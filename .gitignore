@@ -1,0 +1,8 @@
+node_modules/
+.expo/
+dist/
+build/
+.superpowers/
+*.log
+.env
+.env.local
