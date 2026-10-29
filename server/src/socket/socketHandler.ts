@@ -40,7 +40,19 @@ export function setupSocketHandlers(
       socketMeta.set(socket.id, { playerId, roomCode });
       socket.join(roomCode);
 
-      const existingRoom = roomManager.getRoom(roomCode);
+      let existingRoom = roomManager.getRoom(roomCode);
+      if (!existingRoom) {
+        // Room does not exist yet; auto-create with requester as host
+        existingRoom = roomManager.createRoom({
+          code: roomCode,
+          hostId: playerId,
+          hostName: displayName,
+          avatarUrl,
+        });
+        io.to(roomCode).emit(SOCKET_EVENTS.ROOM_STATE_SYNC, existingRoom);
+        return;
+      }
+
       if (existingRoom && existingRoom.players[playerId]) {
         // Reconnecting existing player
         const recovery = roomManager.reconnectPlayer(roomCode, playerId);

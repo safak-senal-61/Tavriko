@@ -15,6 +15,7 @@ import {
 import { GameStateMachine } from './GameStateMachine';
 
 export interface CreateRoomOptions {
+  code?: string;
   hostId: string;
   hostName: string;
   avatarUrl?: string;
@@ -80,8 +81,8 @@ export class GameRoomManager {
   }
 
   public createRoom(options: CreateRoomOptions): GameRoom {
-    let code = this.generateCode();
-    while (this.rooms.has(code)) {
+    let code = options.code ? options.code.toUpperCase() : this.generateCode();
+    while (!options.code && this.rooms.has(code)) {
       code = this.generateCode();
     }
 
