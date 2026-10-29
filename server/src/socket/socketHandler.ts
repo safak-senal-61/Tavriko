@@ -1,0 +1,154 @@
+import { Server as SocketIOServer, Socket } from 'socket.io';
+import { SOCKET_EVENTS, ClientQuestion, RoundResult, FinalMatchSummary, GameRoom } from '@trivia/shared';
+import { GameRoomManager } from '../engine/GameRoomManager';
+import { Matchmaker } from '../engine/Matchmaker';
+
+export function setupSocketHandlers(
+  io: SocketIOServer,
+  roomManager: GameRoomManager,
+  matchmaker: Matchmaker
+) {
+  // Wire up room manager callbacks to broadcast to rooms
+  roomManager.onRoundStart = (roomCode: string, question: ClientQuestion) => {
+    io.to(roomCode).emit(SOCKET_EVENTS.QUESTION_START, question);
+  };
+
+  roomManager.onRoundEnd = (roomCode: string, result: RoundResult) => {
+    io.to(roomCode).emit(SOCKET_EVENTS.ROUND_RESULT, result);
+  };
+
+  roomManager.onGameOver = (roomCode: string, summary: FinalMatchSummary) => {
+    io.to(roomCode).emit(SOCKET_EVENTS.GAME_OVER, summary);
+  };
+
+  roomManager.onStateSync = (roomCode: string, room: GameRoom) => {
+    io.to(roomCode).emit(SOCKET_EVENTS.ROOM_STATE_SYNC, room);
+  };
+
+  matchmaker.onMatchFound = (roomCode: string, players) => {
+    players.forEach((p) => {
+      io.to(p.socketId).emit(SOCKET_EVENTS.MATCH_FOUND, { roomCode });
+    });
+  };
+
+  // Socket connection map: socketId -> { playerId, roomCode }
+  const socketMeta: Map<string, { playerId: string; roomCode?: string }> = new Map();
+
+  io.on('connection', (socket: Socket) => {
+    socket.on(SOCKET_EVENTS.JOIN_ROOM, (data: { roomCode: string; playerId: string; displayName: string; avatarUrl?: string }) => {
+      const { roomCode, playerId, displayName, avatarUrl } = data;
+      socketMeta.set(socket.id, { playerId, roomCode });
+      socket.join(roomCode);
+
+      const existingRoom = roomManager.getRoom(roomCode);
+      if (existingRoom && existingRoom.players[playerId]) {
+        // Reconnecting existing player
+        const recovery = roomManager.reconnectPlayer(roomCode, playerId);
+        io.to(roomCode).emit(SOCKET_EVENTS.PLAYER_RECONNECTED, { playerId, displayName });
+        io.to(roomCode).emit(SOCKET_EVENTS.ROOM_STATE_SYNC, existingRoom);
+        if (recovery.currentQuestion) {
+          socket.emit(SOCKET_EVENTS.QUESTION_START, recovery.currentQuestion);
+        }
+      } else {
+        const joinResult = roomManager.joinRoom(roomCode, {
+          playerId,
+          displayName,
+          avatarUrl,
+        });
+
+        if (joinResult.success && joinResult.room) {
+          io.to(roomCode).emit(SOCKET_EVENTS.ROOM_STATE_SYNC, joinResult.room);
+        } else {
+          socket.emit(SOCKET_EVENTS.ERROR, { message: joinResult.error || 'Odaya katılınamadı' });
+        }
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.TOGGLE_READY, (data: { roomCode: string; playerId: string }) => {
+      const success = roomManager.toggleReady(data.roomCode, data.playerId);
+      if (success) {
+        const room = roomManager.getRoom(data.roomCode);
+        if (room) {
+          io.to(data.roomCode).emit(SOCKET_EVENTS.ROOM_STATE_SYNC, room);
+        }
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.START_GAME, (data: { roomCode: string; playerId: string }) => {
+      const started = roomManager.startGame(data.roomCode, data.playerId);
+      if (started) {
+        const room = roomManager.getRoom(data.roomCode);
+        if (room) {
+          io.to(data.roomCode).emit(SOCKET_EVENTS.ROOM_STATE_SYNC, room);
+        }
+      } else {
+        socket.emit(SOCKET_EVENTS.ERROR, { message: 'Oyun başlatılamadı' });
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.SUBMIT_ANSWER, (data: {
+      roomCode: string;
+      playerId: string;
+      selectedOptionId: string;
+      clientTimestamp?: number;
+    }) => {
+      const result = roomManager.submitAnswer(
+        data.roomCode,
+        data.playerId,
+        data.selectedOptionId,
+        data.clientTimestamp || Date.now()
+      );
+
+      if (result.accepted) {
+        io.to(data.roomCode).emit(SOCKET_EVENTS.PLAYER_ANSWERED, {
+          playerId: data.playerId,
+          streak: result.streak,
+        });
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.FIND_MATCH, (data: {
+      playerId: string;
+      displayName: string;
+      avatarUrl?: string;
+      mode?: any;
+      category?: any;
+      difficulty?: any;
+    }) => {
+      matchmaker.enqueue({
+        socketId: socket.id,
+        playerId: data.playerId,
+        displayName: data.displayName,
+        avatarUrl: data.avatarUrl,
+        mode: data.mode || 'quick_match',
+        category: data.category || 'mixed',
+        difficulty: data.difficulty || 'medium',
+        queuedAt: Date.now(),
+      });
+    });
+
+    socket.on(SOCKET_EVENTS.CANCEL_MATCH, (data: { playerId: string }) => {
+      matchmaker.dequeue(data.playerId);
+    });
+
+    socket.on(SOCKET_EVENTS.SEND_EMOTE, (data: { roomCode: string; playerId: string; emote: string }) => {
+      io.to(data.roomCode).emit(SOCKET_EVENTS.EMOTE_RECEIVED, data);
+    });
+
+    socket.on('disconnect', () => {
+      const meta = socketMeta.get(socket.id);
+      if (meta) {
+        matchmaker.dequeue(meta.playerId);
+        if (meta.roomCode) {
+          roomManager.handlePlayerDisconnect(meta.roomCode, meta.playerId);
+          const room = roomManager.getRoom(meta.roomCode);
+          if (room) {
+            io.to(meta.roomCode).emit(SOCKET_EVENTS.PLAYER_DISCONNECTED, { playerId: meta.playerId });
+            io.to(meta.roomCode).emit(SOCKET_EVENTS.ROOM_STATE_SYNC, room);
+          }
+        }
+        socketMeta.delete(socket.id);
+      }
+    });
+  });
+}
