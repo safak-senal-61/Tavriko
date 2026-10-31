@@ -35,7 +35,7 @@
     ],
     "friendIds": [],
     "createdAt": "2026-10-30T22:46:43.003Z",
-    "updatedAt": "2026-10-31T18:06:53.434Z"
+    "updatedAt": "2026-10-31T21:36:34.022Z"
   },
   {
     "id": "google_nus41m7",
@@ -73,7 +73,7 @@
     ],
     "friendIds": [],
     "createdAt": "2026-10-30T22:46:43.003Z",
-    "updatedAt": "2026-10-31T18:06:00.125Z"
+    "updatedAt": "2026-10-31T21:36:35.293Z"
   },
   {
     "id": "google_xnht5bx",
@@ -111,7 +111,7 @@
     ],
     "friendIds": [],
     "createdAt": "2026-10-30T22:46:43.003Z",
-    "updatedAt": "2026-10-31T18:06:01.175Z"
+    "updatedAt": "2026-10-31T21:36:36.335Z"
   },
   {
     "id": "bot_1",
@@ -149,7 +149,7 @@
     ],
     "friendIds": [],
     "createdAt": "2026-10-30T22:46:43.004Z",
-    "updatedAt": "2026-10-31T18:06:02.396Z"
+    "updatedAt": "2026-10-31T21:36:37.659Z"
   },
   {
     "id": "bot_2",
@@ -187,7 +187,7 @@
     ],
     "friendIds": [],
     "createdAt": "2026-10-30T22:46:43.004Z",
-    "updatedAt": "2026-10-31T18:06:03.681Z"
+    "updatedAt": "2026-10-31T21:36:38.771Z"
   },
   {
     "id": "bot_3",
@@ -225,7 +225,7 @@
     ],
     "friendIds": [],
     "createdAt": "2026-10-30T22:46:43.009Z",
-    "updatedAt": "2026-10-31T18:06:04.854Z"
+    "updatedAt": "2026-10-31T21:36:39.852Z"
   },
   {
     "id": "bot_4",
@@ -263,7 +263,7 @@
     ],
     "friendIds": [],
     "createdAt": "2026-10-30T22:46:43.010Z",
-    "updatedAt": "2026-10-31T18:06:06.132Z"
+    "updatedAt": "2026-10-31T21:16:13.416Z"
   },
   {
     "id": "google_lt6irpu",
@@ -415,7 +415,7 @@
     ],
     "friendIds": [],
     "createdAt": "2026-10-30T23:50:40.761Z",
-    "updatedAt": "2026-10-31T18:06:56.789Z"
+    "updatedAt": "2026-10-31T21:16:18.164Z"
   },
   {
     "id": "usr_zyihjfp",
@@ -433,12 +433,12 @@
     "bio": null,
     "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocL7tBXJ15Yi3eLqwPdmsee25IDV27J0L3Q9xt0zALEuAqsIPw=s96-c",
     "friendCode": "TV-JFP7NJ5",
-    "level": 2,
-    "xp": 650,
-    "coins": 550,
-    "gems": 15,
+    "level": 3,
+    "xp": 800,
+    "coins": 750,
+    "gems": 25,
     "dailyStreak": 1,
-    "rankTitle": "Acemi Kaşif",
+    "rankTitle": "Yükselen Yıldız",
     "rankPoints": 1200,
     "profileCompletionPct": 71,
     "totalMatches": 0,
@@ -453,6 +453,6 @@
     ],
     "friendIds": [],
     "createdAt": "2026-10-31T00:56:30.186Z",
-    "updatedAt": "2026-10-31T18:06:58.144Z"
+    "updatedAt": "2026-10-31T21:19:37.868Z"
   }
 ]

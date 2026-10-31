@@ -379,21 +379,31 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       if (accessToken) {
         sendClientLog('INFO', 'Access token alındı, Supabase kullanıcısı sorgulanıyor...');
         // Fetch authentic Google user details from Supabase using the access token
-        const { data: userData, error: userError } = await clientSupabase.auth.getUser(accessToken);
-        if (userError || !userData?.user) {
-          throw new Error(userError?.message || 'Google hesabı doğrulanamadı.');
+        let userEmail = '';
+        let userName = 'Oyuncu';
+        let userAvatar = 'av1';
+        let userFullName = 'Oyuncu';
+
+        try {
+          const { data: userData } = await clientSupabase.auth.getUser(accessToken);
+          if (userData?.user) {
+            const sbUser = userData.user;
+            userEmail = sbUser.email || '';
+            const meta = sbUser.user_metadata || {};
+            userName = meta.full_name || meta.name || userEmail.split('@')[0] || 'Oyuncu';
+            userFullName = meta.full_name || userName;
+            userAvatar = meta.avatar_url || meta.picture || 'av1';
+          }
+        } catch (fetchErr: any) {
+          sendClientLog('WARN', 'getUser istemcide atlandi, sunucuda cozumlenecek', { err: fetchErr.message });
         }
-        const sbUser = userData.user;
-        const userEmail = sbUser.email || '';
-        const meta = sbUser.user_metadata || {};
-        const userName = meta.full_name || meta.name || userEmail.split('@')[0] || 'Oyuncu';
-        const userAvatar = meta.avatar_url || meta.picture || 'av1';
+
         sendClientLog('INFO', 'Kullanıcı bilgileri sunucuya gönderiliyor', { email: userEmail, userName });
         await submitGoogleAuth({
           accessToken,
-          email: userEmail,
+          email: userEmail || undefined,
           displayName: userName,
-          fullName: meta.full_name || userName,
+          fullName: userFullName,
           avatarUrl: userAvatar,
         });
       } else {
@@ -412,13 +422,53 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     }
   };
   useEffect(() => {
+    // 1. Web direct redirect return & message listener
+    let removeWebMessageListener: (() => void) | undefined;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const currentUrl = window.location.href;
+      if (currentUrl.includes('access_token') || currentUrl.includes('code=')) {
+        sendClientLog('INFO', 'Web baslangic URL oturum parametresi algilandi', { currentUrl });
+        handleAuthRedirectUrl(currentUrl);
+        try {
+          window.history.replaceState(null, '', window.location.pathname);
+        } catch {}
+      }
+
+      const onWindowMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'TAVRIKO_GOOGLE_AUTH') {
+          sendClientLog('INFO', 'window.postMessage uzerinden Google yetkisi alindi', event.data);
+          if (event.data.user && event.data.token) {
+            sound.playSound('victory');
+            sound.triggerHaptic('success');
+            setLoading(false);
+            onSuccess(event.data.user, event.data.token);
+          } else if (event.data.payload) {
+            handleAuthRedirectUrl(event.data.payload);
+          }
+        }
+      };
+      window.addEventListener('message', onWindowMessage);
+      removeWebMessageListener = () => window.removeEventListener('message', onWindowMessage);
+    }
+
+    // 2. Mobile initial URL check (cold start)
+    Linking.getInitialURL().then((initUrl) => {
+      if (initUrl && (initUrl.includes('auth-callback') || initUrl.includes('access_token') || initUrl.includes('code='))) {
+        handleAuthRedirectUrl(initUrl);
+      }
+    }).catch(() => {});
+
+    // 3. Mobile deep link event listener (warm resume)
     const sub = Linking.addEventListener('url', (event) => {
-      if (event.url && (event.url.includes('auth-callback') || event.url.includes('access_token'))) {
+      if (event.url && (event.url.includes('auth-callback') || event.url.includes('access_token') || event.url.includes('code='))) {
         handleAuthRedirectUrl(event.url);
       }
     });
     return () => {
       sub.remove();
+      if (removeWebMessageListener) {
+        removeWebMessageListener();
+      }
     };
   }, []);
   // Authentic Google Sign-In: Always displays Google Account Chooser
@@ -537,8 +587,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         sendClientLog('ERROR', 'Supabase OAuth URL hatası', { error });
         throw new Error(error?.message || 'Google yetkilendirme linki oluşturulamadı.');
       }
+      // On web browser: Direct full-page redirect! Zero popups, zero popup blockers!
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        sendClientLog('INFO', 'Web doğrudan Google OAuth sayfasına yönlendiriliyor (Popup engeli bypass edildi)...', { redirectUri });
+        window.location.href = data.url;
+        return;
+      }
       sendClientLog('INFO', 'WebBrowser açılıyor...', { oauthUrl: data.url });
-      // 5. Open authentic Google account selector in system browser sheet
+      // 5. Open authentic Google account selector in system browser sheet (Mobile Native)
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
       sendClientLog('INFO', 'WebBrowser kapandı/döndü', { resultType: result.type });
       if (result.type === 'success' && result.url) {
@@ -676,6 +732,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         <Circle cx="50" cy="620" r="160" fill="#DB2777" opacity="0.15" />
       </Svg>
       <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -1314,7 +1371,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#12052C',
     width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
     alignItems: 'center',
+  },
+  scrollView: {
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   scrollContent: {
     flexGrow: 1,

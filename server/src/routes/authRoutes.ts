@@ -305,6 +305,35 @@ router.get('/google/callback', (req: Request, res: Response): void => {
     const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
     const sessionId = searchParams.get('sessionId') || hashParams.get('sessionId') || searchParams.get('state') || hashParams.get('state');
 
+    function navigateToApp(user, token) {
+      if (window.opener && window.opener !== window) {
+        try {
+          window.opener.postMessage({ type: 'TAVRIKO_GOOGLE_AUTH', user: user, token: token, payload: payload }, '*');
+        } catch (e) {}
+        setTimeout(function() { window.close(); }, 500);
+        return;
+      }
+
+      const activeHost = window.location.hostname || '${currentHost}';
+      const webTarget = '/app#' + payload;
+      const isExpoClient = /Expo/i.test(navigator.userAgent);
+      const btn = document.getElementById('appBtn');
+
+      if (btn) {
+        btn.href = isExpoClient ? 'exp://' + activeHost + ':8081/--/auth-callback?' + payload : webTarget;
+      }
+
+      if (isExpoClient) {
+        try { window.location.href = 'exp://' + activeHost + ':8081/--/auth-callback?' + payload; } catch(e) {}
+        setTimeout(function() {
+          try { window.location.href = 'tavriko://auth-callback?' + payload; } catch(e) {}
+        }, 1000);
+      } else {
+        // Web browser: Redirect straight to Tavriko web application!
+        window.location.href = webTarget;
+      }
+    }
+
     // Automatically complete server session and persist to Supabase PostgreSQL public.users
     if (accessToken) {
       fetch('/api/auth/google/complete-session', {
@@ -316,24 +345,20 @@ router.get('/google/callback', (req: Request, res: Response): void => {
       .then(function(d) {
         if (d && d.user) {
           document.getElementById('msg').innerText = 'Hoş geldin ' + d.user.displayName + '! Tavriko açılıyor...';
+          setTimeout(function() {
+            navigateToApp(d.user, d.token);
+          }, 350);
+        } else {
+          navigateToApp(null, null);
         }
       })
-      .catch(function(e) { console.error('Error completing session:', e); });
+      .catch(function(e) {
+        console.error('Error completing session:', e);
+        navigateToApp(null, null);
+      });
+    } else {
+      navigateToApp(null, null);
     }
-
-    const activeHost = window.location.hostname || '${currentHost}';
-    const expoDeepLink = 'exp://' + activeHost + ':8081/--/auth-callback?' + payload;
-    const customScheme = 'tavriko://auth-callback?' + payload;
-
-    const btn = document.getElementById('appBtn');
-    btn.href = expoDeepLink;
-
-    try {
-      window.location.href = expoDeepLink;
-    } catch(e) {}
-    setTimeout(function() {
-      try { window.location.href = customScheme; } catch(e) {}
-    }, 1000);
   </script>
 </body>
 </html>`);
@@ -376,19 +401,37 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
         // Fallback to provided profile fields
       }
     } else if (accessToken) {
+      // 1. Check if token is a Supabase JWT
       try {
-        const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        if (userRes.ok) {
-          const userInfo: any = await userRes.json();
-          if (userInfo.email) verifiedEmail = userInfo.email;
-          if (userInfo.name) verifiedName = userInfo.name;
-          if (userInfo.picture) verifiedPicture = userInfo.picture;
-          googleSub = userInfo.sub;
+        const client = supabaseService.getClient();
+        if (client) {
+          const { data, error } = await client.auth.getUser(accessToken);
+          if (data?.user) {
+            verifiedEmail = data.user.email || verifiedEmail;
+            const meta = data.user.user_metadata || {};
+            verifiedName = meta.full_name || meta.name || verifiedName || verifiedEmail?.split('@')[0];
+            verifiedPicture = meta.avatar_url || meta.picture || verifiedPicture || 'av1';
+            googleSub = data.user.id;
+          }
         }
-      } catch {
-        // Fallback to provided profile fields
+      } catch {}
+
+      // 2. Fallback to raw Google OAuth userinfo if not verified yet
+      if (!verifiedEmail) {
+        try {
+          const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (userRes.ok) {
+            const userInfo: any = await userRes.json();
+            if (userInfo.email) verifiedEmail = userInfo.email;
+            if (userInfo.name) verifiedName = userInfo.name;
+            if (userInfo.picture) verifiedPicture = userInfo.picture;
+            googleSub = userInfo.sub;
+          }
+        } catch {
+          // Fallback to provided profile fields
+        }
       }
     }
 

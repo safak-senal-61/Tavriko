@@ -95,7 +95,14 @@ export const RootNavigator: React.FC = () => {
   const isDesktop = isWeb && windowWidth > 540;
   const isWide = isWeb && windowWidth >= 1180;
 
-  const [currentScreen, setCurrentScreen] = useState<ScreenName>('splash');
+  const isWebOAuthReturn =
+    isWeb &&
+    typeof window !== 'undefined' &&
+    (window.location.hash.includes('access_token') ||
+      window.location.search.includes('access_token') ||
+      window.location.search.includes('code='));
+
+  const [currentScreen, setCurrentScreen] = useState<ScreenName>(isWebOAuthReturn ? 'auth' : 'splash');
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('general_culture');
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>('medium');
   const [errorMessage, setErrorMessage] = useState<string>('');

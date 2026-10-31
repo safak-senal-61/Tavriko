@@ -7,7 +7,7 @@
     "desc": "1 altın anahtar ile açılır",
     "qty": 2,
     "createdAt": "2026-10-30T20:01:02.331Z",
-    "updatedAt": "2026-10-31T18:05:59.586Z"
+    "updatedAt": "2026-10-31T21:36:34.701Z"
   },
   {
     "id": "google_i7h0qx1::key",
@@ -17,7 +17,7 @@
     "desc": "Sandıkların kilidini açar",
     "qty": 3,
     "createdAt": "2026-10-30T20:01:02.334Z",
-    "updatedAt": "2026-10-31T18:05:59.587Z"
+    "updatedAt": "2026-10-31T21:36:34.702Z"
   },
   {
     "id": "google_i7h0qx1::bolt",
@@ -27,7 +27,7 @@
     "desc": "+%25 hız bonusu verir",
     "qty": 2,
     "createdAt": "2026-10-30T20:01:02.338Z",
-    "updatedAt": "2026-10-31T18:05:59.588Z"
+    "updatedAt": "2026-10-31T21:36:34.703Z"
   },
   {
     "id": "google_i7h0qx1::crown",
@@ -37,7 +37,7 @@
     "desc": "Özel profil çerçevesi",
     "qty": 1,
     "createdAt": "2026-10-30T20:01:02.341Z",
-    "updatedAt": "2026-10-31T18:05:59.588Z"
+    "updatedAt": "2026-10-31T21:36:34.703Z"
   },
   {
     "id": "google_i7h0qx1::heart",
@@ -47,7 +47,7 @@
     "desc": "Yanlış cevapta seriyi korur",
     "qty": 4,
     "createdAt": "2026-10-30T20:01:02.344Z",
-    "updatedAt": "2026-10-31T18:05:59.589Z"
+    "updatedAt": "2026-10-31T21:36:34.704Z"
   },
   {
     "id": "google_i7h0qx1::gift",
@@ -57,7 +57,7 @@
     "desc": "Rastgele altın ödülü içerir",
     "qty": 1,
     "createdAt": "2026-10-30T20:01:02.348Z",
-    "updatedAt": "2026-10-31T18:05:59.590Z"
+    "updatedAt": "2026-10-31T21:36:34.705Z"
   },
   {
     "id": "google_i7h0qx1::gem",
@@ -67,7 +67,7 @@
     "desc": "Açıldığında +10 elmas verir",
     "qty": 2,
     "createdAt": "2026-10-30T20:01:02.351Z",
-    "updatedAt": "2026-10-31T18:05:59.591Z"
+    "updatedAt": "2026-10-31T21:36:34.706Z"
   },
   {
     "id": "google_i7h0qx1::coin",
@@ -77,7 +77,7 @@
     "desc": "Açıldığında +100 altın verir",
     "qty": 3,
     "createdAt": "2026-10-30T20:01:02.354Z",
-    "updatedAt": "2026-10-31T18:05:59.591Z"
+    "updatedAt": "2026-10-31T21:36:34.709Z"
   },
   {
     "id": "google_i7h0qx1::flame",
@@ -87,7 +87,7 @@
     "desc": "Günlük serini 1 gün korur",
     "qty": 2,
     "createdAt": "2026-10-30T20:01:02.357Z",
-    "updatedAt": "2026-10-31T18:05:59.592Z"
+    "updatedAt": "2026-10-31T21:36:34.712Z"
   },
   {
     "id": "google_nus41m7::chest",
@@ -97,7 +97,7 @@
     "desc": "1 altın anahtar ile açılır",
     "qty": 2,
     "createdAt": "2026-10-30T20:05:44.028Z",
-    "updatedAt": "2026-10-31T18:06:00.577Z"
+    "updatedAt": "2026-10-31T21:36:35.757Z"
   },
   {
     "id": "google_nus41m7::key",
@@ -107,7 +107,7 @@
     "desc": "Sandıkların kilidini açar",
     "qty": 3,
     "createdAt": "2026-10-30T20:05:44.059Z",
-    "updatedAt": "2026-10-31T18:06:00.578Z"
+    "updatedAt": "2026-10-31T21:36:35.758Z"
   },
   {
     "id": "google_nus41m7::bolt",
@@ -117,7 +117,7 @@
     "desc": "+%25 hız bonusu verir",
     "qty": 2,
     "createdAt": "2026-10-30T20:05:44.079Z",
-    "updatedAt": "2026-10-31T18:06:00.578Z"
+    "updatedAt": "2026-10-31T21:36:35.758Z"
   },
   {
     "id": "google_nus41m7::crown",
@@ -127,7 +127,7 @@
     "desc": "Özel profil çerçevesi",
     "qty": 1,
     "createdAt": "2026-10-30T20:05:44.100Z",
-    "updatedAt": "2026-10-31T18:06:00.579Z"
+    "updatedAt": "2026-10-31T21:36:35.759Z"
   },
   {
     "id": "google_nus41m7::heart",
@@ -137,7 +137,7 @@
     "desc": "Yanlış cevapta seriyi korur",
     "qty": 4,
     "createdAt": "2026-10-30T20:05:44.118Z",
-    "updatedAt": "2026-10-31T18:06:00.579Z"
+    "updatedAt": "2026-10-31T21:36:35.760Z"
   },
   {
     "id": "google_nus41m7::gift",
@@ -147,7 +147,7 @@
     "desc": "Rastgele altın ödülü içerir",
     "qty": 1,
     "createdAt": "2026-10-30T20:05:44.138Z",
-    "updatedAt": "2026-10-31T18:06:00.581Z"
+    "updatedAt": "2026-10-31T21:36:35.761Z"
   },
   {
     "id": "google_nus41m7::gem",
@@ -157,7 +157,7 @@
     "desc": "Açıldığında +10 elmas verir",
     "qty": 2,
     "createdAt": "2026-10-30T20:05:44.155Z",
-    "updatedAt": "2026-10-31T18:06:00.583Z"
+    "updatedAt": "2026-10-31T21:36:35.761Z"
   },
   {
     "id": "google_nus41m7::coin",
@@ -167,7 +167,7 @@
     "desc": "Açıldığında +100 altın verir",
     "qty": 3,
     "createdAt": "2026-10-30T20:05:44.184Z",
-    "updatedAt": "2026-10-31T18:06:00.584Z"
+    "updatedAt": "2026-10-31T21:36:35.763Z"
   },
   {
     "id": "google_nus41m7::flame",
@@ -177,7 +177,7 @@
     "desc": "Günlük serini 1 gün korur",
     "qty": 2,
     "createdAt": "2026-10-30T20:05:44.233Z",
-    "updatedAt": "2026-10-31T18:06:00.585Z"
+    "updatedAt": "2026-10-31T21:36:35.764Z"
   },
   {
     "id": "google_xnht5bx::chest",
@@ -187,7 +187,7 @@
     "desc": "1 altın anahtar ile açılır",
     "qty": 2,
     "createdAt": "2026-10-30T20:10:52.182Z",
-    "updatedAt": "2026-10-31T18:06:01.627Z"
+    "updatedAt": "2026-10-31T21:36:37.010Z"
   },
   {
     "id": "google_xnht5bx::key",
@@ -197,7 +197,7 @@
     "desc": "Sandıkların kilidini açar",
     "qty": 3,
     "createdAt": "2026-10-30T20:10:52.191Z",
-    "updatedAt": "2026-10-31T18:06:01.628Z"
+    "updatedAt": "2026-10-31T21:36:37.010Z"
   },
   {
     "id": "google_xnht5bx::bolt",
@@ -207,7 +207,7 @@
     "desc": "+%25 hız bonusu verir",
     "qty": 2,
     "createdAt": "2026-10-30T20:10:52.209Z",
-    "updatedAt": "2026-10-31T18:06:01.629Z"
+    "updatedAt": "2026-10-31T21:36:37.011Z"
   },
   {
     "id": "google_xnht5bx::crown",
@@ -217,7 +217,7 @@
     "desc": "Özel profil çerçevesi",
     "qty": 1,
     "createdAt": "2026-10-30T20:10:52.222Z",
-    "updatedAt": "2026-10-31T18:06:01.630Z"
+    "updatedAt": "2026-10-31T21:36:37.011Z"
   },
   {
     "id": "google_xnht5bx::heart",
@@ -227,7 +227,7 @@
     "desc": "Yanlış cevapta seriyi korur",
     "qty": 4,
     "createdAt": "2026-10-30T20:10:52.238Z",
-    "updatedAt": "2026-10-31T18:06:01.630Z"
+    "updatedAt": "2026-10-31T21:36:37.012Z"
   },
   {
     "id": "google_xnht5bx::gift",
@@ -237,7 +237,7 @@
     "desc": "Rastgele altın ödülü içerir",
     "qty": 1,
     "createdAt": "2026-10-30T20:10:52.261Z",
-    "updatedAt": "2026-10-31T18:06:01.631Z"
+    "updatedAt": "2026-10-31T21:36:37.013Z"
   },
   {
     "id": "google_xnht5bx::gem",
@@ -247,7 +247,7 @@
     "desc": "Açıldığında +10 elmas verir",
     "qty": 2,
     "createdAt": "2026-10-30T20:10:52.283Z",
-    "updatedAt": "2026-10-31T18:06:01.632Z"
+    "updatedAt": "2026-10-31T21:36:37.014Z"
   },
   {
     "id": "google_xnht5bx::coin",
@@ -257,7 +257,7 @@
     "desc": "Açıldığında +100 altın verir",
     "qty": 3,
     "createdAt": "2026-10-30T20:10:52.301Z",
-    "updatedAt": "2026-10-31T18:06:01.633Z"
+    "updatedAt": "2026-10-31T21:36:37.014Z"
   },
   {
     "id": "google_xnht5bx::flame",
@@ -267,7 +267,7 @@
     "desc": "Günlük serini 1 gün korur",
     "qty": 2,
     "createdAt": "2026-10-30T20:10:52.328Z",
-    "updatedAt": "2026-10-31T18:06:01.634Z"
+    "updatedAt": "2026-10-31T21:36:37.016Z"
   },
   {
     "id": "bot_1::chest",
@@ -277,7 +277,7 @@
     "desc": "1 altın anahtar ile açılır",
     "qty": 2,
     "createdAt": "2026-10-30T20:29:01.233Z",
-    "updatedAt": "2026-10-31T18:06:02.994Z"
+    "updatedAt": "2026-10-31T21:36:38.145Z"
   },
   {
     "id": "bot_2::chest",
@@ -287,7 +287,7 @@
     "desc": "1 altın anahtar ile açılır",
     "qty": 2,
     "createdAt": "2026-10-30T20:29:01.233Z",
-    "updatedAt": "2026-10-31T18:06:04.137Z"
+    "updatedAt": "2026-10-31T21:36:39.225Z"
   },
   {
     "id": "bot_3::chest",
@@ -297,7 +297,7 @@
     "desc": "1 altın anahtar ile açılır",
     "qty": 2,
     "createdAt": "2026-10-30T20:29:01.234Z",
-    "updatedAt": "2026-10-31T18:06:05.358Z"
+    "updatedAt": "2026-10-31T21:36:40.319Z"
   },
   {
     "id": "bot_4::chest",
@@ -317,7 +317,7 @@
     "desc": "Sandıkların kilidini açar",
     "qty": 3,
     "createdAt": "2026-10-30T20:29:01.236Z",
-    "updatedAt": "2026-10-31T18:06:02.994Z"
+    "updatedAt": "2026-10-31T21:36:38.146Z"
   },
   {
     "id": "bot_2::key",
@@ -327,7 +327,7 @@
     "desc": "Sandıkların kilidini açar",
     "qty": 3,
     "createdAt": "2026-10-30T20:29:01.237Z",
-    "updatedAt": "2026-10-31T18:06:04.138Z"
+    "updatedAt": "2026-10-31T21:36:39.226Z"
   },
   {
     "id": "bot_3::key",
@@ -337,7 +337,7 @@
     "desc": "Sandıkların kilidini açar",
     "qty": 3,
     "createdAt": "2026-10-30T20:29:01.237Z",
-    "updatedAt": "2026-10-31T18:06:05.358Z"
+    "updatedAt": "2026-10-31T21:36:40.320Z"
   },
   {
     "id": "bot_4::key",
@@ -357,7 +357,7 @@
     "desc": "+%25 hız bonusu verir",
     "qty": 2,
     "createdAt": "2026-10-30T20:29:01.240Z",
-    "updatedAt": "2026-10-31T18:06:02.995Z"
+    "updatedAt": "2026-10-31T21:36:38.146Z"
   },
   {
     "id": "bot_2::bolt",
@@ -367,7 +367,7 @@
     "desc": "+%25 hız bonusu verir",
     "qty": 2,
     "createdAt": "2026-10-30T20:29:01.240Z",
-    "updatedAt": "2026-10-31T18:06:04.138Z"
+    "updatedAt": "2026-10-31T21:36:39.227Z"
   },
   {
     "id": "bot_3::bolt",
@@ -377,7 +377,7 @@
     "desc": "+%25 hız bonusu verir",
     "qty": 2,
     "createdAt": "2026-10-30T20:29:01.240Z",
-    "updatedAt": "2026-10-31T18:06:05.359Z"
+    "updatedAt": "2026-10-31T21:36:40.320Z"
   },
   {
     "id": "bot_4::bolt",
@@ -397,7 +397,7 @@
     "desc": "Özel profil çerçevesi",
     "qty": 1,
     "createdAt": "2026-10-30T20:29:01.242Z",
-    "updatedAt": "2026-10-31T18:06:02.995Z"
+    "updatedAt": "2026-10-31T21:36:38.146Z"
   },
   {
     "id": "bot_2::crown",
@@ -407,7 +407,7 @@
     "desc": "Özel profil çerçevesi",
     "qty": 1,
     "createdAt": "2026-10-30T20:29:01.243Z",
-    "updatedAt": "2026-10-31T18:06:04.139Z"
+    "updatedAt": "2026-10-31T21:36:39.227Z"
   },
   {
     "id": "bot_3::crown",
@@ -417,7 +417,7 @@
     "desc": "Özel profil çerçevesi",
     "qty": 1,
     "createdAt": "2026-10-30T20:29:01.243Z",
-    "updatedAt": "2026-10-31T18:06:05.359Z"
+    "updatedAt": "2026-10-31T21:36:40.321Z"
   },
   {
     "id": "bot_4::crown",
@@ -437,7 +437,7 @@
     "desc": "Yanlış cevapta seriyi korur",
     "qty": 4,
     "createdAt": "2026-10-30T20:29:01.245Z",
-    "updatedAt": "2026-10-31T18:06:02.996Z"
+    "updatedAt": "2026-10-31T21:36:38.147Z"
   },
   {
     "id": "bot_2::heart",
@@ -447,7 +447,7 @@
     "desc": "Yanlış cevapta seriyi korur",
     "qty": 4,
     "createdAt": "2026-10-30T20:29:01.246Z",
-    "updatedAt": "2026-10-31T18:06:04.139Z"
+    "updatedAt": "2026-10-31T21:36:39.229Z"
   },
   {
     "id": "bot_3::heart",
@@ -457,7 +457,7 @@
     "desc": "Yanlış cevapta seriyi korur",
     "qty": 4,
     "createdAt": "2026-10-30T20:29:01.247Z",
-    "updatedAt": "2026-10-31T18:06:05.360Z"
+    "updatedAt": "2026-10-31T21:36:40.322Z"
   },
   {
     "id": "bot_4::heart",
@@ -477,7 +477,7 @@
     "desc": "Rastgele altın ödülü içerir",
     "qty": 1,
     "createdAt": "2026-10-30T20:29:01.249Z",
-    "updatedAt": "2026-10-31T18:06:02.997Z"
+    "updatedAt": "2026-10-31T21:36:38.148Z"
   },
   {
     "id": "bot_2::gift",
@@ -487,7 +487,7 @@
     "desc": "Rastgele altın ödülü içerir",
     "qty": 1,
     "createdAt": "2026-10-30T20:29:01.249Z",
-    "updatedAt": "2026-10-31T18:06:04.140Z"
+    "updatedAt": "2026-10-31T21:36:39.229Z"
   },
   {
     "id": "bot_3::gift",
@@ -497,7 +497,7 @@
     "desc": "Rastgele altın ödülü içerir",
     "qty": 1,
     "createdAt": "2026-10-30T20:29:01.250Z",
-    "updatedAt": "2026-10-31T18:06:05.361Z"
+    "updatedAt": "2026-10-31T21:36:40.324Z"
   },
   {
     "id": "bot_4::gift",
@@ -517,7 +517,7 @@
     "desc": "Açıldığında +10 elmas verir",
     "qty": 2,
     "createdAt": "2026-10-30T20:29:01.253Z",
-    "updatedAt": "2026-10-31T18:06:02.998Z"
+    "updatedAt": "2026-10-31T21:36:38.149Z"
   },
   {
     "id": "bot_2::gem",
@@ -527,7 +527,7 @@
     "desc": "Açıldığında +10 elmas verir",
     "qty": 2,
     "createdAt": "2026-10-30T20:29:01.253Z",
-    "updatedAt": "2026-10-31T18:06:04.141Z"
+    "updatedAt": "2026-10-31T21:36:39.231Z"
   },
   {
     "id": "bot_3::gem",
@@ -537,7 +537,7 @@
     "desc": "Açıldığında +10 elmas verir",
     "qty": 2,
     "createdAt": "2026-10-30T20:29:01.254Z",
-    "updatedAt": "2026-10-31T18:06:05.362Z"
+    "updatedAt": "2026-10-31T21:36:40.325Z"
   },
   {
     "id": "bot_4::gem",
@@ -557,7 +557,7 @@
     "desc": "Açıldığında +100 altın verir",
     "qty": 3,
     "createdAt": "2026-10-30T20:29:01.256Z",
-    "updatedAt": "2026-10-31T18:06:02.999Z"
+    "updatedAt": "2026-10-31T21:36:38.150Z"
   },
   {
     "id": "bot_2::coin",
@@ -567,7 +567,7 @@
     "desc": "Açıldığında +100 altın verir",
     "qty": 3,
     "createdAt": "2026-10-30T20:29:01.257Z",
-    "updatedAt": "2026-10-31T18:06:04.142Z"
+    "updatedAt": "2026-10-31T21:36:39.232Z"
   },
   {
     "id": "bot_3::coin",
@@ -577,7 +577,7 @@
     "desc": "Açıldığında +100 altın verir",
     "qty": 3,
     "createdAt": "2026-10-30T20:29:01.257Z",
-    "updatedAt": "2026-10-31T18:06:05.363Z"
+    "updatedAt": "2026-10-31T21:36:40.326Z"
   },
   {
     "id": "bot_4::coin",
@@ -597,7 +597,7 @@
     "desc": "Günlük serini 1 gün korur",
     "qty": 2,
     "createdAt": "2026-10-30T20:29:01.261Z",
-    "updatedAt": "2026-10-31T18:06:03.000Z"
+    "updatedAt": "2026-10-31T21:36:38.151Z"
   },
   {
     "id": "bot_2::flame",
@@ -607,7 +607,7 @@
     "desc": "Günlük serini 1 gün korur",
     "qty": 2,
     "createdAt": "2026-10-30T20:29:01.262Z",
-    "updatedAt": "2026-10-31T18:06:04.143Z"
+    "updatedAt": "2026-10-31T21:36:39.233Z"
   },
   {
     "id": "bot_3::flame",
@@ -617,7 +617,7 @@
     "desc": "Günlük serini 1 gün korur",
     "qty": 2,
     "createdAt": "2026-10-30T20:29:01.263Z",
-    "updatedAt": "2026-10-31T18:06:05.364Z"
+    "updatedAt": "2026-10-31T21:36:40.327Z"
   },
   {
     "id": "bot_4::flame",
