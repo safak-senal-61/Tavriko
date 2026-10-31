@@ -1,26 +1,22 @@
 import { THEME, getCategoryTheme } from './tokens';
 import { useGameStore } from '../store/gameStore';
-
 describe('Theme and GameStore', () => {
   it('contains expected dark gaming palette tokens', () => {
-    expect(THEME.colors.background).toBe('#0D0F17');
-    expect(THEME.colors.card).toBe('#181C2A');
-    expect(THEME.colors.primary).toBe('#6366F1');
-    expect(THEME.colors.correct).toBe('#10B981');
-    expect(THEME.colors.wrong).toBe('#EF4444');
+    expect(THEME.colors.background).toBe('#180B34');
+    expect(THEME.colors.card).toBe('rgba(255, 255, 255, 0.09)');
+    expect(THEME.colors.primary).toBe('#6B3CFF');
+    expect(THEME.colors.correct).toBe('#3FD08A');
+    expect(THEME.colors.wrong).toBe('#FF5A6A');
   });
-
   it('retrieves custom category colors', () => {
     const geo = getCategoryTheme('geography');
-    expect(geo.primary).toBe('#3B82F6');
+    expect(geo.primary).toBe('#4A9BFF');
     const math = getCategoryTheme('mathematics');
-    expect(math.primary).toBe('#10B981');
+    expect(math.primary).toBe('#FF7A8A');
   });
-
   it('updates store state when user logs in and resets on logout', () => {
     const store = useGameStore.getState();
     expect(store.user).toBeNull();
-
     store.setUser({
       id: 'u1',
       username: 'gamer1',
@@ -40,9 +36,7 @@ describe('Theme and GameStore', () => {
       },
       categoryMastery: {},
     });
-
     expect(useGameStore.getState().user?.displayName).toBe('Gamer 1');
-
     store.resetGame();
     expect(useGameStore.getState().currentQuestion).toBeNull();
   });

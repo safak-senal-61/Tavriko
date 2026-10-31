@@ -1,219 +1,381 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { CategoryId, DifficultyLevel, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
-import { CategoryId, DifficultyLevel } from '@trivia/shared';
-import { Radar, X, Users, Sparkles } from 'lucide-react-native';
-
+import {
+  TavrikoScreen,
+  Button3D,
+  CharacterAvatar,
+} from '../components/TavrikoIcons';
 interface MatchmakingRadarScreenProps {
   category: CategoryId;
   difficulty: DifficultyLevel;
+  avatarSeed?: string;
   onCancel: () => void;
-  onMatchFound?: (roomCode: string) => void;
 }
-
 export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
   category,
-  difficulty,
+  avatarSeed,
   onCancel,
 }) => {
-  const [pulseAnim] = useState(new Animated.Value(0.4));
-  const [elapsedSec, setElapsedSec] = useState(0);
-
+  const [elapsedSec, setElapsedSec] = useState(1);
+  const catObj = ALL_CATEGORIES.find((c) => c.id === category);
+  // Continuous 360-degree radar sweep rotation
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+  // Expanding pulse sonar ring
+  const sonarPulse = useRef(new Animated.Value(0)).current;
+  // Center player avatar heartbeat pulse
+  const centerScale = useRef(new Animated.Value(1)).current;
+  // Blip pop-in animations
+  const blip1Scale = useRef(new Animated.Value(0)).current;
+  const blip2Scale = useRef(new Animated.Value(0)).current;
+  const blip3Scale = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    const pulseLoop = Animated.loop(
+    // Play initial radar sonar ping
+    sound.playSound('radar_ping');
+    // Continuous 360° sweep
+    const sweepLoop = Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 2400,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    sweepLoop.start();
+    // Expanding sonar wave
+    const sonarLoop = Animated.loop(
+      Animated.timing(sonarPulse, {
+        toValue: 1,
+        duration: 2000,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      })
+    );
+    sonarLoop.start();
+    // Center avatar subtle pulse
+    const avatarLoop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.2,
-          duration: 1200,
+        Animated.timing(centerScale, {
+          toValue: 1.09,
+          duration: 850,
+          easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
-        Animated.timing(pulseAnim, {
-          toValue: 0.4,
-          duration: 1200,
+        Animated.timing(centerScale, {
+          toValue: 1,
+          duration: 850,
+          easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
       ])
     );
-    pulseLoop.start();
-
+    avatarLoop.start();
+    // Staggered blip detection pop-ins
+    const tBlip1 = setTimeout(() => {
+      Animated.spring(blip1Scale, {
+        toValue: 1,
+        friction: 5,
+        tension: 90,
+        useNativeDriver: true,
+      }).start();
+    }, 600);
+    const tBlip2 = setTimeout(() => {
+      Animated.spring(blip2Scale, {
+        toValue: 1,
+        friction: 5,
+        tension: 90,
+        useNativeDriver: true,
+      }).start();
+    }, 1500);
+    const tBlip3 = setTimeout(() => {
+      Animated.spring(blip3Scale, {
+        toValue: 1,
+        friction: 5,
+        tension: 90,
+        useNativeDriver: true,
+      }).start();
+    }, 2600);
     const timer = setInterval(() => {
-      setElapsedSec((prev) => prev + 1);
+      setElapsedSec((prev) => {
+        const next = prev + 1;
+        if (next % 2 === 0) {
+          sound.playSound('radar_ping');
+        }
+        return next;
+      });
     }, 1000);
-
     return () => {
-      pulseLoop.stop();
+      sweepLoop.stop();
+      sonarLoop.stop();
+      avatarLoop.stop();
+      clearTimeout(tBlip1);
+      clearTimeout(tBlip2);
+      clearTimeout(tBlip3);
       clearInterval(timer);
     };
-  }, [pulseAnim]);
-
+  }, [rotateAnim, sonarPulse, centerScale, blip1Scale, blip2Scale, blip3Scale]);
+  const spinInterpolation = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+  const sonarScale = sonarPulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.22, 1.05],
+  });
+  const sonarOpacity = sonarPulse.interpolate({
+    inputRange: [0, 0.7, 1],
+    outputRange: [0.65, 0.25, 0],
+  });
+  const formatTimer = (sec: number) => {
+    const m = Math.floor(sec / 60)
+      .toString()
+      .padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.categoryBadge}>{category.toUpperCase()}</Text>
-        <Text style={styles.statusTitle}>Rakip Aranıyor...</Text>
-        <Text style={styles.statusSubtitle}>Benzer beceri puanındaki oyuncular taranıyor</Text>
-      </View>
-
+    <TavrikoScreen>
+      <Text style={styles.title}>RAKİP ARANIYOR</Text>
+      <Text style={styles.subtitle}>
+        Hızlı eşleşme · {catObj?.name || 'Genel Kültür'}
+      </Text>
+      {/* Circular Animated Radar */}
       <View style={styles.radarContainer}>
+        {/* Expanding Sonar Wave Ring */}
         <Animated.View
           style={[
-            styles.radarWaveOuter,
+            styles.sonarWaveRing,
             {
-              transform: [{ scale: pulseAnim }],
-              opacity: pulseAnim.interpolate({
-                inputRange: [0.4, 1.2],
-                outputRange: [0.8, 0],
-              }),
+              opacity: sonarOpacity,
+              transform: [{ scale: sonarScale }],
             },
           ]}
         />
+        {/* Rotating Radar Sweep Container */}
         <Animated.View
           style={[
-            styles.radarWaveMiddle,
-            {
-              transform: [{ scale: pulseAnim }],
-            },
+            styles.rotatingSweepWrap,
+            { transform: [{ rotate: spinInterpolation }] },
           ]}
-        />
-        <View style={styles.radarCenter}>
-          <Radar size={44} color="#FFF" />
-        </View>
-      </View>
-
-      <View style={styles.timerBox}>
-        <Text style={styles.timerLabel}>Geçen Süre</Text>
-        <Text style={styles.timerValue}>
-          00:{elapsedSec < 10 ? `0${elapsedSec}` : elapsedSec}
-        </Text>
-      </View>
-
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={() => {
-            sound.playSound('tap');
-            onCancel();
-          }}
+          pointerEvents="none"
         >
-          <X size={18} color="#FFF" />
-          <Text style={styles.cancelText}>Aramayı İptal Et</Text>
-        </TouchableOpacity>
+          <View style={styles.radarGlowSector} />
+          <View style={styles.radarBeamLine} />
+        </Animated.View>
+        {/* 4 Concentric Rings */}
+        <View
+          style={[
+            styles.ring,
+            {
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              borderColor: 'rgba(255,255,255,0.22)',
+            },
+          ]}
+        />
+        <View
+          style={[
+            styles.ring,
+            {
+              top: 38,
+              left: 38,
+              right: 38,
+              bottom: 38,
+              borderColor: 'rgba(255,255,255,0.18)',
+            },
+          ]}
+        />
+        <View
+          style={[
+            styles.ring,
+            {
+              top: 76,
+              left: 76,
+              right: 76,
+              bottom: 76,
+              borderColor: 'rgba(255,255,255,0.14)',
+            },
+          ]}
+        />
+        <View
+          style={[
+            styles.ring,
+            {
+              top: 114,
+              left: 114,
+              right: 114,
+              bottom: 114,
+              borderColor: 'rgba(255,255,255,0.10)',
+            },
+          ]}
+        />
+        {/* Center Player Avatar with Pulse */}
+        <Animated.View
+          style={[
+            styles.centerAvatarWrap,
+            { transform: [{ scale: centerScale }] },
+          ]}
+        >
+          <CharacterAvatar seed={avatarSeed} index={1} size={58} />
+        </Animated.View>
+        {/* Detected Radar Blips (Animated Pop-In) */}
+        <Animated.View
+          style={[
+            styles.blipTopLeft,
+            { transform: [{ scale: blip1Scale }] },
+          ]}
+        >
+          <CharacterAvatar index={0} size={36} />
+        </Animated.View>
+        <Animated.View
+          style={[
+            styles.blipBottomRight,
+            { transform: [{ scale: blip2Scale }] },
+          ]}
+        >
+          <CharacterAvatar index={5} size={36} />
+        </Animated.View>
+        <Animated.View
+          style={[
+            styles.blipTopRight,
+            { transform: [{ scale: blip3Scale }] },
+          ]}
+        >
+          <CharacterAvatar index={3} size={32} />
+        </Animated.View>
       </View>
-    </View>
+      <Text style={styles.timerText}>{formatTimer(elapsedSec)}</Text>
+      <Text style={styles.playersFoundText}>
+        {elapsedSec < 2
+          ? 'Aday rakipler taranıyor...'
+          : elapsedSec < 4
+          ? '2 aday oyuncu tespit edildi...'
+          : '3 oyuncu bulundu · Eşleştiriliyor!'}
+      </Text>
+      <View style={{ alignItems: 'center' }}>
+        <Button3D
+          title="İPTAL"
+          variant="red"
+          onPress={onCancel}
+          style={{ width: 200 }}
+        />
+      </View>
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: THEME.spacing.lg,
-  },
-  header: {
-    alignItems: 'center',
-  },
-  categoryBadge: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: THEME.colors.primaryLight,
-    backgroundColor: THEME.colors.card,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: THEME.radius.full,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    marginBottom: 12,
-  },
-  statusTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-    marginBottom: 6,
-  },
-  statusSubtitle: {
-    fontSize: 13,
-    color: THEME.colors.textSecondary,
+  title: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 36,
+    color: '#FFFFFF',
     textAlign: 'center',
+    marginTop: 14,
+    marginBottom: 4,
+  },
+  subtitle: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginBottom: 14,
   },
   radarContainer: {
-    width: 240,
-    height: 240,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 310,
+    height: 310,
+    alignSelf: 'center',
+    marginVertical: 10,
     position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  radarWaveOuter: {
+  sonarWaveRing: {
     position: 'absolute',
-    width: 220,
-    height: 220,
-    borderRadius: 110,
+    width: 310,
+    height: 310,
+    borderRadius: 155,
+    borderWidth: 3,
+    borderColor: '#6FE3C1',
+    backgroundColor: 'rgba(111, 227, 193, 0.08)',
+  },
+  rotatingSweepWrap: {
+    position: 'absolute',
+    width: 310,
+    height: 310,
+    borderRadius: 155,
+  },
+  radarGlowSector: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 155,
+    height: 155,
+    borderTopRightRadius: 155,
+    backgroundColor: 'rgba(111, 227, 193, 0.28)',
+  },
+  radarBeamLine: {
+    position: 'absolute',
+    top: 0,
+    left: 154,
+    width: 3,
+    height: 155,
+    backgroundColor: '#6FE3C1',
+    borderRadius: 2,
+  },
+  ring: {
+    position: 'absolute',
+    borderRadius: 999,
     borderWidth: 2,
-    borderColor: THEME.colors.primaryLight,
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
   },
-  radarWaveMiddle: {
+  centerAvatarWrap: {
+    borderRadius: 34,
+    borderWidth: 3,
+    borderColor: '#FFC43D',
+    overflow: 'hidden',
+  },
+  blipTopLeft: {
     position: 'absolute',
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    borderWidth: 1.5,
-    borderColor: THEME.colors.primary,
+    left: 44,
+    top: 82,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#6FE3C1',
+    overflow: 'hidden',
   },
-  radarCenter: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: THEME.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: THEME.colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.6,
-    shadowRadius: 16,
-    elevation: 8,
+  blipBottomRight: {
+    position: 'absolute',
+    right: 48,
+    top: 186,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#FFC43D',
+    overflow: 'hidden',
   },
-  timerBox: {
-    alignItems: 'center',
-    backgroundColor: THEME.colors.card,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: THEME.radius.lg,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
+  blipTopRight: {
+    position: 'absolute',
+    right: 62,
+    top: 52,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#FF7A8A',
+    overflow: 'hidden',
   },
-  timerLabel: {
-    fontSize: 11,
-    color: THEME.colors.textMuted,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+  timerText: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 44,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 14,
   },
-  timerValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-    marginTop: 2,
-  },
-  footer: {
-    width: '100%',
-  },
-  cancelButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: THEME.colors.cardHover,
-    paddingVertical: 14,
-    borderRadius: THEME.radius.md,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  cancelText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '700',
+  playersFoundText: {
+    color: '#6FE3C1',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 24,
   },
 });

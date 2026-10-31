@@ -1,0 +1,192 @@
+[
+  {
+    "id": "geography",
+    "name": "Coğrafya",
+    "description": "Dünya haritası, ülkeler, başkentler, dağlar ve nehirler",
+    "icon": "Globe2",
+    "color": "#93C5FD",
+    "totalQuestions": 18,
+    "createdAt": "2026-10-30T20:01:01.429Z",
+    "updatedAt": "2026-10-31T18:05:57.123Z"
+  },
+  {
+    "id": "mathematics",
+    "name": "Matematik",
+    "description": "Aritmetik, geometri, cebir, mantık ve formüller",
+    "icon": "Binary",
+    "color": "#6EE7B7",
+    "totalQuestions": 13,
+    "createdAt": "2026-10-30T20:01:01.440Z",
+    "updatedAt": "2026-10-31T18:05:57.180Z"
+  },
+  {
+    "id": "general_culture",
+    "name": "Genel Kültür",
+    "description": "Günlük hayat, genel bilgiler, ilginç gerçekler ve rekorlar",
+    "icon": "Sparkles",
+    "color": "#FDE68A",
+    "totalQuestions": 16,
+    "createdAt": "2026-10-30T20:01:01.448Z",
+    "updatedAt": "2026-10-31T18:05:57.199Z"
+  },
+  {
+    "id": "history",
+    "name": "Tarih",
+    "description": "Medeniyetler, savaşlar, imparatorluklar ve tarihi liderler",
+    "icon": "Landmark",
+    "color": "#C4B5FD",
+    "totalQuestions": 12,
+    "createdAt": "2026-10-30T20:01:01.451Z",
+    "updatedAt": "2026-10-31T18:05:57.199Z"
+  },
+  {
+    "id": "science_tech",
+    "name": "Bilim ve Teknoloji",
+    "description": "Yazılım, yapay zeka, icatlar ve dijital dünya",
+    "icon": "Cpu",
+    "color": "#67E8F9",
+    "totalQuestions": 10,
+    "createdAt": "2026-10-30T20:01:01.463Z",
+    "updatedAt": "2026-10-31T18:05:57.200Z"
+  },
+  {
+    "id": "space_astronomy",
+    "name": "Uzay ve Astronomi",
+    "description": "Gezegenler, galaksiler, kara delikler ve uzay görevleri",
+    "icon": "Rocket",
+    "color": "#A5B4FC",
+    "totalQuestions": 7,
+    "createdAt": "2026-10-30T20:01:01.474Z",
+    "updatedAt": "2026-10-31T18:05:57.200Z"
+  },
+  {
+    "id": "sports",
+    "name": "Spor",
+    "description": "Futbol, basketbol, olimpiyatlar, tenis ve şampiyonlar",
+    "icon": "Trophy",
+    "color": "#FCA5A5",
+    "totalQuestions": 7,
+    "createdAt": "2026-10-30T20:01:01.479Z",
+    "updatedAt": "2026-10-31T18:05:57.202Z"
+  },
+  {
+    "id": "cinema_tv",
+    "name": "Sinema ve Diziler",
+    "description": "Kült filmler, oscar ödülleri, oyuncular ve efsane replikler",
+    "icon": "Film",
+    "color": "#F9A8D4",
+    "totalQuestions": 6,
+    "createdAt": "2026-10-30T20:01:01.482Z",
+    "updatedAt": "2026-10-31T18:05:57.203Z"
+  },
+  {
+    "id": "music",
+    "name": "Müzik",
+    "description": "Müzik türleri, efsane sanatçılar, albümler ve enstrümanlar",
+    "icon": "Music2",
+    "color": "#5EEAD4",
+    "totalQuestions": 6,
+    "createdAt": "2026-10-30T20:01:01.485Z",
+    "updatedAt": "2026-10-31T18:05:57.203Z"
+  },
+  {
+    "id": "literature",
+    "name": "Edebiyat",
+    "description": "Dünya klasikleri, şairler, yazarlar ve edebi akımlar",
+    "icon": "BookOpen",
+    "color": "#FCD34D",
+    "totalQuestions": 6,
+    "createdAt": "2026-10-30T20:01:01.492Z",
+    "updatedAt": "2026-10-31T18:05:57.204Z"
+  },
+  {
+    "id": "biology",
+    "name": "Biyoloji",
+    "description": "Canlılar alemi, anatomi, genetik, ekoloji ve hücre yapısı",
+    "icon": "Dna",
+    "color": "#86EFAC",
+    "totalQuestions": 6,
+    "createdAt": "2026-10-30T20:01:01.496Z",
+    "updatedAt": "2026-10-31T18:05:57.204Z"
+  },
+  {
+    "id": "physics_chemistry",
+    "name": "Fizik ve Kimya",
+    "description": "Atomlar, periyodik tablo, kuantum fiziği ve enerji yasaları",
+    "icon": "Atom",
+    "color": "#D8B4FE",
+    "totalQuestions": 6,
+    "createdAt": "2026-10-30T20:01:01.499Z",
+    "updatedAt": "2026-10-31T18:05:57.205Z"
+  },
+  {
+    "id": "logic_puzzles",
+    "name": "Mantık ve Zeka",
+    "description": "Akıl oyunları, sayı dizileri, örüntüler ve bulmacalar",
+    "icon": "Brain",
+    "color": "#FDA4AF",
+    "totalQuestions": 6,
+    "createdAt": "2026-10-30T20:01:01.504Z",
+    "updatedAt": "2026-10-31T18:05:57.205Z"
+  },
+  {
+    "id": "language_vocab",
+    "name": "Dil ve Kelime",
+    "description": "Etimoloji, deyimler, atasözleri ve sözcük dağarcığı",
+    "icon": "SpellCheck",
+    "color": "#7DD3FC",
+    "totalQuestions": 6,
+    "createdAt": "2026-10-30T20:01:01.532Z",
+    "updatedAt": "2026-10-31T18:05:57.211Z"
+  },
+  {
+    "id": "art_culture",
+    "name": "Sanat ve Kültür",
+    "description": "Rönesans tabloları, heykeltıraşlar, müzeler ve mimari eserler",
+    "icon": "Palette",
+    "color": "#FDBA74",
+    "totalQuestions": 6,
+    "createdAt": "2026-10-30T20:01:01.545Z",
+    "updatedAt": "2026-10-31T18:05:57.218Z"
+  },
+  {
+    "id": "food_gastronomy",
+    "name": "Yemek ve Mutfak",
+    "description": "Türk ve dünya mutfağı, yöresel lezzetler, tatlılar ve gastronomi",
+    "icon": "Utensils",
+    "color": "#FDE68A",
+    "totalQuestions": 16,
+    "createdAt": "2026-10-30T20:01:01.553Z",
+    "updatedAt": "2026-10-31T18:05:57.219Z"
+  },
+  {
+    "id": "animals_wildlife",
+    "name": "Hayvanlar Alemi",
+    "description": "Vahşi yaşam, memeliler, kuşlar, deniz canlıları ve rekorlar",
+    "icon": "PawPrint",
+    "color": "#6EE7B7",
+    "totalQuestions": 13,
+    "createdAt": "2026-10-30T20:01:01.562Z",
+    "updatedAt": "2026-10-31T18:05:57.222Z"
+  },
+  {
+    "id": "nature_ecology",
+    "name": "Doğa ve Ekoloji",
+    "description": "Ormanlar, iklim, bitkiler, ekosistemler ve doğa olayları",
+    "icon": "Trees",
+    "color": "#86EFAC",
+    "totalQuestions": 14,
+    "createdAt": "2026-10-30T20:01:01.566Z",
+    "updatedAt": "2026-10-31T18:05:57.224Z"
+  },
+  {
+    "id": "mixed",
+    "name": "Karma Mod",
+    "description": "Tüm kategorilerden rastgele ve sürpriz sorular",
+    "icon": "Shuffle",
+    "color": "#C084FC",
+    "totalQuestions": 174,
+    "createdAt": "2026-10-30T20:01:01.569Z",
+    "updatedAt": "2026-10-31T18:05:57.225Z"
+  }
+]

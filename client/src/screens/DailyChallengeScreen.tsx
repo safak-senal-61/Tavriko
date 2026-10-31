@@ -1,251 +1,348 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { UserProfile, DailyChallengeConfig, getDailyChallengeConfig } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
-import { sound } from '../services/soundService';
-import { ArrowLeft, Flame, Calendar, Sparkles, CheckCircle2, Play } from 'lucide-react-native';
-
+import {
+  TavrikoScreen,
+  TavrikoTopBar,
+  Button3D,
+  StreakFlameIcon,
+  CheckMarkSvg,
+  GemIcon,
+  ChestIcon,
+  CoinIcon,
+} from '../components/TavrikoIcons';
 interface DailyChallengeScreenProps {
+  user?: UserProfile;
   onBack: () => void;
-  onStartDaily: () => void;
+  onStartDaily: (config: DailyChallengeConfig) => void;
 }
-
 export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({
+  user,
   onBack,
   onStartDaily,
 }) => {
-  const [streakDays] = useState(4);
-
-  const days = [
-    { day: 'Pzt', completed: true },
-    { day: 'Sal', completed: true },
-    { day: 'Çar', completed: true },
-    { day: 'Per', completed: true },
-    { day: 'Cum', completed: false, isToday: true },
-    { day: 'Cmt', completed: false },
-    { day: 'Paz', completed: false },
-  ];
-
+  const streak = Math.max(1, user?.dailyStreak ?? 1);
+  const isCompletedToday = Boolean(user?.dailyChallenge?.completedToday);
+  const cfg = getDailyChallengeConfig(streak);
+  // 7-day tracker
+  // If completed today, days 1..cfg.dayNumber are done!
+  // If not completed today, days 1..(cfg.dayNumber - 1) are done, cfg.dayNumber is active!
+  const currentActiveDay = cfg.dayNumber;
+  const days = [1, 2, 3, 4, 5, 6, 7].map((d) => {
+    const isDone = isCompletedToday ? d <= currentActiveDay : d < currentActiveDay;
+    const isActive = !isCompletedToday && d === currentActiveDay;
+    const isToday = d === currentActiveDay;
+    return {
+      label: `${d}.G`,
+      done: isDone,
+      active: isActive,
+      today: isToday,
+    };
+  });
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            sound.playSound('tap');
-            onBack();
-          }}
-        >
-          <ArrowLeft size={22} color={THEME.colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Günün Meydan Okuması</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Streak Hero Card */}
-        <View style={styles.streakCard}>
-          <View style={styles.flameCircle}>
-            <Flame size={48} color={THEME.colors.streak} />
+    <TavrikoScreen>
+      <TavrikoTopBar
+        leftType="back"
+        onLeftPress={onBack}
+        coins={user?.coins ?? 0}
+        gems={user?.gems ?? 0}
+        avatarSeed={user?.avatarUrl || user?.displayName}
+      />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>GÜNÜN MEYDAN OKUMASI</Text>
+        {/* Dynamic Streak Flame Hero */}
+        <View style={styles.streakHero}>
+          <View style={styles.flameContainer}>
+            <StreakFlameIcon size={76} active={isCompletedToday} />
           </View>
-          <Text style={styles.streakCount}>{streakDays} Günlük Seri!</Text>
-          <Text style={styles.streakDesc}>
-            Her gün 5 özel soruyu tamamlayarak serini koru ve haftalık büyük ödülü kap!
+          <Text style={styles.streakTitle}>
+            {streak} günlük seri {isCompletedToday ? '🔥' : ''}
           </Text>
-
-          {/* Week progress circles */}
-          <View style={styles.weekRow}>
-            {days.map((d, index) => (
-              <View key={index} style={styles.dayCol}>
-                <View
-                  style={[
-                    styles.dayCircle,
-                    d.completed && styles.dayCircleDone,
-                    d.isToday && styles.dayCircleToday,
-                  ]}
-                >
-                  {d.completed ? (
-                    <CheckCircle2 size={16} color="#FFF" />
-                  ) : (
-                    <Text style={[styles.dayNumber, d.isToday && styles.dayTodayText]}>
-                      {index + 1}
-                    </Text>
-                  )}
-                </View>
-                <Text style={styles.dayLabel}>{d.day}</Text>
+          <Text style={styles.streakSub}>
+            {isCompletedToday
+              ? '✓ Bugünkü meydan okuma tamamlandı! Serin korundu.'
+              : `En iyi seri: ${user?.stats?.bestStreak ?? 0} · Seriyi bozma, ödüller büyüyor`}
+          </Text>
+          {isCompletedToday && (
+            <View style={styles.completedBadge}>
+              <Text style={styles.completedBadgeText}>🔥 GÜNLÜK SERİ ATEŞLENDİ</Text>
+            </View>
+          )}
+        </View>
+        {/* 7-Day Circle Tracker with Glowing Today Indicator */}
+        <View style={styles.daysCard}>
+          {days.map((d) => (
+            <View key={d.label} style={styles.dayCol}>
+              <View
+                style={[
+                  styles.dayCircle,
+                  d.done && styles.dayCircleDone,
+                  d.active && styles.dayCircleActive,
+                  d.today && styles.dayCircleTodayRing,
+                ]}
+              >
+                {d.done ? (
+                  <StreakFlameIcon size={22} active={true} />
+                ) : d.active ? (
+                  <StreakFlameIcon size={18} active={false} />
+                ) : null}
               </View>
-            ))}
-          </View>
+              <Text
+                style={[
+                  styles.dayLabel,
+                  d.today && { color: '#FFC43D', fontFamily: THEME.fonts.extraBold },
+                ]}
+              >
+                {d.label}
+              </Text>
+            </View>
+          ))}
         </View>
-
-        {/* Today's Challenge Info */}
-        <View style={styles.infoCard}>
-          <Text style={styles.cardHeader}>Bugünün Görevi</Text>
-          <View style={styles.ruleItem}>
-            <Sparkles size={16} color={THEME.colors.primaryLight} />
-            <Text style={styles.ruleText}>5 Özel Seçilmiş Karma Soru</Text>
+        {/* Mission Card (Changes based on whether today is completed) */}
+        {isCompletedToday ? (
+          <View style={[styles.missionCard, styles.missionCardCompleted]}>
+            <View style={styles.completedStatusPill}>
+              <Text style={styles.completedStatusText}>✓ BUGÜN TAMAMLANDI</Text>
+            </View>
+            <Text style={styles.missionTitle}>Harika İş Çıkardın! 🔥</Text>
+            <Text style={styles.missionDesc}>
+              Bugünkü görev başarıyla tamamlandı. Yarın ({((streak) % 7) + 1}. Gün):{' '}
+              {getDailyChallengeConfig(streak + 1).description} görevi seni bekliyor!
+            </Text>
+            <View style={styles.rewardLine}>
+              <Text style={styles.rewardLabel}>Kazanılan Ödül: </Text>
+              <Text style={styles.rewardVal}>+{cfg.rewardXp} XP</Text>
+              <Text style={styles.rewardSep}> · </Text>
+              <CoinIcon size={15} />
+              <Text style={styles.rewardVal}> +{cfg.rewardCoins}</Text>
+              <Text style={styles.rewardSep}> · </Text>
+              <GemIcon size={15} />
+              <Text style={styles.rewardVal}> +{cfg.rewardGems}</Text>
+            </View>
+            <Button3D
+              title="TEKRAR PRATİK YAP (ÖDÜLSÜZ)"
+              variant="mint"
+              onPress={() => onStartDaily(cfg)}
+              style={{ width: '100%', marginTop: 6 }}
+            />
           </View>
-          <View style={styles.ruleItem}>
-            <Sparkles size={16} color={THEME.colors.gold} />
-            <Text style={styles.ruleText}>2x XP & 100 Altın Bonus Ödül</Text>
+        ) : (
+          <View style={styles.missionCard}>
+            <View style={styles.xpPill}>
+              <Text style={styles.xpPillText}>GÜN {cfg.dayNumber} · 2x XP</Text>
+            </View>
+            <Text style={styles.missionTitle}>{cfg.description}</Text>
+            <View style={styles.rewardLine}>
+              <Text style={styles.rewardLabel}>Ödül: </Text>
+              <Text style={styles.rewardVal}>+{cfg.rewardXp} XP</Text>
+              <Text style={styles.rewardSep}> · </Text>
+              <CoinIcon size={16} />
+              <Text style={styles.rewardVal}> +{cfg.rewardCoins}</Text>
+              <Text style={styles.rewardSep}> · </Text>
+              <GemIcon size={16} />
+              <Text style={styles.rewardVal}> +{cfg.rewardGems}</Text>
+              {cfg.rewardChest && (
+                <>
+                  <Text style={styles.rewardSep}> · </Text>
+                  <ChestIcon size={18} />
+                  <Text style={styles.rewardVal}>
+                    {cfg.rewardChest === 'mega_chest' ? ' Mega Sandık' : ' Sandık'}
+                  </Text>
+                </>
+              )}
+            </View>
+            <Button3D
+              title="MEYDAN OKUMAYA BAŞLA ⚡"
+              variant="mint"
+              onPress={() => onStartDaily(cfg)}
+              style={{ width: '100%' }}
+            />
           </View>
-          <View style={styles.ruleItem}>
-            <Sparkles size={16} color={THEME.colors.accent} />
-            <Text style={styles.ruleText}>Her oyuncu için tek hak (Günde 1 kez)</Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={styles.startButton}
-          onPress={() => {
-            sound.playSound('match_found');
-            sound.triggerHaptic('success');
-            onStartDaily();
-          }}
-        >
-          <Play size={20} color="#FFF" />
-          <Text style={styles.btnText}>Bugünün Görevine Başla</Text>
-        </TouchableOpacity>
+        )}
       </ScrollView>
-    </View>
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
+  scrollContent: {
+    paddingBottom: 36,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: THEME.spacing.lg,
-    paddingTop: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.border,
-    backgroundColor: THEME.colors.card,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-  },
-  content: {
-    padding: THEME.spacing.lg,
-  },
-  streakCard: {
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.xl,
-    padding: THEME.spacing.xl,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    marginBottom: 20,
-  },
-  flameCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  streakCount: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: THEME.colors.streak,
-  },
-  streakDesc: {
-    fontSize: 13,
-    color: THEME.colors.textSecondary,
+  title: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 30,
+    color: '#FFFFFF',
     textAlign: 'center',
-    marginTop: 6,
-    lineHeight: 18,
-    marginBottom: 20,
+    marginTop: 10,
+    marginBottom: 8,
   },
-  weekRow: {
+  streakHero: {
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  flameContainer: {
+    marginVertical: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  streakTitle: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 28,
+    color: '#FFFFFF',
+    marginTop: 6,
+  },
+  streakSub: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  completedBadge: {
+    marginTop: 8,
+    backgroundColor: 'rgba(255, 122, 0, 0.22)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FF7A00',
+  },
+  completedBadgeText: {
+    color: '#FFB300',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 0.8,
+  },
+  daysCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: '100%',
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    marginVertical: 10,
   },
   dayCol: {
     alignItems: 'center',
+    gap: 6,
   },
   dayCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: THEME.colors.backgroundSecondary,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: THEME.colors.border,
-    marginBottom: 4,
   },
   dayCircleDone: {
-    backgroundColor: THEME.colors.streak,
-    borderColor: THEME.colors.streak,
+    backgroundColor: '#FF8800',
+    borderWidth: 2,
+    borderColor: '#FFC43D',
+    shadowColor: '#FF9B2F',
+    shadowOpacity: 0.9,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  dayCircleToday: {
-    borderColor: THEME.colors.gold,
+  dayCircleActive: {
+    borderWidth: 2,
+    borderColor: '#FFC43D',
+    backgroundColor: 'rgba(255, 196, 61, 0.18)',
   },
-  dayNumber: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: THEME.colors.textMuted,
+  dayCircleTodayRing: {
+    shadowColor: '#FFC43D',
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  dayTodayText: {
-    color: THEME.colors.gold,
+  activeDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FFC43D',
   },
   dayLabel: {
+    color: '#D9CDF5',
     fontSize: 11,
-    color: THEME.colors.textMuted,
-    fontWeight: '600',
+    fontFamily: THEME.fonts.bold,
   },
-  infoCard: {
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.lg,
-    padding: THEME.spacing.lg,
+  missionCard: {
+    marginTop: 14,
+    padding: 18,
+    borderRadius: 24,
+    backgroundColor: '#7A3FE0',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 196, 61, 0.35)',
+  },
+  missionCardCompleted: {
+    backgroundColor: '#1E1242',
+    borderColor: 'rgba(90, 219, 181, 0.55)',
+  },
+  xpPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(10, 4, 24, 0.72)',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
-    marginBottom: 24,
+    borderColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
-  cardHeader: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
+  xpPillText: {
+    color: '#FFC43D',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  completedStatusPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(90, 219, 181, 0.2)',
+    borderWidth: 1,
+    borderColor: '#5ADBB5',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 14,
+  },
+  completedStatusText: {
+    color: '#5ADBB5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  missionTitle: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 22,
+    color: '#FFFFFF',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  missionDesc: {
+    color: '#D9CDF5',
+    fontSize: 13,
+    fontFamily: THEME.fonts.bold,
+    lineHeight: 18,
     marginBottom: 12,
   },
-  ruleItem: {
+  rewardLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
+    flexWrap: 'wrap',
+    marginBottom: 16,
+    gap: 4,
   },
-  ruleText: {
+  rewardLabel: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
+  },
+  rewardVal: {
+    color: '#FFC43D',
     fontSize: 13,
-    color: THEME.colors.textSecondary,
+    fontFamily: THEME.fonts.extraBold,
   },
-  startButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: THEME.colors.primary,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 14,
-  },
-  btnText: {
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: '700',
+  rewardSep: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 12,
   },
 });

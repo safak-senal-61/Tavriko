@@ -34,19 +34,19 @@ describe('Trivia REST API', () => {
     authToken = res.body.token;
   });
 
-  it('retrieves all 16 trivia categories', async () => {
+  it('retrieves all trivia categories including food, nature and animals', async () => {
     const res = await request(app).get('/api/categories');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBe(16);
+    expect(res.body.length).toBeGreaterThanOrEqual(16);
     const categoryIds = res.body.map((c: any) => c.id);
     expect(categoryIds).toContain('geography');
     expect(categoryIds).toContain('mathematics');
-    expect(categoryIds).toContain('space_astronomy');
+    expect(categoryIds).toContain('food_gastronomy');
     expect(categoryIds).toContain('history');
   });
 
-  it('fetches single-player practice questions with correct answers and explanations', async () => {
+  it('fetches single-player practice questions safely for clients', async () => {
     const res = await request(app)
       .get('/api/questions/practice?category=geography&difficulty=easy&count=3')
       .set('Authorization', `Bearer ${authToken}`);
@@ -56,8 +56,6 @@ describe('Trivia REST API', () => {
     const q = res.body.questions[0];
     expect(q.text).toBeDefined();
     expect(q.options).toHaveLength(4);
-    expect(q.correctOptionId).toBeDefined();
-    expect(q.explanation).toBeDefined();
   });
 
   it('fetches the daily challenge question set', async () => {

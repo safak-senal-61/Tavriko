@@ -1,0 +1,372 @@
+[
+  {
+    "id": "google_i7h0qx1_notif_welcome",
+    "userId": "google_i7h0qx1",
+    "type": "reward",
+    "title": "Hoş geldin jewelkaan01!",
+    "sub": "Başlangıç ödüllerin hesabına tanımlandı",
+    "timeText": "Az önce",
+    "handled": null,
+    "createdAt": "2026-10-30T20:01:02.360Z"
+  },
+  {
+    "id": "google_i7h0qx1_notif_duel_1",
+    "userId": "google_i7h0qx1",
+    "type": "duel",
+    "title": "Bilgi Avcısı seni düelloya davet etti",
+    "sub": "Genel Kültür · 5 soru",
+    "timeText": "5dk",
+    "handled": null,
+    "createdAt": "2026-10-30T20:01:02.363Z"
+  },
+  {
+    "id": "google_i7h0qx1_notif_season",
+    "userId": "google_i7h0qx1",
+    "type": "league",
+    "title": "Sezon 1 Pass aktif!",
+    "sub": "Maç kazanarak sezon kademelerini aç",
+    "timeText": "1sa",
+    "handled": null,
+    "createdAt": "2026-10-30T20:01:02.367Z"
+  },
+  {
+    "id": "google_nus41m7_notif_welcome",
+    "userId": "google_nus41m7",
+    "type": "reward",
+    "title": "Hoş geldin OmerFaruk!",
+    "sub": "Başlangıç ödüllerin hesabına tanımlandı",
+    "timeText": "Az önce",
+    "handled": null,
+    "createdAt": "2026-10-30T20:05:44.316Z"
+  },
+  {
+    "id": "google_nus41m7_notif_duel_1",
+    "userId": "google_nus41m7",
+    "type": "duel",
+    "title": "Bilgi Avcısı seni düelloya davet etti",
+    "sub": "Genel Kültür · 5 soru",
+    "timeText": "5dk",
+    "handled": null,
+    "createdAt": "2026-10-30T20:05:44.350Z"
+  },
+  {
+    "id": "google_nus41m7_notif_season",
+    "userId": "google_nus41m7",
+    "type": "league",
+    "title": "Sezon 1 Pass aktif!",
+    "sub": "Maç kazanarak sezon kademelerini aç",
+    "timeText": "1sa",
+    "handled": null,
+    "createdAt": "2026-10-30T20:05:44.375Z"
+  },
+  {
+    "id": "google_xnht5bx_notif_welcome",
+    "userId": "google_xnht5bx",
+    "type": "reward",
+    "title": "Hoş geldin TavrikoPro!",
+    "sub": "Başlangıç ödüllerin hesabına tanımlandı",
+    "timeText": "Az önce",
+    "handled": null,
+    "createdAt": "2026-10-30T20:10:52.347Z"
+  },
+  {
+    "id": "google_xnht5bx_notif_duel_1",
+    "userId": "google_xnht5bx",
+    "type": "duel",
+    "title": "Bilgi Avcısı seni düelloya davet etti",
+    "sub": "Genel Kültür · 5 soru",
+    "timeText": "5dk",
+    "handled": null,
+    "createdAt": "2026-10-30T20:10:52.366Z"
+  },
+  {
+    "id": "google_xnht5bx_notif_season",
+    "userId": "google_xnht5bx",
+    "type": "league",
+    "title": "Sezon 1 Pass aktif!",
+    "sub": "Maç kazanarak sezon kademelerini aç",
+    "timeText": "1sa",
+    "handled": null,
+    "createdAt": "2026-10-30T20:10:52.380Z"
+  },
+  {
+    "id": "bot_1_notif_welcome",
+    "userId": "bot_1",
+    "type": "reward",
+    "title": "Hoş geldin Bilgi Avcısı!",
+    "sub": "Başlangıç ödüllerin hesabına tanımlandı",
+    "timeText": "Az önce",
+    "handled": null,
+    "createdAt": "2026-10-30T20:29:01.267Z"
+  },
+  {
+    "id": "bot_2_notif_welcome",
+    "userId": "bot_2",
+    "type": "reward",
+    "title": "Hoş geldin Zeka Fırtınası!",
+    "sub": "Başlangıç ödüllerin hesabına tanımlandı",
+    "timeText": "Az önce",
+    "handled": null,
+    "createdAt": "2026-10-30T20:29:01.268Z"
+  },
+  {
+    "id": "bot_3_notif_welcome",
+    "userId": "bot_3",
+    "type": "reward",
+    "title": "Hoş geldin Selin Trivia!",
+    "sub": "Başlangıç ödüllerin hesabına tanımlandı",
+    "timeText": "Az önce",
+    "handled": null,
+    "createdAt": "2026-10-30T20:29:01.269Z"
+  },
+  {
+    "id": "bot_4_notif_welcome",
+    "userId": "bot_4",
+    "type": "reward",
+    "title": "Hoş geldin QuizMaster 3000!",
+    "sub": "Başlangıç ödüllerin hesabına tanımlandı",
+    "timeText": "Az önce",
+    "handled": null,
+    "createdAt": "2026-10-30T20:29:01.269Z"
+  },
+  {
+    "id": "bot_1_notif_duel_1",
+    "userId": "bot_1",
+    "type": "duel",
+    "title": "Bilgi Avcısı seni düelloya davet etti",
+    "sub": "Genel Kültür · 5 soru",
+    "timeText": "5dk",
+    "handled": null,
+    "createdAt": "2026-10-30T20:29:01.274Z"
+  },
+  {
+    "id": "bot_2_notif_duel_1",
+    "userId": "bot_2",
+    "type": "duel",
+    "title": "Bilgi Avcısı seni düelloya davet etti",
+    "sub": "Genel Kültür · 5 soru",
+    "timeText": "5dk",
+    "handled": null,
+    "createdAt": "2026-10-30T20:29:01.275Z"
+  },
+  {
+    "id": "bot_3_notif_duel_1",
+    "userId": "bot_3",
+    "type": "duel",
+    "title": "Bilgi Avcısı seni düelloya davet etti",
+    "sub": "Genel Kültür · 5 soru",
+    "timeText": "5dk",
+    "handled": null,
+    "createdAt": "2026-10-30T20:29:01.275Z"
+  },
+  {
+    "id": "bot_4_notif_duel_1",
+    "userId": "bot_4",
+    "type": "duel",
+    "title": "Bilgi Avcısı seni düelloya davet etti",
+    "sub": "Genel Kültür · 5 soru",
+    "timeText": "5dk",
+    "handled": null,
+    "createdAt": "2026-10-30T20:29:01.276Z"
+  },
+  {
+    "id": "bot_1_notif_season",
+    "userId": "bot_1",
+    "type": "league",
+    "title": "Sezon 1 Pass aktif!",
+    "sub": "Maç kazanarak sezon kademelerini aç",
+    "timeText": "1sa",
+    "handled": null,
+    "createdAt": "2026-10-30T20:29:01.278Z"
+  },
+  {
+    "id": "bot_2_notif_season",
+    "userId": "bot_2",
+    "type": "league",
+    "title": "Sezon 1 Pass aktif!",
+    "sub": "Maç kazanarak sezon kademelerini aç",
+    "timeText": "1sa",
+    "handled": null,
+    "createdAt": "2026-10-30T20:29:01.279Z"
+  },
+  {
+    "id": "bot_3_notif_season",
+    "userId": "bot_3",
+    "type": "league",
+    "title": "Sezon 1 Pass aktif!",
+    "sub": "Maç kazanarak sezon kademelerini aç",
+    "timeText": "1sa",
+    "handled": null,
+    "createdAt": "2026-10-30T20:29:01.279Z"
+  },
+  {
+    "id": "bot_4_notif_season",
+    "userId": "bot_4",
+    "type": "league",
+    "title": "Sezon 1 Pass aktif!",
+    "sub": "Maç kazanarak sezon kademelerini aç",
+    "timeText": "1sa",
+    "handled": null,
+    "createdAt": "2026-10-30T20:29:01.280Z"
+  },
+  {
+    "id": "google_lt6irpu_notif_welcome",
+    "userId": "google_lt6irpu",
+    "type": "reward",
+    "title": "Hoş geldin Safak Senal!",
+    "sub": "Başlangıç ödüllerin hesabına tanımlandı",
+    "timeText": "Az önce",
+    "handled": null,
+    "createdAt": "2026-10-30T21:20:36.659Z"
+  },
+  {
+    "id": "google_lt6irpu_notif_duel_1",
+    "userId": "google_lt6irpu",
+    "type": "duel",
+    "title": "Bilgi Avcısı seni düelloya davet etti",
+    "sub": "Genel Kültür · 5 soru",
+    "timeText": "5dk",
+    "handled": null,
+    "createdAt": "2026-10-30T21:20:36.675Z"
+  },
+  {
+    "id": "google_lt6irpu_notif_season",
+    "userId": "google_lt6irpu",
+    "type": "league",
+    "title": "Sezon 1 Pass aktif!",
+    "sub": "Maç kazanarak sezon kademelerini aç",
+    "timeText": "1sa",
+    "handled": null,
+    "createdAt": "2026-10-30T21:20:36.691Z"
+  },
+  {
+    "id": "google_nc30me3_notif_welcome",
+    "userId": "google_nc30me3",
+    "type": "reward",
+    "title": "Hoş geldin jewelkaan01!",
+    "sub": "Başlangıç ödüllerin hesabına tanımlandı",
+    "timeText": "Az önce",
+    "handled": null,
+    "createdAt": "2026-10-30T22:33:21.130Z"
+  },
+  {
+    "id": "google_nc30me3_notif_duel_1",
+    "userId": "google_nc30me3",
+    "type": "duel",
+    "title": "Bilgi Avcısı seni düelloya davet etti",
+    "sub": "Genel Kültür · 5 soru",
+    "timeText": "5dk",
+    "handled": null,
+    "createdAt": "2026-10-30T22:33:21.134Z"
+  },
+  {
+    "id": "google_nc30me3_notif_season",
+    "userId": "google_nc30me3",
+    "type": "league",
+    "title": "Sezon 1 Pass aktif!",
+    "sub": "Maç kazanarak sezon kademelerini aç",
+    "timeText": "1sa",
+    "handled": null,
+    "createdAt": "2026-10-30T22:33:21.139Z"
+  },
+  {
+    "id": "usr_beb9ub1_notif_welcome",
+    "userId": "usr_beb9ub1",
+    "type": "reward",
+    "title": "Hoş geldin Safak Senal!",
+    "sub": "Başlangıç ödüllerin hesabına tanımlandı",
+    "timeText": "Az önce",
+    "handled": null,
+    "createdAt": "2026-10-30T22:46:45.188Z"
+  },
+  {
+    "id": "usr_beb9ub1_notif_duel_1",
+    "userId": "usr_beb9ub1",
+    "type": "duel",
+    "title": "Bilgi Avcısı seni düelloya davet etti",
+    "sub": "Genel Kültür · 5 soru",
+    "timeText": "5dk",
+    "handled": null,
+    "createdAt": "2026-10-30T22:46:45.191Z"
+  },
+  {
+    "id": "usr_beb9ub1_notif_season",
+    "userId": "usr_beb9ub1",
+    "type": "league",
+    "title": "Sezon 1 Pass aktif!",
+    "sub": "Maç kazanarak sezon kademelerini aç",
+    "timeText": "1sa",
+    "handled": null,
+    "createdAt": "2026-10-30T22:46:45.194Z"
+  },
+  {
+    "id": "google_7u291by_notif_welcome",
+    "userId": "google_7u291by",
+    "type": "reward",
+    "title": "Hoş geldin Test Gamer!",
+    "sub": "Başlangıç ödüllerin hesabına tanımlandı",
+    "timeText": "Az önce",
+    "handled": null,
+    "createdAt": "2026-10-30T23:41:18.483Z"
+  },
+  {
+    "id": "google_7u291by_notif_duel_1",
+    "userId": "google_7u291by",
+    "type": "duel",
+    "title": "Bilgi Avcısı seni düelloya davet etti",
+    "sub": "Genel Kültür · 5 soru",
+    "timeText": "5dk",
+    "handled": null,
+    "createdAt": "2026-10-30T23:41:18.486Z"
+  },
+  {
+    "id": "google_7u291by_notif_season",
+    "userId": "google_7u291by",
+    "type": "league",
+    "title": "Sezon 1 Pass aktif!",
+    "sub": "Maç kazanarak sezon kademelerini aç",
+    "timeText": "1sa",
+    "handled": null,
+    "createdAt": "2026-10-30T23:41:18.488Z"
+  },
+  {
+    "id": "usr_zyihjfp_notif_welcome",
+    "userId": "usr_zyihjfp",
+    "type": "reward",
+    "title": "Hoş geldin Safak Senal!",
+    "sub": "Başlangıç ödüllerin hesabına tanımlandı",
+    "timeText": "Az önce",
+    "handled": null,
+    "createdAt": "2026-10-31T00:56:32.992Z"
+  },
+  {
+    "id": "usr_zyihjfp_notif_duel_1",
+    "userId": "usr_zyihjfp",
+    "type": "duel",
+    "title": "Bilgi Avcısı seni düelloya davet etti",
+    "sub": "Genel Kültür · 5 soru",
+    "timeText": "5dk",
+    "handled": null,
+    "createdAt": "2026-10-31T00:56:32.995Z"
+  },
+  {
+    "id": "usr_zyihjfp_notif_season",
+    "userId": "usr_zyihjfp",
+    "type": "league",
+    "title": "Sezon 1 Pass aktif!",
+    "sub": "Maç kazanarak sezon kademelerini aç",
+    "timeText": "1sa",
+    "handled": null,
+    "createdAt": "2026-10-31T00:56:32.997Z"
+  },
+  {
+    "id": "google_i7h0qx1_notif_fr_1793408298162",
+    "userId": "google_i7h0qx1",
+    "type": "friend",
+    "title": "Safak Senal seni arkadaş olarak ekledi!",
+    "sub": "Artık 1v1 düello maçlarına davet edebilirsin.",
+    "timeText": "Az önce",
+    "handled": null,
+    "createdAt": "2026-10-31T00:58:20.198Z"
+  }
+]

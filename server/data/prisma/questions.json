@@ -1,0 +1,6514 @@
+[
+  {
+    "id": "geo_1",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Türkiye'nin başkenti hangi şehirdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "İstanbul"
+      },
+      {
+        "id": "opt_b",
+        "text": "Ankara"
+      },
+      {
+        "id": "opt_c",
+        "text": "İzmir"
+      },
+      {
+        "id": "opt_d",
+        "text": "Bursa"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Ankara, 13 Ekim 1923 tarihinde Türkiye Cumhuriyeti'nin başkenti kabul edilmiştir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "4eef16d5b64e164a4cf9a160c60258927694b6575ab3a4c618387e6d76808309",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.573Z",
+    "updatedAt": "2026-10-31T18:05:57.227Z"
+  },
+  {
+    "id": "geo_2",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Dünyanın yüzölçümü bakımından en büyük ülkesi hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Kanada"
+      },
+      {
+        "id": "opt_b",
+        "text": "Çin"
+      },
+      {
+        "id": "opt_c",
+        "text": "Rusya"
+      },
+      {
+        "id": "opt_d",
+        "text": "Amerika Birleşik Devletleri"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Rusya, 17 milyon kilometrekareyi aşan yüzölçümüyle dünyanın en geniş ülkesidir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "a50ddc900fa767bdc35c7c9097a2a457f1a9a68722f9d57d35e14931546b8e22",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.581Z",
+    "updatedAt": "2026-10-31T18:05:57.230Z"
+  },
+  {
+    "id": "geo_3",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Afrika kıtasının en yüksek noktası olan Kilimanjaro Dağı hangi ülkededir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Kenya"
+      },
+      {
+        "id": "opt_b",
+        "text": "Tanzanya"
+      },
+      {
+        "id": "opt_c",
+        "text": "Uganda"
+      },
+      {
+        "id": "opt_d",
+        "text": "Etiyopya"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Kilimanjaro Dağı 5.895 metre yüksekliği ile Tanzanya sınırları içindedir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "ff119897c2d1b568cb836152a278d4bf712ba379a7ac53aae6fb6ac984c907c3",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.585Z",
+    "updatedAt": "2026-10-31T18:05:57.232Z"
+  },
+  {
+    "id": "geo_4",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Denize kıyısı olmayan ve tamamen başka tek bir ülke ile çevrili olan (anklav) devlet hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Lesotho"
+      },
+      {
+        "id": "opt_b",
+        "text": "Andorra"
+      },
+      {
+        "id": "opt_c",
+        "text": "Lihtenştayn"
+      },
+      {
+        "id": "opt_d",
+        "text": "Monako"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Lesotho tamamen Güney Afrika Cumhuriyeti ile çevrili bir anklav devlettir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "1d2756ee4913b59a1a8a4afde89c36e889a9083ca9416acb32a0ebffd7bbd5f3",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.589Z",
+    "updatedAt": "2026-10-31T18:05:57.234Z"
+  },
+  {
+    "id": "geo_5",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Dünyanın en derin gölü olan Baykal Gölü hangi tektonik yarık vadisinde yer alır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Doğu Afrika Yarığı"
+      },
+      {
+        "id": "opt_b",
+        "text": "Baykal Rift Bölgesi"
+      },
+      {
+        "id": "opt_c",
+        "text": "San Andreas Fayı"
+      },
+      {
+        "id": "opt_d",
+        "text": "Ren Graben"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Baykal Rift Bölgesi dünyanın en derin ve en eski gölünü barındıran kıtasal yarık havzasıdır.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "e85b8bda0eb8ef77b986b79d95dd77bb58a6b916d9ea141ffbb87ce6d9de860c",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.595Z",
+    "updatedAt": "2026-10-31T18:05:57.236Z"
+  },
+  {
+    "id": "math_1",
+    "categoryId": "mathematics",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "12 x 8 işleminin sonucu kaçtır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "86"
+      },
+      {
+        "id": "opt_b",
+        "text": "96"
+      },
+      {
+        "id": "opt_c",
+        "text": "104"
+      },
+      {
+        "id": "opt_d",
+        "text": "92"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "12 ile 8 çarpıldığında sonuç 96 olur.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "b93292efff99f0fef2f051930ea5da4f9a5612eb59218fb0cfd7a951f9d48289",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.600Z",
+    "updatedAt": "2026-10-31T18:05:57.237Z"
+  },
+  {
+    "id": "math_2",
+    "categoryId": "mathematics",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Bir üçgenin iç açılarının ölçüleri toplamı kaç derecedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "90°"
+      },
+      {
+        "id": "opt_b",
+        "text": "180°"
+      },
+      {
+        "id": "opt_c",
+        "text": "270°"
+      },
+      {
+        "id": "opt_d",
+        "text": "360°"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Öklid geometrisinde herhangi bir üçgenin iç açıları toplamı her zaman 180 derecedir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "5b485fbd2a8dc4136671bced33de0793eb7cfc0d0ed9560171dc9f7e9f405044",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.604Z",
+    "updatedAt": "2026-10-31T18:05:57.238Z"
+  },
+  {
+    "id": "math_3",
+    "categoryId": "mathematics",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Fibonacci dizisinde 1, 1, 2, 3, 5, 8, ... şeklinde devam eden serideki 8. sayı kaçtır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "13"
+      },
+      {
+        "id": "opt_b",
+        "text": "21"
+      },
+      {
+        "id": "opt_c",
+        "text": "34"
+      },
+      {
+        "id": "opt_d",
+        "text": "18"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Seri: 1, 1, 2, 3, 5, 8, 13 (7.), 21 (8.)",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "119029428bd4acb2fd7e478430869f0daded0ac00de6c250336594c5e9003c01",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.607Z",
+    "updatedAt": "2026-10-31T18:05:57.239Z"
+  },
+  {
+    "id": "math_4",
+    "categoryId": "mathematics",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Asal sayıların dağılımı ile doğrudan ilişkili olan ve Milenyum Problemlerinden biri sayılan hipotez hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Poincaré Varsayımı"
+      },
+      {
+        "id": "opt_b",
+        "text": "Riemann Hipotezi"
+      },
+      {
+        "id": "opt_c",
+        "text": "Goldbach Hipotezi"
+      },
+      {
+        "id": "opt_d",
+        "text": "Hodge Sanısı"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Riemann Zeta fonksiyonunun sıfırlarının konumunu ele alan Riemann Hipotezi asal sayılarla temelden bağlantılıdır.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "f760039e80b13e3c5635cd08131bac660208c05f66bdb0b0c207a86721f09cec",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.609Z",
+    "updatedAt": "2026-10-31T18:05:57.240Z"
+  },
+  {
+    "id": "sci_1",
+    "categoryId": "science_tech",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "World Wide Web (WWW) sistemini icat eden bilim insanı kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Bill Gates"
+      },
+      {
+        "id": "opt_b",
+        "text": "Tim Berners-Lee"
+      },
+      {
+        "id": "opt_c",
+        "text": "Steve Jobs"
+      },
+      {
+        "id": "opt_d",
+        "text": "Alan Turing"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Tim Berners-Lee 1989 yılında CERN'de çalışırken WWW protokolünü geliştirmiştir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "18e55606dbba07329c386f3ca86bef19f8250afb9065a71290c0eef62559b813",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.611Z",
+    "updatedAt": "2026-10-31T18:05:57.241Z"
+  },
+  {
+    "id": "sci_2",
+    "categoryId": "science_tech",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Işığın boşluktaki hızı yaklaşık olarak saniyede kaç kilometredir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "150.000 km/s"
+      },
+      {
+        "id": "opt_b",
+        "text": "300.000 km/s"
+      },
+      {
+        "id": "opt_c",
+        "text": "450.000 km/s"
+      },
+      {
+        "id": "opt_d",
+        "text": "1.000.000 km/s"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Işık hızı saniyede yaklaşık 299.792 kilometredir (kabaca 300.000 km/s).",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "d3c941bef7e8cfcf0ce3364c827f3e9136fdf085c6ee335e98565142a72286fb",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.613Z",
+    "updatedAt": "2026-10-31T18:05:57.242Z"
+  },
+  {
+    "id": "space_1",
+    "categoryId": "space_astronomy",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Güneş sistemindeki en büyük gezegen hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Satürn"
+      },
+      {
+        "id": "opt_b",
+        "text": "Jüpiter"
+      },
+      {
+        "id": "opt_c",
+        "text": "Neptün"
+      },
+      {
+        "id": "opt_d",
+        "text": "Dünya"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Jüpiter, kütlesi ve hacmiyle Güneş Sistemi'nin en devasa gaz gezegenidir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "c921e9fc85afa908dd9c884fcb34aa36876f98ce7514cba59709abce1e449260",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.615Z",
+    "updatedAt": "2026-10-31T18:05:57.243Z"
+  },
+  {
+    "id": "space_2",
+    "categoryId": "space_astronomy",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Samanyolu Galaksisi'ne en yakın dev sarmal galaksi hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Andromeda"
+      },
+      {
+        "id": "opt_b",
+        "text": "Üçgen Galaksisi"
+      },
+      {
+        "id": "opt_c",
+        "text": "Büyük Macellan Bulutu"
+      },
+      {
+        "id": "opt_d",
+        "text": "Sombrero"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Andromeda (M31), yaklaşık 2.5 milyon ışık yılı uzaklığıyla en yakın büyük komşu sarmal galaksidir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "06638aa769400f0db11056eb45b8564dfdf60cb62502d42ae2639c305f2ced6c",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.618Z",
+    "updatedAt": "2026-10-31T18:05:57.245Z"
+  },
+  {
+    "id": "hist_1",
+    "categoryId": "history",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "İstanbul hangi yılda Fatih Sultan Mehmet tarafından fethedilmiştir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "1071"
+      },
+      {
+        "id": "opt_b",
+        "text": "1453"
+      },
+      {
+        "id": "opt_c",
+        "text": "1517"
+      },
+      {
+        "id": "opt_d",
+        "text": "1299"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "İstanbul, 29 Mayıs 1453 tarihinde Osmanlı İmparatorluğu tarafından fethedilmiştir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "5a976a6808c5a120318895125b192071a5f5c4e3567e95dc3e59e63153cde7bd",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.620Z",
+    "updatedAt": "2026-10-31T18:05:57.246Z"
+  },
+  {
+    "id": "hist_2",
+    "categoryId": "history",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "İlk yazılı kanunlar olarak kabul edilen \"Hammurabi Kanunları\" hangi uygarlığa aittir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Mısır"
+      },
+      {
+        "id": "opt_b",
+        "text": "Babil"
+      },
+      {
+        "id": "opt_c",
+        "text": "Hitit"
+      },
+      {
+        "id": "opt_d",
+        "text": "Sümer"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Hammurabi Kanunları, M.Ö. 1750 civarında Babil kralı Hammurabi tarafından yürürlüğe konmuştur.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "62ed9314f605e479144fe2be9ef63d2d5f3e466cdf68b648ea103d4eee5eb61c",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.622Z",
+    "updatedAt": "2026-10-31T18:05:57.247Z"
+  },
+  {
+    "id": "gen_1",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Nobel Ödülleri hangi ülkenin başkentinde dağıtılmaktadır (Barış Ödülü hariç)?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Norveç"
+      },
+      {
+        "id": "opt_b",
+        "text": "İsveç (Stockholm)"
+      },
+      {
+        "id": "opt_c",
+        "text": "İsviçre"
+      },
+      {
+        "id": "opt_d",
+        "text": "Danimarka"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Nobel Tıp, Fizik, Kimya ve Edebiyat ödülleri İsveç Stockholm'de, Barış Ödülü ise Oslo'da verilir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "d8547f54ce55eb3c407e1bdd78c45418fd5cc0c791d127806548fa739f9a181e",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.624Z",
+    "updatedAt": "2026-10-31T18:05:57.248Z"
+  },
+  {
+    "id": "gen_2",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Dünyanın bilinen en eski tapınak kompleksi olan Göbeklitepe Türkiye'nin hangi ilindedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Konya"
+      },
+      {
+        "id": "opt_b",
+        "text": "Diyarbakır"
+      },
+      {
+        "id": "opt_c",
+        "text": "Şanlıurfa"
+      },
+      {
+        "id": "opt_d",
+        "text": "Mardin"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Göbeklitepe, Şanlıurfa il merkezinin yaklaşık 18 km kuzeydoğusunda yer alır.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "95791f93ff2413367b2b71f089efd2719a79680d763a16e9e3c7c96337d40841",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.626Z",
+    "updatedAt": "2026-10-31T18:05:57.249Z"
+  },
+  {
+    "id": "gen_3",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Türkiye'nin ilk yerli ve milli yüksek çözünürlüklü yer gözlem uydusu hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "İMECE"
+      },
+      {
+        "id": "opt_b",
+        "text": "BİLSAT"
+      },
+      {
+        "id": "opt_c",
+        "text": "GÖKTÜRK-2"
+      },
+      {
+        "id": "opt_d",
+        "text": "RASAT"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "TÜBİTAK UZAY tarafından tasarlanan İMECE, Türkiye'nin ilk yerli metre altı çözünürlüklü uydusudur.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "a88a96a4dec7f97ced5755508a9f8c83548ad0ee253a928f9f306c5994633c64",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.631Z",
+    "updatedAt": "2026-10-31T18:05:57.250Z"
+  },
+  {
+    "id": "gen_4",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Mustafa Kemal Atatürk hangi ilin nüfus kütüğüne kayıtlıdır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Ankara"
+      },
+      {
+        "id": "opt_b",
+        "text": "Selanik"
+      },
+      {
+        "id": "opt_c",
+        "text": "İstanbul"
+      },
+      {
+        "id": "opt_d",
+        "text": "Gaziantep"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Atatürk, Gaziantep'in Bey Mahallesi nüfus kütüğüne fahri hemşehri olarak kaydedilmiştir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "3e853236def68f730f18aa32dbc0d590b3a78cb9e75692e096ce55e1eb30a9f3",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.635Z",
+    "updatedAt": "2026-10-31T18:05:57.251Z"
+  },
+  {
+    "id": "gen_5",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Dünyaca ünlü travertenleri ile bilinen Pamukkale hangi ilimizdedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Aydın"
+      },
+      {
+        "id": "opt_b",
+        "text": "Denizli"
+      },
+      {
+        "id": "opt_c",
+        "text": "Muğla"
+      },
+      {
+        "id": "opt_d",
+        "text": "Afyonkarahisar"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Pamukkale travertenleri ve Hierapolis antik kenti Denizli sınırları içerisindedir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "85b5e02038c8f3452581666e84070a439ac962519526b8213f6f459251db0b0b",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.637Z",
+    "updatedAt": "2026-10-31T18:05:57.252Z"
+  },
+  {
+    "id": "gen_6",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Güneş Sistemi'nde Güneş'e en yakın gezegen hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Venüs"
+      },
+      {
+        "id": "opt_b",
+        "text": "Mars"
+      },
+      {
+        "id": "opt_c",
+        "text": "Merkür"
+      },
+      {
+        "id": "opt_d",
+        "text": "Dünya"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Merkür, Güneş Sistemi'ndeki en küçük ve Güneş'e en yakın gezegendir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "9d652de8f733bea8cde2b16ea570b41c1774816a98b72a29bf256d6af7e62951",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.640Z",
+    "updatedAt": "2026-10-31T18:05:57.253Z"
+  },
+  {
+    "id": "gen_7",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Eski Türk devletlerinde devlet meselelerinin görüşülüp karara bağlandığı meclise ne ad verilirdi?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Divan"
+      },
+      {
+        "id": "opt_b",
+        "text": "Pankuş"
+      },
+      {
+        "id": "opt_c",
+        "text": "Ayan"
+      },
+      {
+        "id": "opt_d",
+        "text": "Kurultay (Toy)"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Eski Türklerde siyasi, askeri ve ekonomik konular Kurultay (Toy) adı verilen mecliste görüşülürdü.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "b44d75bed4a788c1606dad5301d17fc4c5d221fd23fe81970044c6a1128e2da1",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.643Z",
+    "updatedAt": "2026-10-31T18:05:57.254Z"
+  },
+  {
+    "id": "gen_8",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Uluslararası para piyasalarında Türk Lirası'nın para birimi kodu nedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "TRY"
+      },
+      {
+        "id": "opt_b",
+        "text": "TRL"
+      },
+      {
+        "id": "opt_c",
+        "text": "TLK"
+      },
+      {
+        "id": "opt_d",
+        "text": "TUR"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "ISO 4217 standardına göre Türk Lirası resmi kodu TRY'dir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "0afe105fd7609f972f52af6593f3f5512c38b71772a700a95d5f766b721f5a2b",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.645Z",
+    "updatedAt": "2026-10-31T18:05:57.255Z"
+  },
+  {
+    "id": "sport_1",
+    "categoryId": "sports",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "2022 FIFA Dünya Kupası'nı kazanan milli takım hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Fransa"
+      },
+      {
+        "id": "opt_b",
+        "text": "Brezilya"
+      },
+      {
+        "id": "opt_c",
+        "text": "Arjantin"
+      },
+      {
+        "id": "opt_d",
+        "text": "Almanya"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Katar'da düzenlenen 2022 Dünya Kupası finalinde Fransa'yı penaltılarda yenen Arjantin şampiyon oldu.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "732d8a8b72f4ffa0da7bc3a39f3fd8f9bc68c126907df5bc156d85af15af236c",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.647Z",
+    "updatedAt": "2026-10-31T18:05:57.258Z"
+  },
+  {
+    "id": "cinema_1",
+    "categoryId": "cinema_tv",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "\"Yüzüklerin Efendisi\" üçlemesinin yönetmeni kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Christopher Nolan"
+      },
+      {
+        "id": "opt_b",
+        "text": "Peter Jackson"
+      },
+      {
+        "id": "opt_c",
+        "text": "Steven Spielberg"
+      },
+      {
+        "id": "opt_d",
+        "text": "James Cameron"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Yeni Zelandalı yönetmen Peter Jackson, Tolkien'in eserini sinemaya uyarlayarak 17 Oscar kazanmıştır.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "39703a3d7e5614f9c5adaa0df3bc18681ccc73a751b031cbe918567fd05ba77c",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.649Z",
+    "updatedAt": "2026-10-31T18:05:57.259Z"
+  },
+  {
+    "id": "music_1",
+    "categoryId": "music",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Klasik müziğin dahi bestecisi Wolfgang Amadeus Mozart hangi ülkede doğmuştur?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Almanya"
+      },
+      {
+        "id": "opt_b",
+        "text": "Avusturya"
+      },
+      {
+        "id": "opt_c",
+        "text": "İtalya"
+      },
+      {
+        "id": "opt_d",
+        "text": "Macaristan"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Mozart, 1756 yılında günümüz Avusturya sınırları içindeki Salzburg kentinde doğmuştur.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "ca4cfe23f32d38df21ab79f1427d51aca8359a1c68e767510069e0148d4c442e",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.652Z",
+    "updatedAt": "2026-10-31T18:05:57.260Z"
+  },
+  {
+    "id": "lit_1",
+    "categoryId": "literature",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "\"Suç ve Ceza\" adlı eserin yazarı kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Lev Tolstoy"
+      },
+      {
+        "id": "opt_b",
+        "text": "Fyodor Dostoyevski"
+      },
+      {
+        "id": "opt_c",
+        "text": "Anton Çehov"
+      },
+      {
+        "id": "opt_d",
+        "text": "Maksim Gorki"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Raskolnikov karakterinin vicdan muhasebesini anlatan başyapıt Dostoyevski'ye aittir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "2e4d8c18096c288a9afcb09bb717a8ef70a670f4f6deadbebbaca9505533fded",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.653Z",
+    "updatedAt": "2026-10-31T18:05:57.262Z"
+  },
+  {
+    "id": "bio_1",
+    "categoryId": "biology",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Hücrede enerjinin (ATP) üretildiği organel hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Ribozom"
+      },
+      {
+        "id": "opt_b",
+        "text": "Mitokondri"
+      },
+      {
+        "id": "opt_c",
+        "text": "Lizozom"
+      },
+      {
+        "id": "opt_d",
+        "text": "Golgi cisimciği"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Mitokondri, hücresel solunum yoluyla besin maddelerinden ATP enerjisi sentezler.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "d6acd1063da5f8218f81b28ca6573326f4fdfb89ed6fc14818d2a62524449570",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.663Z",
+    "updatedAt": "2026-10-31T18:05:57.263Z"
+  },
+  {
+    "id": "chem_1",
+    "categoryId": "physics_chemistry",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Periyodik tabloda \"Au\" sembolü ile gösterilen element hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Gümüş"
+      },
+      {
+        "id": "opt_b",
+        "text": "Altın"
+      },
+      {
+        "id": "opt_c",
+        "text": "Bakır"
+      },
+      {
+        "id": "opt_d",
+        "text": "Alüminyum"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Latince \"Aurum\" kelimesinden türetilen Au simgesi altını temsil eder.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "7c7367fb33bb78e82425f21ffe97e0f3697613a474cab97cde0132d476780dba",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.665Z",
+    "updatedAt": "2026-10-31T18:05:57.264Z"
+  },
+  {
+    "id": "logic_1",
+    "categoryId": "logic_puzzles",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Bir yarışta ikinci olanı geçersen kaçıncı olursun?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Birinci"
+      },
+      {
+        "id": "opt_b",
+        "text": "İkinci"
+      },
+      {
+        "id": "opt_c",
+        "text": "Üçüncü"
+      },
+      {
+        "id": "opt_d",
+        "text": "Yarış dışı"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "İkinci sıradaki yarışçıyı geçerek onun sırasını alır ve ikinci olursunuz.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "ec723899329ce4cce805c1929450cbbfbd9e29f384fad39702e42899b0d2baff",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.669Z",
+    "updatedAt": "2026-10-31T18:05:57.265Z"
+  },
+  {
+    "id": "lang_1",
+    "categoryId": "language_vocab",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Türkçede hem tersten hem düzden okunuşu aynı olan kelimelere veya cümlelere ne ad verilir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Akrostiş"
+      },
+      {
+        "id": "opt_b",
+        "text": "Palindrom"
+      },
+      {
+        "id": "opt_c",
+        "text": "Aliterasyon"
+      },
+      {
+        "id": "opt_d",
+        "text": "Anafor"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Örneğin \"KAYAK\" veya \"EY EDİP ADANADA PİDE YE\" gibi ifadeler palindromdur.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "e7b34d000363170e0da3f5e5e628e50dc9f3a163884b0c703f56d79926125b44",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.674Z",
+    "updatedAt": "2026-10-31T18:05:57.266Z"
+  },
+  {
+    "id": "art_1",
+    "categoryId": "art_culture",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Meşhur \"Mona Lisa\" tablosunun ressamı kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Michelangelo"
+      },
+      {
+        "id": "opt_b",
+        "text": "Leonardo da Vinci"
+      },
+      {
+        "id": "opt_c",
+        "text": "Vincent van Gogh"
+      },
+      {
+        "id": "opt_d",
+        "text": "Pablo Picasso"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Leonardo da Vinci'nin başyapıtı olan tablo Paris Louvre Müzesi'nde sergilenmektedir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "cf2accf785b148009c7209b93732b79f7a74e2be26de522b805d908e95bc252c",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.677Z",
+    "updatedAt": "2026-10-31T18:05:57.268Z"
+  },
+  {
+    "id": "food_1",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "İnce açılmış yufka katları arasına Antep fıstığı konularak şerbetlenen, Gaziantep ile özdeşleşmiş dünyaca ünlü tatlımız hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Künefe"
+      },
+      {
+        "id": "opt_b",
+        "text": "Baklava"
+      },
+      {
+        "id": "opt_c",
+        "text": "Sütlaç"
+      },
+      {
+        "id": "opt_d",
+        "text": "Kazandibi"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Gaziantep Baklavası, Avrupa Birliği tarafından tescillenen ilk Türk lezzetidir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "bc3983f2546720a5858539fa4c19b6a06a785691acdbebd1a0ce7813ba87f033",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.678Z",
+    "updatedAt": "2026-10-31T18:05:57.269Z"
+  },
+  {
+    "id": "food_2",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Kayseri mutfağı denince akla ilk gelen, bir kaşığa kırk adet sığdırılmasıyla övünülen geleneksel hamur işi yemeğimiz hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Lahmacun"
+      },
+      {
+        "id": "opt_b",
+        "text": "İçli Köfte"
+      },
+      {
+        "id": "opt_c",
+        "text": "Mantı"
+      },
+      {
+        "id": "opt_d",
+        "text": "Çiğ Köfte"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Kayseri mantısı, sarımsaklı yoğurt ve sumaklı tereyağı sosuyla servis edilen asırlık Türk yemeğidir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "089387f63a6b1b4303432bb470b2a6ef5a6521acf82b8cefc2d027fd73162338",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.680Z",
+    "updatedAt": "2026-10-31T18:05:57.270Z"
+  },
+  {
+    "id": "food_3",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Bursa ilimizle özdeşleşen, tırnak pide üzerine döner eti, domates sosu ve kızgın tereyağı dökülerek servis edilen kebap hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "İskender Kebap"
+      },
+      {
+        "id": "opt_b",
+        "text": "Cağ Kebabı"
+      },
+      {
+        "id": "opt_c",
+        "text": "Adana Kebap"
+      },
+      {
+        "id": "opt_d",
+        "text": "Beyti Kebap"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "İskender Kebap, 1867 yılında Bursa'da İskender Efendi tarafından yapılmıştır.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "3e2f74e689dce90b0d49fc6d0ad418a6c76eec3bda549a88bc4a9b4356c7a652",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.683Z",
+    "updatedAt": "2026-10-31T18:05:57.271Z"
+  },
+  {
+    "id": "food_4",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Hatay mutfağının tescilli lezzeti olan, tel kadayıf arasına tuzsuz özel peynir konularak pişirilen sıcak şerbetli tatlı hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Revani"
+      },
+      {
+        "id": "opt_b",
+        "text": "Künefe"
+      },
+      {
+        "id": "opt_c",
+        "text": "Şekerpare"
+      },
+      {
+        "id": "opt_d",
+        "text": "Tulumba"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Antakya Künefesi, kendine has sünme özelliğine sahip tuzsuz Hatay peyniri ile sıcak servis edilir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "d32152dcccc4f3238a119faf414397af896deae4544c9ad58bd5ca1929f92933",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.684Z",
+    "updatedAt": "2026-10-31T18:05:57.272Z"
+  },
+  {
+    "id": "food_5",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Japon mutfağında sirkeli pirinç ve deniz ürünlerinin yosun (nori) ile sarılmasıyla hazırlanan geleneksel yemek hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Pizza"
+      },
+      {
+        "id": "opt_b",
+        "text": "Taco"
+      },
+      {
+        "id": "opt_c",
+        "text": "Sushi"
+      },
+      {
+        "id": "opt_d",
+        "text": "Paella"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Sushi, Japon mutfak kültürünün dünyadaki en tanınmış yemeğidir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "bb4353e365eeb91ada7b34d1438a8474747805e202b30f4b3fc883e3b20b3583",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.687Z",
+    "updatedAt": "2026-10-31T18:05:57.273Z"
+  },
+  {
+    "id": "food_6",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Karadeniz Bölgesi'nde mısır unu, tereyağı ve kolot peyniri ile bakır tavada pişirilen yöresel lezzet hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Kuymak (Mıhlama)"
+      },
+      {
+        "id": "opt_b",
+        "text": "Menemen"
+      },
+      {
+        "id": "opt_c",
+        "text": "Çılbır"
+      },
+      {
+        "id": "opt_d",
+        "text": "Tarhana"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Kuymak (Mıhlama), Doğu Karadeniz yaylalarının en meşhur sıcak kahvaltılığıdır.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "fb664c9b7ecdac65e8a62894c8b844383b6efc6e5ba5c0919617cc3664b4e4c0",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.689Z",
+    "updatedAt": "2026-10-31T18:05:57.274Z"
+  },
+  {
+    "id": "anim_1",
+    "categoryId": "animals_wildlife",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Karada yaşayan en hızlı memeli hayvan aşağıdakilerden hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Aslan"
+      },
+      {
+        "id": "opt_b",
+        "text": "Çita"
+      },
+      {
+        "id": "opt_c",
+        "text": "At"
+      },
+      {
+        "id": "opt_d",
+        "text": "Kanguru"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Çita, saatte 110-120 km hıza ulaşabilen dünyanın en hızlı kara hayvanıdır.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "a154fb176a5f35a204115ca1419edf4b89f9b45b52f4b73be15f76eb76978a9d",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.692Z",
+    "updatedAt": "2026-10-31T18:05:57.275Z"
+  },
+  {
+    "id": "anim_2",
+    "categoryId": "animals_wildlife",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Dünya üzerinde yaşamış en büyük ve en ağır memeli hayvan hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Afrika Fili"
+      },
+      {
+        "id": "opt_b",
+        "text": "Mavi Balina"
+      },
+      {
+        "id": "opt_c",
+        "text": "Beyaz Köpekbalığı"
+      },
+      {
+        "id": "opt_d",
+        "text": "Zürafa"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Mavi Balina, 30 metreye varan boyu ve 150 tonu aşan ağırlığıyla en büyük hayvandır.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "8bf266b11f20a62e51e415ac4518ab48e5919905332a9ad997dc1da2a8c16a52",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.694Z",
+    "updatedAt": "2026-10-31T18:05:57.276Z"
+  },
+  {
+    "id": "anim_3",
+    "categoryId": "animals_wildlife",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Sekiz kolu ve üç ayrı kalbi bulunan deniz canlısı hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Yunus"
+      },
+      {
+        "id": "opt_b",
+        "text": "Denizyıldızı"
+      },
+      {
+        "id": "opt_c",
+        "text": "Ahtapot"
+      },
+      {
+        "id": "opt_d",
+        "text": "Denizanası"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Ahtapotların iki solungaç kalbi ve bir sistemik kalbi olmak üzere toplam 3 kalbi vardır.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "abefa5aefb3b1073973eb393c1b1e0ed510174de7ed830b0d52d554ffc5b518f",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.696Z",
+    "updatedAt": "2026-10-31T18:05:57.277Z"
+  },
+  {
+    "id": "anim_4",
+    "categoryId": "animals_wildlife",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Avustralya'ya özgü olan ve okaliptüs yapraklarıyla beslenen sevimli keseli hayvan hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Koala"
+      },
+      {
+        "id": "opt_b",
+        "text": "Kutup Ayısı"
+      },
+      {
+        "id": "opt_c",
+        "text": "Zebra"
+      },
+      {
+        "id": "opt_d",
+        "text": "Penguen"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Koalalar Avustralya'daki okaliptüs ormanlarında yaşayan keseli memelilerdir.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "99bfb025cec8387cd0a8fb59950ab32023acf658319fa65008882700e9df33e5",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.701Z",
+    "updatedAt": "2026-10-31T18:05:57.278Z"
+  },
+  {
+    "id": "anim_5",
+    "categoryId": "animals_wildlife",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Memeli bir hayvan olmasına rağmen doğurmak yerine yumurtlayarak çoğalan gagalı hayvan hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Kunduz"
+      },
+      {
+        "id": "opt_b",
+        "text": "Ornitorenk"
+      },
+      {
+        "id": "opt_c",
+        "text": "Su Samuru"
+      },
+      {
+        "id": "opt_d",
+        "text": "Lemur"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Ornitorenk (Platypus), yumurtlayarak çoğalan nadir bir memeli türüdür.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "590863b743231f45307aa244abda8c2d94b7dc04fc52dbccb405d56001c5baf1",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.704Z",
+    "updatedAt": "2026-10-31T18:05:57.279Z"
+  },
+  {
+    "id": "nat_1",
+    "categoryId": "nature_ecology",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Dünyanın akciğerleri olarak nitelendirilen ve biyoçeşitliliği en yüksek olan dev yağmur ormanları hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Amazon Yağmur Ormanları"
+      },
+      {
+        "id": "opt_b",
+        "text": "Kara Orman"
+      },
+      {
+        "id": "opt_c",
+        "text": "Belgrad Ormanı"
+      },
+      {
+        "id": "opt_d",
+        "text": "Sherwood Ormanı"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Güney Amerika'daki Amazon Yağmur Ormanları dünyanın en büyük tropikal yağmur ormanıdır.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "0d6bb593ac2e7b7cb389159781e7c8946c1453b0d5ee6940541863b58409b8e1",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.709Z",
+    "updatedAt": "2026-10-31T18:05:57.280Z"
+  },
+  {
+    "id": "nat_2",
+    "categoryId": "nature_ecology",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Okyanus tabanında meydana gelen şiddetli depremler sonucunda oluşan dev deniz dalgalarına ne ad verilir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Hortum"
+      },
+      {
+        "id": "opt_b",
+        "text": "Tsunami"
+      },
+      {
+        "id": "opt_c",
+        "text": "Gelgit"
+      },
+      {
+        "id": "opt_d",
+        "text": "Çığ"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Tsunami, deniz tabanındaki tektonik hareketler sonucu oluşan dev okyanus dalgalarıdır.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "bb6551ded7163ec017c86beea1ceecd6480c6731f1e66add1d89e586b4d5f9b3",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.711Z",
+    "updatedAt": "2026-10-31T18:05:57.281Z"
+  },
+  {
+    "id": "nat_3",
+    "categoryId": "nature_ecology",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Kutup bölgelerinde Güneş'ten gelen yüklü parçacıkların manyetik alanla etkileşmesi sonucu gökyüzünde oluşan renkli ışımalara ne denir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Serap"
+      },
+      {
+        "id": "opt_b",
+        "text": "Aurora (Kutup Işıkları)"
+      },
+      {
+        "id": "opt_c",
+        "text": "Gökkuşağı"
+      },
+      {
+        "id": "opt_d",
+        "text": "Samanyolu"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Kuzeyde Aurora Borealis, güneyde Aurora Australis olarak bilinen kutup ışımalarıdır.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "2815f1abc4810ac5c4a8b436197c4580b611e052ccebed109ad47b2715cd03e7",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.712Z",
+    "updatedAt": "2026-10-31T18:05:57.282Z"
+  },
+  {
+    "id": "nat_4",
+    "categoryId": "nature_ecology",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Yer kabuğunun derinliklerindeki erimiş kayaların (magma) yeryüzüne çıktığında aldığı isim nedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Lav"
+      },
+      {
+        "id": "opt_b",
+        "text": "Buzul"
+      },
+      {
+        "id": "opt_c",
+        "text": "Fosil"
+      },
+      {
+        "id": "opt_d",
+        "text": "Mercan"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Yer altındaki magma, yanardağlardan yüzeye püskürdüğünde lav adını alır.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "0e9e680f88558c4bba93e401bb9298791b69e183e4a65a34330d511e60de01ae",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.714Z",
+    "updatedAt": "2026-10-31T18:05:57.283Z"
+  },
+  {
+    "id": "nat_5",
+    "categoryId": "nature_ecology",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Bitkilerin güneş ışığı, su ve karbondioksit kullanarak besin ve oksijen üretmesi olayına ne ad verilir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Fermantasyon"
+      },
+      {
+        "id": "opt_b",
+        "text": "Fotosentez"
+      },
+      {
+        "id": "opt_c",
+        "text": "Buharlaşma"
+      },
+      {
+        "id": "opt_d",
+        "text": "Erozyon"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Fotosentez, yeşil bitkilerin güneş enerjisini kimyasal enerjiye ve oksijene dönüştürdüğü temel doğa olayıdır.",
+    "sourceOrVerification": null,
+    "language": "tr",
+    "contentHash": "9b5ba008f268fae4411f271faecc01a52eaad3ad4b316d9e274528f2bcd93f54",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.715Z",
+    "updatedAt": "2026-10-31T18:05:57.284Z"
+  },
+  {
+    "id": "seed_geography_1",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Türkiye'nin başkenti hangi ilimizdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "İstanbul"
+      },
+      {
+        "id": "opt_b",
+        "text": "İzmir"
+      },
+      {
+        "id": "opt_c",
+        "text": "Bursa"
+      },
+      {
+        "id": "opt_d",
+        "text": "Ankara"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Ankara, 13 Ekim 1923 tarihinde Türkiye Cumhuriyeti'nin başkenti ilan edilmiştir.",
+    "sourceOrVerification": "TBMM Tarih Arşivi",
+    "language": "tr",
+    "contentHash": "dfe5421841a313deda3031e8a92689a9db159a0512bef28faf880bf087110789",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.716Z",
+    "updatedAt": "2026-10-31T18:05:57.286Z"
+  },
+  {
+    "id": "seed_geography_2",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Türkiye'nin yüz ölçümü en büyük gölü hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Beyşehir Gölü"
+      },
+      {
+        "id": "opt_b",
+        "text": "İznik Gölü"
+      },
+      {
+        "id": "opt_c",
+        "text": "Van Gölü"
+      },
+      {
+        "id": "opt_d",
+        "text": "Tuz Gölü"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Van Gölü 3.713 km² alanı ile Türkiye'nin en büyük gölüdür.",
+    "sourceOrVerification": "Devlet Su İşleri (DSİ)",
+    "language": "tr",
+    "contentHash": "317c8df14fac8e8a7231cada91009a3e478967e36549e2c245068794c8a7721d",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.718Z",
+    "updatedAt": "2026-10-31T18:05:57.287Z"
+  },
+  {
+    "id": "seed_geography_3",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Ege Denizi, Türkiye'nin hangi coğrafi yönünde yer almaktadır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Güneyinde"
+      },
+      {
+        "id": "opt_b",
+        "text": "Batısında"
+      },
+      {
+        "id": "opt_c",
+        "text": "Doğusunda"
+      },
+      {
+        "id": "opt_d",
+        "text": "Kuzeyinde"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Ege Denizi, Anadolu Yarımadası'nın batı kıyıları boyunca uzanır.",
+    "sourceOrVerification": "Milli Eğitim Bakanlığı Coğrafya Atlası",
+    "language": "tr",
+    "contentHash": "e4027563507f6a97f426c5b36898775f0f629ec7d7fba71d4d821aac936f9f23",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.721Z",
+    "updatedAt": "2026-10-31T18:05:57.288Z"
+  },
+  {
+    "id": "seed_geography_4",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Türkiye'nin kuzeyinde kıyısı bulunan deniz hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Karadeniz"
+      },
+      {
+        "id": "opt_b",
+        "text": "Akdeniz"
+      },
+      {
+        "id": "opt_c",
+        "text": "Ege Denizi"
+      },
+      {
+        "id": "opt_d",
+        "text": "Kızıldeniz"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Türkiye'nin kuzey kıyıları boyunca Karadeniz uzanmaktadır.",
+    "sourceOrVerification": "Harita Genel Müdürlüğü",
+    "language": "tr",
+    "contentHash": "cab9eef672b6ca9640057f7688b3034f6c5a785373ff794c7ad7be6ded17a608",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.724Z",
+    "updatedAt": "2026-10-31T18:05:57.289Z"
+  },
+  {
+    "id": "seed_geography_5",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Peri bacaları doğal oluşumlarıyla ünlü olan turistik bölgemiz neresidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Pamukkale"
+      },
+      {
+        "id": "opt_b",
+        "text": "Ihlara Vadisi"
+      },
+      {
+        "id": "opt_c",
+        "text": "Ölüdeniz"
+      },
+      {
+        "id": "opt_d",
+        "text": "Kapadokya"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Peri bacaları, Nevşehir ve çevresindeki Kapadokya bölgesinde yer alan volkanik tüf oluşumlarıdır.",
+    "sourceOrVerification": "Kültür ve Turizm Bakanlığı",
+    "language": "tr",
+    "contentHash": "8014960861f5ad2b0f7caa1214e81894dbbb5c21d571ca6b1d4996f848dcd4b1",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.726Z",
+    "updatedAt": "2026-10-31T18:05:57.290Z"
+  },
+  {
+    "id": "seed_geography_6",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Beyaz traverten teraslarıyla ünlü Pamukkale, hangi ilimizdedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Muğla"
+      },
+      {
+        "id": "opt_b",
+        "text": "Afyonkarahisar"
+      },
+      {
+        "id": "opt_c",
+        "text": "Denizli"
+      },
+      {
+        "id": "opt_d",
+        "text": "Aydın"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Pamukkale travertenleri Denizli il sınırları içerisinde bulunur ve UNESCO Dünya Mirası listesindedir.",
+    "sourceOrVerification": "Kültür Varlıkları ve Müzeler Genel Müdürlüğü",
+    "language": "tr",
+    "contentHash": "de97a28503e60b83affcd83e3828c163e7120b0aa468052aeb77926426ee4792",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.729Z",
+    "updatedAt": "2026-10-31T18:05:57.291Z"
+  },
+  {
+    "id": "seed_geography_7",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Hem Asya hem de Avrupa kıtalarında toprakları bulunan dünyaca ünlü tarihi şehrimiz hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Trabzon"
+      },
+      {
+        "id": "opt_b",
+        "text": "İstanbul"
+      },
+      {
+        "id": "opt_c",
+        "text": "Çanakkale"
+      },
+      {
+        "id": "opt_d",
+        "text": "İzmir"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "İstanbul Boğazı iki kıtayı ayırırken, İstanbul iki kıtaya yayılan eşsiz bir metropoldür.",
+    "sourceOrVerification": "İstanbul Büyükşehir Belediyesi Arşivi",
+    "language": "tr",
+    "contentHash": "39ee77f59c0ef5b9fbcee759fa55cc04c2c3114188a7d3d4751c17ea13679885",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.731Z",
+    "updatedAt": "2026-10-31T18:05:57.292Z"
+  },
+  {
+    "id": "seed_geography_8",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Türkiye'nin en yüksek dağı hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Ağrı Dağı"
+      },
+      {
+        "id": "opt_b",
+        "text": "Erciyes Dağı"
+      },
+      {
+        "id": "opt_c",
+        "text": "Süphan Dağı"
+      },
+      {
+        "id": "opt_d",
+        "text": "Uludağ"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Ağrı Dağı zirvesiyle Türkiye'nin en yüksek doğal noktasıdır.",
+    "sourceOrVerification": "Harita Genel Müdürlüğü",
+    "language": "tr",
+    "contentHash": "26668af4c2ca4a7dc76b6b32e37fe4fecb2898ae8c0121c64d88dec24ee3820b",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.734Z",
+    "updatedAt": "2026-10-31T18:05:57.293Z"
+  },
+  {
+    "id": "seed_geography_9",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Türkiye'nin en uzun kıyı şeridine sahip denizi hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Karadeniz"
+      },
+      {
+        "id": "opt_b",
+        "text": "Akdeniz"
+      },
+      {
+        "id": "opt_c",
+        "text": "Marmara Denizi"
+      },
+      {
+        "id": "opt_d",
+        "text": "Ege Denizi"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Ege Denizi, girintili çıkıntılı kıyıları ve sayısız koyu nedeniyle en uzun kıyı çizgisine sahiptir.",
+    "sourceOrVerification": "Harita Genel Müdürlüğü",
+    "language": "tr",
+    "contentHash": "3d71fefb5bdf3048b89312dfba51312f77c63ebc03d914c9191bdcbd371ced1b",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.740Z",
+    "updatedAt": "2026-10-31T18:05:57.294Z"
+  },
+  {
+    "id": "seed_geography_10",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "İç Anadolu Bölgesi'ndeki Tuz Gölü hangi üç ilimizin sınırları içerisinde yer alır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Eskişehir, Afyon, Kütahya"
+      },
+      {
+        "id": "opt_b",
+        "text": "Sivas, Yozgat, Kırşehir"
+      },
+      {
+        "id": "opt_c",
+        "text": "Ankara, Konya, Aksaray"
+      },
+      {
+        "id": "opt_d",
+        "text": "Kayseri, Niğde, Nevşehir"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Tuz Gölü havzası Ankara, Konya ve Aksaray illerinin kesişim noktasında bulunur.",
+    "sourceOrVerification": "Çevre ve Şehircilik Bakanlığı",
+    "language": "tr",
+    "contentHash": "023614fd4414fbbdd0e0913430166a61dc638582f9be5cdc28900e8803803847",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.743Z",
+    "updatedAt": "2026-10-31T18:05:57.295Z"
+  },
+  {
+    "id": "seed_geography_11",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Türkiye sınırları içerisinden doğup Basra Körfezi'ne dökülen nehir çifti hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Aras ve Kura"
+      },
+      {
+        "id": "opt_b",
+        "text": "Fırat ve Dicle"
+      },
+      {
+        "id": "opt_c",
+        "text": "Kızılırmak ve Yeşilırmak"
+      },
+      {
+        "id": "opt_d",
+        "text": "Seyhan ve Ceyhan"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Fırat ve Dicle nehirleri Mezopotamya boyunca akarak Basra Körfezi’ne ulaşır.",
+    "sourceOrVerification": "Devlet Su İşleri",
+    "language": "tr",
+    "contentHash": "48d2e4ead88979fae618fefea162889a139d541b30f6dd175cf471c6edf4a8c8",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.746Z",
+    "updatedAt": "2026-10-31T18:05:57.296Z"
+  },
+  {
+    "id": "seed_geography_12",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Türkiye'nin en yüksek dağı olan Ağrı Dağı'nın zirve yüksekliği yaklaşık kaç metredir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "5137 metre"
+      },
+      {
+        "id": "opt_b",
+        "text": "3917 metre"
+      },
+      {
+        "id": "opt_c",
+        "text": "4058 metre"
+      },
+      {
+        "id": "opt_d",
+        "text": "4520 metre"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Büyük Ağrı Dağı zirvesi deniz seviyesinden 5.137 metre yüksekliktedir.",
+    "sourceOrVerification": "Harita Genel Müdürlüğü Resmi Ölçümleri",
+    "language": "tr",
+    "contentHash": "ed067eee53c3f65b4c9380707e7f585038cb2256b37ace56977009a47b21152e",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.749Z",
+    "updatedAt": "2026-10-31T18:05:57.297Z"
+  },
+  {
+    "id": "seed_geography_13",
+    "categoryId": "geography",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Nemrut Kalderası içerisinde yer alan Nemrut Krater Gölü'nün en derin noktası yaklaşık kaç metredir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "120 metre"
+      },
+      {
+        "id": "opt_b",
+        "text": "240 metre"
+      },
+      {
+        "id": "opt_c",
+        "text": "85 metre"
+      },
+      {
+        "id": "opt_d",
+        "text": "176 metre"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Nemrut Krater Gölü maksimum 176 metre derinliğiyle Türkiye’nin en derin krater gölüdür.",
+    "sourceOrVerification": "TÜBİTAK Yer Bilimleri Araştırmaları",
+    "language": "tr",
+    "contentHash": "c5fa5d594612fb263ea6ebf29d8755bc9e7c3dc6bd80f4fc398e68ae217cc002",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.754Z",
+    "updatedAt": "2026-10-31T18:05:57.298Z"
+  },
+  {
+    "id": "seed_history_14",
+    "categoryId": "history",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Türkiye Cumhuriyeti hangi yılda kurulmuştur?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "1919"
+      },
+      {
+        "id": "opt_b",
+        "text": "1922"
+      },
+      {
+        "id": "opt_c",
+        "text": "1923"
+      },
+      {
+        "id": "opt_d",
+        "text": "1920"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Cumhuriyet 29 Ekim 1923 tarihinde TBMM tarafından ilan edilmiştir.",
+    "sourceOrVerification": "Türk Tarih Kurumu",
+    "language": "tr",
+    "contentHash": "5a802550db363a764ae35b68a817dc843a044894693dc83ea9e9ea94943b5f92",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.756Z",
+    "updatedAt": "2026-10-31T18:05:57.299Z"
+  },
+  {
+    "id": "seed_history_15",
+    "categoryId": "history",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Kurtuluş Savaşı'nın Başkomutanı ve Türkiye'nin ilk Cumhurbaşkanı kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Kazım Karabekir"
+      },
+      {
+        "id": "opt_b",
+        "text": "Mustafa Kemal Atatürk"
+      },
+      {
+        "id": "opt_c",
+        "text": "İsmet İnönü"
+      },
+      {
+        "id": "opt_d",
+        "text": "Fevzi Çakmak"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Gazi Mustafa Kemal Atatürk, Kurtuluş Savaşı lideri ve Cumhuriyetin ilk Cumhurbaşkanıdır.",
+    "sourceOrVerification": "TBMM Arşivi",
+    "language": "tr",
+    "contentHash": "bbb231f789109ff77d58bbb742b9a2a126fa2f9cc4c4a3e3981f34dbfe5a247a",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.759Z",
+    "updatedAt": "2026-10-31T18:05:57.301Z"
+  },
+  {
+    "id": "seed_history_16",
+    "categoryId": "history",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Türkiye Büyük Millet Meclisi (TBMM) hangi tarihte açılmıştır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "23 Nisan 1920"
+      },
+      {
+        "id": "opt_b",
+        "text": "29 Ekim 1923"
+      },
+      {
+        "id": "opt_c",
+        "text": "19 Mayıs 1919"
+      },
+      {
+        "id": "opt_d",
+        "text": "30 Ağustos 1922"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "TBMM, 23 Nisan 1920'de Ankara'da tarihi binasında törenle açılmıştır.",
+    "sourceOrVerification": "TBMM Tarihçesi",
+    "language": "tr",
+    "contentHash": "74ff17a2e157144f1fcee91d1049ec2c3ea6c29f423ce4565666cb9ecca0b342",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.762Z",
+    "updatedAt": "2026-10-31T18:05:57.302Z"
+  },
+  {
+    "id": "seed_history_17",
+    "categoryId": "history",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Mustafa Kemal Paşa'nın Samsun'a çıkarak Milli Mücadele'yi fiilen başlattığı tarih hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "23 Nisan 1920"
+      },
+      {
+        "id": "opt_b",
+        "text": "30 Ağustos 1922"
+      },
+      {
+        "id": "opt_c",
+        "text": "9 Eylül 1922"
+      },
+      {
+        "id": "opt_d",
+        "text": "19 Mayıs 1919"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "19 Mayıs 1919, Atatürk'ün Samsun'a ayak bastığı ve Kurtuluş Savaşı meşalesinin yakıldığı gündür.",
+    "sourceOrVerification": "Milli Savunma Bakanlığı Arşivi",
+    "language": "tr",
+    "contentHash": "bbe606d3272a44e5bc60f11b7346990d8fc3fbc752e3bda2ec29c6b0955e0c0b",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.764Z",
+    "updatedAt": "2026-10-31T18:05:57.303Z"
+  },
+  {
+    "id": "seed_history_18",
+    "categoryId": "history",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Osmanlı Devleti'nin kurucusu olan ilk padişah kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Ertuğrul Gazi"
+      },
+      {
+        "id": "opt_b",
+        "text": "I. Murad"
+      },
+      {
+        "id": "opt_c",
+        "text": "Osman Bey"
+      },
+      {
+        "id": "opt_d",
+        "text": "Orhan Bey"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Osmanlı Devleti, 1299 yılında Osman Gazi (Osman Bey) tarafından kurulmuştur.",
+    "sourceOrVerification": "Osmanlı Tarihi Kaynakları",
+    "language": "tr",
+    "contentHash": "555bd8156173912df947a242b2544a72624bd3062536142e770d4512cf662cf2",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.767Z",
+    "updatedAt": "2026-10-31T18:05:57.304Z"
+  },
+  {
+    "id": "seed_history_19",
+    "categoryId": "history",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "1453 yılında İstanbul'u fethederek Fatih unvanını alan Osmanlı padişahı kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "II. Bayezid"
+      },
+      {
+        "id": "opt_b",
+        "text": "II. Mehmet"
+      },
+      {
+        "id": "opt_c",
+        "text": "I. Süleyman"
+      },
+      {
+        "id": "opt_d",
+        "text": "I. Selim"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "II. Mehmet (Fatih Sultan Mehmet), 29 Mayıs 1453'te İstanbul'u fethetmiştir.",
+    "sourceOrVerification": "Türk Tarih Kurumu",
+    "language": "tr",
+    "contentHash": "9c82d5480f9acc9ee60f764889e5f37331051f541a2b7985dab741bec8de8086",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.770Z",
+    "updatedAt": "2026-10-31T18:05:57.305Z"
+  },
+  {
+    "id": "seed_history_20",
+    "categoryId": "history",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Malazgirt Meydan Muharebesi hangi yıl gerçekleşmiştir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "1071"
+      },
+      {
+        "id": "opt_b",
+        "text": "1040"
+      },
+      {
+        "id": "opt_c",
+        "text": "1176"
+      },
+      {
+        "id": "opt_d",
+        "text": "1243"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Sultan Alparslan 26 Ağustos 1071'de Bizans ordusunu mağlup ederek Anadolu kapılarını açmıştır.",
+    "sourceOrVerification": "Türk Tarih Kurumu",
+    "language": "tr",
+    "contentHash": "87c124dc9636a396fbdadfa6380befed5e94e5298b50381cce3000c0f9a199a7",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.772Z",
+    "updatedAt": "2026-10-31T18:05:57.306Z"
+  },
+  {
+    "id": "seed_history_21",
+    "categoryId": "history",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Kurtuluş Savaşı'nda Batı Cephesi Komutanı olarak I. ve II. İnönü Zaferlerini kazanan komutan kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Kazım Karabekir"
+      },
+      {
+        "id": "opt_b",
+        "text": "Refet Bele"
+      },
+      {
+        "id": "opt_c",
+        "text": "Ali Fuat Cebesoy"
+      },
+      {
+        "id": "opt_d",
+        "text": "İsmet İnönü"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "İsmet Paşa (İnönü), Batı Cephesi Komutanı olarak önemli zaferlere imza atmıştır.",
+    "sourceOrVerification": "Askeri Tarih Araştırmaları",
+    "language": "tr",
+    "contentHash": "2bc040d8b6c3687a33335cce6cf469aa9c4f15066f09622a88f6c84e66d71bda",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.775Z",
+    "updatedAt": "2026-10-31T18:05:57.309Z"
+  },
+  {
+    "id": "seed_history_22",
+    "categoryId": "history",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Lozan Barış Antlaşması hangi tarihte imzalanmıştır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "10 Ağustos 1920"
+      },
+      {
+        "id": "opt_b",
+        "text": "11 Ekim 1922"
+      },
+      {
+        "id": "opt_c",
+        "text": "24 Temmuz 1923"
+      },
+      {
+        "id": "opt_d",
+        "text": "29 Ekim 1923"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "İsviçre'nin Lozan şehrinde 24 Temmuz 1923'te imzalanmıştır.",
+    "sourceOrVerification": "Dışişleri Bakanlığı Tarih Arşivi",
+    "language": "tr",
+    "contentHash": "cb3062575724a58e04d145409da3349b801bf493e3ed43b00ca2e4b8983c7d72",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.781Z",
+    "updatedAt": "2026-10-31T18:05:57.310Z"
+  },
+  {
+    "id": "seed_history_23",
+    "categoryId": "history",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "1833 yılında Osmanlı ile Rusya arasında imzalanan Hünkar İskelesi Antlaşması'nın süresi kaç yıldı?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "15 yıl"
+      },
+      {
+        "id": "opt_b",
+        "text": "8 yıl"
+      },
+      {
+        "id": "opt_c",
+        "text": "5 yıl"
+      },
+      {
+        "id": "opt_d",
+        "text": "10 yıl"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Hünkar İskelesi Antlaşması 8 yıllık süre için imzalanmış bir savunma ittifakıdır.",
+    "sourceOrVerification": "Osmanlı Diplomatik Arşivi",
+    "language": "tr",
+    "contentHash": "49a01af0905ebca3d43ef854083652e197acb97fc2af02f53f6405bd9d15d894",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.785Z",
+    "updatedAt": "2026-10-31T18:05:57.312Z"
+  },
+  {
+    "id": "seed_mathematics_24",
+    "categoryId": "mathematics",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Bir üçgenin iç açıları toplamı kaç derecedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "180°"
+      },
+      {
+        "id": "opt_b",
+        "text": "360°"
+      },
+      {
+        "id": "opt_c",
+        "text": "90°"
+      },
+      {
+        "id": "opt_d",
+        "text": "270°"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Öklid geometrisinde tüm düzlemsel üçgenlerin iç açıları toplamı 180 derecedir.",
+    "sourceOrVerification": "Geometri Temel İlkeleri",
+    "language": "tr",
+    "contentHash": "d31f757a191c9fa7211370f870a0e86234eba4c6bfc7b4b1a4ba76f961136b3b",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.787Z",
+    "updatedAt": "2026-10-31T18:05:57.313Z"
+  },
+  {
+    "id": "seed_mathematics_25",
+    "categoryId": "mathematics",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "1 saat kaç dakikadan oluşur?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "100 dakika"
+      },
+      {
+        "id": "opt_b",
+        "text": "30 dakika"
+      },
+      {
+        "id": "opt_c",
+        "text": "120 dakika"
+      },
+      {
+        "id": "opt_d",
+        "text": "60 dakika"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "1 saat 60 dakikaya, 1 dakika da 60 saniyeye eşittir.",
+    "sourceOrVerification": "Temel Ölçü Birimleri",
+    "language": "tr",
+    "contentHash": "e4934c69e54b934d4aa2afdc767f093101cc00b833f1394c937bc0580546aad8",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.791Z",
+    "updatedAt": "2026-10-31T18:05:57.314Z"
+  },
+  {
+    "id": "seed_mathematics_26",
+    "categoryId": "mathematics",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Bir kenarı 5 cm olan karenin çevresi kaç santimetredir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "15 cm"
+      },
+      {
+        "id": "opt_b",
+        "text": "10 cm"
+      },
+      {
+        "id": "opt_c",
+        "text": "20 cm"
+      },
+      {
+        "id": "opt_d",
+        "text": "25 cm"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Karenin çevresi 4 eşit kenarının toplamıdır: 4 × 5 = 20 cm.",
+    "sourceOrVerification": "Temel Geometri",
+    "language": "tr",
+    "contentHash": "dd61e7e04f7a51932622f79c4222488bf7d4a257f5ade3c46d4a505fd91d5266",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.794Z",
+    "updatedAt": "2026-10-31T18:05:57.315Z"
+  },
+  {
+    "id": "seed_mathematics_27",
+    "categoryId": "mathematics",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Bir haftada toplam kaç gün bulunmaktadır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "8 gün"
+      },
+      {
+        "id": "opt_b",
+        "text": "7 gün"
+      },
+      {
+        "id": "opt_c",
+        "text": "5 gün"
+      },
+      {
+        "id": "opt_d",
+        "text": "6 gün"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Standart takvim sisteminde 1 hafta 7 günden oluşur.",
+    "sourceOrVerification": "Zaman Ölçüleri",
+    "language": "tr",
+    "contentHash": "b703dac67f2c55663d6d7d038acf029477a21e5d94179b25f975ad2cff0f180f",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.799Z",
+    "updatedAt": "2026-10-31T18:05:57.317Z"
+  },
+  {
+    "id": "seed_mathematics_28",
+    "categoryId": "mathematics",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Dik açının ölçüsü kaç derecedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "90 derece"
+      },
+      {
+        "id": "opt_b",
+        "text": "180 derece"
+      },
+      {
+        "id": "opt_c",
+        "text": "45 derece"
+      },
+      {
+        "id": "opt_d",
+        "text": "60 derece"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Geometride iki dik doğrunun oluşturduğu açı 90 derecedir.",
+    "sourceOrVerification": "Milli Eğitim Geometri Müfredatı",
+    "language": "tr",
+    "contentHash": "5ab4e915add4d70adb45b363f3a5d8825f3c9b4b00593468209b4e2743a4befd",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.802Z",
+    "updatedAt": "2026-10-31T18:05:57.318Z"
+  },
+  {
+    "id": "seed_mathematics_29",
+    "categoryId": "mathematics",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "6 ile 7 sayılarının çarpımı kaçtır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "36"
+      },
+      {
+        "id": "opt_b",
+        "text": "48"
+      },
+      {
+        "id": "opt_c",
+        "text": "49"
+      },
+      {
+        "id": "opt_d",
+        "text": "42"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Çarpım tablosunda 6 × 7 = 42 eder.",
+    "sourceOrVerification": "Temel Aritmetik",
+    "language": "tr",
+    "contentHash": "bd0017886cca2e8eaf6c12f82e5dc446acad3d7829f532ce1663899ac75cc621",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.805Z",
+    "updatedAt": "2026-10-31T18:05:57.319Z"
+  },
+  {
+    "id": "seed_mathematics_30",
+    "categoryId": "mathematics",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "İki basamaklı en küçük asal sayı kaçtır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "13"
+      },
+      {
+        "id": "opt_b",
+        "text": "17"
+      },
+      {
+        "id": "opt_c",
+        "text": "11"
+      },
+      {
+        "id": "opt_d",
+        "text": "10"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "10 asal değildir (2 ve 5 böleni var), 11 ise yalnızca 1 ve kendisine bölünür.",
+    "sourceOrVerification": "Sayılar Teorisi",
+    "language": "tr",
+    "contentHash": "063cc66032888c999c2b40681939c8d753ebd670b93be9cfc1cd7ba8abf46917",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.808Z",
+    "updatedAt": "2026-10-31T18:05:57.320Z"
+  },
+  {
+    "id": "seed_mathematics_31",
+    "categoryId": "mathematics",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "İki basamaklı en büyük asal sayı kaçtır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "99"
+      },
+      {
+        "id": "opt_b",
+        "text": "97"
+      },
+      {
+        "id": "opt_c",
+        "text": "91"
+      },
+      {
+        "id": "opt_d",
+        "text": "89"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "97 asal sayıdır. 91 (7×13) ve 99 (9×11) asal değildir.",
+    "sourceOrVerification": "Asal Sayılar Tablosu",
+    "language": "tr",
+    "contentHash": "9382991ba15b295b1d215a8817bfdf772cfe0d2d3792b710aa5e48c2639fedc4",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.811Z",
+    "updatedAt": "2026-10-31T18:05:57.321Z"
+  },
+  {
+    "id": "seed_mathematics_32",
+    "categoryId": "mathematics",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Düzgün bir ikosaedronun (20 yüzlü) kaç tane köşesi vardır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "12 köşe"
+      },
+      {
+        "id": "opt_b",
+        "text": "20 köşe"
+      },
+      {
+        "id": "opt_c",
+        "text": "30 köşe"
+      },
+      {
+        "id": "opt_d",
+        "text": "16 köşe"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Düzgün ikosaedron 20 üçgensel yüze, 30 ayrıta ve 12 köşeye sahiptir.",
+    "sourceOrVerification": "Platonik Cisimler Teorisi",
+    "language": "tr",
+    "contentHash": "b2f1c7398c34ddd5d0043833517aff62a081fc48ddf5bf47d0e2516c174befb4",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.818Z",
+    "updatedAt": "2026-10-31T18:05:57.322Z"
+  },
+  {
+    "id": "seed_science_tech_33",
+    "categoryId": "science_tech",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Güneş sistemimizde Dünya'ya en yakın yıldız hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Kutup Yıldızı"
+      },
+      {
+        "id": "opt_b",
+        "text": "Sirius"
+      },
+      {
+        "id": "opt_c",
+        "text": "Proxima Centauri"
+      },
+      {
+        "id": "opt_d",
+        "text": "Güneş"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Güneş sistemimizin merkezindeki Güneş, Dünya'ya yaklaşık 150 milyon km mesafeyle en yakın yıldızdır.",
+    "sourceOrVerification": "Temel Astronomi",
+    "language": "tr",
+    "contentHash": "d3b8816647f0c9d72be1d4ae86df78057b0f2049f63f32da4f927902ef3cb11b",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.822Z",
+    "updatedAt": "2026-10-31T18:05:57.324Z"
+  },
+  {
+    "id": "seed_science_tech_34",
+    "categoryId": "science_tech",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "İnsan vücudunda kanı pompalayan ana hayati organ hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Karaciğer"
+      },
+      {
+        "id": "opt_b",
+        "text": "Mide"
+      },
+      {
+        "id": "opt_c",
+        "text": "Kalp"
+      },
+      {
+        "id": "opt_d",
+        "text": "Akciğer"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Kalp kasılıp gevşeyerek oksijenli kanı tüm vücuda dolaşım sistemiyle pompalar.",
+    "sourceOrVerification": "Temel Biyoloji ve Anatomi",
+    "language": "tr",
+    "contentHash": "5322d968ab2d08fedd5b231c4c03261842ae1471b6e48b22a2a1faf410586a30",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.825Z",
+    "updatedAt": "2026-10-31T18:05:57.325Z"
+  },
+  {
+    "id": "seed_science_tech_35",
+    "categoryId": "science_tech",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Suyun kimyasal formülü nedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "O2"
+      },
+      {
+        "id": "opt_b",
+        "text": "H2O"
+      },
+      {
+        "id": "opt_c",
+        "text": "CO2"
+      },
+      {
+        "id": "opt_d",
+        "text": "NaCl"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Su molekülü 2 hidrojen ve 1 oksijen atomunun birleşmesiyle meydana gelir (H2O).",
+    "sourceOrVerification": "Temel Kimya",
+    "language": "tr",
+    "contentHash": "d6ba48c849b9e278725411dcbe219bb5d3e80a93f715de7cbef838e97dd20c81",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.828Z",
+    "updatedAt": "2026-10-31T18:05:57.326Z"
+  },
+  {
+    "id": "seed_science_tech_36",
+    "categoryId": "science_tech",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Dünya’nın tek doğal uydusu hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Ay"
+      },
+      {
+        "id": "opt_b",
+        "text": "Güneş"
+      },
+      {
+        "id": "opt_c",
+        "text": "Mars"
+      },
+      {
+        "id": "opt_d",
+        "text": "Titan"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Ay, Dünya gezegeninin tek doğal uydusudur.",
+    "sourceOrVerification": "Uzay Bilimleri",
+    "language": "tr",
+    "contentHash": "c7b19ccab713b76116e3941ff4b7b6941668066cd9908e79b91f891d235ab881",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.831Z",
+    "updatedAt": "2026-10-31T18:05:57.327Z"
+  },
+  {
+    "id": "seed_science_tech_37",
+    "categoryId": "science_tech",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Telefonun mucidi olarak kabul edilen bilim insanı kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Thomas Edison"
+      },
+      {
+        "id": "opt_b",
+        "text": "Nikola Tesla"
+      },
+      {
+        "id": "opt_c",
+        "text": "Guglielmo Marconi"
+      },
+      {
+        "id": "opt_d",
+        "text": "Alexander Graham Bell"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Alexander Graham Bell, 1876 yılında telefonun patentini almıştır.",
+    "sourceOrVerification": "Bilim Tarihi",
+    "language": "tr",
+    "contentHash": "a157a8acfa0028a53ee19ced7cf9f0b94fdc86b305c769d2c58633237d1e6359",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.834Z",
+    "updatedAt": "2026-10-31T18:05:57.329Z"
+  },
+  {
+    "id": "seed_science_tech_38",
+    "categoryId": "science_tech",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Işığın boşluktaki yaklaşık yayılma hızı saniyede kaç kilometredir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "500.000 km/s"
+      },
+      {
+        "id": "opt_b",
+        "text": "100.000 km/s"
+      },
+      {
+        "id": "opt_c",
+        "text": "300.000 km/s"
+      },
+      {
+        "id": "opt_d",
+        "text": "150.000 km/s"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Işık hızı boşlukta yaklaşık 299.792 km/s olarak kabul edilir.",
+    "sourceOrVerification": "Fizik Sabitleri",
+    "language": "tr",
+    "contentHash": "b0ec07924dd6dff6b3ab9fa82ab7cb08306d453440031882c624c851e1f713b2",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.836Z",
+    "updatedAt": "2026-10-31T18:05:57.330Z"
+  },
+  {
+    "id": "seed_science_tech_39",
+    "categoryId": "science_tech",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Yapay zekâ modellerinde \"Transformer\" mimarisini tanıtan 2017 tarihli makale hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Generative Adversarial Nets"
+      },
+      {
+        "id": "opt_b",
+        "text": "Attention Is All You Need"
+      },
+      {
+        "id": "opt_c",
+        "text": "Deep Residual Learning"
+      },
+      {
+        "id": "opt_d",
+        "text": "Mastering the Game of Go"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Vaswani ve ekibinin \"Attention Is All You Need\" makalesi modern LLM dönemini başlatmıştır.",
+    "sourceOrVerification": "NeurIPS 2017",
+    "language": "tr",
+    "contentHash": "5a69cce8dde633f1c17b44ea4a1c01c62965caf5543cfa817525914c826f9ded",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.838Z",
+    "updatedAt": "2026-10-31T18:05:57.331Z"
+  },
+  {
+    "id": "seed_science_tech_40",
+    "categoryId": "science_tech",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Bilgisayar bilimlerinde P vs NP problemini 1971 yılında ilk kez tanımlayan teorisyen kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Stephen Cook"
+      },
+      {
+        "id": "opt_b",
+        "text": "Alan Turing"
+      },
+      {
+        "id": "opt_c",
+        "text": "Claude Shannon"
+      },
+      {
+        "id": "opt_d",
+        "text": "John von Neumann"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Stephen Cook, 1971 ACM SIGACT konferansında Cook Teoremi ile NP-complete kavramını ortaya koymuştur.",
+    "sourceOrVerification": "Turing Ödülü Bildirileri",
+    "language": "tr",
+    "contentHash": "74d17699a689e7aa96c98a08d7f200aa1c6e613e9a01d1eb8c7bde8c34908f51",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.843Z",
+    "updatedAt": "2026-10-31T18:05:57.332Z"
+  },
+  {
+    "id": "seed_general_culture_41",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Gökkuşağında toplam kaç renk bulunmaktadır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "6 renk"
+      },
+      {
+        "id": "opt_b",
+        "text": "8 renk"
+      },
+      {
+        "id": "opt_c",
+        "text": "5 renk"
+      },
+      {
+        "id": "opt_d",
+        "text": "7 renk"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Gökkuşağında kırmızı, turuncu, sarı, yeşil, mavi, lacivert ve menekşe olmak üzere 7 ana renk ayırt edilir.",
+    "sourceOrVerification": "Temel Optik ve Renk Bilgisi",
+    "language": "tr",
+    "contentHash": "922057dd00cd5049022e2e4981d555cb4ebe56dd1dec0c8ac061759d94c6c333",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.848Z",
+    "updatedAt": "2026-10-31T18:05:57.334Z"
+  },
+  {
+    "id": "seed_general_culture_42",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Futbolda bir takım sahaya aynı anda kaç oyuncu ile çıkar?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "9 oyuncu"
+      },
+      {
+        "id": "opt_b",
+        "text": "12 oyuncu"
+      },
+      {
+        "id": "opt_c",
+        "text": "11 oyuncu"
+      },
+      {
+        "id": "opt_d",
+        "text": "10 oyuncu"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Futbol müsabakaları her iki takımın 11 kişiden oluşan kadrolarıyla oynanır.",
+    "sourceOrVerification": "IFAB Resmi Oyun Kuralları",
+    "language": "tr",
+    "contentHash": "ddfb9dbf7db0b920393d77f743ee4d5fdb5c6da4b4783f93faa5a633f06047e6",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.852Z",
+    "updatedAt": "2026-10-31T18:05:57.335Z"
+  },
+  {
+    "id": "seed_general_culture_43",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Trafik lambalarında 'Geç' anlamına gelen renk hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Mavi"
+      },
+      {
+        "id": "opt_b",
+        "text": "Yeşil"
+      },
+      {
+        "id": "opt_c",
+        "text": "Kırmızı"
+      },
+      {
+        "id": "opt_d",
+        "text": "Sarı"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Trafik ışıklarında yeşil geç, kırmızı dur, sarı ise hazırlan anlamına gelir.",
+    "sourceOrVerification": "Karayolları Trafik Yönetmeliği",
+    "language": "tr",
+    "contentHash": "a9414b48453f3829488bfe59b7f54fb237b083cc4099ba7d71bbb7aa37e7dc0d",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.855Z",
+    "updatedAt": "2026-10-31T18:05:57.336Z"
+  },
+  {
+    "id": "seed_general_culture_44",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Satranç oyununda her yöne düz ve çapraz olarak sınırsız kare gidebilen en güçlü taş hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Vezir"
+      },
+      {
+        "id": "opt_b",
+        "text": "Kale"
+      },
+      {
+        "id": "opt_c",
+        "text": "Şah"
+      },
+      {
+        "id": "opt_d",
+        "text": "Fil"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Vezir, hem kale hem fil gibi hareket edebilen satrancın en yetenekli ve güçlü taşıdır.",
+    "sourceOrVerification": "FIDE Satranç Kuralları",
+    "language": "tr",
+    "contentHash": "fb9498cbafb36b95c1c1850286115cb860f4078d9bfcd06738b9841b20823216",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.861Z",
+    "updatedAt": "2026-10-31T18:05:57.337Z"
+  },
+  {
+    "id": "seed_general_culture_45",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Hangi hayvan dayanıklılığı sebebiyle 'Çöl Gemisi' olarak adlandırılır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "At"
+      },
+      {
+        "id": "opt_b",
+        "text": "Fil"
+      },
+      {
+        "id": "opt_c",
+        "text": "Zebra"
+      },
+      {
+        "id": "opt_d",
+        "text": "Deve"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Develer hörgüçlerindeki yağ deposu ve susuzluğa haftalarca dayanabilmeleriyle çöl gemisi olarak anılır.",
+    "sourceOrVerification": "Zooloji Bilgisi",
+    "language": "tr",
+    "contentHash": "bf109d9f3f66b7e2da763bc877978055e4379fa2ef8e215ce94379e744feacbf",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.863Z",
+    "updatedAt": "2026-10-31T18:05:57.338Z"
+  },
+  {
+    "id": "seed_general_culture_46",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Ünlü \"Mona Lisa\" tablosunun ressamı olan İtalyan Rönesans dehası kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Raphael"
+      },
+      {
+        "id": "opt_b",
+        "text": "Donatello"
+      },
+      {
+        "id": "opt_c",
+        "text": "Leonardo da Vinci"
+      },
+      {
+        "id": "opt_d",
+        "text": "Michelangelo"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Mona Lisa, Leonardo da Vinci tarafından 16. yüzyıl başlarında resmedilmiştir.",
+    "sourceOrVerification": "Louvre Müzesi Arşivi",
+    "language": "tr",
+    "contentHash": "c8cc5df3317322f1e662a6b211a7a41bd3785013f65dcf1d648e1a468cde0043",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.866Z",
+    "updatedAt": "2026-10-31T18:05:57.339Z"
+  },
+  {
+    "id": "seed_general_culture_47",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Eski Roma takviminde yılın ilk ayı olarak hangi ay kabul edilirdi?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Temmuz"
+      },
+      {
+        "id": "opt_b",
+        "text": "Mart"
+      },
+      {
+        "id": "opt_c",
+        "text": "Ocak"
+      },
+      {
+        "id": "opt_d",
+        "text": "Nisan"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "M.Ö. 153 yılına kadar Roma takviminde ilk ay savaş tanrısı Mars’a atfedilen Mart ayıydı.",
+    "sourceOrVerification": "Antik Roma Tarihi",
+    "language": "tr",
+    "contentHash": "95ac2f26e5b07922d1b8d3c15b41da08ba779c103883684187397bc1e6effb8e",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.869Z",
+    "updatedAt": "2026-10-31T18:05:57.340Z"
+  },
+  {
+    "id": "seed_general_culture_48",
+    "categoryId": "general_culture",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Modern periyodik cetvelde yer alan atom numarası 100 olan element hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Fermiyum (Fm)"
+      },
+      {
+        "id": "opt_b",
+        "text": "Einsteinium (Es)"
+      },
+      {
+        "id": "opt_c",
+        "text": "Mendelevyum (Md)"
+      },
+      {
+        "id": "opt_d",
+        "text": "Nobelyum (No)"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Atom numarası 100 olan element Enrico Fermi anısına Fermiyum olarak adlandırılmıştır.",
+    "sourceOrVerification": "IUPAC Periyodik Tablosu",
+    "language": "tr",
+    "contentHash": "ad0b1c22e03df4016f61e128263bcbc3c11ef5502f1b041320fb32614f993794",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.875Z",
+    "updatedAt": "2026-10-31T18:05:57.341Z"
+  },
+  {
+    "id": "seed_sports_49",
+    "categoryId": "sports",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Futbolda normal bir maç kaç devre ve toplam kaç dakikadan oluşur?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "4 devre - 80 dakika"
+      },
+      {
+        "id": "opt_b",
+        "text": "2 devre - 60 dakika"
+      },
+      {
+        "id": "opt_c",
+        "text": "3 devre - 90 dakika"
+      },
+      {
+        "id": "opt_d",
+        "text": "2 devre - 90 dakika"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Futbol müsabakaları 45’er dakikalık iki devre halinde toplam 90 dakikadır.",
+    "sourceOrVerification": "FIFA Oyun Kuralları",
+    "language": "tr",
+    "contentHash": "9cd3869d52b4fcbac70866ac1bd7faee64d93d30da8910f349d43562d9439ab1",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.880Z",
+    "updatedAt": "2026-10-31T18:05:57.342Z"
+  },
+  {
+    "id": "seed_sports_50",
+    "categoryId": "sports",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Basketbolda faul atışı (serbest atış) çizgisi arkasından kazanılan her basket kaç puan değerindedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "3 puan"
+      },
+      {
+        "id": "opt_b",
+        "text": "4 puan"
+      },
+      {
+        "id": "opt_c",
+        "text": "1 puan"
+      },
+      {
+        "id": "opt_d",
+        "text": "2 puan"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Basketbolda faul atışlarından kazanılan her sayı 1 puandır.",
+    "sourceOrVerification": "FIBA Resmi Kuralları",
+    "language": "tr",
+    "contentHash": "707d3db8eeeb05f0965cae36bdb585695ff8098a6a182ebc2528c8772e4e4d03",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.883Z",
+    "updatedAt": "2026-10-31T18:05:57.343Z"
+  },
+  {
+    "id": "seed_sports_51",
+    "categoryId": "sports",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Dört yılda bir düzenlenen dünyanın en kapsamlı spor organizasyonu hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Wimbledon"
+      },
+      {
+        "id": "opt_b",
+        "text": "Olimpiyat Oyunları"
+      },
+      {
+        "id": "opt_c",
+        "text": "Dünya Kupası"
+      },
+      {
+        "id": "opt_d",
+        "text": "Şampiyonlar Ligi"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Olimpiyat Oyunları, antik çağdan esinlenilerek her 4 yılda bir yaz ve kış dallarında düzenlenir.",
+    "sourceOrVerification": "Uluslararası Olimpiyat Komitesi (IOC)",
+    "language": "tr",
+    "contentHash": "fb5da1119ed775a6b8ad194abddd0fbcbc0f00eeddf3b08284f3bc65d470b31c",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.888Z",
+    "updatedAt": "2026-10-31T18:05:57.344Z"
+  },
+  {
+    "id": "seed_sports_52",
+    "categoryId": "sports",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Türkiye A Milli Futbol Takımı, FIFA Dünya Kupası’nda dünya üçüncülüğünü hangi yılda elde etmiştir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "2002"
+      },
+      {
+        "id": "opt_b",
+        "text": "1996"
+      },
+      {
+        "id": "opt_c",
+        "text": "2008"
+      },
+      {
+        "id": "opt_d",
+        "text": "2016"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Şenol Güneş yönetimindeki Türk Milli Takımı, 2002 Kore-Japonya Dünya Kupası’nda 3. olmuştur.",
+    "sourceOrVerification": "TFF Resmi Tarihçesi",
+    "language": "tr",
+    "contentHash": "b5a0d0756abca411fa1ae7dc01a7c8c4e7462781a771641751a14b89ddb8871d",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.892Z",
+    "updatedAt": "2026-10-31T18:05:57.345Z"
+  },
+  {
+    "id": "seed_sports_53",
+    "categoryId": "sports",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Modern maraton koşusunun standart mesafesi kaç kilometre kaç metredir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "40 km 000 metre"
+      },
+      {
+        "id": "opt_b",
+        "text": "45 km 500 metre"
+      },
+      {
+        "id": "opt_c",
+        "text": "41 km 195 metre"
+      },
+      {
+        "id": "opt_d",
+        "text": "42 km 195 metre"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Maraton koşusunun resmi mesafesi 1908 Londra Olimpiyatlarından bu yana 42.195 km’dir.",
+    "sourceOrVerification": "World Athletics",
+    "language": "tr",
+    "contentHash": "cd19312b7adb2802c5cd7853792a83a876785b67b3f8abce9a98b838c4e54ac9",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.894Z",
+    "updatedAt": "2026-10-31T18:05:57.346Z"
+  },
+  {
+    "id": "seed_sports_54",
+    "categoryId": "sports",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "1960 Roma Olimpiyatları’nda maratonu çıplak ayakla koşarak altın madalya kazanan efsanevi Etiyopyalı atlet kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Kenenisa Bekele"
+      },
+      {
+        "id": "opt_b",
+        "text": "Mamo Wolde"
+      },
+      {
+        "id": "opt_c",
+        "text": "Abebe Bikila"
+      },
+      {
+        "id": "opt_d",
+        "text": "Haile Gebrselassie"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Abebe Bikila, ayakkabısı ayağını vurduğu için çıplak ayak koşarak olimpiyat şampiyonu olmuştur.",
+    "sourceOrVerification": "Olimpiyat Tarihi Arşivi",
+    "language": "tr",
+    "contentHash": "7dd4efff458d6f697bb5ea56a55bbddb46ca840ab60249ec0e38cad151126947",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.898Z",
+    "updatedAt": "2026-10-31T18:05:57.347Z"
+  },
+  {
+    "id": "seed_cinema_tv_55",
+    "categoryId": "cinema_tv",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Yeşilçam sinemasında 'Sultan' lakabıyla anılan unutulmaz kadın oyuncumuz kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Filiz Akın"
+      },
+      {
+        "id": "opt_b",
+        "text": "Türkan Şoray"
+      },
+      {
+        "id": "opt_c",
+        "text": "Hülya Koçyiğit"
+      },
+      {
+        "id": "opt_d",
+        "text": "Fatma Girik"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Türkan Şoray, Türk sinemasının 4 yapraklı yoncasından biri olup Sultan lakabıyla tanınır.",
+    "sourceOrVerification": "Türk Sineması Arşivi",
+    "language": "tr",
+    "contentHash": "89540599ad3cb42c1be126095992daac36567581001672d9e7bb01bab25a4406",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.902Z",
+    "updatedAt": "2026-10-31T18:05:57.348Z"
+  },
+  {
+    "id": "seed_cinema_tv_56",
+    "categoryId": "cinema_tv",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Hababam Sınıfı filmlerinde 'İnek Şaban' karakterini canlandıran güldürü ustamız kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Kemal Sunal"
+      },
+      {
+        "id": "opt_b",
+        "text": "Şener Şen"
+      },
+      {
+        "id": "opt_c",
+        "text": "Halit Akçatepe"
+      },
+      {
+        "id": "opt_d",
+        "text": "Münir Özkul"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Büyük usta Kemal Sunal, İnek Şaban tiplemesiyle milyonların sevgisini kazanmıştır.",
+    "sourceOrVerification": "Yeşilçam Klasikleri",
+    "language": "tr",
+    "contentHash": "c3f00b323d44915dccefedc29dff8c0ce95488a9d32bd41c2c24e75a9a28002f",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.905Z",
+    "updatedAt": "2026-10-31T18:05:57.349Z"
+  },
+  {
+    "id": "seed_cinema_tv_57",
+    "categoryId": "cinema_tv",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Yüzüklerin Efendisi film üçlemesinin yönetmeni kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Steven Spielberg"
+      },
+      {
+        "id": "opt_b",
+        "text": "Christopher Nolan"
+      },
+      {
+        "id": "opt_c",
+        "text": "James Cameron"
+      },
+      {
+        "id": "opt_d",
+        "text": "Peter Jackson"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Peter Jackson, J.R.R. Tolkien’in eserini Yeni Zelanda’da beyaz perdeye aktarmıştır.",
+    "sourceOrVerification": "Akademi Ödülleri Arşivi",
+    "language": "tr",
+    "contentHash": "838b8242f300efdcda293385caab0691691a73aa06486eccb73f4485413ed2f5",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.911Z",
+    "updatedAt": "2026-10-31T18:05:57.350Z"
+  },
+  {
+    "id": "seed_cinema_tv_58",
+    "categoryId": "cinema_tv",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Tarihte ilk kez 11 dalda Akademi (Oscar) Ödülü kazanan 1959 yapımı epik film hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Yüzüklerin Efendisi: Kralın Dönüşü"
+      },
+      {
+        "id": "opt_b",
+        "text": "Rüzgar Gibi Geçti"
+      },
+      {
+        "id": "opt_c",
+        "text": "Ben-Hur"
+      },
+      {
+        "id": "opt_d",
+        "text": "Titanik"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "William Wyler yönetmenliğindeki Ben-Hur 11 Oscar kazanarak bu alanda ilk rekoru kırmıştır.",
+    "sourceOrVerification": "Sinema Tarihi Akademisi",
+    "language": "tr",
+    "contentHash": "518870d7ac3e357f6c9938b5ae1076902da8db82d2443c355ffb58ed29176fa9",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.914Z",
+    "updatedAt": "2026-10-31T18:05:57.351Z"
+  },
+  {
+    "id": "seed_cinema_tv_59",
+    "categoryId": "cinema_tv",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "1927 yapımı 'Metropolis' adlı öncü bilim kurgu başyapıtının Alman dışavurumcu yönetmeni kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Billy Wilder"
+      },
+      {
+        "id": "opt_b",
+        "text": "Fritz Lang"
+      },
+      {
+        "id": "opt_c",
+        "text": "F.W. Murnau"
+      },
+      {
+        "id": "opt_d",
+        "text": "Robert Wiene"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Fritz Lang’ın Metropolis filmi sinema tarihinin en etkileyici distopik eserlerindendir.",
+    "sourceOrVerification": "Sinema Müzesi Arşivi",
+    "language": "tr",
+    "contentHash": "2f2bb7fc2ffff022a87c782e47c49750e54448a2103f87725d4fbd1ee5e69e99",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.919Z",
+    "updatedAt": "2026-10-31T18:05:57.352Z"
+  },
+  {
+    "id": "seed_music_60",
+    "categoryId": "music",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "İstiklal Marşı’mızın bestecisi kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Osman Zeki Üngör"
+      },
+      {
+        "id": "opt_b",
+        "text": "Mehmet Akif Ersoy"
+      },
+      {
+        "id": "opt_c",
+        "text": "İsmail Dede Efendi"
+      },
+      {
+        "id": "opt_d",
+        "text": "Itri"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "İstiklal Marşı’nın sözleri Mehmet Akif Ersoy’a, yürürlükteki bestesi ise Osman Zeki Üngör’e aittir.",
+    "sourceOrVerification": "Kültür ve Turizm Bakanlığı",
+    "language": "tr",
+    "contentHash": "f21d90817478a53b2d9f877e40165732989dbc343b400caac61668633d457a3a",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.925Z",
+    "updatedAt": "2026-10-31T18:05:57.353Z"
+  },
+  {
+    "id": "seed_music_61",
+    "categoryId": "music",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Dört telli, yayla çalınan klasik batı müziği yaylı çalgısı hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Gitar"
+      },
+      {
+        "id": "opt_b",
+        "text": "Piyano"
+      },
+      {
+        "id": "opt_c",
+        "text": "Flüt"
+      },
+      {
+        "id": "opt_d",
+        "text": "Keman"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Keman, yaylı çalgılar ailesinin en tiz sesli ve dört telli üyesidir.",
+    "sourceOrVerification": "Müzik Terimleri ve Çalgı Bilgisi",
+    "language": "tr",
+    "contentHash": "750bc70cb56514dbf189aa9e5a9d514bd9c160cd8d68d2c46d734267616897fd",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.928Z",
+    "updatedAt": "2026-10-31T18:05:57.354Z"
+  },
+  {
+    "id": "seed_music_62",
+    "categoryId": "music",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "İşitme duyusunu neredeyse tamamen kaybettikten sonra efsanevi 9. Senfoni’yi besteleyen besteci kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Johann Sebastian Bach"
+      },
+      {
+        "id": "opt_b",
+        "text": "Frédéric Chopin"
+      },
+      {
+        "id": "opt_c",
+        "text": "Ludwig van Beethoven"
+      },
+      {
+        "id": "opt_d",
+        "text": "Wolfgang Amadeus Mozart"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Alman besteci Beethoven, ileri derecede işitme kaybına rağmen şaheserler üretmeye devam etmiştir.",
+    "sourceOrVerification": "Klasik Müzik Tarihi",
+    "language": "tr",
+    "contentHash": "cb039cf311e66a927367f5e991f71569695eb12873d408235637a3e0ce9797d2",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.931Z",
+    "updatedAt": "2026-10-31T18:05:57.355Z"
+  },
+  {
+    "id": "seed_music_63",
+    "categoryId": "music",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Klasik Türk müziğinde Segah makamının durak perdesi hangi perdedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Çargah perdesi"
+      },
+      {
+        "id": "opt_b",
+        "text": "Segah perdesi"
+      },
+      {
+        "id": "opt_c",
+        "text": "Rast perdesi"
+      },
+      {
+        "id": "opt_d",
+        "text": "Dügah perdesi"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Segah makamı segah perdesinde karar kılar ve adını da bu perdeden alır.",
+    "sourceOrVerification": "Türk Musikisi Nazariyatı",
+    "language": "tr",
+    "contentHash": "164028c652bfabc0b2b806e4618050085ea984cd84d20abc29833e11b54895b2",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.934Z",
+    "updatedAt": "2026-10-31T18:05:57.355Z"
+  },
+  {
+    "id": "seed_music_64",
+    "categoryId": "music",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Barok müziğin zirvesi sayılan \"Goldberg Varyasyonları\" hangi büyük besteciye aittir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Johann Sebastian Bach"
+      },
+      {
+        "id": "opt_b",
+        "text": "George Frideric Handel"
+      },
+      {
+        "id": "opt_c",
+        "text": "Antonio Vivaldi"
+      },
+      {
+        "id": "opt_d",
+        "text": "Claudio Monteverdi"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Goldberg Varyasyonları (BWV 988), J.S. Bach’ın klavsen için bestelediği anıtsal bir eserdir.",
+    "sourceOrVerification": "Barok Müzik Arşivi",
+    "language": "tr",
+    "contentHash": "4ff9cd035d4bf050f06f55df074f86246ec5db6094de90730ffc8530c3ad14c5",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.937Z",
+    "updatedAt": "2026-10-31T18:05:57.357Z"
+  },
+  {
+    "id": "seed_literature_65",
+    "categoryId": "literature",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Milli marşımız olan İstiklal Marşı'nın şairi kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Yahya Kemal Beyatlı"
+      },
+      {
+        "id": "opt_b",
+        "text": "Nazım Hikmet"
+      },
+      {
+        "id": "opt_c",
+        "text": "Necip Fazıl Kısakürek"
+      },
+      {
+        "id": "opt_d",
+        "text": "Mehmet Akif Ersoy"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Mehmet Akif Ersoy, 1921 yılında yazdığı şiirle TBMM tarafından milli şair kabul edilmiştir.",
+    "sourceOrVerification": "Türk Edebiyatı Vakfı",
+    "language": "tr",
+    "contentHash": "fdd17be9ad787fab00b2ba30678f45e457a46239581a3b5c8d424f4ded2ff602",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.943Z",
+    "updatedAt": "2026-10-31T18:05:57.357Z"
+  },
+  {
+    "id": "seed_literature_66",
+    "categoryId": "literature",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "'Küçük Prens' adlı dünyaca ünlü çocuk ve felsefe klasiğinin Fransız yazarı kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Jules Verne"
+      },
+      {
+        "id": "opt_b",
+        "text": "Albert Camus"
+      },
+      {
+        "id": "opt_c",
+        "text": "Antoine de Saint-Exupéry"
+      },
+      {
+        "id": "opt_d",
+        "text": "Victor Hugo"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Antoine de Saint-Exupéry aynı zamanda pilot olup Küçük Prens ile ölümsüzleşmiştir.",
+    "sourceOrVerification": "Dünya Edebiyatı Klasikleri",
+    "language": "tr",
+    "contentHash": "bedb9ba43ec7232858735206859d82aa536ea7ade750c85c670ce4919e3b9dfa",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.948Z",
+    "updatedAt": "2026-10-31T18:05:57.360Z"
+  },
+  {
+    "id": "seed_literature_67",
+    "categoryId": "literature",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "'Sefiller' romanında kürek mahkumu Jean Valjean'ın hikayesini anlatan Fransız yazar kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Gustave Flaubert"
+      },
+      {
+        "id": "opt_b",
+        "text": "Victor Hugo"
+      },
+      {
+        "id": "opt_c",
+        "text": "Émile Zola"
+      },
+      {
+        "id": "opt_d",
+        "text": "Honoré de Balzac"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Victor Hugo, 1862 yılında yayımladığı Sefiller ile adalet ve merhamet temalarını işlemiştir.",
+    "sourceOrVerification": "Klasik Roman İncelemeleri",
+    "language": "tr",
+    "contentHash": "c788be5fd9a3784e003d0a0f8af894159487e54a3a19b08da51ccbad13207524",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.951Z",
+    "updatedAt": "2026-10-31T18:05:57.361Z"
+  },
+  {
+    "id": "seed_literature_68",
+    "categoryId": "literature",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Edebiyatta 'Bilinç Akışı' tekniğinin en önemli örneklerinden olan 'Ulysses' romanının İrlandalı yazarı kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "James Joyce"
+      },
+      {
+        "id": "opt_b",
+        "text": "Virginia Woolf"
+      },
+      {
+        "id": "opt_c",
+        "text": "Franz Kafka"
+      },
+      {
+        "id": "opt_d",
+        "text": "Marcel Proust"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "James Joyce, 1922’de yayımlanan Ulysses romanıyla modern edebiyatın seyrini değiştirmiştir.",
+    "sourceOrVerification": "Modernist Edebiyat Kılavuzu",
+    "language": "tr",
+    "contentHash": "0ad58d949f579af73ca64fc5011f78d1e0600f32b48307989c129b068b4eeebd",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.954Z",
+    "updatedAt": "2026-10-31T18:05:57.362Z"
+  },
+  {
+    "id": "seed_literature_69",
+    "categoryId": "literature",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Divan edebiyatında 'Şairler Sultanı' (Sultanu'ş-Şuara) unvanına layık görülen 16. yüzyıl şairi kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Fuzûlî"
+      },
+      {
+        "id": "opt_b",
+        "text": "Nedîm"
+      },
+      {
+        "id": "opt_c",
+        "text": "Şeyh Gâlib"
+      },
+      {
+        "id": "opt_d",
+        "text": "Bâkî"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Bâkî, Kanuni Sultan Süleyman döneminde Sultanu’ş-Şuara unvanını kazanmıştır.",
+    "sourceOrVerification": "Divan Edebiyatı Tarihi",
+    "language": "tr",
+    "contentHash": "4c42543abc4dc91bc97b45b2fd8437d310ac460509fda8eab1c91324861d1556",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.958Z",
+    "updatedAt": "2026-10-31T18:05:57.364Z"
+  },
+  {
+    "id": "seed_biology_70",
+    "categoryId": "biology",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "İnsan vücudunun en büyük organı hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Akciğer"
+      },
+      {
+        "id": "opt_b",
+        "text": "Beyin"
+      },
+      {
+        "id": "opt_c",
+        "text": "Deri (Cilt)"
+      },
+      {
+        "id": "opt_d",
+        "text": "Karaciğer"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Deri, yaklaşık 2 metrekare yüzey alanıyla insan vücudunun en geniş ve ağır organıdır.",
+    "sourceOrVerification": "Temel Anatomi",
+    "language": "tr",
+    "contentHash": "199d49b2019ceca5dc821984d05d4c7e127851a4ee7827426ca06abbd67758da",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.962Z",
+    "updatedAt": "2026-10-31T18:05:57.365Z"
+  },
+  {
+    "id": "seed_biology_71",
+    "categoryId": "biology",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Bitkilere yeşil rengini veren ve fotosentez yapmasını sağlayan pigment hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Karoten"
+      },
+      {
+        "id": "opt_b",
+        "text": "Klorofil"
+      },
+      {
+        "id": "opt_c",
+        "text": "Hemoglobin"
+      },
+      {
+        "id": "opt_d",
+        "text": "Melanin"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Klorofil, güneş ışığını emerek kimyasal enerjiye çeviren yeşil renkli pigmenttir.",
+    "sourceOrVerification": "Bitki Biyolojisi",
+    "language": "tr",
+    "contentHash": "6543ef00a07f94200dc3ac17f5242780c1bbb7f3603cb75272af205259e53aab",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.966Z",
+    "updatedAt": "2026-10-31T18:05:57.366Z"
+  },
+  {
+    "id": "seed_biology_72",
+    "categoryId": "biology",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Genetik bilginin hücre çekirdeğinde taşındığı çift sarmallı molekülün kısaltması nedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "DNA"
+      },
+      {
+        "id": "opt_b",
+        "text": "RNA"
+      },
+      {
+        "id": "opt_c",
+        "text": "ATP"
+      },
+      {
+        "id": "opt_d",
+        "text": "ADP"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Deoksiribonükleik asit (DNA), tüm canlıların kalıtım şifresini taşır.",
+    "sourceOrVerification": "Moleküler Biyoloji",
+    "language": "tr",
+    "contentHash": "3b5d474ae11dec03a658dffae7df32fc851a3df1d6e6762c30cac06cb9ed20e6",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.970Z",
+    "updatedAt": "2026-10-31T18:05:57.367Z"
+  },
+  {
+    "id": "seed_biology_73",
+    "categoryId": "biology",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Hücrede enerji üretiminden sorumlu olan ve \"hücrenin santrali\" olarak anılan organel hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Ribozom"
+      },
+      {
+        "id": "opt_b",
+        "text": "Golgi Cisimciği"
+      },
+      {
+        "id": "opt_c",
+        "text": "Lizozom"
+      },
+      {
+        "id": "opt_d",
+        "text": "Mitokondri"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Mitokondri, hücresel solunum ile ATP (hücre enerjisi) sentezleyen organeldir.",
+    "sourceOrVerification": "Hücre Biyolojisi",
+    "language": "tr",
+    "contentHash": "b8a0edc22a4a05ef312d582e3ddb5e5f966226046a3bd84e9bd981aa4737d323",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.973Z",
+    "updatedAt": "2026-10-31T18:05:57.368Z"
+  },
+  {
+    "id": "seed_biology_74",
+    "categoryId": "biology",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "İnsan genomunda bulunan 23 çift kromozomdan kaç tanesi otozom (vücut kromozomu) çiftidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "23 çift"
+      },
+      {
+        "id": "opt_b",
+        "text": "20 çift"
+      },
+      {
+        "id": "opt_c",
+        "text": "22 çift"
+      },
+      {
+        "id": "opt_d",
+        "text": "21 çift"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "İnsanda 22 çift otozom (vücut kromozomu) ve 1 çift gonozom (cinsiyet kromozomu) bulunur.",
+    "sourceOrVerification": "İnsan Genetiği İlkeleri",
+    "language": "tr",
+    "contentHash": "adedb8637a0e904afe3efe60cd6d2290574e6d24bad92a7bfba41f40ef111e15",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.977Z",
+    "updatedAt": "2026-10-31T18:05:57.369Z"
+  },
+  {
+    "id": "seed_physics_chemistry_75",
+    "categoryId": "physics_chemistry",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Saf su, standart deniz seviyesi basıncında kaç santigrat derecede kaynar?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "80°C"
+      },
+      {
+        "id": "opt_b",
+        "text": "100°C"
+      },
+      {
+        "id": "opt_c",
+        "text": "90°C"
+      },
+      {
+        "id": "opt_d",
+        "text": "120°C"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "1 atmosfer basınç altında saf suyun kaynama noktası tam 100 santigrat derecedir.",
+    "sourceOrVerification": "Temel Kimya ve Termodinamik",
+    "language": "tr",
+    "contentHash": "bde4f21fc601151f0befddcdfe69549b4dfa91b3f3c66259b7d7498c2a896772",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.983Z",
+    "updatedAt": "2026-10-31T18:05:57.371Z"
+  },
+  {
+    "id": "seed_physics_chemistry_76",
+    "categoryId": "physics_chemistry",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Başına elma düşmesi hikayesiyle yerçekimi kanununu açıklayan İngiliz fizikçi kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Isaac Newton"
+      },
+      {
+        "id": "opt_b",
+        "text": "Albert Einstein"
+      },
+      {
+        "id": "opt_c",
+        "text": "Galileo Galilei"
+      },
+      {
+        "id": "opt_d",
+        "text": "Nikola Tesla"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Sir Isaac Newton, kütleçekim yasasını 1687 tarihli Principia eserinde açıklamıştır.",
+    "sourceOrVerification": "Fizik Tarihi",
+    "language": "tr",
+    "contentHash": "f683c4c4e95023990e7d9d6d157e7193bdf29e3e8259906790bd61c6a9e7c4cb",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.987Z",
+    "updatedAt": "2026-10-31T18:05:57.372Z"
+  },
+  {
+    "id": "seed_physics_chemistry_77",
+    "categoryId": "physics_chemistry",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Periyodik tablonun ilk ve en hafif elementi hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Helyum (He)"
+      },
+      {
+        "id": "opt_b",
+        "text": "Lityum (Li)"
+      },
+      {
+        "id": "opt_c",
+        "text": "Oksijen (O)"
+      },
+      {
+        "id": "opt_d",
+        "text": "Hidrojen (H)"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Hidrojen atom numarası 1 olan evrenin en yaygın ve en hafif elementidir.",
+    "sourceOrVerification": "Periyodik Tablo İlkeleri",
+    "language": "tr",
+    "contentHash": "d563bef9506bc6cd9f78da0ce8aba7d4e08915e7f39403ab13c7bff1de67d584",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.991Z",
+    "updatedAt": "2026-10-31T18:05:57.373Z"
+  },
+  {
+    "id": "seed_physics_chemistry_78",
+    "categoryId": "physics_chemistry",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Özel Görelilik kuramına göre kütle ile enerji arasındaki bağıntıyı veren ünlü formül hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "V = IR"
+      },
+      {
+        "id": "opt_b",
+        "text": "PV = nRT"
+      },
+      {
+        "id": "opt_c",
+        "text": "E = mc²"
+      },
+      {
+        "id": "opt_d",
+        "text": "F = ma"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Albert Einstein’ın 1905’te formüle ettiği denklem enerjinin kütleyle orantılı olduğunu gösterir.",
+    "sourceOrVerification": "Modern Fizik",
+    "language": "tr",
+    "contentHash": "7c6966b9223444e361e4c13be3cecc3b546823095c5989752853bdb3d310fb6c",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.994Z",
+    "updatedAt": "2026-10-31T18:05:57.374Z"
+  },
+  {
+    "id": "seed_physics_chemistry_79",
+    "categoryId": "physics_chemistry",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Kuantum mekaniğinde Belirsizlik İlkesi’ni ortaya koyan Nobel ödüllü Alman teorik fizikçi kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Erwin Schrödinger"
+      },
+      {
+        "id": "opt_b",
+        "text": "Werner Heisenberg"
+      },
+      {
+        "id": "opt_c",
+        "text": "Niels Bohr"
+      },
+      {
+        "id": "opt_d",
+        "text": "Max Planck"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Heisenberg, bir parçacığın konumu ve momentumunun aynı anda kesin bilinemeyeceğini kanıtlamıştır.",
+    "sourceOrVerification": "Kuantum Fiziği Tarihi",
+    "language": "tr",
+    "contentHash": "850952f7b61a5bc542ce9988461bb7d608420a546a425dbea2a473fe668a6b46",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:01.998Z",
+    "updatedAt": "2026-10-31T18:05:57.375Z"
+  },
+  {
+    "id": "seed_space_astronomy_80",
+    "categoryId": "space_astronomy",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Güneş sistemindeki en büyük kütleye ve çapa sahip gezegen hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Jüpiter"
+      },
+      {
+        "id": "opt_b",
+        "text": "Satürn"
+      },
+      {
+        "id": "opt_c",
+        "text": "Mars"
+      },
+      {
+        "id": "opt_d",
+        "text": "Neptün"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Jüpiter, gaz devi olup Güneş sisteminin açık ara en büyük gezegenidir.",
+    "sourceOrVerification": "NASA Güneş Sistemi Rehberi",
+    "language": "tr",
+    "contentHash": "8cf334b3a1f2fd6b644ed8b0777184e7f119e0c4666c0bb8f113f7fb5dd52130",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.001Z",
+    "updatedAt": "2026-10-31T18:05:57.376Z"
+  },
+  {
+    "id": "seed_space_astronomy_81",
+    "categoryId": "space_astronomy",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Halkalarıyla ünlü olan ve Güneş sistemimizin 6. gezegeni olan gök cismi hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Uranüs"
+      },
+      {
+        "id": "opt_b",
+        "text": "Mars"
+      },
+      {
+        "id": "opt_c",
+        "text": "Jüpiter"
+      },
+      {
+        "id": "opt_d",
+        "text": "Satürn"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Satürn, teleskopla belirgin şekilde görülebilen buz ve kaya parçacıklarından halkalarıyla meşhurdur.",
+    "sourceOrVerification": "Astronomi Atlası",
+    "language": "tr",
+    "contentHash": "ed6fef8e4947919124807548a624c75f6fe401fceca39e5f0366d9851dc64975",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.004Z",
+    "updatedAt": "2026-10-31T18:05:57.377Z"
+  },
+  {
+    "id": "seed_space_astronomy_82",
+    "categoryId": "space_astronomy",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Kızıl Gezegen lakabıyla bilinen, yüzeyi demir oksitçe zengin gezegen hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Merkür"
+      },
+      {
+        "id": "opt_b",
+        "text": "Jüpiter"
+      },
+      {
+        "id": "opt_c",
+        "text": "Mars"
+      },
+      {
+        "id": "opt_d",
+        "text": "Venüs"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Mars toprağındaki paslı demir mineralleri gezegene kızıl bir renk verir.",
+    "sourceOrVerification": "Gezegenler Bilimi",
+    "language": "tr",
+    "contentHash": "041c63555a506130d41babd7671b1807e30f10bce184b07b8cabec669d0fe91d",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.007Z",
+    "updatedAt": "2026-10-31T18:05:57.379Z"
+  },
+  {
+    "id": "seed_space_astronomy_83",
+    "categoryId": "space_astronomy",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Işığın dahi kaçamadığı, kütleçekimi sonsuz kabul edilen uzay yapılarına ne ad verilir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Kuasar"
+      },
+      {
+        "id": "opt_b",
+        "text": "Kara Delik"
+      },
+      {
+        "id": "opt_c",
+        "text": "Süpernova"
+      },
+      {
+        "id": "opt_d",
+        "text": "Pulsar"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Kara delikler olay ufkunu geçen hiçbir maddenin veya fotonun kaçamayacağı yoğunluktadır.",
+    "sourceOrVerification": "Astrofizik Temelleri",
+    "language": "tr",
+    "contentHash": "e39aa756c95cc1dbd7184cd3c3cd6cc0fc4670e03b0f75f551223623ec10f9a8",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.011Z",
+    "updatedAt": "2026-10-31T18:05:57.380Z"
+  },
+  {
+    "id": "seed_space_astronomy_84",
+    "categoryId": "space_astronomy",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Güneş sistemimize en yakın yıldız sistemi olan Alfa Centauri'nin Dünya'ya uzaklığı yaklaşık kaç ışık yılıdır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "4.24 ışık yılı"
+      },
+      {
+        "id": "opt_b",
+        "text": "2.50 ışık yılı"
+      },
+      {
+        "id": "opt_c",
+        "text": "8.60 ışık yılı"
+      },
+      {
+        "id": "opt_d",
+        "text": "1.10 ışık yılı"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Proxima Centauri yaklaşık 4.24 ışık yılı uzaklığıyla Güneş’ten sonra bize en yakın yıldızdır.",
+    "sourceOrVerification": "Avrupa Güney Rasathanesi (ESO)",
+    "language": "tr",
+    "contentHash": "0ad87e7c8c02b5bf24ac13e1b08c0b52037664900d83e047b1d42f475c071e24",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.014Z",
+    "updatedAt": "2026-10-31T18:05:57.381Z"
+  },
+  {
+    "id": "seed_logic_puzzles_85",
+    "categoryId": "logic_puzzles",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Bir koşu yarışında ikinci olan koşucuyu geçerseniz kaçıncı sıraya yerleşirsiniz?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Birinci"
+      },
+      {
+        "id": "opt_b",
+        "text": "Üçüncü"
+      },
+      {
+        "id": "opt_c",
+        "text": "Sonuncu"
+      },
+      {
+        "id": "opt_d",
+        "text": "İkinci"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "İkinciyi geçtiğinizde onun yerini alırsınız, yani ikinci olursunuz. Birinciyi geçmedikçe birinci olamazsınız.",
+    "sourceOrVerification": "Klasik Mantık Soruları",
+    "language": "tr",
+    "contentHash": "8cb84a8f6d9aeb7b8107b72a76c36df24f2b3639c5fdc652bc143d090c750e32",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.017Z",
+    "updatedAt": "2026-10-31T18:05:57.382Z"
+  },
+  {
+    "id": "seed_logic_puzzles_86",
+    "categoryId": "logic_puzzles",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Ahmet'in babasının 3 çocuğu vardır: Birincisinin adı Can, ikincisinin adı Cem'dir. Üçüncü çocuğun adı nedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Caner"
+      },
+      {
+        "id": "opt_b",
+        "text": "Cihan"
+      },
+      {
+        "id": "opt_c",
+        "text": "Ahmet"
+      },
+      {
+        "id": "opt_d",
+        "text": "Ali"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Soru başında 'Ahmet'in babası' denildiği için üçüncü çocuk Ahmet'tir.",
+    "sourceOrVerification": "Zeka ve Dikkat Oyunları",
+    "language": "tr",
+    "contentHash": "412ab63feabc80309f8932a2c015d82b61a65fd124f55b52d80c56dd1a4316a0",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.020Z",
+    "updatedAt": "2026-10-31T18:05:57.383Z"
+  },
+  {
+    "id": "seed_logic_puzzles_87",
+    "categoryId": "logic_puzzles",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Şu sayı dizisinde boş bırakılan yere hangi sayı gelmelidir: 2, 4, 8, 16, ?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "64"
+      },
+      {
+        "id": "opt_b",
+        "text": "32"
+      },
+      {
+        "id": "opt_c",
+        "text": "24"
+      },
+      {
+        "id": "opt_d",
+        "text": "30"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Dizideki her sayı bir önceki sayının 2 katıdır (geometrik dizi): 16 × 2 = 32.",
+    "sourceOrVerification": "Sayı Dizileri ve Örüntü Mantığı",
+    "language": "tr",
+    "contentHash": "47a0e00b83ae2d568a470d699b91b7f8b01fbf81656b31ea87075e944f011918",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.024Z",
+    "updatedAt": "2026-10-31T18:05:57.384Z"
+  },
+  {
+    "id": "seed_logic_puzzles_88",
+    "categoryId": "logic_puzzles",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Bir göletteki nilüferler her gün alanını 2 katına çıkarıyor. Gölet 48 günde tamamen doluyorsa, göletin yarısı kaçıncı günde dolmuştur?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "47. günde"
+      },
+      {
+        "id": "opt_b",
+        "text": "24. günde"
+      },
+      {
+        "id": "opt_c",
+        "text": "46. günde"
+      },
+      {
+        "id": "opt_d",
+        "text": "12. günde"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Her gün 2 katına çıktığı için tam dolduğu 48. günden bir gün önce (47. gün) gölet tam yarı doludur.",
+    "sourceOrVerification": "Üstel Büyüme Mantık Problemleri",
+    "language": "tr",
+    "contentHash": "5f7c9ee7a35cfca84991159271525d365a3054250ce48e1572c6504a2106c726",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.027Z",
+    "updatedAt": "2026-10-31T18:05:57.385Z"
+  },
+  {
+    "id": "seed_logic_puzzles_89",
+    "categoryId": "logic_puzzles",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Üç kutunun üzerinde sırasıyla \"Sadece Elma\", \"Sadece Portakal\" ve \"Karışık\" yazıyor. Üç etiket de yanlışsa, tek bir meyve çekerek tüm kutuları doğru etiketlemek için hangi kutudan meyve seçilmelidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "\"Sadece Elma\" yazan kutudan"
+      },
+      {
+        "id": "opt_b",
+        "text": "\"Sadece Portakal\" yazan kutudan"
+      },
+      {
+        "id": "opt_c",
+        "text": "Herhangi birinden fark etmez"
+      },
+      {
+        "id": "opt_d",
+        "text": "\"Karışık\" yazan kutudan"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Karışık yazan kutunun etiketi kesinlikle yanlıştır. Ondan çekilen meyve kutunun gerçek içeriğini belirler ve zincirleme çözüm sağlar.",
+    "sourceOrVerification": "Klasik Epistemik Mantık Bilmeceleri",
+    "language": "tr",
+    "contentHash": "be2c99709215a2765b010ad02062f854caf835955128698d4cd8d9310019980c",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.030Z",
+    "updatedAt": "2026-10-31T18:05:57.387Z"
+  },
+  {
+    "id": "seed_language_vocab_90",
+    "categoryId": "language_vocab",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Türk alfabesinde toplam kaç adet ünlü (sesli) harf bulunmaktadır?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "7"
+      },
+      {
+        "id": "opt_b",
+        "text": "9"
+      },
+      {
+        "id": "opt_c",
+        "text": "8"
+      },
+      {
+        "id": "opt_d",
+        "text": "6"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Türkçede sesli harfler 8 tanedir: a, e, ı, i, o, ö, u, ü.",
+    "sourceOrVerification": "Türk Dil Kurumu (TDK)",
+    "language": "tr",
+    "contentHash": "ff44c28787c4b50b6edadc926a44807126aae827dd634f44d97b09df88b9c50a",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.034Z",
+    "updatedAt": "2026-10-31T18:05:57.388Z"
+  },
+  {
+    "id": "seed_language_vocab_91",
+    "categoryId": "language_vocab",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "'Al' kelimesinin eş anlamlısı olan renk adı hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Beyaz"
+      },
+      {
+        "id": "opt_b",
+        "text": "Kırmızı"
+      },
+      {
+        "id": "opt_c",
+        "text": "Mavi"
+      },
+      {
+        "id": "opt_d",
+        "text": "Sarı"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Al ve kırmızı aynı renk tonunu ifade eden eş anlamlı sözcüklerdir (Al bayrak = Kırmızı bayrak).",
+    "sourceOrVerification": "TDK Eş Anlamlılar Sözlüğü",
+    "language": "tr",
+    "contentHash": "71eb5b780d67955850d14c834753e7e7ecfc9e314cd00b8d9757c1ae2f1c49c3",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.037Z",
+    "updatedAt": "2026-10-31T18:05:57.389Z"
+  },
+  {
+    "id": "seed_language_vocab_92",
+    "categoryId": "language_vocab",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "'Damlaya damlaya göl olur' atasözü temel olarak hangi erdemi ve davranışı öğütler?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Tasarruf ve sabırla birikim yapmayı"
+      },
+      {
+        "id": "opt_b",
+        "text": "Hızlı hareket etmeyi"
+      },
+      {
+        "id": "opt_c",
+        "text": "Risk almayı"
+      },
+      {
+        "id": "opt_d",
+        "text": "Cömertliği"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Küçük şeylerin birikerek büyük değerlere dönüşebileceğini vurgular.",
+    "sourceOrVerification": "TDK Atasözleri ve Deyimler Sözlüğü",
+    "language": "tr",
+    "contentHash": "80882efb41faada683ef618ea351458e6589323d99de0c1bbbe277cdb9d1d60e",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.040Z",
+    "updatedAt": "2026-10-31T18:05:57.390Z"
+  },
+  {
+    "id": "seed_language_vocab_93",
+    "categoryId": "language_vocab",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Aynı anlama gelen veya birbirinin yerine kullanılabilen sözcüklere ne ad verilir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Zıt Anlamlı (Mutezat)"
+      },
+      {
+        "id": "opt_b",
+        "text": "Eş Sesli (Sesteş)"
+      },
+      {
+        "id": "opt_c",
+        "text": "Mecaz Anlamlı"
+      },
+      {
+        "id": "opt_d",
+        "text": "Eş Anlamlı (Müteradif)"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Yazılışları farklı ancak anlamları aynı olan kelimelere eş anlamlı kelimeler denir.",
+    "sourceOrVerification": "Türkçe Dilbilgisi Kuralları",
+    "language": "tr",
+    "contentHash": "7f75842f865f10e4659a99808150eefd5e064d94915e2eab80b3ae62e8da9b4c",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.043Z",
+    "updatedAt": "2026-10-31T18:05:57.391Z"
+  },
+  {
+    "id": "seed_language_vocab_94",
+    "categoryId": "language_vocab",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Eski Türkçede 'yazı, mektup, ferman' anlamlarına gelen ve Orhun Yazıtları'nda sıkça geçen Türkçe sözcük hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Yarlık"
+      },
+      {
+        "id": "opt_b",
+        "text": "Buyruk"
+      },
+      {
+        "id": "opt_c",
+        "text": "Bitig"
+      },
+      {
+        "id": "opt_d",
+        "text": "Tamga"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Bitig (biti-mek kökünden), eski Türkçede kitap, yazıt ve yazı anlamına gelir.",
+    "sourceOrVerification": "Eski Türkçe Sözlüğü (Clauson)",
+    "language": "tr",
+    "contentHash": "dec313688e2a4a803091a29f3d7f4a6268e477ef618f31a651b58f351dc98b48",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.046Z",
+    "updatedAt": "2026-10-31T18:05:57.392Z"
+  },
+  {
+    "id": "seed_art_culture_95",
+    "categoryId": "art_culture",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Dünyaca ünlü 'Mona Lisa' tablosunun ressamı olan İtalyan sanatçı kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Salvador Dali"
+      },
+      {
+        "id": "opt_b",
+        "text": "Leonardo da Vinci"
+      },
+      {
+        "id": "opt_c",
+        "text": "Pablo Picasso"
+      },
+      {
+        "id": "opt_d",
+        "text": "Vincent van Gogh"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Mona Lisa, Rönesans döneminde Leonardo da Vinci tarafından yapılmıştır ve Paris Louvre Müzesi'ndedir.",
+    "sourceOrVerification": "Dünya Sanat Tarihi",
+    "language": "tr",
+    "contentHash": "95cad394fbae356ada3645408a5b6eec3b04aae5cdfc2b28298fa13d569b80b6",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.050Z",
+    "updatedAt": "2026-10-31T18:05:57.393Z"
+  },
+  {
+    "id": "seed_art_culture_96",
+    "categoryId": "art_culture",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Türk resim sanatının simge eserlerinden 'Kaplumbağa Terbiyecisi' tablosu hangi ressamımıza aittir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Osman Hamdi Bey"
+      },
+      {
+        "id": "opt_b",
+        "text": "İbrahim Çallı"
+      },
+      {
+        "id": "opt_c",
+        "text": "Şeker Ahmet Paşa"
+      },
+      {
+        "id": "opt_d",
+        "text": "Fikret Mualla"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Osman Hamdi Bey, 1906 yılında bu eseri tamamlamış olup aynı zamanda modern Türk müzeciliğinin kurucusudur.",
+    "sourceOrVerification": "Pera Müzesi Koleksiyonu",
+    "language": "tr",
+    "contentHash": "7fe87471504361274dd66ed2965d597ebfc2560500651226f820558bfdbc175b",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.053Z",
+    "updatedAt": "2026-10-31T18:05:57.395Z"
+  },
+  {
+    "id": "seed_art_culture_97",
+    "categoryId": "art_culture",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Osmanlı İmparatorluğu'nun baş mimarı olan ve Selimiye Camii'ni 'ustalık eserim' olarak nitelendiren deha kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Mimar Hayreddin"
+      },
+      {
+        "id": "opt_b",
+        "text": "Sedefkar Mehmet Ağa"
+      },
+      {
+        "id": "opt_c",
+        "text": "Sarkis Balyan"
+      },
+      {
+        "id": "opt_d",
+        "text": "Mimar Sinan"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Koca Mimar Sinan, Şehzade Camii’ne çıraklık, Süleymaniye’ye kalfalık, Selimiye’ye ise ustalık eserim demiştir.",
+    "sourceOrVerification": "Vakıflar Genel Müdürlüğü Arşivi",
+    "language": "tr",
+    "contentHash": "9016fc04ab1679bfe0e730328e1b1d7858cb2a7233395febe5523e6e6fa678dc",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.059Z",
+    "updatedAt": "2026-10-31T18:05:57.396Z"
+  },
+  {
+    "id": "seed_art_culture_98",
+    "categoryId": "art_culture",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "İspanya İç Savaşı'nın yıkımını anlatan kübist başyapıt 'Guernica' tablosu hangi ünlü ressama aittir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Joan Miró"
+      },
+      {
+        "id": "opt_b",
+        "text": "Francisco Goya"
+      },
+      {
+        "id": "opt_c",
+        "text": "Pablo Picasso"
+      },
+      {
+        "id": "opt_d",
+        "text": "Salvador Dali"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Picasso, 1937’de Nazi uçaklarının bombaladığı Guernica kasabasına ithafen bu tabloyu yapmıştır.",
+    "sourceOrVerification": "Reina Sofia Müzesi",
+    "language": "tr",
+    "contentHash": "147692d7975d31dc972b44813c831aac62602aa2fed1b34d3012410c8ab7312c",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.063Z",
+    "updatedAt": "2026-10-31T18:05:57.397Z"
+  },
+  {
+    "id": "seed_art_culture_99",
+    "categoryId": "art_culture",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Rönesans döneminde Floransa Katedrali'nin devasa kubbesini matematiksel bir dehayla inşa eden mimar kimdir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Andrea Palladio"
+      },
+      {
+        "id": "opt_b",
+        "text": "Filippo Brunelleschi"
+      },
+      {
+        "id": "opt_c",
+        "text": "Leon Battista Alberti"
+      },
+      {
+        "id": "opt_d",
+        "text": "Donato Bramante"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Brunelleschi, 1420-1436 yılları arasında çift cidarlı kubbe tekniğiyle mimarlık tarihinde devrim yapmıştır.",
+    "sourceOrVerification": "Rönesans Mimarlık Tarihi",
+    "language": "tr",
+    "contentHash": "95aa3aeed36a4bfcd8dec00c86bbce0a6696026c5b3e2cc87496dc2f0e9d1947",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.066Z",
+    "updatedAt": "2026-10-31T18:05:57.398Z"
+  },
+  {
+    "id": "seed_food_gastronomy_100",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "İnce açılmış yufka katları arasına Antep fıstığı veya ceviz konularak şerbetlenen, Gaziantep ile özdeşleşmiş ünlü tatlımız hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Baklava"
+      },
+      {
+        "id": "opt_b",
+        "text": "Künefe"
+      },
+      {
+        "id": "opt_c",
+        "text": "Sütlaç"
+      },
+      {
+        "id": "opt_d",
+        "text": "Kazandibi"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Gaziantep Baklavası, Avrupa Birliği tarafından tescillenen ilk Türk ürünüdür.",
+    "sourceOrVerification": "Türk Patent ve Marka Kurumu Coğrafi İşaretler",
+    "language": "tr",
+    "contentHash": "9ac9d5d1788e2936c2d24e3c3cf58757025df67aa75ab720e7dceb8956887a00",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.070Z",
+    "updatedAt": "2026-10-31T18:05:57.399Z"
+  },
+  {
+    "id": "seed_food_gastronomy_101",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "İtalyan mutfağının dünyaca ünlü, hamur üzerine domates sosu ve mozzarella peyniri konularak fırınlanan yemeği hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Sushi"
+      },
+      {
+        "id": "opt_b",
+        "text": "Paella"
+      },
+      {
+        "id": "opt_c",
+        "text": "Taco"
+      },
+      {
+        "id": "opt_d",
+        "text": "Pizza"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Pizza, İtalya’nın Napoli şehrinde doğmuş ve tüm dünyaya yayılmış geleneksel bir yemektir.",
+    "sourceOrVerification": "Dünya Gastronomi Ansiklopedisi",
+    "language": "tr",
+    "contentHash": "e9993c62682774a447e173647f143813c526c44bfbc4a71506e2cb115388e89e",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.074Z",
+    "updatedAt": "2026-10-31T18:05:57.400Z"
+  },
+  {
+    "id": "seed_food_gastronomy_102",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Kahvaltıların vazgeçilmezi olan, domates, yeşil biber ve yumurtanın birlikte pişirilmesiyle yapılan geleneksel Türk yemeği hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Çılbır"
+      },
+      {
+        "id": "opt_b",
+        "text": "Mıhlama"
+      },
+      {
+        "id": "opt_c",
+        "text": "Menemen"
+      },
+      {
+        "id": "opt_d",
+        "text": "Kuymak"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Menemen, adını İzmir’in Menemen ilçesinden alan en popüler Türk kahvaltı yemeklerinden biridir.",
+    "sourceOrVerification": "Türk Mutfağı Klasikleri",
+    "language": "tr",
+    "contentHash": "f791af5ab35b159dc31ca43f4d6c36905712d1f0659d8755918b4941f48015ab",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.077Z",
+    "updatedAt": "2026-10-31T18:05:57.402Z"
+  },
+  {
+    "id": "seed_food_gastronomy_103",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Japon mutfağında sirkeli pirinç ve çiğ deniz ürünlerinin yosun (nori) ile sarılmasıyla hazırlanan geleneksel yemek hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Dim Sum"
+      },
+      {
+        "id": "opt_b",
+        "text": "Sushi"
+      },
+      {
+        "id": "opt_c",
+        "text": "Ramen"
+      },
+      {
+        "id": "opt_d",
+        "text": "Tempura"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Sushi, Japon mutfak kültürünün en bilinen temsilcisidir.",
+    "sourceOrVerification": "Uzak Doğu Gastronomisi",
+    "language": "tr",
+    "contentHash": "eb3d7c266c67232cc7bb8b0409b624e8af6eab27defbce89de5c144d945e0791",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.081Z",
+    "updatedAt": "2026-10-31T18:05:57.403Z"
+  },
+  {
+    "id": "seed_food_gastronomy_104",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Bursa ilimizle özdeşleşen, pide üzerine döner eti, domates sosu ve kızgın tereyağı dökülerek servis edilen kebap türü hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "İskender Kebap"
+      },
+      {
+        "id": "opt_b",
+        "text": "Cağ Kebabı"
+      },
+      {
+        "id": "opt_c",
+        "text": "Beyti Kebap"
+      },
+      {
+        "id": "opt_d",
+        "text": "Alinazik"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "İskender Kebap, 1867 yılında Bursa’da İskender Efendi tarafından icat edilmiştir.",
+    "sourceOrVerification": "Bursa Ticaret ve Sanayi Odası",
+    "language": "tr",
+    "contentHash": "8cdf90d5e00780c0582fbf2e7a619d487eb04832e982185cbce68db02f10eea3",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.083Z",
+    "updatedAt": "2026-10-31T18:05:57.404Z"
+  },
+  {
+    "id": "seed_food_gastronomy_105",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Hatay mutfağının tescilli tatlısı olan, tel kadayıf arasına tuzsuz özel peynir konularak pişirilen sıcak şerbetli tatlı hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Revani"
+      },
+      {
+        "id": "opt_b",
+        "text": "Şambali"
+      },
+      {
+        "id": "opt_c",
+        "text": "Trileçe"
+      },
+      {
+        "id": "opt_d",
+        "text": "Künefe"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Antakya Künefesi, kendine has sünme özelliğine sahip tuzsuz Hatay peyniri ile yapılır.",
+    "sourceOrVerification": "Hatay Gastronomi Rehberi",
+    "language": "tr",
+    "contentHash": "e10f0aa82e2cb4a7cdb524bb5b406e46156ef9858ca5cb6f5d07009c8bfcf846",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.087Z",
+    "updatedAt": "2026-10-31T18:05:57.405Z"
+  },
+  {
+    "id": "seed_food_gastronomy_106",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Karadeniz Bölgesi'nde mısır unu, tereyağı ve kolot/tellioğlu peyniri ile bakır tavada pişirilen yöresel lezzet hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Turşu Kavurması"
+      },
+      {
+        "id": "opt_b",
+        "text": "Laz Böreği"
+      },
+      {
+        "id": "opt_c",
+        "text": "Kuymak (Mıhlama)"
+      },
+      {
+        "id": "opt_d",
+        "text": "Hamsikoli"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Kuymak veya Mıhlama, Doğu Karadeniz yaylalarının en meşhur sıcak kahvaltılığıdır.",
+    "sourceOrVerification": "Karadeniz Mutfak Kültür Envanteri",
+    "language": "tr",
+    "contentHash": "2793a97b75641dc67f1f30e89fa2595e45a1994952161adc25094e6e23566655",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.090Z",
+    "updatedAt": "2026-10-31T18:05:57.406Z"
+  },
+  {
+    "id": "seed_food_gastronomy_107",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "İspanya'nın Valensiya bölgesine özgü, safranla tatlandırılmış pirinç ve deniz ürünleriyle geniş tavada pişirilen ulusal yemek hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Churros"
+      },
+      {
+        "id": "opt_b",
+        "text": "Paella"
+      },
+      {
+        "id": "opt_c",
+        "text": "Gazpacho"
+      },
+      {
+        "id": "opt_d",
+        "text": "Tortilla"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Paella, adını pişirildiği iki saplı sığ tavadan alan İspanyol pirinç yemeğidir.",
+    "sourceOrVerification": "Avrupa Mutfak Tarihi",
+    "language": "tr",
+    "contentHash": "f1281b3f5ef34659d8c096fafcfb679e8583781a029844db12fcc3b460bd3c06",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.093Z",
+    "updatedAt": "2026-10-31T18:05:57.407Z"
+  },
+  {
+    "id": "seed_food_gastronomy_108",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Dünyanın en pahalı baharatı olarak bilinen ve 'Crocus sativus' çiçeğinin kurutulmuş tepeciklerinden elde edilen baharat hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Safran"
+      },
+      {
+        "id": "opt_b",
+        "text": "Kakule"
+      },
+      {
+        "id": "opt_c",
+        "text": "Vanilya"
+      },
+      {
+        "id": "opt_d",
+        "text": "Zerdeçal"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Safran, binlerce çiçekten yalnızca birkaç gram elde edilebildiği için kırmızı altın olarak anılır.",
+    "sourceOrVerification": "Botanik ve Baharat Ansiklopedisi",
+    "language": "tr",
+    "contentHash": "36a1c02ed1ae744266fe5051b2f39890771ddd0af265bad150160698d7e13577",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.097Z",
+    "updatedAt": "2026-10-31T18:05:57.409Z"
+  },
+  {
+    "id": "seed_food_gastronomy_109",
+    "categoryId": "food_gastronomy",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Osmanlı saray mutfağında etin meyvelerle (erik, kayısı, badem) birlikte pişirildiği tatlı-ekşi yemek geleneklerine verilen genel ad nedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Hünkarbeğendi"
+      },
+      {
+        "id": "opt_b",
+        "text": "Babagannuş"
+      },
+      {
+        "id": "opt_c",
+        "text": "Küşleme"
+      },
+      {
+        "id": "opt_d",
+        "text": "Mutancana"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Fatih Sultan Mehmet’in en sevdiği yemeklerden olan Mutancana, kuzu etinin kuru meyveler ve balla pişirilmesiyle yapılır.",
+    "sourceOrVerification": "Topkapı Sarayı Matbah-ı Amire Kayıtları",
+    "language": "tr",
+    "contentHash": "d9f4f55e8f16a28e24abd153783ba391e34a98473de9a91643d543eece41422c",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.101Z",
+    "updatedAt": "2026-10-31T18:05:57.410Z"
+  },
+  {
+    "id": "seed_animals_wildlife_110",
+    "categoryId": "animals_wildlife",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Kanatları olmasına rağmen uçamayan, Güney Kutbu (Antarktika) ve çevresinde yaşayan deniz kuşu hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Martı"
+      },
+      {
+        "id": "opt_b",
+        "text": "Pelikan"
+      },
+      {
+        "id": "opt_c",
+        "text": "Penguen"
+      },
+      {
+        "id": "opt_d",
+        "text": "Kartal"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Penguenler uçamazlar ancak kanatlarını yüzgeç gibi kullanarak su altında ustalıkla yüzerler.",
+    "sourceOrVerification": "Kutup Ekosistemleri Rehberi",
+    "language": "tr",
+    "contentHash": "1f67fe754782336e570745f9e5d1b00296e80d90d47e1ed7dfcb1b9ccc7ef498",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.104Z",
+    "updatedAt": "2026-10-31T18:05:57.411Z"
+  },
+  {
+    "id": "seed_animals_wildlife_111",
+    "categoryId": "animals_wildlife",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Uzun boynu ile ağaçların en üst yapraklarına ulaşabilen, dünyanın en uzun boylu kara hayvanı hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Gergedan"
+      },
+      {
+        "id": "opt_b",
+        "text": "Zürafa"
+      },
+      {
+        "id": "opt_c",
+        "text": "Fil"
+      },
+      {
+        "id": "opt_d",
+        "text": "Deve"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Zürafalar 5.5 - 6 metreye varan boylarıyla yeryüzünün en uzun canlılarıdır.",
+    "sourceOrVerification": "Afrika Yaban Hayatı",
+    "language": "tr",
+    "contentHash": "e5eac607ebf063f75222c2a1f807e94a63d0f7ca5a1f23de2eadbd599d690d62",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.108Z",
+    "updatedAt": "2026-10-31T18:05:57.414Z"
+  },
+  {
+    "id": "seed_animals_wildlife_112",
+    "categoryId": "animals_wildlife",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Dünya üzerinde bugüne kadar yaşamış en büyük ve en ağır hayvan (memeli) hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Mavi Balina"
+      },
+      {
+        "id": "opt_b",
+        "text": "Afrika Fili"
+      },
+      {
+        "id": "opt_c",
+        "text": "Beyaz Köpekbalığı"
+      },
+      {
+        "id": "opt_d",
+        "text": "Boz Ayı"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Mavi Balina 30 metreye varan boyu ve 150 tonu aşan ağırlığıyla gelmiş geçmiş en büyük hayvandır.",
+    "sourceOrVerification": "Deniz Biyolojisi Enstitüsü",
+    "language": "tr",
+    "contentHash": "554f124edec520cf2a926d0f4a72c091cecb50c167c55d55f1bde345332263e5",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.111Z",
+    "updatedAt": "2026-10-31T18:05:57.415Z"
+  },
+  {
+    "id": "seed_animals_wildlife_113",
+    "categoryId": "animals_wildlife",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Avustralya'ya özgü olan ve sadece okaliptüs yapraklarıyla beslenen keseli hayvan hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Panda"
+      },
+      {
+        "id": "opt_b",
+        "text": "Tembel Hayvan"
+      },
+      {
+        "id": "opt_c",
+        "text": "Lemur"
+      },
+      {
+        "id": "opt_d",
+        "text": "Koala"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Koalalar günün yaklaşık 18-20 saatini okaliptüs ağaçlarında uyuyarak ve yaprak yiyerek geçirirler.",
+    "sourceOrVerification": "Avustralya Faunası",
+    "language": "tr",
+    "contentHash": "d29ad150317654887ee2a9ce15cb9db0a29bc28ac496abc2a179ab4b89736eb5",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.114Z",
+    "updatedAt": "2026-10-31T18:05:57.416Z"
+  },
+  {
+    "id": "seed_animals_wildlife_114",
+    "categoryId": "animals_wildlife",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Sekiz kolu ve üç ayrı kalbi bulunan, mavi kanlı deniz canlısı hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Yunus"
+      },
+      {
+        "id": "opt_b",
+        "text": "Denizanası"
+      },
+      {
+        "id": "opt_c",
+        "text": "Ahtapot"
+      },
+      {
+        "id": "opt_d",
+        "text": "Denizyıldızı"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Ahtapotların iki solungaç kalbi ve bir sistemik kalbi olmak üzere 3 kalbi vardır; kanları hemosiyanin nedeniyle mavidir.",
+    "sourceOrVerification": "Deniz Omurgasızları Bilimi",
+    "language": "tr",
+    "contentHash": "2051403ff5c7680da5b515b2dcfa7d7c7c5c998445af421f75d7f87a9e4e44ba",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.118Z",
+    "updatedAt": "2026-10-31T18:05:57.417Z"
+  },
+  {
+    "id": "seed_animals_wildlife_115",
+    "categoryId": "animals_wildlife",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Memeli bir hayvan olmasına rağmen doğurmak yerine yumurtlayarak çoğalan gagalı hayvan hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Armadillo"
+      },
+      {
+        "id": "opt_b",
+        "text": "Ornitorenk (Platypus)"
+      },
+      {
+        "id": "opt_c",
+        "text": "Kunduz"
+      },
+      {
+        "id": "opt_d",
+        "text": "Su Samuru"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Ornitorenk, tekdelikliler (Monotremata) takımına ait yumurtlayan nadir bir memelidir.",
+    "sourceOrVerification": "Evrimsel Zooloji",
+    "language": "tr",
+    "contentHash": "0a4690920c25e4b5f3ca2d93779c6a07ae80f5bdfe2ee51fea28124ab420f61a",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.122Z",
+    "updatedAt": "2026-10-31T18:05:57.418Z"
+  },
+  {
+    "id": "seed_animals_wildlife_116",
+    "categoryId": "animals_wildlife",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Saniyede 80 defaya kadar kanat çırpabilen ve havada geriye doğru uçabilen tek kuş türü hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Sinek Kuşu (Kolibri)"
+      },
+      {
+        "id": "opt_b",
+        "text": "Kırlangıç"
+      },
+      {
+        "id": "opt_c",
+        "text": "Albatros"
+      },
+      {
+        "id": "opt_d",
+        "text": "Ebabil"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Sinek kuşları özel kanat eklemleri sayesinde havada asılı kalabilir ve geriye doğru uçabilir.",
+    "sourceOrVerification": "Ornitoloji Araştırmaları",
+    "language": "tr",
+    "contentHash": "f4d6f5053586bb4e08559dcab05bd568c42fe3f5b2d1f6d938d546f2cec62947",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.125Z",
+    "updatedAt": "2026-10-31T18:05:57.419Z"
+  },
+  {
+    "id": "seed_animals_wildlife_117",
+    "categoryId": "animals_wildlife",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Uzay boşluğunda, mutlak sıfıra yakın soğukta ve yüksek radyasyonda bile hayatta kalabilen mikroskobik canlı hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Amip"
+      },
+      {
+        "id": "opt_b",
+        "text": "Öglena"
+      },
+      {
+        "id": "opt_c",
+        "text": "Paramesyum"
+      },
+      {
+        "id": "opt_d",
+        "text": "Tardigrad (Su Ayısı)"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Tardigradlar kriptobiyoz durumuna geçerek uzay vakumunda dahi canlı kalabilen en dayanıklı hayvanlardır.",
+    "sourceOrVerification": "Astrobiyoloji Dergisi",
+    "language": "tr",
+    "contentHash": "1e78eaa1f1fc9eb1502d5c2b2b83b692ab3b25221a58d6c828b5d66541641cc2",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.129Z",
+    "updatedAt": "2026-10-31T18:05:57.420Z"
+  },
+  {
+    "id": "seed_nature_ecology_118",
+    "categoryId": "nature_ecology",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Yağmur yağdıktan sonra güneş çıktığında gökyüzünde beliren yedi renkli ışık kuşağına ne ad verilir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Serap"
+      },
+      {
+        "id": "opt_b",
+        "text": "Samanyolu"
+      },
+      {
+        "id": "opt_c",
+        "text": "Gökkuşağı"
+      },
+      {
+        "id": "opt_d",
+        "text": "Kutup Işıkları"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Gökkuşağı, güneş ışınlarının yağmur damlalarında kırılıp yansımasıyla oluşur.",
+    "sourceOrVerification": "Meteoroloji Genel Müdürlüğü",
+    "language": "tr",
+    "contentHash": "9f04a687fa3d4e6df0372ed3116ca7763704bcb193565dff9218a969b2857535",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.132Z",
+    "updatedAt": "2026-10-31T18:05:57.421Z"
+  },
+  {
+    "id": "seed_nature_ecology_119",
+    "categoryId": "nature_ecology",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Ağaçların yapraklarını sarartıp döktüğü, yaz ile kış arasındaki geçiş mevsimi hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Kış"
+      },
+      {
+        "id": "opt_b",
+        "text": "Sonbahar (Güz)"
+      },
+      {
+        "id": "opt_c",
+        "text": "İlkbahar"
+      },
+      {
+        "id": "opt_d",
+        "text": "Yaz"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Sonbahar (Eylül, Ekim, Kasım), doğanın kış uykusuna hazırlandığı mevsimdir.",
+    "sourceOrVerification": "Doğa ve İklim Bilgisi",
+    "language": "tr",
+    "contentHash": "520228f28b4755e5a6b0070b8e0bdf0734ef73492ba0f7f1c12cb66b0c875bac",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.136Z",
+    "updatedAt": "2026-10-31T18:05:57.422Z"
+  },
+  {
+    "id": "seed_nature_ecology_120",
+    "categoryId": "nature_ecology",
+    "subCategory": null,
+    "difficulty": "easy",
+    "text": "Arıların çiçeklerden topladığı nektarı işleyerek peteklerde ürettiği doğal ve şifalı besin nedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Bal"
+      },
+      {
+        "id": "opt_b",
+        "text": "Reçel"
+      },
+      {
+        "id": "opt_c",
+        "text": "Pekmez"
+      },
+      {
+        "id": "opt_d",
+        "text": "Tahin"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Bal arıları binlerce çiçeği ziyaret ederek nektarı enzimleriyle bala dönüştürür.",
+    "sourceOrVerification": "Ekoloji ve Arıcılık",
+    "language": "tr",
+    "contentHash": "a328506acf3cd159e3ee22d2c4fe9fd056bdc677d24b3b3b9fde2dd116d5fa38",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.139Z",
+    "updatedAt": "2026-10-31T18:05:57.423Z"
+  },
+  {
+    "id": "seed_nature_ecology_121",
+    "categoryId": "nature_ecology",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Dünyanın akciğerleri olarak nitelendirilen ve biyoçeşitliliği en yüksek olan dev yağmur ormanları hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Tayga Ormanları"
+      },
+      {
+        "id": "opt_b",
+        "text": "Kara Orman"
+      },
+      {
+        "id": "opt_c",
+        "text": "Belgrad Ormanı"
+      },
+      {
+        "id": "opt_d",
+        "text": "Amazon Yağmur Ormanları"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Güney Amerika’daki Amazon Havzası, yeryüzündeki türlerin önemli bir kısmına ev sahipliği yapar.",
+    "sourceOrVerification": "Dünya Doğayı Koruma Vakfı (WWF)",
+    "language": "tr",
+    "contentHash": "7609d78c99577a5f3e81759dd0fb8de312b17d287b786c7239d8e857e37b2fe2",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.143Z",
+    "updatedAt": "2026-10-31T18:05:57.424Z"
+  },
+  {
+    "id": "seed_nature_ecology_122",
+    "categoryId": "nature_ecology",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Yer kabuğunun derinliklerindeki erimiş kayaların (magma) yeryüzüne püskürmesiyle oluşan doğa olayı nedir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Tsunami"
+      },
+      {
+        "id": "opt_b",
+        "text": "Hortum"
+      },
+      {
+        "id": "opt_c",
+        "text": "Yanardağ (Volkan) Patlaması"
+      },
+      {
+        "id": "opt_d",
+        "text": "Heyelan"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "Magma yeryüzüne çıktığında lav adını alır ve volkanik dağları oluşturur.",
+    "sourceOrVerification": "Jeoloji Mühendisliği Temelleri",
+    "language": "tr",
+    "contentHash": "73589c4efcded5c8e3df4ba35f3dddb1b50d9021e77aac26376b91deebbed083",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.149Z",
+    "updatedAt": "2026-10-31T18:05:57.425Z"
+  },
+  {
+    "id": "seed_nature_ecology_123",
+    "categoryId": "nature_ecology",
+    "subCategory": null,
+    "difficulty": "medium",
+    "text": "Okyanus tabanında meydana gelen şiddetli depremler sonucunda oluşan dev deniz dalgalarına ne ad verilir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Tayfun"
+      },
+      {
+        "id": "opt_b",
+        "text": "Tsunami"
+      },
+      {
+        "id": "opt_c",
+        "text": "Gelgit (Medcezir)"
+      },
+      {
+        "id": "opt_d",
+        "text": "Muson"
+      }
+    ],
+    "correctOptionId": "opt_b",
+    "explanation": "Japonca liman dalgası anlamına gelen Tsunami, deniz altı depremleriyle tetiklenir.",
+    "sourceOrVerification": "Ulusal Okyanus ve Atmosfer Dairesi",
+    "language": "tr",
+    "contentHash": "d881f99841d3f3a34aa4600fad5a9b899a5c7e745c7e2bc009d5959ebb0bedc6",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.153Z",
+    "updatedAt": "2026-10-31T18:05:57.426Z"
+  },
+  {
+    "id": "seed_nature_ecology_124",
+    "categoryId": "nature_ecology",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Kutup bölgelerinde Güneş'ten gelen yüklü parçacıkların Dünya'nın manyetik alanıyla etkileşmesi sonucu gökyüzünde oluşan renkli ışımalara ne denir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Aurora (Kutup Işıkları)"
+      },
+      {
+        "id": "opt_b",
+        "text": "Süpernova"
+      },
+      {
+        "id": "opt_c",
+        "text": "Halley"
+      },
+      {
+        "id": "opt_d",
+        "text": "Güneş Tutulması"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Kuzeyde Aurora Borealis, güneyde Aurora Australis olarak bilinen doğa harikası ışımalardır.",
+    "sourceOrVerification": "Atmosfer Fiziği",
+    "language": "tr",
+    "contentHash": "2b3084c2a87f714c0414e85775609bcf00ded9b0a4328877f5a655a95e927d44",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.156Z",
+    "updatedAt": "2026-10-31T18:05:57.427Z"
+  },
+  {
+    "id": "seed_nature_ecology_125",
+    "categoryId": "nature_ecology",
+    "subCategory": null,
+    "difficulty": "hard",
+    "text": "Atmosferde sera gazlarının artması nedeniyle Dünya yüzeyinin ortalama sıcaklığının yükselmesi olgusuna ne ad verilir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Ozon İncelmesi"
+      },
+      {
+        "id": "opt_b",
+        "text": "Asit Yağmurları"
+      },
+      {
+        "id": "opt_c",
+        "text": "Erozyon"
+      },
+      {
+        "id": "opt_d",
+        "text": "Küresel Isınma"
+      }
+    ],
+    "correctOptionId": "opt_d",
+    "explanation": "Karbondioksit ve metan gibi sera gazları ısıyı hapsederek küresel iklim değişikliğine yol açar.",
+    "sourceOrVerification": "Birleşmiş Milletler İklim Paneli (IPCC)",
+    "language": "tr",
+    "contentHash": "7a995c4a6a9faa95541ff7b86f39da5cb04d503b0a2ed53cefd290c18bc227ea",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.160Z",
+    "updatedAt": "2026-10-31T18:05:57.428Z"
+  },
+  {
+    "id": "seed_nature_ecology_126",
+    "categoryId": "nature_ecology",
+    "subCategory": null,
+    "difficulty": "expert",
+    "text": "Dünya üzerindeki en yaşlı ağaçlar arasında yer alan ve Kaliforniya'da yetişen devasa kozalaklı ağaç türü hangisidir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Baobab"
+      },
+      {
+        "id": "opt_b",
+        "text": "Okaliptüs"
+      },
+      {
+        "id": "opt_c",
+        "text": "Sekoya (Dev Kızılçam)"
+      },
+      {
+        "id": "opt_d",
+        "text": "Sedir"
+      }
+    ],
+    "correctOptionId": "opt_c",
+    "explanation": "General Sherman adlı dev sekoya ağacı hacimce dünyanın bilinen en büyük tek gövdeli ağacıdır.",
+    "sourceOrVerification": "Orman Botaniği Arşivi",
+    "language": "tr",
+    "contentHash": "98de7c89a942f429cb06a9aa5c99ccf476c902cba297e3773516d9e2d60c97b4",
+    "reviewStatus": "published",
+    "reviewedBy": null,
+    "reviewedAt": null,
+    "rejectionReason": null,
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.165Z",
+    "updatedAt": "2026-10-31T18:05:57.429Z"
+  },
+  {
+    "id": "q_5xqyy89",
+    "categoryId": "mathematics",
+    "subCategory": "mathematics_hard",
+    "difficulty": "hard",
+    "text": "Bir dik üçgende hipotenüsün karesi diğer iki kenarın kareleri toplamına eşittir. Bu teorem kime aittir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "Pisagor"
+      },
+      {
+        "id": "opt_b",
+        "text": "Öklid"
+      },
+      {
+        "id": "opt_c",
+        "text": "Tales"
+      },
+      {
+        "id": "opt_d",
+        "text": "Fermat"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "Pisagor teoremi (a² + b² = c²) antik Yunan matematikçisi Pisagor tarafından formüle edilmiştir.",
+    "sourceOrVerification": "Standart Genel Başvuru ve Ansiklopedi Kaynağı",
+    "language": "tr",
+    "contentHash": "c995ff5d3c58ac1283e4a1150e648a8ec1725a50e3b8c1ea1f5aeff09d583fca",
+    "reviewStatus": "rejected",
+    "reviewedBy": "2099206119",
+    "reviewedAt": "2026-10-30T23:21:31.647Z",
+    "rejectionReason": "Yönetici tarafından onaylanmadı.",
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.169Z",
+    "updatedAt": "2026-10-31T18:05:57.430Z"
+  },
+  {
+    "id": "q_fm1rmaa",
+    "categoryId": "mathematics",
+    "subCategory": "mathematics_hard",
+    "difficulty": "hard",
+    "text": "7 sayısının faktöriyeli (7!) kaça eşittir?",
+    "options": [
+      {
+        "id": "opt_a",
+        "text": "5040"
+      },
+      {
+        "id": "opt_b",
+        "text": "720"
+      },
+      {
+        "id": "opt_c",
+        "text": "40320"
+      },
+      {
+        "id": "opt_d",
+        "text": "2520"
+      }
+    ],
+    "correctOptionId": "opt_a",
+    "explanation": "7! = 7 × 6 × 5 × 4 × 3 × 2 × 1 = 5040 işlemine eşittir.",
+    "sourceOrVerification": "Standart Genel Başvuru ve Ansiklopedi Kaynağı",
+    "language": "tr",
+    "contentHash": "c1f990d15074b8352f5b3b391819faa07a7f9d799183afefc838bf66087f66d4",
+    "reviewStatus": "rejected",
+    "reviewedBy": "2099206119",
+    "reviewedAt": "2026-10-30T23:21:24.755Z",
+    "rejectionReason": "Yönetici tarafından onaylanmadı.",
+    "timeLimitSec": 15,
+    "createdAt": "2026-10-30T20:01:02.174Z",
+    "updatedAt": "2026-10-31T18:05:57.431Z"
+  }
+]

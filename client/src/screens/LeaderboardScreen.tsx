@@ -1,266 +1,240 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
+import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
-import { sound } from '../services/soundService';
-import { ArrowLeft, Trophy, Crown, Flame, Shield, Calendar } from 'lucide-react-native';
-
+import { DEFAULT_API_BASE } from '../config';
+import {
+  TavrikoScreen,
+  TavrikoTopBar,
+  TavrikoBottomNav,
+  CharacterAvatar,
+  TrophyIcon,
+} from '../components/TavrikoIcons';
 interface LeaderboardScreenProps {
+  user?: UserProfile;
+  apiBaseUrl?: string;
   onBack: () => void;
+  onNavigateTab?: (tab: 'play' | 'explore' | 'leaders' | 'friends' | 'profile') => void;
+  onNotifications?: () => void;
 }
-
-export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ onBack }) => {
-  const [tab, setTab] = useState<'weekly' | 'all_time'>('weekly');
-
-  const leaderboards = [
-    { rank: 1, name: 'Zeka Fırtınası', points: 4850, level: 24, winRate: 78 },
-    { rank: 2, name: 'Bilgi Avcısı', points: 4320, level: 21, winRate: 74 },
-    { rank: 3, name: 'Selin Trivia', points: 3950, level: 19, winRate: 71 },
-    { rank: 4, name: 'QuizMaster 3000', points: 3410, level: 16, winRate: 65 },
-    { rank: 5, name: 'Canberk_06', points: 3100, level: 15, winRate: 62 },
-    { rank: 6, name: 'Ayşe_Gamer', points: 2890, level: 14, winRate: 59 },
-  ];
-
+interface LeaderboardEntry {
+  rank: number;
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+  rankPoints: number;
+  level: number;
+  xp: number;
+  rankTitle: string;
+  winRate: number;
+}
+export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
+  user,
+  apiBaseUrl,
+  onBack,
+  onNavigateTab,
+  onNotifications,
+}) => {
+  const [activeTab, setActiveTab] = useState<'weekly' | 'all_time'>('weekly');
+  const [leaders, setLeaders] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const base = apiBaseUrl || DEFAULT_API_BASE;
+    let isMounted = true;
+    setLoading(true);
+    fetch(`${base}/social/leaderboard`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
+        const list = Array.isArray(data) ? data : data?.topPlayers;
+        if (Array.isArray(list)) {
+          setLeaders(list);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [apiBaseUrl, user?.rankPoints, user?.xp]);
+  const sortedLeaders = [...leaders].sort((a, b) =>
+    activeTab === 'weekly' ? b.rankPoints - a.rankPoints : b.xp - a.xp
+  );
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            sound.playSound('tap');
-            onBack();
-          }}
-        >
-          <ArrowLeft size={22} color={THEME.colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Liderler Tablosu</Text>
-      </View>
-
-      {/* Season Banner */}
-      <View style={styles.seasonBanner}>
-        <View style={styles.seasonRow}>
-          <Calendar size={16} color={THEME.colors.gold} />
-          <Text style={styles.seasonTitle}>Sezon 1: Bilgi Çağı</Text>
+    <TavrikoScreen>
+      <TavrikoTopBar
+        leftType="bell"
+        onLeftPress={onNotifications || onBack}
+        coins={user?.coins ?? 0}
+        gems={user?.gems ?? 0}
+        avatarSeed={user?.avatarUrl || user?.displayName}
+        onAvatarPress={() => onNavigateTab && onNavigateTab('profile')}
+      />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>LİDERLER</Text>
+        <Text style={styles.subtitle}>
+          Canlı Veritabanı Sıralaması · {sortedLeaders.length} Kayıtlı Oyuncu
+        </Text>
+        {/* Tabs */}
+        <View style={styles.tabsRow}>
+          <TouchableOpacity
+            style={[
+              styles.tabPill,
+              activeTab === 'weekly' && styles.tabPillActive,
+            ]}
+            onPress={() => setActiveTab('weekly')}
+          >
+            <Text style={styles.tabText}>Lig Puanı</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.tabPill,
+              activeTab === 'all_time' && styles.tabPillActive,
+            ]}
+            onPress={() => setActiveTab('all_time')}
+          >
+            <Text style={styles.tabText}>Toplam XP</Text>
+          </TouchableOpacity>
         </View>
-        <Text style={styles.seasonTimer}>Sezonun bitmesine 12 gün kaldı</Text>
-      </View>
-
-      {/* Filter Tabs */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'weekly' && styles.tabActive]}
-          onPress={() => {
-            sound.playSound('tap');
-            setTab('weekly');
-          }}
-        >
-          <Text style={[styles.tabText, tab === 'weekly' && styles.tabTextActive]}>Haftalık Lig</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tab, tab === 'all_time' && styles.tabActive]}
-          onPress={() => {
-            sound.playSound('tap');
-            setTab('all_time');
-          }}
-        >
-          <Text style={[styles.tabText, tab === 'all_time' && styles.tabTextActive]}>Tüm Zamanlar</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.list}>
-        {leaderboards.map((player) => {
-          const isTop3 = player.rank <= 3;
-          return (
-            <View
-              key={player.rank}
-              style={[
-                styles.playerCard,
-                player.rank === 1 && styles.cardFirst,
-                player.rank === 2 && styles.cardSecond,
-                player.rank === 3 && styles.cardThird,
-              ]}
-            >
-              <View style={styles.rankBox}>
-                {player.rank === 1 ? (
-                  <Crown size={22} color={THEME.colors.gold} />
-                ) : (
-                  <Text style={[styles.rankNumber, isTop3 && styles.rankTop3]}>
-                    #{player.rank}
+        {loading ? (
+          <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 32 }} />
+        ) : (
+          <View style={styles.listCard}>
+            {sortedLeaders.map((item, idx) => {
+              const isMe = user ? item.userId === user.id : false;
+              const displayRank = idx + 1;
+              return (
+                <View
+                  key={item.userId ? `${item.userId}_${idx}` : `leader_${idx}`}
+                  style={[styles.playerRow, isMe && styles.playerRowMe]}
+                >
+                  <Text style={styles.rankText}>{displayRank}</Text>
+                  <CharacterAvatar
+                    seed={item.avatarUrl || item.displayName}
+                    size={36}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.nameText}>
+                      {item.displayName} {isMe ? '(Sen)' : ''}
+                    </Text>
+                    <Text style={styles.subRankText}>
+                      Seviye {item.level} · {item.rankTitle}
+                    </Text>
+                  </View>
+                  <TrophyIcon size={18} />
+                  <Text style={styles.scoreText}>
+                    {activeTab === 'weekly' ? item.rankPoints : item.xp}
                   </Text>
-                )}
-              </View>
-
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{player.name.charAt(0)}</Text>
-              </View>
-
-              <View style={styles.playerInfo}>
-                <Text style={styles.playerName}>{player.name}</Text>
-                <Text style={styles.playerMeta}>Lv. {player.level} • %{player.winRate} Win</Text>
-              </View>
-
-              <View style={styles.scoreBox}>
-                <Text style={styles.scoreText}>{player.points}</Text>
-                <Text style={styles.scoreLabel}>LP</Text>
-              </View>
-            </View>
-          );
-        })}
+                </View>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
-    </View>
+      <TavrikoBottomNav
+        activeTab="leaders"
+        onSelectTab={(tab) => {
+          if (tab === 'play') onBack();
+          else if (onNavigateTab) onNavigateTab(tab);
+        }}
+      />
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
+  scrollContent: {
+    paddingBottom: 110,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: THEME.spacing.lg,
-    paddingTop: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.border,
-    backgroundColor: THEME.colors.card,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-  },
-  seasonBanner: {
-    backgroundColor: THEME.colors.card,
-    margin: THEME.spacing.lg,
-    padding: 14,
-    borderRadius: THEME.radius.lg,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  seasonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  title: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 36,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 10,
     marginBottom: 4,
   },
-  seasonTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: THEME.colors.gold,
-  },
-  seasonTimer: {
+  subtitle: {
+    color: '#D9CDF5',
     fontSize: 12,
-    color: THEME.colors.textMuted,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginBottom: 14,
   },
-  tabContainer: {
+  tabsRow: {
     flexDirection: 'row',
-    paddingHorizontal: THEME.spacing.lg,
+    justifyContent: 'center',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: THEME.radius.md,
-    alignItems: 'center',
-    backgroundColor: THEME.colors.card,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
+  tabPill: {
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
-  tabActive: {
-    backgroundColor: THEME.colors.primary,
-    borderColor: THEME.colors.primary,
+  tabPillActive: {
+    backgroundColor: '#6B3CFF',
   },
   tabText: {
+    color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
-    color: THEME.colors.textMuted,
+    fontFamily: THEME.fonts.extraBold,
   },
-  tabTextActive: {
-    color: '#FFF',
+  listCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 20,
+    padding: 8,
+    gap: 6,
   },
-  list: {
-    padding: THEME.spacing.lg,
-    gap: 10,
-  },
-  playerCard: {
+  playerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.lg,
-    padding: 12,
+    minHeight: 56,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 10,
+    borderRadius: 14,
+  },
+  playerRowMe: {
+    backgroundColor: '#6B3CFF',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: '#FFC43D',
   },
-  cardFirst: {
-    borderColor: THEME.colors.gold,
+  rankText: {
+    width: 22,
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: THEME.fonts.extraBold,
   },
-  cardSecond: {
-    borderColor: THEME.colors.silver,
+  nameText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: THEME.fonts.extraBold,
   },
-  cardThird: {
-    borderColor: THEME.colors.bronze,
-  },
-  rankBox: {
-    width: 32,
-    alignItems: 'center',
-  },
-  rankNumber: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: THEME.colors.textMuted,
-  },
-  rankTop3: {
-    color: THEME.colors.textPrimary,
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: THEME.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 10,
-  },
-  avatarText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  playerInfo: {
-    flex: 1,
-  },
-  playerName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: THEME.colors.textPrimary,
-  },
-  playerMeta: {
-    fontSize: 12,
-    color: THEME.colors.textSecondary,
-    marginTop: 2,
-  },
-  scoreBox: {
-    alignItems: 'flex-end',
+  subRankText: {
+    color: '#D9CDF5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.medium,
   },
   scoreText: {
-    fontSize: 17,
-    fontWeight: '900',
-    color: THEME.colors.gold,
-  },
-  scoreLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: THEME.colors.textMuted,
+    minWidth: 46,
+    textAlign: 'right',
+    color: '#FFC43D',
+    fontSize: 14,
+    fontFamily: THEME.fonts.extraBold,
   },
 });

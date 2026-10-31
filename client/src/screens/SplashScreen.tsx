@@ -1,112 +1,92 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { THEME } from '../theme/tokens';
-import { Sparkles, Zap } from 'lucide-react-native';
-
+import { sound } from '../services/soundService';
+import {
+  TavrikoScreen,
+  TavrikoProgressBar,
+  TavrikoHeroLogo,
+} from '../components/TavrikoIcons';
 interface SplashScreenProps {
   onFinish: () => void;
 }
-
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
-  const [fadeAnim] = useState(new Animated.Value(0));
-  const [scaleAnim] = useState(new Animated.Value(0.8));
-
+  const [progress, setProgress] = useState(25);
+  const logoScale = useRef(new Animated.Value(0.82)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, {
+      Animated.spring(logoScale, {
         toValue: 1,
-        duration: 800,
+        friction: 5,
+        tension: 80,
         useNativeDriver: true,
       }),
-      Animated.spring(scaleAnim, {
+      Animated.timing(logoOpacity, {
         toValue: 1,
-        friction: 6,
+        duration: 450,
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      setTimeout(() => {
-        onFinish();
-      }, 1200);
-    });
-  }, [fadeAnim, scaleAnim, onFinish]);
-
+    ]).start();
+    const t1 = setTimeout(() => setProgress(78), 350);
+    const t2 = setTimeout(() => {
+      setProgress(100);
+      sound.playSound('reward');
+    }, 1100);
+    const t3 = setTimeout(() => onFinish(), 1500);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [onFinish, logoScale, logoOpacity]);
   return (
-    <View style={styles.container}>
-      <Animated.View style={[styles.logoContainer, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-        <View style={styles.iconCircle}>
-          <Zap size={48} color="#FFFFFF" strokeWidth={2.5} />
-        </View>
-        <Text style={styles.title}>TRIVIA<Text style={styles.titleAccent}>VERSE</Text></Text>
-        <View style={styles.badgeRow}>
-          <Sparkles size={14} color={THEME.colors.primaryLight} />
-          <Text style={styles.subtitle}>Yeni Nesil Multiplayer Bilgi Arenası</Text>
-        </View>
+    <TavrikoScreen style={styles.centerAll}>
+      <View style={styles.logoHalo} pointerEvents="none" />
+      <Animated.View
+        style={{
+          opacity: logoOpacity,
+          transform: [{ scale: logoScale }],
+        }}
+      >
+        <TavrikoHeroLogo width={270} height={160} />
       </Animated.View>
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Gerçek Zamanlı Rekabet • Stüdyo Kalitesi</Text>
+      <View style={styles.loaderWrap}>
+        <TavrikoProgressBar progress={progress} height={10} />
+        <Text style={styles.loadingText}>Yükleniyor...</Text>
       </View>
-    </View>
+      <Text style={styles.tagline}>Bilgini yarıştır, kazan!</Text>
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
+  centerAll: {
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: THEME.spacing.xl,
   },
-  logoContainer: {
-    alignItems: 'center',
-  },
-  iconCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: THEME.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: THEME.spacing.lg,
-    shadowColor: THEME.colors.primary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: '900',
-    color: THEME.colors.textPrimary,
-    letterSpacing: 2,
-  },
-  titleAccent: {
-    color: THEME.colors.primaryLight,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: THEME.spacing.sm,
-    backgroundColor: THEME.colors.card,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: THEME.radius.full,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  subtitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: THEME.colors.textSecondary,
-  },
-  footer: {
+  logoHalo: {
     position: 'absolute',
-    bottom: 40,
+    width: 260,
+    height: 150,
+    borderRadius: 130,
+    backgroundColor: '#7A3BFF',
+    opacity: 0.35,
   },
-  footerText: {
+  loaderWrap: {
+    width: 200,
+    marginTop: 24,
+  },
+  loadingText: {
+    color: '#D9CDF5',
     fontSize: 12,
-    color: THEME.colors.textMuted,
-    letterSpacing: 0.5,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  tagline: {
+    color: '#FFC43D',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+    marginTop: 12,
   },
 });

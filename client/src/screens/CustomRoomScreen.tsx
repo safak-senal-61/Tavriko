@@ -1,215 +1,305 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+} from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
-import { ArrowLeft, PlusCircle, LogIn, Users } from 'lucide-react-native';
-
+import {
+  TavrikoScreen,
+  TavrikoTopBar,
+  Button3D,
+} from '../components/TavrikoIcons';
 interface CustomRoomScreenProps {
   onBack: () => void;
   onCreateRoom: () => void;
-  onJoinRoom: (code: string) => void;
+  onJoinRoom: (roomCode: string) => void;
+  avatarSeed?: string;
+  coins?: number;
 }
-
 export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   onBack,
   onCreateRoom,
   onJoinRoom,
+  avatarSeed,
+  coins,
 }) => {
+  // Starts completely empty (no pre-filled code!)
   const [roomCode, setRoomCode] = useState('');
-
-  const handleJoin = () => {
-    sound.playSound('tap');
-    if (roomCode.trim().length === 6) {
-      onJoinRoom(roomCode.trim().toUpperCase());
+  const [selectedPreset, setSelectedPreset] = useState('Karışık');
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const codeInputRef = useRef<any>(null);
+  const chips = ['Karışık', 'Orta', '6 oyuncu', '10 soru'];
+  const digits = Array.from({ length: 6 }).map((_, idx) => roomCode[idx] || '');
+  const handleJoinPress = () => {
+    const clean = roomCode.trim().toUpperCase();
+    if (clean.length < 4) {
+      sound.playSound('wrong');
+      setJoinError('Lütfen geçerli bir oda kodu girin.');
+      codeInputRef.current?.focus();
+      return;
     }
+    setJoinError(null);
+    onJoinRoom(clean);
   };
-
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            sound.playSound('tap');
-            onBack();
-          }}
-        >
-          <ArrowLeft size={22} color={THEME.colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Özel Oda</Text>
-      </View>
-
-      <View style={styles.content}>
-        {/* Create room card */}
-        <View style={styles.actionCard}>
-          <View style={styles.iconCircle}>
-            <PlusCircle size={28} color={THEME.colors.primaryLight} />
+    <TavrikoScreen>
+      <TavrikoTopBar
+        leftType="back"
+        onLeftPress={onBack}
+        avatarSeed={avatarSeed}
+        coins={coins}
+      />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>ÖZEL ODA</Text>
+        {/* Create Room Card */}
+        <View style={styles.glassCard}>
+          <Text style={styles.cardHeading}>Oda Oluştur</Text>
+          <View style={styles.chipsRow}>
+            {chips.map((c) => {
+              const isOn = selectedPreset === c;
+              return (
+                <TouchableOpacity
+                  key={c}
+                  style={[styles.chip, isOn && styles.chipOn]}
+                  onPress={() => {
+                    sound.playSound('tap');
+                    sound.triggerHaptic('light');
+                    setSelectedPreset(c);
+                  }}
+                >
+                  <Text style={styles.chipText}>{c}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-          <Text style={styles.cardTitle}>Yeni Oda Oluştur</Text>
-          <Text style={styles.cardSubtitle}>
-            Kendi kurallarını belirle, arkadaşlarını oda kodu veya bağlantıyla davet et.
-          </Text>
+          <Button3D title="ODA KUR" onPress={onCreateRoom} />
+        </View>
+        {/* Divider */}
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>VEYA</Text>
+          <View style={styles.dividerLine} />
+        </View>
+        {/* Join Room Card */}
+        <View style={styles.glassCard}>
+          <Text style={styles.cardHeading}>Odaya Katıl</Text>
+          {/* 6 Digit Boxes + Tappable Input */}
           <TouchableOpacity
-            style={styles.createButton}
+            activeOpacity={0.9}
             onPress={() => {
               sound.playSound('tap');
-              onCreateRoom();
+              codeInputRef.current?.focus();
+            }}
+            style={styles.digitBoxesWrap}
+          >
+            {digits.map((char, i) => {
+              const filled = char.length > 0;
+              const isCurrentSlot = i === roomCode.length;
+              return (
+                <View
+                  key={i}
+                  style={[
+                    styles.digitBox,
+                    !filled && styles.digitBoxEmpty,
+                    isCurrentSlot && styles.digitBoxActive,
+                  ]}
+                >
+                  <Text
+                    style={
+                      filled
+                        ? styles.digitTextFilled
+                        : styles.digitTextPlaceholder
+                    }
+                  >
+                    {filled ? char.toUpperCase() : '·'}
+                  </Text>
+                </View>
+              );
+            })}
+            <TextInput
+              ref={codeInputRef}
+              style={styles.hiddenInput}
+              value={roomCode}
+              onChangeText={(txt) => {
+                sound.playSound('tap');
+                setJoinError(null);
+                setRoomCode(
+                  txt.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 6)
+                );
+              }}
+              maxLength={6}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+          </TouchableOpacity>
+          {joinError ? <Text style={styles.errorText}>{joinError}</Text> : null}
+          <TouchableOpacity
+            style={styles.pasteBtn}
+            onPress={async () => {
+              const clip = await Clipboard.getStringAsync();
+              if (clip) {
+                const clean = clip.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 6);
+                if (clean) {
+                  setRoomCode(clean);
+                  setJoinError(null);
+                  sound.playSound('tap');
+                }
+              }
             }}
           >
-            <Text style={styles.buttonText}>Oda Oluştur</Text>
+            <Text style={styles.pasteBtnText}>📋 Panodan Kodu Yapıştır</Text>
           </TouchableOpacity>
-        </View>
-
-        <View style={styles.divider}>
-          <View style={styles.line} />
-          <Text style={styles.dividerText}>VEYA</Text>
-          <View style={styles.line} />
-        </View>
-
-        {/* Join room card */}
-        <View style={styles.actionCard}>
-          <View style={[styles.iconCircle, { backgroundColor: 'rgba(236, 72, 153, 0.15)' }]}>
-            <LogIn size={28} color={THEME.colors.secondary} />
-          </View>
-          <Text style={styles.cardTitle}>Mevcut Odaya Katıl</Text>
-          <Text style={styles.cardSubtitle}>
-            Arkadaşının paylaştığı 6 haneli oda kodunu girerek lobiye katıl.
-          </Text>
-
-          <TextInput
-            style={styles.codeInput}
-            placeholder="ODA KODU (ÖR: 8X4Y2Z)"
-            placeholderTextColor={THEME.colors.textMuted}
-            value={roomCode}
-            onChangeText={(txt) => setRoomCode(txt.toUpperCase())}
-            maxLength={6}
-            autoCapitalize="characters"
+          <Button3D
+            title="KATIL"
+            variant="mint"
+            onPress={handleJoinPress}
           />
-
-          <TouchableOpacity
-            style={[styles.joinButton, roomCode.length !== 6 && styles.buttonDisabled]}
-            disabled={roomCode.length !== 6}
-            onPress={handleJoin}
-          >
-            <Text style={styles.buttonText}>Odaya Katıl</Text>
-          </TouchableOpacity>
+          <Text style={styles.hintText}>
+            Kutulara dokunarak 6 haneli oda kodunu gir
+          </Text>
         </View>
-      </View>
-    </View>
+      </ScrollView>
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
+  scrollContent: {
+    paddingBottom: 32,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: THEME.spacing.lg,
-    paddingTop: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.border,
-    backgroundColor: THEME.colors.card,
+  title: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 36,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 14,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-  },
-  content: {
-    padding: THEME.spacing.lg,
-  },
-  actionCard: {
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.xl,
-    padding: THEME.spacing.xl,
+  glassCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
-    alignItems: 'center',
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 20,
+    padding: 16,
   },
-  iconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(99, 102, 241, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
+  cardHeading: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 20,
+    color: '#FFFFFF',
+    marginBottom: 10,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-    marginBottom: 6,
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
   },
-  cardSubtitle: {
-    fontSize: 13,
-    color: THEME.colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 16,
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
   },
-  createButton: {
-    width: '100%',
-    backgroundColor: THEME.colors.primary,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 14,
-    alignItems: 'center',
+  chipOn: {
+    backgroundColor: '#6B3CFF',
   },
-  joinButton: {
-    width: '100%',
-    backgroundColor: THEME.colors.secondary,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 14,
-    alignItems: 'center',
+  chipText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
   },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  codeInput: {
-    width: '100%',
-    backgroundColor: THEME.colors.backgroundSecondary,
-    borderRadius: THEME.radius.md,
-    borderWidth: 1.5,
-    borderColor: THEME.colors.border,
-    paddingVertical: 14,
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-    letterSpacing: 4,
-    marginBottom: 12,
-  },
-  divider: {
+  dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: THEME.spacing.lg,
+    gap: 10,
+    marginVertical: 16,
   },
-  line: {
+  dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: THEME.colors.border,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   dividerText: {
-    color: THEME.colors.textMuted,
+    color: '#D9CDF5',
     fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  digitBoxesWrap: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    position: 'relative',
+  },
+  digitBox: {
+    width: 46,
+    height: 56,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.24)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  digitBoxEmpty: {
+    borderStyle: 'dashed',
+  },
+  digitBoxActive: {
+    borderColor: '#FFC43D',
+    borderWidth: 2,
+  },
+  digitTextFilled: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 26,
+    color: '#FFC43D',
+  },
+  digitTextPlaceholder: {
+    fontSize: 24,
+    color: '#CBBFE8',
     fontWeight: '800',
-    marginHorizontal: 12,
+  },
+  hiddenInput: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0.01,
+    color: 'transparent',
+  },
+  errorText: {
+    color: '#FF7A8A',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  pasteBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  pasteBtnText: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
+  },
+  hintText: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginTop: 10,
   },
 });

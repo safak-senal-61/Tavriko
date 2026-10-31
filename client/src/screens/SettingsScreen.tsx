@@ -1,207 +1,186 @@
-import React from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Image,
+} from 'react-native';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
-import { useGameStore } from '../store/gameStore';
-import { ArrowLeft, Volume2, Smartphone, Shield, LogOut, Info } from 'lucide-react-native';
-
+import {
+  TavrikoScreen,
+  TavrikoTopBar,
+  Button3D,
+  BRAND_APP_ICON,
+} from '../components/TavrikoIcons';
 interface SettingsScreenProps {
   onBack: () => void;
   onLogout: () => void;
 }
-
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ onBack, onLogout }) => {
-  const { soundEnabled, hapticsEnabled, setSoundEnabled, setHapticsEnabled } = useGameStore();
-
-  const handleSoundToggle = (val: boolean) => {
-    sound.setSoundEnabled(val);
-    setSoundEnabled(val);
-    if (val) sound.playSound('tap');
-  };
-
-  const handleHapticsToggle = (val: boolean) => {
-    sound.setHapticsEnabled(val);
-    setHapticsEnabled(val);
-    if (val) sound.triggerHaptic('light');
-  };
-
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({
+  onBack,
+  onLogout,
+}) => {
+  const [sfxEnabled, setSfxEnabled] = useState(sound.isSoundEnabled());
+  const [musicEnabled, setMusicEnabled] = useState(false);
+  const [hapticsEnabled, setHapticsEnabled] = useState(sound.isHapticsEnabled());
+  const [notifsEnabled, setNotifsEnabled] = useState(true);
+  const renderSwitch = (value: boolean, onToggle: () => void) => (
+    <TouchableOpacity
+      style={[
+        styles.switchTrack,
+        { backgroundColor: value ? '#3FD08A' : '#4A3A7A' },
+      ]}
+      onPress={onToggle}
+      activeOpacity={0.85}
+    >
+      <View
+        style={[
+          styles.switchThumb,
+          value ? { right: 3 } : { left: 3 },
+        ]}
+      />
+    </TouchableOpacity>
+  );
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            sound.playSound('tap');
-            onBack();
-          }}
-        >
-          <ArrowLeft size={22} color={THEME.colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ayarlar</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionHeader}>Oyun Deneyimi</Text>
-        <View style={styles.card}>
-          <View style={styles.row}>
-            <View style={styles.rowLeft}>
-              <Volume2 size={20} color={THEME.colors.primaryLight} />
-              <View>
-                <Text style={styles.rowTitle}>Ses Efektleri</Text>
-                <Text style={styles.rowDesc}>Cevaplar, sayaç ve zafer sesleri</Text>
-              </View>
-            </View>
-            <Switch
-              value={soundEnabled}
-              onValueChange={handleSoundToggle}
-              trackColor={{ false: THEME.colors.border, true: THEME.colors.primary }}
-              thumbColor="#FFF"
-            />
+    <TavrikoScreen>
+      <TavrikoTopBar leftType="back" onLeftPress={onBack} />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>AYARLAR</Text>
+        {/* Toggles Group */}
+        <View style={styles.groupCard}>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Ses efektleri</Text>
+            {renderSwitch(sfxEnabled, () => {
+              const next = !sfxEnabled;
+              setSfxEnabled(next);
+              sound.setSoundEnabled(next);
+            })}
           </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.row}>
-            <View style={styles.rowLeft}>
-              <Smartphone size={20} color={THEME.colors.primaryLight} />
-              <View>
-                <Text style={styles.rowTitle}>Titreşim & Haptik</Text>
-                <Text style={styles.rowDesc}>Dokunma ve geri bildirim titreşimleri</Text>
-              </View>
-            </View>
-            <Switch
-              value={hapticsEnabled}
-              onValueChange={handleHapticsToggle}
-              trackColor={{ false: THEME.colors.border, true: THEME.colors.primary }}
-              thumbColor="#FFF"
-            />
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Müzik</Text>
+            {renderSwitch(musicEnabled, () => setMusicEnabled((v) => !v))}
+          </View>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Haptik titreşim</Text>
+            {renderSwitch(hapticsEnabled, () => {
+              const next = !hapticsEnabled;
+              setHapticsEnabled(next);
+              sound.setHapticsEnabled(next);
+            })}
+          </View>
+          <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.settingLabel}>Bildirimler</Text>
+            {renderSwitch(notifsEnabled, () => setNotifsEnabled((v) => !v))}
           </View>
         </View>
-
-        <Text style={styles.sectionHeader}>Gizlilik ve Hesap</Text>
-        <View style={styles.card}>
-          <TouchableOpacity
-            style={styles.actionRow}
-            onPress={() => {
-              sound.playSound('tap');
-            }}
-          >
-            <View style={styles.rowLeft}>
-              <Shield size={20} color={THEME.colors.correct} />
-              <Text style={styles.rowTitle}>Gizlilik Politikası & Kurallar</Text>
-            </View>
+        {/* Links Group */}
+        <View style={[styles.groupCard, { marginTop: 14 }]}>
+          <TouchableOpacity style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Dil</Text>
+            <Text style={styles.settingRightSub}>Türkçe ›</Text>
           </TouchableOpacity>
-
-          <View style={styles.divider} />
-
-          <TouchableOpacity
-            style={styles.actionRow}
-            onPress={() => {
-              sound.playSound('tap');
-              onLogout();
-            }}
-          >
-            <View style={styles.rowLeft}>
-              <LogOut size={20} color={THEME.colors.wrong} />
-              <Text style={[styles.rowTitle, { color: THEME.colors.wrong }]}>Çıkış Yap</Text>
-            </View>
+          <TouchableOpacity style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Hesap</Text>
+            <Text style={styles.settingRightSub}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.settingRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.settingLabel}>Gizlilik</Text>
+            <Text style={styles.settingRightSub}>›</Text>
           </TouchableOpacity>
         </View>
-
-        <View style={styles.versionBox}>
-          <Info size={14} color={THEME.colors.textMuted} />
-          <Text style={styles.versionText}>TriviaVerse v1.0.0 (Production Build)</Text>
+        {/* Logout Button */}
+        <View style={{ alignItems: 'center', marginTop: 28 }}>
+          <Button3D
+            title="ÇIKIŞ YAP"
+            variant="red"
+            onPress={onLogout}
+            style={{ width: 240 }}
+          />
+        </View>
+        {/* Footer App Icon & Version */}
+        <View style={styles.footerBrand}>
+          <Image
+            source={BRAND_APP_ICON}
+            style={styles.appIcon}
+            resizeMode="cover"
+          />
+          <Text style={styles.versionText}>Tavriko · Sürüm 1.0.0</Text>
         </View>
       </ScrollView>
-    </View>
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
+  scrollContent: {
+    paddingBottom: 32,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: THEME.spacing.lg,
-    paddingTop: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.border,
-    backgroundColor: THEME.colors.card,
+  title: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 36,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 14,
   },
-  backButton: {
-    width: 40,
-    height: 40,
+  groupCard: {
     borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-  },
-  content: {
-    padding: THEME.spacing.lg,
-  },
-  sectionHeader: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: THEME.colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  card: {
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     overflow: 'hidden',
-    marginBottom: 16,
   },
-  row: {
+  settingRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    height: 52,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  settingLabel: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  settingRightSub: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  switchTrack: {
+    width: 46,
+    height: 26,
+    borderRadius: 13,
+    position: 'relative',
+  },
+  switchThumb: {
+    position: 'absolute',
+    top: 3,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  footerBrand: {
     alignItems: 'center',
-    padding: 16,
+    marginTop: 20,
+    gap: 8,
   },
-  actionRow: {
-    padding: 16,
-  },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  rowTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: THEME.colors.textPrimary,
-  },
-  rowDesc: {
-    fontSize: 11,
-    color: THEME.colors.textMuted,
-    marginTop: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: THEME.colors.border,
-  },
-  versionBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 24,
+  appIcon: {
+    width: 56,
+    height: 51,
+    borderRadius: 14,
   },
   versionText: {
+    color: '#D9CDF5',
     fontSize: 12,
-    color: THEME.colors.textMuted,
+    fontFamily: THEME.fonts.extraBold,
   },
 });

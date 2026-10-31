@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "buildCommand": "npx prisma generate --schema=server/prisma/schema.prisma && npm run build:shared && npm run build:server",
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "node_modules/.prisma/**",
+          "node_modules/@prisma/client/**",
+          "node_modules/@trivia/**",
+          "shared/**",
+          "server/dist/**",
+          "server/prisma/**",
+          "server/data/**"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "api/index.js"
+    }
+  ]
+}

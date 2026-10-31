@@ -1,338 +1,419 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+} from 'react-native';
+import { UserProfile, calculateLevelFromXp } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
-import { UserProfile } from '@trivia/shared';
-import { ArrowLeft, Award, Flame, Target, Clock, Zap, Shield, Sparkles } from 'lucide-react-native';
-
+import {
+  TavrikoScreen,
+  TavrikoTopBar,
+  TavrikoBottomNav,
+  TavrikoProgressBar,
+  CharacterAvatar,
+  TrophyIcon,
+  SpeedBoltIcon,
+  StreakFlameIcon,
+  BadgeShieldIcon,
+  CrownIcon,
+  ChestIcon,
+  ModeSquircleIcon,
+} from '../components/TavrikoIcons';
+let ImagePickerModule: any = null;
+try {
+  ImagePickerModule = require('expo-image-picker');
+} catch {
+  ImagePickerModule = null;
+}
 interface ProfileScreenProps {
   user: UserProfile;
   onBack: () => void;
-  onEditProfile?: () => void;
+  onEditProfile: () => void;
+  onUpdateAvatar?: (uri: string) => void;
+  onNavigateTab?: (tab: 'play' | 'explore' | 'leaders' | 'friends' | 'profile') => void;
+  onSettings?: () => void;
 }
-
-export const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, onBack, onEditProfile }) => {
+export const ProfileScreen: React.FC<ProfileScreenProps> = ({
+  user,
+  onBack,
+  onEditProfile,
+  onUpdateAvatar,
+  onNavigateTab,
+  onSettings,
+}) => {
+  const handlePickPhotoDirect = async () => {
+    sound.playSound('tap');
+    if (onUpdateAvatar && ImagePickerModule?.launchImageLibraryAsync) {
+      try {
+        const res = await ImagePickerModule.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.75,
+        });
+        if (!res.canceled && res.assets?.[0]?.uri) {
+          onUpdateAvatar(res.assets[0].uri);
+          sound.playSound('reward');
+          return;
+        }
+      } catch {
+        // Fallback to profile edit screen
+      }
+    }
+    onEditProfile();
+  };
+  const totalMatches = user.stats?.totalMatches || 0;
+  const wins = user.stats?.wins || 0;
+  const correctAnswers = user.stats?.correctAnswers || 0;
+  const totalAnswers = user.stats?.totalAnswers || 0;
   const winRate =
-    user.stats.totalMatches > 0
-      ? Math.round((user.stats.wins / user.stats.totalMatches) * 100)
+    totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
+  const accuracyRate =
+    totalAnswers > 0
+      ? Math.round((correctAnswers / totalAnswers) * 100)
       : 0;
-
-  const accuracy =
-    user.stats.totalAnswers > 0
-      ? Math.round((user.stats.correctAnswers / user.stats.totalAnswers) * 100)
-      : 0;
-
-  const achievements = [
-    { id: 'ach1', title: 'İlk Zafer', desc: 'İlk çok oyunculu maçını kazan', unlocked: true, icon: Award },
-    { id: 'ach2', title: 'Hız Tutkunu', desc: 'Bir soruyu 2 saniyenin altında doğru bil', unlocked: true, icon: Zap },
-    { id: 'ach3', title: 'Seri Katil', desc: '5 soru üst üste doğru cevap ver', unlocked: user.stats.bestStreak >= 5, icon: Flame },
-    { id: 'ach4', title: 'Bilgi Ustası', desc: '100 soru doğru yanıtla', unlocked: user.stats.correctAnswers >= 100, icon: Shield },
-  ];
-
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            sound.playSound('tap');
-            onBack();
-          }}
-        >
-          <ArrowLeft size={22} color={THEME.colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Oyuncu Profili</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* User Card */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{user.displayName.charAt(0).toUpperCase()}</Text>
-          </View>
-          <Text style={styles.displayName}>{user.displayName}</Text>
-          <Text style={styles.username}>@{user.username}</Text>
-
-          <View style={styles.rankPill}>
-            <Sparkles size={14} color={THEME.colors.gold} />
-            <Text style={styles.rankPillText}>{user.rankTitle} ({user.rankPoints} LP)</Text>
-          </View>
-
-          {/* XP Progress */}
-          <View style={styles.xpSection}>
-            <View style={styles.xpLabelRow}>
-              <Text style={styles.levelBadgeText}>Seviye {user.level}</Text>
-              <Text style={styles.xpText}>{user.xp} / 1000 XP</Text>
-            </View>
-            <View style={styles.xpTrack}>
-              <View style={[styles.xpFill, { width: `${Math.min(100, (user.xp % 1000) / 10)}%` }]} />
-            </View>
-          </View>
-        </View>
-
-        {/* Stats 4-Grid */}
-        <Text style={styles.sectionTitle}>Kariyer İstatistikleri</Text>
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Target size={20} color={THEME.colors.primaryLight} />
-            <Text style={styles.statVal}>{user.stats.totalMatches}</Text>
-            <Text style={styles.statLbl}>Toplam Maç</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Award size={20} color={THEME.colors.correct} />
-            <Text style={[styles.statVal, { color: THEME.colors.correct }]}>%{winRate}</Text>
-            <Text style={styles.statLbl}>Kazanma Oranı</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Flame size={20} color={THEME.colors.streak} />
-            <Text style={[styles.statVal, { color: THEME.colors.streak }]}>{user.stats.bestStreak}x</Text>
-            <Text style={styles.statLbl}>En İyi Seri</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Clock size={20} color={THEME.colors.accent} />
-            <Text style={styles.statVal}>%{accuracy}</Text>
-            <Text style={styles.statLbl}>İsabet Oranı</Text>
-          </View>
-        </View>
-
-        {/* Achievements Section */}
-        <Text style={styles.sectionTitle}>Başarılar</Text>
-        <View style={styles.achievementsList}>
-          {achievements.map((ach) => {
-            const Icon = ach.icon;
+    <TavrikoScreen>
+      <TavrikoTopBar
+        leftType="back"
+        onLeftPress={onBack}
+        coins={user.coins ?? 500}
+        gems={user.gems ?? 14}
+        avatarSeed={user.avatarUrl || user.displayName}
+        onAvatarPress={onEditProfile}
+      />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Center Avatar with Gold Ring */}
+        <View style={styles.avatarHeader}>
+          <TouchableOpacity
+            style={styles.goldAvatarRing}
+            onPress={handlePickPhotoDirect}
+            activeOpacity={0.85}
+          >
+            <CharacterAvatar
+              seed={user.avatarUrl || user.displayName}
+              size={84}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.editPhotoPill}
+            onPress={onEditProfile}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.editPhotoPillText}>
+              Profili & Fotoğrafı Düzenle
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.displayName}>
+            {user.fullName || user.displayName}
+          </Text>
+          {(() => {
+            const prog = calculateLevelFromXp(user.xp ?? 0);
             return (
-              <View key={ach.id} style={[styles.achCard, !ach.unlocked && styles.achLocked]}>
-                <View style={[styles.achIcon, ach.unlocked ? styles.achIconUnlocked : styles.achIconLocked]}>
-                  <Icon size={20} color={ach.unlocked ? THEME.colors.primaryLight : THEME.colors.textMuted} />
-                </View>
-                <View style={styles.achInfo}>
-                  <Text style={[styles.achTitle, !ach.unlocked && styles.textLocked]}>{ach.title}</Text>
-                  <Text style={styles.achDesc}>{ach.desc}</Text>
-                </View>
-                <View style={[styles.statusBadge, ach.unlocked ? styles.statusBadgeUnlocked : styles.statusBadgeLocked]}>
-                  <Text style={[styles.statusBadgeText, ach.unlocked ? styles.textUnlocked : styles.textLocked]}>
-                    {ach.unlocked ? 'AÇILDI' : 'KİLİTLİ'}
-                  </Text>
-                </View>
-              </View>
+              <Text style={styles.levelSub}>
+                @{user.username} · Seviye {prog.level} ({prog.currentLevelXp} / {prog.nextLevelXpRequired} XP) · {prog.rankTitle}
+              </Text>
             );
-          })}
+          })()}
+          {user.bio ? <Text style={styles.bioText}>"{user.bio}"</Text> : null}
+        </View>
+        {/* Real Database Statistics Row */}
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>%{winRate}</Text>
+            <Text style={styles.statLabel}>Kazanma ({wins}/{totalMatches})</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>%{accuracyRate}</Text>
+            <Text style={styles.statLabel}>
+              İsabet ({correctAnswers}/{totalAnswers})
+            </Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{user.stats?.bestStreak || 0}</Text>
+            <Text style={styles.statLabel}>En iyi seri</Text>
+          </View>
+        </View>
+        {/* Supabase User Details Card */}
+        <View style={styles.detailsCard}>
+          <View style={styles.detailsHeaderRow}>
+            <Text style={styles.sectionTitle}>Hesap & Kişisel Bilgiler</Text>
+            <Text style={styles.completionBadge}>
+              Profil %{user.profileCompletionPct || 85}
+            </Text>
+          </View>
+          <TavrikoProgressBar
+            progress={user.profileCompletionPct || 85}
+            height={8}
+            style={{ marginBottom: 12 }}
+          />
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Kullanıcı Adı</Text>
+            <Text style={styles.infoVal}>@{user.username}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Ad Soyad</Text>
+            <Text style={styles.infoVal}>
+              {user.fullName || user.displayName}
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>E-posta Adresi</Text>
+            <Text style={styles.infoVal}>
+              {user.email || `${user.username}@tavriko.app`}
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Ülke</Text>
+            <Text style={styles.infoVal}>
+              {user.countryName || 'Türkiye'} ({user.countryCode || 'TR'})
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Telefon</Text>
+            <Text style={styles.infoVal}>
+              {user.phone || 'Belirtilmedi'}
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Doğum Tarihi</Text>
+            <Text style={styles.infoVal}>
+              {user.birthDate || 'Belirtilmedi'}
+            </Text>
+          </View>
+          {user.gender ? (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Cinsiyet</Text>
+              <Text style={styles.infoVal}>{user.gender}</Text>
+            </View>
+          ) : null}
+        </View>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Başarılar</Text>
+          {onSettings && (
+            <TouchableOpacity
+              style={styles.settingsChip}
+              onPress={() => {
+                sound.playSound('tap');
+                onSettings();
+              }}
+            >
+              <ModeSquircleIcon mode="settings" size={22} />
+              <Text style={styles.settingsChipText}>Ayarlar</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {/* 3x2 Achievements Grid */}
+        <View style={styles.badgeGrid}>
+          <View style={[styles.badgeCard, wins < 1 && { opacity: 0.45 }]}>
+            <TrophyIcon size={38} />
+            <Text style={styles.badgeName}>İlk Zafer</Text>
+          </View>
+          <View style={styles.badgeCard}>
+            <SpeedBoltIcon size={38} />
+            <Text style={styles.badgeName}>Hız Ustası</Text>
+          </View>
+          <View
+            style={[
+              styles.badgeCard,
+              (user.stats?.bestStreak || 0) < 3 && { opacity: 0.45 },
+            ]}
+          >
+            <StreakFlameIcon size={38} />
+            <Text style={styles.badgeName}>Seri Kralı</Text>
+          </View>
+          <View
+            style={[styles.badgeCard, correctAnswers < 10 && { opacity: 0.45 }]}
+          >
+            <BadgeShieldIcon size={38} />
+            <Text style={styles.badgeName}>100 Doğru</Text>
+          </View>
+          <View
+            style={[styles.badgeCard, (user.level || 1) < 5 && { opacity: 0.45 }]}
+          >
+            <CrownIcon size={38} />
+            <Text style={styles.badgeName}>Uzman</Text>
+          </View>
+          <View style={[styles.badgeCard, { opacity: 0.45 }]}>
+            <ChestIcon size={38} />
+            <Text style={styles.badgeName}>Koleksiyoncu</Text>
+          </View>
         </View>
       </ScrollView>
-    </View>
+      <TavrikoBottomNav
+        activeTab="profile"
+        onSelectTab={(tab) => {
+          if (tab === 'play') onBack();
+          else if (onNavigateTab) onNavigateTab(tab);
+        }}
+      />
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
+  scrollContent: {
+    paddingBottom: 110,
   },
-  header: {
-    flexDirection: 'row',
+  avatarHeader: {
     alignItems: 'center',
-    paddingHorizontal: THEME.spacing.lg,
-    paddingTop: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.border,
-    backgroundColor: THEME.colors.card,
+    marginTop: 10,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+  goldAvatarRing: {
+    padding: 4,
+    borderRadius: 50,
+    backgroundColor: '#FFB21E',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-  },
-  content: {
-    padding: THEME.spacing.lg,
-    paddingBottom: 40,
-  },
-  profileCard: {
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.xl,
-    padding: THEME.spacing.xl,
-    alignItems: 'center',
+  editPhotoPill: {
+    marginTop: 8,
+    backgroundColor: 'rgba(107, 60, 255, 0.35)',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
-    marginBottom: 20,
+    borderColor: '#FFC43D',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
   },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: THEME.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: THEME.colors.primaryLight,
-    marginBottom: 8,
-  },
-  avatarText: {
-    color: '#FFF',
-    fontSize: 30,
-    fontWeight: '900',
+  editPhotoPillText: {
+    color: '#FFC43D',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
   },
   displayName: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
+    fontFamily: THEME.fonts.display,
+    fontSize: 26,
+    color: '#FFFFFF',
+    marginTop: 6,
   },
-  username: {
-    fontSize: 13,
-    color: THEME.colors.textMuted,
+  levelSub: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+  },
+  bioText: {
+    color: '#FFC43D',
+    fontSize: 12,
+    fontFamily: THEME.fonts.body,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginVertical: 14,
+  },
+  statCard: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statValue: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 22,
+    color: '#FFFFFF',
+  },
+  statLabel: {
+    color: '#D9CDF5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
     marginTop: 2,
   },
-  rankPill: {
+  detailsCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 20,
+    padding: 14,
+    marginBottom: 16,
+  },
+  detailsHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: THEME.colors.backgroundSecondary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: THEME.radius.full,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    marginVertical: 12,
-  },
-  rankPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: THEME.colors.gold,
-  },
-  xpSection: {
-    width: '100%',
-    marginTop: 4,
-  },
-  xpLabelRow: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  levelBadgeText: {
+  completionBadge: {
+    color: '#7CFC8A',
     fontSize: 12,
-    fontWeight: '800',
-    color: THEME.colors.primaryLight,
+    fontFamily: THEME.fonts.extraBold,
   },
-  xpText: {
-    fontSize: 11,
-    color: THEME.colors.textMuted,
-    fontWeight: '600',
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
-  xpTrack: {
-    height: 8,
-    backgroundColor: THEME.colors.backgroundSecondary,
-    borderRadius: 4,
-    overflow: 'hidden',
+  infoLabel: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
   },
-  xpFill: {
-    height: '100%',
-    backgroundColor: THEME.colors.primary,
-    borderRadius: 4,
+  infoVal: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-    marginBottom: 12,
+    fontFamily: THEME.fonts.display,
+    fontSize: 18,
+    color: '#FFFFFF',
   },
-  statsGrid: {
+  settingsChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(10, 4, 24, 0.72)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  settingsChipText: {
+    color: '#D9CDF5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  badgeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 24,
+    justifyContent: 'space-between',
+    rowGap: 10,
   },
-  statCard: {
-    width: '48%',
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.lg,
-    padding: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  statVal: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: THEME.colors.textPrimary,
-    marginVertical: 4,
-  },
-  statLbl: {
-    fontSize: 11,
-    color: THEME.colors.textMuted,
-    fontWeight: '600',
-  },
-  achievementsList: {
-    gap: 10,
-  },
-  achCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: THEME.colors.card,
-    padding: 12,
-    borderRadius: THEME.radius.lg,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  achLocked: {
-    opacity: 0.6,
-  },
-  achIcon: {
-    width: 40,
-    height: 40,
+  badgeCard: {
+    width: '31.5%',
+    height: 90,
     borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    gap: 4,
   },
-  achIconUnlocked: {
-    backgroundColor: 'rgba(99, 102, 241, 0.15)',
-  },
-  achIconLocked: {
-    backgroundColor: THEME.colors.backgroundSecondary,
-  },
-  achInfo: {
-    flex: 1,
-  },
-  achTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: THEME.colors.textPrimary,
-  },
-  achDesc: {
+  badgeName: {
+    color: '#FFFFFF',
     fontSize: 11,
-    color: THEME.colors.textSecondary,
-    marginTop: 2,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: THEME.radius.sm,
-  },
-  statusBadgeUnlocked: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-  },
-  statusBadgeLocked: {
-    backgroundColor: THEME.colors.backgroundSecondary,
-  },
-  statusBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  textUnlocked: {
-    color: THEME.colors.correct,
-  },
-  textLocked: {
-    color: THEME.colors.textMuted,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
   },
 });

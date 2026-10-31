@@ -1,0 +1,1082 @@
+[
+  {
+    "id": "google_i7h0qx1::chest",
+    "userId": "google_i7h0qx1",
+    "itemId": "chest",
+    "name": "Ahşap Sandık",
+    "desc": "1 altın anahtar ile açılır",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:01:02.331Z",
+    "updatedAt": "2026-10-31T18:05:59.586Z"
+  },
+  {
+    "id": "google_i7h0qx1::key",
+    "userId": "google_i7h0qx1",
+    "itemId": "key",
+    "name": "Altın Anahtar",
+    "desc": "Sandıkların kilidini açar",
+    "qty": 3,
+    "createdAt": "2026-10-30T20:01:02.334Z",
+    "updatedAt": "2026-10-31T18:05:59.587Z"
+  },
+  {
+    "id": "google_i7h0qx1::bolt",
+    "userId": "google_i7h0qx1",
+    "itemId": "bolt",
+    "name": "Hız Güçlendirici",
+    "desc": "+%25 hız bonusu verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:01:02.338Z",
+    "updatedAt": "2026-10-31T18:05:59.588Z"
+  },
+  {
+    "id": "google_i7h0qx1::crown",
+    "userId": "google_i7h0qx1",
+    "itemId": "crown",
+    "name": "Kraliyet Tacı",
+    "desc": "Özel profil çerçevesi",
+    "qty": 1,
+    "createdAt": "2026-10-30T20:01:02.341Z",
+    "updatedAt": "2026-10-31T18:05:59.588Z"
+  },
+  {
+    "id": "google_i7h0qx1::heart",
+    "userId": "google_i7h0qx1",
+    "itemId": "heart",
+    "name": "Ekstra Can",
+    "desc": "Yanlış cevapta seriyi korur",
+    "qty": 4,
+    "createdAt": "2026-10-30T20:01:02.344Z",
+    "updatedAt": "2026-10-31T18:05:59.589Z"
+  },
+  {
+    "id": "google_i7h0qx1::gift",
+    "userId": "google_i7h0qx1",
+    "itemId": "gift",
+    "name": "Gizemli Kutu",
+    "desc": "Rastgele altın ödülü içerir",
+    "qty": 1,
+    "createdAt": "2026-10-30T20:01:02.348Z",
+    "updatedAt": "2026-10-31T18:05:59.590Z"
+  },
+  {
+    "id": "google_i7h0qx1::gem",
+    "userId": "google_i7h0qx1",
+    "itemId": "gem",
+    "name": "Elmas Kesesi",
+    "desc": "Açıldığında +10 elmas verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:01:02.351Z",
+    "updatedAt": "2026-10-31T18:05:59.591Z"
+  },
+  {
+    "id": "google_i7h0qx1::coin",
+    "userId": "google_i7h0qx1",
+    "itemId": "coin",
+    "name": "Altın Kesesi",
+    "desc": "Açıldığında +100 altın verir",
+    "qty": 3,
+    "createdAt": "2026-10-30T20:01:02.354Z",
+    "updatedAt": "2026-10-31T18:05:59.591Z"
+  },
+  {
+    "id": "google_i7h0qx1::flame",
+    "userId": "google_i7h0qx1",
+    "itemId": "flame",
+    "name": "Seri Kalkanı",
+    "desc": "Günlük serini 1 gün korur",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:01:02.357Z",
+    "updatedAt": "2026-10-31T18:05:59.592Z"
+  },
+  {
+    "id": "google_nus41m7::chest",
+    "userId": "google_nus41m7",
+    "itemId": "chest",
+    "name": "Ahşap Sandık",
+    "desc": "1 altın anahtar ile açılır",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:05:44.028Z",
+    "updatedAt": "2026-10-31T18:06:00.577Z"
+  },
+  {
+    "id": "google_nus41m7::key",
+    "userId": "google_nus41m7",
+    "itemId": "key",
+    "name": "Altın Anahtar",
+    "desc": "Sandıkların kilidini açar",
+    "qty": 3,
+    "createdAt": "2026-10-30T20:05:44.059Z",
+    "updatedAt": "2026-10-31T18:06:00.578Z"
+  },
+  {
+    "id": "google_nus41m7::bolt",
+    "userId": "google_nus41m7",
+    "itemId": "bolt",
+    "name": "Hız Güçlendirici",
+    "desc": "+%25 hız bonusu verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:05:44.079Z",
+    "updatedAt": "2026-10-31T18:06:00.578Z"
+  },
+  {
+    "id": "google_nus41m7::crown",
+    "userId": "google_nus41m7",
+    "itemId": "crown",
+    "name": "Kraliyet Tacı",
+    "desc": "Özel profil çerçevesi",
+    "qty": 1,
+    "createdAt": "2026-10-30T20:05:44.100Z",
+    "updatedAt": "2026-10-31T18:06:00.579Z"
+  },
+  {
+    "id": "google_nus41m7::heart",
+    "userId": "google_nus41m7",
+    "itemId": "heart",
+    "name": "Ekstra Can",
+    "desc": "Yanlış cevapta seriyi korur",
+    "qty": 4,
+    "createdAt": "2026-10-30T20:05:44.118Z",
+    "updatedAt": "2026-10-31T18:06:00.579Z"
+  },
+  {
+    "id": "google_nus41m7::gift",
+    "userId": "google_nus41m7",
+    "itemId": "gift",
+    "name": "Gizemli Kutu",
+    "desc": "Rastgele altın ödülü içerir",
+    "qty": 1,
+    "createdAt": "2026-10-30T20:05:44.138Z",
+    "updatedAt": "2026-10-31T18:06:00.581Z"
+  },
+  {
+    "id": "google_nus41m7::gem",
+    "userId": "google_nus41m7",
+    "itemId": "gem",
+    "name": "Elmas Kesesi",
+    "desc": "Açıldığında +10 elmas verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:05:44.155Z",
+    "updatedAt": "2026-10-31T18:06:00.583Z"
+  },
+  {
+    "id": "google_nus41m7::coin",
+    "userId": "google_nus41m7",
+    "itemId": "coin",
+    "name": "Altın Kesesi",
+    "desc": "Açıldığında +100 altın verir",
+    "qty": 3,
+    "createdAt": "2026-10-30T20:05:44.184Z",
+    "updatedAt": "2026-10-31T18:06:00.584Z"
+  },
+  {
+    "id": "google_nus41m7::flame",
+    "userId": "google_nus41m7",
+    "itemId": "flame",
+    "name": "Seri Kalkanı",
+    "desc": "Günlük serini 1 gün korur",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:05:44.233Z",
+    "updatedAt": "2026-10-31T18:06:00.585Z"
+  },
+  {
+    "id": "google_xnht5bx::chest",
+    "userId": "google_xnht5bx",
+    "itemId": "chest",
+    "name": "Ahşap Sandık",
+    "desc": "1 altın anahtar ile açılır",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:10:52.182Z",
+    "updatedAt": "2026-10-31T18:06:01.627Z"
+  },
+  {
+    "id": "google_xnht5bx::key",
+    "userId": "google_xnht5bx",
+    "itemId": "key",
+    "name": "Altın Anahtar",
+    "desc": "Sandıkların kilidini açar",
+    "qty": 3,
+    "createdAt": "2026-10-30T20:10:52.191Z",
+    "updatedAt": "2026-10-31T18:06:01.628Z"
+  },
+  {
+    "id": "google_xnht5bx::bolt",
+    "userId": "google_xnht5bx",
+    "itemId": "bolt",
+    "name": "Hız Güçlendirici",
+    "desc": "+%25 hız bonusu verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:10:52.209Z",
+    "updatedAt": "2026-10-31T18:06:01.629Z"
+  },
+  {
+    "id": "google_xnht5bx::crown",
+    "userId": "google_xnht5bx",
+    "itemId": "crown",
+    "name": "Kraliyet Tacı",
+    "desc": "Özel profil çerçevesi",
+    "qty": 1,
+    "createdAt": "2026-10-30T20:10:52.222Z",
+    "updatedAt": "2026-10-31T18:06:01.630Z"
+  },
+  {
+    "id": "google_xnht5bx::heart",
+    "userId": "google_xnht5bx",
+    "itemId": "heart",
+    "name": "Ekstra Can",
+    "desc": "Yanlış cevapta seriyi korur",
+    "qty": 4,
+    "createdAt": "2026-10-30T20:10:52.238Z",
+    "updatedAt": "2026-10-31T18:06:01.630Z"
+  },
+  {
+    "id": "google_xnht5bx::gift",
+    "userId": "google_xnht5bx",
+    "itemId": "gift",
+    "name": "Gizemli Kutu",
+    "desc": "Rastgele altın ödülü içerir",
+    "qty": 1,
+    "createdAt": "2026-10-30T20:10:52.261Z",
+    "updatedAt": "2026-10-31T18:06:01.631Z"
+  },
+  {
+    "id": "google_xnht5bx::gem",
+    "userId": "google_xnht5bx",
+    "itemId": "gem",
+    "name": "Elmas Kesesi",
+    "desc": "Açıldığında +10 elmas verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:10:52.283Z",
+    "updatedAt": "2026-10-31T18:06:01.632Z"
+  },
+  {
+    "id": "google_xnht5bx::coin",
+    "userId": "google_xnht5bx",
+    "itemId": "coin",
+    "name": "Altın Kesesi",
+    "desc": "Açıldığında +100 altın verir",
+    "qty": 3,
+    "createdAt": "2026-10-30T20:10:52.301Z",
+    "updatedAt": "2026-10-31T18:06:01.633Z"
+  },
+  {
+    "id": "google_xnht5bx::flame",
+    "userId": "google_xnht5bx",
+    "itemId": "flame",
+    "name": "Seri Kalkanı",
+    "desc": "Günlük serini 1 gün korur",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:10:52.328Z",
+    "updatedAt": "2026-10-31T18:06:01.634Z"
+  },
+  {
+    "id": "bot_1::chest",
+    "userId": "bot_1",
+    "itemId": "chest",
+    "name": "Ahşap Sandık",
+    "desc": "1 altın anahtar ile açılır",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.233Z",
+    "updatedAt": "2026-10-31T18:06:02.994Z"
+  },
+  {
+    "id": "bot_2::chest",
+    "userId": "bot_2",
+    "itemId": "chest",
+    "name": "Ahşap Sandık",
+    "desc": "1 altın anahtar ile açılır",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.233Z",
+    "updatedAt": "2026-10-31T18:06:04.137Z"
+  },
+  {
+    "id": "bot_3::chest",
+    "userId": "bot_3",
+    "itemId": "chest",
+    "name": "Ahşap Sandık",
+    "desc": "1 altın anahtar ile açılır",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.234Z",
+    "updatedAt": "2026-10-31T18:06:05.358Z"
+  },
+  {
+    "id": "bot_4::chest",
+    "userId": "bot_4",
+    "itemId": "chest",
+    "name": "Ahşap Sandık",
+    "desc": "1 altın anahtar ile açılır",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.234Z",
+    "updatedAt": "2026-10-31T18:06:06.589Z"
+  },
+  {
+    "id": "bot_1::key",
+    "userId": "bot_1",
+    "itemId": "key",
+    "name": "Altın Anahtar",
+    "desc": "Sandıkların kilidini açar",
+    "qty": 3,
+    "createdAt": "2026-10-30T20:29:01.236Z",
+    "updatedAt": "2026-10-31T18:06:02.994Z"
+  },
+  {
+    "id": "bot_2::key",
+    "userId": "bot_2",
+    "itemId": "key",
+    "name": "Altın Anahtar",
+    "desc": "Sandıkların kilidini açar",
+    "qty": 3,
+    "createdAt": "2026-10-30T20:29:01.237Z",
+    "updatedAt": "2026-10-31T18:06:04.138Z"
+  },
+  {
+    "id": "bot_3::key",
+    "userId": "bot_3",
+    "itemId": "key",
+    "name": "Altın Anahtar",
+    "desc": "Sandıkların kilidini açar",
+    "qty": 3,
+    "createdAt": "2026-10-30T20:29:01.237Z",
+    "updatedAt": "2026-10-31T18:06:05.358Z"
+  },
+  {
+    "id": "bot_4::key",
+    "userId": "bot_4",
+    "itemId": "key",
+    "name": "Altın Anahtar",
+    "desc": "Sandıkların kilidini açar",
+    "qty": 3,
+    "createdAt": "2026-10-30T20:29:01.238Z",
+    "updatedAt": "2026-10-31T18:06:06.589Z"
+  },
+  {
+    "id": "bot_1::bolt",
+    "userId": "bot_1",
+    "itemId": "bolt",
+    "name": "Hız Güçlendirici",
+    "desc": "+%25 hız bonusu verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.240Z",
+    "updatedAt": "2026-10-31T18:06:02.995Z"
+  },
+  {
+    "id": "bot_2::bolt",
+    "userId": "bot_2",
+    "itemId": "bolt",
+    "name": "Hız Güçlendirici",
+    "desc": "+%25 hız bonusu verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.240Z",
+    "updatedAt": "2026-10-31T18:06:04.138Z"
+  },
+  {
+    "id": "bot_3::bolt",
+    "userId": "bot_3",
+    "itemId": "bolt",
+    "name": "Hız Güçlendirici",
+    "desc": "+%25 hız bonusu verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.240Z",
+    "updatedAt": "2026-10-31T18:06:05.359Z"
+  },
+  {
+    "id": "bot_4::bolt",
+    "userId": "bot_4",
+    "itemId": "bolt",
+    "name": "Hız Güçlendirici",
+    "desc": "+%25 hız bonusu verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.241Z",
+    "updatedAt": "2026-10-31T18:06:06.590Z"
+  },
+  {
+    "id": "bot_1::crown",
+    "userId": "bot_1",
+    "itemId": "crown",
+    "name": "Kraliyet Tacı",
+    "desc": "Özel profil çerçevesi",
+    "qty": 1,
+    "createdAt": "2026-10-30T20:29:01.242Z",
+    "updatedAt": "2026-10-31T18:06:02.995Z"
+  },
+  {
+    "id": "bot_2::crown",
+    "userId": "bot_2",
+    "itemId": "crown",
+    "name": "Kraliyet Tacı",
+    "desc": "Özel profil çerçevesi",
+    "qty": 1,
+    "createdAt": "2026-10-30T20:29:01.243Z",
+    "updatedAt": "2026-10-31T18:06:04.139Z"
+  },
+  {
+    "id": "bot_3::crown",
+    "userId": "bot_3",
+    "itemId": "crown",
+    "name": "Kraliyet Tacı",
+    "desc": "Özel profil çerçevesi",
+    "qty": 1,
+    "createdAt": "2026-10-30T20:29:01.243Z",
+    "updatedAt": "2026-10-31T18:06:05.359Z"
+  },
+  {
+    "id": "bot_4::crown",
+    "userId": "bot_4",
+    "itemId": "crown",
+    "name": "Kraliyet Tacı",
+    "desc": "Özel profil çerçevesi",
+    "qty": 1,
+    "createdAt": "2026-10-30T20:29:01.244Z",
+    "updatedAt": "2026-10-31T18:06:06.590Z"
+  },
+  {
+    "id": "bot_1::heart",
+    "userId": "bot_1",
+    "itemId": "heart",
+    "name": "Ekstra Can",
+    "desc": "Yanlış cevapta seriyi korur",
+    "qty": 4,
+    "createdAt": "2026-10-30T20:29:01.245Z",
+    "updatedAt": "2026-10-31T18:06:02.996Z"
+  },
+  {
+    "id": "bot_2::heart",
+    "userId": "bot_2",
+    "itemId": "heart",
+    "name": "Ekstra Can",
+    "desc": "Yanlış cevapta seriyi korur",
+    "qty": 4,
+    "createdAt": "2026-10-30T20:29:01.246Z",
+    "updatedAt": "2026-10-31T18:06:04.139Z"
+  },
+  {
+    "id": "bot_3::heart",
+    "userId": "bot_3",
+    "itemId": "heart",
+    "name": "Ekstra Can",
+    "desc": "Yanlış cevapta seriyi korur",
+    "qty": 4,
+    "createdAt": "2026-10-30T20:29:01.247Z",
+    "updatedAt": "2026-10-31T18:06:05.360Z"
+  },
+  {
+    "id": "bot_4::heart",
+    "userId": "bot_4",
+    "itemId": "heart",
+    "name": "Ekstra Can",
+    "desc": "Yanlış cevapta seriyi korur",
+    "qty": 4,
+    "createdAt": "2026-10-30T20:29:01.247Z",
+    "updatedAt": "2026-10-31T18:06:06.591Z"
+  },
+  {
+    "id": "bot_1::gift",
+    "userId": "bot_1",
+    "itemId": "gift",
+    "name": "Gizemli Kutu",
+    "desc": "Rastgele altın ödülü içerir",
+    "qty": 1,
+    "createdAt": "2026-10-30T20:29:01.249Z",
+    "updatedAt": "2026-10-31T18:06:02.997Z"
+  },
+  {
+    "id": "bot_2::gift",
+    "userId": "bot_2",
+    "itemId": "gift",
+    "name": "Gizemli Kutu",
+    "desc": "Rastgele altın ödülü içerir",
+    "qty": 1,
+    "createdAt": "2026-10-30T20:29:01.249Z",
+    "updatedAt": "2026-10-31T18:06:04.140Z"
+  },
+  {
+    "id": "bot_3::gift",
+    "userId": "bot_3",
+    "itemId": "gift",
+    "name": "Gizemli Kutu",
+    "desc": "Rastgele altın ödülü içerir",
+    "qty": 1,
+    "createdAt": "2026-10-30T20:29:01.250Z",
+    "updatedAt": "2026-10-31T18:06:05.361Z"
+  },
+  {
+    "id": "bot_4::gift",
+    "userId": "bot_4",
+    "itemId": "gift",
+    "name": "Gizemli Kutu",
+    "desc": "Rastgele altın ödülü içerir",
+    "qty": 1,
+    "createdAt": "2026-10-30T20:29:01.250Z",
+    "updatedAt": "2026-10-31T18:06:06.592Z"
+  },
+  {
+    "id": "bot_1::gem",
+    "userId": "bot_1",
+    "itemId": "gem",
+    "name": "Elmas Kesesi",
+    "desc": "Açıldığında +10 elmas verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.253Z",
+    "updatedAt": "2026-10-31T18:06:02.998Z"
+  },
+  {
+    "id": "bot_2::gem",
+    "userId": "bot_2",
+    "itemId": "gem",
+    "name": "Elmas Kesesi",
+    "desc": "Açıldığında +10 elmas verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.253Z",
+    "updatedAt": "2026-10-31T18:06:04.141Z"
+  },
+  {
+    "id": "bot_3::gem",
+    "userId": "bot_3",
+    "itemId": "gem",
+    "name": "Elmas Kesesi",
+    "desc": "Açıldığında +10 elmas verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.254Z",
+    "updatedAt": "2026-10-31T18:06:05.362Z"
+  },
+  {
+    "id": "bot_4::gem",
+    "userId": "bot_4",
+    "itemId": "gem",
+    "name": "Elmas Kesesi",
+    "desc": "Açıldığında +10 elmas verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.254Z",
+    "updatedAt": "2026-10-31T18:06:06.594Z"
+  },
+  {
+    "id": "bot_1::coin",
+    "userId": "bot_1",
+    "itemId": "coin",
+    "name": "Altın Kesesi",
+    "desc": "Açıldığında +100 altın verir",
+    "qty": 3,
+    "createdAt": "2026-10-30T20:29:01.256Z",
+    "updatedAt": "2026-10-31T18:06:02.999Z"
+  },
+  {
+    "id": "bot_2::coin",
+    "userId": "bot_2",
+    "itemId": "coin",
+    "name": "Altın Kesesi",
+    "desc": "Açıldığında +100 altın verir",
+    "qty": 3,
+    "createdAt": "2026-10-30T20:29:01.257Z",
+    "updatedAt": "2026-10-31T18:06:04.142Z"
+  },
+  {
+    "id": "bot_3::coin",
+    "userId": "bot_3",
+    "itemId": "coin",
+    "name": "Altın Kesesi",
+    "desc": "Açıldığında +100 altın verir",
+    "qty": 3,
+    "createdAt": "2026-10-30T20:29:01.257Z",
+    "updatedAt": "2026-10-31T18:06:05.363Z"
+  },
+  {
+    "id": "bot_4::coin",
+    "userId": "bot_4",
+    "itemId": "coin",
+    "name": "Altın Kesesi",
+    "desc": "Açıldığında +100 altın verir",
+    "qty": 3,
+    "createdAt": "2026-10-30T20:29:01.258Z",
+    "updatedAt": "2026-10-31T18:06:06.595Z"
+  },
+  {
+    "id": "bot_1::flame",
+    "userId": "bot_1",
+    "itemId": "flame",
+    "name": "Seri Kalkanı",
+    "desc": "Günlük serini 1 gün korur",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.261Z",
+    "updatedAt": "2026-10-31T18:06:03.000Z"
+  },
+  {
+    "id": "bot_2::flame",
+    "userId": "bot_2",
+    "itemId": "flame",
+    "name": "Seri Kalkanı",
+    "desc": "Günlük serini 1 gün korur",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.262Z",
+    "updatedAt": "2026-10-31T18:06:04.143Z"
+  },
+  {
+    "id": "bot_3::flame",
+    "userId": "bot_3",
+    "itemId": "flame",
+    "name": "Seri Kalkanı",
+    "desc": "Günlük serini 1 gün korur",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.263Z",
+    "updatedAt": "2026-10-31T18:06:05.364Z"
+  },
+  {
+    "id": "bot_4::flame",
+    "userId": "bot_4",
+    "itemId": "flame",
+    "name": "Seri Kalkanı",
+    "desc": "Günlük serini 1 gün korur",
+    "qty": 2,
+    "createdAt": "2026-10-30T20:29:01.264Z",
+    "updatedAt": "2026-10-31T18:06:06.596Z"
+  },
+  {
+    "id": "google_lt6irpu::chest",
+    "userId": "google_lt6irpu",
+    "itemId": "chest",
+    "name": "Ahşap Sandık",
+    "desc": "1 altın anahtar ile açılır",
+    "qty": 2,
+    "createdAt": "2026-10-30T21:20:36.252Z",
+    "updatedAt": "2026-10-31T18:06:52.064Z"
+  },
+  {
+    "id": "google_lt6irpu::key",
+    "userId": "google_lt6irpu",
+    "itemId": "key",
+    "name": "Altın Anahtar",
+    "desc": "Sandıkların kilidini açar",
+    "qty": 3,
+    "createdAt": "2026-10-30T21:20:36.293Z",
+    "updatedAt": "2026-10-31T18:06:52.066Z"
+  },
+  {
+    "id": "google_lt6irpu::bolt",
+    "userId": "google_lt6irpu",
+    "itemId": "bolt",
+    "name": "Hız Güçlendirici",
+    "desc": "+%25 hız bonusu verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T21:20:36.323Z",
+    "updatedAt": "2026-10-31T18:06:52.068Z"
+  },
+  {
+    "id": "google_lt6irpu::crown",
+    "userId": "google_lt6irpu",
+    "itemId": "crown",
+    "name": "Kraliyet Tacı",
+    "desc": "Özel profil çerçevesi",
+    "qty": 1,
+    "createdAt": "2026-10-30T21:20:36.377Z",
+    "updatedAt": "2026-10-31T18:06:52.070Z"
+  },
+  {
+    "id": "google_lt6irpu::heart",
+    "userId": "google_lt6irpu",
+    "itemId": "heart",
+    "name": "Ekstra Can",
+    "desc": "Yanlış cevapta seriyi korur",
+    "qty": 4,
+    "createdAt": "2026-10-30T21:20:36.414Z",
+    "updatedAt": "2026-10-31T18:06:52.073Z"
+  },
+  {
+    "id": "google_lt6irpu::gift",
+    "userId": "google_lt6irpu",
+    "itemId": "gift",
+    "name": "Gizemli Kutu",
+    "desc": "Rastgele altın ödülü içerir",
+    "qty": 1,
+    "createdAt": "2026-10-30T21:20:36.450Z",
+    "updatedAt": "2026-10-31T18:06:52.078Z"
+  },
+  {
+    "id": "google_lt6irpu::gem",
+    "userId": "google_lt6irpu",
+    "itemId": "gem",
+    "name": "Elmas Kesesi",
+    "desc": "Açıldığında +10 elmas verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T21:20:36.496Z",
+    "updatedAt": "2026-10-31T18:06:52.086Z"
+  },
+  {
+    "id": "google_lt6irpu::coin",
+    "userId": "google_lt6irpu",
+    "itemId": "coin",
+    "name": "Altın Kesesi",
+    "desc": "Açıldığında +100 altın verir",
+    "qty": 3,
+    "createdAt": "2026-10-30T21:20:36.549Z",
+    "updatedAt": "2026-10-31T18:06:52.090Z"
+  },
+  {
+    "id": "google_lt6irpu::flame",
+    "userId": "google_lt6irpu",
+    "itemId": "flame",
+    "name": "Seri Kalkanı",
+    "desc": "Günlük serini 1 gün korur",
+    "qty": 2,
+    "createdAt": "2026-10-30T21:20:36.608Z",
+    "updatedAt": "2026-10-31T18:06:52.094Z"
+  },
+  {
+    "id": "google_nc30me3::chest",
+    "userId": "google_nc30me3",
+    "itemId": "chest",
+    "name": "Ahşap Sandık",
+    "desc": "1 altın anahtar ile açılır",
+    "qty": 2,
+    "createdAt": "2026-10-30T22:33:21.103Z",
+    "updatedAt": "2026-10-31T18:06:54.256Z"
+  },
+  {
+    "id": "google_nc30me3::key",
+    "userId": "google_nc30me3",
+    "itemId": "key",
+    "name": "Altın Anahtar",
+    "desc": "Sandıkların kilidini açar",
+    "qty": 3,
+    "createdAt": "2026-10-30T22:33:21.105Z",
+    "updatedAt": "2026-10-31T18:06:54.258Z"
+  },
+  {
+    "id": "google_nc30me3::bolt",
+    "userId": "google_nc30me3",
+    "itemId": "bolt",
+    "name": "Hız Güçlendirici",
+    "desc": "+%25 hız bonusu verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T22:33:21.108Z",
+    "updatedAt": "2026-10-31T18:06:54.263Z"
+  },
+  {
+    "id": "google_nc30me3::crown",
+    "userId": "google_nc30me3",
+    "itemId": "crown",
+    "name": "Kraliyet Tacı",
+    "desc": "Özel profil çerçevesi",
+    "qty": 1,
+    "createdAt": "2026-10-30T22:33:21.109Z",
+    "updatedAt": "2026-10-31T18:06:54.265Z"
+  },
+  {
+    "id": "google_nc30me3::heart",
+    "userId": "google_nc30me3",
+    "itemId": "heart",
+    "name": "Ekstra Can",
+    "desc": "Yanlış cevapta seriyi korur",
+    "qty": 4,
+    "createdAt": "2026-10-30T22:33:21.112Z",
+    "updatedAt": "2026-10-31T18:06:54.268Z"
+  },
+  {
+    "id": "google_nc30me3::gift",
+    "userId": "google_nc30me3",
+    "itemId": "gift",
+    "name": "Gizemli Kutu",
+    "desc": "Rastgele altın ödülü içerir",
+    "qty": 1,
+    "createdAt": "2026-10-30T22:33:21.115Z",
+    "updatedAt": "2026-10-31T18:06:54.272Z"
+  },
+  {
+    "id": "google_nc30me3::gem",
+    "userId": "google_nc30me3",
+    "itemId": "gem",
+    "name": "Elmas Kesesi",
+    "desc": "Açıldığında +10 elmas verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T22:33:21.119Z",
+    "updatedAt": "2026-10-31T18:06:54.278Z"
+  },
+  {
+    "id": "google_nc30me3::coin",
+    "userId": "google_nc30me3",
+    "itemId": "coin",
+    "name": "Altın Kesesi",
+    "desc": "Açıldığında +100 altın verir",
+    "qty": 3,
+    "createdAt": "2026-10-30T22:33:21.121Z",
+    "updatedAt": "2026-10-31T18:06:54.281Z"
+  },
+  {
+    "id": "google_nc30me3::flame",
+    "userId": "google_nc30me3",
+    "itemId": "flame",
+    "name": "Seri Kalkanı",
+    "desc": "Günlük serini 1 gün korur",
+    "qty": 2,
+    "createdAt": "2026-10-30T22:33:21.124Z",
+    "updatedAt": "2026-10-31T18:06:54.285Z"
+  },
+  {
+    "id": "usr_beb9ub1::chest",
+    "userId": "usr_beb9ub1",
+    "itemId": "chest",
+    "name": "Ahşap Sandık",
+    "desc": "1 altın anahtar ile açılır",
+    "qty": 2,
+    "createdAt": "2026-10-30T22:46:45.156Z",
+    "updatedAt": "2026-10-31T18:06:56.166Z"
+  },
+  {
+    "id": "usr_beb9ub1::key",
+    "userId": "usr_beb9ub1",
+    "itemId": "key",
+    "name": "Altın Anahtar",
+    "desc": "Sandıkların kilidini açar",
+    "qty": 3,
+    "createdAt": "2026-10-30T22:46:45.159Z",
+    "updatedAt": "2026-10-31T18:06:56.170Z"
+  },
+  {
+    "id": "usr_beb9ub1::bolt",
+    "userId": "usr_beb9ub1",
+    "itemId": "bolt",
+    "name": "Hız Güçlendirici",
+    "desc": "+%25 hız bonusu verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T22:46:45.162Z",
+    "updatedAt": "2026-10-31T18:06:56.174Z"
+  },
+  {
+    "id": "usr_beb9ub1::crown",
+    "userId": "usr_beb9ub1",
+    "itemId": "crown",
+    "name": "Kraliyet Tacı",
+    "desc": "Özel profil çerçevesi",
+    "qty": 1,
+    "createdAt": "2026-10-30T22:46:45.165Z",
+    "updatedAt": "2026-10-31T18:06:56.179Z"
+  },
+  {
+    "id": "usr_beb9ub1::heart",
+    "userId": "usr_beb9ub1",
+    "itemId": "heart",
+    "name": "Ekstra Can",
+    "desc": "Yanlış cevapta seriyi korur",
+    "qty": 4,
+    "createdAt": "2026-10-30T22:46:45.168Z",
+    "updatedAt": "2026-10-31T18:06:56.184Z"
+  },
+  {
+    "id": "usr_beb9ub1::gift",
+    "userId": "usr_beb9ub1",
+    "itemId": "gift",
+    "name": "Gizemli Kutu",
+    "desc": "Rastgele altın ödülü içerir",
+    "qty": 1,
+    "createdAt": "2026-10-30T22:46:45.172Z",
+    "updatedAt": "2026-10-31T18:06:56.189Z"
+  },
+  {
+    "id": "usr_beb9ub1::gem",
+    "userId": "usr_beb9ub1",
+    "itemId": "gem",
+    "name": "Elmas Kesesi",
+    "desc": "Açıldığında +10 elmas verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T22:46:45.177Z",
+    "updatedAt": "2026-10-31T18:06:56.193Z"
+  },
+  {
+    "id": "usr_beb9ub1::coin",
+    "userId": "usr_beb9ub1",
+    "itemId": "coin",
+    "name": "Altın Kesesi",
+    "desc": "Açıldığında +100 altın verir",
+    "qty": 3,
+    "createdAt": "2026-10-30T22:46:45.180Z",
+    "updatedAt": "2026-10-31T18:06:56.196Z"
+  },
+  {
+    "id": "usr_beb9ub1::flame",
+    "userId": "usr_beb9ub1",
+    "itemId": "flame",
+    "name": "Seri Kalkanı",
+    "desc": "Günlük serini 1 gün korur",
+    "qty": 2,
+    "createdAt": "2026-10-30T22:46:45.184Z",
+    "updatedAt": "2026-10-31T18:06:56.201Z"
+  },
+  {
+    "id": "google_7u291by::chest",
+    "userId": "google_7u291by",
+    "itemId": "chest",
+    "name": "Ahşap Sandık",
+    "desc": "1 altın anahtar ile açılır",
+    "qty": 2,
+    "createdAt": "2026-10-30T23:41:18.456Z",
+    "updatedAt": "2026-10-31T18:06:57.427Z"
+  },
+  {
+    "id": "google_7u291by::key",
+    "userId": "google_7u291by",
+    "itemId": "key",
+    "name": "Altın Anahtar",
+    "desc": "Sandıkların kilidini açar",
+    "qty": 3,
+    "createdAt": "2026-10-30T23:41:18.458Z",
+    "updatedAt": "2026-10-31T18:06:57.429Z"
+  },
+  {
+    "id": "google_7u291by::bolt",
+    "userId": "google_7u291by",
+    "itemId": "bolt",
+    "name": "Hız Güçlendirici",
+    "desc": "+%25 hız bonusu verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T23:41:18.460Z",
+    "updatedAt": "2026-10-31T18:06:57.432Z"
+  },
+  {
+    "id": "google_7u291by::crown",
+    "userId": "google_7u291by",
+    "itemId": "crown",
+    "name": "Kraliyet Tacı",
+    "desc": "Özel profil çerçevesi",
+    "qty": 1,
+    "createdAt": "2026-10-30T23:41:18.463Z",
+    "updatedAt": "2026-10-31T18:06:57.435Z"
+  },
+  {
+    "id": "google_7u291by::heart",
+    "userId": "google_7u291by",
+    "itemId": "heart",
+    "name": "Ekstra Can",
+    "desc": "Yanlış cevapta seriyi korur",
+    "qty": 4,
+    "createdAt": "2026-10-30T23:41:18.465Z",
+    "updatedAt": "2026-10-31T18:06:57.439Z"
+  },
+  {
+    "id": "google_7u291by::gift",
+    "userId": "google_7u291by",
+    "itemId": "gift",
+    "name": "Gizemli Kutu",
+    "desc": "Rastgele altın ödülü içerir",
+    "qty": 1,
+    "createdAt": "2026-10-30T23:41:18.469Z",
+    "updatedAt": "2026-10-31T18:06:57.442Z"
+  },
+  {
+    "id": "google_7u291by::gem",
+    "userId": "google_7u291by",
+    "itemId": "gem",
+    "name": "Elmas Kesesi",
+    "desc": "Açıldığında +10 elmas verir",
+    "qty": 2,
+    "createdAt": "2026-10-30T23:41:18.473Z",
+    "updatedAt": "2026-10-31T18:06:57.445Z"
+  },
+  {
+    "id": "google_7u291by::coin",
+    "userId": "google_7u291by",
+    "itemId": "coin",
+    "name": "Altın Kesesi",
+    "desc": "Açıldığında +100 altın verir",
+    "qty": 3,
+    "createdAt": "2026-10-30T23:41:18.477Z",
+    "updatedAt": "2026-10-31T18:06:57.448Z"
+  },
+  {
+    "id": "google_7u291by::flame",
+    "userId": "google_7u291by",
+    "itemId": "flame",
+    "name": "Seri Kalkanı",
+    "desc": "Günlük serini 1 gün korur",
+    "qty": 2,
+    "createdAt": "2026-10-30T23:41:18.480Z",
+    "updatedAt": "2026-10-31T18:06:57.451Z"
+  },
+  {
+    "id": "usr_zyihjfp::chest",
+    "userId": "usr_zyihjfp",
+    "itemId": "chest",
+    "name": "Ahşap Sandık",
+    "desc": "1 altın anahtar ile açılır",
+    "qty": 2,
+    "createdAt": "2026-10-31T00:56:32.961Z",
+    "updatedAt": "2026-10-31T18:06:58.714Z"
+  },
+  {
+    "id": "usr_zyihjfp::key",
+    "userId": "usr_zyihjfp",
+    "itemId": "key",
+    "name": "Altın Anahtar",
+    "desc": "Sandıkların kilidini açar",
+    "qty": 3,
+    "createdAt": "2026-10-31T00:56:32.964Z",
+    "updatedAt": "2026-10-31T18:06:58.727Z"
+  },
+  {
+    "id": "usr_zyihjfp::bolt",
+    "userId": "usr_zyihjfp",
+    "itemId": "bolt",
+    "name": "Hız Güçlendirici",
+    "desc": "+%25 hız bonusu verir",
+    "qty": 2,
+    "createdAt": "2026-10-31T00:56:32.966Z",
+    "updatedAt": "2026-10-31T18:06:58.738Z"
+  },
+  {
+    "id": "usr_zyihjfp::crown",
+    "userId": "usr_zyihjfp",
+    "itemId": "crown",
+    "name": "Kraliyet Tacı",
+    "desc": "Özel profil çerçevesi",
+    "qty": 1,
+    "createdAt": "2026-10-31T00:56:32.968Z",
+    "updatedAt": "2026-10-31T18:06:58.753Z"
+  },
+  {
+    "id": "usr_zyihjfp::heart",
+    "userId": "usr_zyihjfp",
+    "itemId": "heart",
+    "name": "Ekstra Can",
+    "desc": "Yanlış cevapta seriyi korur",
+    "qty": 4,
+    "createdAt": "2026-10-31T00:56:32.971Z",
+    "updatedAt": "2026-10-31T18:06:58.770Z"
+  },
+  {
+    "id": "usr_zyihjfp::gift",
+    "userId": "usr_zyihjfp",
+    "itemId": "gift",
+    "name": "Gizemli Kutu",
+    "desc": "Rastgele altın ödülü içerir",
+    "qty": 1,
+    "createdAt": "2026-10-31T00:56:32.976Z",
+    "updatedAt": "2026-10-31T18:06:58.781Z"
+  },
+  {
+    "id": "usr_zyihjfp::gem",
+    "userId": "usr_zyihjfp",
+    "itemId": "gem",
+    "name": "Elmas Kesesi",
+    "desc": "Açıldığında +10 elmas verir",
+    "qty": 2,
+    "createdAt": "2026-10-31T00:56:32.980Z",
+    "updatedAt": "2026-10-31T18:06:58.790Z"
+  },
+  {
+    "id": "usr_zyihjfp::coin",
+    "userId": "usr_zyihjfp",
+    "itemId": "coin",
+    "name": "Altın Kesesi",
+    "desc": "Açıldığında +100 altın verir",
+    "qty": 3,
+    "createdAt": "2026-10-31T00:56:32.985Z",
+    "updatedAt": "2026-10-31T18:06:58.795Z"
+  },
+  {
+    "id": "usr_zyihjfp::flame",
+    "userId": "usr_zyihjfp",
+    "itemId": "flame",
+    "name": "Seri Kalkanı",
+    "desc": "Günlük serini 1 gün korur",
+    "qty": 2,
+    "createdAt": "2026-10-31T00:56:32.989Z",
+    "updatedAt": "2026-10-31T18:06:58.799Z"
+  }
+]

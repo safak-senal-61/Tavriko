@@ -1,201 +1,172 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+} from 'react-native';
+import { CategoryId, DifficultyLevel, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
-import { DifficultyLevel, CategoryId } from '@trivia/shared';
-import { ArrowLeft, Shield, Flame, Zap, Award } from 'lucide-react-native';
-
+import {
+  TavrikoScreen,
+  TavrikoTopBar,
+  Button3D,
+  XpStarIcon,
+} from '../components/TavrikoIcons';
 interface DifficultySelectScreenProps {
   categoryId: CategoryId;
   onBack: () => void;
   onSelectDifficulty: (difficulty: DifficultyLevel) => void;
+  avatarSeed?: string;
+  coins?: number;
+  gems?: number;
+  isGuest?: boolean;
+  onLoginPrompt?: () => void;
 }
-
-const TIERS: Array<{
+const DIFFICULTIES: {
   id: DifficultyLevel;
-  name: string;
-  multiplier: string;
-  desc: string;
+  title: string;
   color: string;
-  icon: any;
-}> = [
-  {
-    id: 'easy',
-    name: 'Kolay',
-    multiplier: '1.0x XP',
-    desc: 'Temel kavramlar ve herkesin bildiği genel sorular',
-    color: '#10B981',
-    icon: Shield,
-  },
-  {
-    id: 'medium',
-    name: 'Orta',
-    multiplier: '1.25x XP',
-    desc: 'Dengeli bilgi seviyesi ve dikkat gerektiren sorular',
-    color: '#F59E0B',
-    icon: Zap,
-  },
-  {
-    id: 'hard',
-    name: 'Zor',
-    multiplier: '1.5x XP',
-    desc: 'Detaylı bilgi ve hızlı karar verme yeteneği',
-    color: '#EF4444',
-    icon: Flame,
-  },
-  {
-    id: 'expert',
-    name: 'Uzman',
-    multiplier: '2.0x XP',
-    desc: 'Yalnızca gerçek ustalar için derinlemesine sorular',
-    color: '#A855F7',
-    icon: Award,
-  },
+  stars: number;
+  xpMultiplier: string;
+}[] = [
+  { id: 'easy', title: 'Kolay', color: '#3FD08A', stars: 1, xpMultiplier: 'x1 XP' },
+  { id: 'medium', title: 'Orta', color: '#FFC43D', stars: 2, xpMultiplier: 'x1,5 XP' },
+  { id: 'hard', title: 'Zor', color: '#FF9B2F', stars: 3, xpMultiplier: 'x2 XP' },
+  { id: 'expert', title: 'Uzman', color: '#FF5A6A', stars: 4, xpMultiplier: 'x3 XP' },
 ];
-
 export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
+  categoryId,
   onBack,
   onSelectDifficulty,
+  avatarSeed,
+  coins = 0,
+  gems = 0,
+  isGuest = false,
+  onLoginPrompt,
 }) => {
+  const [selected, setSelected] = useState<DifficultyLevel>('hard');
+  const category = ALL_CATEGORIES.find((c) => c.id === categoryId);
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            sound.playSound('tap');
-            onBack();
-          }}
-        >
-          <ArrowLeft size={22} color={THEME.colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Zorluk Seviyesi</Text>
-      </View>
-
-      <View style={styles.content}>
+    <TavrikoScreen>
+      <TavrikoTopBar
+        leftType="back"
+        onLeftPress={onBack}
+        avatarSeed={avatarSeed}
+        coins={coins}
+        gems={gems}
+        isGuest={isGuest}
+        onGuestLoginPress={onLoginPrompt}
+      />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>ZORLUK SEVİYESİ</Text>
         <Text style={styles.subtitle}>
-          Bilgi seviyene uygun zorluğu seç ve yarışmaya başla!
+          {category?.name || 'Bilim'} · 5 soru
         </Text>
-
-        <View style={styles.tierList}>
-          {TIERS.map((tier) => {
-            const Icon = tier.icon;
-            return (
-              <TouchableOpacity
-                key={tier.id}
-                style={[styles.tierCard, { borderColor: tier.color }]}
-                activeOpacity={0.8}
-                onPress={() => {
-                  sound.playSound('tap');
-                  sound.triggerHaptic('medium');
-                  onSelectDifficulty(tier.id);
-                }}
-              >
-                <View style={[styles.iconBox, { backgroundColor: `${tier.color}22` }]}>
-                  <Icon size={24} color={tier.color} />
+        {DIFFICULTIES.map((diff) => {
+          const isSelected = selected === diff.id;
+          return (
+            <TouchableOpacity
+              key={diff.id}
+              style={[
+                styles.diffCard,
+                { borderLeftColor: diff.color },
+                isSelected && styles.diffCardSelected,
+              ]}
+              onPress={() => {
+                sound.playSound('tap');
+                sound.triggerHaptic('light');
+                setSelected(diff.id);
+              }}
+              activeOpacity={0.85}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.diffTitle, { color: diff.color }]}>
+                  {diff.title}
+                </Text>
+                <View style={styles.starsRow}>
+                  {Array.from({ length: diff.stars }).map((_, idx) => (
+                    <XpStarIcon key={idx} size={18} />
+                  ))}
                 </View>
-
-                <View style={styles.infoCol}>
-                  <View style={styles.titleRow}>
-                    <Text style={styles.tierName}>{tier.name}</Text>
-                    <View style={[styles.multiplierPill, { backgroundColor: `${tier.color}22` }]}>
-                      <Text style={[styles.multiplierText, { color: tier.color }]}>
-                        {tier.multiplier}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.tierDesc}>{tier.desc}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+              </View>
+              <View style={styles.xpPill}>
+                <Text style={styles.xpPillText}>{diff.xpMultiplier}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+        <View style={{ marginTop: 8 }}>
+          <Button3D
+            title="DEVAM"
+            onPress={() => onSelectDifficulty(selected)}
+            style={{ height: 56 }}
+          />
         </View>
-      </View>
-    </View>
+      </ScrollView>
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
+  scrollContent: {
+    paddingBottom: 32,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: THEME.spacing.lg,
-    paddingTop: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.border,
-    backgroundColor: THEME.colors.card,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-  },
-  content: {
-    padding: THEME.spacing.lg,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: THEME.colors.textSecondary,
-    marginBottom: THEME.spacing.xl,
-  },
-  tierList: {
-    gap: 16,
-  },
-  tierCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.lg,
-    padding: THEME.spacing.lg,
-    borderWidth: 1.5,
-  },
-  iconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  infoCol: {
-    flex: 1,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  title: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 36,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 10,
     marginBottom: 4,
   },
-  tierName: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-  },
-  multiplierPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: THEME.radius.full,
-  },
-  multiplierText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  tierDesc: {
+  subtitle: {
+    color: '#D9CDF5',
     fontSize: 12,
-    color: THEME.colors.textSecondary,
-    lineHeight: 16,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  diffCard: {
+    height: 92,
+    paddingHorizontal: 18,
+    marginBottom: 12,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderLeftWidth: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  diffCardSelected: {
+    borderColor: '#FFC43D',
+  },
+  diffTitle: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 26,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: 2,
+    marginTop: 4,
+  },
+  xpPill: {
+    backgroundColor: 'rgba(10, 4, 24, 0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  xpPillText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
   },
 });

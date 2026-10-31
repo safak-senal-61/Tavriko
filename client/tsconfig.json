@@ -2,13 +2,22 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "commonjs",
-    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ES2022"
+    ],
+    "types": ["jest"],
     "jsx": "react-jsx",
     "strict": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*"]
+  "include": [
+    "src/**/*",
+    "test/**/*"
+  ],
+  "extends": "expo/tsconfig.base"
 }

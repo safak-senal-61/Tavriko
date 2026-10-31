@@ -1,25 +1,36 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Image,
+  Animated,
+  Easing,
+} from 'react-native';
+import { UserProfile, calculateLevelFromXp } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
-import { UserProfile } from '@trivia/shared';
 import {
-  Zap,
-  Users,
-  Compass,
-  Trophy,
-  Flame,
-  Award,
-  BookOpen,
-  Swords,
-  ChevronRight,
-  Coins,
-  Settings,
-  Bell,
-} from 'lucide-react-native';
-
+  TavrikoScreen,
+  TavrikoTopBar,
+  TavrikoBottomNav,
+  TavrikoProgressBar,
+  Button3D,
+  CharacterAvatar,
+  ModeSquircleIcon,
+  StreakFlameIcon,
+  SpeedBoltIcon,
+  CrownIcon,
+  ChestIcon,
+  TrophyIcon,
+  InventoryCubeIcon,
+  TavrikoHeroLogo,
+} from '../components/TavrikoIcons';
 interface HomeScreenProps {
   user: UserProfile;
+  isGuest?: boolean;
   onQuickMatch: () => void;
   onCustomRoom: () => void;
   onExploreCategories: () => void;
@@ -30,10 +41,16 @@ interface HomeScreenProps {
   onProfile: () => void;
   onNotifications: () => void;
   onSettings: () => void;
+  onSeason?: () => void;
+  onShop?: () => void;
+  onEvents?: () => void;
+  onInventory?: () => void;
+  onProLeague?: () => void;
+  onLoginPrompt?: () => void;
 }
-
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   user,
+  isGuest = false,
   onQuickMatch,
   onCustomRoom,
   onExploreCategories,
@@ -43,438 +60,447 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onFriends,
   onProfile,
   onNotifications,
-  onSettings,
+  onSeason,
+  onShop,
+  onEvents,
+  onInventory,
+  onProLeague,
+  onLoginPrompt,
 }) => {
+  // Entrance & Floating Bolt Animation
+  const boltFloat = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(18)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(boltFloat, {
+          toValue: -8,
+          duration: 1300,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(boltFloat, {
+          toValue: 0,
+          duration: 1300,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [boltFloat, fadeAnim, slideAnim]);
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Top Bar / Profile Header */}
-      <View style={styles.topBar}>
-        <TouchableOpacity style={styles.userSection} onPress={onProfile}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{user.displayName.charAt(0).toUpperCase()}</Text>
+    <TavrikoScreen>
+      {/* Top HUD Bar */}
+      <TavrikoTopBar
+        leftType="bell"
+        onLeftPress={onNotifications}
+        coins={user.coins ?? 0}
+        gems={user.gems ?? 0}
+        avatarSeed={user.avatarUrl || user.displayName}
+        onAvatarPress={onProfile}
+        onCurrencyPress={onShop}
+        isGuest={isGuest}
+        onGuestLoginPress={onLoginPrompt}
+      />
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          isGuest && { paddingBottom: 36 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View
+          style={{
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          }}
+        >
+          {/* Center Seamless Vector Tavriko Logo (No Square Box!) */}
+          <View style={styles.bannerWrap}>
+            <TavrikoHeroLogo width={165} height={92} />
           </View>
-          <View>
-            <Text style={styles.userName}>{user.displayName}</Text>
-            <View style={styles.rankRow}>
-              <View style={styles.levelBadge}>
-                <Text style={styles.levelText}>Lv. {user.level}</Text>
-              </View>
-              <Text style={styles.rankTitle}>{user.rankTitle}</Text>
+          {/* Guest Mode Notice Pill */}
+          {isGuest && (
+            <TouchableOpacity
+              style={styles.guestNoticeBanner}
+              onPress={() => {
+                sound.playSound('tap');
+                if (onLoginPrompt) onLoginPrompt();
+              }}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.guestNoticeText}>
+                MİSAFİR MODU · Sadece Keşfet açık · Giriş yapmak için dokun →
+              </Text>
+            </TouchableOpacity>
+          )}
+          {/* User Level & XP Card */}
+          <TouchableOpacity
+            style={styles.userXpCard}
+            onPress={() => {
+              sound.playSound('tap');
+              if (onSeason) onSeason();
+              else onProfile();
+            }}
+            activeOpacity={0.85}
+          >
+            <CharacterAvatar
+              seed={user.avatarUrl || user.displayName}
+              size={48}
+            />
+            {(() => {
+              const prog = calculateLevelFromXp(user.xp ?? 0);
+              return (
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.userName}>{user.displayName}</Text>
+                  <Text style={styles.userXpSub}>
+                    Seviye {prog.level} · {prog.currentLevelXp} / {prog.nextLevelXpRequired} XP · {prog.rankTitle}
+                  </Text>
+                  <TavrikoProgressBar
+                    progress={prog.progressPct}
+                    height={10}
+                    style={{ marginTop: 6 }}
+                  />
+                </View>
+              );
+            })()}
+          </TouchableOpacity>
+          {/* Hero Quick Match (1v1 Duel) Card */}
+          <View style={styles.heroMatchCard}>
+            <Text style={styles.onlineSub}>
+              {user.rankPoints ?? 1000} Lig Puanı · {user.stats?.totalMatches ?? 0} Düello Maçı
+            </Text>
+            <Text style={styles.heroMatchTitle}>HIZLI EŞLEŞME</Text>
+            <Button3D
+              title="OYNA"
+              variant="mint"
+              onPress={onQuickMatch}
+              style={styles.heroPlayButton}
+              textStyle={{ fontSize: 22 }}
+            />
+            <Animated.View
+              style={[
+                styles.heroBoltWrap,
+                { transform: [{ translateY: boltFloat }] },
+              ]}
+              pointerEvents="none"
+            >
+              <SpeedBoltIcon size={110} />
+            </Animated.View>
+          </View>
+          {/* 4 Mode Tiles Row */}
+          <View style={styles.modesRow}>
+            <TouchableOpacity
+              style={styles.modeTile}
+              onPress={() => {
+                sound.playSound('tap');
+                sound.triggerHaptic('light');
+                onCustomRoom();
+              }}
+              activeOpacity={0.85}
+            >
+              <ModeSquircleIcon mode="custom_room" size={44} />
+              <Text style={styles.modeTileText}>Özel Oda</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modeTile}
+              onPress={() => {
+                sound.playSound('tap');
+                sound.triggerHaptic('light');
+                onPractice();
+              }}
+              activeOpacity={0.85}
+            >
+              <ModeSquircleIcon mode="single_player" size={44} />
+              <Text style={styles.modeTileText}>Tek Kişilik</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modeTile}
+              onPress={() => {
+                sound.playSound('tap');
+                sound.triggerHaptic('light');
+                onDailyChallenge();
+              }}
+              activeOpacity={0.85}
+            >
+              <ModeSquircleIcon mode="daily" size={44} />
+              <Text style={styles.modeTileText}>Günlük</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modeTile}
+              onPress={() => {
+                sound.playSound('tap');
+                sound.triggerHaptic('light');
+                onFriends();
+              }}
+              activeOpacity={0.85}
+            >
+              <ModeSquircleIcon mode="friends" size={44} />
+              <Text style={styles.modeTileText}>Arkadaşlar</Text>
+            </TouchableOpacity>
+          </View>
+          {/* Daily Streak Card */}
+          <View style={styles.streakCard}>
+            <StreakFlameIcon size={38} active={Boolean(user.dailyChallenge?.completedToday)} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.streakTitle}>
+                {user.dailyStreak ?? 1} günlük seri {user.dailyChallenge?.completedToday ? '🔥' : ''}
+              </Text>
+              <Text style={styles.streakSub}>
+                {user.dailyChallenge?.completedToday
+                  ? '✓ Bugünkü görev tamamlandı! Seri korundu.'
+                  : `En iyi seri: ${user.stats?.bestStreak ?? 0} · Bugünkü meydan okuma 2x XP`}
+              </Text>
             </View>
+            <Button3D
+              title={user.dailyChallenge?.completedToday ? 'GÖR' : 'BAŞLA'}
+              variant={user.dailyChallenge?.completedToday ? 'gold' : 'mint'}
+              onPress={onDailyChallenge}
+              style={{ minHeight: 40, paddingHorizontal: 18 }}
+              textStyle={{ fontSize: 14 }}
+            />
           </View>
-        </TouchableOpacity>
-
-        <View style={styles.topIcons}>
-          <View style={styles.coinBadge}>
-            <Coins size={14} color={THEME.colors.gold} />
-            <Text style={styles.coinText}>{user.coins}</Text>
+          {/* Extra UI Kit Features Row (Season 1, Pro League, Shop, Events, Inventory) */}
+          <View style={styles.extraFeaturesRow}>
+            {onSeason && (
+              <TouchableOpacity
+                style={styles.extraChip}
+                onPress={() => {
+                  sound.playSound('tap');
+                  onSeason();
+                }}
+              >
+                <CrownIcon size={18} />
+                <Text style={styles.extraChipText}>Sezon 1</Text>
+              </TouchableOpacity>
+            )}
+            {onProLeague && (
+              <TouchableOpacity
+                style={styles.extraChip}
+                onPress={() => {
+                  sound.playSound('tap');
+                  onProLeague();
+                }}
+              >
+                <TrophyIcon size={18} />
+                <Text style={styles.extraChipText}>Pro Lig</Text>
+              </TouchableOpacity>
+            )}
+            {onShop && (
+              <TouchableOpacity
+                style={styles.extraChip}
+                onPress={() => {
+                  sound.playSound('tap');
+                  onShop();
+                }}
+              >
+                <ChestIcon size={18} />
+                <Text style={styles.extraChipText}>Mağaza</Text>
+              </TouchableOpacity>
+            )}
+            {onEvents && (
+              <TouchableOpacity
+                style={styles.extraChip}
+                onPress={() => {
+                  sound.playSound('tap');
+                  onEvents();
+                }}
+              >
+                <StreakFlameIcon size={18} />
+                <Text style={styles.extraChipText}>Etkinlik</Text>
+              </TouchableOpacity>
+            )}
+            {onInventory && (
+              <TouchableOpacity
+                style={styles.extraChip}
+                onPress={() => {
+                  sound.playSound('tap');
+                  onInventory();
+                }}
+              >
+                <InventoryCubeIcon size={18} />
+                <Text style={styles.extraChipText}>Envanter</Text>
+              </TouchableOpacity>
+            )}
           </View>
-
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => {
-              sound.playSound('tap');
-              onNotifications();
-            }}
-          >
-            <Bell size={20} color={THEME.colors.textPrimary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => {
-              sound.playSound('tap');
-              onSettings();
-            }}
-          >
-            <Settings size={20} color={THEME.colors.textPrimary} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Hero Quick Match Banner */}
-      <TouchableOpacity
-        style={styles.heroBanner}
-        activeOpacity={0.88}
-        onPress={() => {
-          sound.playSound('tap');
-          sound.triggerHaptic('medium');
-          onQuickMatch();
-        }}
-      >
-        <View style={styles.heroContent}>
-          <View style={styles.heroBadge}>
-            <Zap size={14} color="#FFF" />
-            <Text style={styles.heroBadgeText}>CANLI MULTIPLAYER</Text>
-          </View>
-          <Text style={styles.heroTitle}>Hızlı Eşleşme</Text>
-          <Text style={styles.heroSubtitle}>Dünyanın dört bir yanından rakiplerle anında karşılaş</Text>
-        </View>
-        <View style={styles.playActionCircle}>
-          <ChevronRight size={28} color="#FFF" />
-        </View>
-      </TouchableOpacity>
-
-      {/* Daily Challenge Card */}
-      <TouchableOpacity
-        style={styles.dailyCard}
-        onPress={() => {
-          sound.playSound('tap');
-          onDailyChallenge();
-        }}
-      >
-        <View style={styles.dailyLeft}>
-          <View style={styles.dailyFlame}>
-            <Flame size={24} color={THEME.colors.streak} />
-          </View>
-          <View>
-            <Text style={styles.dailyTitle}>Günün Meydan Okuması</Text>
-            <Text style={styles.dailySubtitle}>Özel 5 soru • 2x Deneyim Puanı</Text>
-          </View>
-        </View>
-        <View style={styles.dailyTag}>
-          <Text style={styles.dailyTagText}>GİRİŞ YAP</Text>
-        </View>
-      </TouchableOpacity>
-
-      {/* Game Modes Grid */}
-      <Text style={styles.sectionHeader}>Oyun Modları</Text>
-      <View style={styles.grid}>
-        <TouchableOpacity
-          style={[styles.gridCard, { borderColor: THEME.colors.primary }]}
-          onPress={() => {
-            sound.playSound('tap');
-            onCustomRoom();
+        </Animated.View>
+      </ScrollView>
+      {/* Floating Bottom Navigation */}
+      {!isGuest && (
+        <TavrikoBottomNav
+          activeTab="play"
+          onSelectTab={(tab) => {
+            if (tab === 'explore') onExploreCategories();
+            else if (tab === 'leaders') onLeaderboard();
+            else if (tab === 'friends') onFriends();
+            else if (tab === 'profile') onProfile();
           }}
-        >
-          <View style={[styles.gridIconCircle, { backgroundColor: 'rgba(99, 102, 241, 0.2)' }]}>
-            <Users size={24} color={THEME.colors.primaryLight} />
-          </View>
-          <Text style={styles.gridTitle}>Arkadaşlarla Oyna</Text>
-          <Text style={styles.gridDesc}>Özel oda kur, oda kodunu paylaş</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.gridCard, { borderColor: THEME.colors.secondary }]}
-          onPress={() => {
-            sound.playSound('tap');
-            onPractice();
-          }}
-        >
-          <View style={[styles.gridIconCircle, { backgroundColor: 'rgba(236, 72, 153, 0.2)' }]}>
-            <BookOpen size={24} color={THEME.colors.secondary} />
-          </View>
-          <Text style={styles.gridTitle}>Tek Kişilik Pratik</Text>
-          <Text style={styles.gridDesc}>Kategorileri öğren ve seviye atla</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.gridCard, { borderColor: THEME.colors.accent }]}
-          onPress={() => {
-            sound.playSound('tap');
-            onExploreCategories();
-          }}
-        >
-          <View style={[styles.gridIconCircle, { backgroundColor: 'rgba(6, 182, 212, 0.2)' }]}>
-            <Compass size={24} color={THEME.colors.accent} />
-          </View>
-          <Text style={styles.gridTitle}>Kategorileri Keşfet</Text>
-          <Text style={styles.gridDesc}>16 Farklı kategori ve zorluklar</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.gridCard, { borderColor: THEME.colors.gold }]}
-          onPress={() => {
-            sound.playSound('tap');
-            onLeaderboard();
-          }}
-        >
-          <View style={[styles.gridIconCircle, { backgroundColor: 'rgba(251, 191, 36, 0.2)' }]}>
-            <Trophy size={24} color={THEME.colors.gold} />
-          </View>
-          <Text style={styles.gridTitle}>Liderler Tablosu</Text>
-          <Text style={styles.gridDesc}>Haftalık ve sezonluk sıralama</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Social / Quick Action Row */}
-      <View style={styles.quickRow}>
-        <TouchableOpacity
-          style={styles.quickBtn}
-          onPress={() => {
-            sound.playSound('tap');
-            onFriends();
-          }}
-        >
-          <Users size={18} color={THEME.colors.textPrimary} />
-          <Text style={styles.quickBtnText}>Arkadaşlar</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.quickBtn}
-          onPress={() => {
-            sound.playSound('tap');
-            onProfile();
-          }}
-        >
-          <Award size={18} color={THEME.colors.textPrimary} />
-          <Text style={styles.quickBtnText}>Başarılar</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+        />
+      )}
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
+  scrollContent: {
+    paddingBottom: 110,
   },
-  content: {
-    padding: THEME.spacing.lg,
-    paddingBottom: 40,
-  },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  bannerWrap: {
     alignItems: 'center',
-    marginBottom: THEME.spacing.xl,
+    marginTop: 6,
   },
-  userSection: {
+  bannerImage: {
+    width: 150,
+    height: 46,
+    borderRadius: 14,
+  },
+  guestNoticeBanner: {
+    marginTop: 10,
+    backgroundColor: 'rgba(255, 196, 61, 0.18)',
+    borderWidth: 1,
+    borderColor: '#FFC43D',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  guestNoticeText: {
+    color: '#FFC43D',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+  },
+  userXpCard: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: THEME.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: THEME.colors.primaryLight,
-  },
-  avatarText: {
-    color: '#FFF',
-    fontSize: 20,
-    fontWeight: '800',
   },
   userName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: THEME.colors.textPrimary,
+    fontFamily: THEME.fonts.display,
+    fontSize: 19,
+    color: '#FFFFFF',
   },
-  rankRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 2,
-  },
-  levelBadge: {
-    backgroundColor: THEME.colors.cardHover,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: THEME.radius.sm,
-  },
-  levelText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: THEME.colors.primaryLight,
-  },
-  rankTitle: {
+  userXpSub: {
+    color: '#D9CDF5',
     fontSize: 12,
-    color: THEME.colors.textSecondary,
-    fontWeight: '500',
+    fontFamily: THEME.fonts.extraBold,
   },
-  topIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  coinBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: THEME.colors.card,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: THEME.radius.full,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  coinText: {
-    color: THEME.colors.gold,
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  iconButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: THEME.colors.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  heroBanner: {
-    backgroundColor: THEME.colors.primary,
-    borderRadius: THEME.radius.xl,
-    padding: THEME.spacing.xl,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: THEME.spacing.lg,
-    shadowColor: THEME.colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  heroContent: {
-    flex: 1,
-  },
-  heroBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: THEME.radius.full,
-    marginBottom: 8,
-  },
-  heroBadgeText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  heroTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#FFF',
-    marginBottom: 4,
-  },
-  heroSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.85)',
-  },
-  playActionCircle: {
-    width: 52,
-    height: 52,
+  heroMatchCard: {
+    marginTop: 16,
+    padding: 20,
     borderRadius: 26,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: '#7A3FE0',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.35)',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  onlineSub: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  heroMatchTitle: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 32,
+    color: '#FFFFFF',
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  heroPlayButton: {
+    alignSelf: 'flex-start',
+    height: 54,
+    paddingHorizontal: 44,
+  },
+  heroBoltWrap: {
+    position: 'absolute',
+    right: 6,
+    top: 10,
+  },
+  modesRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 16,
+  },
+  modeTile: {
+    flex: 1,
+    height: 96,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
+    gap: 6,
   },
-  dailyCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.lg,
-    padding: THEME.spacing.md,
+  modeTileText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+  },
+  streakCard: {
+    marginTop: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
-    marginBottom: THEME.spacing.xl,
-  },
-  dailyLeft: {
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  dailyFlame: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  streakTitle: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 16,
+    color: '#FFFFFF',
   },
-  dailyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: THEME.colors.textPrimary,
-  },
-  dailySubtitle: {
+  streakSub: {
+    color: '#D9CDF5',
     fontSize: 12,
-    color: THEME.colors.textSecondary,
-    marginTop: 2,
+    fontFamily: THEME.fonts.extraBold,
   },
-  dailyTag: {
-    backgroundColor: THEME.colors.cardHover,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: THEME.radius.full,
-    borderWidth: 1,
-    borderColor: THEME.colors.streak,
-  },
-  dailyTagText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: THEME.colors.streak,
-  },
-  sectionHeader: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-    marginBottom: THEME.spacing.md,
-  },
-  grid: {
+  extraFeaturesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: THEME.spacing.xl,
-  },
-  gridCard: {
-    width: '48%',
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.lg,
-    padding: THEME.spacing.md,
-    borderWidth: 1,
-  },
-  gridIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  gridTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: THEME.colors.textPrimary,
-    marginBottom: 4,
-  },
-  gridDesc: {
-    fontSize: 11,
-    color: THEME.colors.textSecondary,
-    lineHeight: 15,
-  },
-  quickRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  quickBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     gap: 8,
-    backgroundColor: THEME.colors.card,
-    paddingVertical: 14,
-    borderRadius: THEME.radius.md,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
+    marginTop: 14,
+    justifyContent: 'center',
   },
-  quickBtnText: {
-    color: THEME.colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
+  extraChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(10, 4, 24, 0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+  },
+  extraChipText: {
+    color: '#D9CDF5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
   },
 });

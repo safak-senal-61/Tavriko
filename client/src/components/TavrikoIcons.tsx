@@ -1,0 +1,1506 @@
+import React from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
+  Image,
+} from 'react-native';
+import Svg, {
+  Defs,
+  LinearGradient,
+  Stop,
+  Rect,
+  Path,
+  Circle,
+  Ellipse,
+  G,
+  Text as SvgText,
+} from 'react-native-svg';
+import { THEME } from '../theme/tokens';
+import { sound } from '../services/soundService';
+// Brand Assets
+export const BRAND_LOGO_MAIN = require('../../assets/images/logo_main.jpg');
+export const BRAND_LOGO_BANNER = require('../../assets/images/logo_banner.jpg');
+export const BRAND_APP_ICON = require('../../assets/images/app_icon.jpg');
+// Shared SVG Gradients from Tavriko UI Kit
+const SharedSvgDefs = () => (
+  <Defs>
+    <LinearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <Stop offset="0" stopColor="#fff1a0" />
+      <Stop offset="0.5" stopColor="#ffb21e" />
+      <Stop offset="1" stopColor="#e07a00" />
+    </LinearGradient>
+    <LinearGradient id="pink" x1="0" y1="0" x2="0" y2="1">
+      <Stop offset="0" stopColor="#ff9af0" />
+      <Stop offset="1" stopColor="#e0309f" />
+    </LinearGradient>
+    <LinearGradient id="blue" x1="0" y1="0" x2="0" y2="1">
+      <Stop offset="0" stopColor="#9fd4ff" />
+      <Stop offset="1" stopColor="#2f6fe0" />
+    </LinearGradient>
+    <LinearGradient id="purple" x1="0" y1="0" x2="0" y2="1">
+      <Stop offset="0" stopColor="#b38bff" />
+      <Stop offset="1" stopColor="#5a27c8" />
+    </LinearGradient>
+    <LinearGradient id="red" x1="0" y1="0" x2="0" y2="1">
+      <Stop offset="0" stopColor="#ff7a8a" />
+      <Stop offset="1" stopColor="#d0102e" />
+    </LinearGradient>
+    <LinearGradient id="green" x1="0" y1="0" x2="0" y2="1">
+      <Stop offset="0" stopColor="#9ff0a8" />
+      <Stop offset="1" stopColor="#22a85a" />
+    </LinearGradient>
+    <LinearGradient id="brown" x1="0" y1="0" x2="0" y2="1">
+      <Stop offset="0" stopColor="#e09a5a" />
+      <Stop offset="1" stopColor="#8a4a12" />
+    </LinearGradient>
+    <LinearGradient id="orange" x1="0" y1="0" x2="0" y2="1">
+      <Stop offset="0" stopColor="#ffb347" />
+      <Stop offset="1" stopColor="#ff3d1f" />
+    </LinearGradient>
+    <LinearGradient id="t0" x1="0" y1="0" x2="1" y2="1">
+      <Stop offset="0" stopColor="#9a6bff" />
+      <Stop offset="1" stopColor="#5a27c8" />
+    </LinearGradient>
+    <LinearGradient id="t1" x1="0" y1="0" x2="1" y2="1">
+      <Stop offset="0" stopColor="#4a9bff" />
+      <Stop offset="1" stopColor="#1f5fe0" />
+    </LinearGradient>
+    <LinearGradient id="t2" x1="0" y1="0" x2="1" y2="1">
+      <Stop offset="0" stopColor="#ff6bc4" />
+      <Stop offset="1" stopColor="#c01f80" />
+    </LinearGradient>
+    <LinearGradient id="t3" x1="0" y1="0" x2="1" y2="1">
+      <Stop offset="0" stopColor="#ffb347" />
+      <Stop offset="1" stopColor="#e06a00" />
+    </LinearGradient>
+    <LinearGradient id="t4" x1="0" y1="0" x2="1" y2="1">
+      <Stop offset="0" stopColor="#4fe0a0" />
+      <Stop offset="1" stopColor="#14935f" />
+    </LinearGradient>
+    <LinearGradient id="t5" x1="0" y1="0" x2="1" y2="1">
+      <Stop offset="0" stopColor="#ff7a8a" />
+      <Stop offset="1" stopColor="#c8102e" />
+    </LinearGradient>
+    <LinearGradient id="t6" x1="0" y1="0" x2="1" y2="1">
+      <Stop offset="0" stopColor="#4fd6e8" />
+      <Stop offset="1" stopColor="#0e7fa8" />
+    </LinearGradient>
+    <LinearGradient id="t7" x1="0" y1="0" x2="1" y2="1">
+      <Stop offset="0" stopColor="#e0985a" />
+      <Stop offset="1" stopColor="#8a4a12" />
+    </LinearGradient>
+  </Defs>
+);
+// ============================================================================
+// 1. CHARACTER AVATARS (6 Custom SVG Avatars from page02)
+// ============================================================================
+export const AVATAR_PRESETS = [
+  { id: 'av0', bg: '#3b6ea5', skin: '#e0ac85', shirt: '#1c1c2e', name: 'Mavi Kaptan' },
+  { id: 'av1', bg: '#8a9bb8', skin: '#c98f6a', shirt: '#222222', name: 'Bozkurt' },
+  { id: 'av2', bg: '#6f8f6a', skin: '#e0ac85', shirt: '#444444', name: 'Orman Bilgesi' },
+  { id: 'av3', bg: '#a58f7a', skin: '#f1c9a5', shirt: '#7a2a2a', name: 'Kızıl Şövalye' },
+  { id: 'av4', bg: '#7a4cd8', skin: '#c98f6a', shirt: '#2a1558', name: 'Mor Büyücü' },
+  { id: 'av5', bg: '#c8456a', skin: '#e0ac85', shirt: '#3a1a50', name: 'Pembe Fırtına' },
+];
+export const CharacterAvatar: React.FC<{
+  index?: number;
+  seed?: string;
+  size?: number;
+}> = ({ index, seed, size = 40 }) => {
+  const [imgError, setImgError] = React.useState(false);
+  const isDirectImageUri =
+    !imgError &&
+    typeof seed === 'string' &&
+    !seed.includes('dicebear.com/7.x/bottts/svg') &&
+    (seed.startsWith('http://') ||
+      seed.startsWith('https://') ||
+      seed.startsWith('file://') ||
+      seed.startsWith('content://') ||
+      seed.startsWith('data:image/'));
+  if (isDirectImageUri && seed) {
+    return (
+      <Image
+        source={{ uri: seed }}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: '#3b6ea5',
+        }}
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+  let resolvedIndex = index ?? 1;
+  if (index === undefined && seed) {
+    const found = AVATAR_PRESETS.findIndex((p) => seed.includes(p.id) || seed.includes(p.name));
+    if (found >= 0) {
+      resolvedIndex = found;
+    } else {
+      let hash = 0;
+      for (let i = 0; i < seed.length; i++) hash += seed.charCodeAt(i);
+      resolvedIndex = hash % AVATAR_PRESETS.length;
+    }
+  }
+  const preset = AVATAR_PRESETS[resolvedIndex % AVATAR_PRESETS.length];
+  return (
+    <Svg width={size} height={size} viewBox="0 0 40 40">
+      <Circle cx="20" cy="20" r="20" fill={preset.bg} />
+      <Circle cx="20" cy="16" r="7" fill={preset.skin} />
+      <Path d="M8 34c2-8 8-10 12-10s10 2 12 10" fill={preset.shirt} />
+    </Svg>
+  );
+};
+export const GoogleGIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
+  <Svg width={size} height={size} viewBox="0 0 48 48">
+    <Path
+      fill="#EA4335"
+      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+    />
+    <Path
+      fill="#4285F4"
+      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+    />
+    <Path
+      fill="#FBBC05"
+      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+    />
+    <Path
+      fill="#34A853"
+      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+    />
+  </Svg>
+);
+// ============================================================================
+// 2. ECONOMY & REWARD ICONS (13 Icons from page28)
+// ============================================================================
+export const CoinIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <SharedSvgDefs />
+    <Circle cx="32" cy="32" r="27" fill="url(#gold)" />
+    <Circle cx="32" cy="32" r="19" fill="none" stroke="#fff" strokeOpacity="0.55" strokeWidth="3" />
+    <Path
+      d="M32 20l3.5 7.2 7.9 1.1-5.7 5.5 1.4 7.8-7.1-3.7-7.1 3.7 1.4-7.8-5.7-5.5 7.9-1.1z"
+      fill="#fff"
+      opacity="0.9"
+    />
+  </Svg>
+);
+export const CoinSvg = CoinIcon;
+export const GemIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <SharedSvgDefs />
+    <Path d="M20 8h24l14 16-26 32L6 24z" fill="url(#pink)" />
+    <Path
+      d="M6 24h52M20 8l-6 16 18 32 18-32-6-16"
+      fill="none"
+      stroke="#fff"
+      strokeOpacity="0.6"
+      strokeWidth="2.5"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+export const TrophyIcon: React.FC<{ size?: number }> = ({ size = 28 }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <SharedSvgDefs />
+    <Path d="M18 8h28v16a14 14 0 01-28 0z" fill="url(#gold)" />
+    <Path
+      d="M18 14H8v4a10 10 0 0010 10M46 14h10v4a10 10 0 01-10 10"
+      fill="none"
+      stroke="#ffb21e"
+      strokeWidth="4"
+      strokeLinecap="round"
+    />
+    <Rect x="28" y="38" width="8" height="8" fill="#e07a00" />
+    <Rect x="18" y="46" width="28" height="10" rx="4" fill="url(#purple)" />
+    <Path d="M24 14v10" stroke="#fff" strokeOpacity="0.6" strokeWidth="3" strokeLinecap="round" />
+  </Svg>
+);
+export const CrownIcon: React.FC<{ size?: number }> = ({ size = 28 }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <SharedSvgDefs />
+    <Path d="M6 48L8 18l16 14 8-18 8 18 16-14 2 30z" fill="url(#gold)" />
+    <Rect x="6" y="48" width="52" height="8" rx="4" fill="#e07a00" />
+    <Circle cx="32" cy="38" r="4" fill="url(#pink)" />
+  </Svg>
+);
+export const XpStarIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <SharedSvgDefs />
+    <Path
+      d="M32 6l7.8 16 17.7 2.5-12.8 12.4 3 17.5L32 46.1 16.3 54.4l3-17.5L6.5 24.5 24.2 22z"
+      fill="url(#gold)"
+      stroke="url(#gold)"
+      strokeWidth="4"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+export const SpeedBoltIcon: React.FC<{ size?: number }> = ({ size = 24 }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <SharedSvgDefs />
+    <Path
+      d="M36 4L10 36h18l-4 24 28-34H34z"
+      fill="url(#blue)"
+      stroke="url(#blue)"
+      strokeWidth="3"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+export const StreakFlameIcon: React.FC<{ size?: number; active?: boolean }> = ({
+  size = 24,
+  active = false,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <Defs>
+      <LinearGradient id="flameHot" x1="0" y1="0" x2="0" y2="1">
+        <Stop offset="0" stopColor="#FFEA79" />
+        <Stop offset="0.3" stopColor="#FF7A00" />
+        <Stop offset="1" stopColor="#D91E18" />
+      </LinearGradient>
+      <LinearGradient id="flameCore" x1="0" y1="0" x2="0" y2="1">
+        <Stop offset="0" stopColor="#FFFFFF" />
+        <Stop offset="0.6" stopColor="#FFF176" />
+        <Stop offset="1" stopColor="#FF9800" />
+      </LinearGradient>
+      <LinearGradient id="flameGlow" x1="0" y1="0" x2="0" y2="1">
+        <Stop offset="0" stopColor="#FF5722" stopOpacity="0.45" />
+        <Stop offset="1" stopColor="#FFB300" stopOpacity="0" />
+      </LinearGradient>
+    </Defs>
+    {active && (
+      <>
+        {/* Ambient Fire Aura Glow */}
+        <Circle cx="32" cy="36" r="26" fill="url(#flameGlow)" />
+        {/* Fire Sparks / Embers */}
+        <Circle cx="16" cy="18" r="2.5" fill="#FFE082" />
+        <Circle cx="48" cy="16" r="2" fill="#FFAB91" />
+        <Circle cx="46" cy="30" r="1.8" fill="#FFD54F" />
+        <Circle cx="18" cy="32" r="1.5" fill="#FF8A65" />
+      </>
+    )}
+    {/* Outer Flame */}
+    <Path
+      d="M32 4c3 10 17 16 17 34a17 17 0 01-34 0c0-8 4-12 9-16 1 4 3 6 6 6-2-8-1-16 2-24z"
+      fill={active ? 'url(#flameHot)' : '#B89B85'}
+      opacity={active ? 1 : 0.65}
+    />
+    {/* Secondary inner tongue */}
+    <Path
+      d="M32 20c2 6 10 10 10 20a10 10 0 01-20 0c0-5 3-7 5-10 1 3 2 4 4 4-1-5-1-10 1-14z"
+      fill={active ? '#FFB300' : '#8A7060'}
+    />
+    {/* Inner Core */}
+    <Path
+      d="M32 34c4 4 8 6 8 12a8 8 0 01-16 0c0-4 4-6 8-12z"
+      fill={active ? 'url(#flameCore)' : '#D0BAA8'}
+    />
+  </Svg>
+);
+export const BadgeShieldIcon: React.FC<{ size?: number }> = ({ size = 32 }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <SharedSvgDefs />
+    <Path d="M32 4l22 8v18c0 14-9 24-22 30C19 54 10 44 10 30V12z" fill="url(#purple)" />
+    <Path
+      d="M22 32l8 8 14-16"
+      fill="none"
+      stroke="#fff"
+      strokeWidth="5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+export const HeartIcon: React.FC<{ size?: number }> = ({ size = 24 }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <SharedSvgDefs />
+    <Path
+      d="M32 56S6 40 6 22C6 12 13 7 20 7c5 0 9 3 12 7 3-4 7-7 12-7 7 0 14 5 14 15 0 18-26 34-26 34z"
+      fill="url(#red)"
+    />
+  </Svg>
+);
+export const ChestIcon: React.FC<{ size?: number }> = ({ size = 36 }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <SharedSvgDefs />
+    <Rect x="6" y="28" width="52" height="28" rx="5" fill="url(#brown)" />
+    <Path d="M6 30v-4C6 12 58 12 58 26v4z" fill="#c9732a" />
+    <Rect x="26" y="14" width="12" height="42" rx="3" fill="url(#gold)" />
+    <Rect x="28" y="32" width="8" height="10" rx="2" fill="#fff3b0" />
+  </Svg>
+);
+export const GiftIcon: React.FC<{ size?: number }> = ({ size = 32 }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <SharedSvgDefs />
+    <Rect x="8" y="28" width="48" height="28" rx="5" fill="url(#green)" />
+    <Rect x="5" y="19" width="54" height="11" rx="4" fill="url(#green)" />
+    <Rect x="28" y="19" width="8" height="37" fill="url(#red)" />
+    <Path d="M32 19C20 3 9 12 20 19zM32 19C44 3 55 12 44 19z" fill="url(#red)" />
+  </Svg>
+);
+export const KeyIcon: React.FC<{ size?: number }> = ({ size = 28 }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <SharedSvgDefs />
+    <Circle cx="20" cy="20" r="12" fill="none" stroke="url(#gold)" strokeWidth="8" />
+    <Path
+      d="M30 30l24 24M44 44l8-8M52 52l6-6"
+      stroke="url(#gold)"
+      strokeWidth="7"
+      strokeLinecap="round"
+      fill="none"
+    />
+  </Svg>
+);
+export const InventoryCubeIcon: React.FC<{ size?: number }> = ({ size = 32 }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <SharedSvgDefs />
+    <Path d="M32 4l24 12v32L32 60 8 48V16z" fill="url(#brown)" />
+    <Path d="M32 4l24 12-24 12L8 16z" fill="#f0b070" />
+    <Path d="M32 28v32" stroke="#5a3010" strokeOpacity="0.4" strokeWidth="3" />
+  </Svg>
+);
+// ============================================================================
+// 3. CATEGORY SQUIRCLE ICONS (All 16 Categories from page04 & page28)
+// ============================================================================
+export type TavrikoCategoryKey =
+  | 'bilim'
+  | 'tarih'
+  | 'cografya'
+  | 'spor'
+  | 'sinema'
+  | 'muzik'
+  | 'sanat'
+  | 'teknoloji'
+  | 'doga'
+  | 'yemek'
+  | 'edebiyat'
+  | 'uzay'
+  | 'hayvanlar'
+  | 'matematik'
+  | 'oyun'
+  | 'genel_kultur';
+export const CategorySquircleIcon: React.FC<{
+  category: TavrikoCategoryKey | string;
+  size?: number;
+}> = ({ category, size = 44 }) => {
+  const key = category.toLowerCase();
+  const renderGlyph = () => {
+    if (key.includes('bilim') || key === 'science_tech' || key === 'physics_chemistry') {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t6)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <Ellipse cx="32" cy="32" rx="21" ry="8" />
+            <Ellipse cx="32" cy="32" rx="21" ry="8" transform="rotate(60 32 32)" />
+            <Ellipse cx="32" cy="32" rx="21" ry="8" transform="rotate(120 32 32)" />
+          </G>
+          <Circle cx="32" cy="32" r="3.5" fill="#fff" />
+        </>
+      );
+    }
+    if (key.includes('tarih') || key === 'history') {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t7)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M10 24L32 10l22 14z" />
+            <Path d="M16 28v20M27 28v20M37 28v20M48 28v20M10 54h44" />
+          </G>
+        </>
+      );
+    }
+    if (key.includes('cografya') || key === 'geography') {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t1)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <Circle cx="32" cy="32" r="20" />
+            <Ellipse cx="32" cy="32" rx="9" ry="20" />
+            <Path d="M12 32h40" />
+          </G>
+        </>
+      );
+    }
+    if (key.includes('spor') || key === 'sports') {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t3)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <Circle cx="32" cy="32" r="20" />
+            <Path d="M12 32h40M32 12v40M17 17a22 22 0 010 30M47 17a22 22 0 000 30" />
+          </G>
+        </>
+      );
+    }
+    if (key.includes('sinema') || key === 'cinema_tv') {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t5)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <Rect x="10" y="26" width="44" height="26" rx="5" />
+            <Path d="M10 26l38-12 4 8-42 4zM22 22l6 7M34 18l6 7" />
+          </G>
+          <Path d="M28 34l10 6-10 6z" fill="#fff" />
+        </>
+      );
+    }
+    if (key.includes('muzik') || key === 'music') {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t2)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M26 46V16l22-5v30" />
+          </G>
+          <Circle cx="20" cy="46" r="6" fill="#fff" />
+          <Circle cx="42" cy="41" r="6" fill="#fff" />
+        </>
+      );
+    }
+    if (key.includes('sanat') || key === 'art_culture') {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t0)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M32 10C18 10 10 20 10 31c0 12 10 22 22 22 4 0 5-3 3-6s0-6 4-6h8c6 0 10-4 10-10C57 19 47 10 32 10z" />
+          </G>
+          <Circle cx="22" cy="30" r="3.5" fill="#fff" />
+          <Circle cx="31" cy="21" r="3.5" fill="#fff" />
+          <Circle cx="43" cy="23" r="3.5" fill="#fff" />
+        </>
+      );
+    }
+    if (key.includes('teknoloji')) {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t1)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <Rect x="19" y="19" width="26" height="26" rx="5" />
+            <Path d="M27 8v11M37 8v11M27 45v11M37 45v11M8 27h11M8 37h11M45 27h11M45 37h11" />
+          </G>
+          <Rect x="28" y="28" width="8" height="8" rx="2" fill="#fff" />
+        </>
+      );
+    }
+    if (key.includes('doga') || key === 'biology') {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t4)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M12 52C12 28 28 12 52 12c0 24-16 40-40 40z" />
+            <Path d="M12 52L36 28" />
+          </G>
+        </>
+      );
+    }
+    if (key.includes('yemek') || key === 'language_vocab') {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t3)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M14 10v14c0 4 3 6 6 6s6-2 6-6V10M20 10v44" />
+            <Path d="M46 54V10c-8 4-10 12-10 20h10" />
+          </G>
+        </>
+      );
+    }
+    if (key.includes('edebiyat') || key === 'literature') {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t0)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M32 20c-6-5-14-6-22-5v34c8-1 16 0 22 5 6-5 14-6 22-5V15c-8-1-16 0-22 5zM32 20v34" />
+          </G>
+        </>
+      );
+    }
+    if (key.includes('uzay') || key === 'space_astronomy') {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t6)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M32 8c10 8 12 20 10 32H22C20 28 22 16 32 8z" />
+            <Path d="M22 40l-8 8 2 6 8-4M42 40l8 8-2 6-8-4M28 48c0 5 2 7 4 9 2-2 4-4 4-9" />
+          </G>
+          <Circle cx="32" cy="26" r="4" fill="#fff" />
+        </>
+      );
+    }
+    if (key.includes('hayvanlar')) {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t7)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <Path
+            d="M32 33c-8 0-14 6-12 12 2 5 8 4 12 4s10 1 12-4c2-6-4-12-12-12z"
+            fill="#fff"
+          />
+          <Circle cx="15" cy="28" r="5.5" fill="#fff" />
+          <Circle cx="25" cy="16" r="5.5" fill="#fff" />
+          <Circle cx="39" cy="16" r="5.5" fill="#fff" />
+          <Circle cx="49" cy="28" r="5.5" fill="#fff" />
+        </>
+      );
+    }
+    if (key.includes('matematik') || key === 'mathematics') {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t5)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M15 20h16M23 12v16M37 20h16M37 41l16 14M53 41L37 55M15 48h16" />
+          </G>
+          <Circle cx="23" cy="41" r="2.5" fill="#fff" />
+          <Circle cx="23" cy="55" r="2.5" fill="#fff" />
+        </>
+      );
+    }
+    if (key.includes('oyun') || key === 'logic_puzzles') {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t2)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M14 22h36c5 0 8 5 8 12v6c0 6-6 8-10 4l-4-6H20l-4 6c-4 4-10 2-10-4v-6c0-7 3-12 8-12z" />
+            <Path d="M20 28v8M16 32h8" />
+          </G>
+          <Circle cx="42" cy="30" r="2.8" fill="#fff" />
+          <Circle cx="48" cy="35" r="2.8" fill="#fff" />
+        </>
+      );
+    }
+    // Default: Genel Kültür
+    return (
+      <>
+        <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t0)" />
+        <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+        <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M32 8a16 16 0 00-8 30v6h16v-6A16 16 0 0032 8z" />
+          <Path d="M26 50h12M28 56h8" />
+        </G>
+      </>
+    );
+  };
+  return (
+    <Svg width={size} height={size} viewBox="0 0 64 64">
+      <SharedSvgDefs />
+      {renderGlyph()}
+    </Svg>
+  );
+};
+// ============================================================================
+// 4. MODE & TOOL SQUIRCLE ICONS (8 Icons from page03 & page28)
+// ============================================================================
+export const ModeSquircleIcon: React.FC<{
+  mode:
+    | 'custom_room'
+    | 'single_player'
+    | 'daily'
+    | 'friends'
+    | 'question'
+    | 'timer'
+    | 'notification'
+    | 'settings';
+  size?: number;
+}> = ({ mode, size = 44 }) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <SharedSvgDefs />
+    {mode === 'custom_room' && (
+      <>
+        <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t1)" />
+        <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+        <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M16 54V10h32v44M10 54h44" />
+        </G>
+        <Circle cx="40" cy="32" r="3" fill="#fff" />
+      </>
+    )}
+    {mode === 'single_player' && (
+      <>
+        <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t2)" />
+        <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+        <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx="32" cy="32" r="20" />
+          <Circle cx="32" cy="32" r="10" />
+        </G>
+        <Circle cx="32" cy="32" r="3.5" fill="#fff" />
+      </>
+    )}
+    {mode === 'daily' && (
+      <>
+        <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t4)" />
+        <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+        <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+          <Rect x="10" y="14" width="44" height="40" rx="8" />
+          <Path d="M10 26h44M22 8v10M42 8v10M24 40l6 6 11-12" />
+        </G>
+      </>
+    )}
+    {mode === 'friends' && (
+      <>
+        <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t0)" />
+        <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+        <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx="24" cy="22" r="8" />
+          <Path d="M8 52c0-9 7-14 16-14s16 5 16 14" />
+          <Circle cx="44" cy="24" r="6" />
+          <Path d="M44 38c7 0 12 4 12 12" />
+        </G>
+      </>
+    )}
+    {mode === 'question' && (
+      <>
+        <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t3)" />
+        <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+        <SvgText
+          x="32"
+          y="45"
+          textAnchor="middle"
+          fontWeight="900"
+          fontSize="38"
+          fill="#fff"
+        >
+          ?
+        </SvgText>
+      </>
+    )}
+    {mode === 'timer' && (
+      <>
+        <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t6)" />
+        <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+        <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx="32" cy="32" r="21" />
+          <Path d="M32 19v14l9 5" />
+        </G>
+      </>
+    )}
+    {mode === 'notification' && (
+      <>
+        <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t5)" />
+        <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+        <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M32 10c-9 0-14 7-14 16v10l-6 8h40l-6-8V26c0-9-5-16-14-16zM26 52a6 6 0 0012 0" />
+        </G>
+      </>
+    )}
+    {mode === 'settings' && (
+      <>
+        <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t7)" />
+        <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+        <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx="32" cy="32" r="9" />
+          <Path d="M32 8v8M32 48v8M8 32h8M48 32h8M15 15l6 6M43 43l6 6M15 49l6-6M43 21l6-6" />
+        </G>
+      </>
+    )}
+  </Svg>
+);
+// ============================================================================
+// 5. BOTTOM NAV & HUD ICONS
+// ============================================================================
+export const BellLineIcon: React.FC<{ size?: number; color?: string }> = ({
+  size = 20,
+  color = '#fff',
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <G fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M32 10c-9 0-14 7-14 16v10l-6 8h40l-6-8V26c0-9-5-16-14-16zM26 52a6 6 0 0012 0" />
+    </G>
+  </Svg>
+);
+export const CheckMarkSvg: React.FC<{ size?: number; color?: string }> = ({
+  size = 22,
+  color = '#fff',
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <Path
+      d="M16 33l11 11 21-22"
+      fill="none"
+      stroke={color}
+      strokeWidth="7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+export const CrossMarkSvg: React.FC<{ size?: number; color?: string }> = ({
+  size = 22,
+  color = '#fff',
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <Path
+      d="M20 20l24 24M44 20L20 44"
+      fill="none"
+      stroke={color}
+      strokeWidth="7"
+      strokeLinecap="round"
+    />
+  </Svg>
+);
+export const EyeOpenIcon: React.FC<{ size?: number; color?: string }> = ({
+  size = 22,
+  color = '#D9CDF5',
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path
+      d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"
+      fill="none"
+      stroke={color}
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Circle
+      cx="12"
+      cy="12"
+      r="3.2"
+      fill="none"
+      stroke={color}
+      strokeWidth="2.2"
+    />
+  </Svg>
+);
+export const EyeOffIcon: React.FC<{ size?: number; color?: string }> = ({
+  size = 22,
+  color = '#8E7EB8',
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path
+      d="M17.94 17.94A10.07 10.07 0 0112 19c-7 0-11-7-11-7a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 7 11 7a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22"
+      fill="none"
+      stroke={color}
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+// ============================================================================
+// TRANSPARENT VECTOR TAVRIKO BRAND LOGO (No Square Box!)
+// ============================================================================
+export const TavrikoHeroLogo: React.FC<{
+  width?: number;
+  height?: number;
+}> = ({ width = 230, height = 135 }) => (
+  <Svg width={width} height={height} viewBox="0 0 260 155">
+    <Defs>
+      <LinearGradient id="heroBubBlue" x1="0" y1="0" x2="1" y2="1">
+        <Stop offset="0" stopColor="#26A8FF" />
+        <Stop offset="0.55" stopColor="#4345F6" />
+        <Stop offset="1" stopColor="#8A24E6" />
+      </LinearGradient>
+      <LinearGradient id="heroBubPink" x1="0" y1="0" x2="1" y2="1">
+        <Stop offset="0" stopColor="#E154FF" />
+        <Stop offset="1" stopColor="#6918C8" />
+      </LinearGradient>
+      <LinearGradient id="heroCrownGold" x1="0" y1="0" x2="0" y2="1">
+        <Stop offset="0" stopColor="#FFF078" />
+        <Stop offset="0.6" stopColor="#FFB01F" />
+        <Stop offset="1" stopColor="#D66500" />
+      </LinearGradient>
+      <LinearGradient id="heroQMark" x1="0" y1="0" x2="0" y2="1">
+        <Stop offset="0" stopColor="#94FFFF" />
+        <Stop offset="1" stopColor="#08A6FF" />
+      </LinearGradient>
+    </Defs>
+    {/* Ambient Sparkle Rays */}
+    <Path
+      d="M52 46l-18-8 4 12z"
+      fill="#FF9248"
+      opacity="0.9"
+    />
+    <Path
+      d="M46 66l-14 4 8 8z"
+      fill="#FFD147"
+      opacity="0.85"
+    />
+    <Path
+      d="M206 32l12-10 4 12z"
+      fill="#3CE8FF"
+      opacity="0.9"
+    />
+    <Path
+      d="M214 54l16-4-4 12z"
+      fill="#FF8547"
+      opacity="0.9"
+    />
+    <Path
+      d="M212 76l14 4-8 10z"
+      fill="#38A8FF"
+      opacity="0.85"
+    />
+    {/* Back Pink Speech Bubble */}
+    <Rect
+      x="95"
+      y="24"
+      width="98"
+      height="74"
+      rx="28"
+      fill="url(#heroBubPink)"
+      stroke="#FF9AF5"
+      strokeWidth="2.5"
+    />
+    {/* Front Blue Speech Bubble */}
+    <Path
+      d="M94 26h66a28 28 0 0128 28v18a28 28 0 01-28 28h-38l-18 14 3-14H94a28 28 0 01-28-28V54a28 28 0 0128-28z"
+      fill="url(#heroBubBlue)"
+      stroke="#66D9FF"
+      strokeWidth="2.5"
+    />
+    {/* Golden crown removed per user request for clean modern look */}
+    {/* 3D Cyan Question Mark */}
+    <Path
+      d="M116 49c0-9 8-15 19-15s19 6 19 15c0 7-4 11-11 14-4 2-6 4-6 8h-11c0-7 3-11 9-14 4-2 6-4 6-7 0-3-3-5-7-5s-7 2-7 6h-11z"
+      fill="url(#heroQMark)"
+      stroke="#FFFFFF"
+      strokeWidth="1.5"
+    />
+    <Circle
+      cx="131"
+      cy="86"
+      r="6.5"
+      fill="url(#heroQMark)"
+      stroke="#FFFFFF"
+      strokeWidth="1.5"
+    />
+    {/* "Tavriko" 3D Typography with Deep Purple Outline */}
+    <SvgText
+      x="130"
+      y="142"
+      textAnchor="middle"
+      fontWeight="900"
+      fontSize="44"
+      fontFamily={THEME.fonts.display}
+      stroke="#23085A"
+      strokeWidth="10"
+      strokeLinejoin="round"
+      fill="#23085A"
+    >
+      Tavriko
+    </SvgText>
+    <SvgText
+      x="130"
+      y="140"
+      textAnchor="middle"
+      fontWeight="900"
+      fontSize="44"
+      fontFamily={THEME.fonts.display}
+      fill="#FFFFFF"
+    >
+      Tavriko
+    </SvgText>
+  </Svg>
+);
+export const TavrikoBadgeBanner: React.FC<{
+  scale?: number;
+}> = ({ scale = 1 }) => (
+  <View
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8 * scale,
+      paddingHorizontal: 16 * scale,
+      paddingVertical: 7 * scale,
+      borderRadius: 20 * scale,
+      backgroundColor: 'rgba(67, 40, 168, 0.55)',
+      borderWidth: 1.5,
+      borderColor: 'rgba(130, 196, 255, 0.38)',
+    }}
+  >
+    <CrownIcon size={22 * scale} />
+    <Text
+      style={{
+        fontFamily: THEME.fonts.display,
+        fontSize: 22 * scale,
+        color: '#FFFFFF',
+        letterSpacing: 0.6,
+      }}
+    >
+      Tavriko
+    </Text>
+  </View>
+);
+export const NavIcon: React.FC<{
+  tab: 'play' | 'explore' | 'leaders' | 'friends' | 'profile' | 'shop' | 'leagues' | 'events' | 'inventory';
+  active?: boolean;
+  size?: number;
+}> = ({ tab, active = false, size = 24 }) => {
+  const color = active ? '#ffc43d' : '#d9cdf5';
+  return (
+    <Svg width={size} height={size} viewBox="0 0 64 64">
+      {tab === 'play' && (
+        <Path
+          d="M22 12l30 20-30 20z"
+          fill={color}
+          stroke={color}
+          strokeWidth="6"
+          strokeLinejoin="round"
+        />
+      )}
+      {tab === 'explore' && (
+        <>
+          <Circle
+            cx="32"
+            cy="32"
+            r="22"
+            fill="none"
+            stroke={color}
+            strokeWidth="5"
+          />
+          <Path d="M43 21l-6 16-16 6 6-16z" fill={color} />
+        </>
+      )}
+      {(tab === 'leaders' || tab === 'leagues') && (
+        <G fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M20 10h24v14a12 12 0 01-24 0z" />
+          <Path d="M20 14h-8v4a8 8 0 008 8M44 14h8v4a8 8 0 01-8 8M32 36v10M22 54h20" />
+        </G>
+      )}
+      {tab === 'friends' && (
+        <G fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx="24" cy="22" r="8" />
+          <Path d="M8 52c0-9 7-14 16-14s16 5 16 14" />
+          <Circle cx="44" cy="24" r="6" />
+          <Path d="M44 38c7 0 12 4 12 12" />
+        </G>
+      )}
+      {tab === 'profile' && (
+        <G fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx="32" cy="22" r="10" />
+          <Path d="M12 54c0-11 9-16 20-16s20 5 20 16" />
+        </G>
+      )}
+      {tab === 'shop' && (
+        <G fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M12 24h40l-4 28H16z" />
+          <Path d="M22 24v-6a10 10 0 0120 0v6" />
+        </G>
+      )}
+      {tab === 'events' && (
+        <G fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
+          <Rect x="10" y="14" width="44" height="40" rx="8" />
+          <Path d="M10 26h44M22 8v10M42 8v10" />
+        </G>
+      )}
+      {tab === 'inventory' && (
+        <G fill="none" stroke={color} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M32 8l22 11v26L32 56 10 45V19z" />
+          <Path d="M10 19l22 11 22-11M32 30v26" />
+        </G>
+      )}
+    </Svg>
+  );
+};
+// ============================================================================
+// 6. REUSABLE UI PRIMITIVES FROM TAVRIKO UI KIT
+// ============================================================================
+export const TavrikoScreen: React.FC<{
+  children: React.ReactNode;
+  style?: ViewStyle;
+}> = ({ children, style }) => (
+  <View style={[styles.screenRoot, style]}>
+    {/* Radial Top Purple Glow */}
+    <View style={styles.topRadialGlow} pointerEvents="none" />
+    {/* Bottom Magenta/Cyan Ambient Glows */}
+    <View style={styles.bottomGlowOrb} pointerEvents="none" />
+    <View style={styles.sideCyanOrb} pointerEvents="none" />
+    {/* Subtle Diagonal Stripes */}
+    <View style={styles.stripe1} pointerEvents="none" />
+    <View style={styles.stripe2} pointerEvents="none" />
+    <View style={styles.stripe3} pointerEvents="none" />
+    {children}
+  </View>
+);
+export const TavrikoTopBar: React.FC<{
+  leftType?: 'bell' | 'back' | 'close' | 'none';
+  onLeftPress?: () => void;
+  coins?: number;
+  gems?: number;
+  avatarSeed?: string;
+  onAvatarPress?: () => void;
+  onCurrencyPress?: () => void;
+  isGuest?: boolean;
+  onGuestLoginPress?: () => void;
+}> = ({
+  leftType = 'bell',
+  onLeftPress,
+  coins = 500,
+  gems = 14,
+  avatarSeed = 'av1',
+  onAvatarPress,
+  onCurrencyPress,
+  isGuest = false,
+  onGuestLoginPress,
+}) => {
+  if (isGuest) {
+    return (
+      <View style={styles.topBarRow}>
+        {leftType === 'back' || leftType === 'close' ? (
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => {
+              sound.playSound('tap');
+              sound.triggerHaptic('light');
+              if (onLeftPress) onLeftPress();
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.iconButtonText}>
+              {leftType === 'back' ? '←' : '✕'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.guestBadgePill}>
+            <Text style={styles.guestBadgeText}>MİSAFİR MODU</Text>
+          </View>
+        )}
+        <TouchableOpacity
+          style={styles.guestLoginCtaBtn}
+          onPress={() => {
+            sound.playSound('reward');
+            sound.triggerHaptic('medium');
+            if (onGuestLoginPress) onGuestLoginPress();
+            else if (onAvatarPress) onAvatarPress();
+          }}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.guestLoginCtaText}>GİRİŞ YAP / KAYIT OL</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.topBarRow}>
+      {leftType !== 'none' ? (
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => {
+            sound.playSound('tap');
+            sound.triggerHaptic('light');
+            if (onLeftPress) onLeftPress();
+          }}
+          activeOpacity={0.8}
+        >
+          {leftType === 'bell' && <BellLineIcon size={20} />}
+          {leftType === 'back' && <Text style={styles.iconButtonText}>←</Text>}
+          {leftType === 'close' && <Text style={styles.iconButtonText}>✕</Text>}
+        </TouchableOpacity>
+      ) : (
+        <View style={{ width: 44 }} />
+      )}
+      <TouchableOpacity
+        style={styles.currencyPill}
+        onPress={() => {
+          if (onCurrencyPress) {
+            sound.playSound('reward');
+            sound.triggerHaptic('light');
+            onCurrencyPress();
+          }
+        }}
+        activeOpacity={onCurrencyPress ? 0.8 : 1}
+      >
+        <CoinIcon size={20} />
+        <Text style={styles.currencyText}>{coins}</Text>
+        <View style={{ width: 6 }} />
+        <GemIcon size={20} />
+        <Text style={styles.currencyText}>{gems}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => {
+          if (onAvatarPress) {
+            sound.playSound('tap');
+            sound.triggerHaptic('light');
+            onAvatarPress();
+          }
+        }}
+        activeOpacity={0.85}
+        style={styles.avatarCircleWrap}
+      >
+        <CharacterAvatar seed={avatarSeed} size={40} />
+      </TouchableOpacity>
+    </View>
+  );
+};
+export const Button3D: React.FC<{
+  title: string;
+  variant?: 'gold' | 'mint' | 'red' | 'glass' | 'purple';
+  onPress?: () => void;
+  disabled?: boolean;
+  style?: ViewStyle;
+  textStyle?: TextStyle;
+}> = ({ title, variant = 'gold', onPress, disabled, style, textStyle }) => {
+  const variantContainer =
+    variant === 'mint'
+      ? styles.btn3DMint
+      : variant === 'red'
+      ? styles.btn3DRed
+      : variant === 'glass'
+      ? styles.btn3DGlass
+      : variant === 'purple'
+      ? styles.btn3DPurple
+      : styles.btn3DGold;
+  const variantText =
+    variant === 'mint'
+      ? styles.btn3DTextMint
+      : variant === 'red' || variant === 'glass' || variant === 'purple'
+      ? styles.btn3DTextWhite
+      : styles.btn3DTextGold;
+  return (
+    <TouchableOpacity
+      onPress={() => {
+        sound.playSound('tap');
+        sound.triggerHaptic('medium');
+        if (onPress) onPress();
+      }}
+      disabled={disabled}
+      activeOpacity={0.85}
+      style={[
+        styles.btn3DBase,
+        variantContainer,
+        disabled && { opacity: 0.55 },
+        style,
+      ]}
+    >
+      <Text style={[styles.btn3DTextBase, variantText, textStyle]}>{title}</Text>
+    </TouchableOpacity>
+  );
+};
+export const TavrikoProgressBar: React.FC<{
+  progress: number; // 0 to 100
+  height?: number;
+  style?: ViewStyle;
+}> = ({ progress, height = 10, style }) => {
+  const clamped = Math.max(0, Math.min(100, progress));
+  return (
+    <View style={[styles.barTrack, { height, borderRadius: height / 2 }, style]}>
+      <View
+        style={[
+          styles.barFill,
+          { width: `${clamped}%`, borderRadius: height / 2 },
+        ]}
+      />
+    </View>
+  );
+};
+export type MainNavTab = 'play' | 'explore' | 'leaders' | 'friends' | 'profile';
+export type SecondaryNavTab = 'shop' | 'leagues' | 'play' | 'events' | 'inventory';
+export const TavrikoBottomNav: React.FC<{
+  activeTab: MainNavTab;
+  onSelectTab: (tab: MainNavTab) => void;
+}> = ({ activeTab, onSelectTab }) => {
+  const items: { key: MainNavTab; label: string }[] = [
+    { key: 'play', label: 'Oyna' },
+    { key: 'explore', label: 'Keşfet' },
+    { key: 'leaders', label: 'Liderler' },
+    { key: 'friends', label: 'Arkadaşlar' },
+    { key: 'profile', label: 'Profil' },
+  ];
+  return (
+    <View style={styles.bottomNav}>
+      {items.map((item) => {
+        const isActive = activeTab === item.key;
+        return (
+          <TouchableOpacity
+            key={item.key}
+            style={[styles.navItem, isActive && styles.navItemActive]}
+            onPress={() => {
+              sound.playSound('nav');
+              sound.triggerHaptic('light');
+              onSelectTab(item.key);
+            }}
+            activeOpacity={0.8}
+          >
+            <NavIcon tab={item.key} active={isActive} size={24} />
+            <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
+export const TavrikoSecondaryBottomNav: React.FC<{
+  activeTab: SecondaryNavTab;
+  onSelectTab: (tab: SecondaryNavTab) => void;
+}> = ({ activeTab, onSelectTab }) => {
+  const items: { key: SecondaryNavTab; label: string }[] = [
+    { key: 'shop', label: 'Shop' },
+    { key: 'leagues', label: 'Leagues' },
+    { key: 'play', label: 'Play' },
+    { key: 'events', label: 'Events' },
+    { key: 'inventory', label: 'Inventory' },
+  ];
+  return (
+    <View style={styles.bottomNav}>
+      {items.map((item) => {
+        const isActive = activeTab === item.key;
+        return (
+          <TouchableOpacity
+            key={item.key}
+            style={[styles.navItem, isActive && styles.navItemActive]}
+            onPress={() => {
+              sound.playSound('nav');
+              sound.triggerHaptic('light');
+              onSelectTab(item.key);
+            }}
+            activeOpacity={0.8}
+          >
+            <NavIcon tab={item.key} active={isActive} size={24} />
+            <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
+const styles = StyleSheet.create({
+  screenRoot: {
+    flex: 1,
+    backgroundColor: '#1B0C38',
+    paddingHorizontal: 18,
+    paddingTop: 26,
+    overflow: 'hidden',
+  },
+  topRadialGlow: {
+    position: 'absolute',
+    top: -120,
+    left: -40,
+    right: -40,
+    height: 360,
+    borderRadius: 220,
+    backgroundColor: '#5b2cc4',
+    opacity: 0.45,
+  },
+  bottomGlowOrb: {
+    position: 'absolute',
+    bottom: -140,
+    right: -60,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: '#9A27D8',
+    opacity: 0.24,
+  },
+  sideCyanOrb: {
+    position: 'absolute',
+    top: 240,
+    left: -100,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: '#247FE0',
+    opacity: 0.18,
+  },
+  stripe1: {
+    position: 'absolute',
+    top: -100,
+    left: -120,
+    width: 600,
+    height: 28,
+    backgroundColor: 'rgba(0,0,0,0.12)',
+    transform: [{ rotate: '-25deg' }],
+  },
+  stripe2: {
+    position: 'absolute',
+    top: 160,
+    left: -120,
+    width: 650,
+    height: 28,
+    backgroundColor: 'rgba(0,0,0,0.12)',
+    transform: [{ rotate: '-25deg' }],
+  },
+  stripe3: {
+    position: 'absolute',
+    top: 440,
+    left: -120,
+    width: 650,
+    height: 28,
+    backgroundColor: 'rgba(0,0,0,0.12)',
+    transform: [{ rotate: '-25deg' }],
+  },
+  topBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  iconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(10, 4, 24, 0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  currencyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(10, 4, 24, 0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 5,
+  },
+  currencyText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  avatarCircleWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  guestBadgePill: {
+    backgroundColor: 'rgba(10, 4, 24, 0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.35)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  guestBadgeText: {
+    color: '#FFC43D',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 0.4,
+  },
+  guestLoginCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#FFB21E',
+    borderBottomWidth: 3,
+    borderBottomColor: '#B8560A',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 16,
+  },
+  guestLoginCtaText: {
+    color: '#3B1500',
+    fontSize: 11,
+    fontFamily: THEME.fonts.display,
+  },
+  btn3DBase: {
+    minHeight: 50,
+    borderRadius: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 4,
+  },
+  btn3DGold: {
+    backgroundColor: '#FFB21E',
+    borderBottomColor: '#B8560A',
+    borderTopWidth: 1,
+    borderTopColor: '#FFE27A',
+  },
+  btn3DMint: {
+    backgroundColor: '#5ADBB5',
+    borderBottomColor: '#1D7A6B',
+    borderTopWidth: 1,
+    borderTopColor: '#8FF0CF',
+  },
+  btn3DRed: {
+    backgroundColor: '#E83850',
+    borderBottomColor: '#7A0A1C',
+    borderTopWidth: 1,
+    borderTopColor: '#FF7A8A',
+  },
+  btn3DPurple: {
+    backgroundColor: '#6B3CFF',
+    borderBottomColor: '#4319B8',
+    borderTopWidth: 1,
+    borderTopColor: '#9D7DFF',
+  },
+  btn3DGlass: {
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderWidth: 1,
+    borderBottomWidth: 2,
+    borderBottomColor: 'rgba(255, 255, 255, 0.22)',
+  },
+  btn3DTextBase: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 18,
+    letterSpacing: 0.5,
+  },
+  btn3DTextGold: {
+    color: '#3B1500',
+  },
+  btn3DTextMint: {
+    color: '#0C3A33',
+  },
+  btn3DTextWhite: {
+    color: '#FFFFFF',
+  },
+  barTrack: {
+    backgroundColor: 'rgba(0, 0, 0, 0.42)',
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    backgroundColor: '#FF9B2F',
+  },
+  bottomNav: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 14,
+    height: 72,
+    borderRadius: 26,
+    backgroundColor: 'rgba(14, 6, 32, 0.94)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  navItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    paddingHorizontal: 8,
+  },
+  navItemActive: {
+    // Fixed in place, only yellow highlight
+  },
+  navLabel: {
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    color: '#D9CDF5',
+  },
+  navLabelActive: {
+    color: '#FFC43D',
+  },
+});

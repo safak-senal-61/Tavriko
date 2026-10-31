@@ -1,0 +1,158 @@
+// ============================================================================
+// Tavriko (TriviaVerse) - Prisma ORM Schema (Supabase PostgreSQL)
+// Supabase Project: rjvbgofzsfescnfohzgu (https://rjvbgofzsfescnfohzgu.supabase.co)
+// ============================================================================
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Category {
+  id             String     @id
+  name           String
+  description    String
+  icon           String
+  color          String
+  totalQuestions Int        @default(0)
+  questions      Question[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@map("categories")
+}
+
+model Question {
+  id                   String    @id
+  categoryId           String
+  category             Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subCategory          String?
+  difficulty           String
+  text                 String
+  options              Json
+  correctOptionId      String
+  explanation          String
+  sourceOrVerification String?
+  language             String    @default("tr")
+  contentHash          String    @unique
+  reviewStatus         String    @default("published")
+  reviewedBy           String?
+  reviewedAt           DateTime?
+  rejectionReason      String?
+  timeLimitSec         Int       @default(15)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([categoryId, difficulty, reviewStatus])
+  @@map("questions")
+}
+
+model User {
+  id                   String              @id
+  username             String              @unique
+  email                String              @unique
+  displayName          String
+  fullName             String?
+  passwordHash         String?
+  googleId             String?             @unique
+  countryCode          String?             @default("TR")
+  countryName          String?             @default("Türkiye")
+  phone                String?
+  birthDate            String?
+  gender               String?
+  bio                  String?
+  avatarUrl            String?             @default("av1")
+  friendCode           String              @unique
+  level                Int                 @default(1)
+  xp                   Int                 @default(0)
+  coins                Int                 @default(500)
+  gems                 Int                 @default(15)
+  dailyStreak          Int                 @default(1)
+  rankTitle            String              @default("Acemi Kaşif")
+  rankPoints           Int                 @default(1000)
+  profileCompletionPct Int                 @default(50)
+  totalMatches         Int                 @default(0)
+  wins                 Int                 @default(0)
+  correctAnswers       Int                 @default(0)
+  totalAnswers         Int                 @default(0)
+  bestStreak           Int                 @default(0)
+  avgResponseTimeMs    Int                 @default(0)
+  categoryMastery      Json                @default("{}")
+  claimedSeasonTiers   Json                @default("[1]")
+  friendIds            Json                @default("[]")
+  inventoryItems       UserInventoryItem[]
+  notifications        UserNotification[]
+  matches              MatchHistory[]
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([rankPoints(sort: Desc)])
+  @@index([xp(sort: Desc)])
+  @@map("users")
+}
+
+model UserInventoryItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId    String
+  name      String
+  desc      String
+  qty       Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, itemId])
+  @@map("user_inventory_items")
+}
+
+model UserNotification {
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  sub       String
+  timeText  String
+  handled   String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("user_notifications")
+}
+
+model MatchHistory {
+  id             String   @id @default(cuid())
+  roomCode       String
+  mode           String
+  categoryId     String
+  winnerId       String?
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  score          Int      @default(0)
+  correctAnswers Int      @default(0)
+  totalQuestions Int      @default(5)
+  rankingsJson   Json
+  playedAt       DateTime @default(now())
+
+  @@index([userId])
+  @@map("match_history")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email, code])
+  @@map("password_reset_tokens")
+}

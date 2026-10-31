@@ -1,10 +1,22 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Share,
+} from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import { GameRoom } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
-import { sound } from '../services/soundService';
-import { GameRoom, Player } from '@trivia/shared';
-import { ArrowLeft, Crown, Check, X, Copy, Play, Users } from 'lucide-react-native';
-
+import {
+  TavrikoScreen,
+  TavrikoTopBar,
+  Button3D,
+  CharacterAvatar,
+  CrownIcon,
+} from '../components/TavrikoIcons';
 interface LobbyScreenProps {
   room: GameRoom;
   currentUserId: string;
@@ -12,7 +24,6 @@ interface LobbyScreenProps {
   onToggleReady: () => void;
   onStartGame: () => void;
 }
-
 export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   room,
   currentUserId,
@@ -20,320 +31,203 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   onToggleReady,
   onStartGame,
 }) => {
-  const isHost = room.hostId === currentUserId;
-  const playersList: Player[] = Object.values(room.players);
-  const myPlayer = room.players[currentUserId];
-  const allReady = playersList.every((p) => p.isReady || p.isHost);
-
-  const copyCode = () => {
-    sound.playSound('tap');
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(room.code);
-    }
-  };
-
+  const [copied, setCopied] = useState(false);
+  const players = Object.values(room.players);
+  const maxPlayers = 6;
+  const emptySlotCount = Math.max(0, maxPlayers - players.length);
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            sound.playSound('tap');
-            onBack();
-          }}
-        >
-          <ArrowLeft size={22} color={THEME.colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Oyun Lobisi</Text>
-      </View>
-
-      <View style={styles.codeCard}>
-        <Text style={styles.codeLabel}>ODA KODU</Text>
-        <TouchableOpacity style={styles.codeRow} onPress={copyCode}>
+    <TavrikoScreen>
+      <TavrikoTopBar leftType="back" onLeftPress={onBack} />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>LOBİ</Text>
+        <Text style={styles.subtitle}>Oda kodu</Text>
+        {/* Room Code Box */}
+        <View style={styles.codeBox}>
           <Text style={styles.codeText}>{room.code}</Text>
-          <Copy size={18} color={THEME.colors.primaryLight} />
-        </TouchableOpacity>
-        <Text style={styles.codeHint}>Koda dokunarak kopyalayabilirsin</Text>
-      </View>
-
-      <View style={styles.playersSection}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>
-            Oyuncular ({playersList.length}/{room.maxPlayers})
-          </Text>
-          <Text style={styles.categoryBadge}>{room.category.toUpperCase()}</Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              style={styles.copyIconBtn}
+              onPress={async () => {
+                await Clipboard.setStringAsync(room.code);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.copyIconText}>{copied ? '✓' : '📋'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.copyIconBtn}
+              onPress={async () => {
+                try {
+                  await Share.share({
+                    message: `Tavriko bilgi yarışmasında özel odama katıl! 🎮\nOda Kodum: ${room.code}\nÖzel Oda ekranından bu kodu girerek hemen oyuna katıl!`,
+                  });
+                } catch {}
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.copyIconText}>🔗</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-
-        <ScrollView contentContainerStyle={styles.playersList}>
-          {playersList.map((player) => (
-            <View key={player.id} style={styles.playerCard}>
-              <View style={styles.playerLeft}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{player.displayName.charAt(0).toUpperCase()}</Text>
-                  {player.isHost && (
-                    <View style={styles.hostCrown}>
-                      <Crown size={12} color="#FFF" />
-                    </View>
-                  )}
-                </View>
-                <View>
-                  <Text style={styles.playerName}>{player.displayName}</Text>
-                  <Text style={styles.playerRole}>{player.isHost ? 'Oda Kurucusu' : 'Yarışmacı'}</Text>
-                </View>
-              </View>
-
+        <Text style={styles.playersCountText}>
+          Oyuncular {players.length}/{maxPlayers}
+        </Text>
+        {/* Active Players */}
+        {players.map((p, index) => {
+          const isHost = p.id === room.hostId;
+          return (
+            <TouchableOpacity
+              key={p.id}
+              style={styles.playerRow}
+              onPress={p.id === currentUserId ? onToggleReady : undefined}
+              activeOpacity={0.85}
+            >
+              <CharacterAvatar seed={p.avatarUrl || p.displayName} index={index} size={36} />
+              <Text style={styles.playerName} numberOfLines={1}>
+                {p.displayName}
+              </Text>
+              {isHost && <CrownIcon size={20} />}
               <View
                 style={[
-                  styles.readyBadge,
-                  player.isReady ? styles.readyBadgeActive : styles.readyBadgePending,
+                  styles.statusChip,
+                  p.isReady ? styles.statusReady : styles.statusWaiting,
                 ]}
               >
-                {player.isReady ? (
-                  <Check size={14} color="#FFF" />
-                ) : (
-                  <X size={14} color={THEME.colors.textMuted} />
-                )}
-                <Text
-                  style={[
-                    styles.readyText,
-                    player.isReady ? styles.readyTextActive : styles.readyTextPending,
-                  ]}
-                >
-                  {player.isReady ? 'HAZIR' : 'BEKLİYOR'}
+                <Text style={styles.statusChipText}>
+                  {p.isReady ? 'HAZIR' : 'BEKLİYOR'}
                 </Text>
               </View>
-            </View>
-          ))}
-        </ScrollView>
-      </View>
-
-      <View style={styles.footer}>
-        {isHost ? (
-          <TouchableOpacity
-            style={[styles.startButton, (!allReady || playersList.length < 1) && styles.buttonDisabled]}
-            disabled={!allReady || playersList.length < 1}
-            onPress={() => {
-              sound.playSound('match_found');
-              sound.triggerHaptic('success');
-              onStartGame();
-            }}
-          >
-            <Play size={20} color="#FFF" />
-            <Text style={styles.buttonText}>Oyunu Başlat</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.readyButton, myPlayer?.isReady && styles.readyButtonActive]}
-            onPress={() => {
-              sound.playSound('tap');
-              sound.triggerHaptic('light');
-              onToggleReady();
-            }}
-          >
-            <Check size={20} color="#FFF" />
-            <Text style={styles.buttonText}>
-              {myPlayer?.isReady ? 'Hazır Durumunu İptal Et' : 'Hazırım!'}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    </View>
+            </TouchableOpacity>
+          );
+        })}
+        {/* Empty Dashed Slots */}
+        {Array.from({ length: Math.min(2, emptySlotCount) }).map((_, idx) => (
+          <View key={`empty_${idx}`} style={styles.emptySlot}>
+            <Text style={styles.emptySlotText}>Oyuncu bekleniyor...</Text>
+          </View>
+        ))}
+        <View style={{ marginTop: 12 }}>
+          <Button3D
+            title="MAÇI BAŞLAT"
+            onPress={onStartGame}
+            style={{ height: 56 }}
+          />
+        </View>
+      </ScrollView>
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
+  scrollContent: {
+    paddingBottom: 32,
   },
-  header: {
+  title: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 36,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  subtitle: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  codeBox: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: THEME.spacing.lg,
-    paddingTop: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.border,
-    backgroundColor: THEME.colors.card,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-  },
-  codeCard: {
-    margin: THEME.spacing.lg,
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.lg,
-    padding: THEME.spacing.lg,
-    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  codeLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: THEME.colors.textMuted,
-    letterSpacing: 1,
-  },
-  codeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginVertical: 6,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
   },
   codeText: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: THEME.colors.primaryLight,
+    fontFamily: THEME.fonts.display,
+    fontSize: 36,
     letterSpacing: 6,
+    color: '#FFC43D',
   },
-  codeHint: {
-    fontSize: 12,
-    color: THEME.colors.textMuted,
-  },
-  playersSection: {
-    flex: 1,
-    paddingHorizontal: THEME.spacing.lg,
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-  },
-  categoryBadge: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: THEME.colors.primaryLight,
-    backgroundColor: THEME.colors.card,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: THEME.radius.sm,
-  },
-  playersList: {
-    gap: 10,
-  },
-  playerCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: THEME.colors.card,
-    padding: 12,
-    borderRadius: THEME.radius.md,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  playerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatar: {
+  copyIconBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: THEME.colors.primary,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(10, 4, 24, 0.72)',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
   },
-  avatarText: {
-    color: '#FFF',
-    fontSize: 18,
+  copyIconText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '800',
   },
-  hostCrown: {
-    position: 'absolute',
-    top: -6,
-    right: -4,
-    backgroundColor: THEME.colors.gold,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  playersCountText: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    marginBottom: 8,
+  },
+  playerRow: {
+    height: 58,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 8,
   },
   playerName: {
+    flex: 1,
+    color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '700',
-    color: THEME.colors.textPrimary,
+    fontFamily: THEME.fonts.extraBold,
   },
-  playerRole: {
-    fontSize: 11,
-    color: THEME.colors.textSecondary,
-    marginTop: 2,
+  statusChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 12,
   },
-  readyBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: THEME.radius.full,
+  statusReady: {
+    backgroundColor: '#1F9A5A',
   },
-  readyBadgeActive: {
-    backgroundColor: THEME.colors.correct,
+  statusWaiting: {
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
   },
-  readyBadgePending: {
-    backgroundColor: THEME.colors.backgroundSecondary,
+  statusChipText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
   },
-  readyText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  readyTextActive: {
-    color: '#FFF',
-  },
-  readyTextPending: {
-    color: THEME.colors.textMuted,
-  },
-  footer: {
-    padding: THEME.spacing.lg,
-  },
-  startButton: {
-    flexDirection: 'row',
+  emptySlot: {
+    height: 58,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: THEME.colors.primary,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 14,
+    marginBottom: 8,
   },
-  readyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: THEME.colors.cardHover,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  readyButtonActive: {
-    backgroundColor: THEME.colors.correct,
-    borderColor: THEME.colors.correct,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
+  emptySlotText: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
   },
 });

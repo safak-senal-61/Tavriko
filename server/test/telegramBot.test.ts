@@ -1,0 +1,106 @@
+import { TelegramBotService } from '../src/telegram/telegramBot';
+import { DatabaseAdapter } from '../src/db/prismaClient';
+
+describe('Telegram Bot Management & Admin Approval Workflow', () => {
+  let db: DatabaseAdapter;
+  let botService: TelegramBotService;
+  const ADMIN_ID = 123456789;
+  const UNAUTHORIZED_ID = 999999999;
+
+  beforeEach(() => {
+    db = new DatabaseAdapter();
+    botService = new TelegramBotService({
+      adminIds: [ADMIN_ID],
+      db,
+    });
+  });
+
+  it('rejects unauthorized users with access denied message', async () => {
+    const res = await botService.handleCommand(UNAUTHORIZED_ID, '/bekleyenler');
+    expect(res.authorized).toBe(false);
+    expect(res.message).toContain('yetkiniz bulunmamaktadır');
+  });
+
+  it('allows authorized admin to list categories via /kategori', async () => {
+    const res = await botService.handleCommand(ADMIN_ID, '/kategori');
+    expect(res.authorized).toBe(true);
+    expect(res.message).toContain('Kategoriler');
+    expect(res.message).toContain('Coğrafya');
+    expect(res.message).toContain('Matematik');
+  });
+
+  it('allows authorized admin to generate questions via /soru_uret', async () => {
+    const res = await botService.handleCommand(ADMIN_ID, '/soru_uret matematik zor 1');
+    expect(res.authorized).toBe(true);
+    expect(res.message).toContain('Evren GLM-5.3 ile üretildi');
+    expect(res.questions?.length).toBe(1);
+
+    const generated = res.questions![0];
+    expect(generated.categoryId).toBe('mathematics');
+    expect(generated.difficulty).toBe('hard');
+    expect(generated.reviewStatus).toBe('pending_review');
+  });
+
+  it('allows authorized admin to view stats via /istatistik', async () => {
+    const res = await botService.handleCommand(ADMIN_ID, '/istatistik');
+    expect(res.authorized).toBe(true);
+    expect(res.message).toContain('İstatistik');
+    expect(res.message).toContain('Toplam Soru');
+  });
+
+  it('approves a pending question when admin clicks approve callback', async () => {
+    const q = db.createQuestion({
+      categoryId: 'history',
+      difficulty: 'medium',
+      text: 'TBMM hangi tarihte açılmıştır?',
+      options: [
+        { id: 'opt_a', text: '23 Nisan 1920' },
+        { id: 'opt_b', text: '29 Ekim 1923' },
+        { id: 'opt_c', text: '19 Mayıs 1919' },
+        { id: 'opt_d', text: '30 Ağustos 1922' },
+      ],
+      correctOptionId: 'opt_a',
+      explanation: 'TBMM 23 Nisan 1920 tarihinde Ankara\'da açılmıştır.',
+    });
+
+    expect(q.reviewStatus).toBe('pending_review');
+
+    // Admin clicks approve
+    const callbackRes = await botService.handleCallback(ADMIN_ID, `approve:${q.id}`);
+    expect(callbackRes.success).toBe(true);
+    expect(callbackRes.message).toContain('ONAYLANDI');
+
+    const updated = db.getQuestionById(q.id);
+    expect(updated?.reviewStatus).toBe('published');
+    expect(updated?.reviewedBy).toBe(String(ADMIN_ID));
+  });
+
+  it('rejects a pending question when admin clicks reject callback', async () => {
+    const q = db.createQuestion({
+      categoryId: 'history',
+      difficulty: 'medium',
+      text: 'Hatalı tarih sorusu?',
+      options: [
+        { id: 'opt_a', text: '1' },
+        { id: 'opt_b', text: '2' },
+        { id: 'opt_c', text: '3' },
+        { id: 'opt_d', text: '4' },
+      ],
+      correctOptionId: 'opt_a',
+      explanation: 'Geçersiz soru',
+    });
+
+    const callbackRes = await botService.handleCallback(ADMIN_ID, `reject:${q.id}`);
+    expect(callbackRes.success).toBe(true);
+    expect(callbackRes.message).toContain('REDDEDİLDİ');
+
+    const updated = db.getQuestionById(q.id);
+    expect(updated?.reviewStatus).toBe('rejected');
+  });
+
+  it('denies callback execution to unauthorized users', async () => {
+    const callbackRes = await botService.handleCallback(UNAUTHORIZED_ID, 'approve:q_123');
+    expect(callbackRes.success).toBe(false);
+    expect(callbackRes.message).toContain('yetkiniz bulunmamaktadır');
+  });
+});

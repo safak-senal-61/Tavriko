@@ -1,203 +1,228 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+} from 'react-native';
+import { CategoryId, DifficultyLevel } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
-import { sound } from '../services/soundService';
-import { CategoryId, DifficultyLevel, ALL_CATEGORIES } from '@trivia/shared';
-import { ArrowLeft, Play, Shield, Zap, Flame, Award } from 'lucide-react-native';
-
+import {
+  TavrikoScreen,
+  TavrikoTopBar,
+  Button3D,
+  XpStarIcon,
+} from '../components/TavrikoIcons';
 interface SinglePlayerPracticeScreenProps {
   onBack: () => void;
   onStartPractice: (category: CategoryId, difficulty: DifficultyLevel) => void;
 }
-
-export const SinglePlayerPracticeScreen: React.FC<SinglePlayerPracticeScreenProps> = ({
-  onBack,
-  onStartPractice,
-}) => {
-  const [selectedCat, setSelectedCat] = useState<CategoryId>('general_culture');
+const PRACTICE_CATEGORIES: { id: CategoryId; label: string }[] = [
+  { id: 'science_tech', label: 'Bilim' },
+  { id: 'history', label: 'Tarih' },
+  { id: 'sports', label: 'Spor' },
+  { id: 'space_astronomy', label: 'Uzay' },
+];
+const PRACTICE_DIFFICULTIES: { id: DifficultyLevel; label: string }[] = [
+  { id: 'easy', label: 'Kolay' },
+  { id: 'medium', label: 'Orta' },
+  { id: 'hard', label: 'Zor' },
+  { id: 'expert', label: 'Uzman' },
+];
+const QUESTION_COUNTS = [5, 10, 15, 20];
+export const SinglePlayerPracticeScreen: React.FC<
+  SinglePlayerPracticeScreenProps
+> = ({ onBack, onStartPractice }) => {
+  const [selectedCat, setSelectedCat] = useState<CategoryId>('science_tech');
   const [selectedDiff, setSelectedDiff] = useState<DifficultyLevel>('medium');
-
-  const difficulties: Array<{ id: DifficultyLevel; name: string }> = [
-    { id: 'easy', name: 'Kolay' },
-    { id: 'medium', name: 'Orta' },
-    { id: 'hard', name: 'Zor' },
-    { id: 'expert', name: 'Uzman' },
-  ];
-
+  const [selectedCount, setSelectedCount] = useState<number>(10);
+  const [timerEnabled, setTimerEnabled] = useState<boolean>(true);
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => {
-            sound.playSound('tap');
-            onBack();
-          }}
-        >
-          <ArrowLeft size={22} color={THEME.colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Tek Kişilik Pratik</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionTitle}>1. Zorluk Seviyesi</Text>
-        <View style={styles.diffRow}>
-          {difficulties.map((d) => {
-            const isSelected = selectedDiff === d.id;
+    <TavrikoScreen>
+      <TavrikoTopBar leftType="back" onLeftPress={onBack} />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>TEK KİŞİLİK PRATİK</Text>
+        <Text style={styles.subtitle}>Kendi hızında çalış</Text>
+        {/* Kategori */}
+        <Text style={styles.sectionLabel}>Kategori</Text>
+        <View style={styles.chipRow}>
+          {PRACTICE_CATEGORIES.map((c) => {
+            const isOn = selectedCat === c.id;
+            return (
+              <TouchableOpacity
+                key={c.id}
+                style={[styles.chip, isOn && styles.chipOn]}
+                onPress={() => setSelectedCat(c.id)}
+              >
+                <Text style={styles.chipText}>{c.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {/* Zorluk */}
+        <Text style={styles.sectionLabel}>Zorluk</Text>
+        <View style={styles.chipRow}>
+          {PRACTICE_DIFFICULTIES.map((d) => {
+            const isOn = selectedDiff === d.id;
             return (
               <TouchableOpacity
                 key={d.id}
-                style={[styles.diffBtn, isSelected && styles.diffBtnSelected]}
-                onPress={() => {
-                  sound.playSound('tap');
-                  setSelectedDiff(d.id);
-                }}
+                style={[styles.chip, isOn && styles.chipOn]}
+                onPress={() => setSelectedDiff(d.id)}
               >
-                <Text style={[styles.diffText, isSelected && styles.diffTextSelected]}>
-                  {d.name}
-                </Text>
+                <Text style={styles.chipText}>{d.label}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
-
-        <Text style={styles.sectionTitle}>2. Kategori Seçimi</Text>
-        <View style={styles.catGrid}>
-          {ALL_CATEGORIES.map((cat) => {
-            const isSelected = selectedCat === cat.id;
-            const catColors = THEME.categoryColors[cat.id] || THEME.categoryColors.mixed;
+        {/* Soru sayısı */}
+        <Text style={styles.sectionLabel}>Soru sayısı</Text>
+        <View style={styles.chipRow}>
+          {QUESTION_COUNTS.map((cnt) => {
+            const isOn = selectedCount === cnt;
             return (
               <TouchableOpacity
-                key={cat.id}
-                style={[
-                  styles.catCard,
-                  isSelected && { borderColor: catColors.primary, backgroundColor: `${catColors.primary}18` },
-                ]}
-                onPress={() => {
-                  sound.playSound('tap');
-                  setSelectedCat(cat.id);
-                }}
+                key={cnt}
+                style={[styles.chip, isOn && styles.chipOn]}
+                onPress={() => setSelectedCount(cnt)}
               >
-                <Text style={[styles.catName, isSelected && { color: catColors.primary }]}>
-                  {cat.name}
-                </Text>
+                <Text style={styles.chipText}>{cnt}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
-
+        {/* Zamanlayıcı Toggle */}
         <TouchableOpacity
-          style={styles.startButton}
-          onPress={() => {
-            sound.playSound('tap');
-            onStartPractice(selectedCat, selectedDiff);
-          }}
+          style={styles.toggleCard}
+          onPress={() => setTimerEnabled((v) => !v)}
+          activeOpacity={0.85}
         >
-          <Play size={20} color="#FFF" />
-          <Text style={styles.btnText}>Pratiğe Başla</Text>
+          <Text style={styles.toggleLabel}>Zamanlayıcı</Text>
+          <View
+            style={[
+              styles.switchTrack,
+              { backgroundColor: timerEnabled ? '#3FD08A' : '#4A3A7A' },
+            ]}
+          >
+            <View
+              style={[
+                styles.switchThumb,
+                timerEnabled ? { right: 3 } : { left: 3 },
+              ]}
+            />
+          </View>
         </TouchableOpacity>
+        {/* Last Practice Summary */}
+        <View style={styles.lastPracticeCard}>
+          <XpStarIcon size={22} />
+          <Text style={styles.lastPracticeText}>
+            Son antrenman: Bilim · 8/10 doğru
+          </Text>
+        </View>
+        <Button3D
+          title="ANTRENMANI BAŞLAT"
+          onPress={() => onStartPractice(selectedCat, selectedDiff)}
+          style={{ height: 56 }}
+        />
       </ScrollView>
-    </View>
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
+  scrollContent: {
+    paddingBottom: 32,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: THEME.spacing.lg,
-    paddingTop: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.border,
-    backgroundColor: THEME.colors.card,
+  title: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 34,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 4,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+  subtitle: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginBottom: 14,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
+  sectionLabel: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    marginBottom: 8,
   },
-  content: {
-    padding: THEME.spacing.lg,
-    paddingBottom: 40,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-    marginBottom: 12,
-    marginTop: 8,
-  },
-  diffRow: {
+  chipRow: {
     flexDirection: 'row',
     gap: 8,
+    marginBottom: 18,
+  },
+  chip: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+    alignItems: 'center',
+  },
+  chipOn: {
+    backgroundColor: '#6B3CFF',
+  },
+  chipText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  toggleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    marginBottom: 12,
+  },
+  toggleLabel: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  switchTrack: {
+    width: 46,
+    height: 26,
+    borderRadius: 13,
+    position: 'relative',
+  },
+  switchThumb: {
+    position: 'absolute',
+    top: 3,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  lastPracticeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     marginBottom: 20,
   },
-  diffBtn: {
-    flex: 1,
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: THEME.colors.border,
-  },
-  diffBtnSelected: {
-    borderColor: THEME.colors.primary,
-    backgroundColor: THEME.colors.primary,
-  },
-  diffText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: THEME.colors.textMuted,
-  },
-  diffTextSelected: {
-    color: '#FFF',
-  },
-  catGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 24,
-  },
-  catCard: {
-    width: '48%',
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderWidth: 1.5,
-    borderColor: THEME.colors.border,
-  },
-  catName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: THEME.colors.textPrimary,
-  },
-  startButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: THEME.colors.primary,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 14,
-  },
-  btnText: {
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: '700',
+  lastPracticeText: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
   },
 });

@@ -1,202 +1,139 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { THEME } from '../theme/tokens';
 import { PlayerScoreSummary } from '@trivia/shared';
-import { Trophy, Flame, Crown } from 'lucide-react-native';
-
+import { THEME } from '../theme/tokens';
+import {
+  TavrikoScreen,
+  TavrikoProgressBar,
+  CharacterAvatar,
+  XpStarIcon,
+} from '../components/TavrikoIcons';
 interface IntermissionLeaderboardScreenProps {
   currentRound: number;
   totalRounds: number;
   leaderboard: PlayerScoreSummary[];
   currentUserId: string;
 }
-
-export const IntermissionLeaderboardScreen: React.FC<IntermissionLeaderboardScreenProps> = ({
-  currentRound,
-  totalRounds,
-  leaderboard,
-  currentUserId,
-}) => {
+export const IntermissionLeaderboardScreen: React.FC<
+  IntermissionLeaderboardScreenProps
+> = ({ currentRound, leaderboard, currentUserId }) => {
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.roundPill}>
-          <Text style={styles.roundText}>
-            {currentRound}. Tur Tamamlandı
-          </Text>
+    <TavrikoScreen>
+      <Text style={styles.title}>SORU {currentRound} SONUÇLARI</Text>
+      <Text style={styles.subtitle}>Canlı sıralama</Text>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.listCard}>
+          {leaderboard.map((item, idx) => {
+            const isMe = item.playerId === currentUserId;
+            return (
+              <View
+                key={item.playerId}
+                style={[styles.playerRow, isMe && styles.playerRowMe]}
+              >
+                <Text style={styles.rankText}>{item.rank || idx + 1}</Text>
+                <CharacterAvatar
+                  seed={item.avatarUrl || item.displayName}
+                  index={idx}
+                  size={34}
+                />
+                <Text style={styles.nameText} numberOfLines={1}>
+                  {item.displayName}
+                </Text>
+                <Text
+                  style={[
+                    styles.deltaText,
+                    { color: item.score > 0 ? '#7CFC8A' : '#CBBFE8' },
+                  ]}
+                >
+                  {item.score > 0 ? `+120` : '0'}
+                </Text>
+                <XpStarIcon size={18} />
+                <Text style={styles.scoreText}>{item.score}</Text>
+              </View>
+            );
+          })}
         </View>
-        <Text style={styles.title}>Canlı Puan Durumu</Text>
-        <Text style={styles.subtitle}>Sonraki soru birkaç saniye içinde başlıyor...</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.list}>
-        {leaderboard.map((player) => {
-          const isMe = player.playerId === currentUserId;
-          const isFirst = player.rank === 1;
-
-          return (
-            <View
-              key={player.playerId}
-              style={[
-                styles.playerRow,
-                isMe && styles.playerRowMe,
-                isFirst && styles.playerRowFirst,
-              ]}
-            >
-              <View style={styles.rankCol}>
-                {isFirst ? (
-                  <Crown size={20} color={THEME.colors.gold} />
-                ) : (
-                  <Text style={[styles.rankText, isMe && styles.rankTextMe]}>
-                    #{player.rank}
-                  </Text>
-                )}
-              </View>
-
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  {player.displayName.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-
-              <View style={styles.nameCol}>
-                <Text style={[styles.playerName, isMe && styles.playerNameMe]}>
-                  {player.displayName} {isMe ? '(Sen)' : ''}
-                </Text>
-                {player.streak > 1 && (
-                  <View style={styles.streakRow}>
-                    <Flame size={12} color={THEME.colors.streak} />
-                    <Text style={styles.streakText}>{player.streak}x Seri</Text>
-                  </View>
-                )}
-              </View>
-
-              <View style={styles.scoreCol}>
-                <Text style={styles.scoreText}>{player.score}</Text>
-                <Text style={styles.scoreLabel}>PUAN</Text>
-              </View>
-            </View>
-          );
-        })}
+        <View style={styles.bottomTimerWrap}>
+          <Text style={styles.nextQuestionText}>Sıradaki soru 3s</Text>
+          <TavrikoProgressBar progress={60} height={12} />
+        </View>
       </ScrollView>
-    </View>
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
-    padding: THEME.spacing.lg,
-  },
-  header: {
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  roundPill: {
-    backgroundColor: THEME.colors.card,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: THEME.radius.full,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    marginBottom: 8,
-  },
-  roundText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: THEME.colors.textSecondary,
+  scrollContent: {
+    paddingBottom: 32,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
+    fontFamily: THEME.fonts.display,
+    fontSize: 36,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 14,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 13,
-    color: THEME.colors.textMuted,
-    marginTop: 4,
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginBottom: 14,
   },
-  list: {
-    gap: 10,
-    paddingTop: 12,
+  listCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 20,
+    padding: 8,
+    gap: 4,
   },
   playerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.lg,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
+    height: 50,
+    paddingHorizontal: 12,
+    gap: 10,
+    borderRadius: 14,
   },
   playerRowMe: {
-    borderColor: THEME.colors.primary,
-    backgroundColor: THEME.colors.cardHover,
-  },
-  playerRowFirst: {
-    borderColor: THEME.colors.gold,
-  },
-  rankCol: {
-    width: 32,
-    alignItems: 'center',
+    backgroundColor: '#6B3CFF',
   },
   rankText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: THEME.colors.textMuted,
+    width: 18,
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: THEME.fonts.extraBold,
   },
-  rankTextMe: {
-    color: THEME.colors.primaryLight,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: THEME.colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 10,
-  },
-  avatarText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  nameCol: {
+  nameText: {
     flex: 1,
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: THEME.fonts.extraBold,
   },
-  playerName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: THEME.colors.textPrimary,
-  },
-  playerNameMe: {
-    color: '#FFF',
-    fontWeight: '800',
-  },
-  streakRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
-  },
-  streakText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: THEME.colors.streak,
-  },
-  scoreCol: {
-    alignItems: 'flex-end',
+  deltaText: {
+    width: 44,
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
   },
   scoreText: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: THEME.colors.gold,
+    minWidth: 42,
+    textAlign: 'right',
+    color: '#FFC43D',
+    fontSize: 14,
+    fontFamily: THEME.fonts.extraBold,
   },
-  scoreLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: THEME.colors.textMuted,
+  bottomTimerWrap: {
+    marginTop: 30,
+  },
+  nextQuestionText: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 20,
+    color: '#FFA54A',
+    textAlign: 'center',
+    marginBottom: 10,
   },
 });

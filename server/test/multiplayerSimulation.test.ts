@@ -1,6 +1,8 @@
 import { createApp } from '../src/server';
 import { io as ClientSocket, Socket as ClientSocketType } from 'socket.io-client';
 import { SOCKET_EVENTS, ClientQuestion, RoundResult } from '@trivia/shared';
+import { QUESTION_BANK } from '../src/db/questionsData';
+import { db } from '../src/db/prismaClient';
 import { Server } from 'http';
 
 describe('Real-Time Multi-Client Multiplayer Simulation', () => {
@@ -79,30 +81,34 @@ describe('Real-Time Multi-Client Multiplayer Simulation', () => {
       expect(question.options).toHaveLength(4);
       expect((question as any).correctOptionId).toBeUndefined();
 
-      // Client A answers immediately with opt_b
+      const bankQ = db.getQuestionById(question.id) || QUESTION_BANK.find((q) => q.id === question.id);
+      const correctId = bankQ ? bankQ.correctOptionId : 'opt_b';
+      const wrongId = question.options.find((o) => o.id !== correctId)?.id || 'opt_d';
+
+      // Client A answers immediately with correct option
       clientA.emit(SOCKET_EVENTS.SUBMIT_ANSWER, {
         roomCode,
         playerId: 'player_a',
-        selectedOptionId: 'opt_b',
+        selectedOptionId: correctId,
         clientTimestamp: Date.now(),
       });
 
-      // Client B answers after small delay with opt_b
+      // Client B answers after small delay with correct option
       setTimeout(() => {
         clientB.emit(SOCKET_EVENTS.SUBMIT_ANSWER, {
           roomCode,
           playerId: 'player_b',
-          selectedOptionId: 'opt_b',
+          selectedOptionId: correctId,
           clientTimestamp: Date.now(),
         });
       }, 50);
 
-      // Client C answers with wrong option opt_a
+      // Client C answers with wrong option
       setTimeout(() => {
         clientC.emit(SOCKET_EVENTS.SUBMIT_ANSWER, {
           roomCode,
           playerId: 'player_c',
-          selectedOptionId: 'opt_a',
+          selectedOptionId: wrongId,
           clientTimestamp: Date.now(),
         });
       }, 80);

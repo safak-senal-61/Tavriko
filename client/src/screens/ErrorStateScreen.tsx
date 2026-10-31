@@ -1,135 +1,132 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+} from 'react-native';
 import { THEME } from '../theme/tokens';
-import { sound } from '../services/soundService';
-import { AlertCircle, RefreshCw, Home } from 'lucide-react-native';
-
+import {
+  TavrikoScreen,
+  Button3D,
+  ModeSquircleIcon,
+  BRAND_APP_ICON,
+} from '../components/TavrikoIcons';
 interface ErrorStateScreenProps {
-  title?: string;
   message?: string;
-  onRetry?: () => void;
-  onHome?: () => void;
+  onRetry: () => void;
+  onHome: () => void;
 }
-
 export const ErrorStateScreen: React.FC<ErrorStateScreenProps> = ({
-  title = 'Bir Hata Oluştu',
-  message = 'İşlem sırasında beklenmeyen bir sorun ile karşılaşıldı. Lütfen tekrar deneyiniz.',
+  message,
   onRetry,
   onHome,
 }) => {
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <View style={styles.iconCircle}>
-          <AlertCircle size={44} color={THEME.colors.wrong} />
-        </View>
-
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.message}>{message}</Text>
-
-        <View style={styles.actions}>
-          {onRetry && (
-            <TouchableOpacity
-              style={styles.retryBtn}
-              onPress={() => {
-                sound.playSound('tap');
-                onRetry();
-              }}
-            >
-              <RefreshCw size={18} color="#FFF" />
-              <Text style={styles.btnText}>Tekrar Dene</Text>
-            </TouchableOpacity>
-          )}
-
-          {onHome && (
-            <TouchableOpacity
-              style={styles.homeBtn}
-              onPress={() => {
-                sound.playSound('tap');
-                onHome();
-              }}
-            >
-              <Home size={18} color={THEME.colors.textPrimary} />
-              <Text style={styles.btnTextSecondary}>Ana Sayfaya Dön</Text>
-            </TouchableOpacity>
-          )}
+    <TavrikoScreen style={styles.screenWrap}>
+      <View style={styles.mainCenter}>
+        <Image
+          source={BRAND_APP_ICON}
+          style={styles.appIcon}
+          resizeMode="cover"
+        />
+        <Text style={styles.title}>BİR ŞEYLER TERS GİTTİ</Text>
+        <Text style={styles.subtitle}>
+          {message ||
+            'Sunucuya ulaşılamadı. Biraz sonra tekrar dene.\nHata kodu: 503'}
+        </Text>
+        <Button3D
+          title="TEKRAR DENE"
+          onPress={onRetry}
+          style={{ width: 240 }}
+        />
+        <TouchableOpacity
+          style={styles.homeBtn}
+          onPress={onHome}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.homeBtnText}>Ana sayfa</Text>
+        </TouchableOpacity>
+      </View>
+      {/* Bottom Empty State Example Card from page23 */}
+      <View style={styles.emptyExampleCard}>
+        <ModeSquircleIcon mode="friends" size={40} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.emptyExampleTitle}>Henüz arkadaşın yok</Text>
+          <Text style={styles.emptyExampleSub}>
+            Boş durum örneği: kod paylaşarak davet et
+          </Text>
         </View>
       </View>
-    </View>
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
+  screenWrap: {
+    justifyContent: 'space-between',
+    paddingBottom: 24,
+  },
+  mainCenter: {
     flex: 1,
-    backgroundColor: THEME.colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: THEME.spacing.lg,
-  },
-  card: {
-    width: '100%',
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.xl,
-    padding: THEME.spacing.xl,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: THEME.colors.wrongBackground,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+  },
+  appIcon: {
+    width: 110,
+    height: 100,
+    borderRadius: 24,
+    opacity: 0.85,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-    marginBottom: 8,
+    fontFamily: THEME.fonts.display,
+    fontSize: 30,
+    color: '#FFFFFF',
+    marginTop: 14,
   },
-  message: {
+  subtitle: {
+    color: '#D9CDF5',
     fontSize: 13,
-    color: THEME.colors.textSecondary,
+    fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
-    lineHeight: 18,
+    maxWidth: 280,
+    marginTop: 8,
     marginBottom: 24,
   },
-  actions: {
-    width: '100%',
-    gap: 10,
-  },
-  retryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: THEME.colors.primary,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 14,
-  },
   homeBtn: {
-    flexDirection: 'row',
+    width: 240,
+    height: 50,
+    marginTop: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: THEME.colors.backgroundSecondary,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 14,
+  },
+  homeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  emptyExampleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    gap: 12,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
   },
-  btnText: {
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: '700',
+  emptyExampleTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: THEME.fonts.extraBold,
   },
-  btnTextSecondary: {
-    color: THEME.colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
+  emptyExampleSub: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
   },
 });

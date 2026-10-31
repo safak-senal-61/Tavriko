@@ -11,6 +11,40 @@ export function setupSocketHandlers(
   // Wire up room manager callbacks to broadcast to rooms
   roomManager.onRoundStart = (roomCode: string, question: ClientQuestion) => {
     io.to(roomCode).emit(SOCKET_EVENTS.QUESTION_START, question);
+
+    // If there is an active simulated bot player in this room, trigger realistic response
+    const room = roomManager.getRoom(roomCode);
+    if (room) {
+      const botPlayer = Object.values(room.players).find((p) => p.id.startsWith('rival_bot_'));
+      if (botPlayer && !botPlayer.hasAnsweredCurrentRound) {
+        // Realistic response delay between 2200ms and 5000ms
+        const responseDelay = Math.floor(2200 + Math.random() * 2800);
+        // ~80% accuracy chance
+        const isBotCorrect = Math.random() < 0.8;
+        const currentQ = room.currentQuestion;
+        let botOptionId = currentQ?.correctOptionId || 'opt_a';
+
+        if (!isBotCorrect && currentQ) {
+          const distractors = currentQ.options.filter((o) => o.id !== currentQ.correctOptionId);
+          if (distractors.length > 0) {
+            botOptionId = distractors[Math.floor(Math.random() * distractors.length)].id;
+          }
+        }
+
+        setTimeout(() => {
+          const checkRoom = roomManager.getRoom(roomCode);
+          if (checkRoom && checkRoom.status === 'question_active') {
+            const res = roomManager.submitAnswer(roomCode, botPlayer.id, botOptionId, Date.now());
+            if (res.accepted) {
+              io.to(roomCode).emit(SOCKET_EVENTS.PLAYER_ANSWERED, {
+                playerId: botPlayer.id,
+                streak: res.streak,
+              });
+            }
+          }
+        }, responseDelay);
+      }
+    }
   };
 
   roomManager.onRoundEnd = (roomCode: string, result: RoundResult) => {
@@ -26,9 +60,32 @@ export function setupSocketHandlers(
   };
 
   matchmaker.onMatchFound = (roomCode: string, players) => {
-    players.forEach((p) => {
-      io.to(p.socketId).emit(SOCKET_EVENTS.MATCH_FOUND, { roomCode });
-    });
+    if (players.length >= 2) {
+      const p1 = players[0];
+      const p2 = players[1];
+
+      // Emit to p1 with p2 as opponent
+      io.to(p1.socketId).emit(SOCKET_EVENTS.MATCH_FOUND, {
+        roomCode,
+        opponent: {
+          id: p2.playerId,
+          displayName: p2.displayName,
+          avatarUrl: p2.avatarUrl,
+        },
+      });
+
+      // Emit to p2 (if not bot) with p1 as opponent
+      if (!p2.socketId.startsWith('bot_')) {
+        io.to(p2.socketId).emit(SOCKET_EVENTS.MATCH_FOUND, {
+          roomCode,
+          opponent: {
+            id: p1.playerId,
+            displayName: p1.displayName,
+            avatarUrl: p1.avatarUrl,
+          },
+        });
+      }
+    }
   };
 
   // Socket connection map: socketId -> { playerId, roomCode }
@@ -132,7 +189,7 @@ export function setupSocketHandlers(
         playerId: data.playerId,
         displayName: data.displayName,
         avatarUrl: data.avatarUrl,
-        mode: data.mode || 'quick_match',
+        mode: data.mode || 'duel',
         category: data.category || 'mixed',
         difficulty: data.difficulty || 'medium',
         queuedAt: Date.now(),

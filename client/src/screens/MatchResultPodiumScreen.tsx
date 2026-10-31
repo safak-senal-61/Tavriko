@@ -1,396 +1,272 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Animated } from 'react-native';
+import { FinalMatchSummary } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
-import { FinalMatchSummary } from '@trivia/shared';
-import { Trophy, Crown, Award, RotateCcw, Home, Sparkles } from 'lucide-react-native';
-
-interface MatchResultPodiumProps {
+import {
+  TavrikoScreen,
+  TavrikoProgressBar,
+  Button3D,
+  CharacterAvatar,
+  CrownIcon,
+  CoinIcon,
+} from '../components/TavrikoIcons';
+interface MatchResultPodiumScreenProps {
   summary: FinalMatchSummary;
   currentUserId: string;
   onPlayAgain: () => void;
   onHome: () => void;
 }
-
-export const MatchResultPodiumScreen: React.FC<MatchResultPodiumProps> = ({
+export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = ({
   summary,
   currentUserId,
   onPlayAgain,
   onHome,
 }) => {
-  const { podium, rankings } = summary;
-
+  const first = summary.podium?.first || { displayName: 'DenizPro', score: 780 };
+  const second = summary.podium?.second || { displayName: 'Ece', score: 610 };
+  const third = summary.podium?.third || { displayName: 'Mert', score: 540 };
+  const myRanking = summary.rankings?.find((r) => r.playerId === currentUserId);
+  const xpEarned = myRanking && myRanking.rank === 1 ? 160 : 60;
+  const coinsEarned = myRanking && myRanking.rank === 1 ? 50 : 20;
+  // Podium rising animations
+  const col1Anim = useRef(new Animated.Value(80)).current;
+  const col2Anim = useRef(new Animated.Value(80)).current;
+  const col3Anim = useRef(new Animated.Value(80)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     sound.playSound('victory');
     sound.triggerHaptic('success');
-  }, []);
-
-  const myResult = rankings.find((p) => p.playerId === currentUserId);
-
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+      Animated.stagger(140, [
+        Animated.spring(col3Anim, {
+          toValue: 0,
+          friction: 6,
+          useNativeDriver: true,
+        }),
+        Animated.spring(col2Anim, {
+          toValue: 0,
+          friction: 6,
+          useNativeDriver: true,
+        }),
+        Animated.spring(col1Anim, {
+          toValue: 0,
+          friction: 5,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+  }, [col1Anim, col2Anim, col3Anim, fadeAnim]);
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <View style={styles.trophyCircle}>
-          <Trophy size={48} color={THEME.colors.gold} />
-        </View>
-        <Text style={styles.title}>MAÇ TAMAMLANDI!</Text>
-        <Text style={styles.subtitle}>
-          {myResult?.rank === 1 ? 'Tebrikler! Arenanın Şampiyonu Oldun!' : `Tebrikler! Yarışmayı #${myResult?.rank || 1} olarak tamamladın.`}
-        </Text>
-      </View>
-
-      {/* 3D-feel Podium: 2nd, 1st, 3rd */}
-      <View style={styles.podiumContainer}>
-        {/* 2nd Place */}
-        {podium.second && (
-          <View style={styles.podiumColumn}>
-            <View style={styles.podiumAvatar}>
-              <Text style={styles.avatarInitial}>
-                {podium.second.displayName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <Text style={styles.podiumName} numberOfLines={1}>{podium.second.displayName}</Text>
-            <Text style={styles.podiumScore}>{podium.second.score}</Text>
-            <View style={[styles.podiumBlock, styles.blockSecond]}>
-              <Text style={styles.blockNumber}>2</Text>
-            </View>
-          </View>
-        )}
-
-        {/* 1st Place */}
-        {podium.first && (
-          <View style={styles.podiumColumn}>
-            <View style={styles.crownWrapper}>
-              <Crown size={24} color={THEME.colors.gold} />
-            </View>
-            <View style={[styles.podiumAvatar, styles.avatarFirst]}>
-              <Text style={styles.avatarInitial}>
-                {podium.first.displayName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <Text style={styles.podiumName} numberOfLines={1}>{podium.first.displayName}</Text>
-            <Text style={[styles.podiumScore, { color: THEME.colors.gold }]}>
-              {podium.first.score}
+    <TavrikoScreen>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>MAÇ BİTTİ</Text>
+        <Text style={styles.subtitle}>Düello · Tamamlandı</Text>
+        {/* 3-Column Podium (2 - 1 - 3) */}
+        <Animated.View style={[styles.podiumRow, { opacity: fadeAnim }]}>
+          {/* 2nd Place */}
+          <Animated.View
+            style={[
+              styles.podiumCol,
+              { transform: [{ translateY: col2Anim }] },
+            ]}
+          >
+            <CharacterAvatar seed={second.displayName} index={2} size={46} />
+            <Text style={styles.podiumName} numberOfLines={1}>
+              {second.displayName}
             </Text>
-            <View style={[styles.podiumBlock, styles.blockFirst]}>
-              <Text style={styles.blockNumber}>1</Text>
+            <Text style={styles.podiumScore}>{second.score}</Text>
+            <View style={[styles.pillar, styles.pillar2]}>
+              <Text style={styles.pillarNumber}>2</Text>
+            </View>
+          </Animated.View>
+          {/* 1st Place */}
+          <Animated.View
+            style={[
+              styles.podiumCol,
+              { transform: [{ translateY: col1Anim }] },
+            ]}
+          >
+            <CrownIcon size={28} />
+            <CharacterAvatar seed={first.displayName} index={1} size={54} />
+            <Text style={styles.podiumName} numberOfLines={1}>
+              {first.displayName}
+            </Text>
+            <Text style={styles.podiumScore}>{first.score}</Text>
+            <View style={[styles.pillar, styles.pillar1]}>
+              <Text style={styles.pillarNumber}>1</Text>
+            </View>
+          </Animated.View>
+          {/* 3rd Place */}
+          <Animated.View
+            style={[
+              styles.podiumCol,
+              { transform: [{ translateY: col3Anim }] },
+            ]}
+          >
+            <CharacterAvatar seed={third.displayName} index={3} size={44} />
+            <Text style={styles.podiumName} numberOfLines={1}>
+              {third.displayName}
+            </Text>
+            <Text style={styles.podiumScore}>{third.score}</Text>
+            <View style={[styles.pillar, styles.pillar3]}>
+              <Text style={styles.pillarNumber}>3</Text>
+            </View>
+          </Animated.View>
+        </Animated.View>
+        {/* XP & Coin Reward Card */}
+        <View style={styles.rewardCard}>
+          <View style={styles.rewardTopRow}>
+            <Text style={styles.xpAwardText}>+{xpEarned} XP</Text>
+            <View style={styles.coinPill}>
+              <CoinIcon size={20} />
+              <Text style={styles.coinPillText}>+{coinsEarned}</Text>
             </View>
           </View>
-        )}
-
-        {/* 3rd Place */}
-        {podium.third && (
-          <View style={styles.podiumColumn}>
-            <View style={styles.podiumAvatar}>
-              <Text style={styles.avatarInitial}>
-                {podium.third.displayName.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <Text style={styles.podiumName} numberOfLines={1}>{podium.third.displayName}</Text>
-            <Text style={styles.podiumScore}>{podium.third.score}</Text>
-            <View style={[styles.podiumBlock, styles.blockThird]}>
-              <Text style={styles.blockNumber}>3</Text>
-            </View>
+          <View style={styles.levelSubRow}>
+            <Text style={styles.levelSubText}>Seviye 12 → 13</Text>
           </View>
-        )}
-      </View>
-
-      {/* Match Rewards */}
-      <View style={styles.rewardsCard}>
-        <View style={styles.rewardRow}>
-          <Sparkles size={20} color={THEME.colors.primaryLight} />
-          <Text style={styles.rewardTitle}>Kazanılan Ödüller</Text>
+          <TavrikoProgressBar progress={92} height={12} />
         </View>
-
-        <View style={styles.rewardBadges}>
-          <View style={styles.rewardBadge}>
-            <Text style={styles.rewardLabel}>DENEYİM (XP)</Text>
-            <Text style={styles.rewardValue}>+350 XP</Text>
-          </View>
-          <View style={styles.rewardBadge}>
-            <Text style={styles.rewardLabel}>ALTIN COIN</Text>
-            <Text style={[styles.rewardValue, { color: THEME.colors.gold }]}>+75</Text>
-          </View>
-          <View style={styles.rewardBadge}>
-            <Text style={styles.rewardLabel}>SIRALAMA PUANI</Text>
-            <Text style={[styles.rewardValue, { color: THEME.colors.correct }]}>+25 LP</Text>
-          </View>
+        {/* Action Buttons */}
+        <View style={styles.actionsRow}>
+          <Button3D
+            title="TEKRAR OYNA"
+            onPress={onPlayAgain}
+            style={{ flex: 1, paddingHorizontal: 8 }}
+          />
+          <Button3D
+            title="ANA SAYFA"
+            variant="mint"
+            onPress={onHome}
+            style={{ flex: 1, paddingHorizontal: 8 }}
+          />
         </View>
-      </View>
-
-      {/* Rankings Table */}
-      <Text style={styles.rankingsHeader}>Tüm Yarışmacılar</Text>
-      <View style={styles.rankingsList}>
-        {rankings.map((p) => (
-          <View key={p.playerId} style={styles.tableRow}>
-            <Text style={styles.tableRank}>#{p.rank}</Text>
-            <Text style={styles.tableName}>{p.displayName}</Text>
-            <Text style={styles.tableScore}>{p.score} Puan</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Actions */}
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={styles.playAgainBtn}
-          onPress={() => {
-            sound.playSound('tap');
-            onPlayAgain();
-          }}
-        >
-          <RotateCcw size={18} color="#FFF" />
-          <Text style={styles.btnText}>Tekrar Oyna</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.homeBtn}
-          onPress={() => {
-            sound.playSound('tap');
-            onHome();
-          }}
-        >
-          <Home size={18} color={THEME.colors.textPrimary} />
-          <Text style={styles.btnTextSecondary}>Ana Sayfa</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
-  },
-  content: {
-    padding: THEME.spacing.lg,
-    paddingBottom: 40,
-    alignItems: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  trophyCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(251, 191, 36, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
+  scrollContent: {
+    paddingBottom: 32,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: THEME.colors.textPrimary,
-    letterSpacing: 1,
+    fontFamily: THEME.fonts.display,
+    fontSize: 36,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginTop: 14,
+    marginBottom: 4,
   },
   subtitle: {
-    fontSize: 14,
-    color: THEME.colors.textSecondary,
-    marginTop: 4,
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginBottom: 14,
   },
-  podiumContainer: {
+  podiumRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    justifyContent: 'center',
-    width: '100%',
-    height: 220,
-    marginBottom: 24,
+    gap: 8,
+    marginTop: 16,
   },
-  podiumColumn: {
+  podiumCol: {
     flex: 1,
     alignItems: 'center',
-  },
-  crownWrapper: {
-    marginBottom: 2,
-  },
-  podiumAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: THEME.colors.cardHover,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: THEME.colors.border,
-  },
-  avatarFirst: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    borderColor: THEME.colors.gold,
-    backgroundColor: THEME.colors.primary,
-  },
-  avatarInitial: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '800',
+    justifyContent: 'flex-end',
+    gap: 4,
   },
   podiumName: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: THEME.colors.textPrimary,
-    marginTop: 4,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
   },
   podiumScore: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: THEME.colors.textSecondary,
-    marginBottom: 6,
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
   },
-  podiumBlock: {
-    width: '85%',
+  pillar: {
+    width: '100%',
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    borderTopLeftRadius: THEME.radius.md,
-    borderTopRightRadius: THEME.radius.md,
   },
-  blockFirst: {
+  pillar1: {
+    height: 150,
+    backgroundColor: '#D4982A',
+  },
+  pillar2: {
     height: 110,
-    backgroundColor: 'rgba(251, 191, 36, 0.25)',
-    borderWidth: 1.5,
-    borderColor: THEME.colors.gold,
+    backgroundColor: '#7C84A8',
   },
-  blockSecond: {
-    height: 80,
-    backgroundColor: 'rgba(203, 213, 225, 0.2)',
-    borderWidth: 1.5,
-    borderColor: THEME.colors.silver,
+  pillar3: {
+    height: 86,
+    backgroundColor: '#985E3E',
   },
-  blockThird: {
-    height: 55,
-    backgroundColor: 'rgba(217, 119, 6, 0.2)',
-    borderWidth: 1.5,
-    borderColor: THEME.colors.bronze,
+  pillarNumber: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 38,
+    color: '#FFFFFF',
   },
-  blockNumber: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#FFF',
-  },
-  rewardsCard: {
-    width: '100%',
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.xl,
+  rewardCard: {
+    marginTop: 20,
     padding: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
-    marginBottom: 20,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
   },
-  rewardRow: {
+  rewardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  rewardTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-  },
-  rewardBadges: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  rewardBadge: {
-    flex: 1,
-    backgroundColor: THEME.colors.backgroundSecondary,
-    borderRadius: THEME.radius.md,
-    padding: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  rewardLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: THEME.colors.textMuted,
-  },
-  rewardValue: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: THEME.colors.primaryLight,
-    marginTop: 2,
-  },
-  rankingsHeader: {
-    alignSelf: 'flex-start',
-    fontSize: 16,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
+    justifyContent: 'space-between',
     marginBottom: 10,
   },
-  rankingsList: {
-    width: '100%',
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.lg,
+  xpAwardText: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 22,
+    color: '#7CFC8A',
+  },
+  coinPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(10, 4, 24, 0.72)',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
-    overflow: 'hidden',
-    marginBottom: 24,
+    borderColor: 'rgba(255,255,255,0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
-  tableRow: {
+  coinPillText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  levelSubRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.border,
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
-  tableRank: {
-    width: 36,
-    fontSize: 14,
-    fontWeight: '800',
-    color: THEME.colors.textMuted,
+  levelSubText: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
   },
-  tableName: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: THEME.colors.textPrimary,
-  },
-  tableScore: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: THEME.colors.gold,
-  },
-  actionButtons: {
-    width: '100%',
+  actionsRow: {
     flexDirection: 'row',
-    gap: 12,
-  },
-  playAgainBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: THEME.colors.primary,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 14,
-  },
-  homeBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  btnText: {
-    color: '#FFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  btnTextSecondary: {
-    color: THEME.colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
+    gap: 10,
+    marginTop: 20,
   },
 });

@@ -1,215 +1,175 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, Modal } from 'react-native';
 import { THEME } from '../theme/tokens';
-import { sound } from '../services/soundService';
-import { CheckCircle2, XCircle, Zap, Flame, Info } from 'lucide-react-native';
-
+import {
+  Button3D,
+  CheckMarkSvg,
+  CrossMarkSvg,
+  SpeedBoltIcon,
+} from '../components/TavrikoIcons';
 interface AnswerFeedbackModalProps {
   visible: boolean;
   isCorrect: boolean;
+  isTimeout?: boolean;
   correctAnswerText: string;
   explanation: string;
   pointsEarned: number;
   speedBonus: number;
   streak: number;
+  onContinue?: () => void;
 }
-
 export const AnswerFeedbackModal: React.FC<AnswerFeedbackModalProps> = ({
   visible,
   isCorrect,
+  isTimeout = false,
   correctAnswerText,
   explanation,
   pointsEarned,
   speedBonus,
-  streak,
+  onContinue,
 }) => {
-  useEffect(() => {
-    if (visible) {
-      if (isCorrect) {
-        sound.playSound('correct');
-        sound.triggerHaptic('success');
-      } else {
-        sound.playSound('wrong');
-        sound.triggerHaptic('error');
-      }
-    }
-  }, [visible, isCorrect]);
-
   if (!visible) return null;
-
+  const badgeBg = isTimeout
+    ? '#FFB21E'
+    : isCorrect
+    ? '#28B46E'
+    : '#D81E3C';
+  const titleText = isTimeout
+    ? 'SÜRE DOLDU!'
+    : isCorrect
+    ? 'DOĞRU!'
+    : 'YANLIŞ!';
+  const titleColor = isTimeout
+    ? '#FFC43D'
+    : isCorrect
+    ? '#7CFC8A'
+    : '#FF7A8A';
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
-        <View style={[styles.dialog, isCorrect ? styles.dialogCorrect : styles.dialogWrong]}>
-          <View style={styles.iconCircle}>
+        <View style={styles.modalCard}>
+          {/* Floating Top Circle Icon */}
+          <View style={[styles.topCircle, { backgroundColor: badgeBg }]}>
             {isCorrect ? (
-              <CheckCircle2 size={56} color={THEME.colors.correct} />
+              <CheckMarkSvg size={34} />
             ) : (
-              <XCircle size={56} color={THEME.colors.wrong} />
+              <CrossMarkSvg size={32} />
             )}
           </View>
-
-          <Text style={[styles.title, { color: isCorrect ? THEME.colors.correct : THEME.colors.wrong }]}>
-            {isCorrect ? 'HARİKA! DOĞRU CEVAP' : 'MAALESEF YANLIŞ'}
-          </Text>
-
-          {isCorrect && (
-            <View style={styles.statsRow}>
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>KAZANILAN</Text>
-                <Text style={styles.statValue}>+{pointsEarned}</Text>
+          <Text style={[styles.title, { color: titleColor }]}>{titleText}</Text>
+          {/* Reward Pills */}
+          <View style={styles.pillsRow}>
+            <View style={styles.pill}>
+              <Text style={styles.pointsText}>+{pointsEarned} puan</Text>
+            </View>
+            {speedBonus > 0 && (
+              <View style={styles.pill}>
+                <SpeedBoltIcon size={16} />
+                <Text style={styles.speedText}>Hız bonusu +{speedBonus}</Text>
               </View>
-
-              {speedBonus > 0 && (
-                <View style={styles.statBox}>
-                  <View style={styles.badgeRow}>
-                    <Zap size={12} color={THEME.colors.gold} />
-                    <Text style={styles.statLabel}>HIZ BONUSU</Text>
-                  </View>
-                  <Text style={[styles.statValue, { color: THEME.colors.gold }]}>+{speedBonus}</Text>
-                </View>
-              )}
-
-              {streak > 1 && (
-                <View style={styles.statBox}>
-                  <View style={styles.badgeRow}>
-                    <Flame size={12} color={THEME.colors.streak} />
-                    <Text style={styles.statLabel}>SERİ</Text>
-                  </View>
-                  <Text style={[styles.statValue, { color: THEME.colors.streak }]}>{streak}x</Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {!isCorrect && (
-            <View style={styles.correctAnswerBox}>
-              <Text style={styles.correctAnswerLabel}>Doğru Seçenek:</Text>
-              <Text style={styles.correctAnswerValue}>{correctAnswerText}</Text>
-            </View>
-          )}
-
-          <View style={styles.explanationBox}>
-            <View style={styles.explanationHeader}>
-              <Info size={14} color={THEME.colors.textSecondary} />
-              <Text style={styles.explanationTitle}>Açıklama</Text>
-            </View>
-            <Text style={styles.explanationText}>{explanation}</Text>
+            )}
           </View>
+          {!isCorrect && correctAnswerText ? (
+            <Text style={styles.correctLine}>
+              Doğru Cevap: {correctAnswerText}
+            </Text>
+          ) : null}
+          {/* Explanation Glass Box */}
+          <View style={styles.explanationBox}>
+            <Text style={styles.explanationText}>
+              {explanation ||
+                'Doğru cevap sistem tarafından doğrulandı. Sıradaki soruya hazırlan!'}
+            </Text>
+          </View>
+          {onContinue && (
+            <View style={{ marginTop: 16, width: '100%' }}>
+              <Button3D title="DEVAM" onPress={onContinue} />
+            </View>
+          )}
         </View>
       </View>
     </Modal>
   );
 };
-
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(8, 3, 20, 0.78)',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: THEME.spacing.lg,
+    paddingHorizontal: 18,
   },
-  dialog: {
+  modalCard: {
     width: '100%',
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.xl,
-    padding: THEME.spacing.xl,
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+    paddingTop: 24,
+    backgroundColor: '#28164D',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
     alignItems: 'center',
-    borderWidth: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 10,
   },
-  dialogCorrect: {
-    borderColor: THEME.colors.correct,
-  },
-  dialogWrong: {
-    borderColor: THEME.colors.wrong,
-  },
-  iconCircle: {
-    marginBottom: 12,
+  topCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    marginTop: -60,
+    marginBottom: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   title: {
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-    marginBottom: 16,
+    fontFamily: THEME.fonts.display,
+    fontSize: 36,
   },
-  statsRow: {
+  pillsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 10,
+    marginBottom: 14,
   },
-  statBox: {
-    backgroundColor: THEME.colors.backgroundSecondary,
-    borderRadius: THEME.radius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  badgeRow: {
+  pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: THEME.colors.textMuted,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: THEME.colors.correct,
-    marginTop: 2,
-  },
-  correctAnswerBox: {
-    width: '100%',
-    backgroundColor: THEME.colors.wrongBackground,
-    borderRadius: THEME.radius.md,
-    padding: 12,
-    marginBottom: 16,
+    gap: 5,
+    backgroundColor: 'rgba(10, 4, 24, 0.72)',
     borderWidth: 1,
-    borderColor: THEME.colors.wrong,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
-  correctAnswerLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: THEME.colors.textSecondary,
-    marginBottom: 2,
+  pointsText: {
+    color: '#FFC43D',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
   },
-  correctAnswerValue: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
+  speedText: {
+    color: '#7FD0FF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  correctLine: {
+    color: '#7CFC8A',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+    marginBottom: 8,
   },
   explanationBox: {
     width: '100%',
-    backgroundColor: THEME.colors.backgroundSecondary,
-    borderRadius: THEME.radius.md,
-    padding: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  explanationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  explanationTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: THEME.colors.textSecondary,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 16,
+    padding: 12,
   },
   explanationText: {
+    color: '#E6DCFF',
     fontSize: 13,
-    color: THEME.colors.textPrimary,
-    lineHeight: 18,
+    fontFamily: THEME.fonts.body,
   },
 });

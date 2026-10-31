@@ -80,6 +80,10 @@ export class GameRoomManager {
     return this.rooms.get(code.toUpperCase());
   }
 
+  public getActiveRoomsCount(): number {
+    return this.rooms.size;
+  }
+
   public createRoom(options: CreateRoomOptions): GameRoom {
     let code = options.code ? options.code.toUpperCase() : this.generateCode();
     while (!options.code && this.rooms.has(code)) {
@@ -207,6 +211,11 @@ export class GameRoomManager {
     // Reset player round states
     Object.values(room.players).forEach((p) => {
       p.hasAnsweredCurrentRound = false;
+      p.lastAnswerTimeMs = 0;
+      p.lastSelectedOptionId = undefined;
+      p.lastAnswerIsCorrect = undefined;
+      p.lastPointsAwarded = 0;
+      p.lastSpeedBonus = 0;
     });
 
     const question = questions[room.currentRound - 1];
@@ -258,6 +267,12 @@ export class GameRoomManager {
     const elapsedMs = Math.max(0, now - roundStartedAt);
     const timeRemainingMs = Math.max(0, totalTimeMs - elapsedMs);
 
+    // Strict server-side expiration: if elapsed exceeds total limit with 500ms grace, reject
+    if (elapsedMs > totalTimeMs + 500) {
+      player.hasAnsweredCurrentRound = true;
+      return { accepted: false, reason: 'Soru süresi doldu' };
+    }
+
     const isCorrect = selectedOptionId === room.currentQuestion.correctOptionId;
 
     const scoreResult = calculateScore({
@@ -270,6 +285,10 @@ export class GameRoomManager {
 
     player.hasAnsweredCurrentRound = true;
     player.lastAnswerTimeMs = elapsedMs;
+    player.lastSelectedOptionId = selectedOptionId;
+    player.lastAnswerIsCorrect = isCorrect;
+    player.lastPointsAwarded = scoreResult.pointsAwarded;
+    player.lastSpeedBonus = scoreResult.speedBonus;
     player.totalResponseTimeMs += elapsedMs;
     player.score += scoreResult.pointsAwarded;
     player.currentStreak = scoreResult.streak;
@@ -309,10 +328,10 @@ export class GameRoomManager {
     const playerAnswers: RoundResult['playerAnswers'] = {};
     Object.values(room.players).forEach((p) => {
       playerAnswers[p.id] = {
-        selectedOptionId: '',
-        isCorrect: false,
-        pointsEarned: 0,
-        speedBonus: 0,
+        selectedOptionId: p.lastSelectedOptionId || '',
+        isCorrect: !!p.lastAnswerIsCorrect,
+        pointsEarned: p.lastPointsAwarded || 0,
+        speedBonus: p.lastSpeedBonus || 0,
         streak: p.currentStreak,
         timeMs: p.lastAnswerTimeMs || 0,
       };

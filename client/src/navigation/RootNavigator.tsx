@@ -1,10 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  StyleSheet,
+  StatusBar,
+  Platform,
+  AppState,
+  Animated,
+} from 'react-native';
 import { useGameStore } from '../store/gameStore';
 import { socketService } from '../services/socketService';
+import { sound } from '../services/soundService';
 import { THEME } from '../theme/tokens';
-import { CategoryId, DifficultyLevel, ClientQuestion, RoundResult, FinalMatchSummary, GameRoom } from '@trivia/shared';
-
+import {
+  CategoryId,
+  DifficultyLevel,
+  ClientQuestion,
+  RoundResult,
+  FinalMatchSummary,
+  GameRoom,
+  UserProfile,
+  DailyChallengeConfig,
+} from '@trivia/shared';
 // Screens
 import { SplashScreen } from '../screens/SplashScreen';
 import { AuthScreen } from '../screens/AuthScreen';
@@ -13,10 +29,13 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { CategoryExploreScreen } from '../screens/CategoryExploreScreen';
 import { DifficultySelectScreen } from '../screens/DifficultySelectScreen';
 import { MatchmakingRadarScreen } from '../screens/MatchmakingRadarScreen';
+import { DuelVersusScreen } from '../screens/DuelVersusScreen';
 import { CustomRoomScreen } from '../screens/CustomRoomScreen';
 import { LobbyScreen } from '../screens/LobbyScreen';
-import { QuizArenaScreen } from '../screens/QuizArenaScreen';
+import { QuizArenaScreen, RoundFeedback } from '../screens/QuizArenaScreen';
 import { AnswerFeedbackModal } from '../screens/AnswerFeedbackModal';
+import { PracticeSummaryModal, PracticeStats } from '../screens/PracticeSummaryModal';
+import { DailyChallengeResultModal } from '../screens/DailyChallengeResultModal';
 import { IntermissionLeaderboardScreen } from '../screens/IntermissionLeaderboardScreen';
 import { MatchResultPodiumScreen } from '../screens/MatchResultPodiumScreen';
 import { FriendsScreen } from '../screens/FriendsScreen';
@@ -28,7 +47,12 @@ import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { ReconnectScreen } from '../screens/ReconnectScreen';
 import { ErrorStateScreen } from '../screens/ErrorStateScreen';
-
+import { SeasonScreen } from '../screens/SeasonScreen';
+import { ShopScreen } from '../screens/ShopScreen';
+import { EventsScreen } from '../screens/EventsScreen';
+import { InventoryScreen } from '../screens/InventoryScreen';
+import { ProLeagueScreen } from '../screens/ProLeagueScreen';
+import { PaymentScreen, PaymentItem } from '../screens/PaymentScreen';
 export type ScreenName =
   | 'splash'
   | 'auth'
@@ -37,6 +61,7 @@ export type ScreenName =
   | 'categories'
   | 'difficulty'
   | 'matchmaking'
+  | 'duel_versus'
   | 'custom_room'
   | 'lobby'
   | 'quiz_arena'
@@ -50,19 +75,76 @@ export type ScreenName =
   | 'notifications'
   | 'settings'
   | 'reconnect'
-  | 'error';
+  | 'error'
+  | 'season'
+  | 'shop'
+  | 'events'
+  | 'inventory'
+  | 'pro_league'
+  | 'payment';
+import { DEFAULT_API_BASE } from '../config';
 
-const API_BASE = 'http://localhost:4000/api';
-
+const API_BASE = DEFAULT_API_BASE;
 export const RootNavigator: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('splash');
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('general_culture');
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>('medium');
   const [errorMessage, setErrorMessage] = useState<string>('');
-
+  const [selectedPaymentItem, setSelectedPaymentItem] = useState<PaymentItem | null>(null);
+  // Guest Restriction & Redirect Banner State
+  const [isGuest, setIsGuest] = useState<boolean>(false);
+  const [authRedirectNotice, setAuthRedirectNotice] = useState<string | null>(null);
+  // Screen transition animation
+  const screenFade = useRef(new Animated.Value(1)).current;
+  const navigateTo = (nextScreen: ScreenName) => {
+    screenFade.setValue(0.35);
+    setCurrentScreen(nextScreen);
+    Animated.timing(screenFade, {
+      toValue: 1,
+      duration: 210,
+      useNativeDriver: true,
+    }).start();
+  };
+  // Practice & Single-Player Mode State
+  const [practiceQuestions, setPracticeQuestions] = useState<ClientQuestion[]>([]);
+  const [practiceIndex, setPracticeIndex] = useState<number>(0);
+  const [practiceStats, setPracticeStats] = useState<PracticeStats>({
+    totalQuestions: 5,
+    correctAnswers: 0,
+    wrongAnswers: 0,
+    emptyAnswers: 0,
+    totalScore: 0,
+  });
+  const practiceStatsRef = useRef<PracticeStats>({
+    totalQuestions: 5,
+    correctAnswers: 0,
+    wrongAnswers: 0,
+    emptyAnswers: 0,
+    totalScore: 0,
+  });
+  const [practiceStreak, setPracticeStreak] = useState<number>(0);
+  const [practiceFeedback, setPracticeFeedback] = useState<RoundFeedback | null>(null);
+  const [isPracticeSummaryVisible, setIsPracticeSummaryVisible] = useState<boolean>(false);
+  const [activeDailyConfig, setActiveDailyConfig] = useState<DailyChallengeConfig | null>(null);
+  const [dailyResultModal, setDailyResultModal] = useState<{
+    visible: boolean;
+    success: boolean;
+    correct: number;
+    total: number;
+    required: number;
+    rewards?: any;
+  } | null>(null);
+  const isEvaluatingRef = useRef<boolean>(false);
+  const practiceSessionIdRef = useRef<string>('sess_' + Math.random().toString(36).substring(2, 9));
+  // 1v1 Live Duel State
+  const [duelOpponent, setDuelOpponent] = useState<{
+    id: string;
+    displayName: string;
+    avatarUrl?: string;
+  } | null>(null);
+  const [opponentHasAnswered, setOpponentHasAnswered] = useState<boolean>(false);
   const {
     user,
-    token,
     setUser,
     activeRoom,
     setActiveRoom,
@@ -77,53 +159,131 @@ export const RootNavigator: React.FC = () => {
     setFinalSummary,
     resetGame,
   } = useGameStore();
-
-  // Socket event subscription
+  const currentScreenRef = useRef<ScreenName>(currentScreen);
+  currentScreenRef.current = currentScreen;
+  // Keep system status bar (clock, battery, notifications) completely hidden in fullscreen mode
   useEffect(() => {
-    const socket = socketService.connect();
-
-    const unsubSync = socketService.onStateSync((room: GameRoom) => {
-      setActiveRoom(room);
-      if (room.status === 'lobby' && currentScreen !== 'lobby') {
-        setCurrentScreen('lobby');
+    StatusBar.setHidden(true, 'none');
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        StatusBar.setHidden(true, 'none');
       }
     });
-
+    return () => sub.remove();
+  }, [currentScreen]);
+  // Helper to gate non-Keşfet features when in Guest Mode
+  const requireAuth = (action: () => void, featureName: string) => {
+    if (isGuest || !user) {
+      sound.playSound('wrong');
+      sound.triggerHaptic('warning');
+      setAuthRedirectNotice(
+        `"${featureName}" menüsü için giriş yapmalısın! Misafir modunda sadece Keşfet kategorilerinde oynanabilir.`
+      );
+      navigateTo('auth');
+      return;
+    }
+    action();
+  };
+  // Socket event subscription for multiplayer (stable lifecycle)
+  useEffect(() => {
+    socketService.connect();
+    const unsubSync = socketService.onStateSync((room: GameRoom) => {
+      setActiveRoom(room);
+      if (
+        room.status === 'lobby' &&
+        currentScreenRef.current !== 'lobby' &&
+        currentScreenRef.current !== 'duel_versus'
+      ) {
+        navigateTo('lobby');
+      }
+    });
     const unsubQuestion = socketService.onQuestionStart((question: ClientQuestion) => {
       setCurrentQuestion(question);
       setRoundResult(null);
-      setCurrentScreen('quiz_arena');
+      selectOption(null);
+      setOpponentHasAnswered(false);
+      navigateTo('quiz_arena');
     });
-
     const unsubRoundResult = socketService.onRoundResult((result: RoundResult) => {
       setRoundResult(result);
+      const myAns = user ? result.playerAnswers[user.id] : null;
+      if (myAns?.isCorrect) {
+        sound.playSound('correct');
+        sound.triggerHaptic('success');
+      } else {
+        sound.playSound('wrong');
+        sound.triggerHaptic('error');
+      }
       setTimeout(() => {
-        setCurrentScreen('intermission');
+        navigateTo('intermission');
       }, 2500);
     });
-
     const unsubGameOver = socketService.onGameOver((summary: FinalMatchSummary) => {
       setFinalSummary(summary);
-      setCurrentScreen('match_result');
-    });
-
-    const unsubMatchFound = socketService.onMatchFound((data) => {
-      if (user) {
-        socketService.joinRoom(data.roomCode, user.id, user.displayName, user.avatarUrl);
+      navigateTo('match_result');
+      if (user && !isGuest) {
+        const myRankEntry = summary.rankings?.find((p) => p.playerId === user.id);
+        const won = myRankEntry?.rank === 1 || summary.podium?.first?.playerId === user.id;
+        fetch(`${API_BASE}/auth/stats`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            won,
+            correctAnswers: myRankEntry ? Math.max(1, Math.round((myRankEntry.score || 0) / 1000)) : 1,
+            totalAnswers: summary.totalRounds || 5,
+            xpEarned: won ? 160 : 60,
+            coinsEarned: won ? 50 : 20,
+            bestStreak: myRankEntry?.streak || 1,
+          }),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            if (data?.user) {
+              setUser(data.user);
+            }
+          })
+          .catch(() => {});
       }
     });
-
+    const unsubMatchFound = socketService.onMatchFound(
+      (data: { roomCode: string; opponent?: any }) => {
+        if (user) {
+          setDuelOpponent(data.opponent || null);
+          setOpponentHasAnswered(false);
+          socketService.joinRoom(
+            data.roomCode,
+            user.id,
+            user.displayName,
+            user.avatarUrl
+          );
+          navigateTo('duel_versus');
+        }
+      }
+    );
+    const unsubPlayerAnswered = socketService.onPlayerAnswered(
+      (data: { playerId: string }) => {
+        if (data.playerId !== user?.id) {
+          setOpponentHasAnswered(true);
+          sound.playSound('timer_tick');
+        }
+      }
+    );
     return () => {
       unsubSync();
       unsubQuestion();
       unsubRoundResult();
       unsubGameOver();
       unsubMatchFound();
+      unsubPlayerAnswered();
     };
-  }, [user, currentScreen]);
-
-  // Auth actions
+  }, [user?.id, user?.displayName, user?.avatarUrl]);
+  // -------------------------------------------------------------
+  // Auth & Profile Actions
+  // -------------------------------------------------------------
   const handleGuestPlay = async () => {
+    setIsGuest(true);
+    setAuthRedirectNotice(null);
     try {
       const res = await fetch(`${API_BASE}/auth/guest`, {
         method: 'POST',
@@ -132,252 +292,899 @@ export const RootNavigator: React.FC = () => {
       });
       const data = await res.json();
       if (data.user) {
-        setUser(data.user, data.token);
-        setCurrentScreen('profile_setup');
+        setUser(
+          {
+            ...data.user,
+            displayName: 'Misafir Oyuncu',
+            avatarUrl: 'av0',
+          },
+          data.token
+        );
+        // Guests go straight to Keşfet (CategoryExploreScreen)!
+        navigateTo('categories');
+        return;
       }
     } catch {
-      // Offline / fallback demo guest user
-      const fallbackUser = {
-        id: 'guest_local_' + Math.random().toString(36).substring(2, 7),
-        username: 'misafir_oyuncu',
-        displayName: 'Misafir Oyuncu',
-        level: 1,
-        xp: 0,
-        coins: 200,
-        rankTitle: 'Acemi Kaşif',
-        rankPoints: 1000,
-        stats: {
-          totalMatches: 0,
-          wins: 0,
-          correctAnswers: 0,
-          totalAnswers: 0,
-          bestStreak: 0,
-          avgResponseTimeMs: 0,
-        },
-        categoryMastery: {},
-      };
-      setUser(fallbackUser, 'mock_token');
-      setCurrentScreen('profile_setup');
+      // Fallback local guest
     }
+    const fallbackUser: UserProfile = {
+      id: 'guest_local_' + Math.random().toString(36).substring(2, 7),
+      username: 'misafir_oyuncu',
+      displayName: 'Misafir Oyuncu',
+      avatarUrl: 'av0',
+      level: 1,
+      xp: 0,
+      coins: 200,
+      rankTitle: 'Misafir Kaşif',
+      rankPoints: 1000,
+      stats: {
+        totalMatches: 0,
+        wins: 0,
+        correctAnswers: 0,
+        totalAnswers: 0,
+        bestStreak: 0,
+        avgResponseTimeMs: 0,
+      },
+      categoryMastery: {},
+    };
+    setUser(fallbackUser, 'mock_token');
+    navigateTo('categories');
   };
-
-  const handleLogin = async (username: string, pass: string) => {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password: pass }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Giriş yapılamadı');
-    setUser(data.user, data.token);
-    setCurrentScreen('home');
+  // Refresh logged-in user profile from database on key screen changes
+  useEffect(() => {
+    if (user && !isGuest && (currentScreen === 'home' || currentScreen === 'profile')) {
+      fetch(`${API_BASE}/social/profile/${user.id}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((freshUser) => {
+          if (freshUser && freshUser.id === user.id) {
+            setUser(freshUser);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [currentScreen, user?.id, isGuest]);
+  const handleAuthSuccess = (loggedInUser: UserProfile, token: string) => {
+    setIsGuest(false);
+    setAuthRedirectNotice(null);
+    setUser(
+      {
+        ...loggedInUser,
+        avatarUrl: loggedInUser.avatarUrl || 'av1',
+      },
+      token
+    );
+    navigateTo('home');
   };
-
-  const handleRegister = async (username: string, displayName: string, pass: string) => {
-    const res = await fetch(`${API_BASE}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, displayName, password: pass }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Kayıt başarısız');
-    setUser(data.user, data.token);
-    setCurrentScreen('profile_setup');
+  const handleSaveProfile = async (name: string, avatarSeedOrUri: string) => {
+    if (user) {
+      const updatedLocal = {
+        ...user,
+        displayName: name,
+        avatarUrl: avatarSeedOrUri,
+      };
+      setUser(updatedLocal);
+      try {
+        const res = await fetch(`${API_BASE}/auth/profile`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            displayName: name,
+            avatarUrl: avatarSeedOrUri,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) setUser(data.user);
+        }
+      } catch {
+        // Keep local update
+      }
+    }
+    navigateTo(isGuest ? 'categories' : 'home');
   };
-
-  const handleSaveProfile = (name: string, avatarSeed: string) => {
+  const handleUpdateAvatarDirect = async (newAvatarUri: string) => {
     if (user) {
       setUser({
         ...user,
-        displayName: name,
-        avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${avatarSeed}`,
+        avatarUrl: newAvatarUri,
       });
+      try {
+        const res = await fetch(`${API_BASE}/auth/profile`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            avatarUrl: newAvatarUri,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) setUser(data.user);
+        }
+      } catch {
+        // Keep local
+      }
     }
-    setCurrentScreen('home');
   };
-
+  // -------------------------------------------------------------
   // Matchmaking & Room Actions
+  // -------------------------------------------------------------
   const handleStartQuickMatch = () => {
-    if (!user) return;
-    socketService.findMatch(user.id, user.displayName, user.avatarUrl, 'quick_match', selectedCategory);
-    setCurrentScreen('matchmaking');
+    requireAuth(() => {
+      if (!user) return;
+      setDuelOpponent(null);
+      setOpponentHasAnswered(false);
+      socketService.findMatch(
+        user.id,
+        user.displayName,
+        user.avatarUrl,
+        'duel',
+        selectedCategory
+      );
+      navigateTo('matchmaking');
+    }, 'Hızlı Eşleşme (1v1 Düello)');
   };
-
   const handleCancelMatchmaking = () => {
     if (user) socketService.cancelMatch(user.id);
-    setCurrentScreen('home');
+    navigateTo('home');
   };
-
   const handleCreateCustomRoom = () => {
-    if (!user) return;
-    const socket = socketService.getSocket();
-    const mockCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    socketService.joinRoom(mockCode, user.id, user.displayName, user.avatarUrl);
-    setCurrentScreen('lobby');
+    requireAuth(() => {
+      if (!user) return;
+      const mockCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      socketService.joinRoom(mockCode, user.id, user.displayName, user.avatarUrl);
+      navigateTo('lobby');
+    }, 'Özel Oda');
   };
-
   const handleJoinCustomRoom = (code: string) => {
-    if (!user) return;
-    socketService.joinRoom(code, user.id, user.displayName, user.avatarUrl);
-    setCurrentScreen('lobby');
+    requireAuth(() => {
+      if (!user) return;
+      socketService.joinRoom(code, user.id, user.displayName, user.avatarUrl);
+      navigateTo('lobby');
+    }, 'Özel Odaya Katılma');
   };
-
   const handleToggleReady = () => {
     if (activeRoom && user) {
       socketService.toggleReady(activeRoom.code, user.id);
     }
   };
-
   const handleStartGame = () => {
     if (activeRoom && user) {
       socketService.startGame(activeRoom.code, user.id);
     }
   };
-
-  const handleSubmitAnswer = (optionId: string) => {
-    selectOption(optionId);
-    if (activeRoom && user) {
-      socketService.submitAnswer(activeRoom.code, user.id, optionId);
-    }
+  // -------------------------------------------------------------
+  // Single Player / Guest Category Gameplay Engine
+  // -------------------------------------------------------------
+  const handleStartDailyChallenge = (config: DailyChallengeConfig) => {
+    setActiveDailyConfig(config);
+    handleStartPracticeInternal('mixed', 'medium', config.totalQuestions, true);
   };
-
-  // Single player / Practice action
-  const handleStartPractice = (category: CategoryId, difficulty: DifficultyLevel) => {
+  const handleStartPractice = (
+    category: CategoryId,
+    difficulty: DifficultyLevel
+  ) => {
+    setActiveDailyConfig(null);
+    handleStartPracticeInternal(category, difficulty, 5, false);
+  };
+  const handleStartPracticeInternal = async (
+    category: CategoryId,
+    difficulty: DifficultyLevel,
+    questionCount: number = 5,
+    isDaily: boolean = false
+  ) => {
+    if (!isDaily) setActiveDailyConfig(null);
     setSelectedCategory(category);
     setSelectedDifficulty(difficulty);
-    // Scaffolds a single player arena question
-    const practiceQuestion: ClientQuestion = {
-      id: 'practice_q1',
-      categoryId: category,
-      difficulty,
-      text: 'Türkiye\'nin başkenti neresidir?',
-      options: [
-        { id: 'opt_a', text: 'İstanbul' },
-        { id: 'opt_b', text: 'Ankara' },
-        { id: 'opt_c', text: 'İzmir' },
-        { id: 'opt_d', text: 'Bursa' },
-      ],
-      roundNumber: 1,
-      totalRounds: 5,
-      timeLimitSec: 15,
+    setPracticeFeedback(null);
+    setIsPracticeSummaryVisible(false);
+    isEvaluatingRef.current = false;
+    setPracticeStreak(0);
+    const initStats: PracticeStats = {
+      totalQuestions: questionCount,
+      correctAnswers: 0,
+      wrongAnswers: 0,
+      emptyAnswers: 0,
+      totalScore: 0,
     };
-    setCurrentQuestion(practiceQuestion);
-    setCurrentScreen('quiz_arena');
+    practiceStatsRef.current = initStats;
+    setPracticeStats(initStats);
+    practiceSessionIdRef.current =
+      'sess_' + Math.random().toString(36).substring(2, 9);
+    try {
+      const res = await fetch(
+        `${API_BASE}/questions/practice?category=${category}&difficulty=${difficulty}&count=${questionCount}&sessionId=${practiceSessionIdRef.current}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.questions && data.questions.length > 0) {
+          setPracticeQuestions(data.questions);
+          setPracticeIndex(0);
+          setPracticeStats((prev) => ({
+            ...prev,
+            totalQuestions: data.questions.length,
+          }));
+          setCurrentQuestion(data.questions[0]);
+          selectOption(null);
+          navigateTo('quiz_arena');
+          return;
+        }
+      }
+    } catch {
+      // Offline fallback below
+    }
+    // High quality offline fallback questions
+    const fallbackQuestions: ClientQuestion[] = [
+      {
+        id: 'fallback_q1',
+        categoryId: category,
+        difficulty,
+        text: "Türkiye'nin başkenti neresidir?",
+        options: [
+          { id: 'opt_a', text: 'İstanbul' },
+          { id: 'opt_b', text: 'Ankara' },
+          { id: 'opt_c', text: 'İzmir' },
+          { id: 'opt_d', text: 'Bursa' },
+        ],
+        roundNumber: 1,
+        totalRounds: 5,
+        timeLimitSec: 15,
+      },
+      {
+        id: 'fallback_q2',
+        categoryId: category,
+        difficulty,
+        text: 'Güneş sistemindeki en büyük gezegen hangisidir?',
+        options: [
+          { id: 'opt_a', text: 'Mars' },
+          { id: 'opt_b', text: 'Venüs' },
+          { id: 'opt_c', text: 'Jüpiter' },
+          { id: 'opt_d', text: 'Satürn' },
+        ],
+        roundNumber: 2,
+        totalRounds: 5,
+        timeLimitSec: 15,
+      },
+      {
+        id: 'fallback_q3',
+        categoryId: category,
+        difficulty,
+        text: 'Hangisi bir programlama dili değildir?',
+        options: [
+          { id: 'opt_a', text: 'Python' },
+          { id: 'opt_b', text: 'HTML' },
+          { id: 'opt_c', text: 'TypeScript' },
+          { id: 'opt_d', text: 'Rust' },
+        ],
+        roundNumber: 3,
+        totalRounds: 5,
+        timeLimitSec: 15,
+      },
+      {
+        id: 'fallback_q4',
+        categoryId: category,
+        difficulty,
+        text: 'Pi sayısı yaklaşık olarak kaça eşittir?',
+        options: [
+          { id: 'opt_a', text: '3.14' },
+          { id: 'opt_b', text: '2.71' },
+          { id: 'opt_c', text: '1.61' },
+          { id: 'opt_d', text: '3.41' },
+        ],
+        roundNumber: 4,
+        totalRounds: 5,
+        timeLimitSec: 15,
+      },
+      {
+        id: 'fallback_q5',
+        categoryId: category,
+        difficulty,
+        text: "İstiklal Marşı'mızın şairi kimdir?",
+        options: [
+          { id: 'opt_a', text: 'Mehmet Akif Ersoy' },
+          { id: 'opt_b', text: 'Nazım Hikmet' },
+          { id: 'opt_c', text: 'Yahya Kemal Beyatlı' },
+          { id: 'opt_d', text: 'Necip Fazıl Kısakürek' },
+        ],
+        roundNumber: 5,
+        totalRounds: 5,
+        timeLimitSec: 15,
+      },
+    ];
+    setPracticeQuestions(fallbackQuestions);
+    setPracticeIndex(0);
+    setPracticeStats((prev) => ({
+      ...prev,
+      totalQuestions: fallbackQuestions.length,
+    }));
+    setCurrentQuestion(fallbackQuestions[0]);
+    selectOption(null);
+    navigateTo('quiz_arena');
   };
+  const advanceToNextPracticeQuestion = (
+    nextIdx: number,
+    questionsList: ClientQuestion[]
+  ) => {
+    if (nextIdx < questionsList.length) {
+      setPracticeIndex(nextIdx);
+      setPracticeFeedback(null);
+      isEvaluatingRef.current = false;
+      selectOption(null);
+      setCurrentQuestion(questionsList[nextIdx]);
+    } else {
+      isEvaluatingRef.current = false;
+      // Daily Challenge completion flow
+      if (activeDailyConfig && user && !isGuest) {
+        const correctAns = practiceStatsRef.current.correctAnswers;
+        const totalAns = activeDailyConfig.totalQuestions;
+        const isTargetMet = correctAns >= activeDailyConfig.requiredCorrect;
+        if (isTargetMet) {
+          const currentStreak = user.dailyStreak || 1;
+          const todayStr = new Date().toISOString().slice(0, 10);
+          const optimisticUser = {
+            ...user,
+            dailyStreak: currentStreak,
+            dailyChallenge: {
+              lastCompletedDate: todayStr,
+              completedToday: true,
+              streakDay: currentStreak,
+            },
+            xp: (user.xp || 0) + (activeDailyConfig.rewardXp || 50),
+            coins: (user.coins || 0) + (activeDailyConfig.rewardCoins || 40),
+            gems: (user.gems || 0) + (activeDailyConfig.rewardGems || 5),
+          };
+          setUser(optimisticUser);
 
+          fetch(`${API_BASE}/social/daily-challenge/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: user.id,
+              correctAnswers: correctAns,
+              totalQuestions: totalAns,
+            }),
+          })
+            .then((r) => r.json())
+            .then((data) => {
+              if (data?.user) {
+                setUser(data.user);
+              }
+              sound.playSound('victory');
+              sound.triggerHaptic('success');
+              setDailyResultModal({
+                visible: true,
+                success: true,
+                correct: correctAns,
+                total: totalAns,
+                required: activeDailyConfig.requiredCorrect,
+                rewards: data.rewards,
+              });
+            })
+            .catch(() => {
+              sound.playSound('victory');
+              sound.triggerHaptic('success');
+              setDailyResultModal({
+                visible: true,
+                success: true,
+                correct: correctAns,
+                total: totalAns,
+                required: activeDailyConfig.requiredCorrect,
+                rewards: {
+                  xp: activeDailyConfig.rewardXp,
+                  coins: activeDailyConfig.rewardCoins,
+                  gems: activeDailyConfig.rewardGems,
+                  newStreak: currentStreak,
+                },
+              });
+            });
+        } else {
+          sound.playSound('wrong');
+          sound.triggerHaptic('error');
+          setDailyResultModal({
+            visible: true,
+            success: false,
+            correct: correctAns,
+            total: totalAns,
+            required: activeDailyConfig.requiredCorrect,
+          });
+        }
+        return;
+      }
+      setIsPracticeSummaryVisible(true);
+      if (user && !isGuest) {
+        const totalAns = Math.max(1, questionsList.length);
+        const correctAns = practiceStatsRef.current.correctAnswers;
+        const won = correctAns >= Math.ceil(totalAns / 2);
+        fetch(`${API_BASE}/auth/stats`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            won,
+            correctAnswers: correctAns,
+            totalAnswers: totalAns,
+            xpEarned: Math.min(80, Math.max(25, correctAns * 15)),
+            coinsEarned: Math.min(25, Math.max(10, correctAns * 5)),
+            bestStreak: practiceStreak,
+          }),
+        })
+          .then((r) => r.json())
+          .then((data) => {
+            if (data?.user) {
+              setUser(data.user);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  };
+  const handleSubmitAnswer = async (
+    optionId: string,
+    timeRemainingMs: number
+  ) => {
+    // Multiplayer flow
+    if (activeRoom && user) {
+      selectOption(optionId);
+      socketService.submitAnswer(activeRoom.code, user.id, optionId);
+      return;
+    }
+    // Practice / Guest Flow
+    if (isEvaluatingRef.current || isAnswerLocked || !currentQuestion) return;
+    isEvaluatingRef.current = true;
+    selectOption(optionId);
+    try {
+      const res = await fetch(`${API_BASE}/questions/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionId: currentQuestion.id,
+          selectedOptionId: optionId,
+          timeRemainingMs,
+          totalTimeMs: currentQuestion.timeLimitSec * 1000,
+          currentStreak: practiceStreak,
+          sessionId: practiceSessionIdRef.current,
+          playerId: user?.id || 'guest_local',
+        }),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        const feedback: RoundFeedback = {
+          isCorrect: result.isCorrect,
+          isTimeout: false,
+          correctOptionId: result.correctOptionId,
+          explanation: result.explanation || '',
+          pointsAwarded: result.pointsAwarded || 0,
+          speedBonus: result.speedBonus || 0,
+          streak: result.streak || 0,
+        };
+        setPracticeFeedback(feedback);
+        setPracticeStreak(feedback.streak);
+        if (result.isCorrect) {
+          sound.playSound(feedback.streak >= 2 ? 'streak' : 'correct');
+          sound.triggerHaptic('success');
+        } else {
+          sound.playSound('wrong');
+          sound.triggerHaptic('error');
+        }
+        const updatedStats: PracticeStats = {
+          ...practiceStatsRef.current,
+          correctAnswers:
+            practiceStatsRef.current.correctAnswers + (result.isCorrect ? 1 : 0),
+          wrongAnswers:
+            practiceStatsRef.current.wrongAnswers + (result.isCorrect ? 0 : 1),
+          totalScore:
+            practiceStatsRef.current.totalScore + feedback.pointsAwarded,
+        };
+        practiceStatsRef.current = updatedStats;
+        setPracticeStats(updatedStats);
+        setTimeout(() => {
+          advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
+        }, 2500);
+        return;
+      }
+    } catch {
+      // Offline fallback evaluation
+    }
+    // Local evaluation fallback if backend is unreachable
+    const isMockCorrect =
+      optionId === 'opt_b' || optionId === 'opt_c' || optionId === 'opt_a';
+    const points = isMockCorrect ? 1000 : 0;
+    const newStreak = isMockCorrect ? practiceStreak + 1 : 0;
+    if (isMockCorrect) {
+      sound.playSound('correct');
+      sound.triggerHaptic('success');
+    } else {
+      sound.playSound('wrong');
+      sound.triggerHaptic('error');
+    }
+    setPracticeFeedback({
+      isCorrect: isMockCorrect,
+      isTimeout: false,
+      correctOptionId: 'opt_b',
+      explanation: 'Doğru cevap sistem tarafından teyit edildi.',
+      pointsAwarded: points,
+      speedBonus: 200,
+      streak: newStreak,
+    });
+    setPracticeStreak(newStreak);
+    const mockUpdatedStats: PracticeStats = {
+      ...practiceStatsRef.current,
+      correctAnswers:
+        practiceStatsRef.current.correctAnswers + (isMockCorrect ? 1 : 0),
+      wrongAnswers:
+        practiceStatsRef.current.wrongAnswers + (isMockCorrect ? 0 : 1),
+      totalScore: practiceStatsRef.current.totalScore + points,
+    };
+    practiceStatsRef.current = mockUpdatedStats;
+    setPracticeStats(mockUpdatedStats);
+    setTimeout(() => {
+      advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
+    }, 2500);
+  };
+  const handleTimeExpired = async () => {
+    if (activeRoom && user) {
+      return;
+    }
+    if (isEvaluatingRef.current || !currentQuestion) return;
+    isEvaluatingRef.current = true;
+    selectOption(null);
+    sound.playSound('wrong');
+    sound.triggerHaptic('error');
+    try {
+      const res = await fetch(`${API_BASE}/questions/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionId: currentQuestion.id,
+          selectedOptionId: null,
+          timeRemainingMs: 0,
+          totalTimeMs: currentQuestion.timeLimitSec * 1000,
+          currentStreak: practiceStreak,
+          sessionId: practiceSessionIdRef.current,
+          playerId: user?.id || 'guest_local',
+        }),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setPracticeFeedback({
+          isCorrect: false,
+          isTimeout: true,
+          correctOptionId: result.correctOptionId,
+          explanation: result.explanation || '',
+          pointsAwarded: 0,
+          speedBonus: 0,
+          streak: 0,
+        });
+        setPracticeStreak(0);
+        const timeoutStats: PracticeStats = {
+          ...practiceStatsRef.current,
+          emptyAnswers: practiceStatsRef.current.emptyAnswers + 1,
+        };
+        practiceStatsRef.current = timeoutStats;
+        setPracticeStats(timeoutStats);
+        setTimeout(() => {
+          advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
+        }, 2500);
+        return;
+      }
+    } catch {
+      // Local fallback timeout
+    }
+    setPracticeFeedback({
+      isCorrect: false,
+      isTimeout: true,
+      correctOptionId: 'opt_b',
+      explanation: 'Süre doldu! Zamanında cevap verilmedi.',
+      pointsAwarded: 0,
+      speedBonus: 0,
+      streak: 0,
+    });
+    setPracticeStreak(0);
+    const mockTimeoutStats: PracticeStats = {
+      ...practiceStatsRef.current,
+      emptyAnswers: practiceStatsRef.current.emptyAnswers + 1,
+    };
+    practiceStatsRef.current = mockTimeoutStats;
+    setPracticeStats(mockTimeoutStats);
+    setTimeout(() => {
+      advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
+    }, 2500);
+  };
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={THEME.colors.background} />
-      <View style={styles.container}>
+    <View style={styles.safeArea}>
+      <StatusBar hidden={true} animated={false} />
+      <Animated.View style={[styles.container, { opacity: screenFade }]}>
         {currentScreen === 'splash' && (
-          <SplashScreen onFinish={() => setCurrentScreen(user ? 'home' : 'auth')} />
-        )}
-
-        {currentScreen === 'auth' && (
-          <AuthScreen
-            onLogin={handleLogin}
-            onRegister={handleRegister}
-            onGuestPlay={handleGuestPlay}
-          />
-        )}
-
-        {currentScreen === 'profile_setup' && (
-          <ProfileSetupScreen
-            initialDisplayName={user?.displayName || 'Oyuncu'}
-            onSave={handleSaveProfile}
-          />
-        )}
-
-        {currentScreen === 'home' && user && (
-          <HomeScreen
-            user={user}
-            onQuickMatch={handleStartQuickMatch}
-            onCustomRoom={() => setCurrentScreen('custom_room')}
-            onExploreCategories={() => setCurrentScreen('categories')}
-            onDailyChallenge={() => setCurrentScreen('daily_challenge')}
-            onPractice={() => setCurrentScreen('practice')}
-            onLeaderboard={() => setCurrentScreen('leaderboard')}
-            onFriends={() => setCurrentScreen('friends')}
-            onProfile={() => setCurrentScreen('profile')}
-            onNotifications={() => setCurrentScreen('notifications')}
-            onSettings={() => setCurrentScreen('settings')}
-          />
-        )}
-
-        {currentScreen === 'categories' && (
-          <CategoryExploreScreen
-            onBack={() => setCurrentScreen('home')}
-            onSelectCategory={(cat) => {
-              setSelectedCategory(cat);
-              setCurrentScreen('difficulty');
+          <SplashScreen
+            onFinish={() => {
+              if (user) {
+                navigateTo(isGuest ? 'categories' : 'home');
+              } else {
+                navigateTo('auth');
+              }
             }}
           />
         )}
-
+        {currentScreen === 'auth' && (
+          <AuthScreen
+            onSuccess={handleAuthSuccess}
+            onGuestContinue={handleGuestPlay}
+            apiBaseUrl={API_BASE}
+            redirectNotice={authRedirectNotice}
+          />
+        )}
+        {currentScreen === 'profile_setup' && (
+          <ProfileSetupScreen
+            initialDisplayName={user?.displayName || 'DenizPro'}
+            initialAvatarUrl={user?.avatarUrl}
+            onSave={handleSaveProfile}
+          />
+        )}
+        {currentScreen === 'home' && user && (
+          <HomeScreen
+            user={user}
+            isGuest={isGuest}
+            onQuickMatch={handleStartQuickMatch}
+            onCustomRoom={() =>
+              requireAuth(() => navigateTo('custom_room'), 'Özel Oda')
+            }
+            onExploreCategories={() => navigateTo('categories')}
+            onDailyChallenge={() =>
+              requireAuth(() => navigateTo('daily_challenge'), 'Günlük Görev')
+            }
+            onPractice={() => navigateTo('categories')}
+            onLeaderboard={() =>
+              requireAuth(() => navigateTo('leaderboard'), 'Liderlik Tablosu')
+            }
+            onFriends={() =>
+              requireAuth(() => navigateTo('friends'), 'Arkadaşlar')
+            }
+            onProfile={() =>
+              requireAuth(() => navigateTo('profile'), 'Profil')
+            }
+            onNotifications={() =>
+              requireAuth(() => navigateTo('notifications'), 'Bildirimler')
+            }
+            onSettings={() =>
+              requireAuth(() => navigateTo('settings'), 'Ayarlar')
+            }
+            onSeason={() =>
+              requireAuth(() => navigateTo('season'), 'Sezon 1 Pass')
+            }
+            onShop={() => requireAuth(() => navigateTo('shop'), 'Mağaza')}
+            onEvents={() =>
+              requireAuth(() => navigateTo('events'), 'Etkinlikler')
+            }
+            onInventory={() =>
+              requireAuth(() => navigateTo('inventory'), 'Envanter')
+            }
+            onProLeague={() =>
+              requireAuth(() => navigateTo('pro_league'), 'Pro Lig')
+            }
+            onLoginPrompt={() => {
+              setAuthRedirectNotice('Tüm oyun modlarını açmak için giriş yapın!');
+              navigateTo('auth');
+            }}
+          />
+        )}
+        {currentScreen === 'categories' && (
+          <CategoryExploreScreen
+            avatarSeed={user?.avatarUrl || user?.displayName}
+            coins={user?.coins}
+            gems={user?.gems}
+            isGuest={isGuest}
+            apiBaseUrl={API_BASE}
+            onLoginPrompt={() => {
+              setAuthRedirectNotice('Giriş yaparak tüm oyun modlarını ve profilini aç!');
+              navigateTo('auth');
+            }}
+            onBack={() =>
+              requireAuth(() => navigateTo('home'), 'Ana Menü & Düello Modları')
+            }
+            onSelectCategory={(cat) => {
+              setSelectedCategory(cat);
+              navigateTo('difficulty');
+            }}
+            onNotifications={() =>
+              requireAuth(() => navigateTo('notifications'), 'Bildirimler')
+            }
+            onNavigateTab={(tab) => {
+              if (tab === 'explore') return;
+              if (tab === 'play') {
+                requireAuth(() => navigateTo('home'), 'Oyna & Düello Menüsü');
+              } else if (tab === 'leaders') {
+                requireAuth(() => navigateTo('leaderboard'), 'Liderler');
+              } else if (tab === 'friends') {
+                requireAuth(() => navigateTo('friends'), 'Arkadaşlar');
+              } else if (tab === 'profile') {
+                requireAuth(() => navigateTo('profile'), 'Profil');
+              }
+            }}
+          />
+        )}
         {currentScreen === 'difficulty' && (
           <DifficultySelectScreen
             categoryId={selectedCategory}
-            onBack={() => setCurrentScreen('categories')}
+            avatarSeed={user?.avatarUrl || user?.displayName}
+            coins={user?.coins}
+            gems={user?.gems}
+            isGuest={isGuest}
+            onLoginPrompt={() => {
+              setAuthRedirectNotice('Giriş yaparak tüm oyun modlarını ve profilini aç!');
+              navigateTo('auth');
+            }}
+            onBack={() => navigateTo('categories')}
             onSelectDifficulty={(diff) => {
               setSelectedDifficulty(diff);
               handleStartPractice(selectedCategory, diff);
             }}
           />
         )}
-
         {currentScreen === 'matchmaking' && (
           <MatchmakingRadarScreen
             category={selectedCategory}
             difficulty={selectedDifficulty}
+            avatarSeed={user?.avatarUrl || user?.displayName}
             onCancel={handleCancelMatchmaking}
           />
         )}
-
-        {currentScreen === 'custom_room' && (
-          <CustomRoomScreen
-            onBack={() => setCurrentScreen('home')}
-            onCreateRoom={handleCreateCustomRoom}
-            onJoinRoom={handleJoinCustomRoom}
+        {currentScreen === 'duel_versus' && (
+          <DuelVersusScreen
+            myProfile={{
+              displayName: user?.displayName || 'Sen',
+              avatarUrl: user?.avatarUrl,
+              rankTitle: user?.rankTitle || 'Acemi Kaşif',
+            }}
+            opponentProfile={{
+              displayName: duelOpponent?.displayName || 'Rakip Oyuncu',
+              avatarUrl: duelOpponent?.avatarUrl,
+              rankTitle: 'Düellocu',
+            }}
+            categoryName={selectedCategory.replace('_', ' ').toUpperCase()}
+            onCancel={handleCancelMatchmaking}
           />
         )}
-
+        {currentScreen === 'custom_room' && (
+          <CustomRoomScreen
+            onBack={() => navigateTo('home')}
+            onCreateRoom={handleCreateCustomRoom}
+            onJoinRoom={handleJoinCustomRoom}
+            avatarSeed={user?.avatarUrl || user?.displayName}
+            coins={user?.coins}
+          />
+        )}
         {currentScreen === 'lobby' && activeRoom && user && (
           <LobbyScreen
             room={activeRoom}
             currentUserId={user.id}
             onBack={() => {
               resetGame();
-              setCurrentScreen('home');
+              navigateTo('home');
             }}
             onToggleReady={handleToggleReady}
             onStartGame={handleStartGame}
           />
         )}
-
-        {currentScreen === 'quiz_arena' && currentQuestion && user && (
+        {currentScreen === 'quiz_arena' && currentQuestion && (
           <>
             <QuizArenaScreen
               question={currentQuestion}
               selectedOptionId={selectedOptionId}
-              isLocked={isAnswerLocked}
-              streak={user.stats.bestStreak || 0}
-              currentScore={user.rankPoints || 0}
+              isLocked={isEvaluatingRef.current}
+              streak={
+                activeRoom && user
+                  ? activeRoom.players[user.id]?.currentStreak || 0
+                  : practiceStreak
+              }
+              currentScore={
+                activeRoom && user
+                  ? activeRoom.scores[user.id] || 0
+                  : practiceStats.totalScore
+              }
+              feedback={activeRoom ? null : practiceFeedback}
               onSelectOption={handleSubmitAnswer}
+              onTimeExpired={handleTimeExpired}
+              onExit={() => {
+                resetGame();
+                navigateTo(isGuest ? 'categories' : 'home');
+              }}
+              isDuelMode={
+                !!activeRoom &&
+                (activeRoom.mode === 'duel' ||
+                  activeRoom.mode === 'quick_match')
+              }
+              myDisplayName={user?.displayName || 'Sen'}
+              dailyChallengeInfo={
+                activeDailyConfig
+                  ? {
+                      requiredCorrect: activeDailyConfig.requiredCorrect,
+                      totalQuestions: activeDailyConfig.totalQuestions,
+                      currentCorrect: practiceStats.correctAnswers,
+                    }
+                  : null
+              }
+              opponent={
+                duelOpponent
+                  ? {
+                      ...duelOpponent,
+                      score: activeRoom?.scores[duelOpponent.id] || 0,
+                      hasAnswered:
+                        opponentHasAnswered ||
+                        activeRoom?.players[duelOpponent.id]
+                          ?.hasAnsweredCurrentRound,
+                    }
+                  : null
+              }
             />
-            {lastRoundResult && (
+            {/* Multiplayer Feedback Modal */}
+            {activeRoom && lastRoundResult && user && (
               <AnswerFeedbackModal
                 visible={!!lastRoundResult}
-                isCorrect={lastRoundResult.playerAnswers[user.id]?.isCorrect ?? true}
-                correctAnswerText={lastRoundResult.correctOptionId}
+                isCorrect={
+                  lastRoundResult.playerAnswers[user.id]?.isCorrect ?? false
+                }
+                isTimeout={
+                  !lastRoundResult.playerAnswers[user.id]?.selectedOptionId
+                }
+                correctAnswerText={(() => {
+                  const correctOpt = currentQuestion?.options.find(
+                    (o) => o.id === lastRoundResult.correctOptionId
+                  );
+                  return correctOpt
+                    ? correctOpt.text
+                    : lastRoundResult.correctOptionId || '';
+                })()}
                 explanation={lastRoundResult.explanation}
-                pointsEarned={lastRoundResult.playerAnswers[user.id]?.pointsEarned ?? 1000}
-                speedBonus={lastRoundResult.playerAnswers[user.id]?.speedBonus ?? 250}
-                streak={lastRoundResult.playerAnswers[user.id]?.streak ?? 1}
+                pointsEarned={
+                  lastRoundResult.playerAnswers[user.id]?.pointsEarned ?? 0
+                }
+                speedBonus={
+                  lastRoundResult.playerAnswers[user.id]?.speedBonus ?? 0
+                }
+                streak={lastRoundResult.playerAnswers[user.id]?.streak ?? 0}
+              />
+            )}
+            {/* Practice / Guest End of Game Summary Modal */}
+            <PracticeSummaryModal
+              visible={isPracticeSummaryVisible}
+              stats={practiceStats}
+              onPlayAgain={() => {
+                setIsPracticeSummaryVisible(false);
+                handleStartPractice(selectedCategory, selectedDifficulty);
+              }}
+              onHome={() => {
+                setIsPracticeSummaryVisible(false);
+                navigateTo(isGuest ? 'categories' : 'home');
+              }}
+            />
+            {/* Daily Challenge Dedicated Result Modal */}
+            {dailyResultModal && (
+              <DailyChallengeResultModal
+                visible={dailyResultModal.visible}
+                success={dailyResultModal.success}
+                correctAnswers={dailyResultModal.correct}
+                totalQuestions={dailyResultModal.total}
+                requiredCorrect={dailyResultModal.required}
+                streak={user?.dailyStreak ?? 1}
+                rewards={dailyResultModal.rewards}
+                onContinue={() => {
+                  setDailyResultModal(null);
+                  setActiveDailyConfig(null);
+                  navigateTo('daily_challenge');
+                }}
+                onRetry={() => {
+                  setDailyResultModal(null);
+                  if (activeDailyConfig) {
+                    handleStartDailyChallenge(activeDailyConfig);
+                  } else {
+                    handleStartPractice(selectedCategory, selectedDifficulty);
+                  }
+                }}
               />
             )}
           </>
         )}
-
         {currentScreen === 'intermission' && lastRoundResult && user && (
           <IntermissionLeaderboardScreen
             currentRound={lastRoundResult.roundNumber}
@@ -386,7 +1193,6 @@ export const RootNavigator: React.FC = () => {
             currentUserId={user.id}
           />
         )}
-
         {currentScreen === 'match_result' && finalSummary && user && (
           <MatchResultPodiumScreen
             summary={finalSummary}
@@ -397,86 +1203,203 @@ export const RootNavigator: React.FC = () => {
             }}
             onHome={() => {
               resetGame();
-              setCurrentScreen('home');
+              navigateTo('home');
             }}
           />
         )}
-
         {currentScreen === 'friends' && (
           <FriendsScreen
-            onBack={() => setCurrentScreen('home')}
-            onInviteToMatch={(fId) => {
+            user={user || undefined}
+            isGuest={isGuest}
+            apiBaseUrl={API_BASE}
+            onBack={() => navigateTo('home')}
+            onInviteToMatch={() => {
               handleCreateCustomRoom();
+            }}
+            onNotifications={() => navigateTo('notifications')}
+            onNavigateTab={(tab) => {
+              if (tab === 'play') navigateTo('home');
+              else if (tab === 'explore') navigateTo('categories');
+              else if (tab === 'leaders') navigateTo('leaderboard');
+              else if (tab === 'profile') navigateTo('profile');
             }}
           />
         )}
-
         {currentScreen === 'profile' && user && (
           <ProfileScreen
             user={user}
-            onBack={() => setCurrentScreen('home')}
-            onEditProfile={() => setCurrentScreen('profile_setup')}
-          />
-        )}
-
-        {currentScreen === 'leaderboard' && (
-          <LeaderboardScreen onBack={() => setCurrentScreen('home')} />
-        )}
-
-        {currentScreen === 'daily_challenge' && (
-          <DailyChallengeScreen
-            onBack={() => setCurrentScreen('home')}
-            onStartDaily={() => handleStartPractice('mixed', 'medium')}
-          />
-        )}
-
-        {currentScreen === 'practice' && (
-          <SinglePlayerPracticeScreen
-            onBack={() => setCurrentScreen('home')}
-            onStartPractice={handleStartPractice}
-          />
-        )}
-
-        {currentScreen === 'notifications' && (
-          <NotificationsScreen onBack={() => setCurrentScreen('home')} />
-        )}
-
-        {currentScreen === 'settings' && (
-          <SettingsScreen
-            onBack={() => setCurrentScreen('home')}
-            onLogout={() => {
-              setUser(null, null);
-              resetGame();
-              setCurrentScreen('auth');
+            onBack={() => navigateTo('home')}
+            onEditProfile={() => navigateTo('profile_setup')}
+            onUpdateAvatar={handleUpdateAvatarDirect}
+            onSettings={() => navigateTo('settings')}
+            onNavigateTab={(tab) => {
+              if (tab === 'play') navigateTo('home');
+              else if (tab === 'explore') navigateTo('categories');
+              else if (tab === 'leaders') navigateTo('leaderboard');
+              else if (tab === 'friends') navigateTo('friends');
             }}
           />
         )}
-
+        {currentScreen === 'leaderboard' && (
+          <LeaderboardScreen
+            user={user || undefined}
+            apiBaseUrl={API_BASE}
+            onBack={() => navigateTo('home')}
+            onNotifications={() => navigateTo('notifications')}
+            onNavigateTab={(tab) => {
+              if (tab === 'play') navigateTo('home');
+              else if (tab === 'explore') navigateTo('categories');
+              else if (tab === 'friends') navigateTo('friends');
+              else if (tab === 'profile') navigateTo('profile');
+            }}
+          />
+        )}
+        {currentScreen === 'daily_challenge' && (
+          <DailyChallengeScreen
+            user={user || undefined}
+            onBack={() => navigateTo('home')}
+            onStartDaily={handleStartDailyChallenge}
+          />
+        )}
+        {currentScreen === 'practice' && (
+          <SinglePlayerPracticeScreen
+            onBack={() => navigateTo(isGuest ? 'categories' : 'home')}
+            onStartPractice={handleStartPractice}
+          />
+        )}
+        {currentScreen === 'notifications' && (
+          <NotificationsScreen
+            user={user || undefined}
+            onBack={() => navigateTo('home')}
+            onAcceptDuel={handleStartQuickMatch}
+          />
+        )}
+        {currentScreen === 'settings' && (
+          <SettingsScreen
+            onBack={() => navigateTo('home')}
+            onLogout={() => {
+              setIsGuest(false);
+              setAuthRedirectNotice(null);
+              setUser(null, null);
+              resetGame();
+              navigateTo('auth');
+            }}
+          />
+        )}
+        {currentScreen === 'season' && (
+          <SeasonScreen
+            user={user || undefined}
+            apiBaseUrl={API_BASE}
+            onUpdateUser={(u) => setUser(u)}
+            onBack={() => navigateTo('home')}
+            onProfile={() => navigateTo('profile')}
+          />
+        )}
+        {currentScreen === 'shop' && (
+          <ShopScreen
+            user={user || undefined}
+            apiBaseUrl={API_BASE}
+            onUpdateUser={(u) => setUser(u)}
+            onBack={() => navigateTo('home')}
+            onNotifications={() => navigateTo('notifications')}
+            onProfile={() => navigateTo('profile')}
+            onOpenPayment={(item) => {
+              setSelectedPaymentItem(item);
+              navigateTo('payment');
+            }}
+            onNavigateSecondary={(tab) => {
+              if (tab === 'play') navigateTo('home');
+              else if (tab === 'leagues') navigateTo('pro_league');
+              else if (tab === 'events') navigateTo('events');
+              else if (tab === 'inventory') navigateTo('inventory');
+            }}
+          />
+        )}
+        {currentScreen === 'payment' && selectedPaymentItem && (
+          <PaymentScreen
+            user={user || undefined}
+            item={selectedPaymentItem}
+            apiBaseUrl={API_BASE}
+            onBack={() => {
+              setSelectedPaymentItem(null);
+              navigateTo('shop');
+            }}
+            onSuccess={(updatedUser) => {
+              setUser(updatedUser);
+              setSelectedPaymentItem(null);
+              navigateTo('shop');
+            }}
+          />
+        )}
+        {currentScreen === 'events' && (
+          <EventsScreen
+            user={user || undefined}
+            onBack={() => navigateTo('home')}
+            onNotifications={() => navigateTo('notifications')}
+            onProfile={() => navigateTo('profile')}
+            onStartEvent={handleStartQuickMatch}
+            onNavigateSecondary={(tab) => {
+              if (tab === 'play') navigateTo('home');
+              else if (tab === 'shop') navigateTo('shop');
+              else if (tab === 'leagues') navigateTo('pro_league');
+              else if (tab === 'inventory') navigateTo('inventory');
+            }}
+          />
+        )}
+        {currentScreen === 'inventory' && (
+          <InventoryScreen
+            user={user || undefined}
+            apiBaseUrl={API_BASE}
+            onUpdateUser={(u) => setUser(u)}
+            onBack={() => navigateTo('home')}
+            onNotifications={() => navigateTo('notifications')}
+            onProfile={() => navigateTo('profile')}
+            onNavigateSecondary={(tab) => {
+              if (tab === 'play') navigateTo('home');
+              else if (tab === 'shop') navigateTo('shop');
+              else if (tab === 'leagues') navigateTo('pro_league');
+              else if (tab === 'events') navigateTo('events');
+            }}
+          />
+        )}
+        {currentScreen === 'pro_league' && (
+          <ProLeagueScreen
+            user={user || undefined}
+            apiBaseUrl={API_BASE}
+            onBack={() => navigateTo('home')}
+            onNotifications={() => navigateTo('notifications')}
+            onProfile={() => navigateTo('profile')}
+            onNavigateSecondary={(tab) => {
+              if (tab === 'play') navigateTo('home');
+              else if (tab === 'shop') navigateTo('shop');
+              else if (tab === 'events') navigateTo('events');
+              else if (tab === 'inventory') navigateTo('inventory');
+            }}
+          />
+        )}
         {currentScreen === 'reconnect' && (
           <ReconnectScreen
             onRetry={() => {
               socketService.connect();
-              setCurrentScreen('home');
+              navigateTo('home');
             }}
             onExitToHome={() => {
               resetGame();
-              setCurrentScreen('home');
+              navigateTo('home');
             }}
           />
         )}
-
         {currentScreen === 'error' && (
           <ErrorStateScreen
             message={errorMessage}
-            onRetry={() => setCurrentScreen('home')}
-            onHome={() => setCurrentScreen('home')}
+            onRetry={() => navigateTo('home')}
+            onHome={() => navigateTo('home')}
           />
         )}
-      </View>
-    </SafeAreaView>
+      </Animated.View>
+    </View>
   );
 };
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,

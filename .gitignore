@@ -6,3 +6,10 @@ build/
 *.log
 .env
 .env.local
+.env.*
+server/.env
+client/.env
+.vercel
+scripts/*vercel*.js
+scripts/fix-font-weights.js
+server/*_store.json

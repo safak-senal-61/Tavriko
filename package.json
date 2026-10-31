@@ -1,5 +1,5 @@
 {
-  "name": "trivia-verse-multiplayer",
+  "name": "tavriko",
   "version": "1.0.0",
   "private": true,
   "workspaces": [
@@ -8,6 +8,7 @@
     "client"
   ],
   "scripts": {
+    "build": "npx prisma generate --schema=server/prisma/schema.prisma && npm run build:shared && npm run build:server",
     "test:all": "scripts\\run-all-tests.bat",
     "test:shared": "npm --prefix shared test",
     "test:server": "npm --prefix server test",
@@ -16,5 +17,21 @@
     "dev:client": "npm --prefix client start",
     "build:shared": "npm --prefix shared run build",
     "build:server": "npm --prefix server run build"
+  },
+  "dependencies": {
+    "@trivia/shared": "file:shared",
+    "@google/genai": "^2.32.0",
+    "@prisma/client": "^6.19.3",
+    "@supabase/supabase-js": "^2.118.0",
+    "@upstash/redis": "^1.40.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^18.0.9",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "prisma": "^6.19.3",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1",
+    "telegraf": "^4.16.3"
   }
 }

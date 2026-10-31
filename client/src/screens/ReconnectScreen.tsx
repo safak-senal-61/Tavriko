@@ -1,142 +1,123 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { THEME } from '../theme/tokens';
-import { sound } from '../services/soundService';
-import { WifiOff, RefreshCw, Home } from 'lucide-react-native';
-
+import { TavrikoScreen, Button3D } from '../components/TavrikoIcons';
 interface ReconnectScreenProps {
   onRetry: () => void;
   onExitToHome: () => void;
 }
-
-export const ReconnectScreen: React.FC<ReconnectScreenProps> = ({ onRetry, onExitToHome }) => {
+export const ReconnectScreen: React.FC<ReconnectScreenProps> = ({
+  onRetry,
+  onExitToHome,
+}) => {
+  const [secondsLeft, setSecondsLeft] = useState(10);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSecondsLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
   return (
-    <View style={styles.container}>
-      <View style={styles.card}>
-        <View style={styles.iconCircle}>
-          <WifiOff size={44} color={THEME.colors.wrong} />
-        </View>
-
-        <Text style={styles.title}>Bağlantı Kesildi</Text>
-        <Text style={styles.desc}>
-          Sunucuyla olan gerçek zamanlı bağlantınız koptu. Maç durumunuzu kurtarmak için otomatik olarak yeniden bağlanılıyor...
-        </Text>
-
-        <View style={styles.spinnerRow}>
-          <ActivityIndicator size="small" color={THEME.colors.primaryLight} />
-          <Text style={styles.spinnerText}>Yeniden bağlanılıyor...</Text>
-        </View>
-
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.retryBtn}
-            onPress={() => {
-              sound.playSound('tap');
-              onRetry();
-            }}
-          >
-            <RefreshCw size={18} color="#FFF" />
-            <Text style={styles.btnText}>Tekrar Dene</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.homeBtn}
-            onPress={() => {
-              sound.playSound('tap');
-              onExitToHome();
-            }}
-          >
-            <Home size={18} color={THEME.colors.textPrimary} />
-            <Text style={styles.btnTextSecondary}>Lobiye Dön</Text>
-          </TouchableOpacity>
+    <TavrikoScreen style={styles.centerAll}>
+      {/* Circular Countdown Ring */}
+      <View style={styles.ringWrap}>
+        <Svg width={150} height={150} viewBox="0 0 150 150">
+          <Circle
+            cx="75"
+            cy="75"
+            r="64"
+            fill="none"
+            stroke="rgba(255,255,255,0.14)"
+            strokeWidth="12"
+          />
+          <Circle
+            cx="75"
+            cy="75"
+            r="64"
+            fill="none"
+            stroke="#FF9B2F"
+            strokeWidth="12"
+            strokeDasharray="402"
+            strokeDashoffset={402 * (1 - secondsLeft / 10)}
+            strokeLinecap="round"
+          />
+        </Svg>
+        <View style={styles.ringNumberWrap}>
+          <Text style={styles.ringNumber}>{secondsLeft}</Text>
         </View>
       </View>
-    </View>
+      <Text style={styles.title}>BAĞLANTI KOPTU</Text>
+      <Text style={styles.subtitle}>
+        Yeniden bağlanıyoruz. 10 saniye içinde dönemezsen maçtan düşersin.
+      </Text>
+      <Button3D
+        title="YENİDEN DENE"
+        variant="mint"
+        onPress={onRetry}
+        style={{ width: 240 }}
+      />
+      <TouchableOpacity
+        style={styles.leaveBtn}
+        onPress={onExitToHome}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.leaveBtnText}>Maçtan ayrıl</Text>
+      </TouchableOpacity>
+    </TavrikoScreen>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: THEME.spacing.lg,
-  },
-  card: {
-    width: '100%',
-    backgroundColor: THEME.colors.card,
-    borderRadius: THEME.radius.xl,
-    padding: THEME.spacing.xl,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: THEME.colors.wrong,
-  },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: THEME.colors.wrongBackground,
+  centerAll: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+  },
+  ringWrap: {
+    width: 150,
+    height: 150,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  ringNumberWrap: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ringNumber: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 56,
+    color: '#FFFFFF',
   },
   title: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: THEME.colors.textPrimary,
-    marginBottom: 8,
+    fontFamily: THEME.fonts.display,
+    fontSize: 30,
+    color: '#FFFFFF',
+    marginTop: 22,
   },
-  desc: {
+  subtitle: {
+    color: '#D9CDF5',
     fontSize: 13,
-    color: THEME.colors.textSecondary,
+    fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 20,
+    maxWidth: 280,
+    marginTop: 8,
+    marginBottom: 28,
   },
-  spinnerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 24,
-  },
-  spinnerText: {
-    fontSize: 13,
-    color: THEME.colors.primaryLight,
-    fontWeight: '600',
-  },
-  actions: {
-    width: '100%',
-    gap: 10,
-  },
-  retryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: THEME.colors.primary,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 14,
-  },
-  homeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: THEME.colors.backgroundSecondary,
-    borderRadius: THEME.radius.md,
-    paddingVertical: 14,
+  leaveBtn: {
+    width: 240,
+    height: 50,
+    marginTop: 14,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  btnText: {
-    color: '#FFF',
+  leaveBtnText: {
+    color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '700',
-  },
-  btnTextSecondary: {
-    color: THEME.colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
+    fontFamily: THEME.fonts.extraBold,
   },
 });

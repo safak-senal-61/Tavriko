@@ -1,25 +1,38 @@
 {
   "expo": {
-    "name": "TriviaVerse",
-    "slug": "trivia-verse-multiplayer",
+    "name": "Tavriko",
+    "slug": "tavriko",
+    "scheme": "tavriko",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "androidStatusBar": {
+      "hidden": true,
+      "translucent": true,
+      "backgroundColor": "#00000000"
+    },
     "splash": {
-      "backgroundColor": "#0D0F17"
+      "backgroundColor": "#180B34"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0D0F17"
+        "backgroundColor": "#180B34"
       }
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
-    }
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      "expo-audio",
+      "expo-web-browser",
+      "@react-native-community/datetimepicker"
+    ]
   }
 }
