@@ -8,6 +8,7 @@ import {
   Image,
   Animated,
   Easing,
+  Platform,
 } from 'react-native';
 import { UserProfile, calculateLevelFromXp } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -76,12 +77,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 400,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(slideAnim, {
         toValue: 0,
         friction: 7,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
     const loop = Animated.loop(
@@ -90,13 +91,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           toValue: -8,
           duration: 1300,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(boltFloat, {
           toValue: 0,
           duration: 1300,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ])
     );

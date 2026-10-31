@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ScrollView,
   Animated,
+  Platform,
 } from 'react-native';
 import { CategoryId, CategoryInfo } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -78,12 +79,12 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 380,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.spring(slideAnim, {
         toValue: 0,
         friction: 7,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
   }, [fadeAnim, slideAnim]);

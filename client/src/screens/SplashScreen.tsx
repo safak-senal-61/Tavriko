@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import {
@@ -20,12 +20,12 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
         toValue: 1,
         friction: 5,
         tension: 80,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(logoOpacity, {
         toValue: 1,
         duration: 450,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
     const t1 = setTimeout(() => setProgress(78), 350);

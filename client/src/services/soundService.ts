@@ -1,4 +1,5 @@
 import { Platform, Vibration } from 'react-native';
+
 export type SoundEffect =
   | 'tap'
   | 'nav'
@@ -10,19 +11,23 @@ export type SoundEffect =
   | 'match_found'
   | 'victory'
   | 'reward';
+
 let expoAudioModule: any = null;
 let expoHapticsModule: any = null;
+
 try {
   // Dynamically require so Jest unit tests run cleanly without native bridge errors
   expoAudioModule = require('expo-audio');
 } catch {
   expoAudioModule = null;
 }
+
 try {
   expoHapticsModule = require('expo-haptics');
 } catch {
   expoHapticsModule = null;
 }
+
 const SOUND_ASSETS: Record<SoundEffect, any> = {
   tap: require('../../assets/sounds/tap.wav'),
   nav: require('../../assets/sounds/nav.wav'),
@@ -35,11 +40,30 @@ const SOUND_ASSETS: Record<SoundEffect, any> = {
   victory: require('../../assets/sounds/victory.wav'),
   reward: require('../../assets/sounds/reward.wav'),
 };
+
+// Singleton Web AudioContext and user gesture tracking for modern browser autoplay policies
+let sharedWebAudioCtx: any = null;
+let hasUserGesture: boolean = false;
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  const registerUserGesture = () => {
+    hasUserGesture = true;
+    if (sharedWebAudioCtx && sharedWebAudioCtx.state === 'suspended') {
+      sharedWebAudioCtx.resume().catch(() => {});
+    }
+  };
+  window.addEventListener('pointerdown', registerUserGesture, { capture: true, passive: true });
+  window.addEventListener('touchstart', registerUserGesture, { capture: true, passive: true });
+  window.addEventListener('keydown', registerUserGesture, { capture: true, passive: true });
+  window.addEventListener('click', registerUserGesture, { capture: true, passive: true });
+}
+
 class SoundService {
   private soundEnabled: boolean = true;
   private hapticsEnabled: boolean = true;
   private players: Partial<Record<SoundEffect, any>> = {};
   private audioModeConfigured: boolean = false;
+
   private ensureAudioMode() {
     if (this.audioModeConfigured || !expoAudioModule?.setAudioModeAsync) return;
     this.audioModeConfigured = true;
@@ -54,20 +78,26 @@ class SoundService {
       // Ignore audio mode errors in non-native environments
     }
   }
+
   public setSoundEnabled(enabled: boolean) {
     this.soundEnabled = enabled;
   }
+
   public setHapticsEnabled(enabled: boolean) {
     this.hapticsEnabled = enabled;
   }
+
   public isSoundEnabled(): boolean {
     return this.soundEnabled;
   }
+
   public isHapticsEnabled(): boolean {
     return this.hapticsEnabled;
   }
+
   public playSound(effect: SoundEffect): void {
     if (!this.soundEnabled) return;
+
     // 1. Native Mobile Audio via expo-audio (Android & iOS)
     if (Platform.OS !== 'web' && expoAudioModule?.createAudioPlayer) {
       try {
@@ -88,20 +118,36 @@ class SoundService {
         // Fallback if player fails
       }
     }
-    // 2. Web Audio API Fallback
+
+    // 2. Web Audio API (Browser) - Respects Autoplay Policy without Console Errors
     if (
+      Platform.OS === 'web' &&
       typeof window !== 'undefined' &&
       (window.AudioContext || (window as any).webkitAudioContext)
     ) {
       try {
-        const AudioCtx =
-          window.AudioContext || (window as any).webkitAudioContext;
-        const ctx = new AudioCtx();
+        // If user has not yet interacted with the page, postpone sound to prevent browser warning
+        if (!hasUserGesture) {
+          return;
+        }
+
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (!sharedWebAudioCtx) {
+          sharedWebAudioCtx = new AudioCtx();
+        }
+
+        if (sharedWebAudioCtx.state === 'suspended') {
+          sharedWebAudioCtx.resume().catch(() => {});
+          return;
+        }
+
+        const ctx = sharedWebAudioCtx;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
         gain.connect(ctx.destination);
         const now = ctx.currentTime;
+
         switch (effect) {
           case 'correct':
           case 'reward':
@@ -112,6 +158,7 @@ class SoundService {
             osc.start(now);
             osc.stop(now + 0.32);
             break;
+
           case 'wrong':
             osc.type = 'triangle';
             osc.frequency.setValueAtTime(311.13, now);
@@ -121,6 +168,7 @@ class SoundService {
             osc.start(now);
             osc.stop(now + 0.35);
             break;
+
           case 'streak':
           case 'victory':
           case 'match_found':
@@ -132,6 +180,7 @@ class SoundService {
             osc.start(now);
             osc.stop(now + 0.45);
             break;
+
           case 'timer_tick':
           case 'radar_ping':
             osc.type = 'sine';
@@ -141,6 +190,7 @@ class SoundService {
             osc.start(now);
             osc.stop(now + 0.08);
             break;
+
           case 'nav':
             osc.type = 'sine';
             osc.frequency.setValueAtTime(784, now);
@@ -150,6 +200,7 @@ class SoundService {
             osc.start(now);
             osc.stop(now + 0.1);
             break;
+
           case 'tap':
           default:
             osc.type = 'sine';
@@ -162,14 +213,16 @@ class SoundService {
             break;
         }
       } catch {
-        // AudioContext not ready
+        // Safe silence on web audio error
       }
     }
   }
+
   public triggerHaptic(
     type: 'light' | 'medium' | 'success' | 'warning' | 'error' = 'light'
   ): void {
     if (!this.hapticsEnabled) return;
+
     // 1. Native Expo Haptics
     if (Platform.OS !== 'web' && expoHapticsModule) {
       try {
@@ -203,6 +256,7 @@ class SoundService {
         // Fallback to React Native Vibration below
       }
     }
+
     // 2. React Native Vibration fallback
     try {
       if (Platform.OS !== 'web') {
@@ -216,4 +270,5 @@ class SoundService {
     }
   }
 }
+
 export const sound = new SoundService();

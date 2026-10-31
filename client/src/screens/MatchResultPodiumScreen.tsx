@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Animated, Platform } from 'react-native';
 import { FinalMatchSummary } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -41,23 +41,23 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 350,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.stagger(140, [
         Animated.spring(col3Anim, {
           toValue: 0,
           friction: 6,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.spring(col2Anim, {
           toValue: 0,
           friction: 6,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.spring(col1Anim, {
           toValue: 0,
           friction: 5,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]),
     ]).start();

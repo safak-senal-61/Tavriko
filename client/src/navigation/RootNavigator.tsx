@@ -118,7 +118,7 @@ export const RootNavigator: React.FC = () => {
     Animated.timing(screenFade, {
       toValue: 1,
       duration: 210,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   };
   // Practice & Single-Player Mode State

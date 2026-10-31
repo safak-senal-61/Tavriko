@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npx prisma generate --schema=server/prisma/schema.prisma && npm run build:shared && npm run build:server",
+  "buildCommand": "npx prisma generate --schema=server/prisma/schema.prisma && npm run build:shared && npm run build:server && npm run build:client:web",
   "builds": [
     {
       "src": "api/index.js",

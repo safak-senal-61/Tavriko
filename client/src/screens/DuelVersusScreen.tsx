@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Animated,
   Easing,
+  Platform,
 } from 'react-native';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -51,20 +52,20 @@ export const DuelVersusScreen: React.FC<DuelVersusScreenProps> = ({
           toValue: 0,
           friction: 6,
           tension: 75,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.spring(oppCardTranslateX, {
           toValue: 0,
           friction: 6,
           tension: 75,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]),
       Animated.spring(vsScale, {
         toValue: 1,
         friction: 4,
         tension: 110,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
     const interval = setInterval(() => {

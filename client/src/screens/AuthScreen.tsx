@@ -135,13 +135,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           toValue: 1,
           duration: 2400,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(floatAnim, {
           toValue: 0,
           duration: 2400,
           easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ])
     ).start();
@@ -151,13 +151,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           toValue: 1,
           duration: 3200,
           easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(glowAnim, {
           toValue: 0,
           duration: 3200,
           easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ])
     ).start();
