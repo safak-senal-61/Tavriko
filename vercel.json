@@ -13,7 +13,8 @@
           "shared/**",
           "server/dist/**",
           "server/prisma/**",
-          "server/data/**"
+          "server/data/**",
+          "client/dist/**"
         ]
       }
     }

@@ -231,7 +231,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 });
 
 router.get('/google/callback', (req: Request, res: Response): void => {
-  const currentHost = (req.headers.host || '192.168.2.67:4000').split(':')[0];
+  const currentHost = (req.headers.host || 'tavriko-app.vercel.app').split(':')[0];
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(`<!DOCTYPE html>
 <html lang="tr">

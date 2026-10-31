@@ -572,7 +572,7 @@ export function renderDashboardHtml(): string {
 </head>
 <body>
   <!-- High Security Gatekeeper Authentication Overlay -->
-  <div id="portalAuthOverlay" style="display: none; position: fixed; inset: 0; background: rgba(11, 8, 24, 0.98); backdrop-filter: blur(16px); z-index: 99999; justify-content: center; align-items: center; padding: 20px;">
+  <div id="portalAuthOverlay" style="display: flex; position: fixed; inset: 0; background: rgba(11, 8, 24, 0.98); backdrop-filter: blur(16px); z-index: 99999; justify-content: center; align-items: center; padding: 20px;">
     <div style="background: #150F2C; border: 1.5px solid #2D2254; box-shadow: 0 25px 60px rgba(0,0,0,0.7); border-radius: 22px; max-width: 440px; width: 100%; padding: 36px 30px; text-align: center;">
       <div style="font-size: 46px; margin-bottom: 10px;">🛡️</div>
       <div style="font-size: 20px; font-weight: 900; background: linear-gradient(135deg, #FFC43D 0%, #FF9F0A 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 6px;">
@@ -614,12 +614,16 @@ export function renderDashboardHtml(): string {
 
     <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
       <div class="nav-tabs">
-        <button class="nav-btn active" onclick="switchTab('tab-expo')">📱 Expo & QR Kod</button>
+        <button class="nav-btn active" onclick="switchTab('tab-game')">🎮 Canlı Web Oyunu & Simülatör</button>
+        <button class="nav-btn" onclick="switchTab('tab-expo')">📱 Mobil & Bulut QR Kod</button>
         <button class="nav-btn" onclick="switchTab('tab-api')">📖 API Dökümanı & Test</button>
         <button class="nav-btn" onclick="switchTab('tab-logs')">📜 Canlı Loglar & Hatalar</button>
         <button class="nav-btn" onclick="switchTab('tab-db')">👥 Kullanıcılar & Veritabanı</button>
       </div>
       <div style="display: flex; align-items: center; gap: 8px;">
+        <a href="/app" target="_blank" class="btn btn-gold" style="text-decoration:none; padding: 7px 14px; font-size: 12px; font-weight:800;">
+          🚀 Tam Ekran Oyna (/app)
+        </a>
         <div style="background: rgba(255,196,61,0.12); border: 1px solid rgba(255,196,61,0.3); border-radius: 999px; padding: 4px 12px; font-size: 12px; color: var(--gold); font-weight: 700;">
           👤 jewelkaan01@gmail.com
         </div>
@@ -649,61 +653,137 @@ export function renderDashboardHtml(): string {
       </div>
     </div>
 
-    <!-- TAB 1: EXPO & QR CODE -->
-    <div id="tab-expo" class="tab-content active">
-      <div class="expo-container">
-        <div class="qr-card">
-          <h2 style="font-size:18px; color:var(--gold); margin-bottom:4px;">Expo Go Bağlantı QR Kodu</h2>
-          <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:12px;">Telefon kameranızla veya Expo Go ile tarayın</p>
-          
-          <div class="qr-box">
-            <img id="qrImg" src="/qr" alt="Expo QR Code">
-          </div>
-
-          <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
-            <a id="openExpoLink" href="exp://192.168.2.67:8081" class="btn btn-gold" style="justify-content:center; text-decoration:none;">
-              🚀 Expo Go Uygulamasında Aç
-            </a>
-            <button class="btn btn-cyan" style="justify-content:center;" onclick="copyExpoLink()">
-              📋 Derin Bağlantıyı Kopyala (<span id="btnExpUrl">exp://192.168.2.67:8081</span>)
-            </button>
-          </div>
-
-          <div style="margin-top:16px; text-align:left;">
-            <label style="font-size:11px; font-weight:800; color:var(--gold);">ÖZEL IP / HOST DEĞİŞTİR:</label>
-            <div style="display:flex; gap:6px; margin-top:4px;">
-              <input type="text" id="customHostInput" class="search-input" style="flex:1;" value="192.168.2.67">
-              <button class="btn" onclick="updateCustomQr()">Güncelle</button>
+    <!-- TAB 1: LIVE GAME SIMULATOR -->
+    <div id="tab-game" class="tab-content active">
+      <div style="display: grid; grid-template-columns: 400px 1fr; gap: 24px; align-items: start;">
+        
+        <!-- Mobile Phone Device Frame -->
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
+          <div style="position: relative; width: 380px; height: 740px; background: #0B0818; border: 12px solid #231942; border-radius: 44px; box-shadow: 0 25px 60px rgba(0,0,0,0.85), 0 0 40px rgba(108,92,231,0.3); overflow: hidden;">
+            <!-- Notch / Speaker bar -->
+            <div style="position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 110px; height: 22px; background: #150F2C; border-radius: 20px; z-index: 20; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              <div style="width: 8px; height: 8px; background: #2A1F4E; border-radius: 50%;"></div>
+              <div style="width: 36px; height: 4px; background: #2A1F4E; border-radius: 2px;"></div>
             </div>
+            <!-- Interactive Live Game IFrame -->
+            <iframe id="gameSimulatorIframe" src="/app" style="width: 100%; height: 100%; border: none; background: #12052C;"></iframe>
+          </div>
+
+          <div style="display: flex; gap: 8px; width: 380px;">
+            <button class="btn btn-gold" style="flex: 1; justify-content: center;" onclick="refreshSimulator()">
+              🔄 Simülatörü Yenile
+            </button>
+            <a href="/app" target="_blank" class="btn btn-cyan" style="flex: 1; justify-content: center; text-decoration: none;">
+              ↗️ Tam Ekranda Aç
+            </a>
           </div>
         </div>
 
+        <!-- Info & Live Features Grid -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div class="guide-card">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+              <span style="font-size: 28px;">🎮</span>
+              <div>
+                <h2 style="font-size: 19px; color: #FFFFFF; margin: 0;">Tavriko Canlı Web & Mobil Deneyimi</h2>
+                <p style="font-size: 12.5px; color: var(--text-muted); margin: 0;">Tamamen bulutta (Vercel Serverless + Supabase PostgreSQL) çalışan 7/24 kesintisiz oyun motoru</p>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 14px;">
+              <div style="background: #0D081D; border: 1px solid var(--card-border); border-radius: 12px; padding: 12px;">
+                <div style="font-size: 11px; font-weight: 800; color: var(--gold); text-transform: uppercase;">Bulut Web Adresi</div>
+                <div style="font-size: 13px; color: #5ADBB5; font-family: monospace; margin-top: 4px; word-break: break-all;" id="cloudLiveGameUrl">https://tavriko-app.vercel.app/app</div>
+              </div>
+              <div style="background: #0D081D; border: 1px solid var(--card-border); border-radius: 12px; padding: 12px;">
+                <div style="font-size: 11px; font-weight: 800; color: var(--gold); text-transform: uppercase;">Bulut Durumu</div>
+                <div style="font-size: 13px; color: #10B981; font-weight: 700; margin-top: 4px;">🟢 7/24 Kesintisiz Yayında</div>
+              </div>
+              <div style="background: #0D081D; border: 1px solid var(--card-border); border-radius: 12px; padding: 12px;">
+                <div style="font-size: 11px; font-weight: 800; color: var(--gold); text-transform: uppercase;">Veritabanı Katmanı</div>
+                <div style="font-size: 13px; color: #A78BFA; font-weight: 700; margin-top: 4px;">⚡ Supabase PostgreSQL + Prisma</div>
+              </div>
+              <div style="background: #0D081D; border: 1px solid var(--card-border); border-radius: 12px; padding: 12px;">
+                <div style="font-size: 11px; font-weight: 800; color: var(--gold); text-transform: uppercase;">Sıfır Yerel Bağımlılık</div>
+                <div style="font-size: 13px; color: #38BDF8; font-weight: 700; margin-top: 4px;">🚀 Localhost / Wi-Fi Zorunluluğu Yok</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="guide-card">
+            <h3 style="font-size: 16px; color: var(--gold); margin-bottom: 10px;">🌟 Neler Test Edebilirsiniz?</h3>
+            <ul style="font-size: 13px; color: #CBD5E1; line-height: 1.7; padding-left: 20px; margin: 0;">
+              <li><b>Kayıt & Giriş:</b> Yeni e-posta ile kayıt olabilir, misafir olarak giriş yapabilir veya mevcut hesabınıza erişebilirsiniz.</li>
+              <li><b>1v1 Canlı Düello & Hızlı Eşleşme:</b> Çevrimiçi botlar veya diğer oyuncularla eşleşip gerçek zamanlı soru cevaplayabilirsiniz.</li>
+              <li><b>Günlük Meydan Okuma & Seri (Streak):</b> Seri kazanımını artırabilir, 5 soruda 4 doğru hedefini test edebilirsiniz.</li>
+              <li><b>Özel Oda:</b> 6 haneli oda kodu oluşturup arkadaşlarınızla paylaşabilirsiniz.</li>
+              <li><b>Mağaza & Sanal Ödeme:</b> Altın ve elmas paketlerini seçip kredi kartı ödeme ekranını deneyimleyebilirsiniz.</li>
+              <li><b>Canlı Log Senkronizasyonu:</b> Yaptığınız her işlem anlık olarak <i>"Canlı Loglar & Hatalar"</i> sekmesine işlenir.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: MOBILE & CLOUD QR CODE -->
+    <div id="tab-expo" class="tab-content">
+      <div class="expo-container">
+        <div class="qr-card">
+          <h2 style="font-size:18px; color:var(--gold); margin-bottom:4px;">Bulut Mobil QR Kodu</h2>
+          <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:12px;">Telefon kameranızla tarayın, kurulum yapmadan mobilde açın</p>
+          
+          <div class="qr-box">
+            <img id="qrImg" src="/qr" alt="Tavriko Mobil QR Kodu">
+          </div>
+
+          <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
+            <a id="openCloudWebLink" href="/app" target="_blank" class="btn btn-gold" style="justify-content:center; text-decoration:none;">
+              🚀 Mobilde / Tarayıcıda Doğrudan Aç
+            </a>
+            <button class="btn btn-cyan" style="justify-content:center;" onclick="copyCloudGameLink()">
+              📋 Bulut Bağlantısını Kopyala (<span id="btnCloudUrlText">https://tavriko-app.vercel.app/app</span>)
+            </button>
+          </div>
+
+          <details style="margin-top:18px; text-align:left; background:rgba(0,0,0,0.3); border-radius:8px; padding:10px 12px; border:1px solid rgba(255,255,255,0.08);">
+            <summary style="font-size:12px; font-weight:800; color:var(--gold); cursor:pointer;">⚙️ Geliştirici Expo Go Bağlantısı (Opsiyonel)</summary>
+            <div style="margin-top:10px;">
+              <label style="font-size:11px; font-weight:700; color:#94A3B8;">ÖZEL HOST / EXPO URL:</label>
+              <div style="display:flex; gap:6px; margin-top:4px;">
+                <input type="text" id="customHostInput" class="search-input" style="flex:1;" placeholder="exp://... veya ip">
+                <button class="btn" onclick="updateCustomQr()">Güncelle</button>
+              </div>
+            </div>
+          </details>
+        </div>
+
         <div class="guide-card">
-          <h2 style="font-size:20px; color:#FFFFFF; margin-bottom:14px;">Mobil Uygulamayı Başlatma & Test Rehberi</h2>
+          <h2 style="font-size:20px; color:#FFFFFF; margin-bottom:14px;">Telefonunuzda Anında Başlatma Rehberi</h2>
           
           <div class="guide-step">
             <div class="step-num">1</div>
             <div>
-              <h3 style="font-size:15px; color:var(--gold);">Expo Go Yükleyin</h3>
-              <p style="font-size:13px; color:var(--text-muted);">iOS App Store veya Android Google Play Store'dan <b>Expo Go</b> uygulamasını cihazınıza ücretsiz indirin.</p>
+              <h3 style="font-size:15px; color:var(--gold);">Telefon Kameranızı Açın</h3>
+              <p style="font-size:13px; color:var(--text-muted);">iOS (iPhone Safari) veya Android (Google Chrome) telefonunuzun standart kamera uygulamasını açın ve soldaki QR koda tutun.</p>
             </div>
           </div>
 
           <div class="guide-step">
             <div class="step-num">2</div>
             <div>
-              <h3 style="font-size:15px; color:var(--gold);">Aynı Yerel Ağa (Wi-Fi) Bağlanın</h3>
-              <p style="font-size:13px; color:var(--text-muted);">Bilgisayarınız ve telefonunuz aynı Wi-Fi ağında olmalıdır. Yerel ağ IP adresiniz: <code style="color:#5ADBB5; background:#0B0818; padding:2px 6px; border-radius:4px;" id="localIpSpan">192.168.2.67</code>.</p>
+              <h3 style="font-size:15px; color:var(--gold);">🌐 7/24 Kesintisiz Bulut Erişimi</h3>
+              <p style="font-size:13px; color:var(--text-muted);">
+                <b>Bilgisayarınızın veya yerel sunucunuzun açık kalmasına gerek yoktur!</b> Aynı Wi-Fi ağı zorunluluğu tamamen kaldırılmıştır. Tavriko, Vercel bulut mimarisi üzerinde 7 gün 24 saat tüm dünyadan erişilebilir durumdadır.
+              </p>
             </div>
           </div>
 
           <div class="guide-step">
             <div class="step-num">3</div>
             <div>
-              <h3 style="font-size:15px; color:var(--gold);">QR Kodu Tarayın</h3>
+              <h3 style="font-size:15px; color:var(--gold);">Anında Oyuna Başlayın</h3>
               <p style="font-size:13px; color:var(--text-muted);">
-                <b>iOS:</b> Standart iPhone Kamera uygulamasını açın ve soldaki QR koda tutun, çıkan "Expo Go'da Aç" bildirimine dokunun.<br>
-                <b>Android:</b> Expo Go uygulamasını açıp <b>"Scan QR Code"</b> butonuna basın.
+                Kameranın tespit ettiği bağlantıya tıkladığınızda oyun tam ekran olarak mobil cihazınızda açılır. Uygulama indirmeye gerek kalmadan tüm özellikleriyle oynanabilir.
               </p>
             </div>
           </div>
@@ -711,15 +791,15 @@ export function renderDashboardHtml(): string {
           <div class="guide-step">
             <div class="step-num">4</div>
             <div>
-              <h3 style="font-size:15px; color:var(--gold);">Canlı Log İzleme</h3>
-              <p style="font-size:13px; color:var(--text-muted);">Uygulamada giriş yaparken, soruları yanıtlarken ve ödeme ekranında yapılan her işlem, çıkan her hata veya başarı bildirimi anlık olarak bu paneldeki <b>"Canlı Loglar"</b> sekmesine akacaktır.</p>
+              <h3 style="font-size:15px; color:var(--gold);">Gerçek Zamanlı Log Takibi</h3>
+              <p style="font-size:13px; color:var(--text-muted);">Telefonunuzda yaptığınız her giriş, soru yanıtı ve profil işlemi bu panelin <b>"Canlı Loglar"</b> sekmesinde anlık olarak izlenebilir.</p>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- TAB 2: DETAILED API DOCUMENTATION -->
+    <!-- TAB 3: DETAILED API DOCUMENTATION -->
     <div id="tab-api" class="tab-content">
       <div style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <div>
@@ -727,7 +807,7 @@ export function renderDashboardHtml(): string {
           <p style="font-size:13px; color:var(--text-muted);">Tüm REST API uç noktaları, örnek yükler ve canlı tarayıcı içi test aracı</p>
         </div>
         <div style="font-size:13px; background:#1A1333; padding:8px 14px; border-radius:8px; border:1px solid var(--card-border);">
-          Base URL: <code style="color:var(--gold);" id="apiBaseUrlDisplay">http://localhost:4000/api</code>
+          Base URL: <code style="color:var(--gold);" id="apiBaseUrlDisplay">https://tavriko-app.vercel.app/api</code>
         </div>
       </div>
 
@@ -1070,20 +1150,30 @@ export function renderDashboardHtml(): string {
       downloadAnchor.remove();
     }
 
-    function updateCustomQr() {
-      const host = document.getElementById('customHostInput').value.trim();
-      const newUrl = 'exp://' + host + ':8081';
-      document.getElementById('qrImg').src = '/qr?url=' + encodeURIComponent(newUrl) + '&t=' + Date.now();
-      document.getElementById('openExpoLink').href = newUrl;
-      document.getElementById('btnExpUrl').innerText = newUrl;
-      document.getElementById('localIpSpan').innerText = host;
+    function refreshSimulator() {
+      const iframe = document.getElementById('gameSimulatorIframe');
+      if (iframe) {
+        iframe.src = '/app?r=' + Date.now();
+      }
     }
 
-    function copyExpoLink() {
-      const url = document.getElementById('openExpoLink').href;
-      navigator.clipboard.writeText(url).then(() => {
-        alert('Expo Go bağlantısı panoya kopyalandı:\\n' + url);
+    function copyCloudGameLink() {
+      const link = window.location.origin + '/app';
+      navigator.clipboard.writeText(link).then(() => {
+        alert('Tavriko 7/24 Bulut Oyun Bağlantısı panoya kopyalandı:\\n' + link);
       });
+    }
+
+    function updateCustomQr() {
+      const host = document.getElementById('customHostInput').value.trim();
+      let newUrl = host;
+      if (host && !host.startsWith('http') && !host.startsWith('exp://')) {
+        newUrl = 'exp://' + host + ':8081';
+      }
+      if (!newUrl) {
+        newUrl = window.location.origin + '/app';
+      }
+      document.getElementById('qrImg').src = '/qr?url=' + encodeURIComponent(newUrl) + '&t=' + Date.now();
     }
 
     async function executeApi(endpoint, method, bodyElementId, resultElementId) {
@@ -1183,8 +1273,26 @@ export function renderDashboardHtml(): string {
       showAuthOverlay();
     }
 
+    function initCloudPortalUrls() {
+      const cloudGameUrl = window.location.origin + '/app';
+      const cloudApiUrl = window.location.origin + '/api';
+      const elGameUrl = document.getElementById('cloudLiveGameUrl');
+      if (elGameUrl) elGameUrl.innerText = cloudGameUrl;
+      const elBtnText = document.getElementById('btnCloudUrlText');
+      if (elBtnText) elBtnText.innerText = cloudGameUrl;
+      const elOpenWeb = document.getElementById('openCloudWebLink');
+      if (elOpenWeb) elOpenWeb.href = cloudGameUrl;
+      const elApiDisplay = document.getElementById('apiBaseUrlDisplay');
+      if (elApiDisplay) elApiDisplay.innerText = cloudApiUrl;
+      const elQr = document.getElementById('qrImg');
+      if (elQr) elQr.src = '/qr?url=' + encodeURIComponent(cloudGameUrl);
+    }
+
+    initCloudPortalUrls();
+
     checkPortalAuth().then(isAuthed => {
       if (isAuthed) {
+        initCloudPortalUrls();
         loadInitialLogs();
         connectSSE();
         refreshStats();

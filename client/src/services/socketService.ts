@@ -1,14 +1,11 @@
 import { io, Socket } from 'socket.io-client';
 import { Platform } from 'react-native';
 import { SOCKET_EVENTS, ClientQuestion, RoundResult, FinalMatchSummary, GameRoom } from '@trivia/shared';
-const LOCAL_LAN_IP = '192.168.2.67';
-const DEFAULT_URL =
-  Platform.OS === 'web'
-    ? 'http://localhost:4000'
-    : `http://${LOCAL_LAN_IP}:4000`;
+import { getSocketBaseUrl } from '../config';
+
 export class SocketService {
   private socket: Socket | null = null;
-  private serverUrl: string = DEFAULT_URL;
+  private serverUrl: string = getSocketBaseUrl();
   public connect(url?: string): Socket {
     if (url) this.serverUrl = url;
     if (this.socket && this.socket.connected) {
