@@ -1,0 +1,25 @@
+export declare const SOCKET_EVENTS: {
+    readonly JOIN_ROOM: "room:join";
+    readonly LEAVE_ROOM: "room:leave";
+    readonly TOGGLE_READY: "room:toggle_ready";
+    readonly START_GAME: "room:start_game";
+    readonly KICK_PLAYER: "room:kick_player";
+    readonly UPDATE_ROOM_SETTINGS: "room:update_settings";
+    readonly FIND_MATCH: "matchmaking:find";
+    readonly CANCEL_MATCH: "matchmaking:cancel";
+    readonly MATCH_FOUND: "matchmaking:found";
+    readonly ROOM_STATE_SYNC: "room:state_sync";
+    readonly COUNTDOWN_TICK: "game:countdown_tick";
+    readonly QUESTION_START: "game:question_start";
+    readonly TIMER_TICK: "game:timer_tick";
+    readonly PLAYER_ANSWERED: "game:player_answered";
+    readonly ROUND_RESULT: "game:round_result";
+    readonly GAME_OVER: "game:game_over";
+    readonly PLAYER_DISCONNECTED: "game:player_disconnected";
+    readonly PLAYER_RECONNECTED: "game:player_reconnected";
+    readonly SUBMIT_ANSWER: "game:submit_answer";
+    readonly SEND_EMOTE: "game:send_emote";
+    readonly EMOTE_RECEIVED: "game:emote_received";
+    readonly ERROR: "system:error";
+};
+export type SocketEventName = typeof SOCKET_EVENTS[keyof typeof SOCKET_EVENTS];

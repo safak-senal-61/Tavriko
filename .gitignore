@@ -4,6 +4,10 @@ dist/
 build/
 !client/dist/
 !client/dist/**
+!server/dist/
+!server/dist/**
+!shared/dist/
+!shared/dist/**
 .superpowers/
 *.log
 .env
