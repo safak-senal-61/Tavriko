@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { PlayerScoreSummary } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
+import { sound } from '../services/soundService';
 import {
   TavrikoScreen,
   TavrikoProgressBar,
@@ -13,14 +14,32 @@ interface IntermissionLeaderboardScreenProps {
   totalRounds: number;
   leaderboard: PlayerScoreSummary[];
   currentUserId: string;
+  onExit?: () => void;
 }
 export const IntermissionLeaderboardScreen: React.FC<
   IntermissionLeaderboardScreenProps
-> = ({ currentRound, leaderboard, currentUserId }) => {
+> = ({ currentRound, leaderboard, currentUserId, onExit }) => {
   return (
     <TavrikoScreen>
-      <Text style={styles.title}>SORU {currentRound} SONUÇLARI</Text>
-      <Text style={styles.subtitle}>Canlı sıralama</Text>
+      <View style={styles.topRow}>
+        {onExit && (
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={() => {
+              sound.playSound('tap');
+              onExit();
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.closeBtnText}>✕</Text>
+          </TouchableOpacity>
+        )}
+        <View style={styles.titleWrap}>
+          <Text style={styles.title}>SORU {currentRound} SONUÇLARI</Text>
+          <Text style={styles.subtitle}>Canlı sıralama</Text>
+        </View>
+        {onExit && <View style={styles.closeBtnPlaceholder} />}
+      </View>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -65,6 +84,37 @@ export const IntermissionLeaderboardScreen: React.FC<
   );
 };
 const styles = StyleSheet.create({
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  closeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  closeBtnPlaceholder: {
+    width: 36,
+    height: 36,
+  },
+  titleWrap: {
+    flex: 1,
+    alignItems: 'center',
+  },
   scrollContent: {
     paddingBottom: 32,
   },

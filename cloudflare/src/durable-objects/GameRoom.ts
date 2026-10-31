@@ -259,6 +259,10 @@ export class GameRoomDO extends DurableObject<Env> {
           this.handleJoinRoom(ws, playerId, envelope);
           break;
 
+        case SOCKET_EVENTS.LEAVE_ROOM:
+          await this.handleLeaveRoom(ws, playerId, envelope);
+          break;
+
         case SOCKET_EVENTS.TOGGLE_READY:
           await this.handleToggleReady(playerId, envelope);
           break;
@@ -363,6 +367,53 @@ export class GameRoomDO extends DurableObject<Env> {
   private handleJoinRoom(ws: WebSocket, playerId: string, envelope: WsMessage): void {
     if (!this.room) return;
     this.broadcastStateSync();
+  }
+
+  private async handleLeaveRoom(ws: WebSocket, playerId: string, envelope: WsMessage): Promise<void> {
+    if (!this.room) return;
+
+    const player = this.room.players[playerId];
+    if (player) {
+      delete this.room.players[playerId];
+      delete this.room.scores[playerId];
+
+      this.broadcast(SOCKET_EVENTS.PLAYER_DISCONNECTED, {
+        playerId,
+        username: player.username,
+        isLeaving: true,
+      });
+
+      const remainingPlayers = Object.values(this.room.players);
+      const connectedRemaining = remainingPlayers.filter((p) => p.isConnected);
+
+      // If room is now empty, cancel all alarms and end game
+      if (connectedRemaining.length === 0) {
+        this.room.status = 'game_over';
+        await this.ctx.storage.deleteAlarm();
+        this.alarmContext = null;
+        await this.ctx.storage.delete('alarmContext');
+      } else if (this.room.status === 'question_active' || this.room.status === 'round_result') {
+        // If 1v1 mode and only 1 player remains, finish game immediately
+        if (remainingPlayers.length <= 1) {
+          await this.finishGame();
+        } else {
+          this.broadcastStateSync();
+        }
+      } else {
+        // In lobby, reassign host if host left
+        if (this.room.hostId === playerId && remainingPlayers.length > 0) {
+          this.room.hostId = remainingPlayers[0].id;
+          remainingPlayers[0].isHost = true;
+        }
+        this.broadcastStateSync();
+      }
+
+      await this.persist();
+    }
+
+    try {
+      ws.close(1000, 'Left room');
+    } catch {}
   }
 
   private async handleToggleReady(playerId: string, envelope: WsMessage): Promise<void> {

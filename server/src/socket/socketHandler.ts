@@ -133,6 +133,20 @@ export function setupSocketHandlers(
       }
     });
 
+    socket.on(SOCKET_EVENTS.LEAVE_ROOM, (data: { roomCode: string; playerId: string }) => {
+      const { roomCode, playerId } = data;
+      socket.leave(roomCode);
+      roomManager.handlePlayerDisconnect(roomCode, playerId);
+      const room = roomManager.getRoom(roomCode);
+      if (room) {
+        delete room.players[playerId];
+        delete room.scores[playerId];
+        io.to(roomCode).emit(SOCKET_EVENTS.PLAYER_DISCONNECTED, { playerId, isLeaving: true });
+        io.to(roomCode).emit(SOCKET_EVENTS.ROOM_STATE_SYNC, room);
+      }
+      socketMeta.delete(socket.id);
+    });
+
     socket.on(SOCKET_EVENTS.TOGGLE_READY, (data: { roomCode: string; playerId: string }) => {
       const success = roomManager.toggleReady(data.roomCode, data.playerId);
       if (success) {

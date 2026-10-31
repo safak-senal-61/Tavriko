@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -175,6 +175,35 @@ export const RootNavigator: React.FC = () => {
     setFinalSummary,
     resetGame,
   } = useGameStore();
+
+  const isGameActiveRef = useRef<boolean>(false);
+  const gameTimersRef = useRef<Set<any>>(new Set());
+
+  const scheduleGameTimeout = useCallback((cb: () => void, delayMs: number) => {
+    const timer = setTimeout(() => {
+      gameTimersRef.current.delete(timer);
+      cb();
+    }, delayMs);
+    gameTimersRef.current.add(timer);
+    return timer;
+  }, []);
+
+  const clearAllGameTimers = useCallback(() => {
+    gameTimersRef.current.forEach((t) => clearTimeout(t));
+    gameTimersRef.current.clear();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      clearAllGameTimers();
+    };
+  }, [clearAllGameTimers]);
+
+  const activeRoomRef = useRef<GameRoom | null>(activeRoom);
+  useEffect(() => {
+    activeRoomRef.current = activeRoom;
+  }, [activeRoom]);
+
   const currentScreenRef = useRef<ScreenName>(currentScreen);
   currentScreenRef.current = currentScreen;
   // Keep system status bar (clock, battery, notifications) completely hidden in fullscreen mode
@@ -211,7 +240,9 @@ export const RootNavigator: React.FC = () => {
     socketService.connect(getRealtimeWsUrl(`/ws?${query}`));
 
     const unsubSync = socketService.onStateSync((room: GameRoom) => {
+      if (!isGameActiveRef.current && !activeRoomRef.current) return;
       setActiveRoom(room);
+      activeRoomRef.current = room;
       if (
         room.status === 'lobby' &&
         currentScreenRef.current !== 'lobby' &&
@@ -221,6 +252,7 @@ export const RootNavigator: React.FC = () => {
       }
     });
     const unsubQuestion = socketService.onQuestionStart((question: ClientQuestion) => {
+      if (!isGameActiveRef.current && !activeRoomRef.current) return;
       setCurrentQuestion(question);
       setRoundResult(null);
       selectOption(null);
@@ -228,6 +260,7 @@ export const RootNavigator: React.FC = () => {
       navigateTo('quiz_arena');
     });
     const unsubRoundResult = socketService.onRoundResult((result: RoundResult) => {
+      if (!isGameActiveRef.current && !activeRoomRef.current) return;
       setRoundResult(result);
       const myAns = user ? result.playerAnswers[user.id] : null;
       if (myAns?.isCorrect) {
@@ -237,11 +270,14 @@ export const RootNavigator: React.FC = () => {
         sound.playSound('wrong');
         sound.triggerHaptic('error');
       }
-      setTimeout(() => {
+      scheduleGameTimeout(() => {
+        if (!isGameActiveRef.current && !activeRoomRef.current) return;
         navigateTo('intermission');
       }, 2500);
     });
     const unsubGameOver = socketService.onGameOver((summary: FinalMatchSummary) => {
+      if (!isGameActiveRef.current && !activeRoomRef.current) return;
+      isGameActiveRef.current = false;
       setFinalSummary(summary);
       navigateTo('match_result');
       if (user && !isGuest) {
@@ -272,6 +308,7 @@ export const RootNavigator: React.FC = () => {
     const unsubMatchFound = socketService.onMatchFound(
       (data: { roomCode: string; opponent?: any }) => {
         if (user) {
+          isGameActiveRef.current = true;
           setDuelOpponent(data.opponent || null);
           setOpponentHasAnswered(false);
           socketService.joinRoom(
@@ -286,6 +323,7 @@ export const RootNavigator: React.FC = () => {
     );
     const unsubPlayerAnswered = socketService.onPlayerAnswered(
       (data: { playerId: string }) => {
+        if (!isGameActiveRef.current && !activeRoomRef.current) return;
         if (data.playerId !== user?.id) {
           setOpponentHasAnswered(true);
           sound.playSound('timer_tick');
@@ -300,7 +338,7 @@ export const RootNavigator: React.FC = () => {
       unsubMatchFound();
       unsubPlayerAnswered();
     };
-  }, [user?.id, user?.displayName, user?.avatarUrl]);
+  }, [user?.id, user?.displayName, user?.avatarUrl, scheduleGameTimeout]);
   // -------------------------------------------------------------
   // Auth & Profile Actions
   // -------------------------------------------------------------
@@ -433,9 +471,50 @@ export const RootNavigator: React.FC = () => {
   // -------------------------------------------------------------
   // Matchmaking & Room Actions
   // -------------------------------------------------------------
+  const handleExitCurrentGame = useCallback(() => {
+    isGameActiveRef.current = false;
+    clearAllGameTimers();
+
+    if (activeRoomRef.current && user) {
+      socketService.leaveRoom(activeRoomRef.current.code, user.id);
+    }
+    if (user) {
+      socketService.cancelMatch(user.id);
+    }
+    activeRoomRef.current = null;
+    setActiveRoom(null);
+
+    setDuelOpponent(null);
+    setOpponentHasAnswered(false);
+    setPracticeQuestions([]);
+    setPracticeIndex(0);
+    setPracticeStreak(0);
+    setPracticeFeedback(null);
+    setActiveDailyConfig(null);
+    setDailyResultModal(null);
+    setIsPracticeSummaryVisible(false);
+    isEvaluatingRef.current = false;
+    practiceSessionIdRef.current = 'sess_' + Math.random().toString(36).substring(2, 9);
+
+    const clearedStats: PracticeStats = {
+      totalQuestions: 5,
+      correctAnswers: 0,
+      wrongAnswers: 0,
+      emptyAnswers: 0,
+      totalScore: 0,
+    };
+    practiceStatsRef.current = clearedStats;
+    setPracticeStats(clearedStats);
+
+    resetGame();
+
+    navigateTo(isGuest ? 'categories' : 'home');
+  }, [user, isGuest, clearAllGameTimers, resetGame]);
+
   const handleStartQuickMatch = () => {
     requireAuth(() => {
       if (!user) return;
+      isGameActiveRef.current = true;
       setDuelOpponent(null);
       setOpponentHasAnswered(false);
       socketService.findMatch(
@@ -449,12 +528,12 @@ export const RootNavigator: React.FC = () => {
     }, 'Hızlı Eşleşme (1v1 Düello)');
   };
   const handleCancelMatchmaking = () => {
-    if (user) socketService.cancelMatch(user.id);
-    navigateTo('home');
+    handleExitCurrentGame();
   };
   const handleCreateCustomRoom = () => {
     requireAuth(() => {
       if (!user) return;
+      isGameActiveRef.current = true;
       const mockCode = Math.random().toString(36).substring(2, 8).toUpperCase();
       socketService.joinRoom(mockCode, user.id, user.displayName, user.avatarUrl);
       navigateTo('lobby');
@@ -463,6 +542,7 @@ export const RootNavigator: React.FC = () => {
   const handleJoinCustomRoom = (code: string) => {
     requireAuth(() => {
       if (!user) return;
+      isGameActiveRef.current = true;
       socketService.joinRoom(code, user.id, user.displayName, user.avatarUrl);
       navigateTo('lobby');
     }, 'Özel Odaya Katılma');
@@ -497,6 +577,7 @@ export const RootNavigator: React.FC = () => {
     questionCount: number = 5,
     isDaily: boolean = false
   ) => {
+    isGameActiveRef.current = true;
     if (!isDaily) setActiveDailyConfig(null);
     setSelectedCategory(category);
     setSelectedDifficulty(difficulty);
@@ -629,6 +710,8 @@ export const RootNavigator: React.FC = () => {
     nextIdx: number,
     questionsList: ClientQuestion[]
   ) => {
+    if (!isGameActiveRef.current) return;
+    if (!questionsList || questionsList.length === 0) return;
     if (nextIdx < questionsList.length) {
       setPracticeIndex(nextIdx);
       setPracticeFeedback(null);
@@ -637,6 +720,7 @@ export const RootNavigator: React.FC = () => {
       setCurrentQuestion(questionsList[nextIdx]);
     } else {
       isEvaluatingRef.current = false;
+      isGameActiveRef.current = false;
       // Daily Challenge completion flow
       if (activeDailyConfig && user && !isGuest) {
         const correctAns = practiceStatsRef.current.correctAnswers;
@@ -801,7 +885,7 @@ export const RootNavigator: React.FC = () => {
         };
         practiceStatsRef.current = updatedStats;
         setPracticeStats(updatedStats);
-        setTimeout(() => {
+        scheduleGameTimeout(() => {
           advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
         }, 2500);
         return;
@@ -841,7 +925,7 @@ export const RootNavigator: React.FC = () => {
     };
     practiceStatsRef.current = mockUpdatedStats;
     setPracticeStats(mockUpdatedStats);
-    setTimeout(() => {
+    scheduleGameTimeout(() => {
       advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
     }, 2500);
   };
@@ -886,7 +970,7 @@ export const RootNavigator: React.FC = () => {
         };
         practiceStatsRef.current = timeoutStats;
         setPracticeStats(timeoutStats);
-        setTimeout(() => {
+        scheduleGameTimeout(() => {
           advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
         }, 2500);
         return;
@@ -910,7 +994,7 @@ export const RootNavigator: React.FC = () => {
     };
     practiceStatsRef.current = mockTimeoutStats;
     setPracticeStats(mockTimeoutStats);
-    setTimeout(() => {
+    scheduleGameTimeout(() => {
       advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
     }, 2500);
   };
@@ -1138,10 +1222,7 @@ export const RootNavigator: React.FC = () => {
           <LobbyScreen
             room={activeRoom}
             currentUserId={user.id}
-            onBack={() => {
-              resetGame();
-              navigateTo('home');
-            }}
+            onBack={handleExitCurrentGame}
             onToggleReady={handleToggleReady}
             onStartGame={handleStartGame}
           />
@@ -1165,10 +1246,7 @@ export const RootNavigator: React.FC = () => {
               feedback={activeRoom ? null : practiceFeedback}
               onSelectOption={handleSubmitAnswer}
               onTimeExpired={handleTimeExpired}
-              onExit={() => {
-                resetGame();
-                navigateTo(isGuest ? 'categories' : 'home');
-              }}
+              onExit={handleExitCurrentGame}
               isDuelMode={
                 !!activeRoom &&
                 (activeRoom.mode === 'duel' ||
@@ -1271,6 +1349,7 @@ export const RootNavigator: React.FC = () => {
             totalRounds={currentQuestion?.totalRounds || 10}
             leaderboard={lastRoundResult.leaderboard}
             currentUserId={user.id}
+            onExit={handleExitCurrentGame}
           />
         )}
         {currentScreen === 'match_result' && finalSummary && user && (

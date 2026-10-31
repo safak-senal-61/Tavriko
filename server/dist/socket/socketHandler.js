@@ -115,6 +115,19 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
                 }
             }
         });
+        socket.on(shared_1.SOCKET_EVENTS.LEAVE_ROOM, (data) => {
+            const { roomCode, playerId } = data;
+            socket.leave(roomCode);
+            roomManager.handlePlayerDisconnect(roomCode, playerId);
+            const room = roomManager.getRoom(roomCode);
+            if (room) {
+                delete room.players[playerId];
+                delete room.scores[playerId];
+                io.to(roomCode).emit(shared_1.SOCKET_EVENTS.PLAYER_DISCONNECTED, { playerId, isLeaving: true });
+                io.to(roomCode).emit(shared_1.SOCKET_EVENTS.ROOM_STATE_SYNC, room);
+            }
+            socketMeta.delete(socket.id);
+        });
         socket.on(shared_1.SOCKET_EVENTS.TOGGLE_READY, (data) => {
             const success = roomManager.toggleReady(data.roomCode, data.playerId);
             if (success) {

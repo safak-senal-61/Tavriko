@@ -11,6 +11,7 @@
       html,
       body {
         height: 100%;
+        background-color: #090414;
       }
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {
@@ -21,6 +22,21 @@
         display: flex;
         height: 100%;
         flex: 1;
+        background-color: #090414;
+      }
+      /* Eliminate browser sharp default outline on all inputs (Chrome, Safari, Edge) */
+      input, textarea, select, button {
+        outline: none !important;
+        outline-width: 0 !important;
+        outline-style: none !important;
+        box-shadow: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+      }
+      input:focus, textarea:focus, select:focus, button:focus, *:focus {
+        outline: none !important;
+        outline-width: 0 !important;
+        outline-style: none !important;
+        box-shadow: none !important;
       }
     </style>
   <link rel="icon" href="/favicon.ico"/></head>
@@ -30,6 +46,6 @@
     <noscript> You need to enable JavaScript to run this app. </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-7b716288e162255e1a01b70618efeca6.js" defer></script>
+  <script src="/_expo/static/js/web/index-dd7694e77e3d4f3f2c214a6345a9a7ce.js" defer></script>
 </body>
 </html>

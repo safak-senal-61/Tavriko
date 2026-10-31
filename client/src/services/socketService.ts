@@ -251,6 +251,14 @@ export class SocketService {
     }
   }
 
+  public leaveRoom(roomCode: string, playerId: string): void {
+    const cleanCode = roomCode.trim().toUpperCase();
+    this.sendEnvelope(SOCKET_EVENTS.LEAVE_ROOM, { roomCode: cleanCode, playerId });
+    if (this.lastSessionContext.roomCode === cleanCode) {
+      delete this.lastSessionContext.roomCode;
+    }
+  }
+
   public toggleReady(roomCode: string, playerId: string): void {
     this.sendEnvelope(SOCKET_EVENTS.TOGGLE_READY, { roomCode, playerId });
   }

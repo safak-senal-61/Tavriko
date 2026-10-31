@@ -121,6 +121,7 @@ const SmoothTimerBar: React.FC<SmoothTimerBarProps> = React.memo(
         }
       }, 33);
       return () => {
+        hasExpiredRef.current = true;
         clearInterval(interval);
       };
     }, [totalMs, endTime, isActive]);
@@ -269,6 +270,20 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     sound.triggerHaptic('medium');
     onSelectOption(optionId, remainingMs);
   };
+  useEffect(() => {
+    return () => {
+      hasExpiredRef.current = true;
+    };
+  }, []);
+
+  const handleExitPress = useCallback(() => {
+    sound.playSound('tap');
+    hasExpiredRef.current = true;
+    if (onExit) {
+      onExit();
+    }
+  }, [onExit]);
+
   const optionLabels = ['A', 'B', 'C', 'D'];
   const isOptionsDisabled =
     answerState !== 'answerable' ||
@@ -281,7 +296,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       <View style={styles.topRow}>
         <TouchableOpacity
           style={styles.closeBtn}
-          onPress={onExit}
+          onPress={handleExitPress}
           activeOpacity={0.8}
         >
           <Text style={styles.closeBtnText}>✕</Text>

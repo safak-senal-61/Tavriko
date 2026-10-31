@@ -569,6 +569,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       if (sessionId) {
         queryParams.sessionId = sessionId;
       }
+      // On web browser: Direct full-page redirect! Zero popups, zero popup blockers!
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        const directOAuthUrl = `https://rjvbgofzsfescnfohzgu.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUri)}&prompt=select_account${sessionId ? `&sessionId=${encodeURIComponent(sessionId)}` : ''}`;
+        sendClientLog('INFO', 'Web doğrudan Google OAuth sayfasına yönlendiriliyor (Popup engeli bypass edildi)...', { redirectUri, directOAuthUrl });
+        window.location.href = directOAuthUrl;
+        return;
+      }
+
       sendClientLog('INFO', 'Supabase OAuth URL isteniyor...', { redirectUri });
       const { data, error } = await clientSupabase.auth.signInWithOAuth({
         provider: 'google',
@@ -586,12 +594,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         clearTimeout(safetyTimer);
         sendClientLog('ERROR', 'Supabase OAuth URL hatası', { error });
         throw new Error(error?.message || 'Google yetkilendirme linki oluşturulamadı.');
-      }
-      // On web browser: Direct full-page redirect! Zero popups, zero popup blockers!
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        sendClientLog('INFO', 'Web doğrudan Google OAuth sayfasına yönlendiriliyor (Popup engeli bypass edildi)...', { redirectUri });
-        window.location.href = data.url;
-        return;
       }
       sendClientLog('INFO', 'WebBrowser açılıyor...', { oauthUrl: data.url });
       // 5. Open authentic Google account selector in system browser sheet (Mobile Native)
@@ -1549,7 +1551,10 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web'
       ? ({
           outlineStyle: 'none',
+          outlineWidth: 0,
+          outlineColor: 'transparent',
           outline: 'none',
+          boxShadow: 'none',
         } as any)
       : {}),
   },
@@ -1575,7 +1580,10 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web'
       ? ({
           outlineStyle: 'none',
+          outlineWidth: 0,
+          outlineColor: 'transparent',
           outline: 'none',
+          boxShadow: 'none',
         } as any)
       : {}),
   },
