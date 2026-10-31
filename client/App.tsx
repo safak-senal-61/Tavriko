@@ -45,6 +45,16 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
       ::-webkit-scrollbar-thumb:hover {
         background: rgba(255, 196, 61, 0.75);
       }
+      /* Eliminate browser sharp default outline on all inputs (Chrome, Safari, Edge) */
+      input, textarea, select {
+        outline: none !important;
+        box-shadow: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+      }
+      input:focus, textarea:focus, select:focus {
+        outline: none !important;
+        box-shadow: none !important;
+      }
     `;
     document.head.appendChild(style);
   }

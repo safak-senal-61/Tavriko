@@ -1546,6 +1546,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontFamily: THEME.fonts.bold,
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outline: 'none',
+        } as any)
+      : {}),
   },
   passwordInputWrap: {
     flexDirection: 'row',
@@ -1554,6 +1560,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 14,
+    overflow: 'hidden',
   },
   passwordInput: {
     flex: 1,
@@ -1562,6 +1569,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontFamily: THEME.fonts.bold,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderRadius: 14,
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outline: 'none',
+        } as any)
+      : {}),
   },
   eyeBtn: {
     paddingHorizontal: 14,
