@@ -7,8 +7,48 @@ import {
   Nunito_800ExtraBold,
   Nunito_900Black,
 } from '@expo-google-fonts/nunito';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import { RootNavigator } from './src/navigation/RootNavigator';
+
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  const styleId = 'tavriko-web-styles';
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      html, body {
+        background-color: #090414 !important;
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+      }
+      #root {
+        background-color: #090414 !important;
+        display: flex;
+        height: 100%;
+        width: 100%;
+      }
+      /* Custom sleek Tavriko scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(14, 6, 32, 0.6);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 196, 61, 0.4);
+        border-radius: 999px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 196, 61, 0.75);
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
 
 export default function App() {
   const [fontsLoaded] = useFonts({

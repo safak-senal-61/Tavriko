@@ -1313,16 +1313,24 @@ const styles = StyleSheet.create({
   authRoot: {
     flex: 1,
     backgroundColor: '#12052C',
+    width: '100%',
+    alignItems: 'center',
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
     paddingVertical: 20,
     paddingHorizontal: 18,
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   heroWrap: {
     alignItems: 'center',
     marginBottom: 16,
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   cleanBrandTitle: {
     fontFamily: THEME.fonts.display,
@@ -1341,6 +1349,9 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.16)',
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   tabRow: {
     flexDirection: 'row',
@@ -1763,6 +1774,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   guestButtonTitle: {
     color: '#FFC43D',
@@ -1779,6 +1793,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(6, 2, 16, 0.82)',
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
   },
   modalSheet: {
@@ -1787,6 +1802,9 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.2)',
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
   },
   modalTitle: {
     fontSize: 16,

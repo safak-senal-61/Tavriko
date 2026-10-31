@@ -1280,6 +1280,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 26,
     overflow: 'hidden',
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   topRadialGlow: {
     position: 'absolute',

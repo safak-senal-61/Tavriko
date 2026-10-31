@@ -7,7 +7,7 @@
     "color": "#93C5FD",
     "totalQuestions": 18,
     "createdAt": "2026-10-30T20:01:01.429Z",
-    "updatedAt": "2026-10-31T21:04:23.093Z"
+    "updatedAt": "2026-10-31T21:20:28.319Z"
   },
   {
     "id": "mathematics",
@@ -17,7 +17,7 @@
     "color": "#6EE7B7",
     "totalQuestions": 13,
     "createdAt": "2026-10-30T20:01:01.440Z",
-    "updatedAt": "2026-10-31T21:04:23.159Z"
+    "updatedAt": "2026-10-31T21:20:28.391Z"
   },
   {
     "id": "general_culture",
@@ -27,7 +27,7 @@
     "color": "#FDE68A",
     "totalQuestions": 16,
     "createdAt": "2026-10-30T20:01:01.448Z",
-    "updatedAt": "2026-10-31T21:04:23.169Z"
+    "updatedAt": "2026-10-31T21:20:28.400Z"
   },
   {
     "id": "history",
@@ -37,7 +37,7 @@
     "color": "#C4B5FD",
     "totalQuestions": 12,
     "createdAt": "2026-10-30T20:01:01.451Z",
-    "updatedAt": "2026-10-31T21:04:23.169Z"
+    "updatedAt": "2026-10-31T21:20:28.403Z"
   },
   {
     "id": "science_tech",
@@ -47,7 +47,7 @@
     "color": "#67E8F9",
     "totalQuestions": 10,
     "createdAt": "2026-10-30T20:01:01.463Z",
-    "updatedAt": "2026-10-31T21:04:23.170Z"
+    "updatedAt": "2026-10-31T21:20:28.403Z"
   },
   {
     "id": "space_astronomy",
@@ -57,7 +57,7 @@
     "color": "#A5B4FC",
     "totalQuestions": 7,
     "createdAt": "2026-10-30T20:01:01.474Z",
-    "updatedAt": "2026-10-31T21:04:23.171Z"
+    "updatedAt": "2026-10-31T21:20:28.404Z"
   },
   {
     "id": "sports",
@@ -67,7 +67,7 @@
     "color": "#FCA5A5",
     "totalQuestions": 7,
     "createdAt": "2026-10-30T20:01:01.479Z",
-    "updatedAt": "2026-10-31T21:04:23.172Z"
+    "updatedAt": "2026-10-31T21:20:28.404Z"
   },
   {
     "id": "cinema_tv",
@@ -77,7 +77,7 @@
     "color": "#F9A8D4",
     "totalQuestions": 6,
     "createdAt": "2026-10-30T20:01:01.482Z",
-    "updatedAt": "2026-10-31T21:04:23.173Z"
+    "updatedAt": "2026-10-31T21:20:28.405Z"
   },
   {
     "id": "music",
@@ -87,7 +87,7 @@
     "color": "#5EEAD4",
     "totalQuestions": 6,
     "createdAt": "2026-10-30T20:01:01.485Z",
-    "updatedAt": "2026-10-31T21:04:23.174Z"
+    "updatedAt": "2026-10-31T21:20:28.405Z"
   },
   {
     "id": "literature",
@@ -97,7 +97,7 @@
     "color": "#FCD34D",
     "totalQuestions": 6,
     "createdAt": "2026-10-30T20:01:01.492Z",
-    "updatedAt": "2026-10-31T21:04:23.175Z"
+    "updatedAt": "2026-10-31T21:20:28.406Z"
   },
   {
     "id": "biology",
@@ -107,7 +107,7 @@
     "color": "#86EFAC",
     "totalQuestions": 6,
     "createdAt": "2026-10-30T20:01:01.496Z",
-    "updatedAt": "2026-10-31T21:04:23.176Z"
+    "updatedAt": "2026-10-31T21:20:28.406Z"
   },
   {
     "id": "physics_chemistry",
@@ -117,7 +117,7 @@
     "color": "#D8B4FE",
     "totalQuestions": 6,
     "createdAt": "2026-10-30T20:01:01.499Z",
-    "updatedAt": "2026-10-31T21:04:23.176Z"
+    "updatedAt": "2026-10-31T21:20:28.407Z"
   },
   {
     "id": "logic_puzzles",
@@ -127,7 +127,7 @@
     "color": "#FDA4AF",
     "totalQuestions": 6,
     "createdAt": "2026-10-30T20:01:01.504Z",
-    "updatedAt": "2026-10-31T21:04:23.177Z"
+    "updatedAt": "2026-10-31T21:20:28.407Z"
   },
   {
     "id": "language_vocab",
@@ -137,7 +137,7 @@
     "color": "#7DD3FC",
     "totalQuestions": 6,
     "createdAt": "2026-10-30T20:01:01.532Z",
-    "updatedAt": "2026-10-31T21:04:23.183Z"
+    "updatedAt": "2026-10-31T21:20:28.413Z"
   },
   {
     "id": "art_culture",
@@ -147,7 +147,7 @@
     "color": "#FDBA74",
     "totalQuestions": 6,
     "createdAt": "2026-10-30T20:01:01.545Z",
-    "updatedAt": "2026-10-31T21:04:23.190Z"
+    "updatedAt": "2026-10-31T21:20:28.420Z"
   },
   {
     "id": "food_gastronomy",
@@ -157,7 +157,7 @@
     "color": "#FDE68A",
     "totalQuestions": 16,
     "createdAt": "2026-10-30T20:01:01.553Z",
-    "updatedAt": "2026-10-31T21:04:23.191Z"
+    "updatedAt": "2026-10-31T21:20:28.422Z"
   },
   {
     "id": "animals_wildlife",
@@ -167,7 +167,7 @@
     "color": "#6EE7B7",
     "totalQuestions": 13,
     "createdAt": "2026-10-30T20:01:01.562Z",
-    "updatedAt": "2026-10-31T21:04:23.194Z"
+    "updatedAt": "2026-10-31T21:20:28.425Z"
   },
   {
     "id": "nature_ecology",
@@ -177,7 +177,7 @@
     "color": "#86EFAC",
     "totalQuestions": 14,
     "createdAt": "2026-10-30T20:01:01.566Z",
-    "updatedAt": "2026-10-31T21:04:23.196Z"
+    "updatedAt": "2026-10-31T21:20:28.426Z"
   },
   {
     "id": "mixed",
@@ -187,6 +187,6 @@
     "color": "#C084FC",
     "totalQuestions": 174,
     "createdAt": "2026-10-30T20:01:01.569Z",
-    "updatedAt": "2026-10-31T21:04:23.197Z"
+    "updatedAt": "2026-10-31T21:20:28.428Z"
   }
 ]

@@ -6,6 +6,10 @@ import {
   Platform,
   AppState,
   Animated,
+  useWindowDimensions,
+  Text,
+  TouchableOpacity,
+  Image,
 } from 'react-native';
 import { useGameStore } from '../store/gameStore';
 import { socketService } from '../services/socketService';
@@ -86,6 +90,11 @@ import { DEFAULT_API_BASE } from '../config';
 
 const API_BASE = DEFAULT_API_BASE;
 export const RootNavigator: React.FC = () => {
+  const { width: windowWidth } = useWindowDimensions();
+  const isWeb = Platform.OS === 'web';
+  const isDesktop = isWeb && windowWidth > 540;
+  const isWide = isWeb && windowWidth >= 1180;
+
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('splash');
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('general_culture');
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>('medium');
@@ -892,9 +901,66 @@ export const RootNavigator: React.FC = () => {
     }, 2500);
   };
   return (
-    <View style={styles.safeArea}>
+    <View style={[styles.outerWrapper, isDesktop && styles.desktopOuter]}>
       <StatusBar hidden={true} animated={false} />
-      <Animated.View style={[styles.container, { opacity: screenFade }]}>
+
+      {/* Desktop Left Sidebar (Wide Displays >= 1180px) */}
+      {isWide && (
+        <View style={styles.desktopSidebarLeft}>
+          <View style={styles.desktopCard}>
+            <View style={{ alignItems: 'center', marginBottom: 18 }}>
+              <View style={styles.crownGlow}>
+                <Text style={{ fontSize: 32 }}>👑</Text>
+              </View>
+              <Text style={styles.brandTitleText}>Tavriko</Text>
+              <Text style={styles.brandSubtitleText}>CANLI BİLGİ & DÜELLO</Text>
+            </View>
+
+            <View style={styles.desktopFeatureList}>
+              <View style={styles.desktopFeatureItem}>
+                <Text style={styles.desktopFeatureIcon}>⚡</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.desktopFeatureTitle}>1v1 Canlı Düello</Text>
+                  <Text style={styles.desktopFeatureDesc}>Gerçek zamanlı hız ve bilgi yarışı</Text>
+                </View>
+              </View>
+
+              <View style={styles.desktopFeatureItem}>
+                <Text style={styles.desktopFeatureIcon}>🏆</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.desktopFeatureTitle}>Pro Lig & Sezon</Text>
+                  <Text style={styles.desktopFeatureDesc}>Haftalık liglerde zirveye tırman</Text>
+                </View>
+              </View>
+
+              <View style={styles.desktopFeatureItem}>
+                <Text style={styles.desktopFeatureIcon}>🧠</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.desktopFeatureTitle}>18+ Zengin Kategori</Text>
+                  <Text style={styles.desktopFeatureDesc}>Yüzlerce doğrulanmış güncel soru</Text>
+                </View>
+              </View>
+
+              <View style={styles.desktopFeatureItem}>
+                <Text style={styles.desktopFeatureIcon}>🔥</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.desktopFeatureTitle}>Günlük Seri</Text>
+                  <Text style={styles.desktopFeatureDesc}>Her gün gir, ödülleri ve XP'yi katla</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.desktopStatusPill}>
+              <View style={styles.pulseDot} />
+              <Text style={styles.desktopStatusText}>7/24 Kesintisiz Bulut Aktif</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Main Centered Mobile Frame */}
+      <View style={[styles.phoneFrame, isDesktop && styles.desktopPhoneFrame]}>
+        <Animated.View style={[styles.container, { opacity: screenFade }]}>
         {currentScreen === 'splash' && (
           <SplashScreen
             onFinish={() => {
@@ -1396,17 +1462,251 @@ export const RootNavigator: React.FC = () => {
             onHome={() => navigateTo('home')}
           />
         )}
-      </Animated.View>
+        </Animated.View>
+      </View>
+
+      {/* Desktop Right Sidebar (Wide Displays >= 1180px) */}
+      {isWide && (
+        <View style={styles.desktopSidebarRight}>
+          <View style={styles.desktopCard}>
+            <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 26, marginBottom: 4 }}>📱</Text>
+              <Text style={styles.desktopCardTitle}>Cebinde Devam Et</Text>
+              <Text style={styles.desktopCardDesc}>
+                Telefon kameranı açıp QR kodu tara, kurulumsuz anında mobilde oyna!
+              </Text>
+            </View>
+
+            <View style={styles.desktopQrWrapper}>
+              <Image
+                source={{ uri: '/qr' }}
+                style={{ width: 140, height: 140, borderRadius: 12 }}
+                resizeMode="contain"
+              />
+            </View>
+
+            <Text style={styles.desktopQrUrlText}>tavriko-app.vercel.app</Text>
+
+            <TouchableOpacity
+              style={styles.portalShortcutBtn}
+              onPress={() => {
+                if (typeof window !== 'undefined') {
+                  window.open('/portal', '_blank');
+                }
+              }}
+            >
+              <Text style={styles.portalShortcutText}>🛡️ Developer & Ops Portalı</Text>
+            </TouchableOpacity>
+
+            <View style={styles.desktopTipBox}>
+              <Text style={styles.desktopTipTitle}>💡 Web İpucu</Text>
+              <Text style={styles.desktopTipText}>
+                Klavyeniz ve farenizle sorulara anında cevap verebilir, tüm lig ve ödülleri büyük ekranda takip edebilirsiniz.
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
+
 const styles = StyleSheet.create({
-  safeArea: {
+  outerWrapper: {
     flex: 1,
     backgroundColor: THEME.colors.background,
+    width: '100%',
+    height: '100%',
+  },
+  desktopOuter: {
+    backgroundColor: '#090414',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  phoneFrame: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    backgroundColor: THEME.colors.background,
+  },
+  desktopPhoneFrame: {
+    maxWidth: 480,
+    width: 480,
+    height: '100%',
+    maxHeight: '100%',
+    borderLeftWidth: 1.5,
+    borderRightWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    boxShadow: '0 0 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(108, 92, 231, 0.35)',
+    overflow: 'hidden',
   },
   container: {
     flex: 1,
     backgroundColor: THEME.colors.background,
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
+  },
+  desktopSidebarLeft: {
+    width: 300,
+    height: '100%',
+    maxHeight: 760,
+    marginRight: 28,
+    justifyContent: 'center',
+  },
+  desktopSidebarRight: {
+    width: 300,
+    height: '100%',
+    maxHeight: 760,
+    marginLeft: 28,
+    justifyContent: 'center',
+  },
+  desktopCard: {
+    backgroundColor: 'rgba(22, 10, 52, 0.72)',
+    borderRadius: 28,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    padding: 24,
+    backdropFilter: 'blur(20px)',
+    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)',
+  },
+  crownGlow: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: 'rgba(255, 196, 61, 0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 196, 61, 0.35)',
+  },
+  brandTitleText: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 34,
+    color: '#FFFFFF',
+    letterSpacing: 1,
+  },
+  brandSubtitleText: {
+    fontFamily: THEME.fonts.extraBold,
+    fontSize: 12,
+    color: '#FFC43D',
+    letterSpacing: 2,
+    marginTop: 2,
+  },
+  desktopFeatureList: {
+    gap: 14,
+    marginVertical: 18,
+  },
+  desktopFeatureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    padding: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  desktopFeatureIcon: {
+    fontSize: 20,
+  },
+  desktopFeatureTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  desktopFeatureDesc: {
+    color: THEME.colors.textSecondary,
+    fontSize: 11,
+    fontFamily: THEME.fonts.medium,
+    marginTop: 1,
+  },
+  desktopStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+    borderRadius: 20,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+  },
+  pulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  desktopStatusText: {
+    color: '#10B981',
+    fontSize: 11,
+    fontFamily: THEME.fonts.bold,
+  },
+  desktopCardTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  desktopCardDesc: {
+    color: THEME.colors.textSecondary,
+    fontSize: 11.5,
+    fontFamily: THEME.fonts.medium,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  desktopQrWrapper: {
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    borderRadius: 16,
+    alignSelf: 'center',
+    marginVertical: 12,
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+  },
+  desktopQrUrlText: {
+    color: '#A78BFA',
+    fontSize: 11,
+    fontFamily: THEME.fonts.bold,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  portalShortcutBtn: {
+    backgroundColor: 'rgba(255, 196, 61, 0.15)',
+    borderWidth: 1.5,
+    borderColor: '#FFC43D',
+    borderRadius: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  portalShortcutText: {
+    color: '#FFC43D',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  desktopTipBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 14,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  desktopTipTitle: {
+    color: '#FFC43D',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    marginBottom: 2,
+  },
+  desktopTipText: {
+    color: THEME.colors.textSecondary,
+    fontSize: 11,
+    fontFamily: THEME.fonts.body,
+    lineHeight: 15,
   },
 });
