@@ -14,7 +14,7 @@ export const CLOUD_API_URL = `${CLOUD_BASE_URL}/api`;
  * Cloudflare Real-Time WebSocket Gateway URL
  * wss:// in production, ws:// in local dev
  */
-export const CLOUDFLARE_WS_DEFAULT_HOST = 'tavriko-realtime.jewelkaan01.workers.dev';
+export const CLOUDFLARE_WS_DEFAULT_HOST = 'tavriko-realtime.uncertainidentity8.workers.dev';
 
 export const getRealtimeWsUrl = (path: string = '/ws'): string => {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;

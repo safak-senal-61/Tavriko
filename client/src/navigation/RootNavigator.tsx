@@ -86,7 +86,7 @@ export type ScreenName =
   | 'inventory'
   | 'pro_league'
   | 'payment';
-import { DEFAULT_API_BASE } from '../config';
+import { DEFAULT_API_BASE, getRealtimeWsUrl } from '../config';
 
 const API_BASE = DEFAULT_API_BASE;
 export const RootNavigator: React.FC = () => {
@@ -200,9 +200,16 @@ export const RootNavigator: React.FC = () => {
     }
     action();
   };
-  // Socket event subscription for multiplayer (stable lifecycle)
+  // Socket event subscription for multiplayer (only active when logged in)
   useEffect(() => {
-    socketService.connect();
+    if (!user) {
+      socketService.disconnect();
+      return;
+    }
+
+    const query = `playerId=${encodeURIComponent(user.id)}&displayName=${encodeURIComponent(user.displayName)}&avatarUrl=${encodeURIComponent(user.avatarUrl || 'av1')}`;
+    socketService.connect(getRealtimeWsUrl(`/ws?${query}`));
+
     const unsubSync = socketService.onStateSync((room: GameRoom) => {
       setActiveRoom(room);
       if (
