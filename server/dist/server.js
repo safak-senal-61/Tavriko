@@ -531,6 +531,68 @@ function createApp() {
     });
     app.use('/api', triviaRoutes_1.default);
     app.use('/api/social', socialRoutes_1.default);
+    // --- Cloudflare Durable Objects Internal Endpoints ---
+    app.post('/api/internal/room-questions', (req, res) => {
+        const internalSecret = process.env.INTERNAL_API_SECRET || 'tavriko_internal_secret_2026';
+        const providedSecret = req.headers['x-internal-secret'];
+        if (providedSecret && providedSecret !== internalSecret) {
+            return res.status(403).json({ error: 'Yetkisiz erişim' });
+        }
+        const { categoryId, difficulty, count = 5 } = req.body || {};
+        const questions = prismaClient_1.db.getQuestions(categoryId || 'general_culture', difficulty || 'medium', Math.min(20, Math.max(1, Number(count) || 5)));
+        return res.json({ success: true, questions });
+    });
+    app.post('/api/internal/match-results', async (req, res) => {
+        const internalSecret = process.env.INTERNAL_API_SECRET || 'tavriko_internal_secret_2026';
+        const providedSecret = req.headers['x-internal-secret'];
+        if (providedSecret && providedSecret !== internalSecret) {
+            return res.status(403).json({ error: 'Yetkisiz erişim' });
+        }
+        try {
+            const summary = req.body;
+            if (!summary || !summary.roomCode || !Array.isArray(summary.rankings)) {
+                return res.status(400).json({ error: 'Geçersiz maç özeti' });
+            }
+            // Record match history in Prisma
+            await prismaClient_1.db.matchHistory.create({
+                data: {
+                    roomCode: summary.roomCode,
+                    mode: summary.mode,
+                    categoryId: summary.mode,
+                    winnerId: summary.podium?.first?.playerId || null,
+                    totalQuestions: summary.totalRounds,
+                    rankingsJson: summary.rankings,
+                },
+            });
+            // Update XP and coins for participating registered users
+            for (const rankItem of summary.rankings) {
+                if (!rankItem.playerId || rankItem.playerId.startsWith('bot_') || rankItem.playerId.startsWith('guest_')) {
+                    continue;
+                }
+                const isWinner = rankItem.rank === 1;
+                const xpEarned = isWinner ? 150 : Math.max(30, Math.round(rankItem.score / 10));
+                const coinsEarned = isWinner ? 50 : 15;
+                await prismaClient_1.db.recordGameStats(rankItem.playerId, {
+                    correctAnswers: Math.round(rankItem.score / 100),
+                    totalAnswers: summary.totalRounds,
+                    xpEarned,
+                    coinsEarned,
+                    bestStreak: rankItem.streak || 0,
+                    won: isWinner,
+                });
+            }
+            logger_1.logger.info('SOCKET', `Cloudflare Durable Objects maçı kaydedildi: ${summary.roomCode}`, {
+                mode: summary.mode,
+                playersCount: summary.rankings.length,
+                winner: summary.podium?.first?.displayName,
+            });
+            return res.json({ success: true });
+        }
+        catch (err) {
+            logger_1.logger.error('SOCKET', `Maç sonucu kaydetme hatası: ${err.message}`, err);
+            return res.status(500).json({ success: false, error: err.message });
+        }
+    });
     const close = () => {
         matchmaker.destroy();
         roomManager.cleanupAll();

@@ -1576,8 +1576,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.12)',
     padding: 24,
-    backdropFilter: 'blur(20px)',
-    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)',
+    ...(Platform.OS === 'web' ? ({ backdropFilter: 'blur(20px)', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)' } as any) : {}),
   },
   crownGlow: {
     width: 54,

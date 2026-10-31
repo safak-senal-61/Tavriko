@@ -5,19 +5,24 @@
   "workspaces": [
     "shared",
     "server",
-    "client"
+    "client",
+    "cloudflare"
   ],
   "scripts": {
-    "build": "npx prisma generate --schema=server/prisma/schema.prisma && npm run build:shared && npm run build:server",
+    "build": "npx prisma generate --schema=server/prisma/schema.prisma && npm run build:shared && npm run build:server && npm run build:cloudflare",
     "test:all": "scripts\\run-all-tests.bat",
     "test:shared": "npm --prefix shared test",
     "test:server": "npm --prefix server test",
     "test:client": "npm --prefix client test",
+    "test:cloudflare": "npm --prefix cloudflare test",
     "dev:server": "npm --prefix server run dev",
     "dev:client": "npm --prefix client start",
+    "dev:cloudflare": "npm --prefix cloudflare run dev",
     "build:shared": "npm --prefix shared run build",
     "build:server": "npm --prefix server run build",
     "build:client:web": "npm --prefix client run build:web",
+    "build:cloudflare": "npm --prefix cloudflare run build",
+    "deploy:cloudflare": "npm --prefix cloudflare run deploy",
     "postinstall": "npx prisma generate --schema=server/prisma/schema.prisma"
   },
   "dependencies": {
