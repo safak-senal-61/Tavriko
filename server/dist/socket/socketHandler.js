@@ -9,7 +9,7 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
         // If there is an active simulated bot player in this room, trigger realistic response
         const room = roomManager.getRoom(roomCode);
         if (room) {
-            const botPlayer = Object.values(room.players).find((p) => p.id.startsWith('rival_bot_'));
+            const botPlayer = Object.values(room.players).find((p) => p.isBot || p.id.startsWith('rival_bot_') || p.id.startsWith('bot_'));
             if (botPlayer && !botPlayer.hasAnsweredCurrentRound) {
                 // Realistic response delay between 2200ms and 5000ms
                 const responseDelay = Math.floor(2200 + Math.random() * 2800);

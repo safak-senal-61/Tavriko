@@ -16,7 +16,7 @@ import {
 } from '@trivia/shared';
 import { Env } from '../env';
 import { encodeWsMessage, decodeWsMessage, createWsError, WsMessage } from '../websocket/protocol';
-import { sanitizeString, RateLimiter } from '../websocket/validation';
+import { sanitizeString, sanitizeRoomCode, RateLimiter } from '../websocket/validation';
 import { ApiService } from '../services/apiService';
 import { verifyJwt, AuthUser } from '../auth/authenticate';
 
@@ -76,6 +76,58 @@ export class GameRoomDO extends DurableObject<Env> {
         }),
         { headers: { 'Content-Type': 'application/json' } }
       );
+    }
+
+    if (request.method === 'POST' && (url.pathname === '/create-match' || url.pathname.endsWith('/create-match'))) {
+      const data = (await request.json()) as any;
+      const roomCode = sanitizeRoomCode(data.roomCode || url.searchParams.get('roomCode') || '');
+      this.room = {
+        code: roomCode,
+        mode: data.mode || 'duel',
+        hostId: data.players?.[0]?.id || 'host',
+        status: 'lobby',
+        category: data.category || 'general_culture',
+        difficulty: data.difficulty || 'medium',
+        maxPlayers: 2,
+        currentRound: 0,
+        totalRounds: 5,
+        questionTimeSec: 15,
+        penaltyForWrong: false,
+        players: {},
+        scores: {},
+      };
+      if (Array.isArray(data.players)) {
+        for (const p of data.players) {
+          this.room.players[p.id] = {
+            id: p.id,
+            username: p.username || p.displayName,
+            displayName: p.displayName,
+            avatarUrl: p.avatarUrl || 'av1',
+            score: 0,
+            currentStreak: 0,
+            isReady: true,
+            isHost: p.id === data.players[0].id,
+            isConnected: !p.isBot,
+            hasAnsweredCurrentRound: false,
+            totalResponseTimeMs: 0,
+            correctAnswersCount: 0,
+            isBot: !!p.isBot,
+          };
+          this.room.scores[p.id] = 0;
+        }
+      }
+      const questions = await this.apiService.fetchRoomQuestions(
+        this.room.category,
+        this.room.difficulty,
+        5
+      );
+      this.questions = questions || [];
+      this.room.totalRounds = this.questions.length;
+      await this.persist();
+      await this.ctx.storage.put('questions', this.questions);
+      return new Response(JSON.stringify({ success: true, room: this.getSanitizedRoom() }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
@@ -215,6 +267,15 @@ export class GameRoomDO extends DurableObject<Env> {
     }
 
     this.broadcastStateSync();
+
+    // In 1v1 duel or quick match, auto-start countdown when all expected human players have connected
+    if (this.room.mode === 'duel' || this.room.mode === 'quick_match') {
+      const humanPlayers = Object.values(this.room.players).filter((p) => !p.isBot);
+      const connectedHumans = humanPlayers.filter((p) => p.isConnected);
+      if (humanPlayers.length > 0 && connectedHumans.length >= humanPlayers.length && this.room.status === 'lobby') {
+        await this.autoStartDuel();
+      }
+    }
 
     // If game is in progress and round is active, send current question to the reconnected player
     if (this.room.status === 'question_active' && this.room.currentQuestion) {
@@ -364,9 +425,18 @@ export class GameRoomDO extends DurableObject<Env> {
   }
 
   // --- Core Game Flow Methods ---
-  private handleJoinRoom(ws: WebSocket, playerId: string, envelope: WsMessage): void {
+  private async handleJoinRoom(ws: WebSocket, playerId: string, envelope: WsMessage): Promise<void> {
     if (!this.room) return;
     this.broadcastStateSync();
+
+    // In 1v1 duel or quick match, auto-start countdown when all expected human players have connected
+    if (this.room.mode === 'duel' || this.room.mode === 'quick_match') {
+      const humanPlayers = Object.values(this.room.players).filter((p) => !p.isBot);
+      const connectedHumans = humanPlayers.filter((p) => p.isConnected);
+      if (humanPlayers.length > 0 && connectedHumans.length >= humanPlayers.length && this.room.status === 'lobby') {
+        await this.autoStartDuel();
+      }
+    }
   }
 
   private async handleLeaveRoom(ws: WebSocket, playerId: string, envelope: WsMessage): Promise<void> {
@@ -500,6 +570,13 @@ export class GameRoomDO extends DurableObject<Env> {
     // Set round timeout alarm
     const questionSec = question.timeLimitSec || this.room.questionTimeSec || 15;
     await this.scheduleAlarm('round_end', questionSec * 1000, { roundNumber: roundNum });
+
+    // Schedule realistic bot answers for any bot in the room
+    Object.values(this.room.players).forEach((p) => {
+      if (p.isBot || p.id.startsWith('bot_')) {
+        this.scheduleBotAnswer(p.id, question, roundNum);
+      }
+    });
   }
 
   private async handleSubmitAnswer(ws: WebSocket, playerId: string, envelope: WsMessage): Promise<void> {
@@ -529,7 +606,6 @@ export class GameRoomDO extends DurableObject<Env> {
     const roundStartedAt = this.room.roundStartedAt || now;
     const totalTimeMs = (this.room.currentQuestion.timeLimitSec || this.room.questionTimeSec || 15) * 1000;
     const elapsedMs = Math.max(0, now - roundStartedAt);
-    const timeRemainingMs = Math.max(0, totalTimeMs - elapsedMs);
 
     // Expiration check with 600ms grace for network latency
     if (elapsedMs > totalTimeMs + 600) {
@@ -537,6 +613,21 @@ export class GameRoomDO extends DurableObject<Env> {
       ws.send(createWsError('Soru süresi doldu', 'TIME_EXPIRED', envelope.requestId));
       return;
     }
+
+    await this.processPlayerAnswer(playerId, selectedOptionId, elapsedMs);
+  }
+
+  private async processPlayerAnswer(
+    playerId: string,
+    selectedOptionId: string,
+    elapsedMs: number
+  ): Promise<void> {
+    if (!this.room || this.room.status !== 'question_active' || !this.room.currentQuestion) return;
+    const player = this.room.players[playerId];
+    if (!player || player.hasAnsweredCurrentRound) return;
+
+    const totalTimeMs = (this.room.currentQuestion.timeLimitSec || this.room.questionTimeSec || 15) * 1000;
+    const timeRemainingMs = Math.max(0, totalTimeMs - elapsedMs);
 
     const isCorrect = selectedOptionId === this.room.currentQuestion.correctOptionId;
 
@@ -565,16 +656,69 @@ export class GameRoomDO extends DurableObject<Env> {
     await this.persist();
 
     // Broadcast that player answered (without revealing correctness)
-    this.broadcast(SOCKET_EVENTS.PLAYER_ANSWERED, { playerId });
+    this.broadcast(SOCKET_EVENTS.PLAYER_ANSWERED, { playerId, streak: player.currentStreak });
 
-    // Check if all connected players answered
-    const connectedPlayers = Object.values(this.room.players).filter((p) => p.isConnected);
-    const allAnswered = connectedPlayers.every((p) => p.hasAnsweredCurrentRound);
+    // Check if all connected or bot participants have answered
+    const activeParticipants = Object.values(this.room.players).filter((p) => p.isConnected || p.isBot);
+    const allAnswered = activeParticipants.every((p) => p.hasAnsweredCurrentRound);
 
     if (allAnswered) {
       // Early trigger for round end
       await this.scheduleAlarm('round_end', 450, { roundNumber: this.room.currentRound });
     }
+  }
+
+  private scheduleBotAnswer(botId: string, question: Question, roundNum: number): void {
+    const minThink = 2200;
+    const maxThink = 5500;
+    const thinkTimeMs = Math.floor(minThink + Math.random() * (maxThink - minThink));
+
+    const accuracy = this.room?.difficulty === 'easy' ? 0.85 : this.room?.difficulty === 'hard' ? 0.55 : 0.72;
+    const isCorrect = Math.random() < accuracy;
+    let selectedOptionId = question.correctOptionId;
+    if (!isCorrect) {
+      const wrongOptions = question.options.filter((o) => o.id !== question.correctOptionId);
+      if (wrongOptions.length > 0) {
+        selectedOptionId = wrongOptions[Math.floor(Math.random() * wrongOptions.length)].id;
+      }
+    }
+
+    setTimeout(async () => {
+      if (
+        this.room &&
+        this.room.status === 'question_active' &&
+        this.room.currentRound === roundNum &&
+        this.room.players[botId] &&
+        !this.room.players[botId].hasAnsweredCurrentRound
+      ) {
+        await this.processPlayerAnswer(botId, selectedOptionId, thinkTimeMs);
+      }
+    }, thinkTimeMs);
+  }
+
+  private async autoStartDuel(): Promise<void> {
+    if (!this.room || this.room.status !== 'lobby') return;
+
+    if (!this.questions || this.questions.length === 0) {
+      const questions = await this.apiService.fetchRoomQuestions(
+        this.room.category,
+        this.room.difficulty,
+        this.room.totalRounds || 5
+      );
+      this.questions = questions || [];
+      this.room.totalRounds = this.questions.length;
+      await this.ctx.storage.put('questions', this.questions);
+    }
+
+    this.room.status = 'countdown';
+    this.room.currentRound = 0;
+    const countdownSec = 3;
+
+    await this.persist();
+    this.broadcastStateSync();
+    this.broadcast(SOCKET_EVENTS.COUNTDOWN_TICK, { secondsRemaining: countdownSec });
+
+    await this.scheduleAlarm('countdown', countdownSec * 1000);
   }
 
   private async endCurrentRound(): Promise<void> {

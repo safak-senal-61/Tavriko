@@ -67,6 +67,7 @@ export interface Player {
     lastSpeedBonus?: number;
     totalResponseTimeMs: number;
     correctAnswersCount: number;
+    isBot?: boolean;
 }
 export type RoomStatus = 'lobby' | 'countdown' | 'question_active' | 'round_result' | 'intermission' | 'game_over';
 export interface GameRoom {

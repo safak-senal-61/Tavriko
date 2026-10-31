@@ -89,6 +89,7 @@ class GameRoomManager {
             const blueCount = Object.values(room.players).filter((p) => p.team === 'blue').length;
             team = redCount <= blueCount ? 'red' : 'blue';
         }
+        const isBot = options.isBot ?? (options.playerId.startsWith('rival_bot_') || options.playerId.startsWith('bot_'));
         const player = {
             id: options.playerId,
             username: options.displayName.toLowerCase().replace(/\s+/g, '_'),
@@ -96,8 +97,9 @@ class GameRoomManager {
             avatarUrl: options.avatarUrl,
             score: 0,
             currentStreak: 0,
-            isReady: false,
+            isReady: isBot ? true : false,
             isHost: false,
+            isBot,
             team,
             isConnected: true,
             hasAnsweredCurrentRound: false,

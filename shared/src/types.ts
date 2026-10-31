@@ -104,6 +104,7 @@ export interface Player {
   lastSpeedBonus?: number;
   totalResponseTimeMs: number;
   correctAnswersCount: number;
+  isBot?: boolean;
 }
 
 export type RoomStatus =

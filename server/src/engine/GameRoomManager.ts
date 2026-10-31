@@ -33,6 +33,7 @@ export interface JoinRoomOptions {
   displayName: string;
   avatarUrl?: string;
   team?: 'red' | 'blue';
+  isBot?: boolean;
 }
 
 export type QuestionProvider = (
@@ -151,6 +152,7 @@ export class GameRoomManager {
       team = redCount <= blueCount ? 'red' : 'blue';
     }
 
+    const isBot = options.isBot ?? (options.playerId.startsWith('rival_bot_') || options.playerId.startsWith('bot_'));
     const player: Player = {
       id: options.playerId,
       username: options.displayName.toLowerCase().replace(/\s+/g, '_'),
@@ -158,8 +160,9 @@ export class GameRoomManager {
       avatarUrl: options.avatarUrl,
       score: 0,
       currentStreak: 0,
-      isReady: false,
+      isReady: isBot ? true : false,
       isHost: false,
+      isBot,
       team,
       isConnected: true,
       hasAnsweredCurrentRound: false,

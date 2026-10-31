@@ -157,6 +157,7 @@ export const RootNavigator: React.FC = () => {
     id: string;
     displayName: string;
     avatarUrl?: string;
+    isBot?: boolean;
   } | null>(null);
   const [opponentHasAnswered, setOpponentHasAnswered] = useState<boolean>(false);
   const {
@@ -1189,6 +1190,7 @@ export const RootNavigator: React.FC = () => {
           <MatchmakingRadarScreen
             category={selectedCategory}
             difficulty={selectedDifficulty}
+            userName={user?.displayName || 'Sen'}
             avatarSeed={user?.avatarUrl || user?.displayName}
             onCancel={handleCancelMatchmaking}
           />
@@ -1201,9 +1203,10 @@ export const RootNavigator: React.FC = () => {
               rankTitle: user?.rankTitle || 'Acemi Kaşif',
             }}
             opponentProfile={{
-              displayName: duelOpponent?.displayName || 'Rakip Oyuncu',
+              displayName: duelOpponent?.displayName || (duelOpponent?.isBot ? 'BİLGİSAYAR' : 'Rakip Oyuncu'),
               avatarUrl: duelOpponent?.avatarUrl,
-              rankTitle: 'Düellocu',
+              rankTitle: duelOpponent?.isBot ? 'Yapay Zeka' : 'Düellocu',
+              isBot: duelOpponent?.isBot,
             }}
             categoryName={selectedCategory.replace('_', ' ').toUpperCase()}
             onCancel={handleCancelMatchmaking}

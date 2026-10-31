@@ -64,11 +64,11 @@ class Matchmaker {
                 }, 2500);
             }
         }
-        // 2. Priority 2: Smart Bot Matchmaking if player has waited >= 6 seconds
+        // 2. Priority 2: Smart Bot Matchmaking if player has waited >= 7 seconds (1v1 fallback)
         const now = Date.now();
         for (let i = 0; i < this.queue.length; i++) {
             const req = this.queue[i];
-            if (now - req.queuedAt >= 6000) {
+            if (now - req.queuedAt >= 7000) {
                 this.queue.splice(i, 1);
                 i--;
                 const rival = exports.RIVAL_BOTS[Math.floor(Math.random() * exports.RIVAL_BOTS.length)];
@@ -96,6 +96,7 @@ class Matchmaker {
                     playerId: rival.id,
                     displayName: rival.name,
                     avatarUrl: rival.avatar,
+                    isBot: true,
                 });
                 if (this.onMatchFound) {
                     this.onMatchFound(room.code, [req, rivalReq]);
