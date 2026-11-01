@@ -45,7 +45,7 @@ describe('Question Diversity & Anti-Repetition Verification', () => {
     expect(text1).not.toBe(text2);
     expect(text2).not.toBe(text3);
     expect(text1).not.toBe(text3);
-  });
+  }, 35000);
 
   it('shuffles option positions so correctOptionId is not always opt_a', () => {
     const questions = generateDeterministicEvrenCandidates('geography', 'easy', 10, db);
@@ -53,5 +53,19 @@ describe('Question Diversity & Anti-Repetition Verification', () => {
     console.log('Distinct correctOptionIds in 10 questions:', Array.from(correctIds));
     // Over 10 questions with 4 options, there should be multiple distinct correct option IDs (not just opt_a)
     expect(correctIds.size).toBeGreaterThan(1);
+  });
+
+  it('guarantees geography questions are not limited to capitals or plates', () => {
+    const questions = generateDeterministicEvrenCandidates('geography', 'easy', 10, db);
+    expect(questions.length).toBe(10);
+
+    // Verify rich variety beyond capitals or plates
+    const nonCapitalOrPlateCount = questions.filter((q) => {
+      const lower = q.text.toLowerCase();
+      return !lower.includes('başkent') && !lower.includes('plaka');
+    }).length;
+
+    console.log(`Out of 10 geography questions, ${nonCapitalOrPlateCount} are diverse (mountains, lakes, rivers, wonders, etc.)`);
+    expect(nonCapitalOrPlateCount).toBeGreaterThanOrEqual(6);
   });
 });

@@ -74,11 +74,13 @@ const DIFFICULTY_NAMES_TR: Record<DifficultyLevel, string> = {
 };
 
 const DIFFICULTY_GUIDELINES: Record<DifficultyLevel, string> = {
-  easy: `KOLAY SEVİYE (7'den 70'e herkesin ilk bakışta bilebileceği çok temel seviye):
+  easy: `KOLAY SEVİYE (7'den 70'e herkesin ilk bakışta bilebileceği çok temel ve zevkli seviye):
 - KESİNLİKLE RAKAM, METRE, KİLOMETRE, DAĞ YÜKSEKLİĞİ, NÜFUS VEYA GÜN/AY TARİH EZBERİ SORMA! (Örn: "Ağrı Dağı kaç metredir?", "Savaş hangi tarihte oldu?" gibi sorular KESİNLİKLE YASAKTIR!)
-- Herkesin ilkokul veya günlük yaşamından bildiği en temel ve eğlenceli bilgileri sor!
-- Örnek Kolay: "Türkiye'nin en yüksek dağı hangisidir? A) Ağrı Dağı B) Erciyes C) Palandöken D) Uludağ"
-- Örnek Kolay: "Türkiye'nin başkenti neresidir? A) Ankara B) İstanbul C) İzmir D) Bursa"
+- Herkesin temel genel kültür veya okul hayatından bildiği en popüler, eğlenceli ve çeşitli bilgileri sor!
+- KESİNLİKLE SADECE BAŞKENT VEYA SADECE PLAKA SORMA! Coğrafyada dağları, gölleri, nehirleri, denizleri, boğazları, şelaleleri, kanyonları, sınırları, kıtaları, iklimi ve doğa harikalarını sor.
+- Örnek Kolay Coğrafya: "Türkiye'nin en yüksek dağı hangisidir? A) Ağrı Dağı B) Erciyes C) Palandöken D) Uludağ"
+- Örnek Kolay Doğa Harikası: "Pamukkale travertenleri hangi ilimizdedir? A) Denizli B) Afyon C) Aydın D) Muğla"
+- Örnek Kolay Göl: "Türkiye'nin yüz ölçümü en büyük gölü hangisidir? A) Van Gölü B) Tuz Gölü C) Beyşehir Gölü D) İznik Gölü"
 - Çeldirici şıklar birbirinden çok farklı ve kolayca elenebilir olsun.`,
 
   medium: `ORTA SEVİYE (Genel kültürü iyi olan birinin çıkarımla bilebileceği sorular):
@@ -93,21 +95,31 @@ const DIFFICULTY_GUIDELINES: Record<DifficultyLevel, string> = {
 };
 
 const SUBTOPIC_HINTS: Record<string, string[]> = {
-  geography: ['Türkiye gölleri', 'Dünya başkentleri', 'Türkiye dağları', 'Körfezler ve boğazlar', 'Nehirler ve akarsular', 'Kıtalar ve okyanuslar', 'Tarihi bölgeler ve vadiler', 'Komşu ülkeler'],
-  history: ['Kurtuluş Savaşı ve kongreler', 'Cumhuriyetin ilk yılları', 'Osmanlı yükselme dönemi', 'İlk Türk devletleri', 'Selçuklu medeniyeti', 'Dünya tarihi dönüm noktaları'],
+  geography: [
+    'Türkiye dağları ve volkanları',
+    'Türkiye gölleri ve sulak alanları',
+    'Nehirler ve akarsular',
+    'Doğa harikaları, kanyonlar ve şelaleler',
+    'Denizler, boğazlar ve adalar',
+    'Coğrafi bölgeler ve sınır kapıları',
+    'Kıtalar, okyanuslar ve çöller',
+    'İklim ve bitki örtüsü',
+    'Tarihi vadiler ve milli parklar',
+  ],
+  history: ['Kurtuluş Savaşı ve kongreler', 'Cumhuriyetin ilk yılları', 'Osmanlı yükselme dönemi ve mimarları', 'İlk Türk devletleri', 'Selçuklu medeniyeti', 'Dünya tarihi dönüm noktaları'],
   mathematics: ['Temel geometri ve açılar', 'Dört işlem ve katlar', 'Alan ve çevre hesapları', 'Asal sayılar', 'Zaman ve ölçü birimleri', 'Yüzde ve oran'],
-  science_tech: ['İcatlar ve mucitler', 'Yapay zeka ve bilgisayarlar', 'İnternet ve yazılım', 'Yenilenebilir enerji', 'Gündelik teknoloji'],
+  science_tech: ['İcatlar ve mucitler', 'Yapay zeka ve bilgisayarlar', 'Güneş sistemi ve gezegenler', 'İnsan vücudu ve organlar', 'Doğa yasaları'],
   space_astronomy: ['Güneş sistemi gezegenleri', 'Ay ve evreleri', 'Yıldızlar ve takımyıldızlar', 'Astronotlar ve uzay görevleri', 'Galaksiler ve Samanyolu'],
-  sports: ['Futbol kuralları ve ligler', 'Basketbol ve NBA', 'Olimpiyat oyunları', 'Voleybol milli başarıları', 'Tenis ve Grand Slam', 'Geleneksel sporlar'],
+  sports: ['Futbol kuralları ve ligler', 'Basketbol ve NBA', 'Olimpiyat şampiyonları', 'Voleybol ve Filenin Sultanları', 'Tenis ve Grand Slam', 'Geleneksel güreş ve halter'],
   cinema_tv: ['Yeşilçam efsaneleri', 'Oscar ödüllü filmler', 'Animasyon ve çizgi filmler', 'Kült dizi karakterleri', 'Ünlü yönetmenler'],
   music: ['Klasik Türk müziği enstrümanları', 'Halk ozanları ve türküler', 'Dünya klasik müziği bestecileri', 'Rock ve pop tarihi', 'Enstrüman aileleri'],
-  literature: ['Türk edebiyatı klasikleri', 'Dünya edebiyatı yazarları', 'Şiirler ve milli şairler', 'Masallar ve destanlar', 'Nobel edebiyat ödülleri'],
+  literature: ['Türk edebiyatı klasikleri ve şairler', 'Dünya edebiyatı yazarları', 'Milli destanlar ve masallar', 'Nobel edebiyat ödülleri'],
   biology: ['İnsan organları ve dolaşım', 'Bitkiler ve fotosentez', 'Canlılar alemi ve hayvanlar', 'Besin zinciri ve ekoloji', 'Hücre yapısı'],
   physics_chemistry: ['Suyun halleri ve kaynama/donma', 'Yerçekimi ve hareket', 'Periyodik tablodaki temel elementler', 'Işık ve ses dalgaları', 'Elektrik ve mıknatıslar'],
   logic_puzzles: ['Sayı örüntüleri', 'Sözel akıl yürütme', 'Görsel mantık', 'Pratik şaşırtmacalı sorular'],
   language_vocab: ['Eş anlamlı sözcükler', 'Atasözleri ve deyimler', 'Türkçe sesli harfler ve imla', 'Zıt anlamlılar', 'Kelime kökleri'],
   art_culture: ['Ünlü tablolar ve ressamlar', 'Tarihi camiler ve mimari', 'Heykel sanatı', 'Müzeler ve antik kentler', 'Geleneksel el sanatları'],
-  general_culture: ['Dünya rekorları', 'Bayraklar ve başkentler', 'İlginç doğa gerçekleri', 'Geleneksel kutlamalar', 'Masa ve zeka oyunları'],
+  general_culture: ['Dünya rekorları', 'İlginç doğa gerçekleri', 'Geleneksel kutlamalar', 'Masa ve zeka oyunları', 'Kültürel simgeler'],
   mixed: ['Genel kültür karma', 'Popüler bilgi karma', 'Dünya ve Türkiye karma'],
 };
 
@@ -152,6 +164,12 @@ KRİTERLER:
 - Benzersiz Tohum / Çeşitlilik: ${randomSeed}
 - Zorluk Seviyesi: ${difficulty} (${DIFFICULTY_GUIDELINES[difficulty]})
 - İstenen Adet: ${count}
+
+ÇOK ÖNEMLİ ÇEŞİTLİLİK VE DENGELİLİK KURALI:
+- ASLA tek bir soru şablonuna (örneğin sadece başkent sorma veya sadece plaka sorma) saplanıp kalma!
+- Coğrafya kategorisinde dağları, gölleri, nehirleri, denizleri, boğazları, şelaleleri, kanyonları, sınırları, kıtaları, iklimi ve doğa harikalarını sor!
+- Tarih kategorisinde sadece savaş değil; mimarları, fatihleri, ilk kadınları, kongreleri, dünya medeniyetlerini sor!
+- Bilim ve sporda da konunun zengin boyutlarını harmanla!
 
 ÇOK ÖNEMLİ ZORLUK KURALI:
 Eğer zorluk "easy" (KOLAY) ise;
@@ -386,34 +404,22 @@ export const RICH_SEED_BANK: Record<string, Record<DifficultyLevel, QuestionTemp
   geography: {
     easy: [
       {
-        text: "Türkiye'nin başkenti hangi ilimizdir?",
-        options: ['Ankara', 'İstanbul', 'İzmir', 'Bursa'],
-        exp: "Ankara, 13 Ekim 1923 tarihinde Türkiye Cumhuriyeti'nin başkenti ilan edilmiştir.",
-        src: 'TBMM Tarih Arşivi',
+        text: "Türkiye'nin en yüksek dağı hangisidir?",
+        options: ['Ağrı Dağı', 'Erciyes Dağı', 'Süphan Dağı', 'Uludağ'],
+        exp: "Ağrı Dağı 5.137 metre zirvesiyle Türkiye'nin ve Anadolu Yarımadası'nın en yüksek doğal noktasıdır.",
+        src: 'Harita Genel Müdürlüğü',
       },
       {
-        text: "Türkiye'nin yüz ölçümü en büyük gölü hangisidir?",
+        text: "Türkiye'nin yüz ölçümü en büyük ve suyu sodalı olan gölü hangisidir?",
         options: ['Van Gölü', 'Tuz Gölü', 'Beyşehir Gölü', 'İznik Gölü'],
         exp: "Van Gölü 3.713 km² alanı ile Türkiye'nin en büyük gölüdür.",
         src: 'Devlet Su İşleri (DSİ)',
       },
       {
-        text: "Ege Denizi, Türkiye'nin hangi coğrafi yönünde yer almaktadır?",
-        options: ['Batısında', 'Doğusunda', 'Kuzeyinde', 'Güneyinde'],
-        exp: "Ege Denizi, Anadolu Yarımadası'nın batı kıyıları boyunca uzanır.",
-        src: 'Milli Eğitim Bakanlığı Coğrafya Atlası',
-      },
-      {
-        text: "Türkiye'nin kuzeyinde kıyısı bulunan deniz hangisidir?",
-        options: ['Karadeniz', 'Akdeniz', 'Ege Denizi', 'Kızıldeniz'],
-        exp: "Türkiye'nin kuzey kıyıları boyunca Karadeniz uzanmaktadır.",
-        src: 'Harita Genel Müdürlüğü',
-      },
-      {
-        text: "Peri bacaları doğal oluşumlarıyla ünlü olan turistik bölgemiz neresidir?",
-        options: ['Kapadokya', 'Pamukkale', 'Ihlara Vadisi', 'Ölüdeniz'],
-        exp: "Peri bacaları, Nevşehir ve çevresindeki Kapadokya bölgesinde yer alan volkanik tüf oluşumlarıdır.",
-        src: 'Kültür ve Turizm Bakanlığı',
+        text: "Tamamı Türkiye sınırları içerisinde doğup Karadeniz'e dökülen en uzun nehrimiz hangisidir?",
+        options: ['Kızılırmak', 'Yeşilırmak', 'Sakarya Nehri', 'Fırat Nehri'],
+        exp: "Kızılırmak 1.355 km uzunluğuyla Türkiye sınırları içindeki en uzun akarsumuzdur.",
+        src: 'Devlet Su İşleri (DSİ)',
       },
       {
         text: "Beyaz traverten teraslarıyla ünlü Pamukkale, hangi ilimizdedir?",
@@ -422,15 +428,51 @@ export const RICH_SEED_BANK: Record<string, Record<DifficultyLevel, QuestionTemp
         src: 'Kültür Varlıkları ve Müzeler Genel Müdürlüğü',
       },
       {
-        text: "Hem Asya hem de Avrupa kıtalarında toprakları bulunan dünyaca ünlü tarihi şehrimiz hangisidir?",
-        options: ['İstanbul', 'Çanakkale', 'İzmir', 'Trabzon'],
-        exp: "İstanbul Boğazı iki kıtayı ayırırken, İstanbul iki kıtaya yayılan eşsiz bir metropoldür.",
-        src: 'İstanbul Büyükşehir Belediyesi Arşivi',
+        text: "Peri bacaları doğal oluşumlarıyla ünlü olan Kapadokya bölgesi hangi ilimizin merkezindedir?",
+        options: ['Nevşehir', 'Kayseri', 'Niğde', 'Konya'],
+        exp: "Peri bacaları, Nevşehir ve çevresindeki Kapadokya bölgesinde yer alan volkanik tüf oluşumlarıdır.",
+        src: 'Kültür ve Turizm Bakanlığı',
       },
       {
-        text: "Türkiye'nin en yüksek dağı hangisidir?",
-        options: ['Ağrı Dağı', 'Erciyes Dağı', 'Süphan Dağı', 'Uludağ'],
-        exp: "Ağrı Dağı zirvesiyle Türkiye'nin en yüksek doğal noktasıdır.",
+        text: "Kış aylarında yüzeyi tamamen buz tutan ve üzerinde atlı kızaklarla gezilen Çıldır Gölü hangi illerimizdedir?",
+        options: ['Ardahan ve Kars', 'Erzurum ve Ağrı', 'Van ve Bitlis', 'Bolu ve Düzce'],
+        exp: "Çıldır Gölü, Ardahan ile Kars sınırları arasında yer alan kış turizmi simgesidir.",
+        src: 'Doğu Anadolu Turizm Rehberi',
+      },
+      {
+        text: "Düden ve Manavgat şelaleleri hangi turistik ilimizde yer almaktadır?",
+        options: ['Antalya', 'Mersin', 'Muğla', 'Adana'],
+        exp: "Düden ve Manavgat şelaleleri Antalya ilimizin dünyaca tanınan karstik doğa harikalarıdır.",
+        src: 'Antalya İl Kültür ve Turizm Müdürlüğü',
+      },
+      {
+        text: "Türkiye'nin yüz ölçümü en büyük TATLI SU gölü hangisidir?",
+        options: ['Beyşehir Gölü', 'Van Gölü', 'Tuz Gölü', 'Sapanca Gölü'],
+        exp: "Beyşehir Gölü 650 km² yüzölçümüyle Türkiye'nin en büyük tatlı su gölüdür.",
+        src: 'Devlet Su İşleri (DSİ)',
+      },
+      {
+        text: "Marmara Bölgesi'nin en ünlü kış turizmi ve kayak merkezi olan dağ hangisidir?",
+        options: ['Uludağ', 'Palandöken', 'Kartalkaya', 'Erciyes'],
+        exp: "Bursa ilimizde bulunan Uludağ, Marmara'nın en yüksek noktası ve köklü kayak merkezidir.",
+        src: 'Türkiye Kayak Federasyonu',
+      },
+      {
+        text: "Karadeniz ile Marmara Denizi'ni birbirine bağlayan ve Asya ile Avrupa kıtalarını ayıran su yolu hangisidir?",
+        options: ['İstanbul Boğazı', 'Çanakkale Boğazı', 'Cebelitarık Boğazı', 'Süveyş Kanalı'],
+        exp: "İstanbul Boğazı Karadeniz ile Marmara'yı bağlayan stratejik bir uluslararası suyoludur.",
+        src: 'Kıyı Emniyeti Genel Müdürlüğü',
+      },
+      {
+        text: "Türkiye'nin en uzun kara sınırına sahip olduğu komşu ülke hangisidir?",
+        options: ['Suriye', 'İran', 'Irak', 'Yunanistan'],
+        exp: "Türkiye ile Suriye arasındaki sınır yaklaşık 911 kilometredir.",
+        src: 'Harita Genel Müdürlüğü',
+      },
+      {
+        text: "Türkiye'nin kuzeyinde kıyısı bulunan deniz hangisidir?",
+        options: ['Karadeniz', 'Akdeniz', 'Ege Denizi', 'Kızıldeniz'],
+        exp: "Türkiye'nin kuzey kıyıları boyunca Karadeniz uzanmaktadır.",
         src: 'Harita Genel Müdürlüğü',
       },
     ],
