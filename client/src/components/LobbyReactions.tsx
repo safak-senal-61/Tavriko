@@ -8,7 +8,6 @@ import {
   Platform,
 } from 'react-native';
 import { sound } from '../services/soundService';
-import { THEME } from '../theme/tokens';
 
 export interface FloatingReaction {
   id: string;
@@ -16,7 +15,8 @@ export interface FloatingReaction {
   xOffset: number;
 }
 
-const REACTION_LIST = ['🔥', '👑', '👏', '😂', '❤️', '⚡', '🎯', '🚀'];
+// Sadeleştirilmiş, en popüler 6 reaksiyon (Kral emojisi kaldırıldı)
+const REACTION_LIST = ['🔥', '👏', '😂', '❤️', '⚡', '🚀'];
 
 interface LobbyReactionsProps {
   onReactionSent?: (emoji: string) => void;
@@ -29,10 +29,10 @@ export const LobbyReactions: React.FC<LobbyReactionsProps> = ({
 
   const handlePressEmoji = (emoji: string) => {
     sound.playSound('tap');
-    sound.triggerHaptic('medium');
+    sound.triggerHaptic('light');
 
     const id = `react_${Date.now()}_${Math.random()}`;
-    const xOffset = (Math.random() - 0.5) * 120;
+    const xOffset = (Math.random() - 0.5) * 140;
 
     setFloatingList((prev) => [...prev, { id, emoji, xOffset }]);
 
@@ -47,7 +47,7 @@ export const LobbyReactions: React.FC<LobbyReactionsProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Uçuşan Reaksiyon Emojileri (Floating Particles) */}
+      {/* Uçuşan Reaksiyon Emojileri */}
       <View style={styles.floatingArea} pointerEvents="none">
         {floatingList.map((item) => (
           <FloatingEmojiItem
@@ -58,21 +58,18 @@ export const LobbyReactions: React.FC<LobbyReactionsProps> = ({
         ))}
       </View>
 
-      {/* Reaksiyon Seçim Çubuğu */}
-      <View style={styles.barWrapper}>
-        <Text style={styles.barTitle}>LOBİ REAKSİYONLARI</Text>
-        <View style={styles.reactionsRow}>
-          {REACTION_LIST.map((emoji) => (
-            <TouchableOpacity
-              key={emoji}
-              style={styles.reactionBtn}
-              activeOpacity={0.7}
-              onPress={() => handlePressEmoji(emoji)}
-            >
-              <Text style={styles.reactionEmojiText}>{emoji}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+      {/* Modern, Sade ve İnce Kapsül Reaksiyon Çubuğu */}
+      <View style={styles.pillBar}>
+        {REACTION_LIST.map((emoji) => (
+          <TouchableOpacity
+            key={emoji}
+            style={styles.emojiTouch}
+            activeOpacity={0.65}
+            onPress={() => handlePressEmoji(emoji)}
+          >
+            <Text style={styles.emojiText}>{emoji}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
@@ -92,7 +89,7 @@ const FloatingEmojiItem: React.FC<FloatingEmojiItemProps> = ({
   React.useEffect(() => {
     Animated.timing(animValue, {
       toValue: 1,
-      duration: 1300,
+      duration: 1200,
       useNativeDriver: Platform.OS !== 'web',
     }).start(() => {
       onComplete();
@@ -101,17 +98,17 @@ const FloatingEmojiItem: React.FC<FloatingEmojiItemProps> = ({
 
   const translateY = animValue.interpolate({
     inputRange: [0, 0.2, 1],
-    outputRange: [0, -30, -110],
+    outputRange: [0, -25, -95],
   });
 
   const opacity = animValue.interpolate({
-    inputRange: [0, 0.2, 0.8, 1],
-    outputRange: [0, 1, 0.8, 0],
+    inputRange: [0, 0.15, 0.75, 1],
+    outputRange: [0, 1, 0.85, 0],
   });
 
   const scale = animValue.interpolate({
     inputRange: [0, 0.2, 0.6, 1],
-    outputRange: [0.5, 1.4, 1.1, 0.8],
+    outputRange: [0.6, 1.35, 1.1, 0.85],
   });
 
   return (
@@ -142,10 +139,10 @@ const styles = StyleSheet.create({
   },
   floatingArea: {
     position: 'absolute',
-    bottom: 50,
+    bottom: 40,
     left: 0,
     right: 0,
-    height: 120,
+    height: 100,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 99,
@@ -154,43 +151,44 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   floatingEmojiText: {
-    fontSize: 36,
+    fontSize: 34,
   },
-  barWrapper: {
-    backgroundColor: 'rgba(10, 4, 30, 0.75)',
-    borderRadius: 20,
-    borderWidth: 1.2,
-    borderColor: 'rgba(154, 107, 255, 0.3)',
-    paddingVertical: 10,
+  pillBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    paddingVertical: 6,
     paddingHorizontal: 12,
     width: '100%',
-    alignItems: 'center',
+    maxWidth: 320,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 3,
+      },
+      web: {
+        backdropFilter: 'blur(10px)',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+      },
+    }),
   },
-  barTitle: {
-    fontSize: 10,
-    fontFamily: THEME.fonts.extraBold,
-    fontWeight: '900',
-    color: '#D9CDF5',
-    letterSpacing: 1.5,
-    marginBottom: 8,
-  },
-  reactionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    paddingHorizontal: 4,
-  },
-  reactionBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+  emojiTouch: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  reactionEmojiText: {
-    fontSize: 18,
+  emojiText: {
+    fontSize: 22,
   },
 });

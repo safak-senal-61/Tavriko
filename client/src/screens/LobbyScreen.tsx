@@ -19,7 +19,6 @@ import {
   TavrikoTopBar,
   Button3D,
   CharacterAvatar,
-  CrownIcon,
 } from '../components/TavrikoIcons';
 import { LobbyReactions } from '../components/LobbyReactions';
 
@@ -32,8 +31,8 @@ interface LobbyScreenProps {
   onKickPlayer?: (targetPlayerId: string) => void;
 }
 
-// Crisp SVG Icons
-const CopySvgIcon = ({ size = 20, color = '#FFFFFF' }: { size?: number; color?: string }) => (
+// Minimalist Vektörel İkonlar
+const CopySvgIcon = ({ size = 18, color = '#FFFFFF' }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Rect
       x="9"
@@ -56,7 +55,7 @@ const CopySvgIcon = ({ size = 20, color = '#FFFFFF' }: { size?: number; color?: 
   </Svg>
 );
 
-const ShareSvgIcon = ({ size = 20, color = '#FFFFFF' }: { size?: number; color?: string }) => (
+const ShareSvgIcon = ({ size = 18, color = '#FFFFFF' }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Circle cx="18" cy="5" r="3" stroke={color} strokeWidth="2" />
     <Circle cx="6" cy="12" r="3" stroke={color} strokeWidth="2" />
@@ -70,7 +69,7 @@ const ShareSvgIcon = ({ size = 20, color = '#FFFFFF' }: { size?: number; color?:
   </Svg>
 );
 
-const CheckSvgIcon = ({ size = 20, color = '#5ADBB5' }: { size?: number; color?: string }) => (
+const CheckSvgIcon = ({ size = 18, color = '#5ADBB5' }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path
       d="M20 6L9 17L4 12"
@@ -147,54 +146,47 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Üst Başlık */}
+        {/* Modern, Sade Başlık */}
         <View style={styles.headerTitleWrap}>
-          <Text style={styles.badgeLabel}>ÖZEL ARENA</Text>
           <Text style={styles.title}>ÖZEL LOBİ</Text>
         </View>
 
-        {/* 1. ODA KODU KARTI (Tavriko Cyber-Obsidian Kartı) */}
+        {/* 1. ODA KODU KARTI (Sade & Modern) */}
         <View style={styles.codeCard}>
           <View style={styles.codeInfoLeft}>
             <Text style={styles.codeCardLabel}>ODA KODU</Text>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleCopyCode}
-              style={styles.codeRowTouch}
-            >
-              <Text style={styles.codeValueText}>{room.code}</Text>
-              <Text style={styles.codeHintText}>
-                {copied ? '✓ Kopyalandı!' : 'Dokun kopyala'}
-              </Text>
-            </TouchableOpacity>
+            <Text style={styles.codeValueText}>{room.code}</Text>
           </View>
 
           <View style={styles.actionBtnsRow}>
             {/* Kopyala Butonu */}
             <TouchableOpacity
-              style={[styles.actionSquircleBtn, copied && styles.actionSquircleBtnActive]}
+              style={[styles.actionBtn, copied && styles.actionBtnActive]}
               onPress={handleCopyCode}
               activeOpacity={0.8}
             >
               {copied ? (
-                <CheckSvgIcon size={20} color="#5ADBB5" />
+                <CheckSvgIcon size={18} color="#5ADBB5" />
               ) : (
-                <CopySvgIcon size={20} color="#FFFFFF" />
+                <CopySvgIcon size={18} color="#FFFFFF" />
               )}
+              <Text style={[styles.actionBtnText, copied && styles.actionBtnTextActive]}>
+                {copied ? 'Kopyalandı' : 'Kopyala'}
+              </Text>
             </TouchableOpacity>
 
             {/* Paylaş Butonu */}
             <TouchableOpacity
-              style={styles.actionSquircleBtn}
+              style={styles.actionBtn}
               onPress={handleShareCode}
               activeOpacity={0.8}
             >
-              <ShareSvgIcon size={20} color="#FFFFFF" />
+              <ShareSvgIcon size={18} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* 2. ODA PARAMETRELERİ ROZETLERİ (Soru, Süre, Ceza, Kategori) */}
+        {/* 2. ODA PARAMETRELERİ (Sadeleştirilmiş Çipler) */}
         <View style={styles.chipsRow}>
           <View style={styles.specChip}>
             <Text style={styles.specChipText}>📝 {room.totalRounds || 7} Soru</Text>
@@ -215,7 +207,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             Oyuncular ({players.length}/{maxPlayers})
           </Text>
           <Text style={styles.roomStatusTag}>
-            {canStart ? '🟢 Başlamaya Hazır' : '🟡 Katılımcı Bekleniyor'}
+            {canStart ? '🟢 Başlamaya Hazır' : '🟡 Bekleniyor'}
           </Text>
         </View>
 
@@ -229,21 +221,13 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 key={p.id}
                 style={[styles.playerRow, isMe && styles.playerRowMe]}
               >
-                <View style={styles.avatarBorderWrap}>
-                  <CharacterAvatar seed={p.avatarUrl || p.displayName} index={index} size={42} />
-                </View>
+                <CharacterAvatar seed={p.avatarUrl || p.displayName} index={index} size={42} />
 
                 <View style={styles.playerInfo}>
-                  <View style={styles.nameRow}>
-                    <Text style={styles.playerName} numberOfLines={1}>
-                      {p.displayName} {isMe ? '(Sen)' : ''}
-                    </Text>
-                    {playerIsHost && (
-                      <View style={styles.hostCrownBadge}>
-                        <CrownIcon size={16} />
-                      </View>
-                    )}
-                  </View>
+                  {/* Kral ikonu kaldırıldı, sade ve modern isim görünümü */}
+                  <Text style={styles.playerName} numberOfLines={1}>
+                    {p.displayName} {isMe ? '(Sen)' : ''}
+                  </Text>
                   <Text style={styles.playerRoleText}>
                     {playerIsHost ? 'Oda Kurucusu' : 'Yarışmacı'}
                   </Text>
@@ -277,61 +261,45 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             );
           })}
 
-          {/* Boş Oyuncu Slotları (Tıklanabilir Arkadaş Daveti) */}
+          {/* Boş Slotlar: Sade, düz ve modern (Tekrarlayan davet yazıları kaldırıldı) */}
           {Array.from({ length: Math.min(4, emptySlotCount) }).map((_, idx) => (
-            <TouchableOpacity
-              key={`empty_${idx}`}
-              style={styles.emptySlotTouch}
-              activeOpacity={0.8}
-              onPress={handleShareCode}
-            >
-              <View style={styles.emptyPlusIcon}>
-                <Text style={styles.emptyPlusText}>+</Text>
-              </View>
-              <View style={styles.emptySlotInfo}>
-                <Text style={styles.emptySlotTitle}>Boş Oyuncu Slotu</Text>
-                <Text style={styles.emptySlotSub}>Arkadaşını odaya davet etmek için dokun 🔗</Text>
-              </View>
-            </TouchableOpacity>
+            <View key={`empty_${idx}`} style={styles.emptySlot}>
+              <View style={styles.emptySlotDot} />
+              <Text style={styles.emptySlotText}>Boş Koltuk</Text>
+            </View>
           ))}
         </View>
 
-        {/* 4. LOBİ İÇİ REAKSİYON ÇUBUĞU */}
+        {/* 4. MODERN, ŞIK VE İNCE REAKSİYON KAPSÜLÜ */}
         <LobbyReactions />
 
-        {/* 5. BAŞLATMA VE AKSİYON ALANI */}
+        {/* 5. ALT BAŞLATMA ALANI (Tek, net ve modern aksiyon) */}
         <View style={styles.controlsWrap}>
           {isHost ? (
             <>
               {!canStart ? (
                 <View style={styles.waitingContainer}>
-                  {/* Nefes alan durum metni */}
                   <Animated.Text style={[styles.waitingPulsingText, { opacity: pulseAnim }]}>
-                    👥 Diğer oyuncular bekleniyor...
+                    Diğer oyuncular bekleniyor...
                   </Animated.Text>
                   <Text style={styles.waitingSubNotice}>
-                    Oyunu başlatabilmek için en az 2 oyuncu olmalıdır ({players.length}/{maxPlayers}).
+                    Oyunu başlatabilmek için en az 2 oyuncu olmalıdır.
                   </Text>
 
-                  {/* Birincil Aksiyon: Arkadaş Daveti */}
+                  {/* Tek, modern davet butonu */}
                   <TouchableOpacity
-                    style={styles.inviteShareBtn}
+                    style={styles.singleInviteBtn}
                     onPress={handleShareCode}
                     activeOpacity={0.85}
                   >
                     <ShareSvgIcon size={18} color="#0C3A33" />
-                    <Text style={styles.inviteShareBtnText}>DAVET LİNKİNİ PAYLAŞ</Text>
+                    <Text style={styles.singleInviteBtnText}>Arkadaşını Davet Et</Text>
                   </TouchableOpacity>
-
-                  {/* Devre Dışı Başlatma Rozeti */}
-                  <View style={styles.disabledStartPill}>
-                    <Text style={styles.disabledStartText}>🔒 Oyunu Başlat (En az 2 kişi)</Text>
-                  </View>
                 </View>
               ) : (
                 <View style={styles.readyContainer}>
                   <Text style={styles.readyNotificationText}>
-                    🎉 Lobi hazır! Yarışmayı hemen başlatabilirsiniz.
+                    ✨ Lobi hazır! Yarışmayı hemen başlatabilirsiniz.
                   </Text>
                   <Button3D
                     title="OYUNU BAŞLAT 🎮"
@@ -341,7 +309,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                       onStartGame();
                     }}
                     variant="gold"
-                    style={{ height: 58, width: '100%' }}
+                    style={{ height: 56, width: '100%' }}
                   />
                 </View>
               )}
@@ -356,7 +324,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 }}
               >
                 <Text style={[styles.readyToggleText, isReady && styles.readyToggleTextActive]}>
-                  {isReady ? '✓ HAZIRSIN (BEKLEMEDEYSİN)' : '⚡ HEMEN HAZIR OL'}
+                  {isReady ? '✓ HAZIRSIN' : '⚡ HAZIR OL'}
                 </Text>
               </TouchableOpacity>
               <Text style={styles.waitingHostText}>
@@ -372,118 +340,114 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 50,
+    paddingBottom: 40,
     paddingHorizontal: 16,
     alignItems: 'center',
   },
   headerTitleWrap: {
     alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  badgeLabel: {
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-    fontWeight: '900',
-    color: '#5ADBB5',
-    letterSpacing: 2,
-    marginBottom: 2,
+    marginTop: 6,
+    marginBottom: 14,
   },
   title: {
     fontFamily: THEME.fonts.display,
-    fontSize: 28,
+    fontSize: 26,
     color: '#FFE27A',
     textAlign: 'center',
-    letterSpacing: 1.5,
+    letterSpacing: 2,
   },
   codeCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#1E0E3D',
-    borderRadius: 24,
-    borderWidth: 2,
+    borderRadius: 22,
+    borderWidth: 1.5,
     borderColor: '#FFC43D',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     width: '100%',
-    maxWidth: 390,
+    maxWidth: 380,
     marginBottom: 12,
     ...Platform.select({
       ios: {
         shadowColor: '#FFC43D',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.35,
-        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
       },
       android: {
-        elevation: 8,
+        elevation: 6,
       },
       web: {
-        boxShadow: '0px 6px 20px rgba(255, 196, 61, 0.25)',
+        boxShadow: '0px 4px 14px rgba(255, 196, 61, 0.2)',
       },
     }),
   },
   codeInfoLeft: {
-    flex: 1,
+    justifyContent: 'center',
   },
   codeCardLabel: {
     color: '#D9CDF5',
     fontSize: 10,
     fontFamily: THEME.fonts.extraBold,
     fontWeight: '800',
-    letterSpacing: 1.5,
-  },
-  codeRowTouch: {
-    marginTop: 2,
+    letterSpacing: 1.2,
   },
   codeValueText: {
     fontFamily: THEME.fonts.display,
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '900',
     color: '#FFFFFF',
-    letterSpacing: 5,
-  },
-  codeHintText: {
-    fontSize: 11,
-    fontFamily: THEME.fonts.bold,
-    color: '#5ADBB5',
-    marginTop: 1,
+    letterSpacing: 4,
+    marginTop: 2,
   },
   actionBtnsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
-  actionSquircleBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.22)',
-    justifyContent: 'center',
+  actionBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    justifyContent: 'center',
   },
-  actionSquircleBtnActive: {
+  actionBtnActive: {
     backgroundColor: 'rgba(90, 219, 181, 0.2)',
     borderColor: '#5ADBB5',
+  },
+  actionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
+    fontWeight: '700',
+  },
+  actionBtnTextActive: {
+    color: '#5ADBB5',
   },
   chipsRow: {
     flexDirection: 'row',
     gap: 8,
     width: '100%',
-    maxWidth: 390,
+    maxWidth: 380,
     marginBottom: 14,
   },
   specChip: {
     flex: 1,
-    backgroundColor: 'rgba(107, 60, 255, 0.2)',
+    backgroundColor: 'rgba(107, 60, 255, 0.18)',
     paddingVertical: 7,
     paddingHorizontal: 10,
     borderRadius: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(154, 107, 255, 0.4)',
+    borderColor: 'rgba(154, 107, 255, 0.35)',
   },
   specChipText: {
     color: '#FFFFFF',
@@ -496,7 +460,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    maxWidth: 390,
+    maxWidth: 380,
     marginBottom: 8,
     paddingHorizontal: 4,
   },
@@ -514,15 +478,15 @@ const styles = StyleSheet.create({
   },
   playersList: {
     width: '100%',
-    maxWidth: 390,
+    maxWidth: 380,
     gap: 8,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   playerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    borderRadius: 20,
+    borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1.5,
     borderColor: 'rgba(154, 107, 255, 0.35)',
@@ -531,29 +495,15 @@ const styles = StyleSheet.create({
     borderColor: '#FFC43D',
     backgroundColor: 'rgba(255, 196, 61, 0.08)',
   },
-  avatarBorderWrap: {
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: '#6B3CFF',
-    padding: 2,
-  },
   playerInfo: {
     flex: 1,
     marginLeft: 12,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
   },
   playerName: {
     color: '#FFFFFF',
     fontSize: 15,
     fontFamily: THEME.fonts.display,
     fontWeight: '900',
-  },
-  hostCrownBadge: {
-    marginLeft: 2,
   },
   playerRoleText: {
     color: '#D9CDF5',
@@ -565,7 +515,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 14,
-    borderWidth: 1.5,
+    borderWidth: 1.2,
   },
   statusReady: {
     backgroundColor: 'rgba(90, 219, 181, 0.2)',
@@ -600,52 +550,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: THEME.fonts.bold,
   },
-  emptySlotTouch: {
+  emptySlot: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 14,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: 'rgba(154, 107, 255, 0.35)',
-    borderStyle: 'dashed',
-    backgroundColor: 'rgba(24, 11, 52, 0.45)',
-  },
-  emptyPlusIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
   },
-  emptyPlusText: {
-    color: '#5ADBB5',
-    fontSize: 22,
-    fontWeight: '900',
-    lineHeight: 24,
+  emptySlotDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    marginRight: 10,
   },
-  emptySlotInfo: {
-    marginLeft: 12,
-  },
-  emptySlotTitle: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontFamily: THEME.fonts.extraBold,
-    fontWeight: '800',
-  },
-  emptySlotSub: {
-    color: '#A79BC4',
-    fontSize: 11,
+  emptySlotText: {
+    color: '#8A7BB3',
+    fontSize: 12,
     fontFamily: THEME.fonts.medium,
-    marginTop: 2,
   },
   controlsWrap: {
     width: '100%',
-    maxWidth: 390,
-    marginTop: 10,
+    maxWidth: 380,
+    marginTop: 8,
   },
   waitingContainer: {
     alignItems: 'center',
@@ -653,7 +583,7 @@ const styles = StyleSheet.create({
   },
   waitingPulsingText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: THEME.fonts.display,
     textAlign: 'center',
     letterSpacing: 0.5,
@@ -663,55 +593,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: THEME.fonts.bold,
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: 3,
     marginBottom: 12,
   },
-  inviteShareBtn: {
+  singleInviteBtn: {
     width: '100%',
-    height: 52,
-    borderRadius: 26,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#5ADBB5',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 10,
     ...Platform.select({
       ios: {
         shadowColor: '#5ADBB5',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.45,
+        shadowOpacity: 0.35,
         shadowRadius: 8,
       },
       android: {
-        elevation: 6,
+        elevation: 5,
       },
       web: {
-        boxShadow: '0 4px 14px rgba(90, 219, 181, 0.4)',
+        boxShadow: '0 4px 12px rgba(90, 219, 181, 0.35)',
       },
     }),
   },
-  inviteShareBtnText: {
+  singleInviteBtnText: {
     color: '#0C3A33',
     fontSize: 15,
     fontFamily: THEME.fonts.display,
     fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  disabledStartPill: {
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1.2,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  disabledStartText: {
-    color: 'rgba(255, 255, 255, 0.4)',
-    fontSize: 14,
-    fontFamily: THEME.fonts.display,
     letterSpacing: 0.5,
   },
   readyContainer: {
