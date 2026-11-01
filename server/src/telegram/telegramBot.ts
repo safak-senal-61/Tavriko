@@ -5,6 +5,7 @@ import { supabaseService } from '../db/supabaseClient';
 import { CategoryId, DifficultyLevel, Question } from '@trivia/shared';
 import { GameRoomManager } from '../engine/GameRoomManager';
 import { cacheService } from '../cache/redisClient';
+import { logger } from '../utils/logger';
 
 export interface TelegramBotConfig {
   token?: string;
@@ -252,19 +253,27 @@ export class TelegramBotService {
 
   public async setWebhook(url: string): Promise<{ success: boolean; message: string; info?: any }> {
     if (!this.bot) {
+      await this.ensureBotReady();
+    }
+    if (!this.bot) {
       return { success: false, message: 'Bot başlatılmamış veya token tanımlanmamış.' };
     }
     try {
       await this.bot.telegram.setWebhook(url, { drop_pending_updates: true });
       const info = await this.bot.telegram.getWebhookInfo();
       this.running = true;
+      logger.success('TELEGRAM', `Webhook güncellendi: ${url}`, info);
       return { success: true, message: `Telegram Webhook başarıyla kuruldu: ${url}`, info };
     } catch (err: any) {
+      logger.error('TELEGRAM', `Webhook kurulum hatası: ${err.message}`);
       return { success: false, message: `Webhook kurulum hatası: ${err.message}` };
     }
   }
 
   public async getWebhookInfo(): Promise<any> {
+    if (!this.bot) {
+      await this.ensureBotReady();
+    }
     if (!this.bot) return null;
     try {
       return await this.bot.telegram.getWebhookInfo();
@@ -290,17 +299,24 @@ export class TelegramBotService {
       this.registerTelegrafHandlers();
 
       const isVercel = Boolean(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
-      const publicBaseUrl = process.env.PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://tavriko-app.vercel.app');
+      const publicBaseUrl = process.env.PUBLIC_APP_URL || 'https://tavriko-app.vercel.app';
 
       if (isVercel || process.env.NODE_ENV === 'production') {
         const webhookUrl = `${publicBaseUrl}/api/telegram/webhook`;
         try {
           await this.bot.telegram.setWebhook(webhookUrl, { drop_pending_updates: true });
           console.log(`🤖 [TelegramBot] Webhook başarıyla ayarlandı: ${webhookUrl}`);
+          logger.success('TELEGRAM', `Webhook başarıyla kuruldu: ${webhookUrl}`);
           this.running = true;
         } catch (whErr: any) {
           console.warn('[TelegramBot] setWebhook uyarısı:', whErr.message);
-          this.running = true;
+          logger.error('TELEGRAM', `Telegram setWebhook reddedildi: ${whErr.message}`, { webhookUrl });
+          this.running = false;
+          this.isStarting = false;
+          return {
+            success: false,
+            message: `Telegram Webhook kurulamadı: ${whErr.message}. Lütfen bot tokeninizi kontrol edin.`,
+          };
         }
       } else {
         // Reset any pending webhooks or conflicting update queues cleanly
@@ -433,11 +449,14 @@ export class TelegramBotService {
   private async replySafe(ctx: any, text: string, extra?: any) {
     try {
       await ctx.replyWithMarkdown(text, extra);
+      logger.info('TELEGRAM', `Kullanıcıya yanıt gönderildi (ChatId: ${ctx?.chat?.id || ctx?.from?.id})`);
     } catch {
       try {
         const clean = text.replace(/[*_`]/g, '');
         await ctx.reply(clean, extra);
+        logger.info('TELEGRAM', `Kullanıcıya düz metin yanıt gönderildi (ChatId: ${ctx?.chat?.id || ctx?.from?.id})`);
       } catch (err: any) {
+        logger.error('TELEGRAM', `Mesaj iletim hatası: ${err.message}`, { chatId: ctx?.chat?.id });
         console.warn('[TelegramBot] Mesaj iletim hatası:', err.message);
       }
     }
@@ -446,6 +465,8 @@ export class TelegramBotService {
   public async handleCommand(userId: number | string, text: string): Promise<BotCommandResponse> {
     const parts = text.trim().split(/\s+/);
     const cmd = parts[0].toLowerCase();
+
+    logger.info('TELEGRAM', `Telegram komutu yürütülüyor: "${cmd}" (Kullanıcı: ${userId})`);
 
     // Admin-only commands check
     const adminOnlyCommands = ['/soru_uret', '/bekleyenler', '/gunluk_soru_uret', '/ozel_soru_uret'];

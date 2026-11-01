@@ -5,7 +5,7 @@ export interface LogEntry {
   timestamp: string;
   iso: string;
   level: 'INFO' | 'SUCCESS' | 'WARN' | 'ERROR' | 'DEBUG';
-  category: 'HTTP' | 'AUTH' | 'GOOGLE' | 'DB' | 'PRISMA' | 'SOCKET' | 'CLIENT' | 'SYSTEM';
+  category: 'HTTP' | 'AUTH' | 'GOOGLE' | 'DB' | 'PRISMA' | 'SOCKET' | 'CLIENT' | 'SYSTEM' | 'TELEGRAM';
   message: string;
   details?: any;
 }

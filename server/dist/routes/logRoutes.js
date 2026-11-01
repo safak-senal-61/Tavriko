@@ -930,6 +930,7 @@ function renderDashboardHtml() {
               <span class="pill" onclick="setLogFilter('CAT', 'HTTP', this)">🌐 HTTP</span>
               <span class="pill" onclick="setLogFilter('CAT', 'AUTH', this)">🔐 Auth</span>
               <span class="pill" onclick="setLogFilter('CAT', 'GOOGLE', this)">🌐 Google</span>
+              <span class="pill" style="color:#38BDF8;" onclick="setLogFilter('CAT', 'TELEGRAM', this)">🤖 Telegram</span>
             </div>
           </div>
 

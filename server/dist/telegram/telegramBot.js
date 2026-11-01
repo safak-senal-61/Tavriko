@@ -5,6 +5,7 @@ const telegraf_1 = require("telegraf");
 const evrenLlmGenerator_1 = require("../ai/evrenLlmGenerator");
 const supabaseClient_1 = require("../db/supabaseClient");
 const redisClient_1 = require("../cache/redisClient");
+const logger_1 = require("../utils/logger");
 exports.CATEGORIES_CONFIG = [
     { id: 'geography', name: 'Coğrafya', emoji: '🌍' },
     { id: 'mathematics', name: 'Matematik', emoji: '📐' },
@@ -219,19 +220,27 @@ class TelegramBotService {
     }
     async setWebhook(url) {
         if (!this.bot) {
+            await this.ensureBotReady();
+        }
+        if (!this.bot) {
             return { success: false, message: 'Bot başlatılmamış veya token tanımlanmamış.' };
         }
         try {
             await this.bot.telegram.setWebhook(url, { drop_pending_updates: true });
             const info = await this.bot.telegram.getWebhookInfo();
             this.running = true;
+            logger_1.logger.success('TELEGRAM', `Webhook güncellendi: ${url}`, info);
             return { success: true, message: `Telegram Webhook başarıyla kuruldu: ${url}`, info };
         }
         catch (err) {
+            logger_1.logger.error('TELEGRAM', `Webhook kurulum hatası: ${err.message}`);
             return { success: false, message: `Webhook kurulum hatası: ${err.message}` };
         }
     }
     async getWebhookInfo() {
+        if (!this.bot) {
+            await this.ensureBotReady();
+        }
         if (!this.bot)
             return null;
         try {
@@ -254,17 +263,24 @@ class TelegramBotService {
             });
             this.registerTelegrafHandlers();
             const isVercel = Boolean(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
-            const publicBaseUrl = process.env.PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://tavriko-app.vercel.app');
+            const publicBaseUrl = process.env.PUBLIC_APP_URL || 'https://tavriko-app.vercel.app';
             if (isVercel || process.env.NODE_ENV === 'production') {
                 const webhookUrl = `${publicBaseUrl}/api/telegram/webhook`;
                 try {
                     await this.bot.telegram.setWebhook(webhookUrl, { drop_pending_updates: true });
                     console.log(`🤖 [TelegramBot] Webhook başarıyla ayarlandı: ${webhookUrl}`);
+                    logger_1.logger.success('TELEGRAM', `Webhook başarıyla kuruldu: ${webhookUrl}`);
                     this.running = true;
                 }
                 catch (whErr) {
                     console.warn('[TelegramBot] setWebhook uyarısı:', whErr.message);
-                    this.running = true;
+                    logger_1.logger.error('TELEGRAM', `Telegram setWebhook reddedildi: ${whErr.message}`, { webhookUrl });
+                    this.running = false;
+                    this.isStarting = false;
+                    return {
+                        success: false,
+                        message: `Telegram Webhook kurulamadı: ${whErr.message}. Lütfen bot tokeninizi kontrol edin.`,
+                    };
                 }
             }
             else {
@@ -386,13 +402,16 @@ class TelegramBotService {
     async replySafe(ctx, text, extra) {
         try {
             await ctx.replyWithMarkdown(text, extra);
+            logger_1.logger.info('TELEGRAM', `Kullanıcıya yanıt gönderildi (ChatId: ${ctx?.chat?.id || ctx?.from?.id})`);
         }
         catch {
             try {
                 const clean = text.replace(/[*_`]/g, '');
                 await ctx.reply(clean, extra);
+                logger_1.logger.info('TELEGRAM', `Kullanıcıya düz metin yanıt gönderildi (ChatId: ${ctx?.chat?.id || ctx?.from?.id})`);
             }
             catch (err) {
+                logger_1.logger.error('TELEGRAM', `Mesaj iletim hatası: ${err.message}`, { chatId: ctx?.chat?.id });
                 console.warn('[TelegramBot] Mesaj iletim hatası:', err.message);
             }
         }
@@ -400,6 +419,7 @@ class TelegramBotService {
     async handleCommand(userId, text) {
         const parts = text.trim().split(/\s+/);
         const cmd = parts[0].toLowerCase();
+        logger_1.logger.info('TELEGRAM', `Telegram komutu yürütülüyor: "${cmd}" (Kullanıcı: ${userId})`);
         // Admin-only commands check
         const adminOnlyCommands = ['/soru_uret', '/bekleyenler', '/gunluk_soru_uret', '/ozel_soru_uret'];
         if (adminOnlyCommands.includes(cmd) && !this.isAdmin(userId)) {

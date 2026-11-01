@@ -78,8 +78,19 @@ function createApp() {
     // Initialize Telegram Bot & Admin Approval Service
     const telegramBot = new telegramBot_1.TelegramBotService({ db: prismaClient_1.db, roomManager });
     // Telegram Webhook endpoint (Essential for Vercel Serverless execution)
-    app.post('/api/telegram/webhook', async (req, res) => {
+    app.post(['/api/telegram/webhook', '/telegram/webhook'], async (req, res) => {
         try {
+            const update = req.body;
+            const sender = update?.message?.from?.username ||
+                update?.callback_query?.from?.username ||
+                update?.message?.from?.id ||
+                'Bilinmiyor';
+            const text = update?.message?.text ||
+                (update?.callback_query ? `[Callback: ${update.callback_query.data}]` : '(medya/diğer)');
+            logger_1.logger.info('TELEGRAM', `Webhook isteği alındı (@${sender}): ${text}`, {
+                updateId: update?.update_id,
+                chatId: update?.message?.chat?.id || update?.callback_query?.message?.chat?.id,
+            });
             if (!req.body || typeof req.body !== 'object') {
                 return res.status(200).send('OK');
             }
@@ -87,16 +98,16 @@ function createApp() {
             return res.status(200).send('OK');
         }
         catch (err) {
+            logger_1.logger.error('TELEGRAM', `Telegram Webhook Hatası: ${err.message}`, { stack: err.stack });
             console.error('[Telegram Webhook Error]:', err.message);
             return res.status(200).send('OK');
         }
     });
     // Telegram set webhook endpoint
-    app.get('/api/admin/telegram/set-webhook', async (req, res) => {
+    app.get(['/api/admin/telegram/set-webhook', '/admin/telegram/set-webhook'], async (req, res) => {
         try {
-            const host = req.get('host') || 'tavriko-app.vercel.app';
-            const proto = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'https';
-            const webhookUrl = req.query.url || `${proto}://${host}/api/telegram/webhook`;
+            const defaultUrl = 'https://tavriko-app.vercel.app/api/telegram/webhook';
+            const webhookUrl = req.query.url || defaultUrl;
             const result = await telegramBot.setWebhook(webhookUrl);
             return res.json(result);
         }
@@ -105,7 +116,7 @@ function createApp() {
         }
     });
     // Telegram webhook info
-    app.get('/api/admin/telegram/webhook-info', async (req, res) => {
+    app.get(['/api/admin/telegram/webhook-info', '/admin/telegram/webhook-info'], async (req, res) => {
         try {
             const info = await telegramBot.getWebhookInfo();
             return res.json({ success: true, info });
@@ -147,7 +158,7 @@ function createApp() {
         });
     });
     // Telegram bot live configuration endpoint
-    app.post('/api/admin/telegram/config', async (req, res) => {
+    app.post(['/api/admin/telegram/config', '/admin/telegram/config'], async (req, res) => {
         try {
             const { token, adminIds } = req.body;
             if (!token || typeof token !== 'string' || token.trim().length < 15) {
@@ -179,7 +190,7 @@ function createApp() {
         }
     });
     // Telegram test & status check endpoint
-    app.get('/api/admin/telegram/test', async (req, res) => {
+    app.get(['/api/admin/telegram/test', '/admin/telegram/test'], async (req, res) => {
         try {
             const info = await telegramBot.getBotInfo();
             return res.json(info);
@@ -459,15 +470,20 @@ function createApp() {
                 <button type="submit" class="btn btn-telegram" id="btn-save-bot">
                   🚀 Botu Bağla ve Başlat
                 </button>
+                <button type="button" class="btn" id="btn-force-webhook" onclick="forceSetWebhook()" style="margin-top: 8px; background: #232B42; border: 1px solid #3B4B75;">
+                  🔄 Webhook'u Tavriko Vercel'e Bağla
+                </button>
                 <button type="button" class="btn" id="btn-test-bot" onclick="testTelegramBot()" style="margin-top: 8px; background: rgba(255,255,255,0.08); border: 1px solid #2B3754;">
                   🧪 Bot & Webhook Bağlantısını Test Et
                 </button>
               </form>
               <div id="msg-box"></div>
-              <div id="bot-details-box" style="display: none; margin-top: 14px; background: rgba(0, 136, 204, 0.1); border: 1px solid rgba(0, 136, 204, 0.3); border-radius: 12px; padding: 12px; font-size: 13px;">
-                <div style="font-weight: 700; color: #38BDF8; margin-bottom: 6px;" id="bot-username-display">🤖 Bot Bilgisi</div>
-                <div style="color: #94A3B8; font-size: 12px;" id="bot-webhook-display">Webhook: https://tavriko-app.vercel.app/api/telegram/webhook</div>
-                <a id="bot-link-btn" href="#" target="_blank" style="display: inline-block; margin-top: 8px; background: #0088cc; color: #fff; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 12px;">📲 Telegram'da Botu Aç</a>
+              <div id="bot-details-box" style="display: none; margin-top: 14px; background: rgba(0, 136, 204, 0.1); border: 1px solid rgba(0, 136, 204, 0.3); border-radius: 12px; padding: 14px; font-size: 13px;">
+                <div style="font-weight: 700; color: #38BDF8; margin-bottom: 6px; font-size: 14px;" id="bot-username-display">🤖 Bot Bilgisi</div>
+                <div style="color: #CBD5E1; font-size: 12px; margin-bottom: 4px;" id="bot-webhook-display">Webhook: https://tavriko-app.vercel.app/api/telegram/webhook</div>
+                <div style="color: #94A3B8; font-size: 11px; margin-bottom: 6px;" id="bot-pending-display">Bekleyen Güncellemeler: 0</div>
+                <div style="color: #EF4444; font-size: 12px; font-weight: 600; display: none;" id="bot-error-display"></div>
+                <a id="bot-link-btn" href="#" target="_blank" style="display: inline-block; margin-top: 8px; background: #0088cc; color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 13px;">📲 Telegram'da Botu Aç</a>
               </div>
             </div>
           </div>
@@ -528,12 +544,43 @@ function createApp() {
             }
           }
 
+          async function forceSetWebhook() {
+            const btn = document.getElementById('btn-force-webhook');
+            const msg = document.getElementById('msg-box');
+            btn.disabled = true;
+            btn.innerText = 'Webhook Kuruluyor...';
+            msg.style.display = 'none';
+
+            try {
+              const res = await fetch('/api/admin/telegram/set-webhook');
+              const data = await res.json();
+              msg.style.display = 'block';
+              if (data.success) {
+                msg.style.color = '#10B981';
+                msg.innerText = '✅ ' + data.message;
+                testTelegramBot();
+              } else {
+                msg.style.color = '#EF4444';
+                msg.innerText = '❌ Webhook kurulamadı: ' + (data.message || data.error);
+              }
+            } catch (err) {
+              msg.style.display = 'block';
+              msg.style.color = '#EF4444';
+              msg.innerText = '❌ İstek hatası: ' + err.message;
+            } finally {
+              btn.disabled = false;
+              btn.innerText = '🔄 Webhook\'u Tavriko Vercel\'e Bağla';
+            }
+          }
+
           async function testTelegramBot() {
             const btn = document.getElementById('btn-test-bot');
             const msg = document.getElementById('msg-box');
             const detailsBox = document.getElementById('bot-details-box');
             const usernameEl = document.getElementById('bot-username-display');
             const webhookEl = document.getElementById('bot-webhook-display');
+            const pendingEl = document.getElementById('bot-pending-display');
+            const errorEl = document.getElementById('bot-error-display');
             const linkBtn = document.getElementById('bot-link-btn');
 
             btn.disabled = true;
@@ -550,6 +597,15 @@ function createApp() {
                 detailsBox.style.display = 'block';
                 usernameEl.innerText = '🤖 @' + data.bot.username + ' (' + (data.bot.first_name || 'Tavriko Bot') + ')';
                 webhookEl.innerText = 'Webhook: ' + (data.webhook?.url || 'Kurulu değil (Polling)');
+                if (pendingEl) pendingEl.innerText = 'Bekleyen Güncellemeler: ' + (data.webhook?.pending_update_count ?? 0);
+                if (errorEl) {
+                  if (data.webhook?.last_error_message) {
+                    errorEl.style.display = 'block';
+                    errorEl.innerText = '⚠️ Telegram Uyarısı: ' + data.webhook.last_error_message;
+                  } else {
+                    errorEl.style.display = 'none';
+                  }
+                }
                 if (data.bot.username) {
                   linkBtn.href = 'https://t.me/' + data.bot.username;
                   linkBtn.style.display = 'inline-block';
@@ -604,7 +660,7 @@ function createApp() {
     `);
     });
     // Health check
-    app.get('/health', async (req, res) => {
+    app.get(['/health', '/api/health'], async (req, res) => {
         const [supabaseHealth, prismaHealth] = await Promise.all([
             supabaseClient_1.supabaseService.checkHealth(),
             prismaClient_1.prisma.checkHealth(),
