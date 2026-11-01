@@ -434,7 +434,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 110,
+    paddingBottom: 140,
     paddingHorizontal: 12,
   },
   heroWrap: {

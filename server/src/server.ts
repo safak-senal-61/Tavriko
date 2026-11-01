@@ -86,7 +86,44 @@ export function createApp() {
   setupSocketHandlers(io, roomManager, matchmaker);
 
   // Initialize Telegram Bot & Admin Approval Service
-  const telegramBot = new TelegramBotService({ db });
+  const telegramBot = new TelegramBotService({ db, roomManager });
+
+  // Telegram Webhook endpoint (Essential for Vercel Serverless execution)
+  app.post('/api/telegram/webhook', async (req, res) => {
+    try {
+      if (!req.body || typeof req.body !== 'object') {
+        return res.status(200).send('OK');
+      }
+      await telegramBot.handleWebhookUpdate(req.body);
+      return res.status(200).send('OK');
+    } catch (err: any) {
+      console.error('[Telegram Webhook Error]:', err.message);
+      return res.status(200).send('OK');
+    }
+  });
+
+  // Telegram set webhook endpoint
+  app.get('/api/admin/telegram/set-webhook', async (req, res) => {
+    try {
+      const host = req.get('host') || 'tavriko-app.vercel.app';
+      const proto = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'https';
+      const webhookUrl = (req.query.url as string) || `${proto}://${host}/api/telegram/webhook`;
+      const result = await telegramBot.setWebhook(webhookUrl);
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Telegram webhook info
+  app.get('/api/admin/telegram/webhook-info', async (req, res) => {
+    try {
+      const info = await telegramBot.getWebhookInfo();
+      return res.json({ success: true, info });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
 
   // Dynamic QR Code endpoint (Default to Cloud Web URL for 24/7 direct play)
   app.get('/qr', async (req, res) => {
@@ -112,11 +149,13 @@ export function createApp() {
   });
 
   // Telegram bot status endpoint
-  app.get('/api/admin/telegram/status', (req, res) => {
+  app.get('/api/admin/telegram/status', async (req, res) => {
+    const webhookInfo = await telegramBot.getWebhookInfo();
     res.json({
       running: telegramBot.isRunning(),
       tokenConfigured: !!(process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_BOT_TOKEN.includes('placeholder')),
       activeToken: telegramBot.getActiveToken(),
+      webhookInfo,
     });
   });
 

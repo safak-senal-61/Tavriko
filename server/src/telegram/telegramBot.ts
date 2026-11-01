@@ -3,11 +3,13 @@ import { DatabaseAdapter } from '../db/prismaClient';
 import { generateQuestionsWithEvrenGLM } from '../ai/evrenLlmGenerator';
 import { supabaseService } from '../db/supabaseClient';
 import { CategoryId, DifficultyLevel, Question } from '@trivia/shared';
+import { GameRoomManager } from '../engine/GameRoomManager';
 
 export interface TelegramBotConfig {
   token?: string;
   adminIds?: Array<number | string>;
   db: DatabaseAdapter;
+  roomManager?: GameRoomManager;
 }
 
 export interface BotCommandResponse {
@@ -116,12 +118,14 @@ export class TelegramBotService {
   private bot: Telegraf | null = null;
   private adminIds: Set<string>;
   private db: DatabaseAdapter;
+  private roomManager?: GameRoomManager;
   private running: boolean = false;
   private activeToken: string | null = null;
   private isStarting: boolean = false;
 
   constructor(config: TelegramBotConfig) {
     this.db = config.db;
+    this.roomManager = config.roomManager;
     const parsedAdmins = (config.adminIds || [])
       .map((id) => String(id).trim())
       .filter(Boolean);
@@ -174,6 +178,35 @@ export class TelegramBotService {
     }
   }
 
+  public async handleWebhookUpdate(update: any): Promise<void> {
+    if (this.bot) {
+      await this.bot.handleUpdate(update);
+    }
+  }
+
+  public async setWebhook(url: string): Promise<{ success: boolean; message: string; info?: any }> {
+    if (!this.bot) {
+      return { success: false, message: 'Bot başlatılmamış veya token tanımlanmamış.' };
+    }
+    try {
+      await this.bot.telegram.setWebhook(url, { drop_pending_updates: true });
+      const info = await this.bot.telegram.getWebhookInfo();
+      this.running = true;
+      return { success: true, message: `Telegram Webhook başarıyla kuruldu: ${url}`, info };
+    } catch (err: any) {
+      return { success: false, message: `Webhook kurulum hatası: ${err.message}` };
+    }
+  }
+
+  public async getWebhookInfo(): Promise<any> {
+    if (!this.bot) return null;
+    try {
+      return await this.bot.telegram.getWebhookInfo();
+    } catch {
+      return null;
+    }
+  }
+
   private async initBot(token: string): Promise<{ success: boolean; message: string }> {
     if (this.isStarting) {
       return { success: false, message: 'Bot zaten başlatılıyor, lütfen bekleyin.' };
@@ -190,22 +223,37 @@ export class TelegramBotService {
 
       this.registerTelegrafHandlers();
 
-      // Reset any pending webhooks or conflicting update queues cleanly
-      try {
-        await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
-      } catch (e: any) {
-        console.warn('[TelegramBot] deleteWebhook uyarısı:', e.message);
-      }
+      const isVercel = Boolean(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
+      const publicBaseUrl = process.env.PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://tavriko-app.vercel.app');
 
-      this.bot.launch({
-        dropPendingUpdates: true,
-      }).then(() => {
-        this.running = true;
-        console.log('🤖 [TelegramBot] Telegram Admin Bot başarıyla başlatıldı ve dinliyor.');
-      }).catch((err: any) => {
-        this.running = false;
-        console.warn('[TelegramBot] Bot başlatılırken hata oluştu:', err.message);
-      });
+      if (isVercel || process.env.NODE_ENV === 'production') {
+        const webhookUrl = `${publicBaseUrl}/api/telegram/webhook`;
+        try {
+          await this.bot.telegram.setWebhook(webhookUrl, { drop_pending_updates: true });
+          console.log(`🤖 [TelegramBot] Webhook başarıyla ayarlandı: ${webhookUrl}`);
+          this.running = true;
+        } catch (whErr: any) {
+          console.warn('[TelegramBot] setWebhook uyarısı:', whErr.message);
+          this.running = true;
+        }
+      } else {
+        // Reset any pending webhooks or conflicting update queues cleanly
+        try {
+          await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
+        } catch (e: any) {
+          console.warn('[TelegramBot] deleteWebhook uyarısı:', e.message);
+        }
+
+        this.bot.launch({
+          dropPendingUpdates: true,
+        }).then(() => {
+          this.running = true;
+          console.log('🤖 [TelegramBot] Telegram Admin Bot başarıyla başlatıldı ve dinliyor.');
+        }).catch((err: any) => {
+          this.running = false;
+          console.warn('[TelegramBot] Bot başlatılırken hata oluştu:', err.message);
+        });
+      }
 
       this.running = true;
       this.isStarting = false;
@@ -227,8 +275,10 @@ export class TelegramBotService {
 
   public getMainKeyboard() {
     return Markup.keyboard([
-      ['✨ Yeni Soru Üret', '📊 Soru Havuzu'],
-      ['⏳ Onay Bekleyenler', '❓ Yardım & Bilgi'],
+      ['✨ Yeni Soru Üret', '📅 Günlük Soru Üret'],
+      ['⚔️ Özel Oda Soru Üret', '📊 Soru Havuzu'],
+      ['⏳ Onay Bekleyenler', '🏆 Pro Lig Sıralaması'],
+      ['🎮 Hızlı Oda Kur', '❓ Yardım & Komutlar'],
     ]).resize();
   }
 
@@ -272,6 +322,13 @@ export class TelegramBotService {
     const catDisplay = catObj ? `${catObj.emoji} ${catObj.name}` : q.categoryId;
     const diffDisplay = diffObj ? `${diffObj.emoji} ${diffObj.name}` : q.difficulty;
 
+    let poolTag = '🌐 Normal Kategori';
+    if (q.targetPool === 'daily_challenge' || q.isDailyChallenge) {
+      poolTag = '📅 Günlük Meydan Okuma';
+    } else if (q.targetPool === 'custom_room' || q.isCustomRoomOnly) {
+      poolTag = '⚔️ Özel Oda / Arkadaş';
+    }
+
     const optLabels = ['A', 'B', 'C', 'D'];
     const optionsText = q.options
       .map((opt, i) => `${optLabels[i]}) ${opt.text} ${opt.id === q.correctOptionId ? '👈 (Doğru Cevap)' : ''}`)
@@ -280,6 +337,7 @@ export class TelegramBotService {
     return (
       `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `📝 *Soru ID:* \`${q.id}\`\n` +
+      `🎯 *Havuz:* ${poolTag}\n` +
       `🏷 *Kategori:* ${catDisplay} | 📊 *Zorluk:* ${diffDisplay}\n` +
       (q.subCategory ? `📌 *Kapsam:* ${q.subCategory}\n` : '') +
       `\n❓ *SORU:*\n*${q.text}*\n\n` +
@@ -293,11 +351,15 @@ export class TelegramBotService {
   public buildInlineKeyboard(q: Question) {
     return Markup.inlineKeyboard([
       [
-        Markup.button.callback('✅ Onayla ve Yayına Al', `approve:${q.id}`),
-        Markup.button.callback('❌ Reddet', `reject:${q.id}`),
+        Markup.button.callback('✅ Normal Kategoriye Al', `approve_cat:${q.id}`),
       ],
       [
-        Markup.button.callback('🔄 Bu Kategoride Yeniden Üret', `wiz_run:${q.categoryId}:${q.difficulty}:1`),
+        Markup.button.callback('📅 Günlük Meydan Okuma', `approve_daily:${q.id}`),
+        Markup.button.callback('⚔️ Özel Oda / Arkadaş', `approve_custom:${q.id}`),
+      ],
+      [
+        Markup.button.callback('❌ Reddet', `reject:${q.id}`),
+        Markup.button.callback('🔄 Yeniden Üret', `wiz_run:${q.categoryId}:${q.difficulty}:1`),
       ],
     ]);
   }
@@ -316,15 +378,17 @@ export class TelegramBotService {
   }
 
   public async handleCommand(userId: number | string, text: string): Promise<BotCommandResponse> {
-    if (!this.isAdmin(userId)) {
+    const parts = text.trim().split(/\s+/);
+    const cmd = parts[0].toLowerCase();
+
+    // Admin-only commands check
+    const adminOnlyCommands = ['/soru_uret', '/bekleyenler', '/gunluk_soru_uret', '/ozel_soru_uret'];
+    if (adminOnlyCommands.includes(cmd) && !this.isAdmin(userId)) {
       return {
         authorized: false,
         message: '⛔ Bu bot yalnızca yetkili yöneticiler içindir. Erişim yetkiniz bulunmamaktadır.',
       };
     }
-
-    const parts = text.trim().split(/\s+/);
-    const cmd = parts[0].toLowerCase();
 
     switch (cmd) {
       case '/start':
@@ -333,10 +397,22 @@ export class TelegramBotService {
         return {
           authorized: true,
           message:
-            `👋 *TriviaVerse Yönetim & Soru Onay Botuna Hoş Geldiniz!*\n\n` +
-            `Bu bot üzerinden T.C. SSB EVREN platformundaki *GLM-5.3* yapay zekâ modelini kullanarak 16 kategoride sorular üretebilir ve onaylayarak doğrudan canlı oyuna dahil edebilirsiniz.\n\n` +
-            `👉 *Nasıl Soru Üretilir?*\n` +
-            `Aşağıdaki *"✨ Yeni Soru Üret"* butonuna basarak adım adım kategori, zorluk ve adet seçimi yapabilirsiniz. Kod veya komut yazmanıza gerek yoktur!`,
+            `👋 *Tavriko Bilgi Yarışması & Yönetim Botu*\n\n` +
+            `T.C. SSB EVREN platformundaki *GLM-5.3* yapay zekâ modeli ile güçlendirilen soru üretim, topluluk ve canlı maç altyapısına hoş geldiniz!\n\n` +
+            `*🎯 Soru Üretimi ve Hedef Havuzlar:*\n` +
+            `• \`/soru_uret [kategori] [zorluk] [adet]\` — Normal maçlar için soru üretir\n` +
+            `• \`/gunluk_soru_uret [zorluk] [adet]\` — Günlük Meydan Okuma havuzu için soru üretir\n` +
+            `• \`/ozel_soru_uret [zorluk] [adet]\` — Özel Oda / Arkadaş düelloları için eğlenceli sorular üretir\n` +
+            `• \`/bekleyenler\` — Onay kuyruğundaki soruları inceler\n` +
+            `• \`/istatistik\` — Soru havuzu metrikleri ve kategori dağılımı\n` +
+            `• \`/kategori\` — 16 yarışma kategorisini listeler\n` +
+            `• \`/ara_soru <kelime>\` — Soru havuzunda arama yapar\n\n` +
+            `*🎮 Oyuncu & Topluluk Komutları:*\n` +
+            `• \`/profil <kullanıcı_adı>\` — Seviye, LP, galibiyet oranı ve unvanı gösterir\n` +
+            `• \`/lig\` veya \`/siralama\` — Pro Lig canlı lider tablosundaki ilk 10 oyuncuyu listeler\n` +
+            `• \`/oda_kur [kategori]\` — Anında 6 haneli oda kodu ve doğrudan yarışma bağlantısı üretir\n` +
+            `• \`/gunun_sorusu\` — Telegram içinden oylanabilen interaktif günün sorusunu gönderir\n\n` +
+            `👉 Aşağıdaki butonları kullanarak da adımları tek dokunuşla başlatabilirsiniz!`,
         };
       }
 
@@ -371,11 +447,54 @@ export class TelegramBotService {
           `✨ *${result.validCount} adet yeni soru Evren GLM-5.3 ile üretildi ve onay kuyruğuna alındı!*\n` +
           `• Kategori: \`${categoryId}\`\n` +
           `• Zorluk: \`${difficulty}\`\n` +
-          `• Model: \`${result.model}\``;
+          `• Model: \`${result.model}\`\n\n` +
+          `Aşağıdaki butonlarla soruyu *Kategori*, *Günlük Meydan Okuma* veya *Özel Oda* havuzuna onaylayabilirsiniz:`;
 
         return {
           authorized: true,
           message: summaryText,
+          questions: result.questions,
+        };
+      }
+
+      case '/gunluk_soru_uret': {
+        const rawDiff = parts[1]?.toLowerCase() || 'medium';
+        const count = Math.min(5, Math.max(1, parseInt(parts[2] || '3', 10)));
+        const difficulty = DIFFICULTY_MAP[rawDiff] || 'medium';
+
+        const result = await generateQuestionsWithEvrenGLM({
+          categoryId: 'mixed',
+          difficulty,
+          count,
+          db: this.db,
+        });
+
+        return {
+          authorized: true,
+          message:
+            `📅 *${result.validCount} adet Günlük Meydan Okuma sorusu üretildi!*\n` +
+            `Soruları aşağıdan inceleyip *[📅 Günlük Meydan Okuma]* butonu ile onaylayın.`,
+          questions: result.questions,
+        };
+      }
+
+      case '/ozel_soru_uret': {
+        const rawDiff = parts[1]?.toLowerCase() || 'medium';
+        const count = Math.min(5, Math.max(1, parseInt(parts[2] || '3', 10)));
+        const difficulty = DIFFICULTY_MAP[rawDiff] || 'medium';
+
+        const result = await generateQuestionsWithEvrenGLM({
+          categoryId: 'logic_puzzles',
+          difficulty,
+          count,
+          db: this.db,
+        });
+
+        return {
+          authorized: true,
+          message:
+            `⚔️ *${result.validCount} adet Özel Oda / Arkadaş Düellosu sorusu üretildi!*\n` +
+            `Soruları aşağıdan inceleyip *[⚔️ Özel Oda / Arkadaş]* butonu ile onaylayın.`,
           questions: result.questions,
         };
       }
@@ -414,10 +533,126 @@ export class TelegramBotService {
         };
       }
 
+      case '/profil': {
+        const query = parts.slice(1).join(' ').trim();
+        if (!query) {
+          return {
+            authorized: true,
+            message: '⚠️ Lütfen sorgulamak istediğiniz kullanıcı adı veya ID belirtin.\nÖrnek: `/profil safak` veya `/profil user_123`',
+          };
+        }
+        const prof = await this.db.findUserByUsernameOrId(query);
+        if (!prof) {
+          return {
+            authorized: true,
+            message: `❌ "${query}" kullanıcı adına sahip oyuncu bulunamadı.`,
+          };
+        }
+        const totalMatches = prof.stats?.totalMatches ?? 0;
+        const wins = prof.stats?.wins ?? 0;
+        const bestStreak = prof.stats?.bestStreak ?? 0;
+        const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
+        const text =
+          `👤 *OYUNCU PROFİLİ: ${prof.displayName}*\n` +
+          `🆔 Kullanıcı: \`@${prof.username || prof.id}\`\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `🏅 *Lig Puanı:* ${prof.rankPoints || 0} LP (${prof.rankTitle || 'Çaylak'})\n` +
+          `⭐ *Seviye:* Seviye ${prof.level || 1} (${prof.xp || 0} XP)\n` +
+          `🎯 *Maç İstatistiği:* ${totalMatches} maç | ${wins} galibiyet (%${winRate})\n` +
+          `🔥 *En Yüksek Seri:* ${bestStreak} doğru cevap\n` +
+          `🪙 *Bakiye:* ${prof.coins || 0} Altın | 💎 ${prof.gems || 0} Elmas\n` +
+          `🎒 *Envanter:* ${(prof.inventory || []).length} eşya\n` +
+          `👑 *Durum:* ${prof.hasPremiumPass ? '⭐ Premium Pass Aktif' : 'Ücretsiz Oyuncu'}\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━`;
+        return { authorized: true, message: text };
+      }
+
+      case '/lig':
+      case '/siralama': {
+        const top = this.db.getLeaderboard(10);
+        if (top.length === 0) {
+          return { authorized: true, message: '🏆 Henüz lider tablosunda kayıtlı oyuncu yok.' };
+        }
+        const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+        const rows = top.map((p, idx) => {
+          const m = medals[idx] || `${idx + 1}.`;
+          return `${m} *${p.displayName}* (@${p.username}) — *${p.rankPoints} LP* (Sv. ${p.level})`;
+        }).join('\n');
+        const text =
+          `🏆 *TAVRİKO PRO LİG CANLI LİDER TABLOSU*\n` +
+          `Sezon 1: Bilgi Çağı — İlk 10 Oyuncu\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+          rows +
+          `\n\n🎮 *Yarışmaya Katılın:* https://tavriko-app.vercel.app/`;
+        return { authorized: true, message: text };
+      }
+
+      case '/oda_kur': {
+        const rawCat = parts[1]?.toLowerCase() || 'general_culture';
+        const categoryId = CATEGORY_MAP[rawCat] || 'general_culture';
+        const catObj = CATEGORIES_CONFIG.find((c) => c.id === categoryId);
+        const catName = catObj ? `${catObj.emoji} ${catObj.name}` : 'Genel Kültür';
+
+        let roomCode = 'TAV' + Math.floor(100 + Math.random() * 900);
+        if (this.roomManager) {
+          try {
+            const room = this.roomManager.createRoom({
+              hostId: 'tg_' + userId,
+              hostName: 'Telegram Grubu',
+              category: categoryId,
+              difficulty: 'medium',
+              totalRounds: 7,
+              mode: 'friends_private',
+            });
+            roomCode = room.code;
+          } catch {}
+        }
+
+        const joinUrl = `https://tavriko-app.vercel.app/?joinRoom=${roomCode}`;
+        const text =
+          `🎮 *YENİ TAVRİKO ÖZEL ODASI OLUŞTURULDU!*\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `🔑 *Oda Kodu:* \`${roomCode}\`\n` +
+          `🏷 *Kategori:* ${catName}\n` +
+          `📊 *Zorluk:* 🟡 Orta | *Soru:* 7 Tur\n\n` +
+          `👉 *Hemen Oyna:* [BURAYA TIKLAYARAK KATIL](${joinUrl})\n\n` +
+          `Veya Tavriko oyununda *"Özel Oda"* sekmesine girip \`${roomCode}\` kodunu yazın!`;
+        return { authorized: true, message: text, extra: { roomCode, joinUrl } };
+      }
+
+      case '/gunun_sorusu': {
+        const daily = this.db.getDailyChallenge();
+        const q = daily.questions[Math.floor(Math.random() * daily.questions.length)] || this.db.getQuestions('mixed', undefined, 1)[0];
+        if (!q) {
+          return { authorized: true, message: 'Şu anda soru bulunamadı.' };
+        }
+        return {
+          authorized: true,
+          message: this.formatQuestionCard(q),
+          questions: [q],
+        };
+      }
+
+      case '/ara_soru': {
+        const kw = parts.slice(1).join(' ').trim();
+        if (!kw) {
+          return { authorized: true, message: 'Lütfen aramak istediğiniz kelimeyi girin. Örn: `/ara_soru Osmanlı`' };
+        }
+        const results = this.db.searchQuestions(kw, 5);
+        if (results.length === 0) {
+          return { authorized: true, message: `🔍 "${kw}" ile eşleşen soru bulunamadı.` };
+        }
+        return {
+          authorized: true,
+          message: `🔍 *"${kw}" ile eşleşen ${results.length} soru bulundu:*`,
+          questions: results,
+        };
+      }
+
       default:
         return {
           authorized: true,
-          message: `❓ Bilinmeyen komut: ${cmd}. Yardım için aşağıdaki butonları kullanabilirsiniz.`,
+          message: `❓ Bilinmeyen komut: ${cmd}. Yardım ve komut listesi için /yardim yazabilirsiniz.`,
         };
     }
   }
@@ -434,9 +669,10 @@ export class TelegramBotService {
     const [action, ...args] = data.split(':');
 
     switch (action) {
-      case 'approve': {
+      case 'approve':
+      case 'approve_cat': {
         const questionId = args[0];
-        const updated = this.db.approveQuestion(questionId, String(userId));
+        const updated = this.db.approveQuestion(questionId, String(userId), 'standard');
         if (!updated) {
           return { authorized: true, success: false, message: 'Soru bulunamadı.' };
         }
@@ -444,7 +680,37 @@ export class TelegramBotService {
         return {
           authorized: true,
           success: true,
-          message: `✅ Soru [${questionId}] ONAYLANDI ve canlı soru havuzuna eklendi!`,
+          message: `✅ Soru [${questionId}] KATEGORİ havuzuna ONAYLANDI ve canlıya alındı!`,
+          question: updated,
+        };
+      }
+
+      case 'approve_daily': {
+        const questionId = args[0];
+        const updated = this.db.approveQuestion(questionId, String(userId), 'daily_challenge');
+        if (!updated) {
+          return { authorized: true, success: false, message: 'Soru bulunamadı.' };
+        }
+        supabaseService.updateQuestionStatus(questionId, 'published', String(userId)).catch(() => {});
+        return {
+          authorized: true,
+          success: true,
+          message: `📅 Soru [${questionId}] GÜNLÜK MEYDAN OKUMA havuzuna ONAYLANDI!`,
+          question: updated,
+        };
+      }
+
+      case 'approve_custom': {
+        const questionId = args[0];
+        const updated = this.db.approveQuestion(questionId, String(userId), 'custom_room');
+        if (!updated) {
+          return { authorized: true, success: false, message: 'Soru bulunamadı.' };
+        }
+        supabaseService.updateQuestionStatus(questionId, 'published', String(userId)).catch(() => {});
+        return {
+          authorized: true,
+          success: true,
+          message: `⚔️ Soru [${questionId}] ÖZEL ODA / ARKADAŞ havuzuna ONAYLANDI!`,
           question: updated,
         };
       }
@@ -495,6 +761,36 @@ export class TelegramBotService {
       );
     });
 
+    this.bot.hears('📅 Günlük Soru Üret', async (ctx) => {
+      if (!this.isAdmin(ctx.from.id)) {
+        return ctx.reply('⛔ Bu komut yalnızca yetkili yöneticiler içindir.');
+      }
+      const res = await this.handleCommand(ctx.from.id, '/gunluk_soru_uret');
+      await this.replySafe(ctx, res.message);
+      if (res.questions && res.questions.length > 0) {
+        for (const q of res.questions) {
+          const card = this.formatQuestionCard(q);
+          const keyboard = this.buildInlineKeyboard(q);
+          await this.replySafe(ctx, card, keyboard);
+        }
+      }
+    });
+
+    this.bot.hears('⚔️ Özel Oda Soru Üret', async (ctx) => {
+      if (!this.isAdmin(ctx.from.id)) {
+        return ctx.reply('⛔ Bu komut yalnızca yetkili yöneticiler içindir.');
+      }
+      const res = await this.handleCommand(ctx.from.id, '/ozel_soru_uret');
+      await this.replySafe(ctx, res.message);
+      if (res.questions && res.questions.length > 0) {
+        for (const q of res.questions) {
+          const card = this.formatQuestionCard(q);
+          const keyboard = this.buildInlineKeyboard(q);
+          await this.replySafe(ctx, card, keyboard);
+        }
+      }
+    });
+
     this.bot.hears('📊 Soru Havuzu', async (ctx) => {
       const res = await this.handleCommand(ctx.from.id, '/istatistik');
       await this.replySafe(ctx, res.message, this.getMainKeyboard());
@@ -512,17 +808,26 @@ export class TelegramBotService {
       }
     });
 
-    this.bot.hears('❓ Yardım & Bilgi', async (ctx) => {
+    this.bot.hears('🏆 Pro Lig Sıralaması', async (ctx) => {
+      const res = await this.handleCommand(ctx.from.id, '/lig');
+      await this.replySafe(ctx, res.message, this.getMainKeyboard());
+    });
+
+    this.bot.hears('🎮 Hızlı Oda Kur', async (ctx) => {
+      const res = await this.handleCommand(ctx.from.id, '/oda_kur');
+      await this.replySafe(ctx, res.message, this.getMainKeyboard());
+    });
+
+    this.bot.hears(['❓ Yardım & Bilgi', '❓ Yardım & Komutlar'], async (ctx) => {
       const res = await this.handleCommand(ctx.from.id, '/start');
       await this.replySafe(ctx, res.message, this.getMainKeyboard());
     });
 
-    // 3. /soru_uret Komutu (Parametresiz girilirse sihirbazı açar)
+    // 3. Özel Komut Dinleyicileri
     this.bot.command('soru_uret', async (ctx) => {
       const text = ctx.message.text.trim();
       const parts = text.split(/\s+/);
       if (parts.length === 1) {
-        // Parametre yoksa doğrudan adım 1'i başlat
         await this.replySafe(
           ctx,
           `📚 *Adım 1/3: Soru Kategorisi Seçin*\n\nHangi kategoride soru üretmek istersiniz? Aşağıdaki butonlardan birine dokunun:`,
@@ -531,8 +836,31 @@ export class TelegramBotService {
         return;
       }
 
-      // Parametre varsa doğrudan üret
       const res = await this.handleCommand(ctx.from.id, text);
+      await this.replySafe(ctx, res.message);
+      if (res.questions && res.questions.length > 0) {
+        for (const q of res.questions) {
+          const card = this.formatQuestionCard(q);
+          const keyboard = this.buildInlineKeyboard(q);
+          await this.replySafe(ctx, card, keyboard);
+        }
+      }
+    });
+
+    this.bot.command('gunluk_soru_uret', async (ctx) => {
+      const res = await this.handleCommand(ctx.from.id, ctx.message.text.trim());
+      await this.replySafe(ctx, res.message);
+      if (res.questions && res.questions.length > 0) {
+        for (const q of res.questions) {
+          const card = this.formatQuestionCard(q);
+          const keyboard = this.buildInlineKeyboard(q);
+          await this.replySafe(ctx, card, keyboard);
+        }
+      }
+    });
+
+    this.bot.command('ozel_soru_uret', async (ctx) => {
+      const res = await this.handleCommand(ctx.from.id, ctx.message.text.trim());
       await this.replySafe(ctx, res.message);
       if (res.questions && res.questions.length > 0) {
         for (const q of res.questions) {
@@ -563,6 +891,59 @@ export class TelegramBotService {
     this.bot.command('istatistik', async (ctx) => {
       const res = await this.handleCommand(ctx.from.id, ctx.message.text);
       await this.replySafe(ctx, res.message);
+    });
+
+    this.bot.command('profil', async (ctx) => {
+      const res = await this.handleCommand(ctx.from.id, ctx.message.text);
+      await this.replySafe(ctx, res.message);
+    });
+
+    this.bot.command(['lig', 'siralama'], async (ctx) => {
+      const res = await this.handleCommand(ctx.from.id, ctx.message.text);
+      await this.replySafe(ctx, res.message);
+    });
+
+    this.bot.command('oda_kur', async (ctx) => {
+      const res = await this.handleCommand(ctx.from.id, ctx.message.text);
+      await this.replySafe(ctx, res.message);
+    });
+
+    this.bot.command(['gunun_sorusu', 'quiz'], async (ctx) => {
+      const res = await this.handleCommand(ctx.from.id, '/gunun_sorusu');
+      if (res.questions && res.questions.length > 0) {
+        const q = res.questions[0];
+        const correctIdx = q.options.findIndex((o) => o.id === q.correctOptionId);
+        if (typeof (ctx as any).sendPoll === 'function' && correctIdx >= 0) {
+          try {
+            await (ctx as any).sendPoll(
+              `❓ [Günün Sorusu] ${q.text}`.slice(0, 290),
+              q.options.map((o) => o.text.slice(0, 95)),
+              {
+                type: 'quiz',
+                correct_option_id: correctIdx,
+                explanation: (q.explanation || 'Tavriko Bilgi Yarışması').slice(0, 190),
+                is_anonymous: false,
+              }
+            );
+            return;
+          } catch {}
+        }
+        await this.replySafe(ctx, res.message);
+      } else {
+        await this.replySafe(ctx, res.message);
+      }
+    });
+
+    this.bot.command('ara_soru', async (ctx) => {
+      const res = await this.handleCommand(ctx.from.id, ctx.message.text);
+      await this.replySafe(ctx, res.message);
+      if (res.questions && res.questions.length > 0) {
+        for (const q of res.questions) {
+          const card = this.formatQuestionCard(q);
+          const keyboard = this.buildInlineKeyboard(q);
+          await this.replySafe(ctx, card, keyboard);
+        }
+      }
     });
 
     // 4. Wizard & Inline Buton Etkileşimleri
@@ -701,19 +1082,30 @@ export class TelegramBotService {
         return;
       }
 
-      // 5. Onaylama (Approve) İşlemi
-      if (data.startsWith('approve:')) {
-        const questionId = data.replace('approve:', '');
+      // 5. Onaylama (Approve) İşlemleri
+      if (
+        data.startsWith('approve:') ||
+        data.startsWith('approve_cat:') ||
+        data.startsWith('approve_daily:') ||
+        data.startsWith('approve_custom:')
+      ) {
         const res = await this.handleCallback(ctx.from.id, data);
+        let tag = '✅ *[ONAYLANDI - KATEGORİ HAVUZUNDA]*';
+        if (data.startsWith('approve_daily:')) {
+          tag = '📅 *[ONAYLANDI - GÜNLÜK MEYDAN OKUMA HAVUZUNDA]*';
+        } else if (data.startsWith('approve_custom:')) {
+          tag = '⚔️ *[ONAYLANDI - ÖZEL ODA / ARKADAŞ HAVUZUNDA]*';
+        }
+
         try {
-          await ctx.answerCbQuery('✅ Soru onaylandı ve yayına alındı!', { show_alert: true });
+          await ctx.answerCbQuery(res.message, { show_alert: true });
           const originalText = (ctx.callbackQuery.message as any)?.text || '';
           await ctx.editMessageText(
-            `${originalText}\n\n✅ *[ONAYLANDI - CANLIDA YAYINDA]*`,
+            `${originalText}\n\n${tag}`,
             {
               parse_mode: 'Markdown',
               ...Markup.inlineKeyboard([
-                [Markup.button.callback('🎉 Canlıda Yayında', 'noop')],
+                [Markup.button.callback('🎉 Havuzda Yayında', 'noop')],
               ]),
             }
           );

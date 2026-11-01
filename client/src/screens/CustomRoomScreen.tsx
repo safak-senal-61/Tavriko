@@ -352,7 +352,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 80,
     paddingHorizontal: 12,
   },
   title: {

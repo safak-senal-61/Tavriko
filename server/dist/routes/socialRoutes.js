@@ -184,6 +184,20 @@ router.post('/events/claim', async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
+router.post('/events/start', (req, res) => {
+    try {
+        const { userId, eventId } = req.body;
+        if (!userId || !eventId) {
+            res.status(400).json({ error: 'userId ve eventId gereklidir' });
+            return;
+        }
+        const result = prismaClient_1.db.startEvent(userId, eventId);
+        res.json({ success: true, ...result });
+    }
+    catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
 // --- User Profile (Pro League & Inspect) ---
 router.get('/profile/:userId', async (req, res) => {
     const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;

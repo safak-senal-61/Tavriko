@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { UserProfile, GameEvent } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -16,9 +17,8 @@ import {
   TavrikoTopBar,
   TavrikoSecondaryBottomNav,
   SecondaryNavTab,
-  TavrikoProgressBar,
   ChestIcon,
-  TrophyIcon,
+  KeyIcon,
   GemIcon,
   CoinIcon,
 } from '../components/TavrikoIcons';
@@ -49,9 +49,12 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
   const [activeTab, setActiveTab] = useState<EventTab>('daily');
   const [events, setEvents] = useState<GameEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [actionEventId, setActionEventId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
+
+  // Tab switch fade animation
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const base = apiBaseUrl || DEFAULT_API_BASE;
 
@@ -79,50 +82,101 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
     fetchEvents();
   }, [user?.id, apiBaseUrl]);
 
+  const switchTab = (tab: EventTab) => {
+    sound.playSound('tap');
+    sound.triggerHaptic('light');
+    Animated.sequence([
+      Animated.timing(fadeAnim, { toValue: 0.3, duration: 100, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 180, useNativeDriver: true }),
+    ]).start();
+    setActiveTab(tab);
+    setStatusMessage(null);
+  };
+
   const filteredEvents = events.filter((e) => e.type === activeTab);
 
-  const handleClaim = async (event: GameEvent) => {
+  const handleAction = async (event: GameEvent) => {
     if (!user) return;
     sound.playSound('tap');
-    setClaimingId(event.id);
+    sound.triggerHaptic('medium');
+    setActionEventId(event.id);
     setStatusMessage(null);
     setIsError(false);
 
-    try {
-      const res = await fetch(`${base}/social/events/claim`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, eventId: event.id }),
-      });
+    const isCompleted = (event.currentCount || 0) >= event.targetCount;
+    const isClaimed = !!event.claimed;
+    const isStarted = !!event.started;
 
-      const data = await res.json();
-      if (!res.ok) {
+    // 1. Claim Reward ("TOPLA")
+    if (isCompleted && !isClaimed) {
+      try {
+        const res = await fetch(`${base}/social/events/claim`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, eventId: event.id }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          sound.playSound('wrong');
+          sound.triggerHaptic('error');
+          setIsError(true);
+          setStatusMessage(data.error || 'Ödül alınamadı.');
+          setActionEventId(null);
+          return;
+        }
+
+        sound.playSound('victory');
+        sound.triggerHaptic('success');
+        setIsError(false);
+        setStatusMessage(data.message || 'Ödül başarıyla toplandı!');
+        if (data.user && onUpdateUser) {
+          onUpdateUser(data.user);
+        }
+        setEvents((prev) =>
+          prev.map((e) => (e.id === event.id ? { ...e, claimed: true } : e))
+        );
+      } catch {
         sound.playSound('wrong');
-        sound.triggerHaptic('error');
         setIsError(true);
-        setStatusMessage(data.error || 'Ödül alınamadı.');
-        setClaimingId(null);
-        return;
+        setStatusMessage('Bağlantı hatası oluştu.');
+      } finally {
+        setActionEventId(null);
       }
-
-      sound.playSound('victory');
-      sound.triggerHaptic('success');
-      setIsError(false);
-      setStatusMessage(data.message || 'Ödül başarıyla alındı!');
-      if (data.user && onUpdateUser) {
-        onUpdateUser(data.user);
-      }
-      // Update local event state to claimed
-      setEvents((prev) =>
-        prev.map((e) => (e.id === event.id ? { ...e, claimed: true } : e))
-      );
-    } catch {
-      sound.playSound('wrong');
-      setIsError(true);
-      setStatusMessage('Bağlantı hatası oluştu.');
-    } finally {
-      setClaimingId(null);
+      return;
     }
+
+    // 2. Start Event if not started yet ("BAŞLA" / "OYNA")
+    if (!isStarted) {
+      try {
+        const res = await fetch(`${base}/social/events/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, eventId: event.id }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.event) {
+          setEvents((prev) =>
+            prev.map((e) => (e.id === event.id ? { ...e, started: true, currentCount: 0 } : e))
+          );
+        }
+      } catch {}
+    }
+
+    setActionEventId(null);
+    // 3. Navigate to gameplay arena
+    if (onStartEvent) {
+      onStartEvent();
+    }
+  };
+
+  const getMetricIcon = (metric: string, type: string) => {
+    if (type === 'special') return '🏆';
+    if (metric === 'wins') return '🏆';
+    if (metric === 'streak') return '🔥';
+    if (metric === 'correct_answers') return '⏱️';
+    return '🏅';
   };
 
   return (
@@ -142,47 +196,43 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
         {/* Header Hero */}
         <View style={styles.heroWrap}>
           <Text style={styles.title}>ETKİNLİKLER</Text>
-          <Text style={styles.subtitle}>Canlı Görevler ve Özel Turnuva Ödülleri</Text>
+          <Text style={styles.subtitle}>Canlı görevler ve özel turnuva ödülleri</Text>
         </View>
 
-        {/* 3 Tabs */}
-        <View style={styles.tabsRow}>
+        {/* 3 Pill Tabs Container */}
+        <View style={styles.tabsContainer}>
           <TouchableOpacity
             style={[styles.tabBtn, activeTab === 'daily' && styles.tabBtnActive]}
-            onPress={() => {
-              sound.playSound('tap');
-              setActiveTab('daily');
-            }}
+            activeOpacity={0.8}
+            onPress={() => switchTab('daily')}
           >
-            <Text style={[styles.tabText, activeTab === 'daily' && styles.tabTextActive]}>
+            <Text style={[styles.tabText, activeTab === 'daily' && styles.tabTextActive]} numberOfLines={1}>
               📅 Günlük Görevler
             </Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.tabBtn, activeTab === 'weekly' && styles.tabBtnActive]}
-            onPress={() => {
-              sound.playSound('tap');
-              setActiveTab('weekly');
-            }}
+            activeOpacity={0.8}
+            onPress={() => switchTab('weekly')}
           >
-            <Text style={[styles.tabText, activeTab === 'weekly' && styles.tabTextActive]}>
+            <Text style={[styles.tabText, activeTab === 'weekly' && styles.tabTextActive]} numberOfLines={1}>
               🏆 Haftalık Hedefler
             </Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.tabBtn, activeTab === 'special' && styles.tabBtnActive]}
-            onPress={() => {
-              sound.playSound('tap');
-              setActiveTab('special');
-            }}
+            activeOpacity={0.8}
+            onPress={() => switchTab('special')}
           >
-            <Text style={[styles.tabText, activeTab === 'special' && styles.tabTextActive]}>
-              ⭐ Özel Turnuva
+            <Text style={[styles.tabText, activeTab === 'special' && styles.tabTextActive]} numberOfLines={1}>
+              ✪ Özel Turnuva
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Status Message */}
+        {/* Status Toast / Banner */}
         {statusMessage && (
           <View style={[styles.statusBanner, isError ? styles.statusError : styles.statusSuccess]}>
             <Text style={[styles.statusText, isError ? styles.statusTextError : styles.statusTextSuccess]}>
@@ -191,24 +241,25 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
           </View>
         )}
 
-        {/* Content */}
+        {/* Content with Fade Animation */}
         {loading ? (
-          <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 32 }} />
+          <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 36 }} />
         ) : filteredEvents.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyIcon}>⏳</Text>
-            <Text style={styles.emptyTitle}>Aktif Etkinlik Bulunmuyor</Text>
-            <Text style={styles.emptyDesc}>Bu kategoride henüz yeni etkinlik başlamadı. Yakında tekrar kontrol et!</Text>
+            <Text style={styles.emptyTitle}>Aktif Görev Bulunmuyor</Text>
+            <Text style={styles.emptyDesc}>Bu kategoride henüz yeni görev başlamadı. Yakında tekrar kontrol et!</Text>
           </View>
         ) : (
-          <View style={styles.eventsList}>
+          <Animated.View style={[styles.eventsList, { opacity: fadeAnim }]}>
             {filteredEvents.map((item) => {
-              const current = (item as any).currentCount ?? (item as any).currentProgress ?? 0;
+              const current = item.currentCount ?? (item as any).currentProgress ?? 0;
               const target = item.targetCount ?? (item as any).target ?? 1;
               const isCompleted = current >= target;
               const isClaimed = !!item.claimed;
+              const isStarted = !!item.started;
               const progressPct = Math.min(100, Math.round((current / target) * 100));
-              const isClaiming = claimingId === item.id;
+              const isBusy = actionEventId === item.id;
               const desc = item.desc || (item as any).description || '';
 
               const coins = item.rewardCoins ?? (item as any).rewards?.coins ?? 0;
@@ -222,108 +273,121 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                   key={item.id}
                   style={[
                     styles.eventCard,
-                    isCompleted && !isClaimed && styles.eventCardReady,
+                    isCompleted && !isClaimed && styles.eventCardCompleted,
                   ]}
                 >
+                  {/* Card Header Row: Icon + Title/Desc + Action Button */}
                   <View style={styles.cardHeaderRow}>
                     <View style={styles.iconCircle}>
-                      {item.type === 'special' ? (
-                        <ChestIcon size={32} />
-                      ) : item.metric === 'wins' ? (
-                        <TrophyIcon size={28} />
-                      ) : item.metric === 'streak' ? (
-                        <Text style={{ fontSize: 24 }}>🔥</Text>
+                      <Text style={styles.metricEmoji}>{getMetricIcon(item.metric, item.type)}</Text>
+                    </View>
+
+                    <View style={styles.headerInfo}>
+                      <Text style={styles.eventTitle} numberOfLines={1}>{item.title}</Text>
+                      <Text style={styles.eventDesc} numberOfLines={2}>{desc}</Text>
+                    </View>
+
+                    {/* Top Right Action Button */}
+                    <View style={styles.actionBtnWrap}>
+                      {isClaimed ? (
+                        <View style={styles.claimedBadge}>
+                          <Text style={styles.claimedText}>ALINDI ✓</Text>
+                        </View>
+                      ) : isCompleted ? (
+                        <TouchableOpacity
+                          style={styles.collectBtn}
+                          disabled={isBusy}
+                          activeOpacity={0.85}
+                          onPress={() => handleAction(item)}
+                        >
+                          {isBusy ? (
+                            <ActivityIndicator color="#0A2920" size="small" />
+                          ) : (
+                            <Text style={styles.collectBtnText}>TOPLA</Text>
+                          )}
+                        </TouchableOpacity>
                       ) : (
-                        <Text style={{ fontSize: 24 }}>🎯</Text>
+                        <TouchableOpacity
+                          style={styles.playBtn}
+                          disabled={isBusy}
+                          activeOpacity={0.85}
+                          onPress={() => handleAction(item)}
+                        >
+                          {isBusy ? (
+                            <ActivityIndicator color="#3B1500" size="small" />
+                          ) : (
+                            <Text style={styles.playBtnText}>{isStarted ? 'OYNA' : 'BAŞLA'}</Text>
+                          )}
+                        </TouchableOpacity>
                       )}
                     </View>
-                    <View style={styles.headerInfo}>
-                      <Text style={styles.eventTitle}>{item.title}</Text>
-                      <Text style={styles.eventDesc}>{desc}</Text>
-                    </View>
                   </View>
 
-                  {/* Progress */}
-                  <View style={styles.progressWrap}>
+                  {/* Progress Row */}
+                  <View style={styles.progressSection}>
                     <View style={styles.progressLabelRow}>
-                      <Text style={styles.progressStatusText}>
+                      <Text style={styles.progressLabel}>
                         İlerleme: {current} / {target}
                       </Text>
-                      <Text style={styles.progressPctText}>%{progressPct}</Text>
+                      <Text style={[styles.progressPct, isCompleted && { color: '#5ADBB5' }]}>
+                        %{progressPct}
+                      </Text>
                     </View>
-                    <TavrikoProgressBar progress={progressPct} height={8} />
+
+                    {/* Progress Bar Track */}
+                    <View style={styles.progressTrack}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          {
+                            width: `${progressPct}%`,
+                            backgroundColor: isCompleted ? '#5ADBB5' : '#FF9B2F',
+                          },
+                        ]}
+                      />
+                    </View>
                   </View>
 
-                  {/* Rewards Row & Action */}
-                  <View style={styles.cardBottomRow}>
-                    <View style={styles.rewardsPreview}>
-                      <Text style={styles.rewardsLabel}>Ödüller:</Text>
-                      <View style={styles.rewardPills}>
-                        {coins > 0 ? (
-                          <View style={styles.rewardPill}>
-                            <CoinIcon size={14} />
-                            <Text style={styles.rewardPillText}>+{coins}</Text>
-                          </View>
-                        ) : null}
-                        {gems > 0 ? (
-                          <View style={styles.rewardPill}>
-                            <GemIcon size={14} />
-                            <Text style={styles.rewardPillText}>+{gems}</Text>
-                          </View>
-                        ) : null}
-                        {xp > 0 ? (
-                          <View style={styles.rewardPill}>
-                            <Text style={styles.rewardPillText}>+{xp} XP</Text>
-                          </View>
-                        ) : null}
-                        {seasonXp > 0 ? (
-                          <View style={styles.rewardPill}>
-                            <Text style={[styles.rewardPillText, { color: '#6FE3C1' }]}>+{seasonXp} S-XP</Text>
-                          </View>
-                        ) : null}
-                        {itemReward ? (
-                          <View style={styles.rewardPill}>
-                            <Text style={styles.rewardPillText}>🎁 {itemReward.name}</Text>
-                          </View>
-                        ) : null}
+                  {/* Rewards Chips Row */}
+                  <View style={styles.rewardsRow}>
+                    {coins > 0 && (
+                      <View style={styles.rewardChip}>
+                        <CoinIcon size={13} />
+                        <Text style={styles.rewardChipTextGold}>+{coins}</Text>
                       </View>
-                    </View>
-
-                    {/* Claim Button */}
-                    {isClaimed ? (
-                      <View style={styles.claimedPill}>
-                        <Text style={styles.claimedText}>ALINDI ✓</Text>
+                    )}
+                    {gems > 0 && (
+                      <View style={styles.rewardChip}>
+                        <GemIcon size={13} />
+                        <Text style={styles.rewardChipTextPink}>+{gems}</Text>
                       </View>
-                    ) : isCompleted ? (
-                      <TouchableOpacity
-                        style={styles.claimBtn}
-                        disabled={isClaiming}
-                        onPress={() => handleClaim(item)}
-                      >
-                        {isClaiming ? (
-                          <ActivityIndicator color="#12052C" size="small" />
-                        ) : (
-                          <Text style={styles.claimBtnText}>ÖDÜLÜ AL</Text>
-                        )}
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity
-                        style={styles.playBtn}
-                        onPress={() => {
-                          sound.playSound('tap');
-                          if (onStartEvent) onStartEvent();
-                        }}
-                      >
-                        <Text style={styles.playBtnText}>OYNA</Text>
-                      </TouchableOpacity>
+                    )}
+                    {xp > 0 && (
+                      <View style={styles.rewardChip}>
+                        <Text style={styles.rewardChipStarBlue}>✪</Text>
+                        <Text style={styles.rewardChipTextBlue}>+{xp} XP</Text>
+                      </View>
+                    )}
+                    {seasonXp > 0 && (
+                      <View style={styles.rewardChip}>
+                        <Text style={styles.rewardChipStarMint}>✪</Text>
+                        <Text style={styles.rewardChipTextMint}>+{seasonXp} S-XP</Text>
+                      </View>
+                    )}
+                    {itemReward && (
+                      <View style={styles.rewardChip}>
+                        {itemReward.category === 'chest' ? <ChestIcon size={13} /> : <KeyIcon size={13} />}
+                        <Text style={styles.rewardChipTextGold}>{itemReward.name}</Text>
+                      </View>
                     )}
                   </View>
                 </View>
               );
             })}
-          </View>
+          </Animated.View>
         )}
       </ScrollView>
+
       <TavrikoSecondaryBottomNav
         activeTab="events"
         onSelectTab={(tab) => onNavigateSecondary && onNavigateSecondary(tab)}
@@ -334,40 +398,46 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 110,
-    paddingHorizontal: 12,
+    paddingBottom: 130, // Ample space so bottom card is never covered by bottom nav
+    paddingHorizontal: 14,
   },
   heroWrap: {
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 10,
+    marginTop: 6,
+    marginBottom: 12,
   },
   title: {
     fontFamily: THEME.fonts.display,
-    fontSize: 28,
+    fontSize: 34,
     color: '#FFC43D',
-    letterSpacing: 1.5,
+    letterSpacing: 2,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   subtitle: {
-    color: '#D9CDF5',
+    color: '#B5A7D6',
     fontSize: 12,
     fontFamily: THEME.fonts.medium,
     marginTop: 2,
+    textAlign: 'center',
   },
-  tabsRow: {
+  tabsContainer: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(10, 4, 24, 0.6)',
-    borderRadius: 16,
+    backgroundColor: 'rgba(12, 5, 28, 0.75)',
+    borderRadius: 20,
     padding: 4,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   tabBtn: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 4,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   tabBtnActive: {
     backgroundColor: '#6B3CFF',
@@ -383,12 +453,12 @@ const styles = StyleSheet.create({
   statusBanner: {
     borderRadius: 14,
     padding: 12,
-    marginVertical: 8,
+    marginBottom: 10,
     borderWidth: 1.5,
   },
   statusSuccess: {
-    backgroundColor: 'rgba(111, 227, 193, 0.15)',
-    borderColor: '#6FE3C1',
+    backgroundColor: 'rgba(90, 219, 181, 0.15)',
+    borderColor: '#5ADBB5',
   },
   statusError: {
     backgroundColor: 'rgba(255, 92, 119, 0.15)',
@@ -400,7 +470,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   statusTextSuccess: {
-    color: '#6FE3C1',
+    color: '#5ADBB5',
   },
   statusTextError: {
     color: '#FF8598',
@@ -433,135 +503,185 @@ const styles = StyleSheet.create({
   },
   eventsList: {
     gap: 12,
-    marginTop: 6,
   },
   eventCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 20,
+    backgroundColor: 'rgba(28, 16, 56, 0.75)',
+    borderRadius: 22,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    padding: 14,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    padding: 16,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
   },
-  eventCardReady: {
-    borderColor: '#FFC43D',
-    backgroundColor: 'rgba(255, 196, 61, 0.12)',
+  eventCardCompleted: {
+    borderColor: 'rgba(90, 219, 181, 0.4)',
+    backgroundColor: 'rgba(28, 24, 60, 0.85)',
   },
   cardHeaderRow: {
     flexDirection: 'row',
-    gap: 12,
     alignItems: 'center',
+    gap: 12,
   },
   iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(107, 60, 255, 0.25)',
-    borderWidth: 1.5,
-    borderColor: '#6B3CFF',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  metricEmoji: {
+    fontSize: 22,
+  },
   headerInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
   eventTitle: {
     fontFamily: THEME.fonts.display,
-    fontSize: 15,
+    fontSize: 16,
     color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   eventDesc: {
     fontFamily: THEME.fonts.medium,
     fontSize: 11,
-    color: '#D9CDF5',
+    color: '#A99DC9',
     marginTop: 2,
+    lineHeight: 15,
   },
-  progressWrap: {
-    marginVertical: 10,
+  actionBtnWrap: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
-  progressLabelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  progressStatusText: {
-    color: '#D9CDF5',
-    fontSize: 10,
-    fontFamily: THEME.fonts.bold,
-  },
-  progressPctText: {
-    color: '#FFC43D',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  cardBottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  playBtn: {
+    backgroundColor: '#FFB21E',
+    borderBottomWidth: 3,
+    borderBottomColor: '#B8560A',
+    paddingHorizontal: 20,
+    paddingVertical: 9,
+    borderRadius: 14,
+    minWidth: 84,
     alignItems: 'center',
-    marginTop: 4,
+    justifyContent: 'center',
   },
-  rewardsPreview: {
-    flexDirection: 'row',
+  playBtnText: {
+    color: '#3B1500',
+    fontSize: 13,
+    fontFamily: THEME.fonts.display,
+    letterSpacing: 0.5,
+  },
+  collectBtn: {
+    backgroundColor: '#5ADBB5',
+    borderBottomWidth: 3,
+    borderBottomColor: '#1D7A6B',
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 14,
+    minWidth: 84,
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
+    shadowColor: '#5ADBB5',
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
   },
-  rewardsLabel: {
-    color: '#D9CDF5',
-    fontSize: 11,
-    fontFamily: THEME.fonts.medium,
+  collectBtnText: {
+    color: '#0A2920',
+    fontSize: 13,
+    fontFamily: THEME.fonts.display,
+    letterSpacing: 0.5,
   },
-  rewardPills: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  rewardPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
+  claimedBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  rewardPillText: {
-    color: '#FFEAA7',
-    fontSize: 10,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  claimedPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
   },
   claimedText: {
     color: '#8A7BB3',
     fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
   },
-  claimBtn: {
-    backgroundColor: '#FFC43D',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    shadowColor: '#FFC43D',
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
+  progressSection: {
+    marginTop: 12,
+    marginBottom: 10,
   },
-  claimBtnText: {
-    color: '#12052C',
+  progressLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  progressLabel: {
+    color: '#D9CDF5',
     fontSize: 12,
-    fontFamily: THEME.fonts.display,
+    fontFamily: THEME.fonts.bold,
   },
-  playBtn: {
-    backgroundColor: '#6B3CFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  playBtnText: {
-    color: '#FFFFFF',
+  progressPct: {
+    color: '#FFB21E',
     fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  progressTrack: {
+    height: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  rewardsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    alignItems: 'center',
+  },
+  rewardChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(10, 4, 24, 0.65)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  rewardChipTextGold: {
+    color: '#FFEAA7',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  rewardChipTextPink: {
+    color: '#FF85C0',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  rewardChipStarBlue: {
+    color: '#38BDF8',
+    fontSize: 10,
+  },
+  rewardChipTextBlue: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  rewardChipStarMint: {
+    color: '#6FE3C1',
+    fontSize: 10,
+  },
+  rewardChipTextMint: {
+    color: '#6FE3C1',
+    fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
   },
 });

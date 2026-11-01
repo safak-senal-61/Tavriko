@@ -1338,52 +1338,36 @@ class PrismaService {
         if (delta.bestStreak > record.stats.bestStreak) {
             record.stats.bestStreak = delta.bestStreak;
         }
-        // Automatically update live event progress
+        // Automatically update live event progress ONLY for tasks the user actively started and not completed yet
         if (!record.eventProgress)
             record.eventProgress = {};
         const ev = record.eventProgress;
-        ev['daily_5_matches'] = {
-            progress: (ev['daily_5_matches']?.progress || 0) + 1,
-            completed: (ev['daily_5_matches']?.progress || 0) + 1 >= 5,
-            claimed: !!ev['daily_5_matches']?.claimed,
-        };
-        ev['daily_10_correct'] = {
-            progress: (ev['daily_10_correct']?.progress || 0) + delta.correctAnswers,
-            completed: (ev['daily_10_correct']?.progress || 0) + delta.correctAnswers >= 10,
-            claimed: !!ev['daily_10_correct']?.claimed,
-        };
-        if (delta.won) {
-            ev['daily_3_wins'] = {
-                progress: (ev['daily_3_wins']?.progress || 0) + 1,
-                completed: (ev['daily_3_wins']?.progress || 0) + 1 >= 3,
-                claimed: !!ev['daily_3_wins']?.claimed,
-            };
-            ev['special_treasure_hunt'] = {
-                progress: (ev['special_treasure_hunt']?.progress || 0) + 1,
-                completed: (ev['special_treasure_hunt']?.progress || 0) + 1 >= 10,
-                claimed: !!ev['special_treasure_hunt']?.claimed,
-            };
-            ev['weekly_20_wins'] = {
-                progress: (ev['weekly_20_wins']?.progress || 0) + 1,
-                completed: (ev['weekly_20_wins']?.progress || 0) + 1 >= 20,
-                claimed: !!ev['weekly_20_wins']?.claimed,
-            };
+        for (const def of shared_1.EVENT_DEFINITIONS) {
+            const state = ev[def.id];
+            // Only track if user has explicitly started this event and not finished yet
+            if (!state || !state.started || state.completed)
+                continue;
+            let progressIncrement = 0;
+            if (def.metric === 'matches_played') {
+                progressIncrement = 1;
+            }
+            else if (def.metric === 'wins' && delta.won) {
+                progressIncrement = 1;
+            }
+            else if (def.metric === 'correct_answers') {
+                progressIncrement = delta.correctAnswers;
+            }
+            else if (def.metric === 'streak' && delta.bestStreak > 0) {
+                state.progress = Math.max(state.progress, delta.bestStreak);
+            }
+            if (progressIncrement > 0) {
+                state.progress = (state.progress || 0) + progressIncrement;
+            }
+            if (state.progress >= def.targetCount) {
+                state.progress = def.targetCount;
+                state.completed = true;
+            }
         }
-        ev['weekly_league_cup'] = {
-            progress: (ev['weekly_league_cup']?.progress || 0) + 1,
-            completed: (ev['weekly_league_cup']?.progress || 0) + 1 >= 15,
-            claimed: !!ev['weekly_league_cup']?.claimed,
-        };
-        ev['weekly_100_correct'] = {
-            progress: (ev['weekly_100_correct']?.progress || 0) + delta.correctAnswers,
-            completed: (ev['weekly_100_correct']?.progress || 0) + delta.correctAnswers >= 100,
-            claimed: !!ev['weekly_100_correct']?.claimed,
-        };
-        ev['special_weekend_cup'] = {
-            progress: (ev['special_weekend_cup']?.progress || 0) + 1,
-            completed: (ev['special_weekend_cup']?.progress || 0) + 1 >= 25,
-            claimed: !!ev['special_weekend_cup']?.claimed,
-        };
         if (delta.bestStreak >= 5) {
             ev['daily_streak_5'] = { progress: 5, completed: true, claimed: !!ev['daily_streak_5']?.claimed };
         }
@@ -1545,13 +1529,20 @@ class PrismaService {
         this.savePersistedQuestions();
         return newQuestion;
     }
-    approveQuestion(id, reviewedBy) {
+    approveQuestion(id, reviewedBy, pool = 'standard') {
         const q = this.questions.find((item) => item.id === id);
         if (!q)
             return null;
         q.reviewStatus = 'published';
         q.reviewedBy = reviewedBy;
         q.reviewedAt = new Date().toISOString();
+        q.targetPool = pool;
+        if (pool === 'daily_challenge') {
+            q.isDailyChallenge = true;
+        }
+        else if (pool === 'custom_room') {
+            q.isCustomRoomOnly = true;
+        }
         this.savePersistedQuestions();
         return q;
     }
@@ -1673,11 +1664,39 @@ class PrismaService {
     }
     getDailyChallenge() {
         const today = new Date().toISOString().split('T')[0];
-        const dailySet = this.getQuestions('mixed', undefined, 5);
+        const dedicated = this.questions.filter((q) => (q.targetPool === 'daily_challenge' || q.isDailyChallenge) && q.reviewStatus === 'published');
+        let selected = [];
+        if (dedicated.length >= 5) {
+            selected = [...dedicated].sort(() => 0.5 - Math.random()).slice(0, 5);
+        }
+        else if (dedicated.length > 0) {
+            const rest = this.getQuestions('mixed', undefined, 5 - dedicated.length);
+            selected = [...dedicated, ...rest];
+        }
+        else {
+            selected = this.getQuestions('mixed', undefined, 5);
+        }
         return {
             date: today,
-            questions: dailySet,
+            questions: selected,
         };
+    }
+    async findUserByUsernameOrId(query) {
+        const qLower = query.toLowerCase().trim();
+        for (const record of this.users.values()) {
+            if (record.id === query ||
+                record.username?.toLowerCase() === qLower ||
+                record.displayName?.toLowerCase() === qLower) {
+                return this.toProfile(record);
+            }
+        }
+        return this.getUserProfileAsync(query);
+    }
+    searchQuestions(keyword, limit = 5) {
+        const kw = keyword.toLowerCase().trim();
+        return this.questions
+            .filter((q) => q.text.toLowerCase().includes(kw) || q.subCategory?.toLowerCase().includes(kw))
+            .slice(0, limit);
     }
     defaultInventory() {
         return [];
@@ -2246,15 +2265,49 @@ class PrismaService {
         const record = this.users.get(userId);
         const progressMap = record?.eventProgress || {};
         const events = shared_1.EVENT_DEFINITIONS.map((ev) => {
-            const state = progressMap[ev.id] || { progress: 0, completed: false, claimed: false };
+            const state = progressMap[ev.id] || { started: false, progress: 0, completed: false, claimed: false };
             return {
                 ...ev,
-                currentCount: state.progress,
-                completed: state.progress >= ev.targetCount,
+                started: !!state.started,
+                currentCount: state.progress || 0,
+                completed: (state.progress || 0) >= ev.targetCount,
                 claimed: !!state.claimed,
             };
         });
         return { events };
+    }
+    startEvent(userId, eventId) {
+        const record = this.users.get(userId);
+        if (!record)
+            throw new Error('Kullanıcı bulunamadı.');
+        const event = shared_1.EVENT_DEFINITIONS.find((e) => e.id === eventId);
+        if (!event)
+            throw new Error('Etkinlik bulunamadı.');
+        if (!record.eventProgress)
+            record.eventProgress = {};
+        const existing = record.eventProgress[eventId];
+        if (!existing || !existing.started) {
+            record.eventProgress[eventId] = {
+                started: true,
+                startedAt: Date.now(),
+                progress: 0,
+                completed: false,
+                claimed: false,
+            };
+        }
+        const state = record.eventProgress[eventId];
+        const eventData = {
+            ...event,
+            started: true,
+            currentCount: state.progress || 0,
+            completed: (state.progress || 0) >= event.targetCount,
+            claimed: !!state.claimed,
+        };
+        return {
+            user: this.toProfile(record),
+            event: eventData,
+            message: `"${event.title}" görevi başlatıldı! İlerlemeler şimdi kaydediliyor.`,
+        };
     }
     async claimEventReward(userId, eventId) {
         const record = this.users.get(userId);

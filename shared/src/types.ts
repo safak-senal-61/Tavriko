@@ -66,6 +66,9 @@ export interface Question {
   reviewedAt?: string;
   reviewedBy?: string;
   rejectionReason?: string;
+  targetPool?: 'standard' | 'daily_challenge' | 'custom_room';
+  isDailyChallenge?: boolean;
+  isCustomRoomOnly?: boolean;
   modelMetadata?: {
     model: string;
     promptVersion: string;
@@ -858,6 +861,10 @@ export interface GameEvent {
   title: string;
   desc: string;
   targetCount: number;
+  currentCount?: number;
+  started?: boolean;
+  completed?: boolean;
+  claimed?: boolean;
   metric: 'matches_played' | 'correct_answers' | 'wins' | 'streak' | 'category_solved';
   categoryFilter?: CategoryId;
   rewardCoins: number;

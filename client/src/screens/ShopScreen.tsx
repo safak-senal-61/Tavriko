@@ -298,8 +298,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                 </View>
 
                 {/* Info */}
-                <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.productDesc} numberOfLines={2}>{item.desc}</Text>
+                <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+                <Text style={styles.productDesc} numberOfLines={3}>{item.desc}</Text>
 
                 {/* Price / Purchase Button */}
                 <TouchableOpacity
@@ -391,7 +391,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 110,
+    paddingBottom: 140,
     paddingHorizontal: 12,
   },
   heroWrap: {
@@ -538,17 +538,20 @@ const styles = StyleSheet.create({
   },
   productName: {
     fontFamily: THEME.fonts.display,
-    fontSize: 14,
+    fontSize: 13,
+    lineHeight: 17,
     color: '#FFFFFF',
     textAlign: 'center',
+    minHeight: 34,
   },
   productDesc: {
     fontFamily: THEME.fonts.medium,
     fontSize: 10,
+    lineHeight: 14,
     color: '#D9CDF5',
     textAlign: 'center',
     marginVertical: 4,
-    minHeight: 28,
+    minHeight: 38,
   },
   priceBtn: {
     width: '100%',

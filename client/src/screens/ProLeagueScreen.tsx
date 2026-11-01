@@ -280,7 +280,7 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 110,
+    paddingBottom: 140,
     paddingHorizontal: 12,
   },
   heroWrap: {
