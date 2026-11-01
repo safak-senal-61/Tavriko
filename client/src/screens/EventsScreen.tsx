@@ -218,8 +218,8 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Hero */}
-        <View style={styles.heroWrap}>
+        {/* Header Hero framed box (matching Image 3) */}
+        <View style={styles.heroBox}>
           <Text style={styles.title}>ETKİNLİKLER</Text>
           <Text style={styles.subtitle}>Canlı görevler ve özel turnuva ödülleri</Text>
         </View>
@@ -252,7 +252,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
             onPress={() => switchTab('special')}
           >
             <Text style={[styles.tabText, activeTab === 'special' && styles.tabTextActive]} numberOfLines={1}>
-              ✪ Özel Turnuva
+              ⭐ Özel Turnuva
             </Text>
           </TouchableOpacity>
         </View>
@@ -422,25 +422,31 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 130, // Ample space so bottom card is never covered by bottom nav
+    paddingBottom: 160, // Ample space so bottom card is never covered by bottom nav
     paddingHorizontal: 14,
   },
-  heroWrap: {
+  heroBox: {
+    borderWidth: 1.5,
+    borderColor: '#30398A',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(23, 16, 52, 0.45)',
     alignItems: 'center',
-    marginTop: 6,
+    marginTop: 4,
     marginBottom: 12,
   },
   title: {
     fontFamily: THEME.fonts.display,
-    fontSize: 34,
+    fontSize: 32,
     color: '#FFC43D',
     letterSpacing: 2,
-    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
   subtitle: {
-    color: '#B5A7D6',
+    color: '#D9CDF5',
     fontSize: 12,
     fontFamily: THEME.fonts.medium,
     marginTop: 2,

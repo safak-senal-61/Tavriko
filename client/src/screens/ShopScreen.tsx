@@ -251,12 +251,14 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             const owned = isProductOwned(item);
             const rarityColor = RARITY_COLORS[item.rarity || 'common'];
             const isBuying = purchasingId === item.id;
+            const isFeatured = activeTab === 'featured';
 
             return (
               <View
                 key={item.id}
                 style={[
                   styles.productCard,
+                  isFeatured && styles.productCardFeatured,
                   { borderColor: rarityColor },
                   owned && styles.productCardOwned,
                 ]}
@@ -391,7 +393,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 140,
+    paddingBottom: 160, // Ample room so bottom products never hide behind bottom nav
     paddingHorizontal: 12,
   },
   heroWrap: {
@@ -414,6 +416,7 @@ const styles = StyleSheet.create({
   },
   categoryScroll: {
     paddingVertical: 8,
+    paddingHorizontal: 12,
     gap: 8,
   },
   categoryTab: {
@@ -481,6 +484,10 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
     position: 'relative',
+  },
+  productCardFeatured: {
+    width: '100%',
+    padding: 16,
   },
   productCardOwned: {
     opacity: 0.65,

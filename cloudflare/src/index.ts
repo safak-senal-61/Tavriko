@@ -40,6 +40,99 @@ export default {
       );
     }
 
+    // ============================================================================
+    // Telegram Webhook Edge Gateway (Cloudflare 24/7 Edge Dispatcher)
+    // ============================================================================
+    if (
+      url.pathname === '/telegram/webhook' ||
+      url.pathname === '/api/telegram/webhook'
+    ) {
+      if (request.method === 'POST') {
+        const backendBase = env.BACKEND_API_URL || 'https://tavriko-app.vercel.app';
+        const targetUrl = `${backendBase.replace(/\/+$/, '')}/api/telegram/webhook`;
+
+        try {
+          const bodyText = await request.text();
+          let parsedUpdate: any = null;
+          try {
+            parsedUpdate = JSON.parse(bodyText);
+          } catch {}
+
+          // Background asynchronous dispatch to Vercel so Telegram gets an instant 200 OK
+          ctx.waitUntil(
+            fetch(targetUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-forwarded-for': request.headers.get('cf-connecting-ip') || '127.0.0.1',
+                'x-cf-source': 'cloudflare-worker-edge',
+              },
+              body: bodyText,
+            })
+              .then(async (res) => {
+                const text = await res.text();
+                console.log(`[CF -> Vercel Telegram Forward] Status: ${res.status}, response: ${text.slice(0, 100)}`);
+              })
+              .catch((err) => {
+                console.error('[CF -> Vercel Telegram Error]', err.message);
+              })
+          );
+
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              edge: 'cloudflare-workers',
+              update_id: parsedUpdate?.update_id || null,
+              forwarded_to: targetUrl,
+            }),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            }
+          );
+        } catch (err: any) {
+          return new Response(JSON.stringify({ ok: false, error: err.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+          });
+        }
+      }
+
+      // GET info
+      return new Response(
+        JSON.stringify({
+          status: 'ready',
+          service: 'Cloudflare Telegram Webhook Edge Gateway',
+          webhook_url: `https://${url.host}/telegram/webhook`,
+          target_backend: `${env.BACKEND_API_URL || 'https://tavriko-app.vercel.app'}/api/telegram/webhook`,
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        }
+      );
+    }
+
+    // Direct helper to set webhook to this Cloudflare Worker
+    if (url.pathname === '/telegram/set-webhook') {
+      const token = url.searchParams.get('token') || '';
+      if (!token || token.length < 15) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Lütfen geçerli bir token belirtin (?token=...)' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      const cfWebhookUrl = `https://${url.host}/telegram/webhook`;
+      const tgRes = await fetch(
+        `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(cfWebhookUrl)}&drop_pending_updates=true`
+      );
+      const data = await tgRes.json();
+      return new Response(JSON.stringify({ cloudflare_gateway: cfWebhookUrl, telegram_response: data }), {
+        status: tgRes.status,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     const isWs = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
 
     // Route: Matchmaking WebSocket (/ws/matchmaking or /ws?intent=matchmaking)

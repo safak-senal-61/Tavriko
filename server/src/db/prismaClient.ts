@@ -1591,42 +1591,15 @@ export class PrismaService {
     if (delta.won) record.stats.wins += 1;
     record.stats.correctAnswers += delta.correctAnswers;
     record.stats.totalAnswers += delta.totalAnswers;
-    if (delta.bestStreak > record.stats.bestStreak) {
-      record.stats.bestStreak = delta.bestStreak;
-    }
+    record.stats.bestStreak = Math.max(record.stats.bestStreak || 0, delta.bestStreak);
 
     // Automatically update live event progress ONLY for tasks the user actively started and not completed yet
-    if (!record.eventProgress) record.eventProgress = {};
-    const ev = record.eventProgress;
-
-    for (const def of EVENT_DEFINITIONS) {
-      const state = ev[def.id];
-      // Only track if user has explicitly started this event and not finished yet
-      if (!state || !state.started || state.completed) continue;
-
-      let progressIncrement = 0;
-      if (def.metric === 'matches_played') {
-        progressIncrement = 1;
-      } else if (def.metric === 'wins' && delta.won) {
-        progressIncrement = 1;
-      } else if (def.metric === 'correct_answers') {
-        progressIncrement = delta.correctAnswers;
-      } else if (def.metric === 'streak' && delta.bestStreak > 0) {
-        state.progress = Math.max(state.progress, delta.bestStreak);
-      }
-
-      if (progressIncrement > 0) {
-        state.progress = (state.progress || 0) + progressIncrement;
-      }
-
-      if (state.progress >= def.targetCount) {
-        state.progress = def.targetCount;
-        state.completed = true;
-      }
-    }
-    if (delta.bestStreak >= 5) {
-      ev['daily_streak_5'] = { progress: 5, completed: true, claimed: !!ev['daily_streak_5']?.claimed };
-    }
+    this.updateStartedEvents(record, {
+      matches: 1,
+      won: delta.won,
+      correctAnswers: delta.correctAnswers,
+      streak: delta.bestStreak,
+    });
 
     this.users.set(userId, record);
     if (!record.isGuest) {
@@ -1634,6 +1607,40 @@ export class PrismaService {
       supabaseService.upsertUser(record).catch(() => {});
     }
     return this.toProfile(record);
+  }
+
+  private updateStartedEvents(
+    record: any,
+    delta: { matches?: number; won?: boolean; correctAnswers?: number; streak?: number }
+  ): void {
+    if (!record.eventProgress) record.eventProgress = {};
+    const ev = record.eventProgress;
+
+    for (const def of EVENT_DEFINITIONS) {
+      const state = ev[def.id];
+      // Only track if user actively started this event and has not completed it yet
+      if (!state || !state.started || state.completed || state.claimed) continue;
+
+      let increment = 0;
+      if (def.metric === 'matches_played' && delta.matches) {
+        increment = delta.matches;
+      } else if (def.metric === 'wins' && delta.won) {
+        increment = 1;
+      } else if (def.metric === 'correct_answers' && delta.correctAnswers) {
+        increment = delta.correctAnswers;
+      } else if (def.metric === 'streak' && delta.streak && delta.streak > 0) {
+        state.progress = Math.max(state.progress || 0, delta.streak);
+      }
+
+      if (increment > 0) {
+        state.progress = (state.progress || 0) + increment;
+      }
+
+      if (state.progress >= def.targetCount) {
+        state.progress = def.targetCount;
+        state.completed = true;
+      }
+    }
   }
 
   public verifyToken(token: string): { userId: string; username: string } | null {
@@ -1733,6 +1740,14 @@ export class PrismaService {
     record.stats.wins += 1;
     record.stats.correctAnswers += data.correctAnswers;
     record.stats.totalAnswers += data.totalQuestions;
+
+    // Apply progress to started events from daily challenge
+    this.updateStartedEvents(record, {
+      matches: 1,
+      won: true,
+      correctAnswers: data.correctAnswers,
+      streak: data.correctAnswers,
+    });
 
     const prog = calculateLevelFromXp(record.xp);
     record.level = prog.level;
@@ -2660,13 +2675,21 @@ export class PrismaService {
     const progressMap = record?.eventProgress || {};
 
     const events = EVENT_DEFINITIONS.map((ev) => {
-      const state = progressMap[ev.id] || { started: false, progress: 0, completed: false, claimed: false };
+      const state = progressMap[ev.id];
+      const isStarted = !!state?.started;
+      // Only count progress if user has explicitly started this event!
+      const rawProgress = isStarted ? (state?.progress || 0) : 0;
+      // Strictly clamp progress between 0 and targetCount (prevents stale 149 / 10 bug)
+      const currentCount = Math.min(ev.targetCount, Math.max(0, rawProgress));
+      const completed = currentCount >= ev.targetCount;
+      const claimed = !!state?.claimed;
+
       return {
         ...ev,
-        started: !!state.started,
-        currentCount: state.progress || 0,
-        completed: (state.progress || 0) >= ev.targetCount,
-        claimed: !!state.claimed,
+        started: isStarted,
+        currentCount,
+        completed,
+        claimed,
       };
     });
 
@@ -2683,7 +2706,8 @@ export class PrismaService {
     if (!record.eventProgress) record.eventProgress = {};
     const existing = record.eventProgress[eventId];
 
-    if (!existing || !existing.started) {
+    // If never started or corrupted progress (> targetCount), initialize clean from 0
+    if (!existing || !existing.started || (existing.progress || 0) > event.targetCount) {
       record.eventProgress[eventId] = {
         started: true,
         startedAt: Date.now(),
@@ -2691,16 +2715,23 @@ export class PrismaService {
         completed: false,
         claimed: false,
       };
+    } else {
+      existing.started = true;
     }
 
     const state = record.eventProgress[eventId];
+    const progress = Math.min(event.targetCount, Math.max(0, state.progress || 0));
     const eventData = {
       ...event,
       started: true,
-      currentCount: state.progress || 0,
-      completed: (state.progress || 0) >= event.targetCount,
+      currentCount: progress,
+      completed: progress >= event.targetCount,
       claimed: !!state.claimed,
     };
+
+    if (!record.isGuest) {
+      this.savePersistedUsers();
+    }
 
     return {
       user: this.toProfile(record),

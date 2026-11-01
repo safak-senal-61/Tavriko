@@ -299,10 +299,11 @@ export class TelegramBotService {
       this.registerTelegrafHandlers();
 
       const isVercel = Boolean(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
-      const publicBaseUrl = process.env.PUBLIC_APP_URL || 'https://tavriko-app.vercel.app';
+      // Prefer Cloudflare Workers 24/7 Edge Webhook Gateway to avoid Vercel cold starts
+      const cfGatewayWebhookUrl = 'https://tavriko-realtime.uncertainidentity8.workers.dev/telegram/webhook';
+      const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL || cfGatewayWebhookUrl;
 
       if (isVercel || process.env.NODE_ENV === 'production') {
-        const webhookUrl = `${publicBaseUrl}/api/telegram/webhook`;
         try {
           await this.bot.telegram.setWebhook(webhookUrl, { drop_pending_updates: true });
           console.log(`🤖 [TelegramBot] Webhook başarıyla ayarlandı: ${webhookUrl}`);

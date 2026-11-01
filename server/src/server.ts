@@ -121,10 +121,16 @@ export function createApp() {
   // Telegram set webhook endpoint
   app.get(['/api/admin/telegram/set-webhook', '/admin/telegram/set-webhook'], async (req, res) => {
     try {
-      const defaultUrl = 'https://tavriko-app.vercel.app/api/telegram/webhook';
-      const webhookUrl = (req.query.url as string) || defaultUrl;
+      const cfGatewayUrl = 'https://tavriko-realtime.uncertainidentity8.workers.dev/telegram/webhook';
+      const vercelUrl = 'https://tavriko-app.vercel.app/api/telegram/webhook';
+      let webhookUrl = cfGatewayUrl;
+      if (req.query.url === 'vercel') {
+        webhookUrl = vercelUrl;
+      } else if (req.query.url && typeof req.query.url === 'string' && req.query.url.startsWith('http')) {
+        webhookUrl = req.query.url;
+      }
       const result = await telegramBot.setWebhook(webhookUrl);
-      return res.json(result);
+      return res.json({ ...result, configured_url: webhookUrl });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
@@ -500,8 +506,11 @@ export function createApp() {
                 <button type="submit" class="btn btn-telegram" id="btn-save-bot">
                   🚀 Botu Bağla ve Başlat
                 </button>
-                <button type="button" class="btn" id="btn-force-webhook" onclick="forceSetWebhook()" style="margin-top: 8px; background: #232B42; border: 1px solid #3B4B75;">
-                  🔄 Webhook'u Tavriko Vercel'e Bağla
+                <button type="button" class="btn" id="btn-cf-webhook" onclick="forceSetWebhook('cloudflare')" style="margin-top: 8px; background: linear-gradient(135deg, #F6821F 0%, #D86300 100%); color: white; font-weight: 800;">
+                  ⚡ Webhook'u Cloudflare Edge Gateway'e Bağla (Önerilen)
+                </button>
+                <button type="button" class="btn" id="btn-vercel-webhook" onclick="forceSetWebhook('vercel')" style="margin-top: 8px; background: #232B42; border: 1px solid #3B4B75;">
+                  🔄 Webhook'u Doğrudan Vercel'e Bağla
                 </button>
                 <button type="button" class="btn" id="btn-test-bot" onclick="testTelegramBot()" style="margin-top: 8px; background: rgba(255,255,255,0.08); border: 1px solid #2B3754;">
                   🧪 Bot & Webhook Bağlantısını Test Et
@@ -510,7 +519,7 @@ export function createApp() {
               <div id="msg-box"></div>
               <div id="bot-details-box" style="display: none; margin-top: 14px; background: rgba(0, 136, 204, 0.1); border: 1px solid rgba(0, 136, 204, 0.3); border-radius: 12px; padding: 14px; font-size: 13px;">
                 <div style="font-weight: 700; color: #38BDF8; margin-bottom: 6px; font-size: 14px;" id="bot-username-display">🤖 Bot Bilgisi</div>
-                <div style="color: #CBD5E1; font-size: 12px; margin-bottom: 4px;" id="bot-webhook-display">Webhook: https://tavriko-app.vercel.app/api/telegram/webhook</div>
+                <div style="color: #CBD5E1; font-size: 12px; margin-bottom: 4px;" id="bot-webhook-display">Webhook: https://tavriko-realtime.uncertainidentity8.workers.dev/telegram/webhook</div>
                 <div style="color: #94A3B8; font-size: 11px; margin-bottom: 6px;" id="bot-pending-display">Bekleyen Güncellemeler: 0</div>
                 <div style="color: #EF4444; font-size: 12px; font-weight: 600; display: none;" id="bot-error-display"></div>
                 <a id="bot-link-btn" href="#" target="_blank" style="display: inline-block; margin-top: 8px; background: #0088cc; color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 13px;">📲 Telegram'da Botu Aç</a>
@@ -574,20 +583,22 @@ export function createApp() {
             }
           }
 
-          async function forceSetWebhook() {
-            const btn = document.getElementById('btn-force-webhook');
+          async function forceSetWebhook(target) {
+            const btnCf = document.getElementById('btn-cf-webhook');
+            const btnVercel = document.getElementById('btn-vercel-webhook');
             const msg = document.getElementById('msg-box');
-            btn.disabled = true;
-            btn.innerText = 'Webhook Kuruluyor...';
+            if (btnCf) btnCf.disabled = true;
+            if (btnVercel) btnVercel.disabled = true;
             msg.style.display = 'none';
 
             try {
-              const res = await fetch('/api/admin/telegram/set-webhook');
+              const query = target ? ('?url=' + encodeURIComponent(target)) : '';
+              const res = await fetch('/api/admin/telegram/set-webhook' + query);
               const data = await res.json();
               msg.style.display = 'block';
               if (data.success) {
                 msg.style.color = '#10B981';
-                msg.innerText = '✅ ' + data.message;
+                msg.innerText = '✅ ' + (data.message || 'Webhook başarıyla bağlandı!') + (data.configured_url ? ' -> ' + data.configured_url : '');
                 testTelegramBot();
               } else {
                 msg.style.color = '#EF4444';
@@ -598,8 +609,14 @@ export function createApp() {
               msg.style.color = '#EF4444';
               msg.innerText = '❌ İstek hatası: ' + err.message;
             } finally {
-              btn.disabled = false;
-              btn.innerText = '🔄 Webhook\'u Tavriko Vercel\'e Bağla';
+              if (btnCf) {
+                btnCf.disabled = false;
+                btnCf.innerText = '⚡ Webhook\'u Cloudflare Edge Gateway\'e Bağla (Önerilen)';
+              }
+              if (btnVercel) {
+                btnVercel.disabled = false;
+                btnVercel.innerText = '🔄 Webhook\'u Doğrudan Vercel\'e Bağla';
+              }
             }
           }
 
