@@ -203,12 +203,19 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
         ) : (
           <View style={styles.eventsList}>
             {filteredEvents.map((item) => {
-              const current = item.currentProgress || 0;
-              const target = item.target || 1;
+              const current = (item as any).currentCount ?? (item as any).currentProgress ?? 0;
+              const target = item.targetCount ?? (item as any).target ?? 1;
               const isCompleted = current >= target;
               const isClaimed = !!item.claimed;
               const progressPct = Math.min(100, Math.round((current / target) * 100));
               const isClaiming = claimingId === item.id;
+              const desc = item.desc || (item as any).description || '';
+
+              const coins = item.rewardCoins ?? (item as any).rewards?.coins ?? 0;
+              const gems = item.rewardGems ?? (item as any).rewards?.gems ?? 0;
+              const xp = item.rewardXp ?? (item as any).rewards?.xp ?? 0;
+              const seasonXp = item.rewardSeasonXp ?? 0;
+              const itemReward = item.rewardItem;
 
               return (
                 <View
@@ -232,7 +239,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                     </View>
                     <View style={styles.headerInfo}>
                       <Text style={styles.eventTitle}>{item.title}</Text>
-                      <Text style={styles.eventDesc}>{item.description}</Text>
+                      <Text style={styles.eventDesc}>{desc}</Text>
                     </View>
                   </View>
 
@@ -252,21 +259,31 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                     <View style={styles.rewardsPreview}>
                       <Text style={styles.rewardsLabel}>Ödüller:</Text>
                       <View style={styles.rewardPills}>
-                        {item.rewards.coins ? (
+                        {coins > 0 ? (
                           <View style={styles.rewardPill}>
                             <CoinIcon size={14} />
-                            <Text style={styles.rewardPillText}>+{item.rewards.coins}</Text>
+                            <Text style={styles.rewardPillText}>+{coins}</Text>
                           </View>
                         ) : null}
-                        {item.rewards.gems ? (
+                        {gems > 0 ? (
                           <View style={styles.rewardPill}>
                             <GemIcon size={14} />
-                            <Text style={styles.rewardPillText}>+{item.rewards.gems}</Text>
+                            <Text style={styles.rewardPillText}>+{gems}</Text>
                           </View>
                         ) : null}
-                        {item.rewards.xp ? (
+                        {xp > 0 ? (
                           <View style={styles.rewardPill}>
-                            <Text style={styles.rewardPillText}>+{item.rewards.xp} XP</Text>
+                            <Text style={styles.rewardPillText}>+{xp} XP</Text>
+                          </View>
+                        ) : null}
+                        {seasonXp > 0 ? (
+                          <View style={styles.rewardPill}>
+                            <Text style={[styles.rewardPillText, { color: '#6FE3C1' }]}>+{seasonXp} S-XP</Text>
+                          </View>
+                        ) : null}
+                        {itemReward ? (
+                          <View style={styles.rewardPill}>
+                            <Text style={styles.rewardPillText}>🎁 {itemReward.name}</Text>
                           </View>
                         ) : null}
                       </View>
