@@ -8,9 +8,8 @@ import {
   ScrollView,
   Switch,
   Platform,
-  Dimensions,
 } from 'react-native';
-import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
 import { CustomRoomSettings, CategoryId, DifficultyLevel } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -37,7 +36,6 @@ interface CustomRoomScreenProps {
   coins?: number;
 }
 
-// TRT Bil Bakalım Standart Soru ve Süre Seçenekleri
 const QUESTION_OPTIONS = [7, 14, 21];
 const TIME_OPTIONS = [20, 40];
 const PLAYER_OPTIONS = [2, 4, 6, 8];
@@ -57,7 +55,6 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   avatarSeed,
   coins,
 }) => {
-  // Aktif mod: Oda Kur veya Odaya Katıl
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
 
   // Katılma Kodu State
@@ -71,6 +68,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   const [questionTimeSec, setQuestionTimeSec] = useState<number>(20);
   const [difficulty, setDifficulty] = useState<DifficultyLevel | 'mixed'>('mixed');
   const [penaltyForWrong, setPenaltyForWrong] = useState<boolean>(true);
+  const [privacy, setPrivacy] = useState<'public' | 'private'>('public');
 
   // Kategori Seçimi State
   const [selectedCategory, setSelectedCategory] = useState<CategoryData | 'mixed'>('mixed');
@@ -107,7 +105,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
       penaltyForWrong,
       categories,
       mixedCategories: isMixed,
-      privacy: 'public',
+      privacy,
     };
 
     onCreateRoom(settings);
@@ -127,10 +125,10 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Üst Başlık ve Sekme Seçici (Oda Kur | Odaya Katıl) */}
+        {/* Tavriko Neon Sekme Seçici (Oda Kur | Odaya Katıl) */}
         <View style={styles.tabToggleRow}>
           <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'create' && styles.tabButtonActive]}
+            style={[styles.tabButton, activeTab === 'create' && styles.tabButtonActiveCreate]}
             activeOpacity={0.85}
             onPress={() => {
               sound.playSound('tap');
@@ -138,12 +136,12 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
             }}
           >
             <Text style={[styles.tabButtonText, activeTab === 'create' && styles.tabButtonTextActive]}>
-              Oda Kur
+              ⚡ ODA KUR
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'join' && styles.tabButtonActive]}
+            style={[styles.tabButton, activeTab === 'join' && styles.tabButtonActiveJoin]}
             activeOpacity={0.85}
             onPress={() => {
               sound.playSound('tap');
@@ -151,16 +149,22 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
             }}
           >
             <Text style={[styles.tabButtonText, activeTab === 'join' && styles.tabButtonTextActive]}>
-              Odaya Katıl
+              🔑 ODAYA KATIL
             </Text>
           </TouchableOpacity>
         </View>
 
         {activeTab === 'create' ? (
-          /* TRT BİL BAKALIM ODA KURMA ARAYÜZÜ */
+          /* TAVRİKO ÖZGÜN ODA KURMA KARTI */
           <View style={styles.roomSetupCard}>
-            {/* 1. KATEGORİ SEÇİCİ DROPDOWN (TRT Görselindeki gibi) */}
-            <Text style={styles.sectionHeader}>Kategori</Text>
+            {/* 1. KATEGORİ SEÇİCİ DROPDOWN */}
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeader}>KATEGORİ</Text>
+              <Text style={styles.sectionBadge}>
+                {selectedCategory === 'mixed' ? '🎲 KARIŞIK MOD' : '🎯 TEK BRANŞ'}
+              </Text>
+            </View>
+
             <TouchableOpacity
               style={styles.categoryDropdown}
               activeOpacity={0.88}
@@ -171,23 +175,36 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               }}
             >
               <View style={styles.categoryDropdownLeft}>
-                <View style={styles.categoryDropdownIconWrap}>
+                <View
+                  style={[
+                    styles.categoryDropdownIconWrap,
+                    selectedCategory !== 'mixed' && {
+                      borderColor: selectedCategory.neonBorder,
+                    },
+                  ]}
+                >
                   {selectedCategory === 'mixed' ? (
-                    <CategorySquircleIcon name="shuffle" size={24} color="#FFFFFF" />
+                    <CategorySquircleIcon name="shuffle" size={26} color="#FFE27A" />
                   ) : (
-                    <CategorySquircleIcon name={selectedCategory.iconName} size={24} color="#FFFFFF" />
+                    <CategorySquircleIcon name={selectedCategory.iconName} size={26} color="#FFFFFF" />
                   )}
                 </View>
-                <Text style={styles.categoryDropdownText}>
-                  {selectedCategory === 'mixed' ? 'Karışık' : selectedCategory.name}
-                </Text>
+                <View>
+                  <Text style={styles.categoryDropdownText}>
+                    {selectedCategory === 'mixed' ? 'Tüm Kategoriler (Karışık)' : selectedCategory.name}
+                  </Text>
+                  <Text style={styles.categoryDropdownSub}>
+                    {selectedCategory === 'mixed'
+                      ? 'Dengeli çoklu branş soruları'
+                      : selectedCategory.badge}
+                  </Text>
+                </View>
               </View>
 
-              {/* Aşağı Açılır Ok İkonu */}
-              <Svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <Svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                 <Path
                   d="M6 9L12 15L18 9"
-                  stroke="#FFFFFF"
+                  stroke="#FFC43D"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -195,7 +212,6 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               </Svg>
             </TouchableOpacity>
 
-            {/* Hızlı Kategori Değiştir / Karışık Butonu */}
             <TouchableOpacity
               style={styles.mixedQuickToggle}
               activeOpacity={0.8}
@@ -205,15 +221,15 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               }}
             >
               <Text style={styles.mixedQuickText}>
-                {selectedCategory === 'mixed' ? '🎯 Tek Kategori Seç' : '🎲 Karışık Moduna Geç'}
+                {selectedCategory === 'mixed' ? '🎯 Tek Kategori Seç' : '🎲 Karışık Moduna Dön'}
               </Text>
             </TouchableOpacity>
 
-            {/* 2. PARAMETRELER: SORU SAYISI & SÜRE (TRT Çift Sütunlu Yan Yana Görseli) */}
+            {/* 2. PARAMETRELER: SORU SAYISI & SÜRE */}
             <View style={styles.paramGridRow}>
-              {/* Soru Sayısı Sütunu */}
+              {/* Soru Sayısı */}
               <View style={styles.paramColumn}>
-                <Text style={styles.sectionHeader}>Soru Sayısı</Text>
+                <Text style={styles.sectionHeader}>SORU SAYISI</Text>
                 <View style={styles.chipGroup}>
                   {QUESTION_OPTIONS.map((q) => {
                     const isSelected = totalRounds === q;
@@ -237,9 +253,9 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 </View>
               </View>
 
-              {/* Süre Sütunu */}
+              {/* Süre */}
               <View style={styles.paramColumn}>
-                <Text style={styles.sectionHeader}>Süre</Text>
+                <Text style={styles.sectionHeader}>SÜRE</Text>
                 <View style={styles.chipGroup}>
                   {TIME_OPTIONS.map((sec) => {
                     const isSelected = questionTimeSec === sec;
@@ -265,7 +281,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
             </View>
 
             {/* 3. OYUNCU SAYISI */}
-            <Text style={styles.sectionHeader}>Oyuncu Sayısı ({maxPlayers} Kişi)</Text>
+            <Text style={styles.sectionHeader}>OYUNCU SAYISI ({maxPlayers} Kişi)</Text>
             <View style={styles.chipRowFull}>
               {PLAYER_OPTIONS.map((num) => {
                 const isSelected = maxPlayers === num;
@@ -289,7 +305,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
             </View>
 
             {/* 4. ZORLUK SEVİYESİ */}
-            <Text style={styles.sectionHeader}>Zorluk Seviyesi</Text>
+            <Text style={styles.sectionHeader}>ZORLUK DERECESİ</Text>
             <View style={styles.chipRowFull}>
               {DIFFICULTY_OPTIONS.map((diff) => {
                 const isSelected = difficulty === diff.id;
@@ -312,7 +328,25 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               })}
             </View>
 
-            {/* 5. YANLIŞ CEVAP CEZASI */}
+            {/* 5. GİZLİLİK & CEZA AYARLARI */}
+            <View style={styles.switchRow}>
+              <View>
+                <Text style={styles.switchLabel}>Oda Gizliliği</Text>
+                <Text style={styles.switchSub}>
+                  {privacy === 'public' ? 'Herkese Açık (Lobiye Katılabilir)' : 'Özel (Yalnızca Kod İle)'}
+                </Text>
+              </View>
+              <Switch
+                value={privacy === 'public'}
+                onValueChange={(val) => {
+                  sound.playSound('tap');
+                  setPrivacy(val ? 'public' : 'private');
+                }}
+                trackColor={{ false: 'rgba(255,255,255,0.2)', true: '#5ADBB5' }}
+                thumbColor={privacy === 'public' ? '#12052C' : '#D9CDF5'}
+              />
+            </View>
+
             <View style={styles.switchRow}>
               <View>
                 <Text style={styles.switchLabel}>Yanlış Cevap Cezası</Text>
@@ -324,49 +358,27 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                   sound.playSound('tap');
                   setPenaltyForWrong(val);
                 }}
-                trackColor={{ false: 'rgba(255,255,255,0.2)', true: '#00B4DB' }}
-                thumbColor={penaltyForWrong ? '#FFFFFF' : '#D9CDF5'}
+                trackColor={{ false: 'rgba(255,255,255,0.2)', true: '#FF6BC4' }}
+                thumbColor={penaltyForWrong ? '#12052C' : '#D9CDF5'}
               />
             </View>
 
-            {/* 6. ODAYI BAŞLAT / KUR BUTONU */}
-            <TouchableOpacity
-              style={styles.createRoomButton}
-              activeOpacity={0.88}
+            {/* 6. TAVRİKO 3D ODA OLUŞTUR BUTONU */}
+            <Button3D
+              title="ODAYI OLUŞTUR"
               onPress={handleCreateRoomPress}
-            >
-              <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
-                <Defs>
-                  <LinearGradient id="createBtnGrad" x1="0" y1="0" x2="1" y2="0">
-                    <Stop offset="0" stopColor="#00B4DB" />
-                    <Stop offset="1" stopColor="#0083B0" />
-                  </LinearGradient>
-                </Defs>
-                <Rect
-                  x="0"
-                  y="0"
-                  width="100%"
-                  height="100%"
-                  rx="26"
-                  ry="26"
-                  fill="url(#createBtnGrad)"
-                  stroke="#FFFFFF"
-                  strokeWidth="1.5"
-                  strokeOpacity={0.4}
-                />
-              </Svg>
-              <Text style={styles.createRoomButtonText}>Odayı Oluştur</Text>
-            </TouchableOpacity>
+              variant="gold"
+              style={{ height: 56, marginTop: 10 }}
+            />
           </View>
         ) : (
           /* ODAYA KATIL KARTI */
           <View style={styles.roomSetupCard}>
-            <Text style={styles.sectionHeader}>Oda Kodunu Girin</Text>
+            <Text style={styles.sectionHeader}>6 HANELİ ODA KODU</Text>
             <Text style={styles.joinSubText}>
-              Arkadaşınızın paylaştığı 6 haneli oda kodunu girerek hemen lobiye katılın.
+              Arkadaşınızın paylaştığı oda kodunu girerek lobiye anında katılın.
             </Text>
 
-            {/* 6 Haneli Kutu Arayüzü */}
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={() => {
@@ -387,7 +399,6 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               </View>
             </TouchableOpacity>
 
-            {/* Gizli TextInput */}
             <TextInput
               ref={codeInputRef}
               style={styles.hiddenInput}
@@ -404,7 +415,6 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 
             {joinError && <Text style={styles.errorText}>{joinError}</Text>}
 
-            {/* Panodan Yapıştır Butonu */}
             <TouchableOpacity
               style={styles.pasteButton}
               activeOpacity={0.8}
@@ -420,38 +430,17 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               <Text style={styles.pasteButtonText}>📋 Panodan Yapıştır</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.createRoomButton, { marginTop: 24 }]}
-              activeOpacity={0.88}
+            <Button3D
+              title="ODAYA KATIL"
               onPress={handleJoinPress}
-            >
-              <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
-                <Defs>
-                  <LinearGradient id="joinBtnGrad" x1="0" y1="0" x2="1" y2="0">
-                    <Stop offset="0" stopColor="#9A6BFF" />
-                    <Stop offset="1" stopColor="#5A27C8" />
-                  </LinearGradient>
-                </Defs>
-                <Rect
-                  x="0"
-                  y="0"
-                  width="100%"
-                  height="100%"
-                  rx="26"
-                  ry="26"
-                  fill="url(#joinBtnGrad)"
-                  stroke="#FFFFFF"
-                  strokeWidth="1.5"
-                  strokeOpacity={0.4}
-                />
-              </Svg>
-              <Text style={styles.createRoomButtonText}>Odaya Katıl</Text>
-            </TouchableOpacity>
+              variant="mint"
+              style={{ height: 56, marginTop: 24 }}
+            />
           </View>
         )}
       </ScrollView>
 
-      {/* TRT BİL BAKALIM "KATEGORİNİ SEÇ" MODALI */}
+      {/* KATEGORİ SEÇİM MODALI */}
       <CategorySelectModal
         visible={isCategoryModalVisible}
         initialCategoryId={selectedCategory === 'mixed' ? 'science_tech' : selectedCategory.id}
@@ -466,78 +455,96 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 40,
     alignItems: 'center',
   },
   tabToggleRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(10, 4, 24, 0.72)',
     borderRadius: 24,
     padding: 4,
-    marginBottom: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(154, 107, 255, 0.3)',
+    marginBottom: 16,
     width: '100%',
-    maxWidth: 360,
+    maxWidth: 380,
   },
   tabButton: {
     flex: 1,
-    height: 42,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 20,
   },
-  tabButtonActive: {
-    backgroundColor: '#00B4DB',
+  tabButtonActiveCreate: {
+    backgroundColor: '#6B3CFF',
+  },
+  tabButtonActiveJoin: {
+    backgroundColor: '#5ADBB5',
   },
   tabButtonText: {
-    fontSize: 15,
-    fontFamily: 'Nunito_800ExtraBold',
-    fontWeight: '800',
+    fontSize: 14,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '900',
     color: '#D9CDF5',
+    letterSpacing: 1,
   },
   tabButtonTextActive: {
     color: '#FFFFFF',
   },
   roomSetupCard: {
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 390,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 28,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    padding: 20,
+    borderColor: 'rgba(154, 107, 255, 0.35)',
+    padding: 18,
     ...Platform.select({
       ios: {
-        shadowColor: '#000000',
+        shadowColor: '#6B3CFF',
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.35,
-        shadowRadius: 16,
+        shadowRadius: 18,
       },
       android: {
         elevation: 10,
       },
       web: {
-        boxShadow: '0px 10px 30px rgba(0, 0, 0, 0.35)',
+        boxShadow: '0px 10px 30px rgba(107, 60, 255, 0.25)',
       },
     }),
   },
-  sectionHeader: {
-    fontSize: 16,
-    fontFamily: 'Nunito_800ExtraBold',
-    fontWeight: '800',
-    color: '#FFFFFF',
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
-    textAlign: 'center',
+  },
+  sectionHeader: {
+    fontSize: 14,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 1,
+  },
+  sectionBadge: {
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    fontWeight: '900',
+    color: '#5ADBB5',
+    letterSpacing: 0.8,
   },
   categoryDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(18, 7, 44, 0.92)',
     borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.22)',
+    borderWidth: 1.8,
+    borderColor: '#6B3CFF',
     paddingVertical: 12,
     paddingHorizontal: 16,
     marginBottom: 6,
@@ -548,64 +555,87 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   categoryDropdownIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFC43D',
   },
   categoryDropdownText: {
-    fontSize: 17,
-    fontFamily: 'Nunito_900Black',
+    fontSize: 16,
+    fontFamily: THEME.fonts.display,
     fontWeight: '900',
     color: '#FFFFFF',
   },
+  categoryDropdownSub: {
+    fontSize: 11,
+    fontFamily: THEME.fonts.bold,
+    fontWeight: '700',
+    color: '#D9CDF5',
+    marginTop: 2,
+  },
   mixedQuickToggle: {
     alignSelf: 'center',
-    paddingVertical: 6,
+    paddingVertical: 4,
     paddingHorizontal: 12,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   mixedQuickText: {
     fontSize: 13,
-    fontFamily: 'Nunito_700Bold',
-    fontWeight: '700',
-    color: '#5AE0B5',
+    fontFamily: THEME.fonts.bold,
+    fontWeight: '800',
+    color: '#5ADBB5',
     textDecorationLine: 'underline',
   },
   paramGridRow: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   paramColumn: {
     flex: 1,
-    alignItems: 'center',
   },
   chipGroup: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(10, 4, 30, 0.65)',
+    backgroundColor: 'rgba(10, 4, 30, 0.75)',
     borderRadius: 20,
     padding: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(154, 107, 255, 0.25)',
     width: '100%',
     justifyContent: 'space-around',
+    marginTop: 6,
   },
   chipPill: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 18,
+    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
   },
   chipPillActive: {
-    backgroundColor: '#00B4DB',
+    backgroundColor: '#6B3CFF',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#6B3CFF',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.6,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        filter: 'drop-shadow(0px 2px 8px rgba(107, 60, 255, 0.6))',
+      },
+    }),
   },
   chipPillText: {
-    fontSize: 15,
-    fontFamily: 'Nunito_800ExtraBold',
+    fontSize: 14,
+    fontFamily: THEME.fonts.extraBold,
     fontWeight: '800',
     color: '#CBBFE8',
   },
@@ -615,18 +645,19 @@ const styles = StyleSheet.create({
   },
   chipRowFull: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(10, 4, 30, 0.65)',
+    backgroundColor: 'rgba(10, 4, 30, 0.75)',
     borderRadius: 20,
     padding: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    marginBottom: 16,
+    borderWidth: 1.2,
+    borderColor: 'rgba(154, 107, 255, 0.25)',
+    marginTop: 6,
+    marginBottom: 14,
     justifyContent: 'space-between',
   },
   chipPillSmall: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 18,
+    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -634,61 +665,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    backgroundColor: 'rgba(18, 7, 44, 0.65)',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderRadius: 18,
-    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 10,
   },
   switchLabel: {
-    fontSize: 15,
-    fontFamily: 'Nunito_800ExtraBold',
+    fontSize: 14,
+    fontFamily: THEME.fonts.extraBold,
     fontWeight: '800',
     color: '#FFFFFF',
   },
   switchSub: {
-    fontSize: 12,
-    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 11,
+    fontFamily: THEME.fonts.medium,
     fontWeight: '600',
     color: '#CBBFE8',
     marginTop: 2,
   },
-  createRoomButton: {
-    width: '100%',
-    height: 52,
-    borderRadius: 26,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#00B4DB',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.45,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 6,
-      },
-      web: {
-        boxShadow: '0px 6px 16px rgba(0, 180, 219, 0.45)',
-      },
-    }),
-  },
-  createRoomButtonText: {
-    fontSize: 18,
-    fontFamily: 'Nunito_900Black',
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
   joinSubText: {
     fontSize: 13,
-    fontFamily: 'Nunito_600SemiBold',
+    fontFamily: THEME.fonts.medium,
     fontWeight: '600',
     color: '#D9CDF5',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   digitsWrapper: {
     alignItems: 'center',
@@ -701,20 +705,20 @@ const styles = StyleSheet.create({
   digitBox: {
     width: 44,
     height: 52,
-    borderRadius: 12,
-    backgroundColor: 'rgba(10, 4, 30, 0.7)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 14,
+    backgroundColor: 'rgba(10, 4, 30, 0.85)',
+    borderWidth: 1.8,
+    borderColor: 'rgba(154, 107, 255, 0.35)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   digitBoxFilled: {
-    borderColor: '#00B4DB',
-    backgroundColor: 'rgba(0, 180, 219, 0.15)',
+    borderColor: '#5ADBB5',
+    backgroundColor: 'rgba(90, 219, 181, 0.15)',
   },
   digitText: {
     fontSize: 22,
-    fontFamily: 'Nunito_900Black',
+    fontFamily: THEME.fonts.display,
     fontWeight: '900',
     color: '#FFFFFF',
   },
@@ -727,8 +731,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#FF5A6A',
     fontSize: 13,
-    fontFamily: 'Nunito_700Bold',
-    fontWeight: '700',
+    fontFamily: THEME.fonts.bold,
     textAlign: 'center',
     marginTop: 6,
   },
@@ -738,11 +741,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginTop: 10,
+    marginTop: 8,
   },
   pasteButtonText: {
     fontSize: 13,
-    fontFamily: 'Nunito_800ExtraBold',
+    fontFamily: THEME.fonts.extraBold,
     fontWeight: '800',
     color: '#FFFFFF',
   },

@@ -100,8 +100,12 @@ Bu doküman, `trt-bil-bakalim.apk` tersine mühendislik incelemesi ve kullanıc�
   - "Diğer oyuncular bekleniyor..." nefes alan (pulsing opacity) animasyonu eklendi.
   - 2 oyuncu olmadan "Oyunu Başlat" butonunun pasif kalması; 2 oyuncu olunca turkuaz parlayarak aktifleşmesi sağlandı.
 
-### Faz 3: Lottie Reaksiyonları ve Ses Entegrasyonu
-- [ ] **3.1. Lobi İçi Lottie Tepki Çubuğu:**
-  - Avatar üzerinde patlayan emojiler (`like.json`, `laugh.json`, `love.json`).
-- [ ] **3.2. Ses Tasarımı:**
-  - Karusel kaydırma tık sesi, buton basma sesi ve modal açılış yaylanma sesi.
+### Faz 3: Lottie Reaksiyonları, Ses ve Özgün Tavriko Kimliği
+- [x] **3.1. Lobi İçi İnteraktif Reaksiyon Çubuğu (`LobbyReactions.tsx`):**
+  - Lobide avatarların üzerinde uçuşan 8 farklı interaktif emoji reaksiyonu (`🔥`, `👑`, `👏`, `😂`, `❤️`, `⚡`, `🎯`, `🚀`) geliştirildi.
+  - Süzülen parçacık fiziksel animasyonu (`FloatingEmojiItem`: translateY -110px, scale 1.4x -> 0.8x, fade out) entegre edildi.
+- [x] **3.2. Ses & Haptik Tasarımı:**
+  - Reaksiyon basma sesi, karusel kaydırma tık sesleri ve onay haptikleri eklendi.
+- [x] **3.3. Özgün Tavriko Cyber-Obsidian Tasarım Kimliği:**
+  - TRT kopyası beyaz kart görünümü kaldırılarak yerine Tavriko'nun tescilli **Dark Luxury Obsidian Glass (`#1E0E3D`)**, neon rim lighting ve **3D Altın Onay Butonu** entegre edildi.
+  - Özel oda gizliliği (Herkese Açık / Kilitli Özel) ayarı eklendi.

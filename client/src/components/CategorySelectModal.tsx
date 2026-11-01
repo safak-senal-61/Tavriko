@@ -17,6 +17,7 @@ import {
 import { SegmentedFilter } from './SegmentedFilter';
 import { CategoryCarousel } from './CategoryCarousel';
 import { sound } from '../services/soundService';
+import { THEME } from '../theme/tokens';
 
 interface CategorySelectModalProps {
   visible: boolean;
@@ -33,23 +34,19 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
   onClose,
   onSelectCategory,
 }) => {
-  // Aktif sekme: Genel veya Özel
   const [activeTab, setActiveTab] = useState<'general' | 'special'>('general');
 
-  // Hangi liste gösteriliyor?
   const currentCategoryList =
     activeTab === 'general' ? GENERAL_CATEGORIES : SPECIAL_CATEGORIES;
 
-  // Seçili kategori
   const [selectedCategory, setSelectedCategory] = useState<CategoryData>(() => {
     return (
       GENERAL_CATEGORIES.find((c) => c.id === initialCategoryId) ||
       SPECIAL_CATEGORIES.find((c) => c.id === initialCategoryId) ||
-      GENERAL_CATEGORIES[2] // Sanat & Kültür (Turuncu boya fırçası - ekran görüntüsüyle eşleşir)
+      GENERAL_CATEGORIES[0]
     );
   });
 
-  // Modal her açıldığında başlangıç durumunu ayarla
   useEffect(() => {
     if (visible) {
       const isSpecial = SPECIAL_CATEGORIES.some((c) => c.id === initialCategoryId);
@@ -65,7 +62,6 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
     }
   }, [visible, initialCategoryId]);
 
-  // Sekme değiştiğinde o sekmenin ilk kategorisini seç
   const handleTabChange = (tab: 'general' | 'special') => {
     setActiveTab(tab);
     const targetList = tab === 'general' ? GENERAL_CATEGORIES : SPECIAL_CATEGORIES;
@@ -87,7 +83,7 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        {/* Arka plan tıklaması */}
+        {/* Arka plan karartması */}
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
           activeOpacity={1}
@@ -95,55 +91,62 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
         />
 
         <View style={styles.modalWrapper}>
-          {/* Modal Başlığı (Ekran görüntüsündeki gibi beyaz başlık) */}
-          <Text style={styles.modalTitle}>Kategorini Seç</Text>
-
-          {/* Beyaz Kart Gövdesi */}
+          {/* Tavriko Dark Luxury Obsidian Kart Gövdesi */}
           <View style={styles.cardContainer}>
+            {/* Üst Vurgu Barı */}
+            <View style={styles.headerBar}>
+              <Text style={styles.modalBadge}>TAVRİKO ARENA</Text>
+              <Text style={styles.modalTitle}>Kategorini Seç</Text>
+            </View>
+
             {/* 1. Üst Sekme: [ Genel | Özel ] */}
             <View style={styles.tabContainer}>
               <SegmentedFilter
                 activeTab={activeTab}
                 onChange={handleTabChange}
-                width={230}
+                width={250}
               />
             </View>
 
-            {/* 2. Orta: 3D Squircle Kategori Karuseli */}
+            {/* 2. 3D Cyber-Squircle Kategori Karuseli */}
             <CategoryCarousel
               categories={currentCategoryList}
               selectedCategoryId={selectedCategory.id}
               onSelectCategory={setSelectedCategory}
-              cardSize={88}
+              cardSize={90}
             />
 
-            {/* 3. Alt: Tamam Butonu (Turkuaz - Mavi Degrade Hap Buton) */}
+            {/* 3. Tavriko 3D Onay Butonu (Altın / Neon Mint Tavriko Stili) */}
             <TouchableOpacity
-              style={styles.confirmButton}
+              style={styles.confirm3DButton}
               activeOpacity={0.88}
               onPress={handleConfirm}
             >
-              <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
-                <Defs>
-                  <LinearGradient id="btnGrad" x1="0" y1="0" x2="1" y2="0">
-                    <Stop offset="0" stopColor="#00B4DB" />
-                    <Stop offset="1" stopColor="#0083B0" />
-                  </LinearGradient>
-                </Defs>
-                <Rect
-                  x="0"
-                  y="0"
-                  width="100%"
-                  height="100%"
-                  rx="26"
-                  ry="26"
-                  fill="url(#btnGrad)"
-                  stroke="#FFFFFF"
-                  strokeWidth="1.5"
-                  strokeOpacity={0.4}
-                />
-              </Svg>
-              <Text style={styles.confirmButtonText}>Tamam</Text>
+              {/* 3D Alt Dudak (Lip) */}
+              <View style={styles.btnLip} />
+
+              {/* 3D Üst Gövde */}
+              <View style={styles.btnBody}>
+                <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+                  <Defs>
+                    <LinearGradient id="tavrikoConfirmGrad" x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0" stopColor="#FFE27A" />
+                      <Stop offset="0.6" stopColor="#FF9B2F" />
+                      <Stop offset="1" stopColor="#E07A00" />
+                    </LinearGradient>
+                  </Defs>
+                  <Rect
+                    x="0"
+                    y="0"
+                    width="100%"
+                    height="100%"
+                    rx="24"
+                    ry="24"
+                    fill="url(#tavrikoConfirmGrad)"
+                  />
+                </Svg>
+                <Text style={styles.confirmButtonText}>SEÇİMİ ONAYLA</Text>
+              </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -155,80 +158,95 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(10, 4, 30, 0.78)',
+    backgroundColor: 'rgba(9, 4, 24, 0.88)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
   },
   modalWrapper: {
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 390,
     alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontFamily: 'Nunito_900Black',
-    fontWeight: '900',
-    color: '#FFFFFF',
-    marginBottom: 16,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.35)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
   },
   cardContainer: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 28,
+    backgroundColor: '#1E0E3D',
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: 'rgba(154, 107, 255, 0.4)',
     paddingVertical: 24,
     paddingHorizontal: 16,
     alignItems: 'center',
     ...Platform.select({
       ios: {
-        shadowColor: '#000000',
+        shadowColor: '#6B3CFF',
         shadowOffset: { width: 0, height: 16 },
-        shadowOpacity: 0.35,
-        shadowRadius: 24,
+        shadowOpacity: 0.6,
+        shadowRadius: 28,
       },
       android: {
-        elevation: 16,
+        elevation: 18,
       },
       web: {
-        boxShadow: '0px 20px 40px rgba(0, 0, 0, 0.45)',
+        boxShadow: '0px 20px 50px rgba(107, 60, 255, 0.45)',
       },
     }),
   },
-  tabContainer: {
-    marginBottom: 12,
-  },
-  confirmButton: {
-    width: '84%',
-    height: 52,
-    borderRadius: 26,
-    justifyContent: 'center',
+  headerBar: {
     alignItems: 'center',
-    marginTop: 14,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#00B4DB',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.45,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 6,
-      },
-      web: {
-        boxShadow: '0px 6px 16px rgba(0, 180, 219, 0.45)',
-      },
-    }),
+    marginBottom: 14,
   },
-  confirmButtonText: {
-    fontSize: 18,
-    fontFamily: 'Nunito_900Black',
+  modalBadge: {
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    fontWeight: '900',
+    color: '#5ADBB5',
+    letterSpacing: 2,
+    marginBottom: 2,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontFamily: THEME.fonts.display,
     fontWeight: '900',
     color: '#FFFFFF',
+    textAlign: 'center',
     letterSpacing: 0.5,
+  },
+  tabContainer: {
+    marginBottom: 10,
+  },
+  confirm3DButton: {
+    width: '88%',
+    height: 54,
+    position: 'relative',
+    marginTop: 16,
+    borderRadius: 24,
+  },
+  btnLip: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 52,
+    borderRadius: 24,
+    backgroundColor: '#B8560A',
+  },
+  btnBody: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '900',
+    color: '#3B1500',
+    letterSpacing: 1,
   },
 });

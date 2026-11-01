@@ -20,6 +20,7 @@ import {
   CharacterAvatar,
   CrownIcon,
 } from '../components/TavrikoIcons';
+import { LobbyReactions } from '../components/LobbyReactions';
 
 interface LobbyScreenProps {
   room: GameRoom;
@@ -189,6 +190,9 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             </View>
           ))}
         </View>
+
+        {/* Lobi İçi İnteraktif Reaksiyon Çubuğu */}
+        <LobbyReactions />
 
         {/* Host vs Guest Controls */}
         <View style={styles.controlsWrap}>

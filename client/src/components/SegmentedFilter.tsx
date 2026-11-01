@@ -19,7 +19,7 @@ interface SegmentedFilterProps {
 export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
   activeTab,
   onChange,
-  width = 240,
+  width = 250,
 }) => {
   const slideAnim = useRef(new Animated.Value(activeTab === 'general' ? 0 : 1)).current;
   const pillWidth = width / 2;
@@ -28,8 +28,8 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
     Animated.spring(slideAnim, {
       toValue: activeTab === 'general' ? 0 : 1,
       useNativeDriver: Platform.OS !== 'web',
-      friction: 8,
-      tension: 65,
+      friction: 7,
+      tension: 60,
     }).start();
   }, [activeTab]);
 
@@ -47,23 +47,23 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
   };
 
   return (
-    <View style={[styles.track, { width, height: 44 }]}>
-      {/* Kayan Degrade Hap (Animated Pill) */}
+    <View style={[styles.track, { width, height: 46 }]}>
+      {/* Tavriko Cyber Gradient Pill Indicator */}
       <Animated.View
         style={[
           styles.pillIndicator,
           {
             width: pillWidth - 4,
-            height: 38,
+            height: 40,
             transform: [{ translateX }],
           },
         ]}
       >
         <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
           <Defs>
-            <LinearGradient id="pillGrad" x1="0" y1="0" x2="1" y2="0">
-              <Stop offset="0" stopColor="#0099FF" />
-              <Stop offset="1" stopColor="#6C28E0" />
+            <LinearGradient id="tavrikoPillGrad" x1="0" y1="0" x2="1" y2="0">
+              <Stop offset="0" stopColor="#6B3CFF" />
+              <Stop offset="1" stopColor="#5ADBB5" />
             </LinearGradient>
           </Defs>
           <Rect
@@ -71,9 +71,12 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
             y="0"
             width="100%"
             height="100%"
-            rx="19"
-            ry="19"
-            fill="url(#pillGrad)"
+            rx="20"
+            ry="20"
+            fill="url(#tavrikoPillGrad)"
+            stroke="#FFFFFF"
+            strokeWidth="1.2"
+            strokeOpacity={0.4}
           />
         </Svg>
       </Animated.View>
@@ -114,10 +117,10 @@ export const SegmentedFilter: React.FC<SegmentedFilterProps> = ({
 
 const styles = StyleSheet.create({
   track: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(18, 7, 44, 0.92)',
     borderRadius: 24,
     borderWidth: 1.5,
-    borderColor: '#4A1D96',
+    borderColor: 'rgba(154, 107, 255, 0.35)',
     flexDirection: 'row',
     alignItems: 'center',
     position: 'relative',
@@ -125,17 +128,20 @@ const styles = StyleSheet.create({
   },
   pillIndicator: {
     position: 'absolute',
-    borderRadius: 19,
+    borderRadius: 20,
     overflow: 'hidden',
     ...Platform.select({
       ios: {
-        shadowColor: '#0099FF',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.35,
-        shadowRadius: 5,
+        shadowColor: '#5ADBB5',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.45,
+        shadowRadius: 8,
       },
       android: {
-        elevation: 4,
+        elevation: 6,
+      },
+      web: {
+        filter: 'drop-shadow(0px 4px 10px rgba(90, 219, 181, 0.35))',
       },
     }),
   },
@@ -147,14 +153,18 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   tabText: {
-    fontSize: 16,
-    fontFamily: 'Nunito_800ExtraBold',
-    fontWeight: '800',
+    fontSize: 15,
+    fontFamily: 'Nunito_900Black',
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
   tabTextActive: {
     color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   tabTextInactive: {
-    color: '#241050',
+    color: '#A79BC4',
   },
 });

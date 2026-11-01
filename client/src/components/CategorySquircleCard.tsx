@@ -3,20 +3,22 @@ import { View, StyleSheet, Platform } from 'react-native';
 import Svg, {
   Defs,
   LinearGradient,
+  RadialGradient,
   Stop,
   Rect,
   Path,
   Circle,
-  G,
 } from 'react-native-svg';
 
 export interface CategoryData {
   id: string;
   name: string;
   type: 'general' | 'special';
+  badge: string;
   primaryColor: string;
   secondaryColor: string;
-  accentShadow: string;
+  neonBorder: string;
+  accentGlow: string;
   iconName:
     | 'science'
     | 'history'
@@ -30,77 +32,94 @@ export interface CategoryData {
     | 'shuffle';
 }
 
+// Tavriko Özgün Cyber-Arcade Renk Paleti (TRT kopyası değil, özgün Tavriko Kimliği)
 export const GENERAL_CATEGORIES: CategoryData[] = [
   {
     id: 'science_tech',
-    name: 'Bilim & Teknoloji',
+    name: 'Bilim & Evren',
     type: 'general',
-    primaryColor: '#8CD47E',
-    secondaryColor: '#5EBA50',
-    accentShadow: 'rgba(94, 186, 80, 0.45)',
+    badge: '🔬 BİLİM',
+    primaryColor: '#00F0FF',
+    secondaryColor: '#0072FF',
+    neonBorder: '#00F0FF',
+    accentGlow: 'rgba(0, 240, 255, 0.45)',
     iconName: 'science',
   },
   {
     id: 'history',
-    name: 'Tarih',
+    name: 'Tarih & Medeniyet',
     type: 'general',
-    primaryColor: '#F7C244',
-    secondaryColor: '#E6A820',
-    accentShadow: 'rgba(230, 168, 32, 0.45)',
+    badge: '🏛️ TARİH',
+    primaryColor: '#FFE27A',
+    secondaryColor: '#FF8800',
+    neonBorder: '#FFC43D',
+    accentGlow: 'rgba(255, 196, 61, 0.45)',
     iconName: 'history',
   },
   {
     id: 'art_culture',
     name: 'Sanat & Kültür',
     type: 'general',
-    primaryColor: '#FF6433',
-    secondaryColor: '#E24515',
-    accentShadow: 'rgba(226, 69, 21, 0.5)',
+    badge: '🎨 SANAT',
+    primaryColor: '#FF6BC4',
+    secondaryColor: '#B00078',
+    neonBorder: '#FF6BC4',
+    accentGlow: 'rgba(255, 107, 196, 0.45)',
     iconName: 'art',
   },
   {
     id: 'geography',
-    name: 'Coğrafya',
+    name: 'Coğrafya & Dünya',
     type: 'general',
-    primaryColor: '#5EB6EA',
-    secondaryColor: '#369BD4',
-    accentShadow: 'rgba(54, 155, 212, 0.45)',
+    badge: '🗺️ COĞRAFYA',
+    primaryColor: '#5ADBB5',
+    secondaryColor: '#0E7A6B',
+    neonBorder: '#5ADBB5',
+    accentGlow: 'rgba(90, 219, 181, 0.45)',
     iconName: 'geography',
   },
   {
     id: 'sports',
-    name: 'Spor',
+    name: 'Spor & Arena',
     type: 'general',
-    primaryColor: '#FFA339',
-    secondaryColor: '#E88214',
-    accentShadow: 'rgba(232, 130, 20, 0.45)',
+    badge: '⚽ SPOR',
+    primaryColor: '#FF9B2F',
+    secondaryColor: '#D0102E',
+    neonBorder: '#FF9B2F',
+    accentGlow: 'rgba(255, 155, 47, 0.45)',
     iconName: 'sports',
   },
   {
     id: 'cinema_tv',
-    name: 'Sinema & Dizi',
+    name: 'Sinema & Ekran',
     type: 'general',
-    primaryColor: '#FF5E79',
-    secondaryColor: '#E03653',
-    accentShadow: 'rgba(224, 54, 83, 0.45)',
+    badge: '🎬 SİNEMA',
+    primaryColor: '#FF416C',
+    secondaryColor: '#8A0027',
+    neonBorder: '#FF416C',
+    accentGlow: 'rgba(255, 65, 108, 0.45)',
     iconName: 'cinema',
   },
   {
     id: 'music',
-    name: 'Müzik',
+    name: 'Müzik & Melodi',
     type: 'general',
-    primaryColor: '#D864FF',
-    secondaryColor: '#B036DE',
-    accentShadow: 'rgba(176, 54, 222, 0.45)',
+    badge: '🎵 MÜZİK',
+    primaryColor: '#9A6BFF',
+    secondaryColor: '#4A00E0',
+    neonBorder: '#9A6BFF',
+    accentGlow: 'rgba(154, 107, 255, 0.45)',
     iconName: 'music',
   },
   {
     id: 'literature',
-    name: 'Edebiyat',
+    name: 'Edebiyat & Söz',
     type: 'general',
-    primaryColor: '#5C7CFA',
-    secondaryColor: '#3B5BDB',
-    accentShadow: 'rgba(59, 91, 219, 0.45)',
+    badge: '📚 EDEBİYAT',
+    primaryColor: '#4A9BFF',
+    secondaryColor: '#1A237E',
+    neonBorder: '#4A9BFF',
+    accentGlow: 'rgba(74, 155, 255, 0.45)',
     iconName: 'literature',
   },
 ];
@@ -108,56 +127,68 @@ export const GENERAL_CATEGORIES: CategoryData[] = [
 export const SPECIAL_CATEGORIES: CategoryData[] = [
   {
     id: 'yesilcam',
-    name: 'Yeşilçam Klasikleri',
+    name: 'Yeşilçam Efsaneleri',
     type: 'special',
+    badge: '⭐ TEMATİK',
     primaryColor: '#FF6B6B',
     secondaryColor: '#C92A2A',
-    accentShadow: 'rgba(201, 42, 42, 0.45)',
+    neonBorder: '#FF6B6B',
+    accentGlow: 'rgba(255, 107, 107, 0.45)',
     iconName: 'cinema',
   },
   {
     id: 'turkish_pop_90s',
-    name: "90'lar Türkçe Pop",
+    name: "90'lar Nostalji Pop",
     type: 'special',
+    badge: '⭐ TEMATİK',
     primaryColor: '#F06595',
     secondaryColor: '#A61E4D',
-    accentShadow: 'rgba(166, 30, 77, 0.45)',
+    neonBorder: '#F06595',
+    accentGlow: 'rgba(240, 101, 149, 0.45)',
     iconName: 'music',
   },
   {
     id: 'ottoman_history',
-    name: 'Osmanlı Tarihi',
+    name: 'Osmanlı & Hanedan',
     type: 'special',
+    badge: '⭐ TEMATİK',
     primaryColor: '#FCC419',
     secondaryColor: '#D97706',
-    accentShadow: 'rgba(217, 119, 6, 0.45)',
+    neonBorder: '#FCC419',
+    accentGlow: 'rgba(252, 196, 25, 0.45)',
     iconName: 'history',
   },
   {
     id: 'super_lig_legends',
-    name: 'Süper Lig Efsaneleri',
+    name: 'Süper Lig Derbileri',
     type: 'special',
+    badge: '⭐ TEMATİK',
     primaryColor: '#51CF66',
-    secondaryColor: '#2B8A3E',
-    accentShadow: 'rgba(43, 138, 62, 0.45)',
+    secondaryColor: '#1B6535',
+    neonBorder: '#51CF66',
+    accentGlow: 'rgba(81, 207, 102, 0.45)',
     iconName: 'sports',
   },
   {
     id: 'world_capitals',
     name: 'Dünya Başkentleri',
     type: 'special',
+    badge: '⭐ TEMATİK',
     primaryColor: '#339AF0',
     secondaryColor: '#1864AB',
-    accentShadow: 'rgba(24, 100, 171, 0.45)',
+    neonBorder: '#339AF0',
+    accentGlow: 'rgba(51, 154, 240, 0.45)',
     iconName: 'geography',
   },
   {
     id: 'space_astronomy',
-    name: 'Uzay & Evren',
+    name: 'Kozmik Evren & Galaksi',
     type: 'special',
+    badge: '⭐ TEMATİK',
     primaryColor: '#845EF7',
     secondaryColor: '#5F3DC4',
-    accentShadow: 'rgba(95, 61, 196, 0.45)',
+    neonBorder: '#845EF7',
+    accentGlow: 'rgba(132, 94, 247, 0.45)',
     iconName: 'science',
   },
 ];
@@ -175,7 +206,6 @@ export const CategorySquircleIcon: React.FC<SquircleIconProps> = ({
 }) => {
   switch (name) {
     case 'science':
-      // Erlenmayer matarası / Flask
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
           <Path
@@ -192,13 +222,12 @@ export const CategorySquircleIcon: React.FC<SquircleIconProps> = ({
             strokeLinecap="round"
             opacity={0.85}
           />
-          <Circle cx="10" cy="17.5" r="1" fill={color} opacity={0.9} />
-          <Circle cx="14" cy="16.5" r="0.75" fill={color} opacity={0.7} />
+          <Circle cx="10" cy="17.5" r="1.2" fill={color} />
+          <Circle cx="14" cy="16.5" r="0.9" fill={color} opacity={0.7} />
         </Svg>
       );
 
     case 'history':
-      // Parthenon / Antik Sütunlu Tapınak
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
           <Path
@@ -212,7 +241,6 @@ export const CategorySquircleIcon: React.FC<SquircleIconProps> = ({
       );
 
     case 'art':
-      // Açılı Boya Fırçası (TRT Görselindeki gibi)
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
           <Path
@@ -224,17 +252,10 @@ export const CategorySquircleIcon: React.FC<SquircleIconProps> = ({
             fill={color}
             opacity={0.9}
           />
-          <Path
-            d="M16 5L20 9"
-            stroke={color}
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
         </Svg>
       );
 
     case 'geography':
-      // Dünya Küresi (Globe)
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
           <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth="2.2" />
@@ -248,7 +269,6 @@ export const CategorySquircleIcon: React.FC<SquircleIconProps> = ({
       );
 
     case 'sports':
-      // Futbol / Spor Topu
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
           <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth="2.2" />
@@ -263,7 +283,6 @@ export const CategorySquircleIcon: React.FC<SquircleIconProps> = ({
       );
 
     case 'music':
-      // Müzik Notaları
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
           <Circle cx="7.5" cy="16.5" r="3.5" fill={color} />
@@ -279,7 +298,6 @@ export const CategorySquircleIcon: React.FC<SquircleIconProps> = ({
       );
 
     case 'cinema':
-      // Klaket (Film Clapper)
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
           <Rect
@@ -297,7 +315,6 @@ export const CategorySquircleIcon: React.FC<SquircleIconProps> = ({
       );
 
     case 'literature':
-      // Kitap
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
           <Path
@@ -313,7 +330,6 @@ export const CategorySquircleIcon: React.FC<SquircleIconProps> = ({
 
     case 'shuffle':
     default:
-      // Karışık / Shuffle
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
           <Path
@@ -336,7 +352,7 @@ interface CategorySquircleCardProps {
 
 export const CategorySquircleCard: React.FC<CategorySquircleCardProps> = ({
   category,
-  size = 88,
+  size = 90,
   isSelected = false,
 }) => {
   const cornerRadius = size * 0.28;
@@ -348,56 +364,69 @@ export const CategorySquircleCard: React.FC<CategorySquircleCardProps> = ({
         {
           width: size,
           height: size,
-          shadowColor: category.accentShadow,
+          shadowColor: category.accentGlow,
         },
         isSelected && styles.containerSelected,
       ]}
     >
       <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
         <Defs>
-          {/* Ana renk dolgusu */}
+          {/* Tavriko Cyber Jewel Gradient */}
           <LinearGradient
-            id={`grad_${category.id}`}
+            id={`tavriko_grad_${category.id}`}
             x1="0"
             y1="0"
-            x2="0"
+            x2="0.8"
             y2="1"
           >
             <Stop offset="0" stopColor={category.primaryColor} />
-            <Stop offset="1" stopColor={category.secondaryColor} />
+            <Stop offset="0.6" stopColor={category.secondaryColor} />
+            <Stop offset="1" stopColor="#0E0522" />
           </LinearGradient>
 
-          {/* 3D Üst Parlama (Glossy Highlight) */}
-          <LinearGradient id="squircleGloss" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.45" />
-            <Stop offset="0.4" stopColor="#FFFFFF" stopOpacity="0.12" />
+          {/* Tavriko Neon Rim Lighting */}
+          <LinearGradient
+            id={`tavriko_rim_${category.id}`}
+            x1="0"
+            y1="0"
+            x2="1"
+            y2="1"
+          >
+            <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.85" />
+            <Stop offset="0.5" stopColor={category.neonBorder} stopOpacity="0.95" />
+            <Stop offset="1" stopColor={category.secondaryColor} stopOpacity="0.4" />
+          </LinearGradient>
+
+          {/* 3D Üst Cam Parlaması */}
+          <LinearGradient id="tavrikoGloss" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.55" />
+            <Stop offset="0.45" stopColor="#FFFFFF" stopOpacity="0.12" />
             <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
           </LinearGradient>
         </Defs>
 
-        {/* Ana Squircle Gövde */}
+        {/* Ana Tavriko Squircle Gövde */}
         <Rect
-          x="1"
-          y="1"
-          width={size - 2}
-          height={size - 2}
+          x="1.5"
+          y="1.5"
+          width={size - 3}
+          height={size - 3}
           rx={cornerRadius}
           ry={cornerRadius}
-          fill={`url(#grad_${category.id})`}
-          stroke="#FFFFFF"
-          strokeWidth={isSelected ? 3.5 : 1.2}
-          strokeOpacity={isSelected ? 0.95 : 0.35}
+          fill={`url(#tavriko_grad_${category.id})`}
+          stroke={`url(#tavriko_rim_${category.id})`}
+          strokeWidth={isSelected ? 3.5 : 1.5}
         />
 
-        {/* 3D Üst Parlama Katmanı */}
+        {/* 3D Üst Cam Parlama Katmanı */}
         <Rect
-          x="3"
-          y="3"
-          width={size - 6}
-          height={(size - 6) * 0.52}
-          rx={cornerRadius * 0.82}
-          ry={cornerRadius * 0.82}
-          fill="url(#squircleGloss)"
+          x="3.5"
+          y="3.5"
+          width={size - 7}
+          height={(size - 7) * 0.48}
+          rx={cornerRadius * 0.8}
+          ry={cornerRadius * 0.8}
+          fill="url(#tavrikoGloss)"
         />
       </Svg>
 
@@ -405,7 +434,7 @@ export const CategorySquircleCard: React.FC<CategorySquircleCardProps> = ({
       <View style={styles.iconCenter}>
         <CategorySquircleIcon
           name={category.iconName}
-          size={size * 0.52}
+          size={size * 0.48}
           color="#FFFFFF"
         />
       </View>
@@ -420,15 +449,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...Platform.select({
       ios: {
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.38,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
         shadowRadius: 10,
       },
       android: {
-        elevation: 8,
+        elevation: 6,
       },
       web: {
-        filter: 'drop-shadow(0px 8px 14px rgba(0,0,0,0.22))',
+        filter: 'drop-shadow(0px 6px 14px rgba(0,0,0,0.35))',
       },
     }),
   },
@@ -436,14 +465,14 @@ const styles = StyleSheet.create({
     ...Platform.select({
       ios: {
         shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.55,
-        shadowRadius: 16,
+        shadowOpacity: 0.75,
+        shadowRadius: 20,
       },
       android: {
-        elevation: 14,
+        elevation: 16,
       },
       web: {
-        filter: 'drop-shadow(0px 12px 20px rgba(0,0,0,0.35))',
+        filter: 'drop-shadow(0px 10px 24px rgba(0, 240, 255, 0.55))',
       },
     }),
   },
