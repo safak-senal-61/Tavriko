@@ -1028,6 +1028,36 @@ export const TavrikoScreen: React.FC<{
     {children}
   </View>
 );
+export const BackChevronIcon: React.FC<{ size?: number; color?: string }> = ({
+  size = 22,
+  color = '#FFFFFF',
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M15 19L8 12L15 5"
+      stroke={color}
+      strokeWidth="2.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+export const CloseXIcon: React.FC<{ size?: number; color?: string }> = ({
+  size = 18,
+  color = '#FFFFFF',
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M18 6L6 18M6 6L18 18"
+      stroke={color}
+      strokeWidth="2.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
 export const TavrikoTopBar: React.FC<{
   leftType?: 'bell' | 'back' | 'close' | 'none';
   onLeftPress?: () => void;
@@ -1062,9 +1092,11 @@ export const TavrikoTopBar: React.FC<{
             }}
             activeOpacity={0.8}
           >
-            <Text style={styles.iconButtonText}>
-              {leftType === 'back' ? '←' : '✕'}
-            </Text>
+            {leftType === 'back' ? (
+              <BackChevronIcon size={22} color="#FFFFFF" />
+            ) : (
+              <CloseXIcon size={18} color="#FFFFFF" />
+            )}
           </TouchableOpacity>
         ) : (
           <View style={styles.guestBadgePill}>
@@ -1099,8 +1131,8 @@ export const TavrikoTopBar: React.FC<{
           activeOpacity={0.8}
         >
           {leftType === 'bell' && <BellLineIcon size={20} />}
-          {leftType === 'back' && <Text style={styles.iconButtonText}>←</Text>}
-          {leftType === 'close' && <Text style={styles.iconButtonText}>✕</Text>}
+          {leftType === 'back' && <BackChevronIcon size={22} color="#FFFFFF" />}
+          {leftType === 'close' && <CloseXIcon size={18} color="#FFFFFF" />}
         </TouchableOpacity>
       ) : (
         <View style={{ width: 44 }} />
@@ -1351,11 +1383,25 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(10, 4, 24, 0.72)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: 'rgba(24, 11, 52, 0.88)',
     alignItems: 'center',
     justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.35,
+        shadowRadius: 5,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 3px 10px rgba(0,0,0,0.3)',
+      },
+    }),
   },
   iconButtonText: {
     color: '#FFFFFF',

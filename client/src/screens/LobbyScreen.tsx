@@ -9,6 +9,7 @@ import {
   Animated,
   Platform,
 } from 'react-native';
+import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
 import { GameRoom } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -31,6 +32,56 @@ interface LobbyScreenProps {
   onKickPlayer?: (targetPlayerId: string) => void;
 }
 
+// Crisp SVG Icons
+const CopySvgIcon = ({ size = 20, color = '#FFFFFF' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect
+      x="9"
+      y="9"
+      width="13"
+      height="13"
+      rx="2.5"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M5 15H4C2.9 15 2 14.1 2 13V4C2 2.9 2.9 2 4 2H13C14.1 2 15 2.9 15 4V5"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+const ShareSvgIcon = ({ size = 20, color = '#FFFFFF' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="18" cy="5" r="3" stroke={color} strokeWidth="2" />
+    <Circle cx="6" cy="12" r="3" stroke={color} strokeWidth="2" />
+    <Circle cx="18" cy="19" r="3" stroke={color} strokeWidth="2" />
+    <Path
+      d="M8.6 13.5L15.4 17.5M15.4 6.5L8.6 10.5"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+  </Svg>
+);
+
+const CheckSvgIcon = ({ size = 20, color = '#5ADBB5' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M20 6L9 17L4 12"
+      stroke={color}
+      strokeWidth="2.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
 export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   room,
   currentUserId,
@@ -41,14 +92,14 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const players = Object.values(room.players);
-  const maxPlayers = room.maxPlayers || 6;
+  const maxPlayers = room.maxPlayers || 4;
   const emptySlotCount = Math.max(0, maxPlayers - players.length);
   const isHost = currentUserId === room.hostId;
   const myPlayer = room.players[currentUserId];
   const isReady = myPlayer?.isReady ?? false;
   const canStart = players.length >= 2;
 
-  // TRT Görselindeki "Diğer oyuncular bekleniyor" nefes alma (pulsing) animasyonu
+  // Nefes alma (pulsing) animasyonu
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
@@ -72,6 +123,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
   const handleCopyCode = async () => {
     sound.playSound('tap');
+    sound.triggerHaptic('light');
     await Clipboard.setStringAsync(room.code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -79,6 +131,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
   const handleShareCode = async () => {
     sound.playSound('tap');
+    sound.triggerHaptic('medium');
     try {
       await Share.share({
         message: `Tavriko bilgi yarışmasında özel odama katıl! 🎮\nOda Kodum: ${room.code}\nÖzel Oda ekranından bu kodu girerek hemen oyuna katıl!`,
@@ -89,49 +142,83 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   return (
     <TavrikoScreen>
       <TavrikoTopBar leftType="back" onLeftPress={onBack} />
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>ÖZEL LOBİ</Text>
+        {/* Üst Başlık */}
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.badgeLabel}>ÖZEL ARENA</Text>
+          <Text style={styles.title}>ÖZEL LOBİ</Text>
+        </View>
 
-        {/* Room Info & Code */}
-        <View style={styles.codeBox}>
-          <View>
-            <Text style={styles.codeLabel}>ODA KODU</Text>
-            <Text style={styles.codeText}>{room.code}</Text>
-          </View>
-          <View style={styles.actionBtnsRow}>
+        {/* 1. ODA KODU KARTI (Tavriko Cyber-Obsidian Kartı) */}
+        <View style={styles.codeCard}>
+          <View style={styles.codeInfoLeft}>
+            <Text style={styles.codeCardLabel}>ODA KODU</Text>
             <TouchableOpacity
-              style={styles.copyIconBtn}
+              activeOpacity={0.8}
+              onPress={handleCopyCode}
+              style={styles.codeRowTouch}
+            >
+              <Text style={styles.codeValueText}>{room.code}</Text>
+              <Text style={styles.codeHintText}>
+                {copied ? '✓ Kopyalandı!' : 'Dokun kopyala'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.actionBtnsRow}>
+            {/* Kopyala Butonu */}
+            <TouchableOpacity
+              style={[styles.actionSquircleBtn, copied && styles.actionSquircleBtnActive]}
               onPress={handleCopyCode}
               activeOpacity={0.8}
             >
-              <Text style={styles.copyIconText}>{copied ? '✓' : '📋'}</Text>
+              {copied ? (
+                <CheckSvgIcon size={20} color="#5ADBB5" />
+              ) : (
+                <CopySvgIcon size={20} color="#FFFFFF" />
+              )}
             </TouchableOpacity>
+
+            {/* Paylaş Butonu */}
             <TouchableOpacity
-              style={styles.copyIconBtn}
+              style={styles.actionSquircleBtn}
               onPress={handleShareCode}
               activeOpacity={0.8}
             >
-              <Text style={styles.copyIconText}>🔗</Text>
+              <ShareSvgIcon size={20} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Room Settings Summary Pill */}
-        <View style={styles.settingsSummary}>
-          <Text style={styles.settingsSummaryText}>
-            ⚙️ {room.totalRounds || 10} Soru · {room.questionTimeSec || 15}s Süre · {room.penaltyForWrong ? 'Cezalı' : 'Cezasız'}
+        {/* 2. ODA PARAMETRELERİ ROZETLERİ (Soru, Süre, Ceza, Kategori) */}
+        <View style={styles.chipsRow}>
+          <View style={styles.specChip}>
+            <Text style={styles.specChipText}>📝 {room.totalRounds || 7} Soru</Text>
+          </View>
+          <View style={styles.specChip}>
+            <Text style={styles.specChipText}>⏱️ {room.questionTimeSec || 20}sn</Text>
+          </View>
+          <View style={styles.specChip}>
+            <Text style={styles.specChipText}>
+              {room.penaltyForWrong ? '⚠️ -50p Ceza' : '🛡️ Cezasız'}
+            </Text>
+          </View>
+        </View>
+
+        {/* 3. OYUNCU LİSTESİ */}
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.playersCountText}>
+            Oyuncular ({players.length}/{maxPlayers})
+          </Text>
+          <Text style={styles.roomStatusTag}>
+            {canStart ? '🟢 Başlamaya Hazır' : '🟡 Katılımcı Bekleniyor'}
           </Text>
         </View>
 
-        {/* Player Count */}
-        <Text style={styles.playersCountText}>
-          Oyuncular ({players.length}/{maxPlayers})
-        </Text>
-
-        {/* Active Players List */}
         <View style={styles.playersList}>
           {players.map((p, index) => {
             const playerIsHost = p.id === room.hostId;
@@ -142,20 +229,27 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 key={p.id}
                 style={[styles.playerRow, isMe && styles.playerRowMe]}
               >
-                <CharacterAvatar seed={p.avatarUrl || p.displayName} index={index} size={38} />
+                <View style={styles.avatarBorderWrap}>
+                  <CharacterAvatar seed={p.avatarUrl || p.displayName} index={index} size={42} />
+                </View>
+
                 <View style={styles.playerInfo}>
                   <View style={styles.nameRow}>
                     <Text style={styles.playerName} numberOfLines={1}>
                       {p.displayName} {isMe ? '(Sen)' : ''}
                     </Text>
-                    {playerIsHost && <CrownIcon size={18} />}
+                    {playerIsHost && (
+                      <View style={styles.hostCrownBadge}>
+                        <CrownIcon size={16} />
+                      </View>
+                    )}
                   </View>
                   <Text style={styles.playerRoleText}>
-                    {playerIsHost ? 'Oda Kurucusu' : 'Oyuncu'}
+                    {playerIsHost ? 'Oda Kurucusu' : 'Yarışmacı'}
                   </Text>
                 </View>
 
-                {/* Ready Status Chip */}
+                {/* Hazır Durumu Rozeti */}
                 <View
                   style={[
                     styles.statusChip,
@@ -163,11 +257,11 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                   ]}
                 >
                   <Text style={[styles.statusChipText, p.isReady && styles.statusChipTextReady]}>
-                    {p.isReady ? 'HAZIR' : 'BEKLİYOR'}
+                    {p.isReady ? '✓ HAZIR' : '⏳ BEKLİYOR'}
                   </Text>
                 </View>
 
-                {/* Host Kick Button */}
+                {/* Kurucu Kick Butonu */}
                 {isHost && !playerIsHost && onKickPlayer && (
                   <TouchableOpacity
                     style={styles.kickBtn}
@@ -183,63 +277,74 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             );
           })}
 
-          {/* Empty Dashed Slots */}
+          {/* Boş Oyuncu Slotları (Tıklanabilir Arkadaş Daveti) */}
           {Array.from({ length: Math.min(4, emptySlotCount) }).map((_, idx) => (
-            <View key={`empty_${idx}`} style={styles.emptySlot}>
-              <Text style={styles.emptySlotText}>Oyuncu bekleniyor...</Text>
-            </View>
+            <TouchableOpacity
+              key={`empty_${idx}`}
+              style={styles.emptySlotTouch}
+              activeOpacity={0.8}
+              onPress={handleShareCode}
+            >
+              <View style={styles.emptyPlusIcon}>
+                <Text style={styles.emptyPlusText}>+</Text>
+              </View>
+              <View style={styles.emptySlotInfo}>
+                <Text style={styles.emptySlotTitle}>Boş Oyuncu Slotu</Text>
+                <Text style={styles.emptySlotSub}>Arkadaşını odaya davet etmek için dokun 🔗</Text>
+              </View>
+            </TouchableOpacity>
           ))}
         </View>
 
-        {/* Lobi İçi İnteraktif Reaksiyon Çubuğu */}
+        {/* 4. LOBİ İÇİ REAKSİYON ÇUBUĞU */}
         <LobbyReactions />
 
-        {/* Host vs Guest Controls */}
+        {/* 5. BAŞLATMA VE AKSİYON ALANI */}
         <View style={styles.controlsWrap}>
           {isHost ? (
             <>
               {!canStart ? (
-                <View style={styles.waitingNoticeBox}>
+                <View style={styles.waitingContainer}>
+                  {/* Nefes alan durum metni */}
                   <Animated.Text style={[styles.waitingPulsingText, { opacity: pulseAnim }]}>
-                    Diğer oyuncular bekleniyor...
+                    👥 Diğer oyuncular bekleniyor...
                   </Animated.Text>
                   <Text style={styles.waitingSubNotice}>
-                    Oyunu başlatabilmek için en az 2 oyuncu olmalıdır.
+                    Oyunu başlatabilmek için en az 2 oyuncu olmalıdır ({players.length}/{maxPlayers}).
                   </Text>
+
+                  {/* Birincil Aksiyon: Arkadaş Daveti */}
+                  <TouchableOpacity
+                    style={styles.inviteShareBtn}
+                    onPress={handleShareCode}
+                    activeOpacity={0.85}
+                  >
+                    <ShareSvgIcon size={18} color="#0C3A33" />
+                    <Text style={styles.inviteShareBtnText}>DAVET LİNKİNİ PAYLAŞ</Text>
+                  </TouchableOpacity>
+
+                  {/* Devre Dışı Başlatma Rozeti */}
+                  <View style={styles.disabledStartPill}>
+                    <Text style={styles.disabledStartText}>🔒 Oyunu Başlat (En az 2 kişi)</Text>
+                  </View>
                 </View>
               ) : (
-                <View style={styles.readyNoticeBox}>
-                  <Text style={styles.readyNoticeText}>
-                    ✨ Lobi hazır! Oyuncular bekleniyor veya maçı hemen başlatabilirsiniz.
+                <View style={styles.readyContainer}>
+                  <Text style={styles.readyNotificationText}>
+                    🎉 Lobi hazır! Yarışmayı hemen başlatabilirsiniz.
                   </Text>
+                  <Button3D
+                    title="OYUNU BAŞLAT 🎮"
+                    onPress={() => {
+                      sound.playSound('tap');
+                      sound.triggerHaptic('medium');
+                      onStartGame();
+                    }}
+                    variant="gold"
+                    style={{ height: 58, width: '100%' }}
+                  />
                 </View>
               )}
-
-              <TouchableOpacity
-                style={[
-                  styles.trtLaunchButton,
-                  !canStart && styles.trtLaunchButtonDisabled,
-                ]}
-                activeOpacity={canStart ? 0.85 : 1}
-                onPress={() => {
-                  if (canStart) {
-                    sound.playSound('tap');
-                    sound.triggerHaptic('medium');
-                    onStartGame();
-                  } else {
-                    sound.playSound('wrong');
-                  }
-                }}
-              >
-                <Text
-                  style={[
-                    styles.trtLaunchButtonText,
-                    !canStart && styles.trtLaunchButtonTextDisabled,
-                  ]}
-                >
-                  Oyunu Başlat
-                </Text>
-              </TouchableOpacity>
             </>
           ) : (
             <View style={styles.guestControls}>
@@ -251,7 +356,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 }}
               >
                 <Text style={[styles.readyToggleText, isReady && styles.readyToggleTextActive]}>
-                  {isReady ? 'HAZIRSIN (İPTAL ET)' : 'HAZIR OL'}
+                  {isReady ? '✓ HAZIRSIN (BEKLEMEDEYSİN)' : '⚡ HEMEN HAZIR OL'}
                 </Text>
               </TouchableOpacity>
               <Text style={styles.waitingHostText}>
@@ -267,97 +372,174 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 32,
-    paddingHorizontal: 12,
+    paddingBottom: 50,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  headerTitleWrap: {
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  badgeLabel: {
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    fontWeight: '900',
+    color: '#5ADBB5',
+    letterSpacing: 2,
+    marginBottom: 2,
   },
   title: {
     fontFamily: THEME.fonts.display,
-    fontSize: 32,
-    color: '#FFC43D',
+    fontSize: 28,
+    color: '#FFE27A',
     textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 4,
-    letterSpacing: 2,
+    letterSpacing: 1.5,
   },
-  codeBox: {
+  codeCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(10, 4, 24, 0.7)',
-    borderRadius: 18,
-    borderWidth: 1.5,
+    backgroundColor: '#1E0E3D',
+    borderRadius: 24,
+    borderWidth: 2,
     borderColor: '#FFC43D',
     paddingHorizontal: 18,
-    paddingVertical: 12,
-    marginVertical: 10,
+    paddingVertical: 14,
+    width: '100%',
+    maxWidth: 390,
+    marginBottom: 12,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#FFC43D',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0px 6px 20px rgba(255, 196, 61, 0.25)',
+      },
+    }),
   },
-  codeLabel: {
+  codeInfoLeft: {
+    flex: 1,
+  },
+  codeCardLabel: {
     color: '#D9CDF5',
     fontSize: 10,
     fontFamily: THEME.fonts.extraBold,
+    fontWeight: '800',
+    letterSpacing: 1.5,
   },
-  codeText: {
+  codeRowTouch: {
+    marginTop: 2,
+  },
+  codeValueText: {
     fontFamily: THEME.fonts.display,
-    fontSize: 26,
+    fontSize: 28,
+    fontWeight: '900',
     color: '#FFFFFF',
-    letterSpacing: 4,
+    letterSpacing: 5,
+  },
+  codeHintText: {
+    fontSize: 11,
+    fontFamily: THEME.fonts.bold,
+    color: '#5ADBB5',
+    marginTop: 1,
   },
   actionBtnsRow: {
     flexDirection: 'row',
     gap: 8,
   },
-  copyIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  actionSquircleBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  copyIconText: {
-    fontSize: 18,
+  actionSquircleBtnActive: {
+    backgroundColor: 'rgba(90, 219, 181, 0.2)',
+    borderColor: '#5ADBB5',
   },
-  settingsSummary: {
-    backgroundColor: 'rgba(107, 60, 255, 0.25)',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 12,
+  chipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+    maxWidth: 390,
+    marginBottom: 14,
+  },
+  specChip: {
+    flex: 1,
+    backgroundColor: 'rgba(107, 60, 255, 0.2)',
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 14,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(107, 60, 255, 0.5)',
-    marginBottom: 12,
+    borderColor: 'rgba(154, 107, 255, 0.4)',
   },
-  settingsSummaryText: {
-    color: '#D9CDF5',
+  specChipText: {
+    color: '#FFFFFF',
     fontSize: 12,
-    fontFamily: THEME.fonts.bold,
+    fontFamily: THEME.fonts.extraBold,
+    fontWeight: '800',
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 390,
+    marginBottom: 8,
+    paddingHorizontal: 4,
   },
   playersCountText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontFamily: THEME.fonts.display,
-    marginBottom: 8,
-    marginLeft: 4,
+    fontWeight: '900',
+  },
+  roomStatusTag: {
+    color: '#5ADBB5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    fontWeight: '800',
   },
   playersList: {
+    width: '100%',
+    maxWidth: 390,
     gap: 8,
+    marginBottom: 6,
   },
   playerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    gap: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(154, 107, 255, 0.35)',
   },
   playerRowMe: {
     borderColor: '#FFC43D',
-    backgroundColor: 'rgba(255, 196, 61, 0.1)',
+    backgroundColor: 'rgba(255, 196, 61, 0.08)',
+  },
+  avatarBorderWrap: {
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#6B3CFF',
+    padding: 2,
   },
   playerInfo: {
     flex: 1,
+    marginLeft: 12,
   },
   nameRow: {
     flexDirection: 'row',
@@ -366,108 +548,108 @@ const styles = StyleSheet.create({
   },
   playerName: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: THEME.fonts.extraBold,
+    fontSize: 15,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '900',
+  },
+  hostCrownBadge: {
+    marginLeft: 2,
   },
   playerRoleText: {
     color: '#D9CDF5',
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: THEME.fonts.medium,
+    marginTop: 2,
   },
   statusChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1.5,
   },
   statusReady: {
-    backgroundColor: 'rgba(111, 227, 193, 0.2)',
-    borderWidth: 1,
-    borderColor: '#6FE3C1',
+    backgroundColor: 'rgba(90, 219, 181, 0.2)',
+    borderColor: '#5ADBB5',
   },
   statusWaiting: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 196, 61, 0.15)',
+    borderColor: '#FFC43D',
   },
   statusChipText: {
-    color: '#D9CDF5',
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
+    fontWeight: '900',
+    color: '#FFC43D',
   },
   statusChipTextReady: {
-    color: '#6FE3C1',
+    color: '#5ADBB5',
   },
   kickBtn: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 92, 119, 0.25)',
+    backgroundColor: 'rgba(255, 92, 119, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#FF5C77',
-    marginLeft: 4,
+    marginLeft: 8,
   },
   kickBtnText: {
     color: '#FF5C77',
     fontSize: 13,
     fontFamily: THEME.fonts.bold,
   },
-  emptySlot: {
-    paddingVertical: 14,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderStyle: 'dashed',
+  emptySlotTouch: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(154, 107, 255, 0.35)',
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(24, 11, 52, 0.45)',
   },
-  emptySlotText: {
-    color: '#8A7BB3',
-    fontSize: 12,
+  emptyPlusIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyPlusText: {
+    color: '#5ADBB5',
+    fontSize: 22,
+    fontWeight: '900',
+    lineHeight: 24,
+  },
+  emptySlotInfo: {
+    marginLeft: 12,
+  },
+  emptySlotTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+    fontWeight: '800',
+  },
+  emptySlotSub: {
+    color: '#A79BC4',
+    fontSize: 11,
     fontFamily: THEME.fonts.medium,
+    marginTop: 2,
   },
   controlsWrap: {
-    marginTop: 18,
-  },
-  warningText: {
-    color: '#FFC43D',
-    fontSize: 12,
-    fontFamily: THEME.fonts.bold,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  guestControls: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  readyToggleBtn: {
     width: '100%',
-    paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    maxWidth: 390,
+    marginTop: 10,
+  },
+  waitingContainer: {
     alignItems: 'center',
-  },
-  readyToggleBtnActive: {
-    backgroundColor: '#6FE3C1',
-    borderColor: '#6FE3C1',
-  },
-  readyToggleText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  readyToggleTextActive: {
-    color: '#12052C',
-  },
-  waitingHostText: {
-    color: '#D9CDF5',
-    fontSize: 12,
-    fontFamily: THEME.fonts.bold,
-  },
-  waitingNoticeBox: {
-    alignItems: 'center',
-    marginBottom: 12,
+    width: '100%',
   },
   waitingPulsingText: {
     color: '#FFFFFF',
@@ -478,66 +660,101 @@ const styles = StyleSheet.create({
   },
   waitingSubNotice: {
     color: '#D9CDF5',
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: THEME.fonts.bold,
     textAlign: 'center',
     marginTop: 4,
-  },
-  readyNoticeBox: {
-    alignItems: 'center',
     marginBottom: 12,
   },
-  readyNoticeText: {
-    color: '#6FE3C1',
-    fontSize: 13,
-    fontFamily: THEME.fonts.display,
-    textAlign: 'center',
-  },
-  trtLaunchButton: {
+  inviteShareBtn: {
     width: '100%',
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#00B4DB',
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#5ADBB5',
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
     ...Platform.select({
       ios: {
-        shadowColor: '#00B4DB',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.5,
-        shadowRadius: 10,
+        shadowColor: '#5ADBB5',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.45,
+        shadowRadius: 8,
       },
       android: {
         elevation: 6,
       },
       web: {
-        boxShadow: '0px 6px 16px rgba(0, 180, 219, 0.45)',
+        boxShadow: '0 4px 14px rgba(90, 219, 181, 0.4)',
       },
     }),
   },
-  trtLaunchButtonDisabled: {
+  inviteShareBtnText: {
+    color: '#0C3A33',
+    fontSize: 15,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  disabledStartPill: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  disabledStartText: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 14,
+    fontFamily: THEME.fonts.display,
+    letterSpacing: 0.5,
+  },
+  readyContainer: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  readyNotificationText: {
+    color: '#5ADBB5',
+    fontSize: 13,
+    fontFamily: THEME.fonts.display,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  guestControls: {
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+  },
+  readyToggleBtn: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    ...Platform.select({
-      ios: {
-        shadowOpacity: 0,
-      },
-      android: {
-        elevation: 0,
-      },
-      web: {
-        boxShadow: 'none',
-      },
-    }),
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
   },
-  trtLaunchButtonText: {
+  readyToggleBtnActive: {
+    backgroundColor: '#5ADBB5',
+    borderColor: '#5ADBB5',
+  },
+  readyToggleText: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 15,
     fontFamily: THEME.fonts.display,
-    letterSpacing: 0.8,
+    fontWeight: '900',
   },
-  trtLaunchButtonTextDisabled: {
-    color: 'rgba(255, 255, 255, 0.35)',
+  readyToggleTextActive: {
+    color: '#0C3A33',
+  },
+  waitingHostText: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
   },
 });
