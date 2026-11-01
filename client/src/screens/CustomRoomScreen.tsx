@@ -8,9 +8,11 @@ import {
   ScrollView,
   Switch,
   Platform,
+  Dimensions,
 } from 'react-native';
+import Svg, { Defs, LinearGradient, Stop, Rect, Path, Circle } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
-import { CustomRoomSettings, QuestionCategory, QuestionDifficulty } from '@trivia/shared';
+import { CustomRoomSettings, CategoryId, DifficultyLevel } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import {
@@ -18,6 +20,14 @@ import {
   TavrikoTopBar,
   Button3D,
 } from '../components/TavrikoIcons';
+import {
+  CategorySelectModal,
+} from '../components/CategorySelectModal';
+import {
+  CategoryData,
+  GENERAL_CATEGORIES,
+  CategorySquircleIcon,
+} from '../components/CategorySquircleCard';
 
 interface CustomRoomScreenProps {
   onBack: () => void;
@@ -27,43 +37,17 @@ interface CustomRoomScreenProps {
   coins?: number;
 }
 
-const PLAYER_OPTIONS = [2, 4, 6, 8, 10];
-const QUESTION_OPTIONS = [5, 10, 15, 20, 30];
-const TIME_OPTIONS = [10, 15, 20, 30];
-const DIFFICULTY_OPTIONS: { id: QuestionDifficulty | 'mixed'; label: string }[] = [
+// TRT Bil Bakalım Standart Soru ve Süre Seçenekleri
+const QUESTION_OPTIONS = [7, 14, 21];
+const TIME_OPTIONS = [20, 40];
+const PLAYER_OPTIONS = [2, 4, 6, 8];
+
+const DIFFICULTY_OPTIONS: { id: DifficultyLevel | 'mixed'; label: string }[] = [
   { id: 'mixed', label: 'Karışık' },
   { id: 'easy', label: 'Kolay' },
   { id: 'medium', label: 'Orta' },
   { id: 'hard', label: 'Zor' },
   { id: 'expert', label: 'Uzman' },
-];
-
-interface CategoryMeta {
-  id: QuestionCategory | 'mixed';
-  name: string;
-  icon: string;
-}
-
-const CATEGORY_LIST: CategoryMeta[] = [
-  { id: 'mixed', name: 'Karışık', icon: '🎲' },
-  { id: 'general_culture', name: 'Genel Kültür', icon: '🌍' },
-  { id: 'history', name: 'Tarih', icon: '🏛️' },
-  { id: 'geography', name: 'Coğrafya', icon: '🗺️' },
-  { id: 'science_tech', name: 'Bilim & Teknoloji', icon: '🔬' },
-  { id: 'cinema_tv', name: 'Sinema & Dizi', icon: '🎬' },
-  { id: 'music', name: 'Müzik', icon: '🎵' },
-  { id: 'sports', name: 'Spor', icon: '⚽' },
-  { id: 'literature_art', name: 'Edebiyat & Sanat', icon: '📚' },
-  { id: 'gaming', name: 'Oyun Dünyası', icon: '🎮' },
-  { id: 'mythology', name: 'Mitoloji', icon: '⚡' },
-  { id: 'food_cuisine', name: 'Yemek & Mutfak', icon: '🍕' },
-  { id: 'nature_animals', name: 'Doğa & Hayvanlar', icon: '🐾' },
-  { id: 'philosophy', name: 'Felsefe & Düşünce', icon: '💡' },
-  { id: 'cars_vehicles', name: 'Arabalar & Araçlar', icon: '🏎️' },
-  { id: 'space_astronomy', name: 'Uzay & Astronomi', icon: '🚀' },
-  { id: 'languages_words', name: 'Diller & Kelimeler', icon: '🗣️' },
-  { id: 'comic_anime', name: 'Çizgi Roman & Anime', icon: '💥' },
-  { id: 'fashion_design', name: 'Moda & Tasarım', icon: '🎨' },
 ];
 
 export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
@@ -73,19 +57,24 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   avatarSeed,
   coins,
 }) => {
-  // Room code to join
+  // Aktif mod: Oda Kur veya Odaya Katıl
+  const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
+
+  // Katılma Kodu State
   const [roomCode, setRoomCode] = useState('');
   const [joinError, setJoinError] = useState<string | null>(null);
   const codeInputRef = useRef<any>(null);
 
-  // Custom Settings
-  const [maxPlayers, setMaxPlayers] = useState<number>(6);
-  const [totalRounds, setTotalRounds] = useState<number>(10);
-  const [questionTimeSec, setQuestionTimeSec] = useState<number>(15);
-  const [difficulty, setDifficulty] = useState<QuestionDifficulty | 'mixed'>('mixed');
+  // Oda Ayarları State
+  const [maxPlayers, setMaxPlayers] = useState<number>(4);
+  const [totalRounds, setTotalRounds] = useState<number>(7);
+  const [questionTimeSec, setQuestionTimeSec] = useState<number>(20);
+  const [difficulty, setDifficulty] = useState<DifficultyLevel | 'mixed'>('mixed');
   const [penaltyForWrong, setPenaltyForWrong] = useState<boolean>(true);
-  const [selectedCategory, setSelectedCategory] = useState<QuestionCategory | 'mixed'>('mixed');
-  const [privacy, setPrivacy] = useState<'public' | 'private'>('public');
+
+  // Kategori Seçimi State
+  const [selectedCategory, setSelectedCategory] = useState<CategoryData | 'mixed'>('mixed');
+  const [isCategoryModalVisible, setCategoryModalVisible] = useState(false);
 
   const digits = Array.from({ length: 6 }).map((_, idx) => roomCode[idx] || '');
 
@@ -105,10 +94,10 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
     sound.playSound('tap');
     sound.triggerHaptic('medium');
 
-    const categories: QuestionCategory[] =
-      selectedCategory === 'mixed'
-        ? ['general_culture']
-        : [selectedCategory as QuestionCategory];
+    const isMixed = selectedCategory === 'mixed';
+    const categories: CategoryId[] = isMixed
+      ? ['science_tech', 'history', 'geography', 'sports', 'cinema_tv', 'art_culture']
+      : [selectedCategory.id as CategoryId];
 
     const settings: CustomRoomSettings = {
       maxPlayers,
@@ -117,8 +106,8 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
       difficulty,
       penaltyForWrong,
       categories,
-      mixedCategories: selectedCategory === 'mixed',
-      privacy,
+      mixedCategories: isMixed,
+      privacy: 'public',
     };
 
     onCreateRoom(settings);
@@ -132,378 +121,601 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
         avatarSeed={avatarSeed}
         coins={coins}
       />
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>ÖZEL ODA</Text>
-
-        {/* Create Room Card */}
-        <View style={styles.glassCard}>
-          <Text style={styles.cardHeading}>Oda Oluştur</Text>
-
-          {/* Oyuncu Sayısı */}
-          <Text style={styles.settingLabel}>OYUNCU SAYISI ({maxPlayers} Kişi)</Text>
-          <View style={styles.optionsRow}>
-            {PLAYER_OPTIONS.map((num) => (
-              <TouchableOpacity
-                key={num}
-                style={[styles.optionBtn, maxPlayers === num && styles.optionBtnActive]}
-                onPress={() => {
-                  sound.playSound('tap');
-                  setMaxPlayers(num);
-                }}
-              >
-                <Text style={[styles.optionBtnText, maxPlayers === num && styles.optionBtnTextActive]}>
-                  {num}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Soru Sayısı */}
-          <Text style={styles.settingLabel}>SORU SAYISI ({totalRounds} Soru)</Text>
-          <View style={styles.optionsRow}>
-            {QUESTION_OPTIONS.map((q) => (
-              <TouchableOpacity
-                key={q}
-                style={[styles.optionBtn, totalRounds === q && styles.optionBtnActive]}
-                onPress={() => {
-                  sound.playSound('tap');
-                  setTotalRounds(q);
-                }}
-              >
-                <Text style={[styles.optionBtnText, totalRounds === q && styles.optionBtnTextActive]}>
-                  {q}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Soru Süresi */}
-          <Text style={styles.settingLabel}>SORU SÜRESİ ({questionTimeSec} Sn)</Text>
-          <View style={styles.optionsRow}>
-            {TIME_OPTIONS.map((sec) => (
-              <TouchableOpacity
-                key={sec}
-                style={[styles.optionBtn, questionTimeSec === sec && styles.optionBtnActive]}
-                onPress={() => {
-                  sound.playSound('tap');
-                  setQuestionTimeSec(sec);
-                }}
-              >
-                <Text style={[styles.optionBtnText, questionTimeSec === sec && styles.optionBtnTextActive]}>
-                  {sec}s
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Zorluk */}
-          <Text style={styles.settingLabel}>ZORLUK DERECESİ</Text>
-          <View style={styles.optionsRow}>
-            {DIFFICULTY_OPTIONS.map((diff) => (
-              <TouchableOpacity
-                key={diff.id}
-                style={[styles.optionBtn, difficulty === diff.id && styles.optionBtnActive]}
-                onPress={() => {
-                  sound.playSound('tap');
-                  setDifficulty(diff.id);
-                }}
-              >
-                <Text style={[styles.optionBtnText, difficulty === diff.id && styles.optionBtnTextActive]}>
-                  {diff.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Kategori Seçimi (Horizontal Scroll) */}
-          <Text style={styles.settingLabel}>KATEGORİ SEÇİMİ</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryScroll}
-          >
-            {CATEGORY_LIST.map((cat) => {
-              const isSelected = selectedCategory === cat.id;
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.categoryCard, isSelected && styles.categoryCardSelected]}
-                  onPress={() => {
-                    sound.playSound('tap');
-                    setSelectedCategory(cat.id);
-                  }}
-                >
-                  <Text style={styles.categoryIcon}>{cat.icon}</Text>
-                  <Text style={[styles.categoryName, isSelected && styles.categoryNameSelected]}>
-                    {cat.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {/* Yanlış Cevap Cezası Toggle */}
-          <View style={styles.switchRow}>
-            <View>
-              <Text style={styles.switchLabel}>Yanlış Cevap Cezası</Text>
-              <Text style={styles.switchSub}>Yanlış cevaplarda -50 puan düşer</Text>
-            </View>
-            <Switch
-              value={penaltyForWrong}
-              onValueChange={(val) => {
-                sound.playSound('tap');
-                setPenaltyForWrong(val);
-              }}
-              trackColor={{ false: 'rgba(255,255,255,0.2)', true: '#6FE3C1' }}
-              thumbColor={penaltyForWrong ? '#12052C' : '#D9CDF5'}
-            />
-          </View>
-
-          <Button3D
-            title="ODA OLUŞTUR"
-            onPress={handleCreateRoomPress}
-            style={{ marginTop: 14 }}
-          />
-        </View>
-
-        {/* Divider */}
-        <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>VEYA</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        {/* Join Room Card */}
-        <View style={styles.glassCard}>
-          <Text style={styles.cardHeading}>Odaya Katıl</Text>
-
-          {/* 6 Digit Boxes */}
+        {/* Üst Başlık ve Sekme Seçici (Oda Kur | Odaya Katıl) */}
+        <View style={styles.tabToggleRow}>
           <TouchableOpacity
-            activeOpacity={0.9}
+            style={[styles.tabButton, activeTab === 'create' && styles.tabButtonActive]}
+            activeOpacity={0.85}
             onPress={() => {
               sound.playSound('tap');
-              codeInputRef.current?.focus();
+              setActiveTab('create');
             }}
-            style={styles.digitsWrapper}
           >
-            <View style={styles.digitsRow}>
-              {digits.map((ch, idx) => (
-                <View
-                  key={idx}
-                  style={[styles.digitBox, !!ch && styles.digitBoxFilled]}
-                >
-                  <Text style={styles.digitText}>{ch}</Text>
-                </View>
-              ))}
-            </View>
+            <Text style={[styles.tabButtonText, activeTab === 'create' && styles.tabButtonTextActive]}>
+              Oda Kur
+            </Text>
           </TouchableOpacity>
 
-          <TextInput
-            ref={codeInputRef}
-            style={styles.hiddenInput}
-            value={roomCode}
-            onChangeText={(text) => {
-              const cleaned = text.toUpperCase().replace(/[^A-Z0-9]/g, '');
-              if (cleaned.length <= 6) {
-                setRoomCode(cleaned);
-                if (cleaned.length > 0) sound.playSound('tap');
-              }
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'join' && styles.tabButtonActive]}
+            activeOpacity={0.85}
+            onPress={() => {
+              sound.playSound('tap');
+              setActiveTab('join');
             }}
-            maxLength={6}
-            autoCapitalize="characters"
-            autoCorrect={false}
-          />
+          >
+            <Text style={[styles.tabButtonText, activeTab === 'join' && styles.tabButtonTextActive]}>
+              Odaya Katıl
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-          <View style={styles.joinActionsRow}>
+        {activeTab === 'create' ? (
+          /* TRT BİL BAKALIM ODA KURMA ARAYÜZÜ */
+          <View style={styles.roomSetupCard}>
+            {/* 1. KATEGORİ SEÇİCİ DROPDOWN (TRT Görselindeki gibi) */}
+            <Text style={styles.sectionHeader}>Kategori</Text>
             <TouchableOpacity
-              style={styles.pasteBtn}
-              onPress={async () => {
+              style={styles.categoryDropdown}
+              activeOpacity={0.88}
+              onPress={() => {
                 sound.playSound('tap');
-                try {
-                  const clip = await Clipboard.getStringAsync();
-                  const cleaned = clip.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-                  if (cleaned.length >= 4) {
-                    setRoomCode(cleaned.slice(0, 6));
-                    sound.playSound('reward');
-                  }
-                } catch {}
+                sound.triggerHaptic('medium');
+                setCategoryModalVisible(true);
               }}
             >
-              <Text style={styles.pasteBtnText}>📋 Yapıştır</Text>
+              <View style={styles.categoryDropdownLeft}>
+                <View style={styles.categoryDropdownIconWrap}>
+                  {selectedCategory === 'mixed' ? (
+                    <CategorySquircleIcon name="shuffle" size={24} color="#FFFFFF" />
+                  ) : (
+                    <CategorySquircleIcon name={selectedCategory.iconName} size={24} color="#FFFFFF" />
+                  )}
+                </View>
+                <Text style={styles.categoryDropdownText}>
+                  {selectedCategory === 'mixed' ? 'Karışık' : selectedCategory.name}
+                </Text>
+              </View>
+
+              {/* Aşağı Açılır Ok İkonu */}
+              <Svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M6 9L12 15L18 9"
+                  stroke="#FFFFFF"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
             </TouchableOpacity>
+
+            {/* Hızlı Kategori Değiştir / Karışık Butonu */}
             <TouchableOpacity
-              style={styles.joinBtn}
-              onPress={handleJoinPress}
+              style={styles.mixedQuickToggle}
+              activeOpacity={0.8}
+              onPress={() => {
+                sound.playSound('tap');
+                setSelectedCategory(selectedCategory === 'mixed' ? GENERAL_CATEGORIES[0] : 'mixed');
+              }}
             >
-              <Text style={styles.joinBtnText}>KATIL</Text>
+              <Text style={styles.mixedQuickText}>
+                {selectedCategory === 'mixed' ? '🎯 Tek Kategori Seç' : '🎲 Karışık Moduna Geç'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* 2. PARAMETRELER: SORU SAYISI & SÜRE (TRT Çift Sütunlu Yan Yana Görseli) */}
+            <View style={styles.paramGridRow}>
+              {/* Soru Sayısı Sütunu */}
+              <View style={styles.paramColumn}>
+                <Text style={styles.sectionHeader}>Soru Sayısı</Text>
+                <View style={styles.chipGroup}>
+                  {QUESTION_OPTIONS.map((q) => {
+                    const isSelected = totalRounds === q;
+                    return (
+                      <TouchableOpacity
+                        key={q}
+                        style={[styles.chipPill, isSelected && styles.chipPillActive]}
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          sound.playSound('tap');
+                          sound.triggerHaptic('light');
+                          setTotalRounds(q);
+                        }}
+                      >
+                        <Text style={[styles.chipPillText, isSelected && styles.chipPillTextActive]}>
+                          {q}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Süre Sütunu */}
+              <View style={styles.paramColumn}>
+                <Text style={styles.sectionHeader}>Süre</Text>
+                <View style={styles.chipGroup}>
+                  {TIME_OPTIONS.map((sec) => {
+                    const isSelected = questionTimeSec === sec;
+                    return (
+                      <TouchableOpacity
+                        key={sec}
+                        style={[styles.chipPill, isSelected && styles.chipPillActive]}
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          sound.playSound('tap');
+                          sound.triggerHaptic('light');
+                          setQuestionTimeSec(sec);
+                        }}
+                      >
+                        <Text style={[styles.chipPillText, isSelected && styles.chipPillTextActive]}>
+                          {sec}sn
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+
+            {/* 3. OYUNCU SAYISI */}
+            <Text style={styles.sectionHeader}>Oyuncu Sayısı ({maxPlayers} Kişi)</Text>
+            <View style={styles.chipRowFull}>
+              {PLAYER_OPTIONS.map((num) => {
+                const isSelected = maxPlayers === num;
+                return (
+                  <TouchableOpacity
+                    key={num}
+                    style={[styles.chipPillSmall, isSelected && styles.chipPillActive]}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      sound.playSound('tap');
+                      sound.triggerHaptic('light');
+                      setMaxPlayers(num);
+                    }}
+                  >
+                    <Text style={[styles.chipPillText, isSelected && styles.chipPillTextActive]}>
+                      {num} Kişi
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* 4. ZORLUK SEVİYESİ */}
+            <Text style={styles.sectionHeader}>Zorluk Seviyesi</Text>
+            <View style={styles.chipRowFull}>
+              {DIFFICULTY_OPTIONS.map((diff) => {
+                const isSelected = difficulty === diff.id;
+                return (
+                  <TouchableOpacity
+                    key={diff.id}
+                    style={[styles.chipPillSmall, isSelected && styles.chipPillActive]}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      sound.playSound('tap');
+                      sound.triggerHaptic('light');
+                      setDifficulty(diff.id);
+                    }}
+                  >
+                    <Text style={[styles.chipPillText, isSelected && styles.chipPillTextActive]}>
+                      {diff.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* 5. YANLIŞ CEVAP CEZASI */}
+            <View style={styles.switchRow}>
+              <View>
+                <Text style={styles.switchLabel}>Yanlış Cevap Cezası</Text>
+                <Text style={styles.switchSub}>Yanlış cevaplarda -50 puan düşer</Text>
+              </View>
+              <Switch
+                value={penaltyForWrong}
+                onValueChange={(val) => {
+                  sound.playSound('tap');
+                  setPenaltyForWrong(val);
+                }}
+                trackColor={{ false: 'rgba(255,255,255,0.2)', true: '#00B4DB' }}
+                thumbColor={penaltyForWrong ? '#FFFFFF' : '#D9CDF5'}
+              />
+            </View>
+
+            {/* 6. ODAYI BAŞLAT / KUR BUTONU */}
+            <TouchableOpacity
+              style={styles.createRoomButton}
+              activeOpacity={0.88}
+              onPress={handleCreateRoomPress}
+            >
+              <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+                <Defs>
+                  <LinearGradient id="createBtnGrad" x1="0" y1="0" x2="1" y2="0">
+                    <Stop offset="0" stopColor="#00B4DB" />
+                    <Stop offset="1" stopColor="#0083B0" />
+                  </LinearGradient>
+                </Defs>
+                <Rect
+                  x="0"
+                  y="0"
+                  width="100%"
+                  height="100%"
+                  rx="26"
+                  ry="26"
+                  fill="url(#createBtnGrad)"
+                  stroke="#FFFFFF"
+                  strokeWidth="1.5"
+                  strokeOpacity={0.4}
+                />
+              </Svg>
+              <Text style={styles.createRoomButtonText}>Odayı Oluştur</Text>
             </TouchableOpacity>
           </View>
+        ) : (
+          /* ODAYA KATIL KARTI */
+          <View style={styles.roomSetupCard}>
+            <Text style={styles.sectionHeader}>Oda Kodunu Girin</Text>
+            <Text style={styles.joinSubText}>
+              Arkadaşınızın paylaştığı 6 haneli oda kodunu girerek hemen lobiye katılın.
+            </Text>
 
-          {joinError && <Text style={styles.errorText}>{joinError}</Text>}
-        </View>
+            {/* 6 Haneli Kutu Arayüzü */}
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => {
+                sound.playSound('tap');
+                codeInputRef.current?.focus();
+              }}
+              style={styles.digitsWrapper}
+            >
+              <View style={styles.digitsRow}>
+                {digits.map((ch, idx) => (
+                  <View
+                    key={idx}
+                    style={[styles.digitBox, !!ch && styles.digitBoxFilled]}
+                  >
+                    <Text style={styles.digitText}>{ch}</Text>
+                  </View>
+                ))}
+              </View>
+            </TouchableOpacity>
+
+            {/* Gizli TextInput */}
+            <TextInput
+              ref={codeInputRef}
+              style={styles.hiddenInput}
+              value={roomCode}
+              onChangeText={(text) => {
+                const clean = text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+                setRoomCode(clean);
+                if (clean.length > 0) setJoinError(null);
+              }}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={6}
+            />
+
+            {joinError && <Text style={styles.errorText}>{joinError}</Text>}
+
+            {/* Panodan Yapıştır Butonu */}
+            <TouchableOpacity
+              style={styles.pasteButton}
+              activeOpacity={0.8}
+              onPress={async () => {
+                sound.playSound('tap');
+                const clip = await Clipboard.getStringAsync();
+                if (clip) {
+                  const clean = clip.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+                  setRoomCode(clean);
+                }
+              }}
+            >
+              <Text style={styles.pasteButtonText}>📋 Panodan Yapıştır</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.createRoomButton, { marginTop: 24 }]}
+              activeOpacity={0.88}
+              onPress={handleJoinPress}
+            >
+              <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+                <Defs>
+                  <LinearGradient id="joinBtnGrad" x1="0" y1="0" x2="1" y2="0">
+                    <Stop offset="0" stopColor="#9A6BFF" />
+                    <Stop offset="1" stopColor="#5A27C8" />
+                  </LinearGradient>
+                </Defs>
+                <Rect
+                  x="0"
+                  y="0"
+                  width="100%"
+                  height="100%"
+                  rx="26"
+                  ry="26"
+                  fill="url(#joinBtnGrad)"
+                  stroke="#FFFFFF"
+                  strokeWidth="1.5"
+                  strokeOpacity={0.4}
+                />
+              </Svg>
+              <Text style={styles.createRoomButtonText}>Odaya Katıl</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
+
+      {/* TRT BİL BAKALIM "KATEGORİNİ SEÇ" MODALI */}
+      <CategorySelectModal
+        visible={isCategoryModalVisible}
+        initialCategoryId={selectedCategory === 'mixed' ? 'science_tech' : selectedCategory.id}
+        onClose={() => setCategoryModalVisible(false)}
+        onSelectCategory={(cat) => {
+          setSelectedCategory(cat);
+        }}
+      />
     </TavrikoScreen>
   );
 };
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 80,
-    paddingHorizontal: 12,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 40,
+    alignItems: 'center',
   },
-  title: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 28,
-    color: '#FFC43D',
-    letterSpacing: 2,
-    textAlign: 'center',
-    marginVertical: 10,
-  },
-  glassCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+  tabToggleRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 24,
+    padding: 4,
+    marginBottom: 20,
+    width: '100%',
+    maxWidth: 360,
+  },
+  tabButton: {
+    flex: 1,
+    height: 42,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+  },
+  tabButtonActive: {
+    backgroundColor: '#00B4DB',
+  },
+  tabButtonText: {
+    fontSize: 15,
+    fontFamily: 'Nunito_800ExtraBold',
+    fontWeight: '800',
+    color: '#D9CDF5',
+  },
+  tabButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  roomSetupCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 28,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.14)',
-    padding: 16,
-    marginBottom: 12,
+    padding: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.35,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 10,
+      },
+      web: {
+        boxShadow: '0px 10px 30px rgba(0, 0, 0, 0.35)',
+      },
+    }),
   },
-  cardHeading: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 18,
+  sectionHeader: {
+    fontSize: 16,
+    fontFamily: 'Nunito_800ExtraBold',
+    fontWeight: '800',
     color: '#FFFFFF',
     marginBottom: 8,
+    textAlign: 'center',
   },
-  settingLabel: {
-    fontFamily: THEME.fonts.extraBold,
-    fontSize: 11,
-    color: '#D9CDF5',
-    letterSpacing: 0.5,
-    marginTop: 10,
+  categoryDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     marginBottom: 6,
   },
-  optionsRow: {
+  categoryDropdownLeft: {
     flexDirection: 'row',
-    gap: 6,
+    alignItems: 'center',
+    gap: 12,
   },
-  optionBtn: {
-    flex: 1,
-    paddingVertical: 8,
+  categoryDropdownIconWrap: {
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    backgroundColor: 'rgba(10, 4, 24, 0.6)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
-  },
-  optionBtnActive: {
-    backgroundColor: 'rgba(107, 60, 255, 0.6)',
-    borderColor: '#FFC43D',
-  },
-  optionBtnText: {
-    fontFamily: THEME.fonts.extraBold,
-    fontSize: 12,
-    color: '#D9CDF5',
-  },
-  optionBtnTextActive: {
-    color: '#FFFFFF',
-  },
-  categoryScroll: {
-    gap: 8,
-    paddingVertical: 4,
-  },
-  categoryCard: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 14,
-    backgroundColor: 'rgba(10, 4, 24, 0.6)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
-  categoryCardSelected: {
-    backgroundColor: 'rgba(107, 60, 255, 0.5)',
-    borderColor: '#FFC43D',
-  },
-  categoryIcon: {
-    fontSize: 16,
-  },
-  categoryName: {
-    fontFamily: THEME.fonts.bold,
-    fontSize: 12,
-    color: '#D9CDF5',
-  },
-  categoryNameSelected: {
+  categoryDropdownText: {
+    fontSize: 17,
+    fontFamily: 'Nunito_900Black',
+    fontWeight: '900',
     color: '#FFFFFF',
+  },
+  mixedQuickToggle: {
+    alignSelf: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+  },
+  mixedQuickText: {
+    fontSize: 13,
+    fontFamily: 'Nunito_700Bold',
+    fontWeight: '700',
+    color: '#5AE0B5',
+    textDecorationLine: 'underline',
+  },
+  paramGridRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  paramColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  chipGroup: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(10, 4, 30, 0.65)',
+    borderRadius: 20,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    width: '100%',
+    justifyContent: 'space-around',
+  },
+  chipPill: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chipPillActive: {
+    backgroundColor: '#00B4DB',
+  },
+  chipPillText: {
+    fontSize: 15,
+    fontFamily: 'Nunito_800ExtraBold',
+    fontWeight: '800',
+    color: '#CBBFE8',
+  },
+  chipPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+  },
+  chipRowFull: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(10, 4, 30, 0.65)',
+    borderRadius: 20,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    marginBottom: 16,
+    justifyContent: 'space-between',
+  },
+  chipPillSmall: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   switchRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(10, 4, 24, 0.5)',
-    borderRadius: 14,
-    padding: 12,
-    marginTop: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    marginBottom: 20,
   },
   switchLabel: {
-    fontFamily: THEME.fonts.bold,
-    fontSize: 13,
+    fontSize: 15,
+    fontFamily: 'Nunito_800ExtraBold',
+    fontWeight: '800',
     color: '#FFFFFF',
   },
   switchSub: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 10,
-    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: 'Nunito_600SemiBold',
+    fontWeight: '600',
+    color: '#CBBFE8',
     marginTop: 2,
   },
-  dividerRow: {
-    flexDirection: 'row',
+  createRoomButton: {
+    width: '100%',
+    height: 52,
+    borderRadius: 26,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
-    marginVertical: 12,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#00B4DB',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.45,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 6,
+      },
+      web: {
+        boxShadow: '0px 6px 16px rgba(0, 180, 219, 0.45)',
+      },
+    }),
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  createRoomButtonText: {
+    fontSize: 18,
+    fontFamily: 'Nunito_900Black',
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
-  dividerText: {
-    fontFamily: THEME.fonts.extraBold,
-    fontSize: 12,
+  joinSubText: {
+    fontSize: 13,
+    fontFamily: 'Nunito_600SemiBold',
+    fontWeight: '600',
     color: '#D9CDF5',
+    textAlign: 'center',
+    marginBottom: 20,
   },
   digitsWrapper: {
-    marginVertical: 10,
+    alignItems: 'center',
+    marginVertical: 12,
   },
   digitsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 6,
+    gap: 8,
   },
   digitBox: {
-    flex: 1,
-    height: 50,
+    width: 44,
+    height: 52,
     borderRadius: 12,
-    backgroundColor: 'rgba(10, 4, 24, 0.7)',
+    backgroundColor: 'rgba(10, 4, 30, 0.7)',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   digitBoxFilled: {
-    borderColor: '#FFC43D',
-    backgroundColor: 'rgba(255, 196, 61, 0.15)',
+    borderColor: '#00B4DB',
+    backgroundColor: 'rgba(0, 180, 219, 0.15)',
   },
   digitText: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 20,
+    fontSize: 22,
+    fontFamily: 'Nunito_900Black',
+    fontWeight: '900',
     color: '#FFFFFF',
   },
   hiddenInput: {
@@ -512,42 +724,26 @@ const styles = StyleSheet.create({
     width: 1,
     height: 1,
   },
-  joinActionsRow: {
-    flexDirection: 'row',
-    gap: 10,
+  errorText: {
+    color: '#FF5A6A',
+    fontSize: 13,
+    fontFamily: 'Nunito_700Bold',
+    fontWeight: '700',
+    textAlign: 'center',
     marginTop: 6,
   },
-  pasteBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 14,
+  pasteButton: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: 10,
   },
-  pasteBtnText: {
-    fontFamily: THEME.fonts.bold,
+  pasteButtonText: {
     fontSize: 13,
-    color: '#D9CDF5',
-  },
-  joinBtn: {
-    flex: 2,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: '#FFC43D',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  joinBtnText: {
-    fontFamily: THEME.fonts.extraBold,
-    fontSize: 14,
-    color: '#12052C',
-  },
-  errorText: {
-    color: '#FF5C77',
-    fontSize: 12,
-    fontFamily: THEME.fonts.bold,
-    textAlign: 'center',
-    marginTop: 8,
+    fontFamily: 'Nunito_800ExtraBold',
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 });

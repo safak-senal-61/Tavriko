@@ -78,24 +78,27 @@ Bu doküman, `trt-bil-bakalim.apk` tersine mühendislik incelemesi ve kullanıc�
 ## 📋 5. Adım Adım Yapılacaklar Listesi (Roadmap)
 
 ### Faz 1: "Kategorini Seç" Modalı ve 3D Squircle Karuseli
-- [ ] **1.1. 3D Squircle Kategori Bileşeni (`CategorySquircleCard.tsx`):**
-  - Squircle köşe yumuşatması, 3D üst parlama ve alt gölge derinliği.
-  - Vektörel beyaz ikonlar (Kimya, Tapınak, Boya Fırçası, Küre vb.).
-- [ ] **1.2. Center-Snapping Carousel (`CategoryCarousel.tsx`):**
-  - Reanimated ile `interpolate`: Merkeze göre $\text{Scale: } 0.85 \rightarrow 1.25$, $\text{Opacity: } 0.6 \rightarrow 1.0$.
-  - Kart değişiminde mikro haptik geribildirim.
-- [ ] **1.3. Genel / Özel Segment Switch (`SegmentedFilter.tsx`):**
-  - "Genel" ve "Özel" arasında kayan degrade hap animasyonu.
+- [x] **1.1. 3D Squircle Kategori Bileşeni (`CategorySquircleCard.tsx`):**
+  - Squircle köşe yumuşatması, 3D üst parlama ve alt gölge derinliği eklendi.
+  - Vektörel beyaz ikonlar (Kimya, Tapınak, Boya Fırçası, Küre, Spor, Müzik, Sinema, Edebiyat) modellendi.
+- [x] **1.2. Center-Snapping Carousel (`CategoryCarousel.tsx`):**
+  - Animated/Reanimated ile interpolate: Merkeze göre $\text{Scale: } 0.80 \rightarrow 1.25$, $\text{Opacity: } 0.6 \rightarrow 1.0$.
+  - Kart değişiminde mikro haptik geribildirim ve tıklayarak ortalama entegre edildi.
+- [x] **1.3. Genel / Özel Segment Switch (`SegmentedFilter.tsx`):**
+  - "Genel" ve "Özel" arasında kayan degrade hap yaylanma animasyonu tamamlandı.
+- [x] **1.4. "Kategorini Seç" Modalı (`CategorySelectModal.tsx`):**
+  - Görseldeki saf beyaz kart, segment switch, 3D karusel ve turkuaz "Tamam" onay butonu tamamlandı.
 
 ### Faz 2: Lobi ve Oda Kurma Ekranının TRT Standartlarına Uyarlanması
-- [ ] **2.1. Ekran Yeniden Tasarımı (`CustomRoomScreen.tsx`):**
-  - TRT renk paletine geçiş (Kraliyet Moru degrade).
-  - Soru sayısı çiplerinin `[ 7 ] [ 14 ] [ 21 ]` yapılması.
-  - Süre seçeneklerinin `[ 20sn ] [ 40sn ]` yapılması.
-  - Kategori butonuna basıldığında açılan modal yapısının entegre edilmesi.
-- [ ] **2.2. Bekleme & Başlatma Durumu (`LobbyScreen.tsx`):**
-  - "Diğer oyuncular bekleniyor" pulsing animasyonu.
-  - 2 oyuncu olmadan "Oyunu Başlat" butonunun pasif kalması.
+- [x] **2.1. Ekran Yeniden Tasarımı (`CustomRoomScreen.tsx`):**
+  - TRT renk paletine geçiş (Kraliyet Moru degrade ve cam kart yapısı).
+  - Soru sayısı çiplerinin TRT standardı olan `[ 7 ] [ 14 ] [ 21 ]` yapılması.
+  - Süre seçeneklerinin TRT standardı olan `[ 20sn ] [ 40sn ]` yapılması.
+  - Kategori butonuna basıldığında açılan modal yapısının (`CategorySelectModal`) tam entegrasyonu.
+  - Hızlı "Karışık 🎲" geçiş butonu ve 6 haneli odaya katılma kutucukları.
+- [x] **2.2. Bekleme & Başlatma Durumu (`LobbyScreen.tsx`):**
+  - "Diğer oyuncular bekleniyor..." nefes alan (pulsing opacity) animasyonu eklendi.
+  - 2 oyuncu olmadan "Oyunu Başlat" butonunun pasif kalması; 2 oyuncu olunca turkuaz parlayarak aktifleşmesi sağlandı.
 
 ### Faz 3: Lottie Reaksiyonları ve Ses Entegrasyonu
 - [ ] **3.1. Lobi İçi Lottie Tepki Çubuğu:**

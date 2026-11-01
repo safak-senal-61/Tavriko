@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   StyleSheet,
   ScrollView,
   Share,
+  Animated,
+  Platform,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { GameRoom } from '@trivia/shared';
@@ -44,6 +46,28 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   const myPlayer = room.players[currentUserId];
   const isReady = myPlayer?.isReady ?? false;
   const canStart = players.length >= 2;
+
+  // TRT Görselindeki "Diğer oyuncular bekleniyor" nefes alma (pulsing) animasyonu
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
+
+  useEffect(() => {
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.0,
+          duration: 900,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.4,
+          duration: 900,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ])
+    );
+    pulseLoop.start();
+    return () => pulseLoop.stop();
+  }, []);
 
   const handleCopyCode = async () => {
     sound.playSound('tap');
@@ -170,13 +194,29 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         <View style={styles.controlsWrap}>
           {isHost ? (
             <>
-              {!canStart && (
-                <Text style={styles.warningText}>
-                  ⚠️ Oyunu başlatmak için en az 2 oyuncu gereklidir.
-                </Text>
+              {!canStart ? (
+                <View style={styles.waitingNoticeBox}>
+                  <Animated.Text style={[styles.waitingPulsingText, { opacity: pulseAnim }]}>
+                    Diğer oyuncular bekleniyor...
+                  </Animated.Text>
+                  <Text style={styles.waitingSubNotice}>
+                    Oyunu başlatabilmek için en az 2 oyuncu olmalıdır.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.readyNoticeBox}>
+                  <Text style={styles.readyNoticeText}>
+                    ✨ Lobi hazır! Oyuncular bekleniyor veya maçı hemen başlatabilirsiniz.
+                  </Text>
+                </View>
               )}
-              <Button3D
-                title="MAÇI BAŞLAT"
+
+              <TouchableOpacity
+                style={[
+                  styles.trtLaunchButton,
+                  !canStart && styles.trtLaunchButtonDisabled,
+                ]}
+                activeOpacity={canStart ? 0.85 : 1}
                 onPress={() => {
                   if (canStart) {
                     sound.playSound('tap');
@@ -186,9 +226,16 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                     sound.playSound('wrong');
                   }
                 }}
-                disabled={!canStart}
-                style={{ height: 56, opacity: canStart ? 1 : 0.6 }}
-              />
+              >
+                <Text
+                  style={[
+                    styles.trtLaunchButtonText,
+                    !canStart && styles.trtLaunchButtonTextDisabled,
+                  ]}
+                >
+                  Oyunu Başlat
+                </Text>
+              </TouchableOpacity>
             </>
           ) : (
             <View style={styles.guestControls}>
@@ -412,7 +459,81 @@ const styles = StyleSheet.create({
   waitingHostText: {
     color: '#D9CDF5',
     fontSize: 12,
-    fontFamily: THEME.fonts.medium,
+    fontFamily: THEME.fonts.bold,
+  },
+  waitingNoticeBox: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  waitingPulsingText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: THEME.fonts.display,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  waitingSubNotice: {
+    color: '#D9CDF5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.bold,
+    textAlign: 'center',
     marginTop: 4,
+  },
+  readyNoticeBox: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  readyNoticeText: {
+    color: '#6FE3C1',
+    fontSize: 13,
+    fontFamily: THEME.fonts.display,
+    textAlign: 'center',
+  },
+  trtLaunchButton: {
+    width: '100%',
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#00B4DB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#00B4DB',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.5,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 6,
+      },
+      web: {
+        boxShadow: '0px 6px 16px rgba(0, 180, 219, 0.45)',
+      },
+    }),
+  },
+  trtLaunchButtonDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    ...Platform.select({
+      ios: {
+        shadowOpacity: 0,
+      },
+      android: {
+        elevation: 0,
+      },
+      web: {
+        boxShadow: 'none',
+      },
+    }),
+  },
+  trtLaunchButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontFamily: THEME.fonts.display,
+    letterSpacing: 0.8,
+  },
+  trtLaunchButtonTextDisabled: {
+    color: 'rgba(255, 255, 255, 0.35)',
   },
 });
