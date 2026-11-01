@@ -68,4 +68,24 @@ describe('Question Diversity & Anti-Repetition Verification', () => {
     console.log(`Out of 10 geography questions, ${nonCapitalOrPlateCount} are diverse (mountains, lakes, rivers, wonders, etc.)`);
     expect(nonCapitalOrPlateCount).toBeGreaterThanOrEqual(6);
   });
+
+  it('guarantees clear distinction between easy and expert difficulty levels', () => {
+    const easyQuestions = generateDeterministicEvrenCandidates('geography', 'easy', 6, db);
+    const expertQuestions = generateDeterministicEvrenCandidates('geography', 'expert', 6, db);
+
+    const easyTexts = easyQuestions.map((q) => q.text);
+    const expertTexts = expertQuestions.map((q) => q.text);
+
+    console.log('--- Easy Geography Sample ---', easyTexts[0]);
+    console.log('--- Expert Geography Sample ---', expertTexts[0]);
+
+    // Check that easy and expert sets do not overlap
+    for (const eText of easyTexts) {
+      expect(expertTexts).not.toContain(eText);
+    }
+
+    // Verify subCategories reflect the difficulty
+    expect(easyQuestions[0].subCategory).toContain('Kolay');
+    expect(expertQuestions[0].subCategory).toContain('Uzman');
+  });
 });
