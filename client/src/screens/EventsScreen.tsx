@@ -175,8 +175,33 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
     if (type === 'special') return '🏆';
     if (metric === 'wins') return '🏆';
     if (metric === 'streak') return '🔥';
-    if (metric === 'correct_answers') return '⏱️';
+    if (metric === 'correct_answers') return '⚡';
     return '🏅';
+  };
+
+  const getIconCircleStyle = (metric: string, type: string) => {
+    if (metric === 'streak') {
+      return {
+        backgroundColor: 'rgba(249, 115, 22, 0.2)',
+        borderColor: 'rgba(249, 115, 22, 0.45)',
+      };
+    }
+    if (metric === 'correct_answers') {
+      return {
+        backgroundColor: 'rgba(56, 189, 248, 0.2)',
+        borderColor: 'rgba(56, 189, 248, 0.45)',
+      };
+    }
+    if (metric === 'wins' || type === 'special') {
+      return {
+        backgroundColor: 'rgba(168, 85, 247, 0.2)',
+        borderColor: 'rgba(168, 85, 247, 0.45)',
+      };
+    }
+    return {
+      backgroundColor: 'rgba(255, 196, 61, 0.2)',
+      borderColor: 'rgba(255, 196, 61, 0.45)',
+    };
   };
 
   return (
@@ -278,7 +303,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                 >
                   {/* Card Header Row: Icon + Title/Desc + Action Button */}
                   <View style={styles.cardHeaderRow}>
-                    <View style={styles.iconCircle}>
+                    <View style={[styles.iconCircle, getIconCircleStyle(item.metric, item.type)]}>
                       <Text style={styles.metricEmoji}>{getMetricIcon(item.metric, item.type)}</Text>
                     </View>
 
@@ -314,9 +339,9 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                           onPress={() => handleAction(item)}
                         >
                           {isBusy ? (
-                            <ActivityIndicator color="#3B1500" size="small" />
+                            <ActivityIndicator color="#1A0E00" size="small" />
                           ) : (
-                            <Text style={styles.playBtnText}>{isStarted ? 'OYNA' : 'BAŞLA'}</Text>
+                            <Text style={styles.playBtnText}>OYNA</Text>
                           )}
                         </TouchableOpacity>
                       )}
@@ -376,8 +401,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                     )}
                     {itemReward && (
                       <View style={styles.rewardChip}>
-                        {itemReward.category === 'chest' ? <ChestIcon size={13} /> : <KeyIcon size={13} />}
-                        <Text style={styles.rewardChipTextGold}>{itemReward.name}</Text>
+                        {itemReward.category === 'chest' ? <ChestIcon size={14} /> : <KeyIcon size={14} />}
                       </View>
                     )}
                   </View>
@@ -440,7 +464,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabBtnActive: {
-    backgroundColor: '#6B3CFF',
+    backgroundColor: '#6236FF',
   },
   tabText: {
     color: '#D9CDF5',
@@ -505,7 +529,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   eventCard: {
-    backgroundColor: 'rgba(28, 16, 56, 0.75)',
+    backgroundColor: '#1E163B',
     borderRadius: 22,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.08)',
@@ -516,8 +540,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
   },
   eventCardCompleted: {
-    borderColor: 'rgba(90, 219, 181, 0.4)',
-    backgroundColor: 'rgba(28, 24, 60, 0.85)',
+    borderColor: 'rgba(90, 219, 181, 0.5)',
+    backgroundColor: '#1E1A3F',
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -525,12 +549,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -545,33 +567,33 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.display,
     fontSize: 16,
     color: '#FFFFFF',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
+    marginBottom: 2,
   },
   eventDesc: {
     fontFamily: THEME.fonts.medium,
-    fontSize: 11,
+    fontSize: 12,
     color: '#A99DC9',
-    marginTop: 2,
-    lineHeight: 15,
+    lineHeight: 16,
   },
   actionBtnWrap: {
     alignItems: 'flex-end',
     justifyContent: 'center',
   },
   playBtn: {
-    backgroundColor: '#FFB21E',
+    backgroundColor: '#FFB800',
     borderBottomWidth: 3,
     borderBottomColor: '#B8560A',
-    paddingHorizontal: 20,
-    paddingVertical: 9,
-    borderRadius: 14,
-    minWidth: 84,
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    borderRadius: 16,
+    minWidth: 88,
     alignItems: 'center',
     justifyContent: 'center',
   },
   playBtnText: {
-    color: '#3B1500',
-    fontSize: 13,
+    color: '#1A0E00',
+    fontSize: 14,
     fontFamily: THEME.fonts.display,
     letterSpacing: 0.5,
   },
@@ -579,20 +601,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#5ADBB5',
     borderBottomWidth: 3,
     borderBottomColor: '#1D7A6B',
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 14,
-    minWidth: 84,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 16,
+    minWidth: 88,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#5ADBB5',
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.45,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
   },
   collectBtnText: {
-    color: '#0A2920',
-    fontSize: 13,
+    color: '#072E22',
+    fontSize: 14,
     fontFamily: THEME.fonts.display,
     letterSpacing: 0.5,
   },

@@ -273,7 +273,7 @@ export function createApp() {
   }
 
   // Developer & Operations Portal (Password protected via jewelkaan01@gmail.com)
-  app.get(['/portal', '/dashboard', '/admin', '/ops'], (req, res) => {
+  app.get(['/portal', '/dashboard', '/admin', '/ops', '/developer', '/dev', '/developer-portal', '/gelistirici'], (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(renderDashboardHtml());
   });

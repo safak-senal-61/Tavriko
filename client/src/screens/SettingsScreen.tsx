@@ -18,10 +18,12 @@ import {
 interface SettingsScreenProps {
   onBack: () => void;
   onLogout: () => void;
+  onDeveloper?: () => void;
 }
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onBack,
   onLogout,
+  onDeveloper,
 }) => {
   const [sfxEnabled, setSfxEnabled] = useState(sound.isSoundEnabled());
   const [musicEnabled, setMusicEnabled] = useState(false);
@@ -89,9 +91,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <Text style={styles.settingLabel}>Hesap</Text>
             <Text style={styles.settingRightSub}>›</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.settingRow, { borderBottomWidth: 0 }]}>
+          <TouchableOpacity style={styles.settingRow}>
             <Text style={styles.settingLabel}>Gizlilik</Text>
             <Text style={styles.settingRightSub}>›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.settingRow, { borderBottomWidth: 0 }]}
+            onPress={() => {
+              sound.playSound('tap');
+              if (onDeveloper) {
+                onDeveloper();
+              }
+            }}
+          >
+            <Text style={[styles.settingLabel, { color: '#FFC43D' }]}>🛡️ Geliştirici & Ops Paneli</Text>
+            <Text style={[styles.settingRightSub, { color: '#FFC43D' }]}>Aç ›</Text>
           </TouchableOpacity>
         </View>
         {/* Logout Button */}

@@ -15,6 +15,7 @@ export const CLOUD_API_URL = `${CLOUD_BASE_URL}/api`;
  * wss:// in production, ws:// in local dev
  */
 export const CLOUDFLARE_WS_DEFAULT_HOST = 'tavriko-realtime.uncertainidentity8.workers.dev';
+export const REALTIME_WS_BASE = `wss://${CLOUDFLARE_WS_DEFAULT_HOST}/ws`;
 
 export const getRealtimeWsUrl = (path: string = '/ws'): string => {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;

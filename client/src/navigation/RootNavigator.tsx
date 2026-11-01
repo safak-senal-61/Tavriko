@@ -58,6 +58,7 @@ import { EventsScreen } from '../screens/EventsScreen';
 import { InventoryScreen } from '../screens/InventoryScreen';
 import { ProLeagueScreen } from '../screens/ProLeagueScreen';
 import { PaymentScreen, PaymentItem } from '../screens/PaymentScreen';
+import { DeveloperScreen } from '../screens/DeveloperScreen';
 export type ScreenName =
   | 'splash'
   | 'auth'
@@ -86,7 +87,8 @@ export type ScreenName =
   | 'events'
   | 'inventory'
   | 'pro_league'
-  | 'payment';
+  | 'payment'
+  | 'developer';
 import { DEFAULT_API_BASE, getRealtimeWsUrl } from '../config';
 
 const API_BASE = DEFAULT_API_BASE;
@@ -103,7 +105,15 @@ export const RootNavigator: React.FC = () => {
       window.location.search.includes('access_token') ||
       window.location.search.includes('code='));
 
-  const [currentScreen, setCurrentScreen] = useState<ScreenName>(isWebOAuthReturn ? 'auth' : 'splash');
+  const isWebDeveloperReturn =
+    isWeb &&
+    typeof window !== 'undefined' &&
+    (window.location.search.includes('screen=developer') ||
+      window.location.hash.includes('developer'));
+
+  const [currentScreen, setCurrentScreen] = useState<ScreenName>(
+    isWebOAuthReturn ? 'auth' : isWebDeveloperReturn ? 'developer' : 'splash'
+  );
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('general_culture');
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>('medium');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -1450,6 +1460,7 @@ export const RootNavigator: React.FC = () => {
         {currentScreen === 'settings' && (
           <SettingsScreen
             onBack={() => navigateTo('home')}
+            onDeveloper={() => navigateTo('developer')}
             onLogout={() => {
               setIsGuest(false);
               setAuthRedirectNotice(null);
@@ -1457,6 +1468,15 @@ export const RootNavigator: React.FC = () => {
               resetGame();
               navigateTo('auth');
             }}
+          />
+        )}
+        {currentScreen === 'developer' && (
+          <DeveloperScreen
+            user={user || undefined}
+            apiBaseUrl={API_BASE}
+            onUpdateUser={(updated) => setUser(updated, null)}
+            onNavigate={(screen) => navigateTo(screen)}
+            onBack={() => navigateTo('settings')}
           />
         )}
         {currentScreen === 'season' && (
@@ -1597,12 +1617,21 @@ export const RootNavigator: React.FC = () => {
             <TouchableOpacity
               style={styles.portalShortcutBtn}
               onPress={() => {
+                navigateTo('developer');
+              }}
+            >
+              <Text style={styles.portalShortcutText}>🛡️ Geliştirici Sandbox Paneli</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.portalShortcutBtn, { marginTop: 6, backgroundColor: 'rgba(255, 196, 61, 0.1)', borderColor: 'rgba(255, 196, 61, 0.3)' }]}
+              onPress={() => {
                 if (typeof window !== 'undefined') {
-                  window.open('/portal', '_blank');
+                  window.open('/developer', '_blank');
                 }
               }}
             >
-              <Text style={styles.portalShortcutText}>🛡️ Developer & Ops Portalı</Text>
+              <Text style={[styles.portalShortcutText, { color: '#FFC43D' }]}>🌐 Web Operasyon Portalı</Text>
             </TouchableOpacity>
 
             <View style={styles.desktopTipBox}>
