@@ -8,6 +8,7 @@ class UpstashRedisService {
     memExpiry = new Map();
     memLocks = new Set();
     memSeen = new Map();
+    memCustom = new Map();
     usingFallback = true;
     constructor() {
         const rawUrl = process.env.UPSTASH_REDIS_REST_URL;
@@ -115,6 +116,40 @@ class UpstashRedisService {
         }
         const set = this.memSeen.get(key);
         return set ? Array.from(set) : [];
+    }
+    async getCustomValue(key) {
+        if (this.client) {
+            try {
+                const val = await this.client.get(key);
+                if (val !== null && val !== undefined)
+                    return val;
+            }
+            catch (err) {
+                console.warn('[Upstash Redis] getCustomValue fallback devrede:', err.message);
+            }
+        }
+        const val = this.memCustom.get(key);
+        return val !== undefined ? val : null;
+    }
+    async setCustomValue(key, value, ttlSec) {
+        if (this.client) {
+            try {
+                if (ttlSec && ttlSec > 0) {
+                    await this.client.set(key, value, { ex: ttlSec });
+                }
+                else {
+                    await this.client.set(key, value);
+                }
+                return;
+            }
+            catch (err) {
+                console.warn('[Upstash Redis] setCustomValue fallback devrede:', err.message);
+            }
+        }
+        this.memCustom.set(key, value);
+        if (ttlSec && ttlSec > 0) {
+            setTimeout(() => this.memCustom.delete(key), ttlSec * 1000);
+        }
     }
 }
 exports.cacheService = new UpstashRedisService();

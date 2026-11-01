@@ -38,6 +38,10 @@ export class SocketService {
     token?: string;
   } = {};
 
+  public isConnected(): boolean {
+    return !!(this.ws && this.ws.readyState === (typeof WebSocket !== 'undefined' ? WebSocket.OPEN : 1));
+  }
+
   public connect(url?: string): any {
     this.isManuallyClosed = false;
     const targetUrl = url || getRealtimeWsUrl('/ws');

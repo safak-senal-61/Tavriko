@@ -192,6 +192,16 @@ export function createApp() {
     }
   });
 
+  // Telegram test & status check endpoint
+  app.get('/api/admin/telegram/test', async (req, res) => {
+    try {
+      const info = await telegramBot.getBotInfo();
+      return res.json(info);
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Static Web App Serving (client/dist)
   const clientDistCandidates = [
     path.resolve(__dirname, '../../client/dist'),
@@ -475,8 +485,16 @@ export function createApp() {
                 <button type="submit" class="btn btn-telegram" id="btn-save-bot">
                   🚀 Botu Bağla ve Başlat
                 </button>
+                <button type="button" class="btn" id="btn-test-bot" onclick="testTelegramBot()" style="margin-top: 8px; background: rgba(255,255,255,0.08); border: 1px solid #2B3754;">
+                  🧪 Bot & Webhook Bağlantısını Test Et
+                </button>
               </form>
               <div id="msg-box"></div>
+              <div id="bot-details-box" style="display: none; margin-top: 14px; background: rgba(0, 136, 204, 0.1); border: 1px solid rgba(0, 136, 204, 0.3); border-radius: 12px; padding: 12px; font-size: 13px;">
+                <div style="font-weight: 700; color: #38BDF8; margin-bottom: 6px;" id="bot-username-display">🤖 Bot Bilgisi</div>
+                <div style="color: #94A3B8; font-size: 12px;" id="bot-webhook-display">Webhook: https://tavriko-app.vercel.app/api/telegram/webhook</div>
+                <a id="bot-link-btn" href="#" target="_blank" style="display: inline-block; margin-top: 8px; background: #0088cc; color: #fff; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 12px;">📲 Telegram'da Botu Aç</a>
+              </div>
             </div>
           </div>
 
@@ -535,6 +553,77 @@ export function createApp() {
               btn.innerText = '🚀 Botu Bağla ve Başlat';
             }
           }
+
+          async function testTelegramBot() {
+            const btn = document.getElementById('btn-test-bot');
+            const msg = document.getElementById('msg-box');
+            const detailsBox = document.getElementById('bot-details-box');
+            const usernameEl = document.getElementById('bot-username-display');
+            const webhookEl = document.getElementById('bot-webhook-display');
+            const linkBtn = document.getElementById('bot-link-btn');
+
+            btn.disabled = true;
+            btn.innerText = 'Test ediliyor...';
+            msg.style.display = 'none';
+
+            try {
+              const res = await fetch('/api/admin/telegram/test');
+              const data = await res.json();
+              msg.style.display = 'block';
+              if (data.success && data.bot) {
+                msg.style.color = '#10B981';
+                msg.innerText = '✅ Telegram Bot Aktif: @' + (data.bot.username || data.bot.first_name);
+                detailsBox.style.display = 'block';
+                usernameEl.innerText = '🤖 @' + data.bot.username + ' (' + (data.bot.first_name || 'Tavriko Bot') + ')';
+                webhookEl.innerText = 'Webhook: ' + (data.webhook?.url || 'Kurulu değil (Polling)');
+                if (data.bot.username) {
+                  linkBtn.href = 'https://t.me/' + data.bot.username;
+                  linkBtn.style.display = 'inline-block';
+                }
+                const pill = document.getElementById('bot-status-pill');
+                pill.style.background = 'rgba(16,185,129,0.15)';
+                pill.style.color = '#10B981';
+                pill.innerText = '● AKTİF';
+              } else {
+                msg.style.color = '#EF4444';
+                msg.innerText = '❌ ' + (data.error || 'Bot başlatılmamış.');
+                detailsBox.style.display = 'none';
+              }
+            } catch (err) {
+              msg.style.display = 'block';
+              msg.style.color = '#EF4444';
+              msg.innerText = '❌ Test hatası: ' + err.message;
+            } finally {
+              btn.disabled = false;
+              btn.innerText = '🧪 Bot & Webhook Bağlantısını Test Et';
+            }
+          }
+
+          // Otomatik mevcut bot durumunu sorgula
+          window.addEventListener('DOMContentLoaded', () => {
+            fetch('/api/admin/telegram/test').then(r => r.json()).then(data => {
+              if (data.success && data.bot) {
+                const pill = document.getElementById('bot-status-pill');
+                if (pill) {
+                  pill.style.background = 'rgba(16,185,129,0.15)';
+                  pill.style.color = '#10B981';
+                  pill.innerText = '● AKTİF (@' + data.bot.username + ')';
+                }
+                const detailsBox = document.getElementById('bot-details-box');
+                const usernameEl = document.getElementById('bot-username-display');
+                const webhookEl = document.getElementById('bot-webhook-display');
+                const linkBtn = document.getElementById('bot-link-btn');
+                if (detailsBox && usernameEl && webhookEl && linkBtn) {
+                  detailsBox.style.display = 'block';
+                  usernameEl.innerText = '🤖 @' + data.bot.username + ' (' + (data.bot.first_name || 'Tavriko Bot') + ')';
+                  webhookEl.innerText = 'Webhook: ' + (data.webhook?.url || 'https://tavriko-app.vercel.app/api/telegram/webhook');
+                  if (data.bot.username) {
+                    linkBtn.href = 'https://t.me/' + data.bot.username;
+                  }
+                }
+              }
+            }).catch(() => {});
+          });
         </script>
       </body>
       </html>

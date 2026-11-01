@@ -4,6 +4,7 @@ import { generateQuestionsWithEvrenGLM } from '../ai/evrenLlmGenerator';
 import { supabaseService } from '../db/supabaseClient';
 import { CategoryId, DifficultyLevel, Question } from '@trivia/shared';
 import { GameRoomManager } from '../engine/GameRoomManager';
+import { cacheService } from '../cache/redisClient';
 
 export interface TelegramBotConfig {
   token?: string;
@@ -155,7 +156,53 @@ export class TelegramBotService {
     return this.activeToken ? `${this.activeToken.substring(0, 8)}...` : null;
   }
 
-  public async configure(token: string, adminIds?: Array<number | string>): Promise<{ success: boolean; message: string }> {
+  public async ensureBotReady(): Promise<boolean> {
+    if (this.bot) return true;
+    const isTest = process.env.NODE_ENV === 'test';
+    if (isTest) return false;
+
+    let token = process.env.TELEGRAM_BOT_TOKEN;
+    let savedAdmins: string[] = [];
+
+    if (!token || token.includes('placeholder')) {
+      try {
+        const saved = await cacheService.getCustomValue<{ token: string; adminIds?: string[] }>('tavriko:telegram:config');
+        if (saved && saved.token) {
+          token = saved.token;
+          if (saved.adminIds && Array.isArray(saved.adminIds)) {
+            savedAdmins = saved.adminIds;
+          }
+        }
+      } catch {}
+    }
+
+    if (token && !token.includes('placeholder') && token.trim().length >= 15) {
+      if (savedAdmins.length > 0) {
+        savedAdmins.forEach((id) => this.adminIds.add(String(id).trim()));
+      }
+      const res = await this.initBot(token.trim());
+      return res.success;
+    }
+    return false;
+  }
+
+  public async getBotInfo(): Promise<{ success: boolean; bot?: any; webhook?: any; error?: string }> {
+    await this.ensureBotReady();
+    if (!this.bot) {
+      return { success: false, error: 'Telegram bot tokeni henüz ayarlanmadı.' };
+    }
+    try {
+      const [me, webhook] = await Promise.all([
+        this.bot.telegram.getMe(),
+        this.bot.telegram.getWebhookInfo(),
+      ]);
+      return { success: true, bot: me, webhook };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  public async configure(token: string, adminIds?: Array<number | string>): Promise<{ success: boolean; message: string; bot?: any }> {
     if (!token || token.trim().length < 15) {
       return { success: false, message: 'Geçersiz Telegram Bot Token formatı.' };
     }
@@ -165,7 +212,23 @@ export class TelegramBotService {
     }
 
     await this.stopBot();
-    return this.initBot(token.trim());
+    const initRes = await this.initBot(token.trim());
+    if (initRes.success) {
+      try {
+        await cacheService.setCustomValue('tavriko:telegram:config', {
+          token: token.trim(),
+          adminIds: Array.from(this.adminIds),
+        });
+      } catch (e: any) {
+        console.warn('[TelegramBot] Token cache kaydedilemedi:', e.message);
+      }
+      let botMe: any = null;
+      try {
+        if (this.bot) botMe = await this.bot.telegram.getMe();
+      } catch {}
+      return { ...initRes, bot: botMe };
+    }
+    return initRes;
   }
 
   public async stopBot(): Promise<void> {
@@ -179,6 +242,9 @@ export class TelegramBotService {
   }
 
   public async handleWebhookUpdate(update: any): Promise<void> {
+    if (!this.bot) {
+      await this.ensureBotReady();
+    }
     if (this.bot) {
       await this.bot.handleUpdate(update);
     }

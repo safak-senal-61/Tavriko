@@ -4,6 +4,7 @@ exports.TelegramBotService = exports.DIFFICULTIES_CONFIG = exports.CATEGORIES_CO
 const telegraf_1 = require("telegraf");
 const evrenLlmGenerator_1 = require("../ai/evrenLlmGenerator");
 const supabaseClient_1 = require("../db/supabaseClient");
+const redisClient_1 = require("../cache/redisClient");
 exports.CATEGORIES_CONFIG = [
     { id: 'geography', name: 'Coğrafya', emoji: '🌍' },
     { id: 'mathematics', name: 'Matematik', emoji: '📐' },
@@ -124,6 +125,51 @@ class TelegramBotService {
     getActiveToken() {
         return this.activeToken ? `${this.activeToken.substring(0, 8)}...` : null;
     }
+    async ensureBotReady() {
+        if (this.bot)
+            return true;
+        const isTest = process.env.NODE_ENV === 'test';
+        if (isTest)
+            return false;
+        let token = process.env.TELEGRAM_BOT_TOKEN;
+        let savedAdmins = [];
+        if (!token || token.includes('placeholder')) {
+            try {
+                const saved = await redisClient_1.cacheService.getCustomValue('tavriko:telegram:config');
+                if (saved && saved.token) {
+                    token = saved.token;
+                    if (saved.adminIds && Array.isArray(saved.adminIds)) {
+                        savedAdmins = saved.adminIds;
+                    }
+                }
+            }
+            catch { }
+        }
+        if (token && !token.includes('placeholder') && token.trim().length >= 15) {
+            if (savedAdmins.length > 0) {
+                savedAdmins.forEach((id) => this.adminIds.add(String(id).trim()));
+            }
+            const res = await this.initBot(token.trim());
+            return res.success;
+        }
+        return false;
+    }
+    async getBotInfo() {
+        await this.ensureBotReady();
+        if (!this.bot) {
+            return { success: false, error: 'Telegram bot tokeni henüz ayarlanmadı.' };
+        }
+        try {
+            const [me, webhook] = await Promise.all([
+                this.bot.telegram.getMe(),
+                this.bot.telegram.getWebhookInfo(),
+            ]);
+            return { success: true, bot: me, webhook };
+        }
+        catch (err) {
+            return { success: false, error: err.message };
+        }
+    }
     async configure(token, adminIds) {
         if (!token || token.trim().length < 15) {
             return { success: false, message: 'Geçersiz Telegram Bot Token formatı.' };
@@ -132,7 +178,26 @@ class TelegramBotService {
             this.adminIds = new Set(adminIds.map((id) => String(id).trim()));
         }
         await this.stopBot();
-        return this.initBot(token.trim());
+        const initRes = await this.initBot(token.trim());
+        if (initRes.success) {
+            try {
+                await redisClient_1.cacheService.setCustomValue('tavriko:telegram:config', {
+                    token: token.trim(),
+                    adminIds: Array.from(this.adminIds),
+                });
+            }
+            catch (e) {
+                console.warn('[TelegramBot] Token cache kaydedilemedi:', e.message);
+            }
+            let botMe = null;
+            try {
+                if (this.bot)
+                    botMe = await this.bot.telegram.getMe();
+            }
+            catch { }
+            return { ...initRes, bot: botMe };
+        }
+        return initRes;
     }
     async stopBot() {
         if (this.bot) {
@@ -145,6 +210,9 @@ class TelegramBotService {
         }
     }
     async handleWebhookUpdate(update) {
+        if (!this.bot) {
+            await this.ensureBotReady();
+        }
         if (this.bot) {
             await this.bot.handleUpdate(update);
         }

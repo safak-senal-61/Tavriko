@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  Linking,
 } from 'react-native';
 import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -40,16 +41,28 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
 }) => {
   const [apiPing, setApiPing] = useState<number | null>(null);
   const [isPinging, setIsPinging] = useState<boolean>(false);
-  const [wsConnected, setWsConnected] = useState<boolean>(socketService.isConnected());
+  const [wsConnected, setWsConnected] = useState<boolean>(() => {
+    try {
+      return typeof socketService?.isConnected === 'function' ? socketService.isConnected() : false;
+    } catch {
+      return false;
+    }
+  });
   const [showJson, setShowJson] = useState<boolean>(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [tgTesting, setTgTesting] = useState<boolean>(false);
+  const [tgStatus, setTgStatus] = useState<string | null>(null);
 
   const base = apiBaseUrl || DEFAULT_API_BASE;
 
   useEffect(() => {
     checkApiLatency();
     const timer = setInterval(() => {
-      setWsConnected(socketService.isConnected());
+      try {
+        setWsConnected(typeof socketService?.isConnected === 'function' ? socketService.isConnected() : false);
+      } catch {
+        setWsConnected(false);
+      }
     }, 2000);
     return () => clearInterval(timer);
   }, []);
@@ -153,8 +166,43 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
 
   const openUrl = (path: string) => {
     sound.playSound('tap');
+    let target = path;
+    if (!path.startsWith('http')) {
+      const origin =
+        typeof window !== 'undefined' && window.location?.origin
+          ? window.location.origin
+          : base.replace(/\/api\/?$/, '');
+      target = `${origin}${path.startsWith('/') ? path : `/${path}`}`;
+    }
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.open(path, '_blank');
+      window.open(target, '_blank');
+    } else {
+      Linking.openURL(target).catch(() => {});
+    }
+  };
+
+  const testTelegram = async () => {
+    setTgTesting(true);
+    setTgStatus(null);
+    sound.playSound('tap');
+    try {
+      const res = await fetch(`${base}/admin/telegram/test`);
+      const data = await res.json();
+      if (data.success && data.bot) {
+        setTgStatus(`✅ @${data.bot.username || data.bot.first_name} Aktif ve hazır!`);
+        sound.playSound('reward');
+        sound.triggerHaptic('success');
+      } else {
+        setTgStatus(`⚠️ ${data.error || 'Bot henüz başlatılmamış.'}`);
+        sound.playSound('wrong');
+        sound.triggerHaptic('error');
+      }
+    } catch {
+      setTgStatus('❌ Sunucuya erişilemedi.');
+      sound.playSound('wrong');
+      sound.triggerHaptic('error');
+    } finally {
+      setTgTesting(false);
     }
   };
 
@@ -295,6 +343,46 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
             </View>
             <Text style={styles.portalArrow}>›</Text>
           </TouchableOpacity>
+
+          {/* Telegram Test Button & Live Feedback */}
+          <View style={{ marginTop: 8, marginBottom: 10, paddingHorizontal: 2 }}>
+            <TouchableOpacity
+              style={{
+                backgroundColor: 'rgba(0, 136, 204, 0.18)',
+                borderWidth: 1,
+                borderColor: '#0088cc',
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                borderRadius: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+              onPress={testTelegram}
+              disabled={tgTesting}
+              activeOpacity={0.8}
+            >
+              {tgTesting ? (
+                <ActivityIndicator size="small" color="#38BDF8" />
+              ) : (
+                <>
+                  <Text style={{ fontSize: 15 }}>⚡</Text>
+                  <Text style={{ color: '#38BDF8', fontSize: 12, fontFamily: THEME.fonts.bold }}>
+                    Telegram Bot Durumunu Canlı Test Et
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {tgStatus && (
+              <View style={{ marginTop: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 10, padding: 8 }}>
+                <Text style={{ color: tgStatus.startsWith('✅') ? '#5ADBB5' : '#FF8598', fontSize: 11, fontFamily: THEME.fonts.bold, textAlign: 'center' }}>
+                  {tgStatus}
+                </Text>
+              </View>
+            )}
+          </View>
 
           <TouchableOpacity style={[styles.portalRowBtn, { borderBottomWidth: 0 }]} onPress={() => openUrl('/api/logs')}>
             <View style={styles.portalIconBox}>
