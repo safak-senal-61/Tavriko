@@ -611,11 +611,11 @@ export function createApp() {
             } finally {
               if (btnCf) {
                 btnCf.disabled = false;
-                btnCf.innerText = '⚡ Webhook\'u Cloudflare Edge Gateway\'e Bağla (Önerilen)';
+                btnCf.innerText = "⚡ Webhook'u Cloudflare Edge Gateway'e Bağla (Önerilen)";
               }
               if (btnVercel) {
                 btnVercel.disabled = false;
-                btnVercel.innerText = '🔄 Webhook\'u Doğrudan Vercel\'e Bağla';
+                btnVercel.innerText = "🔄 Webhook'u Doğrudan Vercel'e Bağla";
               }
             }
           }
