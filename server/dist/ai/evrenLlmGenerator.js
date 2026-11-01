@@ -5,6 +5,7 @@ exports.generateQuestionsWithEvrenGLM = generateQuestionsWithEvrenGLM;
 exports.generateDeterministicEvrenCandidates = generateDeterministicEvrenCandidates;
 const questionValidator_1 = require("./questionValidator");
 const supabaseClient_1 = require("../db/supabaseClient");
+const proceduralQuestionFactory_1 = require("./proceduralQuestionFactory");
 const CATEGORY_PROMPTS = {
     geography: 'Coğrafya, başkentler, dağlar, denizler, göller, harita bilgisi ve şehirler.',
     mathematics: 'Matematik, geometri, temel işlemler, mantıksal hesaplamalar ve sayılar.',
@@ -144,8 +145,8 @@ JSON FORMATI:
     if (apiKey && !apiKey.includes('placeholder')) {
         try {
             const controller = new AbortController();
-            // 30 second timeout for GLM 5.3
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
+            // Fast 6 second timeout so Telegram / Vercel never hangs
+            const timeoutId = setTimeout(() => controller.abort(), 6000);
             const endpoint = baseUrl.endsWith('/chat/completions') ? baseUrl : `${baseUrl}/chat/completions`;
             const res = await fetch(endpoint, {
                 method: 'POST',
@@ -159,7 +160,7 @@ JSON FORMATI:
                         { role: 'system', content: 'Düşünme zinciri uzatmadan doğrudan geçerli JSON array döndür.' },
                         { role: 'user', content: systemPrompt },
                     ],
-                    temperature: 0.85,
+                    temperature: 0.95,
                     max_tokens: 1500,
                 }),
                 signal: controller.signal,
@@ -216,11 +217,27 @@ JSON FORMATI:
         recentlyGeneratedSignatures.add(sig);
         return true;
     });
-    // If AI was slow/failed or returned fewer questions than requested, fill with diverse pool
+    // If AI was slow/failed or returned fewer questions than requested, fill with guaranteed unique candidates
     if (candidates.length < count) {
         const needed = count - candidates.length;
+        const allDbSignatures = new Set(db.getAllQuestions().map((q) => normalizeTextSignature(q.text)));
+        recentlyGeneratedSignatures.forEach((s) => allDbSignatures.add(s));
+        candidates.forEach((c) => allDbSignatures.add(normalizeTextSignature(c.text)));
+        // 1. Try static template candidates first WITHOUT repetitions
         const fallbackCandidates = generateDeterministicEvrenCandidates(categoryId, difficulty, needed, db);
-        candidates.push(...fallbackCandidates);
+        for (const fc of fallbackCandidates) {
+            const sig = normalizeTextSignature(fc.text);
+            if (!allDbSignatures.has(sig)) {
+                allDbSignatures.add(sig);
+                candidates.push(fc);
+            }
+        }
+        // 2. If still needed, fill with procedural generator
+        if (candidates.length < count) {
+            const remainingNeeded = count - candidates.length;
+            const procedural = (0, proceduralQuestionFactory_1.generateGuaranteedUniqueCandidates)(categoryId, difficulty, remainingNeeded, allDbSignatures);
+            candidates.push(...procedural);
+        }
     }
     const validQuestions = [];
     const errors = [];
@@ -1331,14 +1348,13 @@ function generateDeterministicEvrenCandidates(categoryId, difficulty, count, db)
     // Shuffle available templates so order is unpredictable
     const shuffledTemplates = [...availableTemplates].sort(() => Math.random() - 0.5);
     const results = [];
-    for (let i = 0; i < count; i++) {
-        const template = shuffledTemplates[i % shuffledTemplates.length];
+    // Take unique templates up to available without repeating within this batch
+    const maxFromTemplates = Math.min(count, shuffledTemplates.length);
+    for (let i = 0; i < maxFromTemplates; i++) {
+        const template = shuffledTemplates[i];
         const sig = normalizeTextSignature(template.text);
         recentlyGeneratedSignatures.add(sig);
-        // If requesting more questions than available or template is already in DB, add unique context marker
-        const isAlreadyInDb = existingSignatures.has(sig);
-        const isOverPool = count > shuffledTemplates.length || isAlreadyInDb;
-        const text = isOverPool ? `${template.text} (Seri #${Math.floor(100 + Math.random() * 900)})` : template.text;
+        existingSignatures.add(sig);
         // Shuffle the 4 options and determine new correctOptionId
         const correctAnswerText = template.options[0]; // First option in template is always the correct one
         const shuffledChoices = [...template.options].sort(() => Math.random() - 0.5);
@@ -1351,7 +1367,7 @@ function generateDeterministicEvrenCandidates(categoryId, difficulty, count, db)
         const correctOption = options.find((o) => o.text === correctAnswerText);
         const correctOptionId = correctOption ? correctOption.id : 'opt_a';
         results.push({
-            text,
+            text: template.text,
             subCategory: `${friendlyCategory} (${friendlyDiff})`,
             options,
             correctOptionId,
@@ -1359,5 +1375,15 @@ function generateDeterministicEvrenCandidates(categoryId, difficulty, count, db)
             sourceOrVerification: template.src,
         });
     }
+    // If more questions are needed than available templates, generate guaranteed unique candidates
+    if (results.length < count) {
+        const needed = count - results.length;
+        const procedural = (0, proceduralQuestionFactory_1.generateGuaranteedUniqueCandidates)(categoryId, difficulty, needed, existingSignatures);
+        for (const p of procedural) {
+            existingSignatures.add(normalizeTextSignature(p.text));
+            results.push(p);
+        }
+    }
+    return results;
     return results;
 }

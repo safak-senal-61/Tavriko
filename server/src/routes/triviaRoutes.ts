@@ -4,6 +4,7 @@ import { CategoryId, DifficultyLevel, calculateScore, ClientQuestion } from '@tr
 import { generateQuestionsWithEvrenGLM } from '../ai/evrenLlmGenerator';
 import { cacheService } from '../cache/redisClient';
 import { supabaseService } from '../db/supabaseClient';
+import { importQuestionsFromJson } from '../utils/questionImporter';
 
 const router = Router();
 
@@ -140,14 +141,15 @@ router.get('/admin/questions/review', (req: Request, res: Response): void => {
 router.post('/admin/questions/:id/approve', (req: Request, res: Response): void => {
   const id = String(req.params.id);
   const reviewedBy = req.body.reviewedBy || 'admin';
-  const approved = db.approveQuestion(id, reviewedBy);
+  const pool = req.body.targetPool || req.body.pool || 'standard';
+  const approved = db.approveQuestion(id, reviewedBy, pool);
 
   if (!approved) {
     res.status(404).json({ error: 'Soru bulunamadı' });
     return;
   }
   supabaseService.updateQuestionStatus(id, 'published', reviewedBy).catch(() => {});
-  res.json({ success: true, question: approved });
+  res.json({ success: true, question: approved, pool });
 });
 
 // Reject question
@@ -168,6 +170,23 @@ router.post('/admin/questions/:id/reject', (req: Request, res: Response): void =
 router.get('/admin/questions/stats', (req: Request, res: Response): void => {
   const stats = db.getReviewStats();
   res.json(stats);
+});
+
+// Import questions manually via JSON text or parsed array
+router.post('/admin/questions/import-json', (req: Request, res: Response): void => {
+  try {
+    const { json, questions, publishDirectly = true, addedBy = 'Web Admin' } = req.body;
+    const input = json || questions || req.body;
+    if (!input) {
+      res.status(400).json({ error: 'Geçerli bir JSON içeriği belirtilmelidir.' });
+      return;
+    }
+
+    const result = importQuestionsFromJson(input, db, addedBy, Boolean(publishDirectly));
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;

@@ -6,6 +6,7 @@ const evrenLlmGenerator_1 = require("../ai/evrenLlmGenerator");
 const supabaseClient_1 = require("../db/supabaseClient");
 const redisClient_1 = require("../cache/redisClient");
 const logger_1 = require("../utils/logger");
+const questionImporter_1 = require("../utils/questionImporter");
 exports.CATEGORIES_CONFIG = [
     { id: 'geography', name: 'Coğrafya', emoji: '🌍' },
     { id: 'mathematics', name: 'Matematik', emoji: '📐' },
@@ -230,6 +231,7 @@ class TelegramBotService {
             const info = await this.bot.telegram.getWebhookInfo();
             this.running = true;
             logger_1.logger.success('TELEGRAM', `Webhook güncellendi: ${url}`, info);
+            this.setupMenuButton().catch(() => { });
             return { success: true, message: `Telegram Webhook başarıyla kuruldu: ${url}`, info };
         }
         catch (err) {
@@ -249,6 +251,56 @@ class TelegramBotService {
         catch {
             return null;
         }
+    }
+    async setupMenuButton() {
+        if (!this.bot)
+            return;
+        try {
+            const publicBase = (process.env.PUBLIC_APP_URL || 'https://tavriko-app.vercel.app').replace(/\/+$/, '');
+            const webAppUrl = `${publicBase}/telegram-webapp`;
+            await this.bot.telegram.setChatMenuButton({
+                menuButton: {
+                    type: 'web_app',
+                    text: '🎮 Tavriko Aç',
+                    web_app: { url: webAppUrl },
+                },
+            });
+            console.log(`🤖 [TelegramBot] Web App menü butonu ayarlandı: ${webAppUrl}`);
+            logger_1.logger.info('TELEGRAM', `Web App menü butonu kuruldu: ${webAppUrl}`);
+        }
+        catch (err) {
+            console.warn('[TelegramBot] setChatMenuButton hatası:', err.message);
+        }
+    }
+    async handleJsonQuestionInput(fromId, rawJson, sourceName = 'Telegram Girişi') {
+        const importRes = (0, questionImporter_1.importQuestionsFromJson)(rawJson, this.db, `Telegram Admin (${fromId})`, true);
+        if (!importRes.success && importRes.importedCount === 0) {
+            return (`❌ *Soru İçe Aktarma Başarısız Oldu*\n\n` +
+                `• Kaynak: \`${sourceName}\`\n` +
+                `• Hata Detayları:\n` +
+                importRes.errors.map((e) => `  ⚠️ ${e}`).join('\n') +
+                `\n\n📌 *Doğru Format Örneği İçin:* \`/json_ornek\` komutunu kullanabilirsiniz.`);
+        }
+        const categorySummary = Object.entries(importRes.categoryBreakdown)
+            .map(([cat, cnt]) => `  • \`${cat}\`: *${cnt} soru*`)
+            .join('\n');
+        let msg = `🎉 *${importRes.importedCount} Adet Soru Başarıyla Havuza Eklendi!*\n\n` +
+            `📁 *Kaynak:* \`${sourceName}\`\n` +
+            `✅ *Eklenen:* ${importRes.importedCount} soru\n` +
+            `📋 *Toplam Okunan:* ${importRes.totalProcessed}\n` +
+            (importRes.duplicateCount > 0 ? `🔁 *Mükerrer (Atlandı):* ${importRes.duplicateCount}\n` : '') +
+            (importRes.errorCount > 0 ? `⚠️ *Hatalı Soru:* ${importRes.errorCount}\n` : '') +
+            `\n*Kategori Dağılımı:*\n${categorySummary}\n\n` +
+            `✨ Sorular doğrudan yayınlandı ve oyunda çözülmeye hazır!`;
+        if (importRes.errors.length > 0) {
+            msg += `\n\n⚠️ *Bazı Uyarılar:*\n` + importRes.errors.slice(0, 3).map((e) => `• ${e}`).join('\n');
+        }
+        logger_1.logger.success('TELEGRAM', `JSON Soru İçe Aktarma: ${importRes.importedCount} eklendi`, {
+            fromId,
+            sourceName,
+            importedCount: importRes.importedCount,
+        });
+        return msg;
     }
     async initBot(token) {
         if (this.isStarting) {
@@ -272,6 +324,7 @@ class TelegramBotService {
                     console.log(`🤖 [TelegramBot] Webhook başarıyla ayarlandı: ${webhookUrl}`);
                     logger_1.logger.success('TELEGRAM', `Webhook başarıyla kuruldu: ${webhookUrl}`);
                     this.running = true;
+                    this.setupMenuButton().catch(() => { });
                 }
                 catch (whErr) {
                     console.warn('[TelegramBot] setWebhook uyarısı:', whErr.message);
@@ -320,11 +373,13 @@ class TelegramBotService {
         return this.adminIds.has(String(userId));
     }
     getMainKeyboard() {
+        const webAppUrl = `${(process.env.PUBLIC_APP_URL || 'https://tavriko-app.vercel.app').replace(/\/+$/, '')}/telegram-webapp`;
         return telegraf_1.Markup.keyboard([
             ['✨ Yeni Soru Üret', '📅 Günlük Soru Üret'],
             ['⚔️ Özel Oda Soru Üret', '📊 Soru Havuzu'],
-            ['⏳ Onay Bekleyenler', '🏆 Pro Lig Sıralaması'],
-            ['🎮 Hızlı Oda Kur', '❓ Yardım & Komutlar'],
+            ['📥 JSON Soru Ekle', '⏳ Onay Bekleyenler'],
+            ['🏆 Pro Lig Sıralaması', '🎮 Hızlı Oda Kur'],
+            [telegraf_1.Markup.button.webApp('🎮 Tavriko WebApp Aç', webAppUrl), '❓ Yardım & Komutlar'],
         ]).resize();
     }
     getCategoryWizardKeyboard() {
@@ -422,7 +477,7 @@ class TelegramBotService {
         const cmd = parts[0].toLowerCase();
         logger_1.logger.info('TELEGRAM', `Telegram komutu yürütülüyor: "${cmd}" (Kullanıcı: ${userId})`);
         // Admin-only commands check
-        const adminOnlyCommands = ['/soru_uret', '/bekleyenler', '/gunluk_soru_uret', '/ozel_soru_uret'];
+        const adminOnlyCommands = ['/soru_uret', '/bekleyenler', '/gunluk_soru_uret', '/ozel_soru_uret', '/soru_ekle', '/json_ekle'];
         if (adminOnlyCommands.includes(cmd) && !this.isAdmin(userId)) {
             return {
                 authorized: false,
@@ -433,24 +488,76 @@ class TelegramBotService {
             case '/start':
             case '/yardim':
             case '/help': {
+                const publicBase = (process.env.PUBLIC_APP_URL || 'https://tavriko-app.vercel.app').replace(/\/+$/, '');
                 return {
                     authorized: true,
                     message: `👋 *Tavriko Bilgi Yarışması & Yönetim Botu*\n\n` +
                         `T.C. SSB EVREN platformundaki *GLM-5.3* yapay zekâ modeli ile güçlendirilen soru üretim, topluluk ve canlı maç altyapısına hoş geldiniz!\n\n` +
-                        `*🎯 Soru Üretimi ve Hedef Havuzlar:*\n` +
-                        `• \`/soru_uret [kategori] [zorluk] [adet]\` — Normal maçlar için soru üretir\n` +
+                        `*🎯 Soru Üretimi ve Manuel JSON Ekleme:*\n` +
+                        `• \`/soru_uret [kategori] [zorluk] [adet]\` — Normal maçlar için yapay zekâ sorusu üretir\n` +
                         `• \`/gunluk_soru_uret [zorluk] [adet]\` — Günlük Meydan Okuma havuzu için soru üretir\n` +
                         `• \`/ozel_soru_uret [zorluk] [adet]\` — Özel Oda / Arkadaş düelloları için eğlenceli sorular üretir\n` +
+                        `• \`/soru_ekle <json>\` — Manuel olarak 1 veya daha fazla soru ekler\n` +
+                        `• \`/json_ornek\` — Örnek JSON soru formatı şablonunu gösterir\n` +
                         `• \`/bekleyenler\` — Onay kuyruğundaki soruları inceler\n` +
                         `• \`/istatistik\` — Soru havuzu metrikleri ve kategori dağılımı\n` +
-                        `• \`/kategori\` — 16 yarışma kategorisini listeler\n` +
+                        `• \`/kategori\` — 18 yarışma kategorisini listeler\n` +
                         `• \`/ara_soru <kelime>\` — Soru havuzunda arama yapar\n\n` +
                         `*🎮 Oyuncu & Topluluk Komutları:*\n` +
                         `• \`/profil <kullanıcı_adı>\` — Seviye, LP, galibiyet oranı ve unvanı gösterir\n` +
                         `• \`/lig\` veya \`/siralama\` — Pro Lig canlı lider tablosundaki ilk 10 oyuncuyu listeler\n` +
                         `• \`/oda_kur [kategori]\` — Anında 6 haneli oda kodu ve doğrudan yarışma bağlantısı üretir\n` +
-                        `• \`/gunun_sorusu\` — Telegram içinden oylanabilen interaktif günün sorusunu gönderir\n\n` +
+                        `• \`/gunun_sorusu\` — Telegram içinden oylanabilen interaktif günün sorusunu gönderir\n` +
+                        `• \`/webapp\` — Telegram Web App yönetim portalı bağlantısını gönderir\n\n` +
+                        `📁 *Dosya ile Soru Yükleme:* Bu sohbete doğrudan bir \`.json\` soru dosyası yükleyerek anında havuza aktarabilirsiniz!\n` +
                         `👉 Aşağıdaki butonları kullanarak da adımları tek dokunuşla başlatabilirsiniz!`,
+                };
+            }
+            case '/json_ornek':
+            case '/format':
+            case '/ornek_json': {
+                return {
+                    authorized: true,
+                    message: `📥 *Tavriko JSON Formatı Rehberi ve Örnek Şablon*\n\n` +
+                        `Telegram'a doğrudan bir \`.json\` soru dosyası gönderebilir veya aşağıdaki şablona uygun JSON metnini sohbete yapıştırabilirsiniz:\n\n` +
+                        `\`\`\`json\n${questionImporter_1.SAMPLE_QUESTION_JSON}\n\`\`\`\n\n` +
+                        `*Alan Açıklamaları:*\n` +
+                        `• \`text\` (veya \`soru\`): Soru metni (Zorunlu)\n` +
+                        `• \`options\` (veya \`secenekler\`): 4 seçenek içeren dizi (Zorunlu)\n` +
+                        `• \`correctAnswerIndex\`: 0, 1, 2 veya 3 (veya \`dogruCevap\`: 'A', 'B', 'C', 'D' veya doğru şıkkın tam metni)\n` +
+                        `• \`categoryId\` (veya \`kategori\`): geography, history, science_tech, sports vb.\n` +
+                        `• \`difficulty\` (veya \`zorluk\`): easy, medium, hard, expert (veya kolay, orta, zor, uzman)\n` +
+                        `• \`explanation\` (veya \`aciklama\`): Doğru cevabın açıklaması\n` +
+                        `• \`targetPool\` (veya \`havuz\`): standard (Genel), daily_challenge (Günlük), custom_room (Özel Oda)\n\n` +
+                        `💡 *İpucu:* Tek bir soru eklemek için sadece bir JSON objesi \`{ ... }\` de gönderebilirsiniz!`,
+                };
+            }
+            case '/soru_ekle':
+            case '/json_ekle': {
+                const rawJson = parts.slice(1).join(' ').trim();
+                if (!rawJson) {
+                    return {
+                        authorized: true,
+                        message: `⚠️ Lütfen komutun yanına JSON formatında soru verisini ekleyin.\n` +
+                            `Örnek:\n\`/soru_ekle {"soru": "...", "secenekler": ["A", "B", "C", "D"], "dogruCevap": "A"}\`\n\n` +
+                            `Şablon görmek için: \`/json_ornek\``,
+                    };
+                }
+                const msg = await this.handleJsonQuestionInput(Number(userId), rawJson, 'Komut Girişi');
+                return {
+                    authorized: true,
+                    message: msg,
+                };
+            }
+            case '/webapp': {
+                const publicBase = (process.env.PUBLIC_APP_URL || 'https://tavriko-app.vercel.app').replace(/\/+$/, '');
+                const webAppUrl = `${publicBase}/telegram-webapp`;
+                return {
+                    authorized: true,
+                    message: `🎮 *Tavriko Web App Yönetim ve Oyun Portalı*\n\n` +
+                        `Tüm yönetim ve oyun araçlarına Telegram içinden doğrudan erişebilirsiniz:\n` +
+                        `• Bağlantı: ${webAppUrl}\n\n` +
+                        `Ayrıca mesaj yazma kutusunun yanındaki *[🎮 Tavriko Aç]* butonuna dokunarak da mini app'i açabilirsiniz.`,
                 };
             }
             case '/kategori': {
@@ -809,7 +916,42 @@ class TelegramBotService {
             const res = await this.handleCommand(ctx.from.id, '/start');
             await this.replySafe(ctx, res.message, this.getMainKeyboard());
         });
+        this.bot.hears('📥 JSON Soru Ekle', async (ctx) => {
+            const res = await this.handleCommand(ctx.from.id, '/json_ornek');
+            await this.replySafe(ctx, res.message, this.getMainKeyboard());
+        });
+        this.bot.hears('🎮 Tavriko WebApp Aç', async (ctx) => {
+            const res = await this.handleCommand(ctx.from.id, '/webapp');
+            await this.replySafe(ctx, res.message, this.getMainKeyboard());
+        });
+        // Otomatik JSON Tespit Edici: Kullanıcı doğrudan { ... } veya [ ... ] şeklinde JSON yapıştırırsa
+        this.bot.hears(/^\s*(\[|\{)/s, async (ctx) => {
+            if (!this.isAdmin(ctx.from.id))
+                return;
+            const text = ctx.message.text?.trim() || '';
+            if ((text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']'))) {
+                try {
+                    const resMsg = await this.handleJsonQuestionInput(ctx.from.id, text, 'Mesaj İçi JSON');
+                    await this.replySafe(ctx, resMsg, this.getMainKeyboard());
+                }
+                catch (err) {
+                    await ctx.reply(`⚠️ JSON işlenirken bir sorun oluştu: ${err.message}`);
+                }
+            }
+        });
         // 3. Özel Komut Dinleyicileri
+        this.bot.command(['json_ornek', 'format', 'ornek_json'], async (ctx) => {
+            const res = await this.handleCommand(ctx.from.id, '/json_ornek');
+            await this.replySafe(ctx, res.message);
+        });
+        this.bot.command(['soru_ekle', 'json_ekle'], async (ctx) => {
+            const res = await this.handleCommand(ctx.from.id, ctx.message.text.trim());
+            await this.replySafe(ctx, res.message);
+        });
+        this.bot.command('webapp', async (ctx) => {
+            const res = await this.handleCommand(ctx.from.id, '/webapp');
+            await this.replySafe(ctx, res.message);
+        });
         this.bot.command('soru_uret', async (ctx) => {
             const text = ctx.message.text.trim();
             const parts = text.split(/\s+/);
@@ -914,7 +1056,34 @@ class TelegramBotService {
                 }
             }
         });
-        // 4. Wizard & Inline Buton Etkileşimleri
+        // 4. Belge / Dosya Yükleme (.json dosya desteği)
+        this.bot.on('document', async (ctx) => {
+            if (!this.isAdmin(ctx.from.id)) {
+                return ctx.reply('⛔ Yetkiniz bulunmamaktadır.');
+            }
+            const doc = ctx.message.document;
+            const fileName = doc.file_name || 'sorular.json';
+            const isJsonExt = fileName.toLowerCase().endsWith('.json');
+            const isJsonMime = doc.mime_type?.includes('json');
+            if (!isJsonExt && !isJsonMime) {
+                return ctx.reply('ℹ️ Yalnızca .json uzantılı veya JSON formatındaki soru dosyaları desteklenmektedir.');
+            }
+            try {
+                await ctx.reply(`⏳ "${fileName}" dosyası okunuyor ve sorular doğrulanıyor...`);
+                const fileLink = await ctx.telegram.getFileLink(doc.file_id);
+                const response = await fetch(fileLink.href);
+                if (!response.ok) {
+                    throw new Error(`Dosya indirilemedi (HTTP ${response.status})`);
+                }
+                const fileContent = await response.text();
+                const resMsg = await this.handleJsonQuestionInput(ctx.from.id, fileContent, `Dosya: ${fileName}`);
+                await this.replySafe(ctx, resMsg, this.getMainKeyboard());
+            }
+            catch (err) {
+                await ctx.reply(`❌ Dosya işlenirken hata oluştu: ${err.message}`);
+            }
+        });
+        // 5. Wizard & Inline Buton Etkileşimleri
         this.bot.on('callback_query', async (ctx) => {
             const data = ctx.callbackQuery?.data;
             if (!data)

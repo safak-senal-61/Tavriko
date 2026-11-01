@@ -172,4 +172,33 @@ describe('Telegram Bot Management & Admin Approval Workflow', () => {
     expect(callbackRes.success).toBe(false);
     expect(callbackRes.message).toContain('yetkiniz bulunmamaktadır');
   });
+
+  it('shows JSON format guide via /json_ornek', async () => {
+    const res = await botService.handleCommand(ADMIN_ID, '/json_ornek');
+    expect(res.authorized).toBe(true);
+    expect(res.message).toContain('Tavriko JSON Formatı Rehberi');
+    expect(res.message).toContain('correctAnswerIndex');
+  });
+
+  it('imports manual questions via /soru_ekle with raw JSON', async () => {
+    const sampleQuestion = JSON.stringify({
+      soru: 'Test Sorusudur: Ankara hangi ülkenin başkentidir?',
+      secenekler: ['Türkiye', 'Almanya', 'Fransa', 'İtalya'],
+      dogruCevap: 'A',
+      kategori: 'geography',
+      zorluk: 'kolay',
+      aciklama: 'Ankara Türkiye Cumhuriyeti başkentidir.',
+      havuz: 'standard',
+    });
+
+    const res = await botService.handleCommand(ADMIN_ID, `/soru_ekle ${sampleQuestion}`);
+    expect(res.authorized).toBe(true);
+    expect(res.message).toContain('Başarıyla Havuza Eklendi');
+  });
+
+  it('provides webapp link via /webapp', async () => {
+    const res = await botService.handleCommand(ADMIN_ID, '/webapp');
+    expect(res.authorized).toBe(true);
+    expect(res.message).toContain('/telegram-webapp');
+  });
 });

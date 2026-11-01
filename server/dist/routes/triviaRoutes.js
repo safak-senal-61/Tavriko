@@ -6,6 +6,7 @@ const shared_1 = require("@trivia/shared");
 const evrenLlmGenerator_1 = require("../ai/evrenLlmGenerator");
 const redisClient_1 = require("../cache/redisClient");
 const supabaseClient_1 = require("../db/supabaseClient");
+const questionImporter_1 = require("../utils/questionImporter");
 const router = (0, express_1.Router)();
 // Public trivia categories
 router.get('/categories', (req, res) => {
@@ -120,13 +121,14 @@ router.get('/admin/questions/review', (req, res) => {
 router.post('/admin/questions/:id/approve', (req, res) => {
     const id = String(req.params.id);
     const reviewedBy = req.body.reviewedBy || 'admin';
-    const approved = prismaClient_1.db.approveQuestion(id, reviewedBy);
+    const pool = req.body.targetPool || req.body.pool || 'standard';
+    const approved = prismaClient_1.db.approveQuestion(id, reviewedBy, pool);
     if (!approved) {
         res.status(404).json({ error: 'Soru bulunamadı' });
         return;
     }
     supabaseClient_1.supabaseService.updateQuestionStatus(id, 'published', reviewedBy).catch(() => { });
-    res.json({ success: true, question: approved });
+    res.json({ success: true, question: approved, pool });
 });
 // Reject question
 router.post('/admin/questions/:id/reject', (req, res) => {
@@ -144,5 +146,21 @@ router.post('/admin/questions/:id/reject', (req, res) => {
 router.get('/admin/questions/stats', (req, res) => {
     const stats = prismaClient_1.db.getReviewStats();
     res.json(stats);
+});
+// Import questions manually via JSON text or parsed array
+router.post('/admin/questions/import-json', (req, res) => {
+    try {
+        const { json, questions, publishDirectly = true, addedBy = 'Web Admin' } = req.body;
+        const input = json || questions || req.body;
+        if (!input) {
+            res.status(400).json({ error: 'Geçerli bir JSON içeriği belirtilmelidir.' });
+            return;
+        }
+        const result = (0, questionImporter_1.importQuestionsFromJson)(input, prismaClient_1.db, addedBy, Boolean(publishDirectly));
+        res.json(result);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 exports.default = router;
