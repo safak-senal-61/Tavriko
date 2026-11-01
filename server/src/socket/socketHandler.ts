@@ -160,14 +160,48 @@ export function setupSocketHandlers(
     });
 
     socket.on(SOCKET_EVENTS.START_GAME, (data: { roomCode: string; playerId: string }) => {
+      const room = roomManager.getRoom(data.roomCode);
+      if (!room) {
+        socket.emit(SOCKET_EVENTS.ERROR, { message: 'Oda bulunamadı' });
+        return;
+      }
+      if (room.hostId !== data.playerId) {
+        socket.emit(SOCKET_EVENTS.ERROR, { message: 'Yalnızca oda sahibi oyunu başlatabilir!' });
+        return;
+      }
+      if (Object.keys(room.players).length < 2) {
+        socket.emit(SOCKET_EVENTS.ERROR, { message: 'Oyunu başlatmak için en az 2 oyuncu gereklidir!' });
+        return;
+      }
       const started = roomManager.startGame(data.roomCode, data.playerId);
       if (started) {
+        io.to(data.roomCode).emit(SOCKET_EVENTS.ROOM_STATE_SYNC, room);
+      } else {
+        socket.emit(SOCKET_EVENTS.ERROR, { message: 'Oyun başlatılamadı' });
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.KICK_PLAYER, (data: { roomCode: string; hostId: string; targetPlayerId: string }) => {
+      const result = roomManager.kickPlayer(data.roomCode, data.hostId, data.targetPlayerId);
+      if (result.success) {
         const room = roomManager.getRoom(data.roomCode);
         if (room) {
           io.to(data.roomCode).emit(SOCKET_EVENTS.ROOM_STATE_SYNC, room);
         }
       } else {
-        socket.emit(SOCKET_EVENTS.ERROR, { message: 'Oyun başlatılamadı' });
+        socket.emit(SOCKET_EVENTS.ERROR, { message: result.error || 'Oyuncu atılamadı' });
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.UPDATE_ROOM_SETTINGS, (data: { roomCode: string; hostId: string; settings: any }) => {
+      const result = roomManager.updateRoomSettings(data.roomCode, data.hostId, data.settings);
+      if (result.success) {
+        const room = roomManager.getRoom(data.roomCode);
+        if (room) {
+          io.to(data.roomCode).emit(SOCKET_EVENTS.ROOM_STATE_SYNC, room);
+        }
+      } else {
+        socket.emit(SOCKET_EVENTS.ERROR, { message: result.error || 'Ayarlar güncellenemedi' });
       }
     });
 

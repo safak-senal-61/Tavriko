@@ -138,15 +138,49 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
             }
         });
         socket.on(shared_1.SOCKET_EVENTS.START_GAME, (data) => {
+            const room = roomManager.getRoom(data.roomCode);
+            if (!room) {
+                socket.emit(shared_1.SOCKET_EVENTS.ERROR, { message: 'Oda bulunamadı' });
+                return;
+            }
+            if (room.hostId !== data.playerId) {
+                socket.emit(shared_1.SOCKET_EVENTS.ERROR, { message: 'Yalnızca oda sahibi oyunu başlatabilir!' });
+                return;
+            }
+            if (Object.keys(room.players).length < 2) {
+                socket.emit(shared_1.SOCKET_EVENTS.ERROR, { message: 'Oyunu başlatmak için en az 2 oyuncu gereklidir!' });
+                return;
+            }
             const started = roomManager.startGame(data.roomCode, data.playerId);
             if (started) {
+                io.to(data.roomCode).emit(shared_1.SOCKET_EVENTS.ROOM_STATE_SYNC, room);
+            }
+            else {
+                socket.emit(shared_1.SOCKET_EVENTS.ERROR, { message: 'Oyun başlatılamadı' });
+            }
+        });
+        socket.on(shared_1.SOCKET_EVENTS.KICK_PLAYER, (data) => {
+            const result = roomManager.kickPlayer(data.roomCode, data.hostId, data.targetPlayerId);
+            if (result.success) {
                 const room = roomManager.getRoom(data.roomCode);
                 if (room) {
                     io.to(data.roomCode).emit(shared_1.SOCKET_EVENTS.ROOM_STATE_SYNC, room);
                 }
             }
             else {
-                socket.emit(shared_1.SOCKET_EVENTS.ERROR, { message: 'Oyun başlatılamadı' });
+                socket.emit(shared_1.SOCKET_EVENTS.ERROR, { message: result.error || 'Oyuncu atılamadı' });
+            }
+        });
+        socket.on(shared_1.SOCKET_EVENTS.UPDATE_ROOM_SETTINGS, (data) => {
+            const result = roomManager.updateRoomSettings(data.roomCode, data.hostId, data.settings);
+            if (result.success) {
+                const room = roomManager.getRoom(data.roomCode);
+                if (room) {
+                    io.to(data.roomCode).emit(shared_1.SOCKET_EVENTS.ROOM_STATE_SYNC, room);
+                }
+            }
+            else {
+                socket.emit(shared_1.SOCKET_EVENTS.ERROR, { message: result.error || 'Ayarlar güncellenemedi' });
             }
         });
         socket.on(shared_1.SOCKET_EVENTS.SUBMIT_ANSWER, (data) => {

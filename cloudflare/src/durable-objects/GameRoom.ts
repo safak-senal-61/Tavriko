@@ -172,6 +172,11 @@ export class GameRoomDO extends DurableObject<Env> {
 
     // Initialize room if not already created
     if (!this.room) {
+      const qpMaxPlayers = parseInt(url.searchParams.get('maxPlayers') || '', 10);
+      const qpTotalRounds = parseInt(url.searchParams.get('totalRounds') || '', 10);
+      const qpQuestionTime = parseInt(url.searchParams.get('questionTimeSec') || '', 10);
+      const qpPenalty = url.searchParams.get('penaltyForWrong') === 'true';
+
       this.room = {
         code: rawRoomCode || 'TAV-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
         mode,
@@ -179,11 +184,11 @@ export class GameRoomDO extends DurableObject<Env> {
         status: 'lobby',
         category,
         difficulty,
-        maxPlayers: mode === 'duel' ? 2 : 8,
+        maxPlayers: qpMaxPlayers > 0 ? qpMaxPlayers : (mode === 'duel' ? 2 : 8),
         currentRound: 0,
-        totalRounds: 5,
-        questionTimeSec: 15,
-        penaltyForWrong: false,
+        totalRounds: qpTotalRounds > 0 ? qpTotalRounds : 5,
+        questionTimeSec: qpQuestionTime > 0 ? qpQuestionTime : 15,
+        penaltyForWrong: qpPenalty,
         players: {},
         scores: {},
       };
@@ -330,6 +335,14 @@ export class GameRoomDO extends DurableObject<Env> {
 
         case SOCKET_EVENTS.START_GAME:
           await this.handleStartGame(ws, playerId, envelope);
+          break;
+
+        case SOCKET_EVENTS.KICK_PLAYER:
+          await this.handleKickPlayer(ws, playerId, envelope);
+          break;
+
+        case SOCKET_EVENTS.UPDATE_ROOM_SETTINGS:
+          await this.handleUpdateRoomSettings(ws, playerId, envelope);
           break;
 
         case SOCKET_EVENTS.SUBMIT_ANSWER:
@@ -536,6 +549,46 @@ export class GameRoomDO extends DurableObject<Env> {
 
     // Set alarm for when countdown finishes
     await this.scheduleAlarm('countdown', countdownSec * 1000);
+  }
+
+  private async handleKickPlayer(ws: WebSocket, playerId: string, envelope: WsMessage): Promise<void> {
+    if (!this.room) return;
+    if (this.room.hostId !== playerId) {
+      ws.send(createWsError('Yalnızca oda kurucusu oyuncu atabilir', 'FORBIDDEN', envelope.requestId));
+      return;
+    }
+    const targetPlayerId = String(envelope.payload?.targetPlayerId || '');
+    if (!targetPlayerId || targetPlayerId === playerId) {
+      ws.send(createWsError('Geçersiz oyuncu seçimi', 'BAD_REQUEST', envelope.requestId));
+      return;
+    }
+    delete this.room.players[targetPlayerId];
+    delete this.room.scores[targetPlayerId];
+    await this.persist();
+    this.broadcastStateSync();
+  }
+
+  private async handleUpdateRoomSettings(ws: WebSocket, playerId: string, envelope: WsMessage): Promise<void> {
+    if (!this.room) return;
+    if (this.room.hostId !== playerId) {
+      ws.send(createWsError('Yalnızca oda kurucusu ayarları değiştirebilir', 'FORBIDDEN', envelope.requestId));
+      return;
+    }
+    if (this.room.status !== 'lobby') {
+      ws.send(createWsError('Oyun devam ederken ayar değiştirilemez', 'INVALID_STATE', envelope.requestId));
+      return;
+    }
+    const s = envelope.payload?.settings || {};
+    if (s.maxPlayers) this.room.maxPlayers = Number(s.maxPlayers);
+    if (s.totalRounds) this.room.totalRounds = Number(s.totalRounds);
+    if (s.questionTimeSec) this.room.questionTimeSec = Number(s.questionTimeSec);
+    if (s.difficulty) this.room.difficulty = s.difficulty;
+    if (s.category) this.room.category = s.category;
+    if (s.categories) this.room.categories = s.categories;
+    if (s.mixedCategories !== undefined) this.room.mixedCategories = !!s.mixedCategories;
+    if (s.penaltyForWrong !== undefined) this.room.penaltyForWrong = !!s.penaltyForWrong;
+    await this.persist();
+    this.broadcastStateSync();
   }
 
   private async beginQuestionRound(roundNum: number): Promise<void> {

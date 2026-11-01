@@ -82,10 +82,25 @@ export interface GameRoom {
     totalRounds: number;
     questionTimeSec: number;
     penaltyForWrong: boolean;
+    categories?: CategoryId[];
+    mixedCategories?: boolean;
+    privacy?: 'public' | 'private' | 'password';
+    password?: string;
     players: Record<string, Player>;
     currentQuestion?: Question;
     roundStartedAt?: number;
     scores: Record<string, number>;
+}
+export interface CustomRoomSettings {
+    maxPlayers: number;
+    totalRounds: number;
+    difficulty: DifficultyLevel | 'mixed';
+    questionTimeSec: number;
+    categories?: CategoryId[];
+    mixedCategories?: boolean;
+    penaltyForWrong?: boolean;
+    privacy?: 'public' | 'private';
+    password?: string;
 }
 export interface AnswerSubmission {
     roomCode: string;
@@ -116,6 +131,7 @@ export interface PlayerScoreSummary {
     streak: number;
     team?: 'red' | 'blue';
     isHost: boolean;
+    isBot?: boolean;
 }
 export interface PlayerResult {
     playerId: string;
@@ -140,11 +156,17 @@ export interface FinalMatchSummary {
         winner: 'red' | 'blue' | 'tie';
     };
 }
+export type ItemRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+export type ItemCategory = 'chest' | 'key' | 'booster' | 'cosmetic' | 'badge' | 'avatar' | 'frame' | 'name_effect' | 'background';
 export interface InventoryItem {
     id: string;
     name: string;
     desc: string;
     qty: number;
+    category?: ItemCategory;
+    rarity?: ItemRarity;
+    icon?: string;
+    equipped?: boolean;
 }
 export interface NotificationItem {
     id: string;
@@ -170,6 +192,8 @@ export interface UserProfile {
     friendCode?: string;
     level: number;
     xp: number;
+    seasonXp?: number;
+    hasPremiumPass?: boolean;
     coins: number;
     gems?: number;
     dailyStreak?: number;
@@ -183,8 +207,20 @@ export interface UserProfile {
     profileCompletionPct?: number;
     inventory?: InventoryItem[];
     claimedSeasonTiers?: number[];
+    claimedSeasonFreeTiers?: number[];
+    claimedSeasonPremiumTiers?: number[];
+    equippedFrame?: string;
+    equippedBadge?: string;
+    equippedNameEffect?: string;
+    equippedBackground?: string;
+    activeBoosterExpiresAt?: number;
     friendIds?: string[];
     notifications?: NotificationItem[];
+    eventProgress?: Record<string, {
+        progress: number;
+        completed: boolean;
+        claimed: boolean;
+    }>;
     stats: {
         totalMatches: number;
         wins: number;
@@ -216,18 +252,81 @@ export interface LevelProgress {
     totalXp: number;
 }
 /**
- * Fair, balanced RPG leveling formula:
- * Level 1: 0 - 300 XP (300 XP needed)
- * Level 2: 300 - 750 XP (450 XP needed)
- * Level 3: 750 - 1350 XP (600 XP needed)
- * Level 4: 1350 - 2100 XP (750 XP needed)
- * Level 5: 2100 - 3000 XP (900 XP needed)
- * Level 6: 3000 - 4050 XP (1050 XP needed)
- * Level 7: 4050 - 5250 XP (1200 XP needed)
- * Level 8: 5250 - 6600 XP (1350 XP needed)
- * Level L requires 300 + (L - 1) * 150 XP.
+ * Steep, balanced RPG leveling curve designed for longevity:
+ * - Level 1: 500 XP
+ * - Level 2: 800 XP
+ * - Level 3: 1,200 XP
+ * - Level 4: 1,700 XP
+ * - Level 5: 2,300 XP
+ * - Level 6..10: Progressive +1,200 XP per level (reach ~8,300 XP at Level 10)
+ * - Level 11..20: Noticeably harder, +2,200 XP per level (~30,000 XP per level at Level 20)
+ * - Level 21..30: Serious dedication, +5,000 XP per level (~80,000 XP at Level 30)
+ * - Level 31+: Veteran players only, +12,000 XP per level
  */
+export declare function getXpRequiredForLevel(level: number): number;
 export declare function calculateLevelFromXp(totalXp?: number): LevelProgress;
+export interface SeasonReward {
+    type: 'coin' | 'gem' | 'key' | 'chest' | 'booster' | 'frame' | 'badge' | 'name_effect' | 'background';
+    amount: number;
+    title: string;
+    itemId?: string;
+    rarity?: ItemRarity;
+}
+export interface SeasonTierItem {
+    tier: number;
+    requiredSeasonXp: number;
+    freeReward: SeasonReward;
+    premiumReward: SeasonReward;
+}
+export declare function generateSeason1Tiers(): SeasonTierItem[];
+export declare const SEASON_1_TIERS: SeasonTierItem[];
+export interface ShopProduct {
+    id: string;
+    name: string;
+    desc: string;
+    category: 'featured' | 'diamonds' | 'gold' | 'chests' | 'keys' | 'avatars' | 'frames' | 'badges' | 'name_effects' | 'boosters' | 'backgrounds';
+    price: number;
+    currency: 'coins' | 'gems' | 'try';
+    rarity: ItemRarity;
+    badge?: string;
+    bonusText?: string;
+    discountPct?: number;
+    grantItems?: {
+        id: string;
+        name: string;
+        desc: string;
+        qty: number;
+        category: ItemCategory;
+        rarity: ItemRarity;
+    }[];
+    grantCoins?: number;
+    grantGems?: number;
+    grantPremiumPass?: boolean;
+}
+export declare const SHOP_CATALOG: ShopProduct[];
+export interface GameEvent {
+    id: string;
+    type: 'daily' | 'weekly' | 'special';
+    title: string;
+    desc: string;
+    targetCount: number;
+    metric: 'matches_played' | 'correct_answers' | 'wins' | 'streak' | 'category_solved';
+    categoryFilter?: CategoryId;
+    rewardCoins: number;
+    rewardGems: number;
+    rewardXp: number;
+    rewardSeasonXp: number;
+    rewardItem?: {
+        id: string;
+        name: string;
+        desc: string;
+        qty: number;
+        category: ItemCategory;
+        rarity: ItemRarity;
+    };
+    endsInHours: number;
+}
+export declare const EVENT_DEFINITIONS: GameEvent[];
 export interface DailyChallengeConfig {
     dayNumber: number;
     totalQuestions: number;

@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { UserProfile } from '@trivia/shared';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Modal,
+} from 'react-native';
+import { UserProfile, SHOP_CATALOG, ShopProduct, ShopProductCategory } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
@@ -9,12 +17,12 @@ import {
   TavrikoTopBar,
   TavrikoSecondaryBottomNav,
   SecondaryNavTab,
-  Button3D,
   ChestIcon,
   CoinIcon,
   GemIcon,
 } from '../components/TavrikoIcons';
 import { PaymentItem } from './PaymentScreen';
+
 interface ShopScreenProps {
   user?: UserProfile;
   apiBaseUrl?: string;
@@ -25,7 +33,35 @@ interface ShopScreenProps {
   onProfile?: () => void;
   onOpenPayment?: (item: PaymentItem) => void;
 }
-const SHOP_TABS = ['Öne Çıkanlar', 'Elmas', 'Altın', 'Sandıklar'] as const;
+
+interface CategoryTabItem {
+  id: ShopProductCategory;
+  name: string;
+  icon: string;
+}
+
+const CATEGORY_TABS: CategoryTabItem[] = [
+  { id: 'featured', name: 'Öne Çıkanlar', icon: '🔥' },
+  { id: 'diamonds', name: 'Elmas', icon: '💎' },
+  { id: 'coins', name: 'Altın', icon: '🪙' },
+  { id: 'chests', name: 'Sandıklar', icon: '📦' },
+  { id: 'keys', name: 'Anahtarlar', icon: '🗝️' },
+  { id: 'avatars', name: 'Avatarlar', icon: '🎭' },
+  { id: 'frames', name: 'Çerçeveler', icon: '🖼️' },
+  { id: 'badges', name: 'Rozetler', icon: '🎖️' },
+  { id: 'name_effects', name: 'İsim Efekti', icon: '✨' },
+  { id: 'boosters', name: 'Güçlendirici', icon: '⚡' },
+  { id: 'backgrounds', name: 'Arka Plan', icon: '🌌' },
+];
+
+const RARITY_COLORS: Record<string, string> = {
+  common: '#A0A0A0',
+  rare: '#3B82F6',
+  epic: '#A855F7',
+  legendary: '#F59E0B',
+  mythic: '#EF4444',
+};
+
 export const ShopScreen: React.FC<ShopScreenProps> = ({
   user,
   apiBaseUrl,
@@ -36,82 +72,123 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   onProfile,
   onOpenPayment,
 }) => {
-  const [activeTab, setActiveTab] = useState<string>('Öne Çıkanlar');
+  const [activeTab, setActiveTab] = useState<ShopProductCategory>('featured');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
-  // In-Game Currency Purchase Handler with Strict Pre-flight Validation
-  const handleInGamePurchase = async (packId: 'coins_2000' | 'mega_chest') => {
-    setStatusMessage(null);
-    setIsError(false);
+  const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  const [confirmProduct, setConfirmProduct] = useState<ShopProduct | null>(null);
+
+  const filteredProducts = SHOP_CATALOG.filter((p) => p.category === activeTab);
+
+  const isProductOwned = (product: ShopProduct): boolean => {
+    if (!user) return false;
+    if (product.grantPremiumPass && user.hasPremiumPass) return true;
+    if (product.category === 'avatars' && user.inventory?.some((i) => i.id === product.id)) return true;
+    if (product.category === 'frames' && user.inventory?.some((i) => i.id === product.id)) return true;
+    if (product.category === 'badges' && user.inventory?.some((i) => i.id === product.id)) return true;
+    if (product.category === 'name_effects' && user.inventory?.some((i) => i.id === product.id)) return true;
+    if (product.category === 'backgrounds' && user.inventory?.some((i) => i.id === product.id)) return true;
+    return false;
+  };
+
+  const handleInitiatePurchase = (product: ShopProduct) => {
+    sound.playSound('tap');
     if (!user) {
       sound.playSound('wrong');
       setIsError(true);
-      setStatusMessage('İşlem yapmak için giriş yapmalısınız.');
+      setStatusMessage('Satın alma yapmak için giriş yapmalısınız.');
       return;
     }
-    // Strict Client-Side Balance Validation
-    if (packId === 'coins_2000') {
-      const requiredGems = 10;
-      const currentGems = user.gems ?? 0;
-      if (currentGems < requiredGems) {
-        sound.playSound('wrong');
-        sound.triggerHaptic('error');
-        setIsError(true);
-        setStatusMessage(
-          `⚠️ Yetersiz Bakiye! Bu paket için ${requiredGems} Elmas gerekli (Mevcut: ${currentGems}, Eksik: ${requiredGems - currentGems} Elmas).`
-        );
-        return;
-      }
-    } else if (packId === 'mega_chest') {
-      const requiredCoins = 400;
-      const currentCoins = user.coins ?? 0;
-      if (currentCoins < requiredCoins) {
-        sound.playSound('wrong');
-        sound.triggerHaptic('error');
-        setIsError(true);
-        setStatusMessage(
-          `⚠️ Yetersiz Bakiye! Bu sandık için ${requiredCoins} Altın gerekli (Mevcut: ${currentCoins}, Eksik: ${requiredCoins - currentCoins} Altın).`
-        );
-        return;
-      }
+
+    if (isProductOwned(product)) {
+      sound.playSound('wrong');
+      setIsError(true);
+      setStatusMessage('Bu eşyaya zaten sahipsiniz!');
+      return;
     }
+
+    if (product.currency === 'try') {
+      if (onOpenPayment) {
+        onOpenPayment({
+          id: product.id,
+          title: product.name,
+          priceText: `₺${product.price.toFixed(2)}`,
+          description: product.desc,
+        });
+      } else {
+        // Fallback simulated payment
+        setConfirmProduct(product);
+      }
+      return;
+    }
+
+    // Check currency balance
+    if (product.currency === 'coins' && (user.coins ?? 0) < product.price) {
+      sound.playSound('wrong');
+      sound.triggerHaptic('error');
+      setIsError(true);
+      setStatusMessage(`⚠️ Yetersiz Altın! ${product.price} Altın gerekli (Mevcut: ${user.coins ?? 0}).`);
+      return;
+    }
+
+    if (product.currency === 'gems' && (user.gems ?? 0) < product.price) {
+      sound.playSound('wrong');
+      sound.triggerHaptic('error');
+      setIsError(true);
+      setStatusMessage(`⚠️ Yetersiz Elmas! ${product.price} Elmas gerekli (Mevcut: ${user.gems ?? 0}).`);
+      return;
+    }
+
+    setConfirmProduct(product);
+  };
+
+  const handleConfirmPurchase = async () => {
+    if (!confirmProduct || !user) return;
+    const product = confirmProduct;
+    setPurchasingId(product.id);
+    setStatusMessage(null);
+    setIsError(false);
+
     const base = apiBaseUrl || DEFAULT_API_BASE;
     try {
-      sound.playSound('tap');
       const res = await fetch(`${base}/social/shop/purchase`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, packId }),
+        body: JSON.stringify({
+          userId: user.id,
+          productId: product.id,
+          paymentMethod: product.currency === 'gems' ? 'gems' : product.currency === 'coins' ? 'coins' : 'credit_card',
+        }),
       });
+
       const data = await res.json();
       if (!res.ok) {
         sound.playSound('wrong');
         sound.triggerHaptic('error');
         setIsError(true);
-        setStatusMessage(data.error || 'İşlem başarısız oldu.');
+        setStatusMessage(data.error || 'Satın alma başarısız oldu.');
+        setConfirmProduct(null);
+        setPurchasingId(null);
         return;
       }
+
       sound.playSound('reward');
       sound.triggerHaptic('success');
       setIsError(false);
+      setStatusMessage(data.message || `${product.name} başarıyla satın alındı!`);
       if (data.user && onUpdateUser) {
         onUpdateUser(data.user);
       }
-      setStatusMessage(data.message || 'Satın alma veritabanına kaydedildi!');
-    } catch {
+    } catch (err: any) {
       sound.playSound('wrong');
       setIsError(true);
-      setStatusMessage('Sunucu bağlantı hatası.');
+      setStatusMessage('Bağlantı hatası oluştu.');
+    } finally {
+      setPurchasingId(null);
+      setConfirmProduct(null);
     }
   };
-  // Real Money Purchases Redirect to High-Fidelity PaymentScreen
-  const handleOpenRealMoneyPayment = (item: PaymentItem) => {
-    sound.playSound('tap');
-    sound.triggerHaptic('light');
-    if (onOpenPayment) {
-      onOpenPayment(item);
-    }
-  };
+
   return (
     <TavrikoScreen>
       <TavrikoTopBar
@@ -126,181 +203,184 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>MAĞAZA</Text>
-        <Text style={styles.subtitle}>
-          Bakiye: {user?.coins ?? 0} Altın · {user?.gems ?? 0} Elmas (Canlı Veritabanı)
-        </Text>
+        {/* Header Hero */}
+        <View style={styles.heroWrap}>
+          <Text style={styles.shopTitle}>TAVRİKO MAĞAZASI</Text>
+          <Text style={styles.shopSub}>Sandıklar, Özel Kozmetikler ve Avantajlı Paketler</Text>
+        </View>
+
+        {/* 11 Categories Horizontal Scroll */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryScroll}
+        >
+          {CATEGORY_TABS.map((cat) => {
+            const isActive = activeTab === cat.id;
+            return (
+              <TouchableOpacity
+                key={cat.id}
+                style={[styles.categoryTab, isActive && styles.categoryTabActive]}
+                onPress={() => {
+                  sound.playSound('tap');
+                  setActiveTab(cat.id);
+                  setStatusMessage(null);
+                }}
+              >
+                <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                <Text style={[styles.categoryName, isActive && styles.categoryNameActive]}>
+                  {cat.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* Status Toast / Banner */}
         {statusMessage && (
-          <View
-            style={[
-              styles.statusBanner,
-              isError ? styles.statusBannerError : styles.statusBannerSuccess,
-            ]}
-          >
-            <Text
-              style={[
-                styles.statusBannerText,
-                isError ? styles.statusBannerTextError : styles.statusBannerTextSuccess,
-              ]}
-            >
+          <View style={[styles.statusBanner, isError ? styles.statusError : styles.statusSuccess]}>
+            <Text style={[styles.statusText, isError ? styles.statusTextError : styles.statusTextSuccess]}>
               {statusMessage}
             </Text>
           </View>
         )}
-        {/* Filter Tabs */}
-        <View style={styles.tabsRow}>
-          {SHOP_TABS.map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tabPill, activeTab === tab && styles.tabPillActive]}
-              onPress={() => {
-                sound.playSound('tap');
-                setActiveTab(tab);
-              }}
-              activeOpacity={0.85}
-            >
-              <Text
+
+        {/* Product Grid */}
+        <View style={styles.productGrid}>
+          {filteredProducts.map((item) => {
+            const owned = isProductOwned(item);
+            const rarityColor = RARITY_COLORS[item.rarity || 'common'];
+            const isBuying = purchasingId === item.id;
+
+            return (
+              <View
+                key={item.id}
                 style={[
-                  styles.tabText,
-                  activeTab === tab && styles.tabTextActive,
+                  styles.productCard,
+                  { borderColor: rarityColor },
+                  owned && styles.productCardOwned,
                 ]}
               >
-                {tab}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        {/* Starter Pack Hero Card */}
-        {(activeTab === 'Öne Çıkanlar' || activeTab === 'Sandıklar') && (
-          <View style={styles.starterPackCard}>
-            <View style={{ flex: 1 }}>
-              <View style={styles.badgeRow}>
-                <View style={styles.specialBadge}>
-                  <Text style={styles.specialBadgeText}>ÖZEL FIRSAT</Text>
+                {/* Badges */}
+                <View style={styles.badgeRow}>
+                  {item.badge && (
+                    <View style={styles.promoBadge}>
+                      <Text style={styles.promoBadgeText}>{item.badge}</Text>
+                    </View>
+                  )}
+                  {item.bonusText && (
+                    <View style={styles.bonusBadge}>
+                      <Text style={styles.bonusBadgeText}>{item.bonusText}</Text>
+                    </View>
+                  )}
                 </View>
+
+                {/* Product Visual */}
+                <View style={styles.visualWrap}>
+                  {item.category === 'chests' || item.id.includes('chest') ? (
+                    <ChestIcon size={64} />
+                  ) : item.category === 'diamonds' ? (
+                    <GemIcon size={56} />
+                  ) : item.category === 'coins' ? (
+                    <CoinIcon size={56} />
+                  ) : (
+                    <View style={[styles.cosmeticCircle, { borderColor: rarityColor }]}>
+                      <Text style={styles.cosmeticIcon}>
+                        {item.category === 'avatars' ? '🎭' :
+                         item.category === 'frames' ? '🖼️' :
+                         item.category === 'badges' ? '🎖️' :
+                         item.category === 'name_effects' ? '✨' :
+                         item.category === 'keys' ? '🗝️' :
+                         item.category === 'boosters' ? '⚡' : '🌌'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Info */}
+                <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.productDesc} numberOfLines={2}>{item.desc}</Text>
+
+                {/* Price / Purchase Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.priceBtn,
+                    owned ? styles.priceBtnOwned : styles.priceBtnActive,
+                  ]}
+                  disabled={owned || isBuying}
+                  activeOpacity={0.8}
+                  onPress={() => handleInitiatePurchase(item)}
+                >
+                  {isBuying ? (
+                    <ActivityIndicator color="#12052C" size="small" />
+                  ) : owned ? (
+                    <Text style={styles.priceBtnTextOwned}>SAHİPSİN</Text>
+                  ) : (
+                    <View style={styles.priceContentRow}>
+                      {item.currency === 'coins' && <CoinIcon size={16} />}
+                      {item.currency === 'gems' && <GemIcon size={16} />}
+                      <Text style={styles.priceBtnText}>
+                        {item.currency === 'try' ? `₺${item.price.toFixed(2)}` : item.price}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
               </View>
-              <Text style={styles.starterTitle}>BAŞLANGIÇ PAKETİ</Text>
-              <Text style={styles.starterSub}>
-                Sandık + 1.000 Altın + 50 Elmas + 2x XP İksiri
-              </Text>
-              <Button3D
-                title="₺39,99 SATIN AL"
-                variant="gold"
-                onPress={() =>
-                  handleOpenRealMoneyPayment({
-                    id: 'starter_pack',
-                    title: 'Başlangıç Paketi',
-                    subtitle: 'Sandık + 1.000 Altın + 50 Elmas + 2x XP İksiri',
-                    price: '₺39,99',
-                    priceNumeric: 39.99,
-                    iconType: 'pack',
-                  })
-                }
-                style={{ alignSelf: 'flex-start', minHeight: 44, paddingHorizontal: 20 }}
-                textStyle={{ fontSize: 14 }}
-              />
-            </View>
-            <View style={styles.starterIconWrap}>
-              <ChestIcon size={58} />
-              <View style={styles.gemOverlay}>
-                <GemIcon size={32} />
-              </View>
-            </View>
-          </View>
-        )}
-        {/* 2x2 Interactive Shop Items Grid */}
-        <View style={styles.gridWrap}>
-          {/* 100 Elmas */}
-          {(activeTab === 'Öne Çıkanlar' || activeTab === 'Elmas') && (
-            <View style={styles.shopItemCard}>
-              <View style={styles.iconCircle}>
-                <GemIcon size={46} />
-              </View>
-              <Text style={styles.itemAmount}>+100 Elmas</Text>
-              <Text style={styles.itemDetailText}>Hemen teslim</Text>
-              <Button3D
-                title="₺19,99"
-                variant="purple"
-                onPress={() =>
-                  handleOpenRealMoneyPayment({
-                    id: 'gems_100',
-                    title: '100 Elmas',
-                    subtitle: 'Hemen teslim · 100 Elmas',
-                    price: '₺19,99',
-                    priceNumeric: 19.99,
-                    iconType: 'gem',
-                  })
-                }
-                style={styles.buyBtn}
-                textStyle={{ fontSize: 15 }}
-              />
-            </View>
-          )}
-          {/* 500 Elmas (Matches Ödeme@1x.png with bonus) */}
-          {(activeTab === 'Öne Çıkanlar' || activeTab === 'Elmas') && (
-            <View style={styles.shopItemCard}>
-              <View style={styles.bonusTag}>
-                <Text style={styles.bonusTagText}>+50 BONUS</Text>
-              </View>
-              <View style={styles.iconCircle}>
-                <GemIcon size={46} />
-              </View>
-              <Text style={styles.itemAmount}>500 Elmas</Text>
-              <Text style={styles.itemDetailText}>+50 bonus elmas</Text>
-              <Button3D
-                title="₺89,99"
-                variant="mint"
-                onPress={() =>
-                  handleOpenRealMoneyPayment({
-                    id: 'gems_500',
-                    title: '500 Elmas',
-                    subtitle: '+50 bonus elmas',
-                    price: '₺89,99',
-                    priceNumeric: 89.99,
-                    iconType: 'gem',
-                  })
-                }
-                style={styles.buyBtn}
-                textStyle={{ fontSize: 15 }}
-              />
-            </View>
-          )}
-          {/* +2.000 Altın (Costs 10 Elmas) */}
-          {(activeTab === 'Öne Çıkanlar' || activeTab === 'Altın') && (
-            <View style={styles.shopItemCard}>
-              <View style={styles.iconCircle}>
-                <CoinIcon size={46} />
-              </View>
-              <Text style={styles.itemAmount}>+2.000 Altın</Text>
-              <Text style={styles.itemDetailText}>Oyun içi takas</Text>
-              <Button3D
-                title="10 Elmas"
-                variant="gold"
-                onPress={() => handleInGamePurchase('coins_2000')}
-                style={styles.buyBtn}
-                textStyle={{ fontSize: 14 }}
-              />
-            </View>
-          )}
-          {/* Mega Sandık (Costs 400 Altın) */}
-          {(activeTab === 'Öne Çıkanlar' || activeTab === 'Sandıklar') && (
-            <View style={styles.shopItemCard}>
-              <View style={styles.iconCircle}>
-                <ChestIcon size={46} />
-              </View>
-              <Text style={styles.itemAmount}>Mega Sandık</Text>
-              <Text style={styles.itemDetailText}>Özel ödüller</Text>
-              <Button3D
-                title="400 Altın"
-                variant="mint"
-                onPress={() => handleInGamePurchase('mega_chest')}
-                style={styles.buyBtn}
-                textStyle={{ fontSize: 14 }}
-              />
-            </View>
-          )}
+            );
+          })}
         </View>
       </ScrollView>
+
+      {/* Confirmation Modal */}
+      <Modal
+        visible={!!confirmProduct}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmProduct(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>SATIN ALMAYI ONAYLA</Text>
+            {confirmProduct && (
+              <>
+                <Text style={styles.modalProduct}>{confirmProduct.name}</Text>
+                <Text style={styles.modalDesc}>{confirmProduct.desc}</Text>
+                <View style={styles.modalCostRow}>
+                  <Text style={styles.modalCostLabel}>Fiyat:</Text>
+                  <View style={styles.priceContentRow}>
+                    {confirmProduct.currency === 'coins' && <CoinIcon size={18} />}
+                    {confirmProduct.currency === 'gems' && <GemIcon size={18} />}
+                    <Text style={styles.modalCostVal}>
+                      {confirmProduct.currency === 'try'
+                        ? `₺${confirmProduct.price.toFixed(2)}`
+                        : `${confirmProduct.price} ${confirmProduct.currency === 'coins' ? 'Altın' : 'Elmas'}`}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.modalButtonsRow}>
+                  <TouchableOpacity
+                    style={styles.modalCancelBtn}
+                    onPress={() => {
+                      sound.playSound('tap');
+                      setConfirmProduct(null);
+                    }}
+                  >
+                    <Text style={styles.modalCancelText}>İptal</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalConfirmBtn}
+                    onPress={handleConfirmPurchase}
+                  >
+                    <Text style={styles.modalConfirmText}>Satın Al</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       <TavrikoSecondaryBottomNav
         activeTab="shop"
         onSelectTab={(tab) => onNavigateSecondary && onNavigateSecondary(tab)}
@@ -308,188 +388,281 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     </TavrikoScreen>
   );
 };
+
 const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 110,
+    paddingHorizontal: 12,
   },
-  title: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 34,
-    color: '#FFFFFF',
-    textAlign: 'center',
+  heroWrap: {
+    alignItems: 'center',
     marginTop: 8,
-  },
-  subtitle: {
-    color: '#D9CDF5',
-    fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
-    textAlign: 'center',
     marginBottom: 12,
   },
-  statusBanner: {
-    borderWidth: 1.5,
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginBottom: 14,
+  shopTitle: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 28,
+    color: '#FFC43D',
+    letterSpacing: 1.5,
   },
-  statusBannerSuccess: {
-    backgroundColor: 'rgba(90, 219, 181, 0.18)',
-    borderColor: '#5ADBB5',
-  },
-  statusBannerError: {
-    backgroundColor: 'rgba(255, 75, 75, 0.20)',
-    borderColor: '#FF4B4B',
-  },
-  statusBannerText: {
-    fontSize: 12.5,
-    fontFamily: THEME.fonts.extraBold,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  statusBannerTextSuccess: {
-    color: '#5ADBB5',
-  },
-  statusBannerTextError: {
-    color: '#FF6B6B',
-  },
-  tabsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  tabPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.10)',
-  },
-  tabPillActive: {
-    backgroundColor: '#6B3CFF',
-    borderColor: '#FFC43D',
-  },
-  tabText: {
+  shopSub: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 12,
     color: '#D9CDF5',
-    fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
+    marginTop: 2,
+    textAlign: 'center',
   },
-  tabTextActive: {
-    color: '#FFFFFF',
+  categoryScroll: {
+    paddingVertical: 8,
+    gap: 8,
   },
-  starterPackCard: {
+  categoryTab: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 18,
-    borderRadius: 24,
-    backgroundColor: '#7A3FE0',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 196, 61, 0.55)',
-    gap: 12,
-    marginBottom: 16,
-    shadowColor: '#6B3CFF',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 8,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    marginBottom: 6,
-  },
-  specialBadge: {
-    backgroundColor: '#FFC43D',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  specialBadgeText: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 10,
-    color: '#2A1558',
-  },
-  starterTitle: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 22,
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  starterSub: {
-    color: '#F0E6FF',
-    fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
-    marginTop: 4,
-    marginBottom: 14,
-    lineHeight: 16,
-  },
-  starterIconWrap: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gemOverlay: {
-    position: 'absolute',
-    bottom: -6,
-    right: -6,
-  },
-  gridWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 14,
-  },
-  shopItemCard: {
-    width: '48%',
-    backgroundColor: 'rgba(28, 12, 62, 0.88)',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: 'rgba(10, 4, 24, 0.6)',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 22,
-    paddingVertical: 16,
-    paddingHorizontal: 10,
+  },
+  categoryTabActive: {
+    backgroundColor: 'rgba(107, 60, 255, 0.45)',
+    borderColor: '#FFC43D',
+  },
+  categoryIcon: {
+    fontSize: 14,
+  },
+  categoryName: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  categoryNameActive: {
+    color: '#FFFFFF',
+  },
+  statusBanner: {
+    borderRadius: 14,
+    padding: 12,
+    marginVertical: 10,
+    borderWidth: 1.5,
+  },
+  statusSuccess: {
+    backgroundColor: 'rgba(111, 227, 193, 0.15)',
+    borderColor: '#6FE3C1',
+  },
+  statusError: {
+    backgroundColor: 'rgba(255, 92, 119, 0.15)',
+    borderColor: '#FF5C77',
+  },
+  statusText: {
+    fontSize: 13,
+    fontFamily: THEME.fonts.bold,
+    textAlign: 'center',
+  },
+  statusTextSuccess: {
+    color: '#6FE3C1',
+  },
+  statusTextError: {
+    color: '#FF8598',
+  },
+  productGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 8,
+  },
+  productCard: {
+    width: '48.5%',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 18,
+    borderWidth: 1.5,
+    padding: 12,
     alignItems: 'center',
     position: 'relative',
   },
-  bonusTag: {
+  productCardOwned: {
+    opacity: 0.65,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+  },
+  badgeRow: {
     position: 'absolute',
     top: 8,
+    left: 8,
     right: 8,
-    backgroundColor: '#5ADBB5',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 2,
+  },
+  promoBadge: {
+    backgroundColor: '#FF5C77',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: 8,
   },
-  bonusTagText: {
-    fontFamily: THEME.fonts.display,
+  promoBadgeText: {
+    color: '#FFFFFF',
     fontSize: 9,
-    color: '#0D382B',
+    fontFamily: THEME.fonts.extraBold,
   },
-  iconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    alignItems: 'center',
+  bonusBadge: {
+    backgroundColor: '#6FE3C1',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  bonusBadgeText: {
+    color: '#12052C',
+    fontSize: 9,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  visualWrap: {
+    height: 72,
     justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 14,
     marginBottom: 8,
   },
-  itemAmount: {
+  cosmeticCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    backgroundColor: 'rgba(10, 4, 24, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cosmeticIcon: {
+    fontSize: 28,
+  },
+  productName: {
     fontFamily: THEME.fonts.display,
-    fontSize: 18,
+    fontSize: 14,
     color: '#FFFFFF',
     textAlign: 'center',
   },
-  itemDetailText: {
-    color: '#A799C7',
-    fontSize: 11,
+  productDesc: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 10,
+    color: '#D9CDF5',
+    textAlign: 'center',
+    marginVertical: 4,
+    minHeight: 28,
+  },
+  priceBtn: {
+    width: '100%',
+    paddingVertical: 9,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  priceBtnActive: {
+    backgroundColor: '#FFC43D',
+  },
+  priceBtnOwned: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  priceContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  priceBtnText: {
     fontFamily: THEME.fonts.extraBold,
-    marginTop: 2,
+    fontSize: 13,
+    color: '#12052C',
+  },
+  priceBtnTextOwned: {
+    fontFamily: THEME.fonts.bold,
+    fontSize: 11,
+    color: '#D9CDF5',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(6, 2, 16, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalSheet: {
+    backgroundColor: '#1E0E3E',
+    borderWidth: 1.5,
+    borderColor: '#FFC43D',
+    borderRadius: 24,
+    padding: 20,
+    width: '100%',
+    maxWidth: 380,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 18,
+    color: '#FFC43D',
     marginBottom: 12,
   },
-  buyBtn: {
+  modalProduct: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 20,
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  modalDesc: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 12,
+    color: '#D9CDF5',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  modalCostRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(10, 4, 24, 0.6)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    marginBottom: 20,
+  },
+  modalCostLabel: {
+    color: '#D9CDF5',
+    fontSize: 13,
+    fontFamily: THEME.fonts.bold,
+  },
+  modalCostVal: {
+    color: '#FFC43D',
+    fontSize: 16,
+    fontFamily: THEME.fonts.display,
+  },
+  modalButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
     width: '100%',
-    minHeight: 42,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: THEME.fonts.bold,
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: '#FFC43D',
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    color: '#12052C',
+    fontSize: 14,
+    fontFamily: THEME.fonts.extraBold,
   },
 });

@@ -24,6 +24,7 @@ import {
   GameRoom,
   UserProfile,
   DailyChallengeConfig,
+  CustomRoomSettings,
 } from '@trivia/shared';
 // Screens
 import { SplashScreen } from '../screens/SplashScreen';
@@ -242,6 +243,13 @@ export const RootNavigator: React.FC = () => {
 
     const unsubSync = socketService.onStateSync((room: GameRoom) => {
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
+      // If user was in room but removed from room.players, user was kicked!
+      if (user && activeRoomRef.current && !room.players[user.id] && currentScreenRef.current === 'lobby') {
+        sound.playSound('wrong');
+        sound.triggerHaptic('error');
+        handleExitCurrentGame();
+        return;
+      }
       setActiveRoom(room);
       activeRoomRef.current = room;
       if (
@@ -531,12 +539,12 @@ export const RootNavigator: React.FC = () => {
   const handleCancelMatchmaking = () => {
     handleExitCurrentGame();
   };
-  const handleCreateCustomRoom = () => {
+  const handleCreateCustomRoom = (settings?: CustomRoomSettings) => {
     requireAuth(() => {
       if (!user) return;
       isGameActiveRef.current = true;
-      const mockCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-      socketService.joinRoom(mockCode, user.id, user.displayName, user.avatarUrl);
+      const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      socketService.createRoom(roomCode, user.id, user.displayName, user.avatarUrl, settings);
       navigateTo('lobby');
     }, 'Özel Oda');
   };
@@ -1228,6 +1236,9 @@ export const RootNavigator: React.FC = () => {
             onBack={handleExitCurrentGame}
             onToggleReady={handleToggleReady}
             onStartGame={handleStartGame}
+            onKickPlayer={(targetPlayerId) => {
+              socketService.kickPlayer(activeRoom.code, user.id, targetPlayerId);
+            }}
           />
         )}
         {currentScreen === 'quiz_arena' && currentQuestion && (

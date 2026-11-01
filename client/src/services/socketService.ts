@@ -5,6 +5,7 @@ import {
   RoundResult,
   FinalMatchSummary,
   GameRoom,
+  CustomRoomSettings,
 } from '@trivia/shared';
 import { getRealtimeWsUrl } from '../config';
 
@@ -224,6 +225,66 @@ export class SocketService {
   }
 
   // --- Public Domain Actions ---
+  public createRoom(
+    roomCode: string,
+    playerId: string,
+    displayName: string,
+    avatarUrl?: string,
+    settings?: CustomRoomSettings
+  ): void {
+    const cleanCode = roomCode.trim().toUpperCase();
+    this.lastSessionContext = {
+      roomCode: cleanCode,
+      playerId,
+      displayName,
+      avatarUrl,
+      isMatchmaking: false,
+    };
+
+    const queryParts = [
+      `roomCode=${cleanCode}`,
+      `playerId=${encodeURIComponent(playerId)}`,
+      `displayName=${encodeURIComponent(displayName)}`,
+      `avatarUrl=${encodeURIComponent(avatarUrl || 'av1')}`,
+      `isHost=true`,
+    ];
+    if (settings) {
+      if (settings.maxPlayers) queryParts.push(`maxPlayers=${settings.maxPlayers}`);
+      if (settings.totalRounds) queryParts.push(`totalRounds=${settings.totalRounds}`);
+      if (settings.questionTimeSec) queryParts.push(`questionTimeSec=${settings.questionTimeSec}`);
+      if (settings.penaltyForWrong !== undefined) queryParts.push(`penaltyForWrong=${settings.penaltyForWrong}`);
+      if (settings.difficulty) queryParts.push(`difficulty=${settings.difficulty}`);
+      if (settings.categories && settings.categories.length > 0) queryParts.push(`category=${settings.categories[0]}`);
+    }
+
+    const targetUrl = getRealtimeWsUrl(`/ws/room/${cleanCode}?${queryParts.join('&')}`);
+
+    this.connect(targetUrl);
+    this.sendEnvelope(SOCKET_EVENTS.CREATE_ROOM, {
+      roomCode: cleanCode,
+      playerId,
+      displayName,
+      avatarUrl,
+      settings,
+    });
+  }
+
+  public kickPlayer(roomCode: string, hostId: string, targetPlayerId: string): void {
+    this.sendEnvelope(SOCKET_EVENTS.KICK_PLAYER, {
+      roomCode: roomCode.trim().toUpperCase(),
+      hostId,
+      targetPlayerId,
+    });
+  }
+
+  public updateRoomSettings(roomCode: string, hostId: string, settings: Partial<CustomRoomSettings>): void {
+    this.sendEnvelope(SOCKET_EVENTS.UPDATE_ROOM_SETTINGS, {
+      roomCode: roomCode.trim().toUpperCase(),
+      hostId,
+      settings,
+    });
+  }
+
   public joinRoom(roomCode: string, playerId: string, displayName: string, avatarUrl?: string): void {
     const cleanCode = roomCode.trim().toUpperCase();
     this.lastSessionContext = {

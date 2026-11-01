@@ -303,6 +303,15 @@ class PrismaService {
             friendCode: u.friendCode,
             dailyStreak: u.dailyStreak,
             claimedSeasonTiers: Array.isArray(u.claimedSeasonTiers) ? u.claimedSeasonTiers : [1],
+            seasonXp: u.seasonXp ?? 0,
+            hasPremiumPass: !!u.hasPremiumPass,
+            claimedSeasonFreeTiers: Array.isArray(u.claimedSeasonFreeTiers) ? u.claimedSeasonFreeTiers : [],
+            claimedSeasonPremiumTiers: Array.isArray(u.claimedSeasonPremiumTiers) ? u.claimedSeasonPremiumTiers : [],
+            equippedFrame: u.equippedFrame ?? undefined,
+            equippedBadge: u.equippedBadge ?? undefined,
+            equippedNameEffect: u.equippedNameEffect ?? undefined,
+            equippedBackground: u.equippedBackground ?? undefined,
+            eventProgress: u.eventProgress || {},
             friendIds: Array.isArray(u.friendIds) ? u.friendIds : [],
             categoryMastery: u.categoryMastery || {},
             stats: {
@@ -429,6 +438,15 @@ class PrismaService {
                         avgResponseTimeMs: args.create.avgResponseTimeMs ?? 0,
                         categoryMastery: (args.create.categoryMastery ?? {}),
                         claimedSeasonTiers: (args.create.claimedSeasonTiers ?? [1]),
+                        seasonXp: args.create.seasonXp ?? 0,
+                        hasPremiumPass: args.create.hasPremiumPass ?? false,
+                        claimedSeasonFreeTiers: (args.create.claimedSeasonFreeTiers ?? []),
+                        claimedSeasonPremiumTiers: (args.create.claimedSeasonPremiumTiers ?? []),
+                        equippedFrame: args.create.equippedFrame ?? null,
+                        equippedBadge: args.create.equippedBadge ?? null,
+                        equippedNameEffect: args.create.equippedNameEffect ?? null,
+                        equippedBackground: args.create.equippedBackground ?? null,
+                        eventProgress: (args.create.eventProgress ?? {}),
                         friendIds: (args.create.friendIds ?? []),
                         createdAt: args.create.createdAt ?? now,
                         updatedAt: args.create.updatedAt ?? now,
@@ -1080,6 +1098,15 @@ class PrismaService {
                 avgResponseTimeMs: 0,
                 categoryMastery: {},
                 claimedSeasonTiers: [1],
+                seasonXp: 0,
+                hasPremiumPass: false,
+                claimedSeasonFreeTiers: [],
+                claimedSeasonPremiumTiers: [],
+                equippedFrame: null,
+                equippedBadge: null,
+                equippedNameEffect: null,
+                equippedBackground: null,
+                eventProgress: {},
                 friendIds: [],
                 createdAt: now,
                 updatedAt: now,
@@ -1177,6 +1204,15 @@ class PrismaService {
                     avgResponseTimeMs: 0,
                     categoryMastery: {},
                     claimedSeasonTiers: [1],
+                    seasonXp: 0,
+                    hasPremiumPass: false,
+                    claimedSeasonFreeTiers: [],
+                    claimedSeasonPremiumTiers: [],
+                    equippedFrame: null,
+                    equippedBadge: null,
+                    equippedNameEffect: null,
+                    equippedBackground: null,
+                    eventProgress: {},
                     friendIds: [],
                     createdAt: now,
                     updatedAt: now,
@@ -1284,8 +1320,13 @@ class PrismaService {
         const record = this.users.get(userId);
         if (!record)
             return null;
-        record.xp += delta.xpEarned;
+        // Balanced RPG XP curve: Cap single match XP to prevent rapid leveling
+        const cappedXp = Math.min(delta.xpEarned, delta.won ? 80 : 30);
+        record.xp += cappedXp;
         record.coins += delta.coinsEarned;
+        // Season 1 Pass XP progression
+        const seasonXpGain = delta.won ? 60 : 25;
+        record.seasonXp = (record.seasonXp || 0) + seasonXpGain;
         const progress = (0, shared_1.calculateLevelFromXp)(record.xp);
         record.level = progress.level;
         record.rankTitle = progress.rankTitle;
@@ -1296,6 +1337,55 @@ class PrismaService {
         record.stats.totalAnswers += delta.totalAnswers;
         if (delta.bestStreak > record.stats.bestStreak) {
             record.stats.bestStreak = delta.bestStreak;
+        }
+        // Automatically update live event progress
+        if (!record.eventProgress)
+            record.eventProgress = {};
+        const ev = record.eventProgress;
+        ev['daily_5_matches'] = {
+            progress: (ev['daily_5_matches']?.progress || 0) + 1,
+            completed: (ev['daily_5_matches']?.progress || 0) + 1 >= 5,
+            claimed: !!ev['daily_5_matches']?.claimed,
+        };
+        ev['daily_10_correct'] = {
+            progress: (ev['daily_10_correct']?.progress || 0) + delta.correctAnswers,
+            completed: (ev['daily_10_correct']?.progress || 0) + delta.correctAnswers >= 10,
+            claimed: !!ev['daily_10_correct']?.claimed,
+        };
+        if (delta.won) {
+            ev['daily_3_wins'] = {
+                progress: (ev['daily_3_wins']?.progress || 0) + 1,
+                completed: (ev['daily_3_wins']?.progress || 0) + 1 >= 3,
+                claimed: !!ev['daily_3_wins']?.claimed,
+            };
+            ev['special_treasure_hunt'] = {
+                progress: (ev['special_treasure_hunt']?.progress || 0) + 1,
+                completed: (ev['special_treasure_hunt']?.progress || 0) + 1 >= 10,
+                claimed: !!ev['special_treasure_hunt']?.claimed,
+            };
+            ev['weekly_20_wins'] = {
+                progress: (ev['weekly_20_wins']?.progress || 0) + 1,
+                completed: (ev['weekly_20_wins']?.progress || 0) + 1 >= 20,
+                claimed: !!ev['weekly_20_wins']?.claimed,
+            };
+        }
+        ev['weekly_league_cup'] = {
+            progress: (ev['weekly_league_cup']?.progress || 0) + 1,
+            completed: (ev['weekly_league_cup']?.progress || 0) + 1 >= 15,
+            claimed: !!ev['weekly_league_cup']?.claimed,
+        };
+        ev['weekly_100_correct'] = {
+            progress: (ev['weekly_100_correct']?.progress || 0) + delta.correctAnswers,
+            completed: (ev['weekly_100_correct']?.progress || 0) + delta.correctAnswers >= 100,
+            claimed: !!ev['weekly_100_correct']?.claimed,
+        };
+        ev['special_weekend_cup'] = {
+            progress: (ev['special_weekend_cup']?.progress || 0) + 1,
+            completed: (ev['special_weekend_cup']?.progress || 0) + 1 >= 25,
+            claimed: !!ev['special_weekend_cup']?.claimed,
+        };
+        if (delta.bestStreak >= 5) {
+            ev['daily_streak_5'] = { progress: 5, completed: true, claimed: !!ev['daily_streak_5']?.claimed };
         }
         this.users.set(userId, record);
         if (!record.isGuest) {
@@ -1590,17 +1680,7 @@ class PrismaService {
         };
     }
     defaultInventory() {
-        return [
-            { id: 'chest', name: 'Ahşap Sandık', desc: '1 altın anahtar ile açılır', qty: 2 },
-            { id: 'key', name: 'Altın Anahtar', desc: 'Sandıkların kilidini açar', qty: 3 },
-            { id: 'bolt', name: 'Hız Güçlendirici', desc: '+%25 hız bonusu verir', qty: 2 },
-            { id: 'crown', name: 'Kraliyet Tacı', desc: 'Özel profil çerçevesi', qty: 1 },
-            { id: 'heart', name: 'Ekstra Can', desc: 'Yanlış cevapta seriyi korur', qty: 4 },
-            { id: 'gift', name: 'Gizemli Kutu', desc: 'Rastgele altın ödülü içerir', qty: 1 },
-            { id: 'gem', name: 'Elmas Kesesi', desc: 'Açıldığında +10 elmas verir', qty: 2 },
-            { id: 'coin', name: 'Altın Kesesi', desc: 'Açıldığında +100 altın verir', qty: 3 },
-            { id: 'flame', name: 'Seri Kalkanı', desc: 'Günlük serini 1 gün korur', qty: 2 },
-        ];
+        return [];
     }
     defaultNotifications(displayName) {
         return [
@@ -1886,7 +1966,7 @@ class PrismaService {
         }
         return { user: this.toProfile(record), rewardText };
     }
-    async claimSeasonTier(userId, tier) {
+    async claimSeasonTier(userId, tier, track = 'free') {
         let record = this.users.get(userId);
         if (!record) {
             try {
@@ -1902,19 +1982,245 @@ class PrismaService {
         }
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
-        if (!record.claimedSeasonTiers)
-            record.claimedSeasonTiers = [1];
-        const currentLevel = (0, shared_1.calculateLevelFromXp)(record.xp || 0).level;
-        if (tier > currentLevel) {
-            throw new Error(`Bu seviye henüz kilitli! ${tier}. kademeyi açmak için Seviye ${tier} olmalısın (Şu anki Seviyen: ${currentLevel}).`);
+        if (tier < 1 || tier > 50) {
+            throw new Error('Geçersiz sezon aşaması (1-50 arası olmalıdır).');
         }
-        if (record.claimedSeasonTiers.includes(tier)) {
-            throw new Error('Bu kademe ödülü zaten hesabınıza tanımlandı.');
+        const tierData = shared_1.SEASON_1_TIERS.find((t) => t.tier === tier);
+        if (!tierData)
+            throw new Error(`${tier}. aşama verisi bulunamadı.`);
+        const userSeasonXp = record.seasonXp || 0;
+        if (userSeasonXp < tierData.requiredSeasonXp) {
+            const missing = tierData.requiredSeasonXp - userSeasonXp;
+            throw new Error(`Bu kademe kilitli! Açmak için ${tierData.requiredSeasonXp} Sezon XP gerekli (Mevcut: ${userSeasonXp}, Eksik: ${missing} Sezon XP).`);
         }
-        record.claimedSeasonTiers.push(tier);
-        record.coins += tier * 150;
-        record.gems = (record.gems || 0) + tier * 10;
-        record.xp += tier * 200;
+        if (!record.claimedSeasonFreeTiers)
+            record.claimedSeasonFreeTiers = [];
+        if (!record.claimedSeasonPremiumTiers)
+            record.claimedSeasonPremiumTiers = [];
+        if (track === 'premium') {
+            if (!record.hasPremiumPass) {
+                throw new Error('Bu ödülü almak için Sezon 1 Premium Pass sahibi olmalısınız!');
+            }
+            if (record.claimedSeasonPremiumTiers.includes(tier)) {
+                throw new Error('Bu Premium kademe ödülü zaten hesabınıza tanımlandı.');
+            }
+        }
+        else {
+            if (record.claimedSeasonFreeTiers.includes(tier)) {
+                throw new Error('Bu Ücretsiz kademe ödülü zaten hesabınıza tanımlandı.');
+            }
+        }
+        const reward = track === 'premium' ? tierData.premiumReward : tierData.freeReward;
+        // Grant reward to user account/inventory
+        if (reward.type === 'coin') {
+            record.coins += reward.amount;
+        }
+        else if (reward.type === 'gem') {
+            record.gems = (record.gems || 0) + reward.amount;
+        }
+        else {
+            if (!record.inventory)
+                record.inventory = [];
+            const itemId = reward.itemId || `${reward.type}_${tier}`;
+            const existing = record.inventory.find((i) => i.id === itemId);
+            if (existing) {
+                existing.qty += reward.amount;
+            }
+            else {
+                record.inventory.push({
+                    id: itemId,
+                    name: reward.title,
+                    desc: `Sezon 1 Kademe ${tier} ${track === 'premium' ? 'Premium' : 'Ücretsiz'} Ödülü`,
+                    qty: reward.amount,
+                    category: reward.type,
+                    rarity: reward.rarity || 'rare',
+                });
+            }
+            if (reward.type === 'frame' && !record.equippedFrame)
+                record.equippedFrame = itemId;
+            if (reward.type === 'badge' && !record.equippedBadge)
+                record.equippedBadge = itemId;
+            if (reward.type === 'name_effect' && !record.equippedNameEffect)
+                record.equippedNameEffect = itemId;
+            if (reward.type === 'background' && !record.equippedBackground)
+                record.equippedBackground = itemId;
+        }
+        if (track === 'premium') {
+            record.claimedSeasonPremiumTiers.push(tier);
+        }
+        else {
+            record.claimedSeasonFreeTiers.push(tier);
+        }
+        this.users.set(userId, record);
+        if (!record.isGuest) {
+            this.savePersistedUsers();
+            this.syncUserToPrisma(record).catch(() => { });
+        }
+        return { user: this.toProfile(record), reward };
+    }
+    async buyPremiumPass(userId) {
+        const record = this.users.get(userId);
+        if (!record)
+            throw new Error('Kullanıcı bulunamadı.');
+        if (record.hasPremiumPass) {
+            throw new Error('Zaten Sezon 1 Premium Pass sahibisiniz!');
+        }
+        const costGems = 250;
+        if ((record.gems || 0) < costGems) {
+            throw new Error(`Yetersiz Elmas! Premium Pass için ${costGems} Elmas gerekli (Mevcut: ${record.gems || 0} Elmas).`);
+        }
+        record.gems = (record.gems || 0) - costGems;
+        record.hasPremiumPass = true;
+        this.users.set(userId, record);
+        if (!record.isGuest) {
+            this.savePersistedUsers();
+            this.syncUserToPrisma(record).catch(() => { });
+        }
+        return this.toProfile(record);
+    }
+    async purchaseShopProduct(userId, productId, paymentMethod = 'coins') {
+        const record = this.users.get(userId);
+        if (!record)
+            throw new Error('Kullanıcı bulunamadı.');
+        const product = shared_1.SHOP_CATALOG.find((p) => p.id === productId);
+        if (!product)
+            throw new Error('Ürün mağazada bulunamadı.');
+        if (product.currency === 'coins') {
+            if (record.coins < product.price) {
+                throw new Error(`Yetersiz Altın! Bu ürün için ${product.price} Altın gereklidir (Mevcut: ${record.coins} Altın).`);
+            }
+            record.coins -= product.price;
+        }
+        else if (product.currency === 'gems') {
+            if ((record.gems || 0) < product.price) {
+                throw new Error(`Yetersiz Elmas! Bu ürün için ${product.price} Elmas gereklidir (Mevcut: ${record.gems || 0} Elmas).`);
+            }
+            record.gems = (record.gems || 0) - product.price;
+        }
+        if (product.grantPremiumPass) {
+            record.hasPremiumPass = true;
+        }
+        if (product.grantCoins) {
+            record.coins += product.grantCoins;
+        }
+        if (product.grantGems) {
+            record.gems = (record.gems || 0) + product.grantGems;
+        }
+        if (product.grantItems) {
+            if (!record.inventory)
+                record.inventory = [];
+            for (const item of product.grantItems) {
+                const existing = record.inventory.find((i) => i.id === item.id);
+                if (existing) {
+                    existing.qty += item.qty;
+                }
+                else {
+                    record.inventory.push({
+                        id: item.id,
+                        name: item.name,
+                        desc: item.desc,
+                        qty: item.qty,
+                        category: item.category,
+                        rarity: item.rarity,
+                    });
+                }
+            }
+        }
+        this.users.set(userId, record);
+        if (!record.isGuest) {
+            this.savePersistedUsers();
+            this.syncUserToPrisma(record).catch(() => { });
+        }
+        return {
+            user: this.toProfile(record),
+            message: `${product.name} başarıyla satın alındı ve hesabınıza tanımlandı!`,
+        };
+    }
+    async openChest(userId, chestId, keyId) {
+        const record = this.users.get(userId);
+        if (!record)
+            throw new Error('Kullanıcı bulunamadı.');
+        if (!record.inventory)
+            record.inventory = [];
+        const chestItem = record.inventory.find((i) => i.id === chestId);
+        if (!chestItem || chestItem.qty <= 0) {
+            throw new Error('Açılacak sandık envanterinizde bulunamadı.');
+        }
+        let requiredKeyId = 'key_silver';
+        let chestRarity = 'common';
+        if (chestId.includes('silver')) {
+            requiredKeyId = 'key_silver';
+            chestRarity = 'rare';
+        }
+        else if (chestId.includes('gold')) {
+            requiredKeyId = 'key_gold';
+            chestRarity = 'epic';
+        }
+        else if (chestId.includes('legendary') || chestId.includes('diamond')) {
+            requiredKeyId = 'key_diamond';
+            chestRarity = 'mythic';
+        }
+        const actualKeyId = keyId || requiredKeyId;
+        const keyItem = record.inventory.find((i) => i.id === actualKeyId || i.id === 'key_master');
+        if (!keyItem || keyItem.qty <= 0) {
+            throw new Error(`Bu sandığı açmak için ${requiredKeyId.replace('key_', '').toUpperCase()} Anahtar gereklidir!`);
+        }
+        // Atomically consume key & chest
+        chestItem.qty -= 1;
+        keyItem.qty -= 1;
+        record.inventory = record.inventory.filter((i) => i.qty > 0);
+        let coins = 0;
+        let gems = 0;
+        let xp = 0;
+        let bonusItem;
+        if (chestId.includes('legendary')) {
+            coins = Math.floor(4000 + Math.random() * 6000);
+            gems = Math.floor(100 + Math.random() * 200);
+            xp = Math.floor(800 + Math.random() * 800);
+            bonusItem = {
+                id: 'frame_flame',
+                name: 'Alev Çerçevesi',
+                desc: 'Mitolojik profil çerçevesi',
+                qty: 1,
+                category: 'frame',
+                rarity: 'mythic',
+            };
+        }
+        else if (chestId.includes('gold')) {
+            coins = Math.floor(1500 + Math.random() * 2500);
+            gems = Math.floor(40 + Math.random() * 60);
+            xp = Math.floor(350 + Math.random() * 350);
+            bonusItem = {
+                id: 'booster_xp_2x_1h',
+                name: '2x XP (1 Saat)',
+                desc: '1 saat boyunca iki kat XP',
+                qty: 1,
+                category: 'booster',
+                rarity: 'rare',
+            };
+        }
+        else if (chestId.includes('silver')) {
+            coins = Math.floor(600 + Math.random() * 900);
+            gems = Math.floor(15 + Math.random() * 25);
+            xp = Math.floor(150 + Math.random() * 200);
+        }
+        else {
+            coins = Math.floor(250 + Math.random() * 350);
+            gems = Math.floor(5 + Math.random() * 10);
+            xp = Math.floor(80 + Math.random() * 100);
+        }
+        record.coins += coins;
+        record.gems = (record.gems || 0) + gems;
+        record.xp += xp;
+        if (bonusItem) {
+            const existing = record.inventory.find((i) => i.id === bonusItem.id);
+            if (existing) {
+                existing.qty += bonusItem.qty;
+            }
+            else {
+                record.inventory.push(bonusItem);
+            }
+        }
         const prog = (0, shared_1.calculateLevelFromXp)(record.xp);
         record.level = prog.level;
         record.rankTitle = prog.rankTitle;
@@ -1923,7 +2229,78 @@ class PrismaService {
             this.savePersistedUsers();
             this.syncUserToPrisma(record).catch(() => { });
         }
-        return this.toProfile(record);
+        const rewardText = `🎉 Sandık açıldı: +${coins} Altın, +${gems} Elmas ve +${xp} XP kazandınız!${bonusItem ? ` Bonus: ${bonusItem.name}!` : ''}`;
+        return {
+            user: this.toProfile(record),
+            reward: {
+                coins,
+                gems,
+                xp,
+                rarity: chestRarity,
+                rewardText,
+                item: bonusItem,
+            },
+        };
+    }
+    getUserEvents(userId) {
+        const record = this.users.get(userId);
+        const progressMap = record?.eventProgress || {};
+        const events = shared_1.EVENT_DEFINITIONS.map((ev) => {
+            const state = progressMap[ev.id] || { progress: 0, completed: false, claimed: false };
+            return {
+                ...ev,
+                currentCount: state.progress,
+                completed: state.progress >= ev.targetCount,
+                claimed: !!state.claimed,
+            };
+        });
+        return { events };
+    }
+    async claimEventReward(userId, eventId) {
+        const record = this.users.get(userId);
+        if (!record)
+            throw new Error('Kullanıcı bulunamadı.');
+        const event = shared_1.EVENT_DEFINITIONS.find((e) => e.id === eventId);
+        if (!event)
+            throw new Error('Etkinlik bulunamadı.');
+        if (!record.eventProgress)
+            record.eventProgress = {};
+        const state = record.eventProgress[eventId] || { progress: 0, completed: false, claimed: false };
+        if (state.progress < event.targetCount) {
+            throw new Error(`Bu görev henüz tamamlanmadı (${state.progress} / ${event.targetCount}).`);
+        }
+        if (state.claimed) {
+            throw new Error('Bu etkinliğin ödülü zaten alındı.');
+        }
+        state.claimed = true;
+        record.eventProgress[eventId] = state;
+        record.coins += event.rewardCoins;
+        record.gems = (record.gems || 0) + event.rewardGems;
+        record.xp += event.rewardXp;
+        record.seasonXp = (record.seasonXp || 0) + event.rewardSeasonXp;
+        if (event.rewardItem) {
+            if (!record.inventory)
+                record.inventory = [];
+            const existing = record.inventory.find((i) => i.id === event.rewardItem.id);
+            if (existing) {
+                existing.qty += event.rewardItem.qty;
+            }
+            else {
+                record.inventory.push({ ...event.rewardItem });
+            }
+        }
+        const prog = (0, shared_1.calculateLevelFromXp)(record.xp);
+        record.level = prog.level;
+        record.rankTitle = prog.rankTitle;
+        this.users.set(userId, record);
+        if (!record.isGuest) {
+            this.savePersistedUsers();
+            this.syncUserToPrisma(record).catch(() => { });
+        }
+        return {
+            user: this.toProfile(record),
+            message: `Tebrikler! ${event.title} tamamlandı: +${event.rewardCoins} Altın, +${event.rewardGems} Elmas, +${event.rewardSeasonXp} Sezon XP kazandınız!`,
+        };
     }
     toProfile(record) {
         let filledCount = 2;
@@ -1942,7 +2319,7 @@ class PrismaService {
             record.friendCode = this.generateFriendCode(record.id);
         }
         if (!record.inventory) {
-            record.inventory = this.defaultInventory();
+            record.inventory = [];
         }
         if (!record.claimedSeasonTiers) {
             record.claimedSeasonTiers = [1];
@@ -1972,6 +2349,8 @@ class PrismaService {
             friendCode: record.friendCode,
             level: record.level,
             xp: record.xp,
+            seasonXp: record.seasonXp ?? 0,
+            hasPremiumPass: !!record.hasPremiumPass,
             coins: record.coins,
             gems: record.gems ?? 14,
             dailyStreak: record.dailyStreak ?? 1,
@@ -1985,6 +2364,13 @@ class PrismaService {
             profileCompletionPct,
             inventory: record.inventory,
             claimedSeasonTiers: record.claimedSeasonTiers,
+            claimedSeasonFreeTiers: record.claimedSeasonFreeTiers || [],
+            claimedSeasonPremiumTiers: record.claimedSeasonPremiumTiers || [],
+            equippedFrame: record.equippedFrame,
+            equippedBadge: record.equippedBadge,
+            equippedNameEffect: record.equippedNameEffect,
+            equippedBackground: record.equippedBackground,
+            eventProgress: record.eventProgress || {},
             friendIds: record.friendIds || [],
             notifications: record.notifications,
             stats: record.stats,

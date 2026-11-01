@@ -85,6 +85,15 @@ model User {
   avgResponseTimeMs    Int                 @default(0)
   categoryMastery      Json                @default("{}")
   claimedSeasonTiers   Json                @default("[1]")
+  seasonXp             Int                 @default(0)
+  hasPremiumPass       Boolean             @default(false)
+  claimedSeasonFreeTiers Json              @default("[]")
+  claimedSeasonPremiumTiers Json           @default("[]")
+  equippedFrame        String?
+  equippedBadge        String?
+  equippedNameEffect   String?
+  equippedBackground   String?
+  eventProgress        Json                @default("{}")
   friendIds            Json                @default("[]")
   inventoryItems       UserInventoryItem[]
   notifications        UserNotification[]

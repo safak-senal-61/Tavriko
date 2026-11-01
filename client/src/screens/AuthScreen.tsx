@@ -478,6 +478,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     setErrorMsg(null);
     setLoading(true);
     sendClientLog('INFO', 'Google ile Giriş Yap butonuna tıklandı');
+
+    const redirectUri = `${apiBaseUrl}/auth/google/callback`;
+
+    // On Web browsers: Direct full-page redirect! Zero popups, zero popup blockers, 100% reliable!
+    if (Platform.OS === 'web' || (typeof window !== 'undefined' && typeof window.location !== 'undefined')) {
+      const directOAuthUrl = `https://rjvbgofzsfescnfohzgu.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUri)}&prompt=select_account`;
+      sendClientLog('INFO', 'Web doğrudan Google OAuth sayfasına yönlendiriliyor (Popup engeli bypass edildi)...', { redirectUri, directOAuthUrl });
+      window.location.href = directOAuthUrl;
+      return;
+    }
+
     if (googlePollInterval.current) {
       clearInterval(googlePollInterval.current);
       googlePollInterval.current = null;
@@ -516,8 +527,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         WebBrowser.dismissAuthSession();
       } catch {}
       lastProcessedAuthUrl.current = null;
-      // Authentic LAN / Production callback allowed in Supabase
-      const redirectUri = `${apiBaseUrl}/auth/google/callback`;
       // 3. Start background polling if sessionId exists
       if (sessionId) {
         let attempts = 0;
@@ -569,13 +578,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       if (sessionId) {
         queryParams.sessionId = sessionId;
       }
-      // On web browser: Direct full-page redirect! Zero popups, zero popup blockers!
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        const directOAuthUrl = `https://rjvbgofzsfescnfohzgu.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUri)}&prompt=select_account${sessionId ? `&sessionId=${encodeURIComponent(sessionId)}` : ''}`;
-        sendClientLog('INFO', 'Web doğrudan Google OAuth sayfasına yönlendiriliyor (Popup engeli bypass edildi)...', { redirectUri, directOAuthUrl });
-        window.location.href = directOAuthUrl;
-        return;
-      }
 
       sendClientLog('INFO', 'Supabase OAuth URL isteniyor...', { redirectUri });
       const { data, error } = await clientSupabase.auth.signInWithOAuth({
@@ -623,6 +625,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       }
       clearTimeout(safetyTimer);
       sendClientLog('ERROR', 'handleRealGoogleSignIn genel hatası', { message: err.message });
+      // Graceful fallback for web if popup was blocked
+      if (typeof window !== 'undefined' && err?.message && err.message.toLowerCase().includes('popup')) {
+        const directOAuthUrl = `https://rjvbgofzsfescnfohzgu.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUri)}&prompt=select_account`;
+        window.location.href = directOAuthUrl;
+        return;
+      }
       sound.playSound('wrong');
       setErrorMsg(err.message || 'Google ile giriş yapılamadı.');
       setLoading(false);
@@ -1566,6 +1574,15 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 14,
     overflow: 'hidden',
+    ...(Platform.OS === 'web'
+      ? ({
+          outlineStyle: 'none',
+          outlineWidth: 0,
+          outlineColor: 'transparent',
+          outline: 'none',
+          boxShadow: 'none',
+        } as any)
+      : {}),
   },
   passwordInput: {
     flex: 1,

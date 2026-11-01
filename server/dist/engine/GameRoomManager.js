@@ -56,13 +56,17 @@ class GameRoomManager {
             mode: options.mode || 'friends_private',
             hostId: options.hostId,
             status: 'lobby',
-            category: options.category || 'general_culture',
+            category: options.category || (options.categories?.[0] || 'general_culture'),
             difficulty: options.difficulty || 'medium',
             maxPlayers: options.maxPlayers || 8,
             currentRound: 0,
             totalRounds: options.totalRounds || 10,
             questionTimeSec: options.questionTimeSec || 15,
             penaltyForWrong: options.penaltyForWrong ?? false,
+            categories: options.categories,
+            mixedCategories: options.mixedCategories,
+            privacy: options.privacy,
+            password: options.password,
             players: { [options.hostId]: host },
             scores: { [options.hostId]: 0 },
         };
@@ -116,6 +120,56 @@ class GameRoomManager {
             return false;
         room.players[playerId].isReady = !room.players[playerId].isReady;
         return true;
+    }
+    kickPlayer(code, hostId, targetPlayerId) {
+        const room = this.getRoom(code);
+        if (!room)
+            return { success: false, error: 'Oda bulunamadı' };
+        if (room.hostId !== hostId) {
+            return { success: false, error: 'Yalnızca oda sahibi oyuncu atabilir' };
+        }
+        if (room.status !== 'lobby') {
+            return { success: false, error: 'Oyun devam ederken oyuncu atılamaz' };
+        }
+        if (targetPlayerId === hostId) {
+            return { success: false, error: 'Oda sahibi kendini odadan atamaz' };
+        }
+        if (!room.players[targetPlayerId]) {
+            return { success: false, error: 'Oyuncu odada bulunamadı' };
+        }
+        delete room.players[targetPlayerId];
+        delete room.scores[targetPlayerId];
+        return { success: true };
+    }
+    updateRoomSettings(code, hostId, settings) {
+        const room = this.getRoom(code);
+        if (!room)
+            return { success: false, error: 'Oda bulunamadı' };
+        if (room.hostId !== hostId) {
+            return { success: false, error: 'Yalnızca oda sahibi ayarları değiştirebilir' };
+        }
+        if (room.status !== 'lobby') {
+            return { success: false, error: 'Oyun devam ederken ayarlar değiştirilemez' };
+        }
+        if (settings.maxPlayers && typeof settings.maxPlayers === 'number')
+            room.maxPlayers = settings.maxPlayers;
+        if (settings.totalRounds && typeof settings.totalRounds === 'number')
+            room.totalRounds = settings.totalRounds;
+        if (settings.questionTimeSec && typeof settings.questionTimeSec === 'number')
+            room.questionTimeSec = settings.questionTimeSec;
+        if (settings.difficulty)
+            room.difficulty = settings.difficulty;
+        if (settings.category)
+            room.category = settings.category;
+        if (settings.categories)
+            room.categories = settings.categories;
+        if (settings.mixedCategories !== undefined)
+            room.mixedCategories = !!settings.mixedCategories;
+        if (settings.penaltyForWrong !== undefined)
+            room.penaltyForWrong = !!settings.penaltyForWrong;
+        if (settings.privacy)
+            room.privacy = settings.privacy;
+        return { success: true };
     }
     startGame(code, requesterId) {
         const room = this.getRoom(code);

@@ -22,6 +22,18 @@
         height: 100%;
         flex: 1;
       }
+      /* Remove ugly default browser outline/focus rings on web inputs & views */
+      *:focus, *:focus-visible, input:focus, textarea:focus, select:focus, button:focus, div:focus {
+        outline: none !important;
+        outline-width: 0 !important;
+        outline-color: transparent !important;
+        box-shadow: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+      }
+      input, textarea, select, button {
+        outline: none !important;
+        box-shadow: none !important;
+      }
     </style>
   <link rel="icon" href="/favicon.ico"/></head>
 
@@ -30,6 +42,6 @@
     <noscript> You need to enable JavaScript to run this app. </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-ef5a7650e3b0281a8b25c8a8f8cb9534.js" defer></script>
+  <script src="/_expo/static/js/web/index-a881d28117aad3f981d042fca492f6f9.js" defer></script>
 </body>
 </html>
