@@ -283,6 +283,18 @@ export interface QuestionStats {
     rejected: number;
     byCategory?: Partial<Record<CategoryId, number>>;
     byDifficulty?: Partial<Record<DifficultyLevel, number>>;
+    matrix?: Record<string, Record<string, number>>;
+    pools?: Record<string, number>;
+    categoriesDetail?: Array<{
+        id: CategoryId;
+        name: string;
+        icon: string;
+        total: number;
+        easy: number;
+        medium: number;
+        hard: number;
+        expert: number;
+    }>;
 }
 export interface LevelProgress {
     level: number;

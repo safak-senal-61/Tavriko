@@ -1,6 +1,25 @@
 import { Question, CategoryId, DifficultyLevel, QuestionOption } from '@trivia/shared';
 import type { DatabaseAdapter } from '../db/prismaClient';
 
+export interface ImportQuestionDetail {
+  id: string;
+  text: string;
+  categoryId: CategoryId;
+  categoryName: string;
+  categoryIcon: string;
+  difficulty: DifficultyLevel;
+  difficultyName: string;
+  targetPool: string;
+  poolName: string;
+  options: string[];
+  correctAnswer: string;
+}
+
+export interface SkippedDuplicateDetail {
+  text: string;
+  matchedSignature: string;
+}
+
 export interface ImportResult {
   success: boolean;
   totalProcessed: number;
@@ -10,7 +29,46 @@ export interface ImportResult {
   questions: Question[];
   errors: string[];
   categoryBreakdown: Record<string, number>;
+  difficultyBreakdown: Record<string, number>;
+  poolBreakdown: Record<string, number>;
+  importedDetails: ImportQuestionDetail[];
+  skippedDuplicates: SkippedDuplicateDetail[];
 }
+
+export const CATEGORY_NAMES_TR: Record<CategoryId, { name: string; icon: string }> = {
+  science_tech: { name: 'Bilim & Teknoloji', icon: '🔬' },
+  history: { name: 'Tarih', icon: '🏛️' },
+  geography: { name: 'Coğrafya', icon: '🌍' },
+  sports: { name: 'Spor', icon: '🏀' },
+  cinema_tv: { name: 'Sinema & Dizi', icon: '🎬' },
+  music: { name: 'Müzik', icon: '🎵' },
+  art_culture: { name: 'Sanat & Kültür', icon: '🎨' },
+  nature_ecology: { name: 'Doğa & Ekoloji', icon: '🌿' },
+  biology: { name: 'Biyoloji', icon: '🧬' },
+  food_gastronomy: { name: 'Yemek & Mutfak', icon: '🍲' },
+  literature: { name: 'Edebiyat', icon: '📚' },
+  space_astronomy: { name: 'Uzay & Astronomi', icon: '🚀' },
+  animals_wildlife: { name: 'Hayvanlar Alemi', icon: '🐾' },
+  mathematics: { name: 'Matematik', icon: '➗' },
+  logic_puzzles: { name: 'Mantık & Zeka', icon: '🎮' },
+  language_vocab: { name: 'Dil & Kelime', icon: '💬' },
+  general_culture: { name: 'Genel Kültür', icon: '💡' },
+  physics_chemistry: { name: 'Fizik & Kimya', icon: '⚛️' },
+  mixed: { name: 'Karışık Kategori', icon: '🎲' },
+};
+
+export const DIFFICULTY_NAMES_TR: Record<DifficultyLevel, { name: string; color: string }> = {
+  easy: { name: 'Kolay', color: '#10B981' },
+  medium: { name: 'Orta', color: '#3B82F6' },
+  hard: { name: 'Zor', color: '#F59E0B' },
+  expert: { name: 'Uzman', color: '#EF4444' },
+};
+
+export const POOL_NAMES_TR: Record<string, string> = {
+  standard: '🏆 Normal Havuz',
+  daily_challenge: '📅 Günlük Meydan Okuma',
+  custom_room: '⚔️ Özel Oda',
+};
 
 const CATEGORY_MAP_TR: Record<string, CategoryId> = {
   cografya: 'geography',
@@ -206,6 +264,10 @@ export function importQuestionsFromJson(
     questions: [],
     errors: [],
     categoryBreakdown: {},
+    difficultyBreakdown: {},
+    poolBreakdown: {},
+    importedDetails: [],
+    skippedDuplicates: [],
   };
 
   let rawList: any[] = [];
@@ -244,6 +306,11 @@ export function importQuestionsFromJson(
     const textSig = text.toLowerCase().replace(/[^a-z0-9ğüşıöç]/gi, '').trim();
     if (existingSignatures.has(textSig)) {
       result.duplicateCount++;
+      result.skippedDuplicates.push({
+        text: text.slice(0, 90),
+        matchedSignature: textSig,
+      });
+      console.warn(`🔁 [questionImporter] ${indexLabel} mükerrer atlandı: "${text.slice(0, 35)}..."`);
       continue;
     }
 
@@ -348,6 +415,24 @@ export function importQuestionsFromJson(
       result.questions.push(created);
       existingSignatures.add(textSig);
       result.categoryBreakdown[categoryId] = (result.categoryBreakdown[categoryId] || 0) + 1;
+      result.difficultyBreakdown[difficulty] = (result.difficultyBreakdown[difficulty] || 0) + 1;
+      result.poolBreakdown[targetPool] = (result.poolBreakdown[targetPool] || 0) + 1;
+
+      const correctOpt = options.find((o) => o.id === correctOptionId);
+      result.importedDetails.push({
+        id: created.id,
+        text: created.text,
+        categoryId,
+        categoryName: CATEGORY_NAMES_TR[categoryId]?.name || categoryId,
+        categoryIcon: CATEGORY_NAMES_TR[categoryId]?.icon || '❓',
+        difficulty,
+        difficultyName: DIFFICULTY_NAMES_TR[difficulty]?.name || difficulty,
+        targetPool,
+        poolName: POOL_NAMES_TR[targetPool] || targetPool,
+        options: options.map((o) => o.text),
+        correctAnswer: correctOpt?.text || '',
+      });
+
       console.log(`✅ [questionImporter] ${indexLabel} eklendi: "${text.slice(0, 35)}..." [${categoryId} / ${difficulty} / ${targetPool}]`);
     } catch (saveErr: any) {
       result.errorCount++;

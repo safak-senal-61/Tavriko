@@ -1087,6 +1087,24 @@ export function createApp() {
           }
           .alert-box.success { background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #10B981; }
           .alert-box.error { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #EF4444; }
+          .tag-pill.diff-easy { background: rgba(16, 185, 129, 0.18); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3); }
+          .tag-pill.diff-medium { background: rgba(59, 130, 246, 0.18); color: #60A5FA; border: 1px solid rgba(59, 130, 246, 0.3); }
+          .tag-pill.diff-hard { background: rgba(245, 158, 11, 0.18); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.3); }
+          .tag-pill.diff-expert { background: rgba(239, 68, 68, 0.18); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+          .tag-pill.pool-std { background: rgba(98, 54, 255, 0.18); color: #C4B5FD; }
+          .tag-pill.pool-daily { background: rgba(245, 158, 11, 0.18); color: #FBBF24; }
+          .tag-pill.pool-custom { background: rgba(236, 72, 153, 0.18); color: #F472B6; }
+          .category-matrix-card { background: var(--surface-2); border-radius: var(--radius-md); padding: 12px; margin-bottom: 8px; border: 1px solid var(--border-color); cursor: pointer; transition: background 0.15s; }
+          .category-matrix-card:hover { background: rgba(98, 54, 255, 0.15); border-color: var(--accent-primary); }
+          .matrix-diff-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+          .matrix-diff-pills span { font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 700; }
+          .duplicate-box { background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-md); padding: 14px; margin-bottom: 14px; }
+          .duplicate-group-header { font-size: 13px; font-weight: 800; color: #F87171; margin-bottom: 8px; }
+          .duplicate-item { background: var(--surface-1); border-radius: 8px; padding: 10px; margin-top: 8px; border: 1px solid rgba(255,255,255,0.06); }
+          .browser-filters-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+          @media (max-width: 480px) {
+            .browser-filters-grid { grid-template-columns: 1fr; }
+          }
           .loader {
             display: inline-block;
             width: 18px;
@@ -1243,6 +1261,7 @@ export function createApp() {
               </button>
 
               <div class="alert-box" id="json-alert"></div>
+              <div id="json-result-details" style="display: none; margin-top: 16px;"></div>
             </div>
           </div>
 
@@ -1262,8 +1281,9 @@ export function createApp() {
             </div>
           </div>
 
-          <!-- TAB 4: HAVUZ & İSTATİSTİKLER -->
+          <!-- TAB 4: HAVUZ & SORU GEZGİNİ -->
           <div id="pane-stats" class="tab-pane">
+            <!-- 1. Genel İstatistik Sayaçları -->
             <div class="stats-grid" id="stats-summary-grid">
               <div class="stat-card">
                 <div class="stat-val" id="stat-total">-</div>
@@ -1283,10 +1303,101 @@ export function createApp() {
               </div>
             </div>
 
+            <!-- 2. Mükerrer (Aynı) Soru Tarama Aracı -->
+            <div class="card" style="border-color: rgba(245, 158, 11, 0.4);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div>
+                  <h2 class="card-title" style="margin: 0; color: var(--accent-gold);">🔍 Mükerrer (Aynı) Soru Tarayıcısı</h2>
+                  <p class="card-desc" style="margin: 0;">Havuzdaki aynı metne veya şıklara sahip mükerrer soruları denetleyin</p>
+                </div>
+                <button class="btn-secondary" onclick="scanDuplicates()" id="btn-scan-dup">⚡ Taramayı Başlat</button>
+              </div>
+              <div id="duplicate-results-container" style="display: none; margin-top: 12px;"></div>
+            </div>
+
+            <!-- 3. Kategori & Zorluk Analiz Matrisi -->
             <div class="card">
-              <h2 class="card-title">📊 Kategori Dağılımı</h2>
-              <p class="card-desc">Soru havuzunun 18 kategoriye göre güncel dağılımı</p>
-              <div id="categories-breakdown-list"></div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <div>
+                  <h2 class="card-title" style="margin: 0;">📊 Kategori & Zorluk Dağılımı</h2>
+                  <p class="card-desc" style="margin: 0;">16 geçerli branşın zorluk (Kolay, Orta, Zor, Uzman) oranları</p>
+                </div>
+                <button class="btn-secondary" onclick="loadStats()">🔄 Yenile</button>
+              </div>
+              <div id="categories-breakdown-list">
+                <div style="text-align: center; padding: 20px; color: var(--text-secondary);"><span class="loader"></span> Yükleniyor...</div>
+              </div>
+            </div>
+
+            <!-- 4. Canlı Soru Gezgini (Arama, Filtreleme ve İnceleme) -->
+            <div class="card">
+              <h2 class="card-title">🔎 Soru Gezgini & Arama</h2>
+              <p class="card-desc">Havuzdaki soruları doğrudan arayın, filtreleyin ve inceleyin.</p>
+
+              <div class="form-group">
+                <input type="text" id="browser-search" placeholder="🔍 Soru metni veya şık ara..." oninput="debounceBrowserSearch()" />
+              </div>
+
+              <div class="browser-filters-grid">
+                <div>
+                  <label class="form-label">Kategori</label>
+                  <select id="browser-category" onchange="loadQuestionsBrowser(0)">
+                    <option value="all">Tüm Kategoriler (Hepsi)</option>
+                    <option value="science_tech">🔬 Bilim & Teknoloji</option>
+                    <option value="history">🏛️ Tarih</option>
+                    <option value="geography">🌍 Coğrafya</option>
+                    <option value="sports">🏀 Spor</option>
+                    <option value="cinema_tv">🎬 Sinema & Dizi</option>
+                    <option value="music">🎵 Müzik</option>
+                    <option value="art_culture">🎨 Sanat & Kültür</option>
+                    <option value="nature_ecology">🌿 Doğa & Ekoloji</option>
+                    <option value="food_gastronomy">🍲 Yemek & Mutfak</option>
+                    <option value="literature">📚 Edebiyat</option>
+                    <option value="space_astronomy">🚀 Uzay & Astronomi</option>
+                    <option value="animals_wildlife">🐾 Hayvanlar Alemi</option>
+                    <option value="mathematics">➗ Matematik</option>
+                    <option value="logic_puzzles">🎮 Mantık & Zeka</option>
+                    <option value="general_culture">💡 Genel Kültür</option>
+                    <option value="physics_chemistry">⚛️ Fizik & Kimya</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label">Zorluk Seviyesi</label>
+                  <select id="browser-difficulty" onchange="loadQuestionsBrowser(0)">
+                    <option value="all">Tüm Zorluklar (Hepsi)</option>
+                    <option value="easy">🟢 Kolay (Easy)</option>
+                    <option value="medium">🔵 Orta (Medium)</option>
+                    <option value="hard">🟡 Zor (Hard)</option>
+                    <option value="expert">🔴 Uzman (Expert)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label">Hedef Havuz</label>
+                  <select id="browser-pool" onchange="loadQuestionsBrowser(0)">
+                    <option value="all">Tüm Havuzlar</option>
+                    <option value="standard">🏆 Normal Havuz</option>
+                    <option value="daily_challenge">📅 Günlük Meydan Okuma</option>
+                    <option value="custom_room">⚔️ Özel Oda</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label">Durum</label>
+                  <select id="browser-status" onchange="loadQuestionsBrowser(0)">
+                    <option value="published" selected>✅ Yayında</option>
+                    <option value="pending_review">⏳ Onay Bekleyen</option>
+                    <option value="rejected">❌ Reddedilen</option>
+                    <option value="all">Tüm Durumlar</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; margin: 12px 0 8px 0;">
+                <span id="browser-count-label" style="font-size: 12px; font-weight: 700; color: var(--text-secondary);">Sorular yükleniyor...</span>
+                <button class="btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="loadQuestionsBrowser(0)">🔄 Yenile</button>
+              </div>
+
+              <div id="browser-questions-list"></div>
+              <div id="browser-pagination" style="display: flex; justify-content: center; gap: 8px; margin-top: 14px;"></div>
             </div>
           </div>
 
@@ -1335,7 +1446,7 @@ export function createApp() {
           </button>
           <button class="nav-tab-btn" onclick="switchTab('stats')">
             <span class="tab-icon">📊</span>
-            <span>Havuz</span>
+            <span>Havuz & Gezgin</span>
           </button>
           <button class="nav-tab-btn" onclick="switchTab('play')">
             <span class="tab-icon">🎮</span>
@@ -1669,6 +1780,56 @@ export function createApp() {
                 alertBox.innerText = msg;
                 textarea.value = '';
                 console.log('🎉 [Telegram WebApp] Sorular başarıyla eklendi:', data.importedCount);
+
+                const detailBox = document.getElementById('json-result-details');
+                if (detailBox) {
+                  let detailHtml = '<div style="background: var(--surface-2); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 14px;">';
+                  detailHtml += '<div style="font-weight: 800; font-size: 14px; margin-bottom: 8px; color: var(--accent-mint);">📊 Eklenen Soru Detay Raporu</div>';
+
+                  if (data.categoryBreakdown) {
+                    detailHtml += '<div style="margin-bottom: 8px;"><div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px;">KATEGORİ DAĞILIMI:</div><div style="display: flex; gap: 6px; flex-wrap: wrap;">';
+                    for (const [cat, cnt] of Object.entries(data.categoryBreakdown)) {
+                      detailHtml += '<span class="tag-pill gold">' + cat + ': ' + cnt + '</span>';
+                    }
+                    detailHtml += '</div></div>';
+                  }
+
+                  if (data.difficultyBreakdown) {
+                    detailHtml += '<div style="margin-bottom: 8px;"><div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px;">ZORLUK DAĞILIMI:</div><div style="display: flex; gap: 6px; flex-wrap: wrap;">';
+                    for (const [diff, cnt] of Object.entries(data.difficultyBreakdown)) {
+                      detailHtml += '<span class="tag-pill diff-' + diff + '">' + diff + ': ' + cnt + '</span>';
+                    }
+                    detailHtml += '</div></div>';
+                  }
+
+                  if (data.importedDetails && data.importedDetails.length > 0) {
+                    detailHtml += '<details style="margin-top: 10px;" open><summary style="cursor: pointer; font-size: 12px; font-weight: 700; color: var(--accent-primary);">📋 Eklenen Tüm Sorular (' + data.importedDetails.length + ' Soru)</summary><div style="margin-top: 8px;">';
+                    data.importedDetails.forEach((q, idx) => {
+                      detailHtml += '<div style="background: var(--surface-1); padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; border: 1px solid rgba(255,255,255,0.06); font-size: 12px;">';
+                      detailHtml += '<div style="font-weight: 700;">' + (idx + 1) + '. ' + escapeHtml(q.text) + '</div>';
+                      detailHtml += '<div style="display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap;">';
+                      detailHtml += '<span class="tag-pill">' + (q.categoryIcon || '❓') + ' ' + (q.categoryName || q.categoryId) + '</span>';
+                      detailHtml += '<span class="tag-pill diff-' + q.difficulty + '">' + (q.difficultyName || q.difficulty) + '</span>';
+                      detailHtml += '<span class="tag-pill">' + (q.poolName || q.targetPool) + '</span>';
+                      detailHtml += '<span class="tag-pill mint">✓ ' + escapeHtml(q.correctAnswer) + '</span>';
+                      detailHtml += '</div></div>';
+                    });
+                    detailHtml += '</div></details>';
+                  }
+
+                  if (data.skippedDuplicates && data.skippedDuplicates.length > 0) {
+                    detailHtml += '<div style="margin-top: 10px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; padding: 8px 10px;">';
+                    detailHtml += '<div style="font-weight: 700; color: #F87171; font-size: 12px;">🔁 Mükerrer Olduğu İçin Atlanan Sorular (' + data.skippedDuplicates.length + ')</div>';
+                    data.skippedDuplicates.forEach((dup) => {
+                      detailHtml += '<div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">• ' + escapeHtml(dup.text) + '</div>';
+                    });
+                    detailHtml += '</div>';
+                  }
+
+                  detailHtml += '</div>';
+                  detailBox.innerHTML = detailHtml;
+                  detailBox.style.display = 'block';
+                }
               } else {
                 const errList = data.errors && data.errors.length > 0
                   ? data.errors.join('\n• ')
@@ -1712,35 +1873,246 @@ export function createApp() {
             }
           }
 
-          // Tab 4: Pool Stats
+          // Tab 4: Pool Stats, Category Matrix & Question Browser
+          let currentBrowserPage = 0;
+          let browserSearchTimeout = null;
+
           async function loadStats() {
             try {
               const res = await fetch('/api/admin/questions/stats');
               const stats = await res.json();
               
-              document.getElementById('stat-total').innerText = stats.totalQuestions || 0;
-              document.getElementById('stat-published').innerText = stats.published || 0;
-              document.getElementById('stat-pending').innerText = stats.pendingReview || 0;
+              if (document.getElementById('stat-total')) document.getElementById('stat-total').innerText = stats.total || 0;
+              if (document.getElementById('stat-published')) document.getElementById('stat-published').innerText = stats.published || 0;
+              if (document.getElementById('stat-pending')) document.getElementById('stat-pending').innerText = stats.pending || 0;
               
               let dailyCount = 0;
               if (stats.pools) {
                 dailyCount = (stats.pools.daily_challenge || 0) + (stats.pools.custom_room || 0);
               }
-              document.getElementById('stat-daily').innerText = dailyCount;
+              if (document.getElementById('stat-daily')) document.getElementById('stat-daily').innerText = dailyCount;
 
               const breakdownContainer = document.getElementById('categories-breakdown-list');
-              if (breakdownContainer && stats.categories) {
-                const entries = Object.entries(stats.categories);
-                entries.sort((a, b) => b[1] - a[1]);
-                breakdownContainer.innerHTML = entries.map(([cat, cnt]) => \`
-                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
-                    <span style="font-size: 13px; font-weight: 600;">\${cat}</span>
-                    <span class="tag-pill mint">\${cnt} soru</span>
-                  </div>
-                \`).join('');
+              if (breakdownContainer && stats.categoriesDetail && stats.categoriesDetail.length > 0) {
+                breakdownContainer.innerHTML = stats.categoriesDetail.map((c) => {
+                  return '<div class="category-matrix-card" onclick="filterBrowserCategory(\'' + c.id + '\')">' +
+                    '<div style="display: flex; justify-content: space-between; align-items: center;">' +
+                      '<span style="font-size: 14px; font-weight: 800;">' + c.icon + ' ' + escapeHtml(c.name) + ' <span style="font-size: 11px; color: var(--text-secondary); font-weight: normal;">(' + c.id + ')</span></span>' +
+                      '<span class="tag-pill gold" style="font-size: 12px;">' + c.total + ' soru</span>' +
+                    '</div>' +
+                    '<div class="matrix-diff-pills">' +
+                      '<span class="tag-pill diff-easy">🟢 Kolay: ' + c.easy + '</span>' +
+                      '<span class="tag-pill diff-medium">🔵 Orta: ' + c.medium + '</span>' +
+                      '<span class="tag-pill diff-hard">🟡 Zor: ' + c.hard + '</span>' +
+                      '<span class="tag-pill diff-expert">🔴 Uzman: ' + c.expert + '</span>' +
+                    '</div>' +
+                  '</div>';
+                }).join('');
               }
+
+              loadQuestionsBrowser(0);
             } catch (err) {
               console.warn('Stats error:', err);
+            }
+          }
+
+          function filterBrowserCategory(catId) {
+            triggerHaptic('light');
+            const sel = document.getElementById('browser-category');
+            if (sel) sel.value = catId;
+            loadQuestionsBrowser(0);
+            const target = document.getElementById('browser-category');
+            if (target) target.scrollIntoView({ behavior: 'smooth' });
+          }
+
+          function debounceBrowserSearch() {
+            clearTimeout(browserSearchTimeout);
+            browserSearchTimeout = setTimeout(() => {
+              loadQuestionsBrowser(0);
+            }, 300);
+          }
+
+          async function scanDuplicates() {
+            triggerHaptic('medium');
+            const btn = document.getElementById('btn-scan-dup');
+            const container = document.getElementById('duplicate-results-container');
+            if (!container) return;
+
+            container.style.display = 'block';
+            container.innerHTML = '<div style="text-align: center; padding: 16px; color: var(--text-secondary);"><span class="loader"></span> Havuzdaki tüm sorular taranıyor...</div>';
+            if (btn) btn.disabled = true;
+
+            try {
+              const res = await fetch('/api/admin/questions/duplicates');
+              const data = await res.json();
+              console.log('🔍 [Duplicates Scan]:', data);
+
+              if (data.duplicateGroupsCount === 0) {
+                container.innerHTML = '<div style="padding: 14px; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); border-radius: 8px; color: #10B981; font-weight: 700; text-align: center;">' +
+                  '✨ Tebrikler! Havuzda hiçbir mükerrer (aynı metne sahip) soru bulunamadı. Toplam ' + data.totalQuestions + ' soru denetlendi.' +
+                '</div>';
+              } else {
+                let html = '<div style="padding: 12px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 8px; margin-bottom: 12px; color: #F87171; font-weight: 700;">' +
+                  '⚠️ Dikkat! ' + data.duplicateGroupsCount + ' farklı grupta toplam ' + data.duplicateQuestionsCount + ' adet mükerrer soru tespit edildi:' +
+                '</div>';
+
+                data.groups.forEach((grp, gIdx) => {
+                  html += '<div class="duplicate-box">';
+                  html += '<div class="duplicate-group-header">Grup #' + (gIdx + 1) + ' (' + grp.count + ' Adet Aynı Soru):</div>';
+                  html += '<div style="font-weight: 700; font-size: 13px; margin-bottom: 6px;">"' + escapeHtml(grp.questions[0].text) + '"</div>';
+
+                  grp.questions.forEach((q, qIdx) => {
+                    html += '<div class="duplicate-item" id="dup-card-' + q.id + '">';
+                    html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">';
+                    html += '<span style="font-size: 11px; color: var(--text-secondary);">Kopya #' + (qIdx + 1) + ' · ID: ' + q.id + ' · ' + (q.reviewStatus || 'published') + '</span>';
+                    html += '<button class="btn-action reject" style="max-width: 130px; padding: 4px 8px; font-size: 11px;" onclick="deleteQuestionFromPool(\'' + q.id + '\', true)">🗑️ Bu Kopyayı Sil</button>';
+                    html += '</div>';
+                    html += '<div style="font-size: 12px; color: var(--text-secondary);">Kategori: <b>' + q.categoryId + '</b> · Zorluk: <b>' + q.difficulty + '</b> · Havuz: <b>' + (q.targetPool || 'standard') + '</b></div>';
+                    html += '</div>';
+                  });
+
+                  html += '</div>';
+                });
+
+                container.innerHTML = html;
+              }
+            } catch (err) {
+              container.innerHTML = '<div style="color: #EF4444; padding: 12px;">Tarama hatası: ' + err.message + '</div>';
+            } finally {
+              if (btn) btn.disabled = false;
+            }
+          }
+
+          async function loadQuestionsBrowser(page) {
+            currentBrowserPage = page || 0;
+            const listContainer = document.getElementById('browser-questions-list');
+            const countLabel = document.getElementById('browser-count-label');
+            const paginationContainer = document.getElementById('browser-pagination');
+            if (!listContainer) return;
+
+            listContainer.innerHTML = '<div style="text-align: center; padding: 24px; color: var(--text-secondary);"><span class="loader"></span> Sorular yükleniyor...</div>';
+
+            const search = document.getElementById('browser-search')?.value || '';
+            const categoryId = document.getElementById('browser-category')?.value || 'all';
+            const difficulty = document.getElementById('browser-difficulty')?.value || 'all';
+            const targetPool = document.getElementById('browser-pool')?.value || 'all';
+            const reviewStatus = document.getElementById('browser-status')?.value || 'published';
+
+            const limit = 25;
+            const offset = currentBrowserPage * limit;
+
+            try {
+              const params = new URLSearchParams({
+                search,
+                categoryId,
+                difficulty,
+                targetPool,
+                reviewStatus,
+                limit: String(limit),
+                offset: String(offset)
+              });
+
+              const res = await fetch('/api/admin/questions/list?' + params.toString());
+              const data = await res.json();
+              console.log('🔎 [Questions Browser]:', data);
+
+              const questions = data.questions || [];
+              if (countLabel) {
+                countLabel.innerText = 'Filtrelenen: ' + (data.filteredCount || 0) + ' / Toplam: ' + (data.total || 0) + ' soru (Sayfa ' + (currentBrowserPage + 1) + ')';
+              }
+
+              if (questions.length === 0) {
+                listContainer.innerHTML = '<div style="text-align: center; padding: 32px; color: var(--text-secondary);">Seçilen filtrelere uygun soru bulunamadı.</div>';
+                if (paginationContainer) paginationContainer.innerHTML = '';
+                return;
+              }
+
+              listContainer.innerHTML = questions.map((q, idx) => {
+                const correctIdx = q.options.findIndex(o => o.id === q.correctOptionId);
+                const poolLabel = q.targetPool === 'daily_challenge' || q.isDailyChallenge
+                  ? '📅 Günlük Meydan Okuma'
+                  : q.targetPool === 'custom_room' || q.isCustomRoomOnly
+                  ? '⚔️ Özel Oda'
+                  : '🏆 Normal Havuz';
+
+                return '<div class="question-item" id="pool-card-' + q.id + '">' +
+                  '<div class="question-item-header">' +
+                    '<div>' +
+                      '<span class="tag-pill gold">' + q.categoryId + '</span> ' +
+                      '<span class="tag-pill diff-' + q.difficulty + '">' + q.difficulty + '</span> ' +
+                      '<span class="tag-pill">' + poolLabel + '</span>' +
+                    '</div>' +
+                    '<span class="tag-pill" style="font-size: 10px;">#' + (offset + idx + 1) + '</span>' +
+                  '</div>' +
+                  '<div class="question-text">' + escapeHtml(q.text) + '</div>' +
+                  '<div class="options-list">' +
+                    q.options.map((opt, oIdx) => {
+                      const isCorrect = oIdx === correctIdx;
+                      return '<div class="option-row ' + (isCorrect ? 'correct' : '') + '">' +
+                        '<span>' + ['A', 'B', 'C', 'D'][oIdx] + ')</span>' +
+                        '<span>' + escapeHtml(opt.text) + '</span>' +
+                        (isCorrect ? '<span style="margin-left: auto; font-weight: 900;">✓ Doğru</span>' : '') +
+                      '</div>';
+                    }).join('') +
+                  '</div>' +
+                  (q.explanation ? '<div style="font-size: 12px; color: var(--text-secondary); margin-top: 6px; font-style: italic;">💡 ' + escapeHtml(q.explanation) + '</div>' : '') +
+                  '<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;">' +
+                    '<span style="font-size: 11px; color: var(--text-secondary);">ID: ' + q.id + '</span>' +
+                    '<button class="btn-action reject" style="max-width: 120px; padding: 6px 10px;" onclick="deleteQuestionFromPool(\'' + q.id + '\')">🗑️ Soruyu Sil</button>' +
+                  '</div>' +
+                '</div>';
+              }).join('');
+
+              // Pagination
+              if (paginationContainer) {
+                let pageHtml = '';
+                if (currentBrowserPage > 0) {
+                  pageHtml += '<button class="btn-secondary" onclick="loadQuestionsBrowser(' + (currentBrowserPage - 1) + ')">◀ Önceki Sayfa</button> ';
+                }
+                if ((offset + questions.length) < data.filteredCount) {
+                  pageHtml += '<button class="btn-secondary" onclick="loadQuestionsBrowser(' + (currentBrowserPage + 1) + ')">Sonraki Sayfa ▶</button>';
+                }
+                paginationContainer.innerHTML = pageHtml;
+              }
+            } catch (err) {
+              listContainer.innerHTML = '<div style="color: #EF4444; padding: 14px;">Sorular yüklenirken hata oluştu: ' + err.message + '</div>';
+            }
+          }
+
+          async function deleteQuestionFromPool(id, isDuplicateScan) {
+            if (!confirm('Bu soruyu kalıcı olarak silmek istediğinizden emin misiniz?')) {
+              return;
+            }
+
+            triggerHaptic('warning');
+            try {
+              const res = await fetch('/api/admin/questions/' + id, { method: 'DELETE' });
+              const data = await res.json();
+              if (data.success) {
+                triggerHaptic('success');
+                const poolCard = document.getElementById('pool-card-' + id);
+                if (poolCard) {
+                  poolCard.style.transition = 'all 0.3s ease';
+                  poolCard.style.opacity = '0';
+                  poolCard.style.transform = 'scale(0.95)';
+                  setTimeout(() => poolCard.remove(), 300);
+                }
+                const dupCard = document.getElementById('dup-card-' + id);
+                if (dupCard) dupCard.remove();
+
+                if (isDuplicateScan) {
+                  scanDuplicates();
+                }
+                // Refresh stats
+                fetch('/api/admin/questions/stats').then(r => r.json()).then(stats => {
+                  if (document.getElementById('stat-total')) document.getElementById('stat-total').innerText = stats.total || 0;
+                  if (document.getElementById('stat-published')) document.getElementById('stat-published').innerText = stats.published || 0;
+                }).catch(() => {});
+              } else {
+                alert('Silme başarısız: ' + (data.error || 'Bilinmeyen hata'));
+              }
+            } catch (err) {
+              alert('İstek hatası: ' + err.message);
             }
           }
 

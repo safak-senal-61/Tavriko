@@ -2111,6 +2111,111 @@ export class PrismaService {
     return updated;
   }
 
+  public deleteQuestion(id: string): boolean {
+    const idx = this.questions.findIndex((item) => item.id === id);
+    if (idx === -1) return false;
+    this.questions.splice(idx, 1);
+    this.savePersistedQuestions();
+    try {
+      this.rawClient.question.delete({ where: { id } }).catch(() => {});
+    } catch {}
+    return true;
+  }
+
+  public getQuestionsFiltered(filters: {
+    search?: string;
+    categoryId?: string;
+    difficulty?: string;
+    reviewStatus?: string;
+    targetPool?: string;
+    limit?: number;
+    offset?: number;
+  }): { total: number; filteredCount: number; questions: Question[] } {
+    const search = (filters.search || '').trim().toLowerCase();
+    const categoryId = filters.categoryId && filters.categoryId !== 'all' ? filters.categoryId : null;
+    const difficulty = filters.difficulty && filters.difficulty !== 'all' ? filters.difficulty : null;
+    const reviewStatus = filters.reviewStatus && filters.reviewStatus !== 'all' ? filters.reviewStatus : null;
+    const targetPool = filters.targetPool && filters.targetPool !== 'all' ? filters.targetPool : null;
+    const limit = Math.min(200, Math.max(1, filters.limit || 50));
+    const offset = Math.max(0, filters.offset || 0);
+
+    let list = this.questions;
+
+    if (reviewStatus) {
+      list = list.filter((q) => (q.reviewStatus || 'published') === reviewStatus);
+    }
+    if (categoryId) {
+      list = list.filter((q) => q.categoryId === categoryId);
+    }
+    if (difficulty) {
+      list = list.filter((q) => q.difficulty === difficulty);
+    }
+    if (targetPool) {
+      if (targetPool === 'daily_challenge') {
+        list = list.filter((q) => q.targetPool === 'daily_challenge' || q.isDailyChallenge);
+      } else if (targetPool === 'custom_room') {
+        list = list.filter((q) => q.targetPool === 'custom_room' || q.isCustomRoomOnly);
+      } else {
+        list = list.filter((q) => !q.targetPool || q.targetPool === 'standard');
+      }
+    }
+    if (search) {
+      list = list.filter((q) => {
+        if (q.text.toLowerCase().includes(search)) return true;
+        if (q.explanation && q.explanation.toLowerCase().includes(search)) return true;
+        if (q.options && q.options.some((o) => o.text.toLowerCase().includes(search))) return true;
+        return false;
+      });
+    }
+
+    return {
+      total: this.questions.length,
+      filteredCount: list.length,
+      questions: list.slice(offset, offset + limit),
+    };
+  }
+
+  public findDuplicates(): {
+    totalQuestions: number;
+    duplicateGroupsCount: number;
+    duplicateQuestionsCount: number;
+    groups: Array<{ signature: string; count: number; questions: Question[] }>;
+  } {
+    const signatureMap = new Map<string, Question[]>();
+    for (const q of this.questions) {
+      const sig = q.text.toLowerCase().replace(/[^a-z0-9ğüşıöç]/gi, '').trim();
+      if (!sig) continue;
+      if (!signatureMap.has(sig)) {
+        signatureMap.set(sig, []);
+      }
+      signatureMap.get(sig)!.push(q);
+    }
+
+    const groups: Array<{ signature: string; count: number; questions: Question[] }> = [];
+    let duplicateQuestionsCount = 0;
+
+    for (const [sig, qList] of signatureMap.entries()) {
+      if (qList.length > 1) {
+        groups.push({
+          signature: sig,
+          count: qList.length,
+          questions: qList,
+        });
+        duplicateQuestionsCount += qList.length;
+      }
+    }
+
+    // Sort by largest duplicate cluster first
+    groups.sort((a, b) => b.count - a.count);
+
+    return {
+      totalQuestions: this.questions.length,
+      duplicateGroupsCount: groups.length,
+      duplicateQuestionsCount,
+      groups,
+    };
+  }
+
   public getReviewStats(): QuestionStats {
     const stats: QuestionStats = {
       total: this.questions.length,
@@ -2120,7 +2225,16 @@ export class PrismaService {
       rejected: 0,
       byCategory: {},
       byDifficulty: {},
+      matrix: {},
+      pools: {
+        standard: 0,
+        daily_challenge: 0,
+        custom_room: 0,
+      },
+      categoriesDetail: [],
     };
+
+    const catMatrix: Record<string, { total: number; easy: number; medium: number; hard: number; expert: number }> = {};
 
     this.questions.forEach((q) => {
       const status = q.reviewStatus || 'published';
@@ -2129,11 +2243,45 @@ export class PrismaService {
       else if (status === 'published') stats.published++;
       else if (status === 'rejected') stats.rejected++;
 
-      if (status === 'published') {
+      const p = q.targetPool === 'daily_challenge' || q.isDailyChallenge
+        ? 'daily_challenge'
+        : q.targetPool === 'custom_room' || q.isCustomRoomOnly
+        ? 'custom_room'
+        : 'standard';
+      stats.pools![p] = (stats.pools![p] || 0) + 1;
+
+      if (status === 'published' || status === 'approved') {
         stats.byCategory![q.categoryId] = (stats.byCategory![q.categoryId] || 0) + 1;
         stats.byDifficulty![q.difficulty] = (stats.byDifficulty![q.difficulty] || 0) + 1;
+
+        if (!catMatrix[q.categoryId]) {
+          catMatrix[q.categoryId] = { total: 0, easy: 0, medium: 0, hard: 0, expert: 0 };
+        }
+        catMatrix[q.categoryId].total++;
+        if (q.difficulty === 'easy') catMatrix[q.categoryId].easy++;
+        else if (q.difficulty === 'medium') catMatrix[q.categoryId].medium++;
+        else if (q.difficulty === 'hard') catMatrix[q.categoryId].hard++;
+        else if (q.difficulty === 'expert') catMatrix[q.categoryId].expert++;
       }
     });
+
+    stats.matrix = catMatrix as any;
+
+    stats.categoriesDetail = this.categories
+      .filter((c) => c.id !== 'mixed')
+      .map((c) => {
+        const m = catMatrix[c.id] || { total: 0, easy: 0, medium: 0, hard: 0, expert: 0 };
+        return {
+          id: c.id,
+          name: c.name,
+          icon: c.icon,
+          total: m.total,
+          easy: m.easy,
+          medium: m.medium,
+          hard: m.hard,
+          expert: m.expert,
+        };
+      });
 
     return stats;
   }

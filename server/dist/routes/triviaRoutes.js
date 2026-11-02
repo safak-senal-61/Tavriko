@@ -142,10 +142,52 @@ router.post('/admin/questions/:id/reject', (req, res) => {
     supabaseClient_1.supabaseService.updateQuestionStatus(id, 'rejected', reviewedBy, reason).catch(() => { });
     res.json({ success: true, question: rejected });
 });
-// Question pool & review statistics
+// Question pool & review statistics (with full category x difficulty matrix)
 router.get('/admin/questions/stats', (req, res) => {
     const stats = prismaClient_1.db.getReviewStats();
     res.json(stats);
+});
+// Search and filter questions in pool
+router.get('/admin/questions/list', (req, res) => {
+    const { search, categoryId, difficulty, reviewStatus, targetPool, limit, offset, } = req.query;
+    const result = prismaClient_1.db.getQuestionsFiltered({
+        search: search,
+        categoryId: categoryId,
+        difficulty: difficulty,
+        reviewStatus: reviewStatus,
+        targetPool: targetPool,
+        limit: limit ? parseInt(limit, 10) : 50,
+        offset: offset ? parseInt(offset, 10) : 0,
+    });
+    res.json(result);
+});
+// Scan pool for duplicate questions
+router.get('/admin/questions/duplicates', (req, res) => {
+    const result = prismaClient_1.db.findDuplicates();
+    res.json(result);
+});
+// Delete a question by ID
+router.delete('/admin/questions/:id', (req, res) => {
+    const id = String(req.params.id);
+    const deleted = prismaClient_1.db.deleteQuestion(id);
+    if (!deleted) {
+        res.status(404).json({ error: 'Soru bulunamadı veya silinemedi.' });
+        return;
+    }
+    if (typeof supabaseClient_1.supabaseService.deleteQuestion === 'function') {
+        supabaseClient_1.supabaseService.deleteQuestion(id).catch(() => { });
+    }
+    res.json({ success: true, id, message: 'Soru başarıyla silindi.' });
+});
+// Update a question by ID
+router.put('/admin/questions/:id', (req, res) => {
+    const id = String(req.params.id);
+    const updated = prismaClient_1.db.updateQuestion(id, req.body);
+    if (!updated) {
+        res.status(404).json({ error: 'Soru bulunamadı veya güncellenemedi.' });
+        return;
+    }
+    res.json({ success: true, question: updated });
 });
 // Import questions manually via JSON text or parsed array
 router.post('/admin/questions/import-json', (req, res) => {
