@@ -1105,6 +1105,73 @@ export function createApp() {
           @media (max-width: 480px) {
             .browser-filters-grid { grid-template-columns: 1fr; }
           }
+          .pool-choice-card {
+            background: var(--surface-2);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+          }
+          .pool-choice-card:hover {
+            border-color: rgba(98, 54, 255, 0.6);
+            background: rgba(98, 54, 255, 0.1);
+          }
+          .pool-choice-card.active {
+            border-color: var(--accent-primary);
+            background: rgba(98, 54, 255, 0.2);
+            box-shadow: 0 4px 16px rgba(98, 54, 255, 0.3);
+          }
+          .category-squircle-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 8px;
+          }
+          @media (max-width: 480px) {
+            .category-squircle-grid {
+              grid-template-columns: repeat(4, 1fr);
+              gap: 6px;
+            }
+          }
+          .category-squircle-card {
+            background: var(--surface-2);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 8px 4px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+          }
+          .category-squircle-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--accent-gold);
+            background: rgba(255, 196, 61, 0.12);
+          }
+          .category-squircle-card.active {
+            border-color: var(--accent-mint);
+            background: rgba(90, 219, 181, 0.2);
+            box-shadow: 0 2px 10px rgba(90, 219, 181, 0.3);
+          }
+          .cat-card-icon {
+            font-size: 20px;
+          }
+          .cat-card-title {
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--text-primary);
+            line-height: 1.1;
+          }
+          .cat-card-id {
+            font-size: 9px;
+            color: var(--text-secondary);
+            font-family: monospace;
+          }
           .loader {
             display: inline-block;
             width: 18px;
@@ -1205,57 +1272,120 @@ export function createApp() {
           <!-- TAB 2: MANUEL & JSON SORU YÜKLE -->
           <div id="pane-json" class="tab-pane">
             <div class="card">
-              <h2 class="card-title">📥 Manuel & JSON Soru Ekle</h2>
-              <p class="card-desc">Kendi hazırladığınız soruları JSON formatında doğrudan yapıştırın veya <code>.json</code> dosyasını sürükleyip bırakın.</p>
+              <h2 class="card-title">📥 Soru Yükleme & Kategori Merkezi</h2>
+              <p class="card-desc">Sorularınızı ister Keşfet ekranındaki 16 tek kişilik kategoriye, ister arkadaşınızla yarışacağınız Özel Oda moduna yükleyin. Aşağıdan oyun modunu ve kategoriyi seçtiğinizde şablon otomatik doldurulur.</p>
 
+              <!-- 1. HEDEF OYUN MODU & HAVUZ SEÇİCİ -->
               <div class="form-group">
-                <label class="form-label">JSON Dosyası Yükle</label>
-                <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
-                  <div style="font-size: 28px; margin-bottom: 6px;">📁</div>
-                  <div style="font-weight: 700; font-size: 14px;">.json dosyasını buraya sürükleyin</div>
-                  <div style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">veya dosya seçmek için dokunun</div>
-                  <input type="file" id="file-input" accept=".json,application/json" style="display: none;" onchange="handleFileSelect(event)">
+                <label class="form-label">🎮 1. Adım: Hedef Oyun Modu & Havuz Seçin</label>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px;">
+                  
+                  <div class="pool-choice-card active" id="pool-card-standard" data-pool="standard" onclick="selectPoolMode(this.dataset.pool)">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                      <span style="font-weight: 800; font-size: 13px; color: var(--accent-gold);">🏆 Tek Kişilik Mod</span>
+                      <span class="tag-pill gold">standard</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.3;">
+                      Uygulama Keşfet ekranındaki <b>16 ana kategoriye</b> gider. Tek başına antrenman & yarış.
+                    </div>
+                  </div>
+
+                  <div class="pool-choice-card" id="pool-card-custom_room" data-pool="custom_room" onclick="selectPoolMode(this.dataset.pool)">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                      <span style="font-weight: 800; font-size: 13px; color: #C084FC;">⚔️ Arkadaşla Özel Oda</span>
+                      <span class="tag-pill" style="background: rgba(192,132,252,0.2); color: #C084FC;">custom_room</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.3;">
+                      Arkadaşla kurulan <b>Özel Odalarda</b>, 1v1 düellolarda ve tematik odalarda çıkar.
+                    </div>
+                  </div>
+
+                  <div class="pool-choice-card" id="pool-card-daily_challenge" data-pool="daily_challenge" onclick="selectPoolMode(this.dataset.pool)">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                      <span style="font-weight: 800; font-size: 13px; color: var(--accent-mint);">📅 Günlük Meydan Okuma</span>
+                      <span class="tag-pill mint">daily_challenge</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.3;">
+                      Tüm kullanıcılara her gün çıkan <b>Günün Özel Sorusu</b> havuzuna eklenir.
+                    </div>
+                  </div>
+
                 </div>
+                <input type="hidden" id="json-pool" value="standard">
               </div>
 
-              <div class="form-group">
+              <!-- 2. GÖRSEL KATEGORİ REHBERİ VE TEK TIKLA ŞABLON -->
+              <div class="form-group" style="margin-top: 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                  <label class="form-label" style="margin-bottom: 0;">JSON Verisi</label>
+                  <label class="form-label" style="margin-bottom: 0;">🏷️ 2. Adım: Kategori Seç (16 Oyun Kategorisi)</label>
+                  <span style="font-size: 11px; color: var(--accent-gold); font-weight: 700;">👆 Dokunarak Şablonu Al</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">
+                  Aşağıdaki 16 kategoriden birine dokunduğunuzda, o kategoriye ait hazır ve eksiksiz JSON taslağı otomatik oluşturulur.
+                </div>
+
+                <!-- 16 KATEGORİ SQUIRCLE GRID -->
+                <div class="category-squircle-grid" id="main-16-cat-grid"></div>
+
+                <!-- ÖZEL ODA TEMATİK PAKETLERİ -->
+                <details style="margin-top: 10px; background: rgba(255, 255, 255, 0.03); border-radius: var(--radius-sm); padding: 8px 12px; border: 1px solid rgba(255, 255, 255, 0.08);">
+                  <summary style="cursor: pointer; font-size: 12px; font-weight: 700; color: #C084FC; outline: none;">
+                    ⚔️ Arkadaşla Özel Oda Paketleri & Karışık Mod (Tıkla ve Gör)
+                  </summary>
+                  <div style="margin-top: 8px;" class="category-squircle-grid" id="special-cat-grid"></div>
+                </details>
+              </div>
+
+              <!-- 3. JSON METİN ALANI VE CANLI ALGILAMA BARI -->
+              <div class="form-group" style="margin-top: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <label class="form-label" style="margin-bottom: 0;">📝 3. Adım: Soru JSON Verisi</label>
                   <div>
-                    <button class="btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="pasteSampleJson()">📋 Örnek Şablon</button>
+                    <button class="btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="pasteSampleJson()">📋 Varsayılan Şablon</button>
                     <button class="btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="clearJsonText()">🧹 Temizle</button>
                   </div>
                 </div>
-                <textarea id="json-textarea" rows="9" placeholder='[&#10;  {&#10;    "text": "Soru metni...",&#10;    "options": ["A", "B", "C", "D"],&#10;    "correctAnswerIndex": 0,&#10;    "categoryId": "geography",&#10;    "difficulty": "medium",&#10;    "explanation": "Detaylı açıklama...",&#10;    "targetPool": "standard"&#10;  }&#10;]'></textarea>
-                
+
+                <!-- CANLI ALGILAMA & DOĞRULAMA ÇUBUĞU -->
+                <div id="live-parser-bar" style="margin-bottom: 8px; background: rgba(21, 15, 44, 0.8); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+                  <div id="live-parser-status" style="font-weight: 700; color: var(--text-secondary); display: flex; align-items: center; gap: 6px;">
+                    <span>ℹ️</span> <span>Henüz soru girilmedi. Yukarıdan bir kategoriye dokunarak şablonu alabilirsiniz.</span>
+                  </div>
+                  <div id="live-parser-tags" style="display: flex; gap: 4px; flex-wrap: wrap;"></div>
+                </div>
+
+                <textarea id="json-textarea" rows="10" placeholder='[&#10;  {&#10;    "text": "Soru metnini buraya yazın...",&#10;    "options": ["A", "B", "C", "D"],&#10;    "correctAnswerIndex": 0,&#10;    "categoryId": "geography",&#10;    "difficulty": "medium",&#10;    "explanation": "Detaylı açıklama...",&#10;    "targetPool": "standard"&#10;  }&#10;]' oninput="updateLiveDetection()"></textarea>
+
+                <!-- DOSYA YÜKLEME KUTUSU (İSTEĞE BAĞLI) -->
+                <div style="margin-top: 8px;">
+                  <div class="dropzone" id="dropzone" style="padding: 12px;" onclick="document.getElementById('file-input').click()">
+                    <span style="font-size: 18px; vertical-align: middle; margin-right: 6px;">📁</span>
+                    <span style="font-size: 12px; font-weight: 700;">Hazır .json dosyanız varsa buraya sürükleyin veya seçin</span>
+                    <input type="file" id="file-input" accept=".json,application/json" style="display: none;" onchange="handleFileSelect(event)">
+                  </div>
+                </div>
+
                 <details style="margin-top: 8px; background: rgba(255, 255, 255, 0.04); border-radius: 8px; padding: 8px 12px; font-size: 12px; color: var(--text-secondary); border: 1px solid rgba(255, 255, 255, 0.08);">
-                  <summary style="cursor: pointer; font-weight: 700; color: var(--accent-mint); outline: none;">📖 Desteklenen JSON Format Rehberi (Tıkla ve İncele)</summary>
+                  <summary style="cursor: pointer; font-weight: 700; color: var(--accent-mint); outline: none;">📖 Desteklenen Tüm JSON Alanları & Eşleme Tablosu</summary>
                   <div style="margin-top: 8px; line-height: 1.6;">
-                    <div>• <b>text</b> veya <b>soru:</b> Soru metni (Zorunlu, min 5 karakter)</div>
-                    <div>• <b>options</b> veya <b>secenekler:</b> Tam 4 adet şık dizisi <code>["A", "B", "C", "D"]</code> (Zorunlu)</div>
-                    <div>• <b>correctAnswerIndex:</b> 0 (A), 1 (B), 2 (C) veya 3 (D) (veya <b>dogruCevap:</b> "A", "B", "C", "D")</div>
-                    <div>• <b>categoryId</b> veya <b>kategori:</b> <code>bilim</code>, <code>tarih</code>, <code>cografya</code>, <code>spor</code>, <code>sinema</code>, <code>muzik</code>, <code>sanat</code>, <code>teknoloji</code>, <code>doga</code>, <code>yemek</code>, <code>edebiyat</code>, <code>uzay</code>, <code>hayvanlar</code>, <code>matematik</code>, <code>oyun</code>, <code>genel_kultur</code></div>
-                    <div>• <b>difficulty</b> veya <b>zorluk:</b> <code>kolay</code> (easy), <code>orta</code> (medium), <code>zor</code> (hard), <code>uzman</code> (expert)</div>
-                    <div>• <b>explanation</b> veya <b>aciklama:</b> Açıklama (Opsiyonel)</div>
-                    <div>• <b>targetPool</b> veya <b>havuz:</b> <code>standard</code>, <code>daily_challenge</code>, <code>custom_room</code> (Opsiyonel, varsayılan aşağıdaki seçimdir)</div>
+                    <div>• <b>text / soru / question:</b> Soru metni (Zorunlu, min 5 karakter)</div>
+                    <div>• <b>options / secenekler:</b> Tam 4 adet seçenek <code>["A", "B", "C", "D"]</code> (Zorunlu)</div>
+                    <div>• <b>correctAnswerIndex / dogruCevap:</b> <code>0</code>, <code>1</code>, <code>2</code>, <code>3</code> (veya doğru cevabın birebir metni)</div>
+                    <div>• <b>categoryId / kategori:</b> <code>bilim</code>, <code>tarih</code>, <code>cografya</code>, <code>spor</code>, <code>sinema</code>, <code>muzik</code>, <code>sanat</code>, <code>teknoloji</code>, <code>doga</code>, <code>yemek</code>, <code>edebiyat</code>, <code>uzay</code>, <code>hayvanlar</code>, <code>matematik</code>, <code>oyun</code>, <code>genel_kultur</code></div>
+                    <div>• <b>difficulty / zorluk:</b> <code>kolay</code> (easy), <code>orta</code> (medium), <code>zor</code> (hard), <code>uzman</code> (expert)</div>
+                    <div>• <b>targetPool / havuz:</b> <code>standard</code> (Tek Kişilik/Keşfet), <code>custom_room</code> (Arkadaşla Özel Oda), <code>daily_challenge</code> (Günün Sorusu)</div>
+                    <div>• <b>explanation / aciklama:</b> Soru çözüldükten sonra oyuncuya gösterilen bilgi notu.</div>
                   </div>
                 </details>
               </div>
 
-              <div class="form-group">
-                <label class="form-label">Varsayılan Hedef Havuz</label>
-                <select id="json-pool">
-                  <option value="standard" selected>🏆 Normal Kategori Havuzu</option>
-                  <option value="daily_challenge">📅 Günlük Meydan Okuma Havuzu</option>
-                  <option value="custom_room">⚔️ Özel Oda / Arkadaş Düellosu</option>
-                </select>
-              </div>
-
-              <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+              <!-- DOĞRUDAN YAYINLA SEÇENEĞİ -->
+              <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
                 <input type="checkbox" id="json-autopublish" checked style="width: 18px; height: 18px; accent-color: var(--accent-primary);">
-                <label for="json-autopublish" style="font-size: 13px; font-weight: 600; cursor: pointer;">Doğrudan yayınla (Onay kuyruğunu atla)</label>
+                <label for="json-autopublish" style="font-size: 13px; font-weight: 600; cursor: pointer;">Doğrudan yayınla (Onay kuyruğunu atla ve havuza ekle)</label>
               </div>
 
+              <!-- AKTAR BUTONU -->
               <button class="btn-primary" id="btn-import-json" onclick="importJsonQuestions()">
                 <span>🚀 Soruları Havuza Aktar</span>
               </button>
@@ -1648,7 +1778,174 @@ export function createApp() {
             }
           }
 
-          // Tab 2: JSON Importer
+          // Tab 2: JSON Importer & 16 Kategori Tanımları
+          const APP_16_CATEGORIES = [
+            { id: 'science_tech', name: 'Bilim', icon: '⚛️', trKeys: ['bilim', 'science', 'science_tech'] },
+            { id: 'history', name: 'Tarih', icon: '🏛️', trKeys: ['tarih', 'history'] },
+            { id: 'geography', name: 'Coğrafya', icon: '🌍', trKeys: ['cografya', 'coğrafya', 'geography'] },
+            { id: 'sports', name: 'Spor', icon: '🏀', trKeys: ['spor', 'sports'] },
+            { id: 'cinema_tv', name: 'Sinema', icon: '🎬', trKeys: ['sinema', 'cinema_tv', 'dizi'] },
+            { id: 'music', name: 'Müzik', icon: '🎵', trKeys: ['muzik', 'müzik', 'music'] },
+            { id: 'art_culture', name: 'Sanat', icon: '🎨', trKeys: ['sanat', 'art_culture', 'kultur', 'kültür'] },
+            { id: 'physics_chemistry', name: 'Teknoloji', icon: '💻', trKeys: ['teknoloji', 'technology', 'tech', 'fizik', 'kimya'] },
+            { id: 'nature_ecology', name: 'Doğa', icon: '🌿', trKeys: ['doga', 'doğa', 'nature', 'nature_ecology'] },
+            { id: 'food_gastronomy', name: 'Yemek', icon: '🍲', trKeys: ['yemek', 'food', 'food_gastronomy', 'mutfak'] },
+            { id: 'literature', name: 'Edebiyat', icon: '📚', trKeys: ['edebiyat', 'literature'] },
+            { id: 'space_astronomy', name: 'Uzay', icon: '🚀', trKeys: ['uzay', 'space', 'space_astronomy'] },
+            { id: 'animals_wildlife', name: 'Hayvanlar', icon: '🐾', trKeys: ['hayvanlar', 'animals', 'animals_wildlife'] },
+            { id: 'mathematics', name: 'Matematik', icon: '🔢', trKeys: ['matematik', 'mathematics', 'math'] },
+            { id: 'logic_puzzles', name: 'Oyun & Zeka', icon: '🎮', trKeys: ['oyun', 'gaming', 'logic_puzzles', 'zeka'] },
+            { id: 'general_culture', name: 'Genel Kültür', icon: '💡', trKeys: ['genel', 'genel_kultur', 'general_culture'] }
+          ];
+
+          const SPECIAL_ROOM_CATEGORIES = [
+            { id: 'mixed', name: 'Karışık Mod', icon: '🎲', desc: 'Tüm kategorilerden karma sorular' },
+            { id: 'yesilcam', name: 'Yeşilçam', icon: '⭐', desc: 'Yeşilçam Sineması özel' },
+            { id: 'turkish_pop_90s', name: "90'lar Pop", icon: '⭐', desc: 'Nostalji müzik' },
+            { id: 'ottoman_history', name: 'Osmanlı', icon: '⭐', desc: 'Tarih tematik oda' },
+            { id: 'super_lig_legends', name: 'Süper Lig', icon: '⭐', desc: 'Futbol özel oda' },
+            { id: 'world_capitals', name: 'Başkentler', icon: '⭐', desc: 'Coğrafya başkentler' }
+          ];
+
+          function renderCategoryPickers() {
+            const grid16 = document.getElementById('main-16-cat-grid');
+            if (grid16) {
+              grid16.innerHTML = APP_16_CATEGORIES.map(c => {
+                return '<div class="category-squircle-card" data-cat-id="' + c.id + '" onclick="selectCategoryTemplate(this.dataset.catId)">' +
+                  '<div class="cat-card-icon">' + c.icon + '</div>' +
+                  '<div class="cat-card-title">' + c.name + '</div>' +
+                  '<div class="cat-card-id">' + c.id + '</div>' +
+                '</div>';
+              }).join('');
+            }
+
+            const gridSpecial = document.getElementById('special-cat-grid');
+            if (gridSpecial) {
+              gridSpecial.innerHTML = SPECIAL_ROOM_CATEGORIES.map(c => {
+                return '<div class="category-squircle-card" data-cat-id="' + c.id + '" onclick="selectCategoryTemplate(this.dataset.catId)">' +
+                  '<div class="cat-card-icon">' + c.icon + '</div>' +
+                  '<div class="cat-card-title">' + c.name + '</div>' +
+                  '<div class="cat-card-id">' + c.id + '</div>' +
+                '</div>';
+              }).join('');
+            }
+          }
+
+          function selectPoolMode(pool) {
+            triggerHaptic('light');
+            const poolInput = document.getElementById('json-pool');
+            if (poolInput) poolInput.value = pool;
+            document.querySelectorAll('.pool-choice-card').forEach(c => {
+              c.classList.toggle('active', c.getAttribute('data-pool') === pool);
+            });
+            updateLiveDetection();
+          }
+
+          function selectCategoryTemplate(catId) {
+            triggerHaptic('light');
+            document.querySelectorAll('.category-squircle-card').forEach(c => {
+              c.classList.toggle('active', c.getAttribute('data-cat-id') === catId);
+            });
+            const currentPool = document.getElementById('json-pool').value || 'standard';
+            const catObj = APP_16_CATEGORIES.find(c => c.id === catId) || SPECIAL_ROOM_CATEGORIES.find(c => c.id === catId) || { name: catId, icon: '🏷️' };
+            
+            const sample = [
+              {
+                "text": catObj.name + " kategorisi için soru metnini buraya yazın...",
+                "options": [
+                  "A seçeneği (Doğru cevap örneği)",
+                  "B seçeneği",
+                  "C seçeneği",
+                  "D seçeneği"
+                ],
+                "correctAnswerIndex": 0,
+                "categoryId": catId,
+                "difficulty": "medium",
+                "explanation": "Bu soruya ait detaylı açıklama metni...",
+                "targetPool": currentPool
+              }
+            ];
+
+            document.getElementById('json-textarea').value = JSON.stringify(sample, null, 2);
+            updateLiveDetection();
+          }
+
+          function updateLiveDetection() {
+            const textarea = document.getElementById('json-textarea');
+            if (!textarea) return;
+            const content = textarea.value.trim();
+            const statusEl = document.getElementById('live-parser-status');
+            const tagsEl = document.getElementById('live-parser-tags');
+            if (!statusEl || !tagsEl) return;
+
+            if (!content) {
+              statusEl.innerHTML = '<span>ℹ️</span> <span>Henüz soru girilmedi. Yukarıdaki 16 kategoriden birine dokunarak şablon alabilirsiniz.</span>';
+              tagsEl.innerHTML = '';
+              return;
+            }
+
+            try {
+              let cleaned = content;
+              const tick3 = String.fromCharCode(96, 96, 96);
+              if (cleaned.indexOf(tick3) === 0) {
+                cleaned = cleaned.slice(3).replace(/^json\s*/i, '');
+                const lastIdx = cleaned.lastIndexOf(tick3);
+                if (lastIdx !== -1) cleaned = cleaned.slice(0, lastIdx);
+                cleaned = cleaned.trim();
+              }
+
+              let parsed = JSON.parse(cleaned);
+              if (!Array.isArray(parsed)) {
+                if (typeof parsed === 'object' && parsed !== null) {
+                  if (Array.isArray(parsed.questions)) parsed = parsed.questions;
+                  else if (Array.isArray(parsed.sorular)) parsed = parsed.sorular;
+                  else parsed = [parsed];
+                } else {
+                  parsed = [];
+                }
+              }
+
+              if (parsed.length === 0) {
+                statusEl.innerHTML = '<span style="color: #F87171;">⚠️ Dizi içinde soru objesi bulunamadı.</span>';
+                tagsEl.innerHTML = '';
+                return;
+              }
+
+              const catCounts = {};
+              const diffCounts = {};
+              const poolCounts = {};
+
+              parsed.forEach(q => {
+                const rawC = (q.categoryId || q.kategori || q.category || 'general_culture').toString().toLowerCase().trim();
+                const rawD = (q.difficulty || q.zorluk || 'medium').toString().toLowerCase().trim();
+                const rawP = (q.targetPool || q.havuz || document.getElementById('json-pool').value || 'standard').toString().toLowerCase().trim();
+
+                const matchedCat = APP_16_CATEGORIES.find(c => c.id === rawC || c.trKeys.includes(rawC)) || 
+                                   SPECIAL_ROOM_CATEGORIES.find(c => c.id === rawC) || 
+                                   { name: rawC, icon: '🏷️' };
+                const catLabel = matchedCat.icon + ' ' + matchedCat.name;
+                catCounts[catLabel] = (catCounts[catLabel] || 0) + 1;
+                diffCounts[rawD] = (diffCounts[rawD] || 0) + 1;
+                poolCounts[rawP] = (poolCounts[rawP] || 0) + 1;
+              });
+
+              statusEl.innerHTML = '<span style="color: var(--accent-mint); font-weight: 800;">✅ ' + parsed.length + ' Soru Algılandı</span>';
+
+              let tagsHtml = '';
+              Object.keys(catCounts).forEach(c => {
+                tagsHtml += '<span class="tag-pill gold">' + c + ' (' + catCounts[c] + ')</span>';
+              });
+              Object.keys(poolCounts).forEach(p => {
+                const poolLabel = p === 'custom_room' ? '⚔️ Arkadaşla Özel Oda' : p === 'daily_challenge' ? '📅 Günlük Meydan Okuma' : '🏆 Tek Kişilik Mod';
+                tagsHtml += '<span class="tag-pill" style="background: rgba(192,132,252,0.25); color: #C084FC; font-weight: 800;">' + poolLabel + '</span>';
+              });
+              tagsEl.innerHTML = tagsHtml;
+            } catch (syntaxErr) {
+              statusEl.innerHTML = '<span style="color: #F87171;">⚠️ JSON sözdizimi henüz tamamlanmadı (Tırnak veya virgülleri kontrol edin)</span>';
+              tagsEl.innerHTML = '';
+            }
+          }
+
           const SAMPLE_JSON_TEMPLATE = JSON.stringify([
             {
               "text": "Türkiye'nin başkenti neresidir?",
@@ -1683,6 +1980,7 @@ export function createApp() {
             triggerHaptic('light');
             document.getElementById('json-textarea').value = SAMPLE_JSON_TEMPLATE;
             console.log("📋 [Telegram WebApp] Örnek JSON şablonu alana yerleştirildi.");
+            updateLiveDetection();
           }
 
           function clearJsonText() {
@@ -1690,18 +1988,21 @@ export function createApp() {
             document.getElementById('json-textarea').value = '';
             const alertBox = document.getElementById('json-alert');
             if (alertBox) alertBox.style.display = 'none';
-            console.log('🧹 [Telegram WebApp] JSON textarea ve uyarı kutusu temizlendi.');
+            document.querySelectorAll('.category-squircle-card').forEach(c => c.classList.remove('active'));
+            console.log("🧹 [Telegram WebApp] JSON textarea ve uyarı kutusu temizlendi.");
+            updateLiveDetection();
           }
 
           function handleFileSelect(e) {
             const file = e.target.files[0];
             if (!file) return;
-            console.log('📁 [Telegram WebApp] Dosya seçildi:', file.name, '(' + file.size + ' bayt)');
+            console.log("📁 [Telegram WebApp] Dosya seçildi: " + file.name + " (" + file.size + " bayt)");
             const reader = new FileReader();
             reader.onload = (event) => {
               document.getElementById('json-textarea').value = event.target.result;
               triggerHaptic('success');
-              console.log('✅ [Telegram WebApp] Dosya içeriği başarıyla okundu.');
+              console.log("✅ [Telegram WebApp] Dosya içeriği başarıyla okundu.");
+              updateLiveDetection();
             };
             reader.readAsText(file);
           }
@@ -2155,6 +2456,8 @@ export function createApp() {
 
           // Initial load
           window.addEventListener('DOMContentLoaded', () => {
+            renderCategoryPickers();
+            updateLiveDetection();
             fetch('/api/admin/questions/review?limit=1').then(r => r.json()).then(d => {
               const dot = document.getElementById('pending-dot');
               if (dot && d.count > 0) dot.style.display = 'block';
