@@ -192,6 +192,7 @@ export const RootNavigator: React.FC = () => {
   matchQuestionsReviewRef.current = matchQuestionsReview;
   const {
     user,
+    token,
     setUser,
     activeRoom,
     setActiveRoom,
