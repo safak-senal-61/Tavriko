@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   Image,
 } from 'react-native';
-import { useGameStore, clearAllAccountStorage } from '../store/gameStore';
+import { useGameStore, clearAllAccountStorage, getStoredAuth } from '../store/gameStore';
 import { socketService } from '../services/socketService';
 import { sound } from '../services/soundService';
 import { THEME } from '../theme/tokens';
@@ -112,7 +112,7 @@ export const RootNavigator: React.FC = () => {
     (window.location.search.includes('screen=developer') ||
       window.location.hash.includes('developer'));
 
-  const initialAuthUser = getStoredAuth().user;
+  const initialAuthUser = getStoredAuth()?.user || useGameStore.getState().user;
   const initialScreen: ScreenName = isWebOAuthReturn
     ? 'auth'
     : isWebDeveloperReturn
