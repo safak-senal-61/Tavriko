@@ -1,4 +1,5 @@
 export declare const SOCKET_EVENTS: {
+    readonly CREATE_ROOM: "room:create";
     readonly JOIN_ROOM: "room:join";
     readonly LEAVE_ROOM: "room:leave";
     readonly TOGGLE_READY: "room:toggle_ready";

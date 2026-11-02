@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SOCKET_EVENTS = void 0;
 exports.SOCKET_EVENTS = {
     // Connection & Room Management
+    CREATE_ROOM: 'room:create',
     JOIN_ROOM: 'room:join',
     LEAVE_ROOM: 'room:leave',
     TOGGLE_READY: 'room:toggle_ready',

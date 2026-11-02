@@ -1,5 +1,6 @@
 export const SOCKET_EVENTS = {
   // Connection & Room Management
+  CREATE_ROOM: 'room:create',
   JOIN_ROOM: 'room:join',
   LEAVE_ROOM: 'room:leave',
   TOGGLE_READY: 'room:toggle_ready',

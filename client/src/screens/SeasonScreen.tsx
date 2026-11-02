@@ -48,7 +48,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
   const [claimedRewardModal, setClaimedRewardModal] = useState<SeasonReward | null>(null);
   const [isPurchasingPass, setIsPurchasingPass] = useState(false);
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<any>(null);
 
   const seasonXp = user?.seasonXp || 0;
   const hasPremium = !!user?.hasPremiumPass;

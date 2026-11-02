@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -94,7 +95,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
             </Text>
           </View>
         </TouchableOpacity>
-        {/* 3x2 Character Avatar Grid */}
+        {/* 10 Character Avatar Grid from Tavriko UI Kit */}
         <View style={styles.avatarGrid}>
           {AVATAR_PRESETS.map((preset, idx) => {
             const isSelected = !customPhotoUri && idx === selectedIndex;
@@ -113,7 +114,15 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
                 }}
                 activeOpacity={0.85}
               >
-                <CharacterAvatar index={idx} size={64} />
+                <CharacterAvatar index={idx} size={54} />
+                <Text style={styles.avatarNameText} numberOfLines={1}>
+                  {preset.name}
+                </Text>
+                <View style={[styles.avatarRarityBadge, { backgroundColor: preset.badgeBg }]}>
+                  <Text style={[styles.avatarRarityText, { color: preset.badgeFg }]}>
+                    {preset.rarity}
+                  </Text>
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -206,16 +215,40 @@ const styles = StyleSheet.create({
   },
   avatarSlot: {
     width: '31%',
-    height: 92,
+    height: 116,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 3,
+    borderWidth: 2.5,
     borderColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 6,
   },
   avatarSlotSelected: {
     borderColor: '#FFC43D',
+    backgroundColor: 'rgba(255, 196, 61, 0.1)',
+    ...Platform.select({
+      web: { boxShadow: '0 0 16px rgba(255, 196, 61, 0.4)' },
+      default: { elevation: 6 },
+    }),
+  },
+  avatarNameText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '900',
+    marginTop: 4,
+  },
+  avatarRarityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 1,
+    borderRadius: 6,
+    marginTop: 3,
+  },
+  avatarRarityText: {
+    fontSize: 9,
+    fontFamily: THEME.fonts.extraBold,
+    fontWeight: '900',
   },
   inputCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.09)',

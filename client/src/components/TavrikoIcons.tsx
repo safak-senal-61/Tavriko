@@ -7,6 +7,7 @@ import {
   ViewStyle,
   TextStyle,
   Image,
+  Platform,
 } from 'react-native';
 import Svg, {
   Defs,
@@ -21,6 +22,7 @@ import Svg, {
 } from 'react-native-svg';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
+import { CharacterAvatar, AVATAR_PRESETS, AvatarPreset } from './TavrikoAvatars';
 // Brand Assets
 export const BRAND_LOGO_MAIN = require('../../assets/images/logo_main.jpg');
 export const BRAND_LOGO_BANNER = require('../../assets/images/logo_banner.jpg');
@@ -98,63 +100,13 @@ const SharedSvgDefs = () => (
 // ============================================================================
 // 1. CHARACTER AVATARS (6 Custom SVG Avatars from page02)
 // ============================================================================
-export const AVATAR_PRESETS = [
-  { id: 'av0', bg: '#3b6ea5', skin: '#e0ac85', shirt: '#1c1c2e', name: 'Mavi Kaptan' },
-  { id: 'av1', bg: '#8a9bb8', skin: '#c98f6a', shirt: '#222222', name: 'Bozkurt' },
-  { id: 'av2', bg: '#6f8f6a', skin: '#e0ac85', shirt: '#444444', name: 'Orman Bilgesi' },
-  { id: 'av3', bg: '#a58f7a', skin: '#f1c9a5', shirt: '#7a2a2a', name: 'Kızıl Şövalye' },
-  { id: 'av4', bg: '#7a4cd8', skin: '#c98f6a', shirt: '#2a1558', name: 'Mor Büyücü' },
-  { id: 'av5', bg: '#c8456a', skin: '#e0ac85', shirt: '#3a1a50', name: 'Pembe Fırtına' },
-];
-export const CharacterAvatar: React.FC<{
-  index?: number;
-  seed?: string;
-  size?: number;
-}> = ({ index, seed, size = 40 }) => {
-  const [imgError, setImgError] = React.useState(false);
-  const isDirectImageUri =
-    !imgError &&
-    typeof seed === 'string' &&
-    !seed.includes('dicebear.com/7.x/bottts/svg') &&
-    (seed.startsWith('http://') ||
-      seed.startsWith('https://') ||
-      seed.startsWith('file://') ||
-      seed.startsWith('content://') ||
-      seed.startsWith('data:image/'));
-  if (isDirectImageUri && seed) {
-    return (
-      <Image
-        source={{ uri: seed }}
-        style={{
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: '#3b6ea5',
-        }}
-        onError={() => setImgError(true)}
-      />
-    );
-  }
-  let resolvedIndex = index ?? 1;
-  if (index === undefined && seed) {
-    const found = AVATAR_PRESETS.findIndex((p) => seed.includes(p.id) || seed.includes(p.name));
-    if (found >= 0) {
-      resolvedIndex = found;
-    } else {
-      let hash = 0;
-      for (let i = 0; i < seed.length; i++) hash += seed.charCodeAt(i);
-      resolvedIndex = hash % AVATAR_PRESETS.length;
-    }
-  }
-  const preset = AVATAR_PRESETS[resolvedIndex % AVATAR_PRESETS.length];
-  return (
-    <Svg width={size} height={size} viewBox="0 0 40 40">
-      <Circle cx="20" cy="20" r="20" fill={preset.bg} />
-      <Circle cx="20" cy="16" r="7" fill={preset.skin} />
-      <Path d="M8 34c2-8 8-10 12-10s10 2 12 10" fill={preset.shirt} />
-    </Svg>
-  );
-};
+// 1. CHARACTER AVATARS (10 Official Vector Avatars from Tavriko UI Kit)
+// ============================================================================
+export {
+  AVATAR_PRESETS,
+  CharacterAvatar,
+  AvatarPreset,
+} from './TavrikoAvatars';
 export const GoogleGIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
   <Svg width={size} height={size} viewBox="0 0 48 48">
     <Path
@@ -1029,14 +981,14 @@ export const TavrikoScreen: React.FC<{
   </View>
 );
 export const BackChevronIcon: React.FC<{ size?: number; color?: string }> = ({
-  size = 22,
+  size = 20,
   color = '#FFFFFF',
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path
-      d="M15 19L8 12L15 5"
+      d="M15 18L9 12L15 6"
       stroke={color}
-      strokeWidth="2.8"
+      strokeWidth="2.6"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
@@ -1384,10 +1336,11 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    backgroundColor: 'rgba(24, 11, 52, 0.88)',
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: 'rgba(24, 11, 52, 0.92)',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 0,
     ...Platform.select({
       ios: {
         shadowColor: '#000000',
@@ -1399,6 +1352,7 @@ const styles = StyleSheet.create({
         elevation: 4,
       },
       web: {
+        cursor: 'pointer',
         boxShadow: '0 3px 10px rgba(0,0,0,0.3)',
       },
     }),

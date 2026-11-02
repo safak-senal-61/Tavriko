@@ -500,11 +500,24 @@ export const SEASON_1_TIERS = generateSeason1Tiers();
 // -------------------------------------------------------------
 // Comprehensive Shop Catalog
 // -------------------------------------------------------------
+export type ShopProductCategory =
+  | 'featured'
+  | 'diamonds'
+  | 'gold'
+  | 'chests'
+  | 'keys'
+  | 'avatars'
+  | 'frames'
+  | 'badges'
+  | 'name_effects'
+  | 'boosters'
+  | 'backgrounds';
+
 export interface ShopProduct {
   id: string;
   name: string;
   desc: string;
-  category: 'featured' | 'diamonds' | 'gold' | 'chests' | 'keys' | 'avatars' | 'frames' | 'badges' | 'name_effects' | 'boosters' | 'backgrounds';
+  category: ShopProductCategory;
   price: number;
   currency: 'coins' | 'gems' | 'try';
   rarity: ItemRarity;

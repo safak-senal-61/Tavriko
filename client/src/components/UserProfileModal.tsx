@@ -71,12 +71,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   const isMe = userId === currentUserId;
   const stats = profile?.stats;
-  const matches = stats?.matchesPlayed || 0;
+  const matches = (stats as any)?.totalMatches || (stats as any)?.matchesPlayed || 0;
   const wins = stats?.wins || 0;
   const winRate = matches > 0 ? Math.round((wins / matches) * 100) : 0;
   const correct = stats?.correctAnswers || 0;
-  const wrong = stats?.wrongAnswers || 0;
-  const totalAnswers = correct + wrong;
+  const wrong = (stats as any)?.wrongAnswers ?? (stats?.totalAnswers ? Math.max(0, stats.totalAnswers - stats.correctAnswers) : 0);
+  const totalAnswers = stats?.totalAnswers || (correct + wrong);
   const accuracy = totalAnswers > 0 ? Math.round((correct / totalAnswers) * 100) : 0;
 
   return (

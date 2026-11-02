@@ -43,7 +43,7 @@ interface CategoryTabItem {
 const CATEGORY_TABS: CategoryTabItem[] = [
   { id: 'featured', name: 'Öne Çıkanlar', icon: '🔥' },
   { id: 'diamonds', name: 'Elmas', icon: '💎' },
-  { id: 'coins', name: 'Altın', icon: '🪙' },
+  { id: 'gold', name: 'Altın', icon: '🪙' },
   { id: 'chests', name: 'Sandıklar', icon: '📦' },
   { id: 'keys', name: 'Anahtarlar', icon: '🗝️' },
   { id: 'avatars', name: 'Avatarlar', icon: '🎭' },
@@ -112,8 +112,9 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         onOpenPayment({
           id: product.id,
           title: product.name,
-          priceText: `₺${product.price.toFixed(2)}`,
-          description: product.desc,
+          subtitle: product.desc,
+          price: `₺${product.price.toFixed(2)}`,
+          priceNumeric: product.price,
         });
       } else {
         // Fallback simulated payment
@@ -283,7 +284,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                     <ChestIcon size={64} />
                   ) : item.category === 'diamonds' ? (
                     <GemIcon size={56} />
-                  ) : item.category === 'coins' ? (
+                  ) : item.category === 'gold' ? (
                     <CoinIcon size={56} />
                   ) : (
                     <View style={[styles.cosmeticCircle, { borderColor: rarityColor }]}>

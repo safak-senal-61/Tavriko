@@ -19,3 +19,12 @@ client/.env
 scripts/*vercel*.js
 scripts/fix-font-weights.js
 server/*_store.json
+# Temp extraction scripts and kit dumps
+*.py
+screen_dumps/
+unpacked_pages/
+unpacked_uikit/
+*_body.html
+avatars_*.json
+icons_*.json
+extracted_avatars.json

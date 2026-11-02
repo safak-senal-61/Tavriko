@@ -36,6 +36,7 @@ import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import {
   CharacterAvatar,
+  AVATAR_PRESETS,
   Button3D,
   CoinIcon,
   EyeOpenIcon,
@@ -50,7 +51,7 @@ interface AuthScreenProps {
   apiBaseUrl: string;
   redirectNotice?: string | null;
 }
-const AVATAR_PRESETS = ['av1', 'av2', 'av3', 'av4', 'av5', 'av6'];
+const AVATAR_OPTIONS = AVATAR_PRESETS.map((p) => p.id);
 interface CountryOption {
   code: string;
   name: string;
@@ -1123,7 +1124,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       </View>
                     </TouchableOpacity>
                     <View style={styles.avatarGrid}>
-                      {AVATAR_PRESETS.map((av) => {
+                      {AVATAR_OPTIONS.map((av) => {
                         const isSelected = !customPhotoUri && selectedAvatar === av;
                         return (
                           <TouchableOpacity

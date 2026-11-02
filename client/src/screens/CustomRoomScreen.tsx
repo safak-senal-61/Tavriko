@@ -9,7 +9,7 @@ import {
   Switch,
   Platform,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
 import { CustomRoomSettings, CategoryId, DifficultyLevel } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -18,6 +18,7 @@ import {
   TavrikoScreen,
   TavrikoTopBar,
   Button3D,
+  CategorySquircleIcon,
 } from '../components/TavrikoIcons';
 import {
   CategorySelectModal,
@@ -25,7 +26,6 @@ import {
 import {
   CategoryData,
   GENERAL_CATEGORIES,
-  CategorySquircleIcon,
 } from '../components/CategorySquircleCard';
 
 interface CustomRoomScreenProps {
@@ -46,6 +46,65 @@ const DIFFICULTY_OPTIONS: { id: DifficultyLevel | 'mixed'; label: string }[] = [
   { id: 'medium', label: 'Orta' },
   { id: 'hard', label: 'Zor' },
   { id: 'expert', label: 'Uzman' },
+];
+
+interface PublicRoomItem {
+  id: string;
+  code: string;
+  title: string;
+  categoryKey: string;
+  categoryName: string;
+  totalRounds: number;
+  timeSec: number;
+  players: number;
+  maxPlayers: number;
+}
+
+const PUBLIC_ROOMS: PublicRoomItem[] = [
+  {
+    id: 'pub1',
+    code: 'DNZ720',
+    title: "Deniz'in Odası",
+    categoryKey: 'bilim',
+    categoryName: 'Bilim',
+    totalRounds: 7,
+    timeSec: 20,
+    players: 3,
+    maxPlayers: 4,
+  },
+  {
+    id: 'pub2',
+    code: 'ECE40S',
+    title: 'Ece Arena',
+    categoryKey: 'genel_kultur',
+    categoryName: 'Karışık',
+    totalRounds: 14,
+    timeSec: 40,
+    players: 2,
+    maxPlayers: 6,
+  },
+  {
+    id: 'pub3',
+    code: 'BRK8SP',
+    title: 'Burak Challenge',
+    categoryKey: 'spor',
+    categoryName: 'Spor',
+    totalRounds: 7,
+    timeSec: 20,
+    players: 5,
+    maxPlayers: 8,
+  },
+  {
+    id: 'pub4',
+    code: 'GLK20S',
+    title: 'Galaksi Turu',
+    categoryKey: 'uzay',
+    categoryName: 'Uzay',
+    totalRounds: 21,
+    timeSec: 20,
+    players: 1,
+    maxPlayers: 4,
+  },
 ];
 
 export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
@@ -125,7 +184,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Tavriko Neon Sekme Seçici (Oda Kur | Odaya Katıl) */}
+        {/* Tavriko Neon Sekme Seçici (Oda Kur | Odaya Katıl - UI Kit Design) */}
         <View style={styles.tabToggleRow}>
           <TouchableOpacity
             style={[styles.tabButton, activeTab === 'create' && styles.tabButtonActiveCreate]}
@@ -135,8 +194,15 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               setActiveTab('create');
             }}
           >
+            <Svg width={20} height={20} viewBox="0 0 64 64" style={{ marginRight: 6 }}>
+              <Rect x="27" y="3" width="10" height="6" rx="2" fill="#b8c2d8" />
+              <Path d="M49 13l4 4" stroke="#b8c2d8" strokeWidth="4" strokeLinecap="round" />
+              <Circle cx="32" cy="36" r="22" fill="#4A9BFF" />
+              <Circle cx="32" cy="36" r="17" fill="#fff" opacity={0.18} />
+              <Path d="M36 21L24 38h8l-3 13 14-19h-8z" fill="#FFC43D" />
+            </Svg>
             <Text style={[styles.tabButtonText, activeTab === 'create' && styles.tabButtonTextActive]}>
-              ⚡ ODA KUR
+              ODA KUR
             </Text>
           </TouchableOpacity>
 
@@ -148,8 +214,14 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               setActiveTab('join');
             }}
           >
+            <Svg width={20} height={20} viewBox="0 0 64 64" style={{ marginRight: 6 }}>
+              <Circle cx="20" cy="20" r="13" fill="#FFC43D" />
+              <Circle cx="20" cy="20" r="5.5" fill="#2a1558" />
+              <Path d="M29 29l24 24M43 43l7-7M50 50l6-6" stroke="#f5a300" strokeWidth="7" strokeLinecap="round" fill="none" />
+              <Path d="M12 14a10 10 0 016-4" stroke="#fff" strokeWidth="3" strokeLinecap="round" fill="none" opacity={0.7} />
+            </Svg>
             <Text style={[styles.tabButtonText, activeTab === 'join' && styles.tabButtonTextActive]}>
-              🔑 ODAYA KATIL
+              ODAYA KATIL
             </Text>
           </TouchableOpacity>
         </View>
@@ -184,9 +256,9 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                   ]}
                 >
                   {selectedCategory === 'mixed' ? (
-                    <CategorySquircleIcon name="shuffle" size={26} color="#FFE27A" />
+                    <CategorySquircleIcon category="genel_kultur" size={26} />
                   ) : (
-                    <CategorySquircleIcon name={selectedCategory.iconName} size={26} color="#FFFFFF" />
+                    <CategorySquircleIcon category={selectedCategory.id} size={26} />
                   )}
                 </View>
                 <View>
@@ -436,6 +508,43 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               variant="mint"
               style={{ height: 56, marginTop: 24 }}
             />
+
+            {/* HERKESE AÇIK ODALAR (Tavriko UI Kit - Public Rooms) */}
+            <View style={styles.publicRoomsHeaderRow}>
+              <View style={styles.publicRoomsDivider} />
+              <Text style={styles.publicRoomsSectionTitle}>HERKESE AÇIK ODALAR</Text>
+              <View style={styles.publicRoomsDivider} />
+            </View>
+
+            <View style={styles.publicRoomsList}>
+              {PUBLIC_ROOMS.map((room) => (
+                <View key={room.id} style={styles.publicRoomCard}>
+                  <View style={styles.publicRoomIconWrap}>
+                    <CategorySquircleIcon category={room.categoryKey} size={42} />
+                  </View>
+                  <View style={styles.publicRoomInfo}>
+                    <Text style={styles.publicRoomTitle} numberOfLines={1}>{room.title}</Text>
+                    <Text style={styles.publicRoomSub}>
+                      {room.categoryName} · {room.totalRounds} soru · {room.timeSec}sn
+                    </Text>
+                  </View>
+                  <View style={styles.publicRoomPill}>
+                    <Text style={styles.publicRoomPillText}>{room.players}/{room.maxPlayers}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.publicRoomJoinBtn}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      sound.playSound('tap');
+                      sound.triggerHaptic('medium');
+                      onJoinRoom(room.code);
+                    }}
+                  >
+                    <Text style={styles.publicRoomJoinBtnText}>KATIL</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -748,5 +857,89 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.extraBold,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  publicRoomsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 22,
+    marginBottom: 12,
+  },
+  publicRoomsDivider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  publicRoomsSectionTitle: {
+    color: '#D9CDF5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 1.2,
+  },
+  publicRoomsList: {
+    width: '100%',
+    gap: 8,
+  },
+  publicRoomCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 10,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  publicRoomIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  publicRoomInfo: {
+    flex: 1,
+  },
+  publicRoomTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '900',
+  },
+  publicRoomSub: {
+    color: '#A79BC4',
+    fontSize: 11,
+    fontFamily: THEME.fonts.medium,
+    marginTop: 2,
+  },
+  publicRoomPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  publicRoomPillText: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
+  },
+  publicRoomJoinBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: '#5ADBB5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  publicRoomJoinBtnText: {
+    color: '#082520',
+    fontSize: 13,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
 });

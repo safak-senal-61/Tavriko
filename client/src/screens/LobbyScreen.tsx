@@ -159,7 +159,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </View>
 
           <View style={styles.actionBtnsRow}>
-            {/* Kopyala Butonu */}
+            {/* Tek ve Net Kopyala Butonu */}
             <TouchableOpacity
               style={[styles.actionBtn, copied && styles.actionBtnActive]}
               onPress={handleCopyCode}
@@ -173,15 +173,6 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
               <Text style={[styles.actionBtnText, copied && styles.actionBtnTextActive]}>
                 {copied ? 'Kopyalandı' : 'Kopyala'}
               </Text>
-            </TouchableOpacity>
-
-            {/* Paylaş Butonu */}
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={handleShareCode}
-              activeOpacity={0.8}
-            >
-              <ShareSvgIcon size={18} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </View>
@@ -261,11 +252,10 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             );
           })}
 
-          {/* Boş Slotlar: Sade, düz ve modern (Tekrarlayan davet yazıları kaldırıldı) */}
+          {/* Boş Slotlar: Tavriko UI Kit kesikli çizgili sade tasarım */}
           {Array.from({ length: Math.min(4, emptySlotCount) }).map((_, idx) => (
             <View key={`empty_${idx}`} style={styles.emptySlot}>
-              <View style={styles.emptySlotDot} />
-              <Text style={styles.emptySlotText}>Boş Koltuk</Text>
+              <Text style={styles.emptySlotText}>Oyuncu bekleniyor...</Text>
             </View>
           ))}
         </View>
@@ -551,26 +541,22 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.bold,
   },
   emptySlot: {
-    flexDirection: 'row',
+    height: 52,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-  },
-  emptySlotDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginRight: 10,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    marginBottom: 4,
   },
   emptySlotText: {
-    color: '#8A7BB3',
-    fontSize: 12,
-    fontFamily: THEME.fonts.medium,
+    color: '#D9CDF5',
+    fontSize: 13,
+    fontFamily: THEME.fonts.bold,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   controlsWrap: {
     width: '100%',

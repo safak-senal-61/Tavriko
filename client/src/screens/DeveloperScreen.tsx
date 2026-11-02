@@ -151,10 +151,10 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
     if (!user || !onUpdateUser) return;
     const inv = [...(user.inventory || [])];
     inv.push(
-      { id: 'chest_gold_' + Date.now(), name: 'Altın Sandık', category: 'chests', rarity: 'legendary', qty: 1, icon: '📦', isEquipped: false },
-      { id: 'key_gold_' + Date.now(), name: 'Altın Anahtar', category: 'keys', rarity: 'legendary', qty: 1, icon: '🗝️', isEquipped: false },
-      { id: 'chest_silver_' + Date.now(), name: 'Gümüş Sandık', category: 'chests', rarity: 'rare', qty: 2, icon: '📦', isEquipped: false },
-      { id: 'key_silver_' + Date.now(), name: 'Gümüş Anahtar', category: 'keys', rarity: 'rare', qty: 2, icon: '🗝️', isEquipped: false }
+      { id: 'chest_gold_' + Date.now(), name: 'Altın Sandık', desc: 'Değerli ödüller içerir', category: 'chest', rarity: 'legendary', qty: 1, icon: '📦', equipped: false },
+      { id: 'key_gold_' + Date.now(), name: 'Altın Anahtar', desc: 'Altın sandığı açar', category: 'key', rarity: 'legendary', qty: 1, icon: '🗝️', equipped: false },
+      { id: 'chest_silver_' + Date.now(), name: 'Gümüş Sandık', desc: 'Sürpriz ödüller içerir', category: 'chest', rarity: 'rare', qty: 2, icon: '📦', equipped: false },
+      { id: 'key_silver_' + Date.now(), name: 'Gümüş Anahtar', desc: 'Gümüş sandığı açar', category: 'key', rarity: 'rare', qty: 2, icon: '🗝️', equipped: false }
     );
     const updated: UserProfile = {
       ...user,
