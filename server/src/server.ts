@@ -8,10 +8,12 @@ import fs from 'fs';
 // @ts-ignore
 import QRCode from 'qrcode';
 import { Server as SocketIOServer } from 'socket.io';
+import { WebSocketServer, WebSocket as WsWebSocket } from 'ws';
 import { prisma, db } from './db/prismaClient';
 import { GameRoomManager } from './engine/GameRoomManager';
 import { Matchmaker } from './engine/Matchmaker';
 import { setupSocketHandlers } from './socket/socketHandler';
+import { presenceManager } from './services/presenceManager';
 import { TelegramBotService } from './telegram/telegramBot';
 import { supabaseService } from './db/supabaseClient';
 import { cacheService } from './cache/redisClient';
@@ -85,6 +87,65 @@ export function createApp() {
   const matchmaker = new Matchmaker(roomManager);
 
   setupSocketHandlers(io, roomManager, matchmaker);
+
+  // Native WebSocket server for /ws connections (real-time presence & notifications)
+  const wss = new WebSocketServer({ noServer: true });
+
+  httpServer.on('upgrade', (request, socket, head) => {
+    const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
+    if (url.pathname.startsWith('/ws')) {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    }
+  });
+
+  wss.on('connection', (ws: WsWebSocket, request: http.IncomingMessage) => {
+    const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
+    const playerId = url.searchParams.get('playerId');
+    const roomCode = url.searchParams.get('roomCode');
+
+    if (playerId) {
+      presenceManager.registerSocket(playerId, ws);
+      if (roomCode) {
+        presenceManager.setUserRoom(playerId, roomCode);
+      }
+      ws.send(
+        JSON.stringify({
+          event: 'presence:sync',
+          payload: { presences: presenceManager.getAllPresences() },
+          timestamp: Date.now(),
+        })
+      );
+    }
+
+    ws.on('message', (data) => {
+      try {
+        const text = data.toString();
+        const msg = JSON.parse(text);
+        if (msg.event === 'ping') {
+          ws.send(JSON.stringify({ event: 'pong', timestamp: Date.now() }));
+        } else if (msg.event === 'presence:ping' && msg.payload?.playerId) {
+          presenceManager.touchUser(msg.payload.playerId);
+        } else if (msg.event === 'presence:register' && msg.payload?.playerId) {
+          presenceManager.registerSocket(msg.payload.playerId, ws);
+          ws.send(
+            JSON.stringify({
+              event: 'presence:sync',
+              payload: { presences: presenceManager.getAllPresences() },
+              timestamp: Date.now(),
+            })
+          );
+        }
+      } catch {}
+    });
+
+    ws.on('close', () => {
+      if (playerId) {
+        presenceManager.unregisterSocket(playerId, ws);
+      }
+    });
+  });
 
   // Initialize Telegram Bot & Admin Approval Service
   const telegramBot = new TelegramBotService({ db, roomManager });

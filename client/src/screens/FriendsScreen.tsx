@@ -15,6 +15,7 @@ import { UserProfile, calculateLevelFromXp } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
+import { socketService } from '../services/socketService';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -89,7 +90,18 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       .then((data) => {
         if (data.friendCode) setFriendCode(data.friendCode);
         if (Array.isArray(data.friends)) {
-          setFriendsList(data.friends);
+          // Strictly deduplicate users by ID and username
+          const seenIds = new Set<string>();
+          const seenUsernames = new Set<string>();
+          const cleanFriends = data.friends.filter((f: FriendRowItem) => {
+            if (!f || !f.id || seenIds.has(f.id)) return false;
+            const uName = (f.username || f.name || f.displayName || '').toLowerCase().trim();
+            if (uName && seenUsernames.has(uName)) return false;
+            seenIds.add(f.id);
+            if (uName) seenUsernames.add(uName);
+            return true;
+          });
+          setFriendsList(cleanFriends);
         }
       })
       .catch(() => {})
@@ -97,8 +109,85 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         setLoading(false);
       });
   };
+
   useEffect(() => {
     fetchFriends();
+
+    // Listen to real-time presence events from WebSocket
+    const unsubPresenceUpdate = socketService.on('presence:update', (data: any) => {
+      if (!data || !data.userId) return;
+      setFriendsList((prev) =>
+        prev.map((f) => {
+          if (f.id === data.userId) {
+            const isOnline = data.online ?? f.online;
+            const inRoom = data.inRoom ?? f.inRoom;
+            const currentRoomCode = data.currentRoomCode ?? f.currentRoomCode;
+            let status = f.status;
+            if (inRoom && currentRoomCode) {
+              status = `Oda: #${currentRoomCode} · Lobide`;
+            } else if (f.isFriend) {
+              status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
+            } else {
+              status = isOnline ? 'Çevrimiçi' : 'Çevrimdışı';
+            }
+            return {
+              ...f,
+              online: isOnline,
+              inRoom,
+              currentRoomCode,
+              status,
+            };
+          }
+          return f;
+        })
+      );
+    });
+
+    const unsubUserOnline = socketService.on('user:online', (data: any) => {
+      const uid = data?.userId || data?.presence?.userId;
+      if (!uid) return;
+      setFriendsList((prev) =>
+        prev.map((f) => {
+          if (f.id === uid) {
+            return {
+              ...f,
+              online: true,
+              status: f.isFriend ? 'Arkadaşın · Çevrimiçi' : 'Çevrimiçi',
+            };
+          }
+          return f;
+        })
+      );
+    });
+
+    const unsubUserOffline = socketService.on('user:offline', (data: any) => {
+      const uid = data?.userId || data?.presence?.userId;
+      if (!uid) return;
+      setFriendsList((prev) =>
+        prev.map((f) => {
+          if (f.id === uid) {
+            return {
+              ...f,
+              online: false,
+              inRoom: false,
+              status: f.isFriend ? 'Arkadaşın · Çevrimdışı' : 'Çevrimdışı',
+            };
+          }
+          return f;
+        })
+      );
+    });
+
+    const unsubFriendsUpdate = socketService.on('friends:update', () => {
+      fetchFriends();
+    });
+
+    return () => {
+      unsubPresenceUpdate();
+      unsubUserOnline();
+      unsubUserOffline();
+      unsubFriendsUpdate();
+    };
   }, [apiBaseUrl, user?.id]);
   const currentCode = user?.friendCode || friendCode;
   const handleCopyCode = async () => {

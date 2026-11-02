@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/prismaClient';
+import { presenceManager } from '../services/presenceManager';
 import { SHOP_CATALOG, SEASON_1_TIERS, EVENT_DEFINITIONS } from '@trivia/shared';
 
 const router = Router();
@@ -13,10 +14,14 @@ router.get('/leaderboard', (req: Request, res: Response): void => {
   });
 });
 
-router.get('/friends/:userId', (req: Request, res: Response): void => {
-  const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
-  const data = db.getFriendsForUser(userId || 'anon');
-  res.json(data);
+router.get('/friends/:userId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    const data = await db.getFriendsForUserAsync(userId || 'anon');
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.post('/friends/add', async (req: Request, res: Response): Promise<void> => {
@@ -57,13 +62,17 @@ router.post('/friends/challenge', async (req: Request, res: Response): Promise<v
 });
 
 // --- Real Notifications API ---
-router.get('/notifications/:userId', (req: Request, res: Response): void => {
-  const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
-  const notifications = db.getUserNotifications(userId || 'anon');
-  res.json({
-    success: true,
-    notifications,
-  });
+router.get('/notifications/:userId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    const notifications = await db.getUserNotificationsAsync(userId || 'anon');
+    res.json({
+      success: true,
+      notifications,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.post('/notifications/respond', async (req: Request, res: Response): Promise<void> => {
@@ -79,6 +88,29 @@ router.post('/notifications/respond', async (req: Request, res: Response): Promi
       return;
     }
     res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Real-Time Presence API ---
+router.get('/presence', (req: Request, res: Response): void => {
+  res.json({
+    success: true,
+    presences: presenceManager.getAllPresences(),
+  });
+});
+
+router.post('/presence/heartbeat', (req: Request, res: Response): void => {
+  try {
+    const { userId, inRoom, roomCode } = req.body;
+    if (userId) {
+      presenceManager.touchUser(userId);
+      if (inRoom !== undefined) {
+        presenceManager.setUserRoom(userId, roomCode || null);
+      }
+    }
+    res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

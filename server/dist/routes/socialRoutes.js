@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const prismaClient_1 = require("../db/prismaClient");
+const presenceManager_1 = require("../services/presenceManager");
 const shared_1 = require("@trivia/shared");
 const router = (0, express_1.Router)();
 router.get('/leaderboard', (req, res) => {
@@ -12,10 +13,15 @@ router.get('/leaderboard', (req, res) => {
         topPlayers,
     });
 });
-router.get('/friends/:userId', (req, res) => {
-    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
-    const data = prismaClient_1.db.getFriendsForUser(userId || 'anon');
-    res.json(data);
+router.get('/friends/:userId', async (req, res) => {
+    try {
+        const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+        const data = await prismaClient_1.db.getFriendsForUserAsync(userId || 'anon');
+        res.json(data);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 router.post('/friends/add', async (req, res) => {
     try {
@@ -55,13 +61,18 @@ router.post('/friends/challenge', async (req, res) => {
     }
 });
 // --- Real Notifications API ---
-router.get('/notifications/:userId', (req, res) => {
-    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
-    const notifications = prismaClient_1.db.getUserNotifications(userId || 'anon');
-    res.json({
-        success: true,
-        notifications,
-    });
+router.get('/notifications/:userId', async (req, res) => {
+    try {
+        const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+        const notifications = await prismaClient_1.db.getUserNotificationsAsync(userId || 'anon');
+        res.json({
+            success: true,
+            notifications,
+        });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 router.post('/notifications/respond', async (req, res) => {
     try {
@@ -76,6 +87,28 @@ router.post('/notifications/respond', async (req, res) => {
             return;
         }
         res.json(result);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// --- Real-Time Presence API ---
+router.get('/presence', (req, res) => {
+    res.json({
+        success: true,
+        presences: presenceManager_1.presenceManager.getAllPresences(),
+    });
+});
+router.post('/presence/heartbeat', (req, res) => {
+    try {
+        const { userId, inRoom, roomCode } = req.body;
+        if (userId) {
+            presenceManager_1.presenceManager.touchUser(userId);
+            if (inRoom !== undefined) {
+                presenceManager_1.presenceManager.setUserRoom(userId, roomCode || null);
+            }
+        }
+        res.json({ success: true });
     }
     catch (err) {
         res.status(500).json({ error: err.message });

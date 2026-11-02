@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.setupSocketHandlers = setupSocketHandlers;
 const shared_1 = require("@trivia/shared");
+const presenceManager_1 = require("../services/presenceManager");
 function setupSocketHandlers(io, roomManager, matchmaker) {
     // Wire up room manager callbacks to broadcast to rooms
     roomManager.onRoundStart = (roomCode, question) => {
@@ -76,10 +77,30 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
     // Socket connection map: socketId -> { playerId, roomCode }
     const socketMeta = new Map();
     io.on('connection', (socket) => {
+        const initialPlayerId = socket.handshake.query.playerId;
+        if (initialPlayerId) {
+            socketMeta.set(socket.id, { playerId: initialPlayerId });
+            presenceManager_1.presenceManager.registerSocket(initialPlayerId, socket);
+            socket.emit('presence:sync', { presences: presenceManager_1.presenceManager.getAllPresences() });
+        }
+        socket.on('presence:register', (data) => {
+            if (data?.playerId) {
+                socketMeta.set(socket.id, { playerId: data.playerId });
+                presenceManager_1.presenceManager.registerSocket(data.playerId, socket);
+                socket.emit('presence:sync', { presences: presenceManager_1.presenceManager.getAllPresences() });
+            }
+        });
+        socket.on('presence:ping', (data) => {
+            if (data?.playerId) {
+                presenceManager_1.presenceManager.touchUser(data.playerId);
+            }
+        });
         socket.on(shared_1.SOCKET_EVENTS.JOIN_ROOM, (data) => {
             const { roomCode, playerId, displayName, avatarUrl } = data;
             socketMeta.set(socket.id, { playerId, roomCode });
             socket.join(roomCode);
+            presenceManager_1.presenceManager.registerSocket(playerId, socket);
+            presenceManager_1.presenceManager.setUserRoom(playerId, roomCode);
             let existingRoom = roomManager.getRoom(roomCode);
             if (!existingRoom) {
                 // Room does not exist yet; auto-create with requester as host
@@ -118,6 +139,7 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
         socket.on(shared_1.SOCKET_EVENTS.LEAVE_ROOM, (data) => {
             const { roomCode, playerId } = data;
             socket.leave(roomCode);
+            presenceManager_1.presenceManager.setUserRoom(playerId, null);
             roomManager.handlePlayerDisconnect(roomCode, playerId);
             const room = roomManager.getRoom(roomCode);
             if (room) {
@@ -211,6 +233,8 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
             const { roomCode, playerId, displayName, avatarUrl, settings } = data;
             socketMeta.set(socket.id, { playerId, roomCode });
             socket.join(roomCode);
+            presenceManager_1.presenceManager.registerSocket(playerId, socket);
+            presenceManager_1.presenceManager.setUserRoom(playerId, roomCode);
             const room = roomManager.createRoom({
                 code: roomCode,
                 hostId: playerId,
@@ -257,6 +281,9 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
         socket.on('disconnect', () => {
             const meta = socketMeta.get(socket.id);
             if (meta) {
+                if (meta.playerId) {
+                    presenceManager_1.presenceManager.unregisterSocket(meta.playerId, socket);
+                }
                 matchmaker.dequeue(meta.playerId);
                 if (meta.roomCode) {
                     roomManager.handlePlayerDisconnect(meta.roomCode, meta.playerId);

@@ -2,6 +2,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { SOCKET_EVENTS, ClientQuestion, RoundResult, FinalMatchSummary, GameRoom } from '@trivia/shared';
 import { GameRoomManager } from '../engine/GameRoomManager';
 import { Matchmaker } from '../engine/Matchmaker';
+import { presenceManager } from '../services/presenceManager';
 
 export function setupSocketHandlers(
   io: SocketIOServer,
@@ -94,10 +95,33 @@ export function setupSocketHandlers(
   const socketMeta: Map<string, { playerId: string; roomCode?: string }> = new Map();
 
   io.on('connection', (socket: Socket) => {
+    const initialPlayerId = socket.handshake.query.playerId as string;
+    if (initialPlayerId) {
+      socketMeta.set(socket.id, { playerId: initialPlayerId });
+      presenceManager.registerSocket(initialPlayerId, socket);
+      socket.emit('presence:sync', { presences: presenceManager.getAllPresences() });
+    }
+
+    socket.on('presence:register', (data: { playerId: string }) => {
+      if (data?.playerId) {
+        socketMeta.set(socket.id, { playerId: data.playerId });
+        presenceManager.registerSocket(data.playerId, socket);
+        socket.emit('presence:sync', { presences: presenceManager.getAllPresences() });
+      }
+    });
+
+    socket.on('presence:ping', (data: { playerId: string }) => {
+      if (data?.playerId) {
+        presenceManager.touchUser(data.playerId);
+      }
+    });
+
     socket.on(SOCKET_EVENTS.JOIN_ROOM, (data: { roomCode: string; playerId: string; displayName: string; avatarUrl?: string }) => {
       const { roomCode, playerId, displayName, avatarUrl } = data;
       socketMeta.set(socket.id, { playerId, roomCode });
       socket.join(roomCode);
+      presenceManager.registerSocket(playerId, socket);
+      presenceManager.setUserRoom(playerId, roomCode);
 
       let existingRoom = roomManager.getRoom(roomCode);
       if (!existingRoom) {
@@ -138,6 +162,7 @@ export function setupSocketHandlers(
     socket.on(SOCKET_EVENTS.LEAVE_ROOM, (data: { roomCode: string; playerId: string }) => {
       const { roomCode, playerId } = data;
       socket.leave(roomCode);
+      presenceManager.setUserRoom(playerId, null);
       roomManager.handlePlayerDisconnect(roomCode, playerId);
       const room = roomManager.getRoom(roomCode);
       if (room) {
@@ -260,6 +285,8 @@ export function setupSocketHandlers(
       const { roomCode, playerId, displayName, avatarUrl, settings } = data;
       socketMeta.set(socket.id, { playerId, roomCode });
       socket.join(roomCode);
+      presenceManager.registerSocket(playerId, socket);
+      presenceManager.setUserRoom(playerId, roomCode);
 
       const room = roomManager.createRoom({
         code: roomCode,
@@ -319,6 +346,9 @@ export function setupSocketHandlers(
     socket.on('disconnect', () => {
       const meta = socketMeta.get(socket.id);
       if (meta) {
+        if (meta.playerId) {
+          presenceManager.unregisterSocket(meta.playerId, socket);
+        }
         matchmaker.dequeue(meta.playerId);
         if (meta.roomCode) {
           roomManager.handlePlayerDisconnect(meta.roomCode, meta.playerId);

@@ -446,6 +446,21 @@ export const RootNavigator: React.FC = () => {
         }
       }
     );
+
+    const unsubNotif = socketService.on('notification:new', (notif: any) => {
+      sound.playSound('reward');
+      sound.triggerHaptic('success');
+      if (notif.type === 'match_invite' || notif.type === 'duel') {
+        setAuthRedirectNotice(`⚔️ ${notif.title}\n${notif.sub}`);
+      }
+    });
+
+    const heartbeatInterval = setInterval(() => {
+      if (socketService.isConnected() && user?.id) {
+        socketService.sendEnvelope('presence:ping', { playerId: user.id });
+      }
+    }, 25000);
+
     return () => {
       unsubSync();
       unsubQuestion();
@@ -453,6 +468,8 @@ export const RootNavigator: React.FC = () => {
       unsubGameOver();
       unsubMatchFound();
       unsubPlayerAnswered();
+      unsubNotif();
+      clearInterval(heartbeatInterval);
     };
   }, [user?.id, user?.displayName, user?.avatarUrl, scheduleGameTimeout]);
   // -------------------------------------------------------------

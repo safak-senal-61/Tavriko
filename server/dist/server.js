@@ -14,10 +14,12 @@ const fs_1 = __importDefault(require("fs"));
 // @ts-ignore
 const qrcode_1 = __importDefault(require("qrcode"));
 const socket_io_1 = require("socket.io");
+const ws_1 = require("ws");
 const prismaClient_1 = require("./db/prismaClient");
 const GameRoomManager_1 = require("./engine/GameRoomManager");
 const Matchmaker_1 = require("./engine/Matchmaker");
 const socketHandler_1 = require("./socket/socketHandler");
+const presenceManager_1 = require("./services/presenceManager");
 const telegramBot_1 = require("./telegram/telegramBot");
 const supabaseClient_1 = require("./db/supabaseClient");
 const redisClient_1 = require("./cache/redisClient");
@@ -76,6 +78,58 @@ function createApp() {
     });
     const matchmaker = new Matchmaker_1.Matchmaker(roomManager);
     (0, socketHandler_1.setupSocketHandlers)(io, roomManager, matchmaker);
+    // Native WebSocket server for /ws connections (real-time presence & notifications)
+    const wss = new ws_1.WebSocketServer({ noServer: true });
+    httpServer.on('upgrade', (request, socket, head) => {
+        const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
+        if (url.pathname.startsWith('/ws')) {
+            wss.handleUpgrade(request, socket, head, (ws) => {
+                wss.emit('connection', ws, request);
+            });
+        }
+    });
+    wss.on('connection', (ws, request) => {
+        const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
+        const playerId = url.searchParams.get('playerId');
+        const roomCode = url.searchParams.get('roomCode');
+        if (playerId) {
+            presenceManager_1.presenceManager.registerSocket(playerId, ws);
+            if (roomCode) {
+                presenceManager_1.presenceManager.setUserRoom(playerId, roomCode);
+            }
+            ws.send(JSON.stringify({
+                event: 'presence:sync',
+                payload: { presences: presenceManager_1.presenceManager.getAllPresences() },
+                timestamp: Date.now(),
+            }));
+        }
+        ws.on('message', (data) => {
+            try {
+                const text = data.toString();
+                const msg = JSON.parse(text);
+                if (msg.event === 'ping') {
+                    ws.send(JSON.stringify({ event: 'pong', timestamp: Date.now() }));
+                }
+                else if (msg.event === 'presence:ping' && msg.payload?.playerId) {
+                    presenceManager_1.presenceManager.touchUser(msg.payload.playerId);
+                }
+                else if (msg.event === 'presence:register' && msg.payload?.playerId) {
+                    presenceManager_1.presenceManager.registerSocket(msg.payload.playerId, ws);
+                    ws.send(JSON.stringify({
+                        event: 'presence:sync',
+                        payload: { presences: presenceManager_1.presenceManager.getAllPresences() },
+                        timestamp: Date.now(),
+                    }));
+                }
+            }
+            catch { }
+        });
+        ws.on('close', () => {
+            if (playerId) {
+                presenceManager_1.presenceManager.unregisterSocket(playerId, ws);
+            }
+        });
+    });
     // Initialize Telegram Bot & Admin Approval Service
     const telegramBot = new telegramBot_1.TelegramBotService({ db: prismaClient_1.db, roomManager });
     // Telegram Webhook endpoint (Essential for Vercel Serverless execution)

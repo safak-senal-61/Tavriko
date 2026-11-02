@@ -117,15 +117,19 @@ model UserInventoryItem {
 }
 
 model UserNotification {
-  id        String   @id
-  userId    String
-  type      String
-  title     String
-  sub       String
-  timeText  String
-  handled   String?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String   @id
+  userId       String
+  type         String
+  title        String
+  sub          String
+  timeText     String
+  handled      String?
+  senderId     String?
+  senderName   String?
+  senderAvatar String?
+  roomCode     String?
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("user_notifications")

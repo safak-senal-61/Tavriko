@@ -48,6 +48,7 @@ const shared_1 = require("@trivia/shared");
 const questionsData_1 = require("./questionsData");
 const evrenLlmGenerator_1 = require("../ai/evrenLlmGenerator");
 const supabaseClient_1 = require("./supabaseClient");
+const presenceManager_1 = require("../services/presenceManager");
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_trivia_key_2026';
 const PRISMA_DATA_DIR = path.join(__dirname, '..', '..', 'data', 'prisma');
 const USERS_DB_FILE = path.join(__dirname, '..', '..', 'supabase_users_store.json');
@@ -616,6 +617,10 @@ class PrismaService {
                     sub: args.create.sub,
                     timeText: args.create.timeText,
                     handled: args.create.handled ?? null,
+                    senderId: args.create.senderId ?? null,
+                    senderName: args.create.senderName ?? null,
+                    senderAvatar: args.create.senderAvatar ?? null,
+                    roomCode: args.create.roomCode ?? null,
                     createdAt: args.create.createdAt ?? now,
                 };
             this.store.userNotifications.set(record.id, record);
@@ -914,6 +919,10 @@ class PrismaService {
                         sub: notif.sub,
                         timeText: notif.timeText,
                         handled: notif.handled ?? null,
+                        senderId: notif.senderId ?? null,
+                        senderName: notif.senderName ?? null,
+                        senderAvatar: notif.senderAvatar ?? null,
+                        roomCode: notif.roomCode ?? null,
                     },
                     create: {
                         id: notifId,
@@ -923,6 +932,10 @@ class PrismaService {
                         sub: notif.sub,
                         timeText: notif.timeText,
                         handled: notif.handled ?? null,
+                        senderId: notif.senderId ?? null,
+                        senderName: notif.senderName ?? null,
+                        senderAvatar: notif.senderAvatar ?? null,
+                        roomCode: notif.roomCode ?? null,
                     },
                 }).catch(() => { });
             }
@@ -2186,57 +2199,56 @@ class PrismaService {
     setUserActiveRoom(userId, roomCode) {
         if (roomCode) {
             this.activeUserRooms.set(userId, { roomCode, joinedAt: Date.now() });
+            presenceManager_1.presenceManager.setUserRoom(userId, roomCode);
         }
         else {
             this.activeUserRooms.delete(userId);
+            presenceManager_1.presenceManager.setUserRoom(userId, null);
         }
     }
     getFriendsForUser(userId) {
         const me = this.users.get(userId);
         const friendCode = me?.friendCode || this.generateFriendCode(userId);
         const explicitFriendIds = new Set(me?.friendIds || []);
-        const explicitFriends = [];
-        for (const fId of explicitFriendIds) {
-            const u = this.users.get(fId);
-            if (u) {
-                const prog = (0, shared_1.calculateLevelFromXp)(u.xp || 0);
-                const roomInfo = this.activeUserRooms.get(u.id);
-                const inRoom = !!roomInfo;
-                const currentRoomCode = roomInfo ? roomInfo.roomCode : undefined;
-                explicitFriends.push({
-                    id: u.id,
-                    username: u.username,
-                    displayName: u.displayName || u.username,
-                    name: u.displayName || u.username,
-                    avatarUrl: u.avatarUrl || 'av1',
-                    level: prog.level,
-                    rankTitle: prog.rankTitle,
-                    rankPoints: u.rankPoints || 1000,
-                    xp: u.xp || 0,
-                    wins: u.stats?.wins || 0,
-                    totalMatches: u.stats?.totalMatches || 0,
-                    correctAnswers: u.stats?.correctAnswers || 0,
-                    bestStreak: u.stats?.bestStreak || 0,
-                    countryCode: u.countryCode || 'TR',
-                    countryName: u.countryName || 'Türkiye',
-                    online: true,
-                    status: inRoom ? `Oda: #${currentRoomCode} · Lobide` : 'Arkadaşın · Çevrimiçi',
-                    isFriend: true,
-                    inRoom,
-                    currentRoomCode,
-                });
+        const seenUserIds = new Set();
+        const seenUsernames = new Set();
+        if (me?.id)
+            seenUserIds.add(me.id);
+        seenUserIds.add(userId);
+        if (me?.username)
+            seenUsernames.add(me.username.toLowerCase());
+        // Build unique user pool from memory store
+        const uniqueUsers = [];
+        for (const u of this.users.values()) {
+            const uName = (u?.username || '').toLowerCase().trim();
+            if (u && u.id && !seenUserIds.has(u.id) && (!uName || !seenUsernames.has(uName))) {
+                seenUserIds.add(u.id);
+                if (uName)
+                    seenUsernames.add(uName);
+                uniqueUsers.push(u);
             }
         }
-        const otherUsers = Array.from(this.users.values())
-            .filter((u) => u.id !== userId && !u.isGuest && !explicitFriendIds.has(u.id))
-            .slice(0, 10)
-            .map((u, idx) => {
+        const friendsResult = [];
+        for (const u of uniqueUsers) {
+            if (u.isGuest)
+                continue;
+            const isFriend = explicitFriendIds.has(u.id);
             const prog = (0, shared_1.calculateLevelFromXp)(u.xp || 0);
-            const roomInfo = this.activeUserRooms.get(u.id);
-            // DenizPro (idx === 0) has an active demo room so users can immediately test room join
-            const inRoom = !!roomInfo || idx === 0;
-            const currentRoomCode = roomInfo ? roomInfo.roomCode : idx === 0 ? 'DENIZ1' : undefined;
-            return {
+            const presence = presenceManager_1.presenceManager.getUserPresence(u.id);
+            const isOnline = presence.online;
+            const inRoom = presence.inRoom;
+            const currentRoomCode = presence.currentRoomCode;
+            let status = 'Çevrimdışı';
+            if (inRoom && currentRoomCode) {
+                status = `Oda: #${currentRoomCode} · Lobide`;
+            }
+            else if (isFriend) {
+                status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
+            }
+            else {
+                status = isOnline ? 'Çevrimiçi' : 'Çevrimdışı';
+            }
+            friendsResult.push({
                 id: u.id,
                 username: u.username,
                 displayName: u.displayName || u.username,
@@ -2252,36 +2264,179 @@ class PrismaService {
                 bestStreak: u.stats?.bestStreak || 0,
                 countryCode: u.countryCode || 'TR',
                 countryName: u.countryName || 'Türkiye',
-                online: idx % 3 !== 2,
-                status: inRoom
-                    ? `Oda: #${currentRoomCode} · Lobide`
-                    : idx % 3 !== 2
-                        ? 'Çevrimiçi'
-                        : 'Çevrimdışı',
-                isFriend: false,
+                online: isOnline,
+                status,
+                isFriend,
                 inRoom,
                 currentRoomCode,
-            };
+            });
+        }
+        // Sort: Friends first, then by inRoom, then online, then XP
+        friendsResult.sort((a, b) => {
+            if (a.isFriend !== b.isFriend)
+                return a.isFriend ? -1 : 1;
+            if (a.inRoom !== b.inRoom)
+                return a.inRoom ? -1 : 1;
+            if (a.online !== b.online)
+                return a.online ? -1 : 1;
+            return (b.xp || 0) - (a.xp || 0);
         });
-        return { friendCode, friends: [...explicitFriends, ...otherUsers] };
+        return { friendCode, friends: friendsResult };
+    }
+    async getFriendsForUserAsync(userId) {
+        let me = this.users.get(userId);
+        if (!me) {
+            try {
+                const dbMe = await this.rawClient.user.findFirst({
+                    where: { OR: [{ id: userId }, { username: userId }] },
+                });
+                if (dbMe) {
+                    me = this.prismaUserToRecord(dbMe);
+                    this.users.set(me.id, me);
+                }
+            }
+            catch { }
+        }
+        const friendCode = me?.friendCode || this.generateFriendCode(userId);
+        const explicitFriendIds = new Set(Array.isArray(me?.friendIds) ? me.friendIds : []);
+        const seenUserIds = new Set();
+        const seenUsernames = new Set();
+        if (me?.id)
+            seenUserIds.add(me.id);
+        seenUserIds.add(userId);
+        if (me?.username)
+            seenUsernames.add(me.username.toLowerCase());
+        const uniqueUsersMap = new Map();
+        // 1. Fetch real registered users from PostgreSQL database
+        try {
+            const dbUsers = await this.rawClient.user.findMany({
+                where: { id: { not: me?.id || userId } },
+                orderBy: { xp: 'desc' },
+                take: 50,
+            });
+            for (const dbu of dbUsers) {
+                const uName = (dbu.username || '').toLowerCase().trim();
+                if (!seenUserIds.has(dbu.id) && (!uName || !seenUsernames.has(uName))) {
+                    seenUserIds.add(dbu.id);
+                    if (uName)
+                        seenUsernames.add(uName);
+                    const rec = this.prismaUserToRecord(dbu);
+                    uniqueUsersMap.set(rec.id, rec);
+                    // keep memory store warmed up
+                    this.users.set(rec.id, rec);
+                }
+            }
+        }
+        catch (err) {
+            console.warn('[getFriendsForUserAsync] DB query warning:', err.message);
+        }
+        // 2. Merge any memory store users not yet in DB map
+        for (const u of this.users.values()) {
+            const uName = (u?.username || '').toLowerCase().trim();
+            if (u && u.id && !seenUserIds.has(u.id) && (!uName || !seenUsernames.has(uName)) && !u.isGuest) {
+                seenUserIds.add(u.id);
+                if (uName)
+                    seenUsernames.add(uName);
+                uniqueUsersMap.set(u.id, u);
+            }
+        }
+        const friendsResult = [];
+        for (const u of uniqueUsersMap.values()) {
+            const isFriend = explicitFriendIds.has(u.id);
+            const prog = (0, shared_1.calculateLevelFromXp)(u.xp || 0);
+            // REAL-TIME WEBSOCKET PRESENCE
+            const presence = presenceManager_1.presenceManager.getUserPresence(u.id);
+            const isOnline = presence.online;
+            const inRoom = presence.inRoom;
+            const currentRoomCode = presence.currentRoomCode;
+            let status = 'Çevrimdışı';
+            if (inRoom && currentRoomCode) {
+                status = `Oda: #${currentRoomCode} · Lobide`;
+            }
+            else if (isFriend) {
+                status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
+            }
+            else {
+                status = isOnline ? 'Çevrimiçi' : 'Çevrimdışı';
+            }
+            friendsResult.push({
+                id: u.id,
+                username: u.username,
+                displayName: u.displayName || u.username,
+                name: u.displayName || u.username,
+                avatarUrl: u.avatarUrl || 'av1',
+                level: prog.level,
+                rankTitle: prog.rankTitle,
+                rankPoints: u.rankPoints || 1000,
+                xp: u.xp || 0,
+                wins: u.stats?.wins || 0,
+                totalMatches: u.stats?.totalMatches || 0,
+                correctAnswers: u.stats?.correctAnswers || 0,
+                bestStreak: u.stats?.bestStreak || 0,
+                countryCode: u.countryCode || 'TR',
+                countryName: u.countryName || 'Türkiye',
+                online: isOnline,
+                status,
+                isFriend,
+                inRoom,
+                currentRoomCode,
+            });
+        }
+        // Sort: Friends first, in-room first, online first, xp descending
+        friendsResult.sort((a, b) => {
+            if (a.isFriend !== b.isFriend)
+                return a.isFriend ? -1 : 1;
+            if (a.inRoom !== b.inRoom)
+                return a.inRoom ? -1 : 1;
+            if (a.online !== b.online)
+                return a.online ? -1 : 1;
+            return (b.xp || 0) - (a.xp || 0);
+        });
+        return { friendCode, friends: friendsResult };
     }
     async addFriend(userId, targetCodeOrUsername) {
-        const me = this.users.get(userId);
+        let me = this.users.get(userId);
+        if (!me) {
+            try {
+                const dbMe = await this.rawClient.user.findFirst({
+                    where: { OR: [{ id: userId }, { username: userId }] },
+                });
+                if (dbMe)
+                    me = this.prismaUserToRecord(dbMe);
+            }
+            catch { }
+        }
         if (!me)
             return { success: false, error: 'Kullanıcı bulunamadı.' };
         const clean = targetCodeOrUsername.trim().toUpperCase();
         const cleanLower = targetCodeOrUsername.trim().toLowerCase();
-        // Find target user by friendCode or username
-        const target = Array.from(this.users.values()).find((u) => !u.isGuest &&
+        // 1. Find target user in memory or PostgreSQL
+        let target = Array.from(this.users.values()).find((u) => u &&
+            !u.isGuest &&
             ((u.friendCode && u.friendCode.toUpperCase() === clean) ||
                 u.username.toLowerCase() === cleanLower));
+        if (!target) {
+            try {
+                const dbTarget = await this.rawClient.user.findFirst({
+                    where: {
+                        OR: [
+                            { friendCode: { equals: clean, mode: 'insensitive' } },
+                            { username: { equals: cleanLower, mode: 'insensitive' } },
+                        ],
+                    },
+                });
+                if (dbTarget)
+                    target = this.prismaUserToRecord(dbTarget);
+            }
+            catch { }
+        }
         if (!target) {
             return {
                 success: false,
                 error: 'Bu arkadaşlık kodu veya kullanıcı adına ait oyuncu bulunamadı.',
             };
         }
-        if (target.id === userId) {
+        if (target.id === me.id) {
             return { success: false, error: 'Kendi kodunuzu arkadaş olarak ekleyemezsiniz!' };
         }
         if (!me.friendIds)
@@ -2291,33 +2446,67 @@ class PrismaService {
         if (me.friendIds.includes(target.id)) {
             return { success: false, error: 'Bu kullanıcı zaten arkadaş listenizde!' };
         }
-        // Add friend request notification to target user so they can accept / decline
-        if (!target.notifications)
-            target.notifications = [];
-        // Check if an existing pending request is already present
-        const existingReq = target.notifications.find((n) => n.type === 'friend_request' && n.senderId === me.id && !n.handled);
-        if (!existingReq) {
-            target.notifications.unshift({
-                id: 'notif_fr_' + Date.now(),
-                type: 'friend_request',
-                title: `${me.displayName} sana arkadaşlık isteği gönderdi!`,
-                sub: '1v1 düello maçları ve ortak odalarda yarışmak için isteği kabul et.',
-                timeText: 'Az önce',
-                senderId: me.id,
-                senderName: me.displayName,
-                senderAvatar: me.avatarUrl || 'av1',
-                handled: null,
-            });
-        }
-        // For instantaneous convenience, also add to friend lists mutually
+        // Bilateral friendship
         me.friendIds.push(target.id);
         if (!target.friendIds.includes(me.id)) {
             target.friendIds.push(me.id);
         }
+        // Persist bilateral friendship in PostgreSQL
+        try {
+            await this.rawClient.user.update({
+                where: { id: me.id },
+                data: { friendIds: me.friendIds },
+            });
+            await this.rawClient.user.update({
+                where: { id: target.id },
+                data: { friendIds: target.friendIds },
+            });
+        }
+        catch (err) {
+            console.warn('[addFriend] DB update error:', err.message);
+        }
         this.users.set(me.id, me);
         this.users.set(target.id, target);
         this.savePersistedUsers();
+        // Create real notification in PostgreSQL for target
+        const notifItem = {
+            id: 'notif_fr_' + Date.now(),
+            type: 'friend_request',
+            title: `${me.displayName} seni arkadaş olarak ekledi!`,
+            sub: '1v1 düellolar ve ortak odalarda birlikte yarışabilirsiniz.',
+            timeText: 'Az önce',
+            senderId: me.id,
+            senderName: me.displayName,
+            senderAvatar: me.avatarUrl || 'av1',
+            handled: 'accepted',
+        };
+        try {
+            await this.rawClient.userNotification.create({
+                data: {
+                    id: notifItem.id,
+                    userId: target.id,
+                    type: notifItem.type,
+                    title: notifItem.title,
+                    sub: notifItem.sub,
+                    timeText: notifItem.timeText,
+                    handled: 'accepted',
+                    senderId: notifItem.senderId,
+                    senderName: notifItem.senderName,
+                    senderAvatar: notifItem.senderAvatar,
+                },
+            });
+        }
+        catch (e) {
+            console.warn('[addFriend] DB notification error:', e.message);
+        }
+        if (!target.notifications)
+            target.notifications = [];
+        target.notifications.unshift(notifItem);
+        // REAL-TIME WEBSOCKET PUSH TO TARGET
+        presenceManager_1.presenceManager.notifyUser(target.id, 'notification:new', notifItem);
+        presenceManager_1.presenceManager.notifyUser(target.id, 'friends:update', { friendId: me.id });
         const progress = (0, shared_1.calculateLevelFromXp)(target.xp || 0);
+        const targetPresence = presenceManager_1.presenceManager.getUserPresence(target.id);
         return {
             success: true,
             friend: {
@@ -2328,8 +2517,8 @@ class PrismaService {
                 level: progress.level,
                 rankTitle: progress.rankTitle,
                 rankPoints: target.rankPoints || 1000,
-                online: true,
-                status: 'Arkadaşın · Çevrimiçi',
+                online: targetPresence.online,
+                status: targetPresence.status,
                 isFriend: true,
             },
         };
@@ -2338,107 +2527,195 @@ class PrismaService {
         const user = this.users.get(userId);
         if (!user)
             return [];
-        if (!user.notifications || user.notifications.length === 0) {
-            user.notifications = [
-                {
-                    id: 'notif_fr_sample',
-                    type: 'friend_request',
-                    title: 'Ece Yıldız sana arkadaşlık isteği gönderdi!',
-                    sub: '1v1 düellolar ve özel odalar için isteği kabul et.',
-                    timeText: 'Az önce',
-                    senderId: 'user_ece',
-                    senderName: 'Ece Yıldız',
-                    senderAvatar: 'av2',
-                    handled: null,
-                },
-                {
-                    id: 'notif_duel_sample',
-                    type: 'match_invite',
-                    title: 'Burak Challenge sana 1v1 Düello Meydan Okudu!',
-                    sub: 'Bilim & Genel Kültür · Hazırsan kabul et ve hemen yarış!',
-                    timeText: '3 dk önce',
-                    senderId: 'user_burak',
-                    senderName: 'Burak Challenge',
-                    senderAvatar: 'av3',
-                    roomCode: 'BURAK1',
-                    handled: null,
-                },
-                {
-                    id: 'notif_rew_sample',
-                    type: 'reward',
-                    title: 'Haftalık Katılım Ödülü Hazır!',
-                    sub: 'Tebrikler! +150 Altın ve +10 Elmas hesabına yüklendi.',
-                    timeText: 'Bugün',
-                },
-            ];
-            this.users.set(userId, user);
-            this.savePersistedUsers();
+        // Filter out old mock sample items
+        if (user.notifications) {
+            return user.notifications.filter((n) => !n.id.startsWith('notif_fr_sample') &&
+                !n.id.startsWith('notif_duel_sample') &&
+                !n.id.startsWith('notif_rew_sample'));
         }
-        return user.notifications;
+        return [];
+    }
+    async getUserNotificationsAsync(userId) {
+        try {
+            const dbNotifs = await this.rawClient.userNotification.findMany({
+                where: { userId },
+                orderBy: { createdAt: 'desc' },
+                take: 50,
+            });
+            if (dbNotifs.length === 0) {
+                const memNotifs = this.getUserNotifications(userId);
+                if (memNotifs.length > 0)
+                    return memNotifs;
+                // Create genuine welcome notification for brand new user
+                const welcomeNotif = {
+                    id: 'notif_welcome_' + Date.now(),
+                    type: 'reward',
+                    title: 'Tavriko Bilgi Dünyasına Hoş Geldin! 🦉',
+                    sub: 'Profilini tamamla, 1v1 düellolara katıl ve arkadaşlarınla yarış!',
+                    timeText: 'Bugün',
+                    handled: null,
+                };
+                try {
+                    await this.rawClient.userNotification.create({
+                        data: {
+                            id: welcomeNotif.id,
+                            userId,
+                            type: welcomeNotif.type,
+                            title: welcomeNotif.title,
+                            sub: welcomeNotif.sub,
+                            timeText: welcomeNotif.timeText,
+                            handled: null,
+                        },
+                    });
+                }
+                catch { }
+                const user = this.users.get(userId);
+                if (user) {
+                    if (!user.notifications)
+                        user.notifications = [];
+                    user.notifications.unshift(welcomeNotif);
+                }
+                return [welcomeNotif];
+            }
+            return dbNotifs.map((n) => ({
+                id: n.id,
+                type: n.type,
+                title: n.title,
+                sub: n.sub,
+                timeText: n.timeText || 'Az önce',
+                handled: n.handled || null,
+                senderId: n.senderId || undefined,
+                senderName: n.senderName || undefined,
+                senderAvatar: n.senderAvatar || undefined,
+                roomCode: n.roomCode || undefined,
+            }));
+        }
+        catch (err) {
+            console.warn('[getUserNotificationsAsync] DB fallback:', err.message);
+            return this.getUserNotifications(userId);
+        }
     }
     async respondToNotification(userId, notificationId, action) {
         const finalHandled = action === 'accept' ? 'accepted' : 'declined';
-        const user = this.users.get(userId);
+        let user = this.users.get(userId);
+        if (!user) {
+            try {
+                const dbUser = await this.rawClient.user.findFirst({
+                    where: { OR: [{ id: userId }, { username: userId }] },
+                });
+                if (dbUser)
+                    user = this.prismaUserToRecord(dbUser);
+            }
+            catch { }
+        }
         if (!user) {
             return { success: false, handled: finalHandled, error: 'Kullanıcı bulunamadı.', message: '' };
         }
-        if (!user.notifications)
-            user.notifications = [];
-        const notif = user.notifications.find((n) => n.id === notificationId);
+        let notif = user.notifications?.find((n) => n.id === notificationId);
+        try {
+            const dbNotif = await this.rawClient.userNotification.findUnique({
+                where: { id: notificationId },
+            });
+            if (dbNotif)
+                notif = dbNotif;
+        }
+        catch { }
         if (!notif) {
             return { success: false, handled: finalHandled, error: 'Bildirim bulunamadı.', message: '' };
         }
         notif.handled = finalHandled;
-        if (notif.type === 'friend_request' || notif.type === 'friend') {
-            if (action === 'accept') {
-                notif.sub = 'Arkadaşlık isteği kabul edildi. Artık arkadaşsınız!';
-                if (notif.senderId) {
-                    if (!user.friendIds)
-                        user.friendIds = [];
-                    if (!user.friendIds.includes(notif.senderId)) {
-                        user.friendIds.push(notif.senderId);
-                    }
-                    const sender = this.users.get(notif.senderId);
-                    if (sender) {
-                        if (!sender.friendIds)
-                            sender.friendIds = [];
-                        if (!sender.friendIds.includes(user.id)) {
-                            sender.friendIds.push(user.id);
-                        }
-                        if (!sender.notifications)
-                            sender.notifications = [];
-                        sender.notifications.unshift({
-                            id: 'notif_fra_' + Date.now(),
-                            type: 'system',
-                            title: `${user.displayName} arkadaşlık isteğini kabul etti!`,
-                            sub: 'Artık 1v1 düello maçlarına davet edebilirsin.',
-                            timeText: 'Az önce',
-                        });
-                        this.users.set(sender.id, sender);
-                    }
-                }
-            }
-            else {
-                notif.sub = 'Arkadaşlık isteği reddedildi.';
-            }
+        const newSub = action === 'accept'
+            ? notif.type === 'match_invite' || notif.type === 'duel'
+                ? 'Düello kabul edildi! Odaya aktarılıyorsunuz...'
+                : 'Arkadaşlık isteği kabul edildi. Artık arkadaşsınız!'
+            : 'İstek reddedildi.';
+        notif.sub = newSub;
+        // Update in PostgreSQL
+        try {
+            await this.rawClient.userNotification.update({
+                where: { id: notificationId },
+                data: { handled: finalHandled, sub: newSub },
+            });
         }
-        else if (notif.type === 'match_invite' || notif.type === 'duel') {
-            if (action === 'accept') {
-                notif.sub = 'Düello daveti kabul edildi! Odaya katıldın.';
-                this.savePersistedUsers();
-                return {
-                    success: true,
-                    handled: 'accepted',
-                    roomCode: notif.roomCode || 'BURAK1',
-                    message: 'Düello daveti kabul edildi! Odaya aktarılıyorsunuz...',
-                };
-            }
-            else {
-                notif.sub = 'Düello daveti reddedildi.';
+        catch (err) {
+            console.warn('[respondToNotification] DB update error:', err.message);
+        }
+        if (notif.type === 'friend_request' || notif.type === 'friend') {
+            if (action === 'accept' && notif.senderId) {
+                if (!user.friendIds)
+                    user.friendIds = [];
+                if (!user.friendIds.includes(notif.senderId))
+                    user.friendIds.push(notif.senderId);
+                let sender = this.users.get(notif.senderId);
+                if (!sender) {
+                    try {
+                        const dbSender = await this.rawClient.user.findUnique({ where: { id: notif.senderId } });
+                        if (dbSender)
+                            sender = this.prismaUserToRecord(dbSender);
+                    }
+                    catch { }
+                }
+                if (sender) {
+                    if (!sender.friendIds)
+                        sender.friendIds = [];
+                    if (!sender.friendIds.includes(user.id))
+                        sender.friendIds.push(user.id);
+                    try {
+                        await this.rawClient.user.update({
+                            where: { id: user.id },
+                            data: { friendIds: user.friendIds },
+                        });
+                        await this.rawClient.user.update({
+                            where: { id: sender.id },
+                            data: { friendIds: sender.friendIds },
+                        });
+                    }
+                    catch { }
+                    const senderNotif = {
+                        id: 'notif_fra_' + Date.now(),
+                        type: 'system',
+                        title: `${user.displayName} arkadaşlık isteğini kabul etti!`,
+                        sub: 'Artık 1v1 düello maçlarına davet edebilirsin.',
+                        timeText: 'Az önce',
+                        handled: 'accepted',
+                    };
+                    try {
+                        await this.rawClient.userNotification.create({
+                            data: {
+                                id: senderNotif.id,
+                                userId: sender.id,
+                                type: senderNotif.type,
+                                title: senderNotif.title,
+                                sub: senderNotif.sub,
+                                timeText: senderNotif.timeText,
+                                handled: 'accepted',
+                            },
+                        });
+                    }
+                    catch { }
+                    // WebSocket notify sender
+                    presenceManager_1.presenceManager.notifyUser(sender.id, 'notification:new', senderNotif);
+                    presenceManager_1.presenceManager.notifyUser(sender.id, 'friends:update', { friendId: user.id });
+                }
             }
         }
         this.users.set(user.id, user);
         this.savePersistedUsers();
+        // WebSocket notify self that notification is handled
+        presenceManager_1.presenceManager.notifyUser(user.id, 'notification:update', {
+            id: notificationId,
+            handled: finalHandled,
+        });
+        if (notif.type === 'match_invite' || notif.type === 'duel') {
+            if (action === 'accept') {
+                return {
+                    success: true,
+                    handled: 'accepted',
+                    roomCode: notif.roomCode || 'DUEL1',
+                    message: 'Düello daveti kabul edildi! Odaya aktarılıyorsunuz...',
+                };
+            }
+        }
         return {
             success: true,
             handled: finalHandled,
@@ -2446,17 +2723,36 @@ class PrismaService {
         };
     }
     async sendDuelChallenge(userId, targetUserId, category = 'genel_kultur') {
-        const me = this.users.get(userId);
+        let me = this.users.get(userId);
+        if (!me) {
+            try {
+                const dbMe = await this.rawClient.user.findFirst({
+                    where: { OR: [{ id: userId }, { username: userId }] },
+                });
+                if (dbMe)
+                    me = this.prismaUserToRecord(dbMe);
+            }
+            catch { }
+        }
         if (!me)
             return { success: false, error: 'Kullanıcı oturumu bulunamadı.', message: '' };
-        const target = this.users.get(targetUserId);
+        let target = this.users.get(targetUserId);
+        if (!target) {
+            try {
+                const dbTarget = await this.rawClient.user.findFirst({
+                    where: { OR: [{ id: targetUserId }, { username: targetUserId }] },
+                });
+                if (dbTarget)
+                    target = this.prismaUserToRecord(dbTarget);
+            }
+            catch { }
+        }
         if (!target)
             return { success: false, error: 'Hedef oyuncu bulunamadı.', message: '' };
-        const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const roomCode = 'DUEL-' + Math.random().toString(36).substring(2, 6).toUpperCase();
         this.setUserActiveRoom(userId, roomCode);
-        if (!target.notifications)
-            target.notifications = [];
-        target.notifications.unshift({
+        presenceManager_1.presenceManager.setUserRoom(userId, roomCode);
+        const notifItem = {
             id: 'notif_chal_' + Date.now(),
             type: 'match_invite',
             title: `${me.displayName} sana 1v1 Düello Meydan Okudu!`,
@@ -2467,9 +2763,37 @@ class PrismaService {
             senderAvatar: me.avatarUrl || 'av1',
             roomCode: roomCode,
             handled: null,
-        });
+        };
+        // 1. Persist notification in PostgreSQL
+        try {
+            await this.rawClient.userNotification.create({
+                data: {
+                    id: notifItem.id,
+                    userId: target.id,
+                    type: notifItem.type,
+                    title: notifItem.title,
+                    sub: notifItem.sub,
+                    timeText: notifItem.timeText,
+                    handled: null,
+                    senderId: notifItem.senderId,
+                    senderName: notifItem.senderName,
+                    senderAvatar: notifItem.senderAvatar,
+                    roomCode: notifItem.roomCode,
+                },
+            });
+        }
+        catch (e) {
+            console.warn('[sendDuelChallenge] DB notification error:', e.message);
+        }
+        if (!target.notifications)
+            target.notifications = [];
+        target.notifications.unshift(notifItem);
         this.users.set(target.id, target);
         this.savePersistedUsers();
+        // 2. REAL-TIME WEBSOCKET NOTIFICATION TO TARGET
+        presenceManager_1.presenceManager.notifyUser(target.id, 'notification:new', notifItem);
+        // 3. BROADCAST SENDER PRESENCE (Now in room)
+        presenceManager_1.presenceManager.broadcast('presence:update', presenceManager_1.presenceManager.getUserPresence(userId));
         return {
             success: true,
             roomCode,

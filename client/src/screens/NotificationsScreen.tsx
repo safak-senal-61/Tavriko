@@ -11,6 +11,7 @@ import { UserProfile, NotificationItem } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
+import { socketService } from '../services/socketService';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -50,14 +51,35 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data && Array.isArray(data.notifications)) {
-          setNotifications(data.notifications);
+          // Filter out any legacy dummy mock notifications
+          const cleanNotifs = data.notifications.filter(
+            (n: NotificationItem) =>
+              !n.id.startsWith('notif_fr_sample') &&
+              !n.id.startsWith('notif_duel_sample') &&
+              !n.id.startsWith('notif_rew_sample')
+          );
+          setNotifications(cleanNotifs);
         } else if (user?.notifications && user.notifications.length > 0) {
-          setNotifications(user.notifications);
+          setNotifications(
+            user.notifications.filter(
+              (n: NotificationItem) =>
+                !n.id.startsWith('notif_fr_sample') &&
+                !n.id.startsWith('notif_duel_sample') &&
+                !n.id.startsWith('notif_rew_sample')
+            )
+          );
         }
       })
       .catch(() => {
         if (user?.notifications) {
-          setNotifications(user.notifications);
+          setNotifications(
+            user.notifications.filter(
+              (n: NotificationItem) =>
+                !n.id.startsWith('notif_fr_sample') &&
+                !n.id.startsWith('notif_duel_sample') &&
+                !n.id.startsWith('notif_rew_sample')
+            )
+          );
         }
       })
       .finally(() => {
@@ -67,6 +89,28 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
 
   useEffect(() => {
     fetchNotifications();
+
+    // Listen to real-time incoming notifications over WebSocket
+    const unsubNewNotif = socketService.on('notification:new', (newNotif: NotificationItem) => {
+      sound.playSound('reward');
+      sound.triggerHaptic('success');
+      setNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)]);
+    });
+
+    // Listen to notification update events over WebSocket
+    const unsubUpdateNotif = socketService.on(
+      'notification:update',
+      (data: { id: string; handled: 'accepted' | 'declined' }) => {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === data.id ? { ...n, handled: data.handled } : n))
+        );
+      }
+    );
+
+    return () => {
+      unsubNewNotif();
+      unsubUpdateNotif();
+    };
   }, [userId, base]);
 
   const handleRespond = async (
