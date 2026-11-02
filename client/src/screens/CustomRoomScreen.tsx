@@ -22,6 +22,7 @@ import {
   TavrikoTopBar,
   Button3D,
   CategorySquircleIcon,
+  ModeSquircleIcon,
 } from '../components/TavrikoIcons';
 import {
   CategorySelectModal,
@@ -512,12 +513,15 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
             />
           </View>
         ) : (
-          /* ODAYA KATIL KARTI */
+          /* ODAYA KATIL KARTI (Tavriko UI Kit Screen 08) */
           <View style={styles.roomSetupCard}>
-            <Text style={styles.sectionHeader}>6 HANELİ ODA KODU</Text>
-            <Text style={styles.joinSubText}>
-              Arkadaşınızın paylaştığı oda kodunu girerek lobiye anında katılın.
-            </Text>
+            <View style={styles.joinCodeHeaderRow}>
+              <ModeSquircleIcon mode="custom_room" size={38} />
+              <View style={styles.joinCodeHeaderTextCol}>
+                <Text style={styles.joinCodeTitle}>Oda Kodunu Gir</Text>
+                <Text style={styles.joinCodeSub}>Arkadaşının paylaştığı 6 haneli kod</Text>
+              </View>
+            </View>
 
             <TouchableOpacity
               activeOpacity={0.9}
@@ -885,6 +889,26 @@ const styles = StyleSheet.create({
     color: '#D9CDF5',
     textAlign: 'center',
     marginBottom: 16,
+  },
+  joinCodeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  joinCodeHeaderTextCol: {
+    flex: 1,
+  },
+  joinCodeTitle: {
+    fontSize: 16,
+    fontFamily: THEME.fonts.bold,
+    color: '#FFFFFF',
+  },
+  joinCodeSub: {
+    fontSize: 11,
+    fontFamily: THEME.fonts.medium,
+    color: '#9A8BC2',
+    marginTop: 2,
   },
   digitsWrapper: {
     alignItems: 'center',

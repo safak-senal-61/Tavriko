@@ -378,8 +378,13 @@ export class SocketService {
     this.lastSessionContext.isMatchmaking = false;
   }
 
-  public sendEmote(roomCode: string, playerId: string, emote: string): void {
-    this.sendEnvelope(SOCKET_EVENTS.SEND_EMOTE, { roomCode, playerId, emote });
+  public sendEmote(roomCode: string, playerId: string, emote: string, id?: string): void {
+    this.sendEnvelope(SOCKET_EVENTS.SEND_EMOTE, {
+      id: id || `emote_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      roomCode,
+      playerId,
+      emote,
+    });
   }
 
   public onEmoteReceived(callback: (data: { roomCode: string; playerId: string; emote: string; id?: string }) => void): () => void {
@@ -391,9 +396,11 @@ export class SocketService {
     playerId: string,
     displayName: string,
     text: string,
-    avatarUrl?: string
+    avatarUrl?: string,
+    id?: string
   ): void {
     this.sendEnvelope(SOCKET_EVENTS.LOBBY_CHAT, {
+      id: id || `chat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       roomCode,
       playerId,
       displayName,

@@ -84,7 +84,7 @@ const CheckSvgIcon = ({ size = 18, color = '#5ADBB5' }: { size?: number; color?:
 );
 
 // Tavriko UI Kit 8 Lobi Reaksiyonu
-const LOBBY_REACTION_EMOJIS = ['🔥', '👑', '👏', '😂', '❤️', '⚡', '🎯', '🚀'];
+const LOBBY_REACTION_EMOJIS = ['🔥', '👏', '😂', '❤️', '⚡', '🎯', '🚀'];
 
 // Hızlı Mesaj Çipleri
 const QUICK_CHAT_CHIPS = [
@@ -192,6 +192,9 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   const [chatText, setChatText] = useState('');
   const [floatingItems, setFloatingItems] = useState<FloatingItemData[]>([]);
 
+  // İki katmanlı tekillik (deduplication) önbelleği: Ali'de ve tüm oyuncularda çift mesaj/reaksiyonu %100 engeller!
+  const processedKeysRef = useRef<Set<string>>(new Set());
+
   const players = Object.values(room.players);
   const maxPlayers = room.maxPlayers || 4;
   const emptySlotCount = Math.max(0, maxPlayers - players.length);
@@ -204,8 +207,14 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   useEffect(() => {
     const unsubEmote = socketService.onEmoteReceived((data) => {
       if (data.roomCode === room.code && data.playerId !== currentUserId) {
+        // Çift render ve soket yankısını engelle
+        const itemKey = data.id || `emote_${data.playerId}_${data.emote}_${Math.floor(Date.now() / 1200)}`;
+        if (processedKeysRef.current.has(itemKey)) return;
+        processedKeysRef.current.add(itemKey);
+        setTimeout(() => processedKeysRef.current.delete(itemKey), 4000);
+
         sound.playSound('tap');
-        const id = `emote_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const id = data.id || `emote_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         const xOffset = (Math.random() - 0.5) * 160;
         setFloatingItems((prev) => [
           ...prev.slice(-12),
@@ -216,9 +225,15 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
     const unsubChat = socketService.onLobbyMessage((data) => {
       if (data.roomCode === room.code && data.playerId !== currentUserId) {
+        // Çift sohbet mesajını engelle
+        const itemKey = data.id || `chat_${data.playerId}_${data.text}_${Math.floor(Date.now() / 1500)}`;
+        if (processedKeysRef.current.has(itemKey)) return;
+        processedKeysRef.current.add(itemKey);
+        setTimeout(() => processedKeysRef.current.delete(itemKey), 4000);
+
         sound.playSound('tap');
         sound.triggerHaptic('medium');
-        const id = `chat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const id = data.id || `chat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         const xOffset = (Math.random() - 0.5) * 80;
         setFloatingItems((prev) => [
           ...prev.slice(-12),
@@ -249,15 +264,20 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
     sound.triggerHaptic('light');
 
     // Optimistik anlık render: Kullanıcı dokunduğu an ekranda süzülür!
-    const id = `emote_local_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const emoteId = `emote_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const xOffset = (Math.random() - 0.5) * 160;
+
+    // Kendi gönderdiğimizi önbelleğe alıp soketten geri gelirse çift gösterimi engelle
+    processedKeysRef.current.add(emoteId);
+    setTimeout(() => processedKeysRef.current.delete(emoteId), 4000);
+
     setFloatingItems((prev) => [
       ...prev.slice(-12),
-      { id, type: 'emoji', content: emoji, xOffset },
+      { id: emoteId, type: 'emoji', content: emoji, xOffset },
     ]);
 
     // WebSocket ile odadaki diğer tüm oyunculara yayınla
-    socketService.sendEmote(room.code, currentUserId, emoji);
+    socketService.sendEmote(room.code, currentUserId, emoji, emoteId);
   };
 
   const handleSendChat = (presetText?: string) => {
@@ -267,12 +287,17 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
     sound.triggerHaptic('medium');
 
     // Optimistik anlık render: Gönderen kişinin ekranında anında süzülür!
-    const id = `chat_local_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const chatId = `chat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const xOffset = (Math.random() - 0.5) * 80;
+
+    // Kendi gönderdiğimizi önbelleğe alıp soket yankısında çiftleşmeyi önle
+    processedKeysRef.current.add(chatId);
+    setTimeout(() => processedKeysRef.current.delete(chatId), 4000);
+
     setFloatingItems((prev) => [
       ...prev.slice(-12),
       {
-        id,
+        id: chatId,
         type: 'message',
         content: textToSend,
         senderName: myPlayer?.displayName || 'Sen',
@@ -287,7 +312,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
       currentUserId,
       myPlayer?.displayName || 'Oyuncu',
       textToSend,
-      myPlayer?.avatarUrl || myPlayer?.displayName
+      myPlayer?.avatarUrl || myPlayer?.displayName,
+      chatId
     );
 
     if (!presetText) setChatText('');
@@ -431,7 +457,6 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                     <Text style={styles.playerName} numberOfLines={1}>
                       {p.displayName} {isMe ? '(Sen)' : ''}
                     </Text>
-                    {playerIsHost && <Text style={styles.crownBadge}>👑</Text>}
                   </View>
                   <Text style={styles.playerRoleText}>
                     {playerIsHost ? 'Oda Kurucusu' : 'Yarışmacı'}
@@ -466,22 +491,11 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             );
           })}
 
-          {/* Boş Slotlar: Tavriko UI Kit kesikli çizgili kart + davet dokunması */}
+          {/* Boş Slotlar: Sade ve modern minimalist slotlar */}
           {Array.from({ length: Math.min(4, emptySlotCount) }).map((_, idx) => (
-            <TouchableOpacity
-              key={`empty_${idx}`}
-              style={styles.emptySlotCard}
-              activeOpacity={0.8}
-              onPress={handleShareCode}
-            >
-              <View style={styles.emptySlotPlusCircle}>
-                <Text style={styles.emptySlotPlusText}>+</Text>
-              </View>
-              <View style={styles.emptySlotTextCol}>
-                <Text style={styles.emptySlotTitle}>Boş Oyuncu Slotu</Text>
-                <Text style={styles.emptySlotSub}>Arkadaşını odaya davet etmek için dokun 🔗</Text>
-              </View>
-            </TouchableOpacity>
+            <View key={`empty_${idx}`} style={styles.emptySlotCardMinimal}>
+              <Text style={styles.emptySlotTextMinimal}>Oyuncu bekleniyor...</Text>
+            </View>
           ))}
         </View>
 
@@ -549,25 +563,13 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             <>
               {!canStart ? (
                 <View style={styles.waitingContainer}>
-                  <View style={styles.waitingHeaderRow}>
-                    <Text style={styles.waitingIcon}>👥</Text>
-                    <Animated.Text style={[styles.waitingPulsingText, { opacity: pulseAnim }]}>
-                      Diğer oyuncular bekleniyor...
-                    </Animated.Text>
-                  </View>
+                  <Text style={styles.waitingNoticeTitle}>Diğer oyuncular bekleniyor...</Text>
                   <Text style={styles.waitingSubNotice}>
-                    Oyunu başlatabilmek için en az 2 oyuncu olmalıdır ({players.length}/{maxPlayers}).
+                    Oyunu başlatabilmek için en az 2 oyuncu olmalıdır.
                   </Text>
-
-                  {/* UI Kit Davet Linkini Paylaş Butonu */}
-                  <TouchableOpacity
-                    style={styles.inviteShareBtn}
-                    onPress={handleShareCode}
-                    activeOpacity={0.85}
-                  >
-                    <ShareSvgIcon size={18} color="#0B2E28" />
-                    <Text style={styles.inviteShareBtnText}>DAVET LİNKİNİ PAYLAŞ</Text>
-                  </TouchableOpacity>
+                  <View style={styles.disabledStartBtn}>
+                    <Text style={styles.disabledStartBtnText}>Oyunu Başlat</Text>
+                  </View>
                 </View>
               ) : (
                 <View style={styles.readyContainer}>
@@ -818,7 +820,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // Boş Oyuncu Slotu (Tavriko UI Kit Kesikli Kart)
+  // Boş Oyuncu Slotu (Sade ve Şık Kesikli Slot)
+  emptySlotCardMinimal: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(154, 107, 255, 0.25)',
+    backgroundColor: 'rgba(23, 11, 51, 0.35)',
+  },
+  emptySlotTextMinimal: {
+    color: '#8A7BAF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.medium,
+  },
   emptySlotCard: {
     width: '100%',
     flexDirection: 'row',
@@ -970,6 +990,27 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(154, 107, 255, 0.3)',
     paddingVertical: 14,
     paddingHorizontal: 16,
+  },
+  waitingNoticeTitle: {
+    color: '#D9CDF5',
+    fontSize: 14,
+    fontFamily: THEME.fonts.bold,
+    marginBottom: 4,
+  },
+  disabledStartBtn: {
+    width: '100%',
+    height: 52,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  disabledStartBtnText: {
+    color: 'rgba(255, 255, 255, 0.35)',
+    fontSize: 16,
+    fontFamily: THEME.fonts.bold,
   },
   waitingHeaderRow: {
     flexDirection: 'row',

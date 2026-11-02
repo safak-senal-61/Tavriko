@@ -178,29 +178,36 @@ export const CrownIcon: React.FC<{ size?: number }> = ({ size = 28 }) => (
     <SharedSvgDefs />
     <Path d="M6 48L8 18l16 14 8-18 8 18 16-14 2 30z" fill="url(#gold)" />
     <Rect x="6" y="48" width="52" height="8" rx="4" fill="#e07a00" />
-    <Circle cx="32" cy="38" r="4" fill="url(#pink)" />
+    <Circle cx="8" cy="18" r="3.5" fill="#FFF9C4" />
+    <Circle cx="32" cy="14" r="3.5" fill="#FFF9C4" />
+    <Circle cx="56" cy="18" r="3.5" fill="#FFF9C4" />
+    <Circle cx="20" cy="52" r="2.2" fill="#E91E63" />
+    <Circle cx="32" cy="52" r="2.2" fill="#00E5FF" />
+    <Circle cx="44" cy="52" r="2.2" fill="#E91E63" />
   </Svg>
 );
 export const XpStarIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
   <Svg width={size} height={size} viewBox="0 0 64 64">
     <SharedSvgDefs />
+    <Circle cx="32" cy="32" r="26" fill="#1976D2" />
+    <Circle cx="32" cy="32" r="22" fill="#0D47A1" />
     <Path
-      d="M32 6l7.8 16 17.7 2.5-12.8 12.4 3 17.5L32 46.1 16.3 54.4l3-17.5L6.5 24.5 24.2 22z"
-      fill="url(#gold)"
-      stroke="url(#gold)"
-      strokeWidth="4"
-      strokeLinejoin="round"
+      d="M32 15l4.5 9 10 1.5-7.2 7 1.7 10-9-4.7-9 4.7 1.7-10-7.2-7 10-1.5z"
+      fill="#FFD600"
     />
   </Svg>
 );
 export const SpeedBoltIcon: React.FC<{ size?: number }> = ({ size = 24 }) => (
   <Svg width={size} height={size} viewBox="0 0 64 64">
     <SharedSvgDefs />
+    <Rect x="28" y="4" width="8" height="6" rx="2" fill="#2979FF" />
+    <Circle cx="32" cy="35" r="25" fill="#2979FF" />
+    <Circle cx="32" cy="35" r="21" fill="#1565C0" />
     <Path
-      d="M36 4L10 36h18l-4 24 28-34H34z"
-      fill="url(#blue)"
-      stroke="url(#blue)"
-      strokeWidth="3"
+      d="M34 19L21 37h10l-3 14 15-20H29z"
+      fill="#FFD600"
+      stroke="#FFD600"
+      strokeWidth="1.5"
       strokeLinejoin="round"
     />
   </Svg>
@@ -312,9 +319,10 @@ export const KeyIcon: React.FC<{ size?: number }> = ({ size = 28 }) => (
 export const InventoryCubeIcon: React.FC<{ size?: number }> = ({ size = 32 }) => (
   <Svg width={size} height={size} viewBox="0 0 64 64">
     <SharedSvgDefs />
-    <Path d="M32 4l24 12v32L32 60 8 48V16z" fill="url(#brown)" />
-    <Path d="M32 4l24 12-24 12L8 16z" fill="#f0b070" />
-    <Path d="M32 28v32" stroke="#5a3010" strokeOpacity="0.4" strokeWidth="3" />
+    <Rect x="12" y="24" width="40" height="32" rx="10" fill="url(#t0)" />
+    <Path d="M22 24V16a10 10 0 0120 0v8" stroke="#D1C4E9" strokeWidth="5" strokeLinecap="round" fill="none" />
+    <Circle cx="32" cy="38" r="3.5" fill="#FFD600" />
+    <Path d="M32 41v5" stroke="#FFD600" strokeWidth="3" strokeLinecap="round" />
   </Svg>
 );
 // ============================================================================
@@ -578,21 +586,32 @@ export const ModeSquircleIcon: React.FC<{
       <>
         <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t1)" />
         <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
-        <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-          <Path d="M16 54V10h32v44M10 54h44" />
-        </G>
-        <Circle cx="40" cy="32" r="3" fill="#fff" />
+        <Path
+          d="M22 28V20a10 10 0 0120 0v8"
+          stroke="#fff"
+          strokeWidth="4.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <Rect x="15" y="28" width="34" height="26" rx="7" fill="#fff" />
+        <Circle cx="32" cy="38" r="3.2" fill="#1565C0" />
+        <Path d="M30.5 40l-1.5 7h6l-1.5-7z" fill="#1565C0" />
       </>
     )}
     {mode === 'single_player' && (
       <>
-        <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t2)" />
+        <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t5)" />
         <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
-        <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-          <Circle cx="32" cy="32" r="20" />
-          <Circle cx="32" cy="32" r="10" />
-        </G>
-        <Circle cx="32" cy="32" r="3.5" fill="#fff" />
+        <Circle cx="32" cy="23" r="9" fill="#fff" />
+        <Path
+          d="M16 49c0-8.8 7.2-14 16-14s16 5.2 16 14"
+          stroke="#fff"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          fill="#fff"
+          opacity="0.95"
+        />
       </>
     )}
     {mode === 'daily' && (

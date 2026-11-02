@@ -247,6 +247,14 @@ export class GameRoomDO extends DurableObject<Env> {
 
     await this.persist();
 
+    // Close and prune any existing websockets for this player to prevent multiple active connections
+    const existingPlayerSockets = this.ctx.getWebSockets(`player:${authUser.id}`);
+    for (const oldWs of existingPlayerSockets) {
+      try {
+        oldWs.close(1000, 'Replaced by new connection');
+      } catch {}
+    }
+
     // Accept WebSocket pair with Hibernation
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
@@ -860,7 +868,9 @@ export class GameRoomDO extends DurableObject<Env> {
 
   private handleSendEmote(playerId: string, envelope: WsMessage): void {
     const emote = sanitizeString(envelope.payload?.emote || '👏', 10);
+    const id = envelope.payload?.id || `emote_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     this.broadcast(SOCKET_EVENTS.EMOTE_RECEIVED, {
+      id,
       playerId,
       emote,
       roomCode: this.room?.code,
@@ -873,7 +883,7 @@ export class GameRoomDO extends DurableObject<Env> {
     if (!text.trim()) return;
     const player = this.room?.players?.[playerId];
     const payload = {
-      id: `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: envelope.payload?.id || `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       roomCode: this.room?.code,
       playerId,
       displayName: player?.displayName || envelope.payload?.displayName || 'Oyuncu',
@@ -950,11 +960,22 @@ export class GameRoomDO extends DurableObject<Env> {
   private broadcast(event: string, payload: any): void {
     const raw = encodeWsMessage(event, payload);
     const sockets = this.ctx.getWebSockets();
+    const sentPlayerIds = new Set<string>();
+
     for (const ws of sockets) {
       try {
+        const attachment = ws.deserializeAttachment() as WsAttachment | null;
+        if (attachment?.playerId) {
+          if (sentPlayerIds.has(attachment.playerId)) {
+            // Already sent to this player via another active socket; close duplicate
+            try { ws.close(1000, 'Duplicate socket pruned'); } catch {}
+            continue;
+          }
+          sentPlayerIds.add(attachment.playerId);
+        }
         ws.send(raw);
       } catch {
-        // Socket might be closing or dead
+        // Socket dead
       }
     }
   }

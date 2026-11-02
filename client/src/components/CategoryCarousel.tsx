@@ -30,7 +30,7 @@ export const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
   categories,
   selectedCategoryId,
   onSelectCategory,
-  cardSize = 92,
+  cardSize = 88,
 }) => {
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<any>(null);
@@ -106,7 +106,7 @@ export const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
   return (
     <View style={styles.wrapper}>
       {/* Yatay 3D Karusel */}
-      <View style={[styles.carouselContainer, { width: CONTAINER_WIDTH, height: cardSize * 1.6 }]}>
+      <View style={[styles.carouselContainer, { width: CONTAINER_WIDTH, height: cardSize * 1.55 }]}>
         <ScrollView
           ref={scrollViewRef}
           horizontal
@@ -133,13 +133,13 @@ export const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
 
             const scale = scrollX.interpolate({
               inputRange,
-              outputRange: [0.8, 1.25, 0.8],
+              outputRange: [0.82, 1.18, 0.82],
               extrapolate: 'clamp',
             });
 
             const opacity = scrollX.interpolate({
               inputRange,
-              outputRange: [0.6, 1.0, 0.6],
+              outputRange: [0.55, 1.0, 0.55],
               extrapolate: 'clamp',
             });
 
@@ -173,15 +173,23 @@ export const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
         </ScrollView>
       </View>
 
-      {/* Seçili Kategori Başlığı & Alt Bilgi */}
+      {/* Seçili Kategori Başlığı & Alt Bilgi (UI Kit Screen 9) */}
       {selectedCategory && (
         <View style={styles.categoryInfoBox}>
           <Text style={styles.categoryTitle}>{selectedCategory.name}</Text>
           <Text style={styles.categorySub}>
-            {selectedCategory.type === 'special'
-              ? '⭐ Tematik Özel Soru Paketi'
-              : '🎯 Genel Branş Soruları'}
+            {selectedCategory.badge ||
+              (selectedCategory.type === 'special'
+                ? '⭐ Tematik Özel Soru Paketi'
+                : '🧬 Genel Branş Soruları')}
           </Text>
+
+          {/* Tavriko UI Kit 3'lü Sayfalama Göstergesi */}
+          <View style={styles.paginationDotsRow}>
+            <View style={styles.dotInactive} />
+            <View style={styles.dotActive} />
+            <View style={styles.dotInactive} />
+          </View>
         </View>
       )}
     </View>
@@ -192,7 +200,7 @@ const styles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 8,
+    marginVertical: 6,
   },
   carouselContainer: {
     overflow: 'hidden',
@@ -209,11 +217,11 @@ const styles = StyleSheet.create({
   },
   categoryInfoBox: {
     alignItems: 'center',
-    marginTop: 8,
-    minHeight: 44,
+    marginTop: 6,
+    minHeight: 56,
   },
   categoryTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontFamily: 'Nunito_900Black',
     fontWeight: '900',
     color: '#FFFFFF',
@@ -227,6 +235,25 @@ const styles = StyleSheet.create({
     color: '#5ADBB5',
     marginTop: 3,
     textAlign: 'center',
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
+  },
+  paginationDotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  dotActive: {
+    width: 20,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFC43D',
+  },
+  dotInactive: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
   },
 });
