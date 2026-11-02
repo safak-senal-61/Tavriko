@@ -1682,7 +1682,7 @@ export function createApp() {
           function pasteSampleJson() {
             triggerHaptic('light');
             document.getElementById('json-textarea').value = SAMPLE_JSON_TEMPLATE;
-            console.log('📋 [Telegram WebApp] Örnek JSON şablonu textarea\'ya yerleştirildi.');
+            console.log("📋 [Telegram WebApp] Örnek JSON şablonu alana yerleştirildi.");
           }
 
           function clearJsonText() {
@@ -1832,9 +1832,9 @@ export function createApp() {
                 }
               } else {
                 const errList = data.errors && data.errors.length > 0
-                  ? data.errors.join('\n• ')
+                  ? data.errors.join('<br>• ')
                   : (data.error || 'Hiçbir geçerli soru içe aktarılamadı.');
-                console.error('❌ [Telegram WebApp] İçe aktarma başarısız:\n• ' + errList);
+                console.error('❌ [Telegram WebApp] İçe aktarma başarısız: ' + errList);
                 throw new Error(errList);
               }
             } catch (err) {
@@ -1895,7 +1895,7 @@ export function createApp() {
               const breakdownContainer = document.getElementById('categories-breakdown-list');
               if (breakdownContainer && stats.categoriesDetail && stats.categoriesDetail.length > 0) {
                 breakdownContainer.innerHTML = stats.categoriesDetail.map((c) => {
-                  return '<div class="category-matrix-card" onclick="filterBrowserCategory(\'' + c.id + '\')">' +
+                  return '<div class="category-matrix-card" data-cat-id="' + c.id + '" onclick="filterBrowserCategory(this.dataset.catId)">' +
                     '<div style="display: flex; justify-content: space-between; align-items: center;">' +
                       '<span style="font-size: 14px; font-weight: 800;">' + c.icon + ' ' + escapeHtml(c.name) + ' <span style="font-size: 11px; color: var(--text-secondary); font-weight: normal;">(' + c.id + ')</span></span>' +
                       '<span class="tag-pill gold" style="font-size: 12px;">' + c.total + ' soru</span>' +
@@ -1965,7 +1965,7 @@ export function createApp() {
                     html += '<div class="duplicate-item" id="dup-card-' + q.id + '">';
                     html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">';
                     html += '<span style="font-size: 11px; color: var(--text-secondary);">Kopya #' + (qIdx + 1) + ' · ID: ' + q.id + ' · ' + (q.reviewStatus || 'published') + '</span>';
-                    html += '<button class="btn-action reject" style="max-width: 130px; padding: 4px 8px; font-size: 11px;" onclick="deleteQuestionFromPool(\'' + q.id + '\', true)">🗑️ Bu Kopyayı Sil</button>';
+                    html += '<button class="btn-action reject" style="max-width: 130px; padding: 4px 8px; font-size: 11px;" data-id="' + q.id + '" onclick="deleteQuestionFromPool(this.dataset.id, true)">🗑️ Bu Kopyayı Sil</button>';
                     html += '</div>';
                     html += '<div style="font-size: 12px; color: var(--text-secondary);">Kategori: <b>' + q.categoryId + '</b> · Zorluk: <b>' + q.difficulty + '</b> · Havuz: <b>' + (q.targetPool || 'standard') + '</b></div>';
                     html += '</div>';
@@ -2058,7 +2058,7 @@ export function createApp() {
                   (q.explanation ? '<div style="font-size: 12px; color: var(--text-secondary); margin-top: 6px; font-style: italic;">💡 ' + escapeHtml(q.explanation) + '</div>' : '') +
                   '<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 8px;">' +
                     '<span style="font-size: 11px; color: var(--text-secondary);">ID: ' + q.id + '</span>' +
-                    '<button class="btn-action reject" style="max-width: 120px; padding: 6px 10px;" onclick="deleteQuestionFromPool(\'' + q.id + '\')">🗑️ Soruyu Sil</button>' +
+                    '<button class="btn-action reject" style="max-width: 120px; padding: 6px 10px;" data-id="' + q.id + '" onclick="deleteQuestionFromPool(this.dataset.id)">🗑️ Soruyu Sil</button>' +
                   '</div>' +
                 '</div>';
               }).join('');
