@@ -2726,7 +2726,20 @@ export class PrismaService {
     this.users.set(userId, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
-      this.syncUserToPrisma(record).catch(() => {});
+      try {
+        await this.rawClient.user.update({
+          where: { id: record.id },
+          data: {
+            coins: record.coins,
+            gems: record.gems,
+            xp: record.xp,
+            level: record.level,
+            updatedAt: new Date(),
+          },
+        });
+      } catch (err) {
+        console.error('[openChest] DB update error:', err);
+      }
     }
     return this.toProfile(record);
   }
@@ -2790,7 +2803,20 @@ export class PrismaService {
     this.users.set(userId, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
-      this.syncUserToPrisma(record).catch(() => {});
+      try {
+        await this.rawClient.user.update({
+          where: { id: record.id },
+          data: {
+            coins: record.coins,
+            gems: record.gems,
+            xp: record.xp,
+            level: record.level,
+            updatedAt: new Date(),
+          },
+        });
+      } catch (err) {
+        console.error('[openChest] DB update error:', err);
+      }
     }
     return { user: this.toProfile(record), rewardText };
   }
@@ -2881,7 +2907,20 @@ export class PrismaService {
     this.users.set(userId, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
-      this.syncUserToPrisma(record).catch(() => {});
+      try {
+        await this.rawClient.user.update({
+          where: { id: record.id },
+          data: {
+            coins: record.coins,
+            gems: record.gems,
+            xp: record.xp,
+            level: record.level,
+            updatedAt: new Date(),
+          },
+        });
+      } catch (err) {
+        console.error('[openChest] DB update error:', err);
+      }
     }
     return { user: this.toProfile(record), reward };
   }
@@ -2904,7 +2943,20 @@ export class PrismaService {
     this.users.set(userId, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
-      this.syncUserToPrisma(record).catch(() => {});
+      try {
+        await this.rawClient.user.update({
+          where: { id: record.id },
+          data: {
+            coins: record.coins,
+            gems: record.gems,
+            xp: record.xp,
+            level: record.level,
+            updatedAt: new Date(),
+          },
+        });
+      } catch (err) {
+        console.error('[openChest] DB update error:', err);
+      }
     }
     return this.toProfile(record);
   }
@@ -2914,7 +2966,18 @@ export class PrismaService {
     productId: string,
     paymentMethod: 'coins' | 'gems' | 'try' = 'coins'
   ): Promise<{ user: UserProfile; message: string }> {
-    const record = this.users.get(userId);
+    let record = this.users.get(userId);
+    if (!record) {
+      try {
+        const u = await this.rawClient.user.findFirst({
+          where: { OR: [{ id: userId }, { username: userId }] },
+        });
+        if (u) {
+          record = this.prismaUserToRecord(u);
+          this.users.set(record.id, record);
+        }
+      } catch {}
+    }
     if (!record) throw new Error('Kullanıcı bulunamadı.');
 
     const product = SHOP_CATALOG.find((p) => p.id === productId);
@@ -2963,7 +3026,18 @@ export class PrismaService {
     this.users.set(userId, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
-      this.syncUserToPrisma(record).catch(() => {});
+      try {
+        await this.rawClient.user.update({
+          where: { id: record.id },
+          data: {
+            coins: record.coins,
+            gems: record.gems,
+            updatedAt: new Date(),
+          },
+        });
+      } catch (err) {
+        console.error('[purchaseShopProduct] DB update error:', err);
+      }
     }
 
     return {
@@ -3079,7 +3153,20 @@ export class PrismaService {
     this.users.set(userId, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
-      this.syncUserToPrisma(record).catch(() => {});
+      try {
+        await this.rawClient.user.update({
+          where: { id: record.id },
+          data: {
+            coins: record.coins,
+            gems: record.gems,
+            xp: record.xp,
+            level: record.level,
+            updatedAt: new Date(),
+          },
+        });
+      } catch (err) {
+        console.error('[openChest] DB update error:', err);
+      }
     }
 
     const rewardText = `🎉 Sandık açıldı: +${coins} Altın, +${gems} Elmas ve +${xp} XP kazandınız!${bonusItem ? ` Bonus: ${bonusItem.name}!` : ''}`;
@@ -3210,7 +3297,20 @@ export class PrismaService {
     this.users.set(userId, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
-      this.syncUserToPrisma(record).catch(() => {});
+      try {
+        await this.rawClient.user.update({
+          where: { id: record.id },
+          data: {
+            coins: record.coins,
+            gems: record.gems,
+            xp: record.xp,
+            level: record.level,
+            updatedAt: new Date(),
+          },
+        });
+      } catch (err) {
+        console.error('[openChest] DB update error:', err);
+      }
     }
 
     return {

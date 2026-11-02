@@ -63,44 +63,15 @@ export const saveStoredAuth = (user: UserProfile | null, token?: string | null) 
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
       if (user) {
-        // Read existing permanent wallet so we never downgrade
-        const rawPerm = window.localStorage.getItem(STORAGE_KEY_PERMANENT_WALLET);
-        let existingCoins = 0;
-        let existingGems = 0;
-        let existingXp = 0;
-        let existingLevel = 1;
-        if (rawPerm) {
-          try {
-            const p = JSON.parse(rawPerm);
-            existingCoins = p.coins ?? 0;
-            existingGems = p.gems ?? 0;
-            existingXp = p.xp ?? 0;
-            existingLevel = p.level ?? 1;
-          } catch {}
-        }
-
-        const maxCoins = Math.max(user.coins ?? 0, existingCoins);
-        const maxGems = Math.max(user.gems ?? 0, existingGems);
-        const maxXp = Math.max(user.xp ?? 0, existingXp);
-        const maxLevel = Math.max(user.level ?? 1, existingLevel);
-
-        const secureUser: UserProfile = {
-          ...user,
-          coins: maxCoins,
-          gems: maxGems,
-          xp: maxXp,
-          level: maxLevel,
-        };
-
-        window.localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(secureUser));
+        window.localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
 
         const permPayload = {
           id: user.id,
           email: user.email,
-          coins: maxCoins,
-          gems: maxGems,
-          xp: maxXp,
-          level: maxLevel,
+          coins: user.coins,
+          gems: user.gems,
+          xp: user.xp,
+          level: user.level,
           savedAt: Date.now(),
         };
         window.localStorage.setItem(STORAGE_KEY_PERMANENT_WALLET, JSON.stringify(permPayload));

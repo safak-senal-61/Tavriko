@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -44,6 +44,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    console.log('[SettingsScreen] Mount/Update | User:', {
+      id: user?.id,
+      email: user?.email,
+      coins: user?.coins,
+      gems: user?.gems,
+      xp: user?.xp,
+      level: user?.level,
+    });
+  }, [user]);
 
   // Audio & Haptics
   const [sfxEnabled, setSfxEnabled] = useState(sound.isSoundEnabled());

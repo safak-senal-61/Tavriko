@@ -2315,7 +2315,21 @@ class PrismaService {
         this.users.set(userId, record);
         if (!record.isGuest) {
             this.savePersistedUsers();
-            this.syncUserToPrisma(record).catch(() => { });
+            try {
+                await this.rawClient.user.update({
+                    where: { id: record.id },
+                    data: {
+                        coins: record.coins,
+                        gems: record.gems,
+                        xp: record.xp,
+                        level: record.level,
+                        updatedAt: new Date(),
+                    },
+                });
+            }
+            catch (err) {
+                console.error('[openChest] DB update error:', err);
+            }
         }
         return this.toProfile(record);
     }
@@ -2375,7 +2389,21 @@ class PrismaService {
         this.users.set(userId, record);
         if (!record.isGuest) {
             this.savePersistedUsers();
-            this.syncUserToPrisma(record).catch(() => { });
+            try {
+                await this.rawClient.user.update({
+                    where: { id: record.id },
+                    data: {
+                        coins: record.coins,
+                        gems: record.gems,
+                        xp: record.xp,
+                        level: record.level,
+                        updatedAt: new Date(),
+                    },
+                });
+            }
+            catch (err) {
+                console.error('[openChest] DB update error:', err);
+            }
         }
         return { user: this.toProfile(record), rewardText };
     }
@@ -2467,7 +2495,21 @@ class PrismaService {
         this.users.set(userId, record);
         if (!record.isGuest) {
             this.savePersistedUsers();
-            this.syncUserToPrisma(record).catch(() => { });
+            try {
+                await this.rawClient.user.update({
+                    where: { id: record.id },
+                    data: {
+                        coins: record.coins,
+                        gems: record.gems,
+                        xp: record.xp,
+                        level: record.level,
+                        updatedAt: new Date(),
+                    },
+                });
+            }
+            catch (err) {
+                console.error('[openChest] DB update error:', err);
+            }
         }
         return { user: this.toProfile(record), reward };
     }
@@ -2487,12 +2529,38 @@ class PrismaService {
         this.users.set(userId, record);
         if (!record.isGuest) {
             this.savePersistedUsers();
-            this.syncUserToPrisma(record).catch(() => { });
+            try {
+                await this.rawClient.user.update({
+                    where: { id: record.id },
+                    data: {
+                        coins: record.coins,
+                        gems: record.gems,
+                        xp: record.xp,
+                        level: record.level,
+                        updatedAt: new Date(),
+                    },
+                });
+            }
+            catch (err) {
+                console.error('[openChest] DB update error:', err);
+            }
         }
         return this.toProfile(record);
     }
     async purchaseShopProduct(userId, productId, paymentMethod = 'coins') {
-        const record = this.users.get(userId);
+        let record = this.users.get(userId);
+        if (!record) {
+            try {
+                const u = await this.rawClient.user.findFirst({
+                    where: { OR: [{ id: userId }, { username: userId }] },
+                });
+                if (u) {
+                    record = this.prismaUserToRecord(u);
+                    this.users.set(record.id, record);
+                }
+            }
+            catch { }
+        }
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
         const product = shared_1.SHOP_CATALOG.find((p) => p.id === productId);
@@ -2542,7 +2610,19 @@ class PrismaService {
         this.users.set(userId, record);
         if (!record.isGuest) {
             this.savePersistedUsers();
-            this.syncUserToPrisma(record).catch(() => { });
+            try {
+                await this.rawClient.user.update({
+                    where: { id: record.id },
+                    data: {
+                        coins: record.coins,
+                        gems: record.gems,
+                        updatedAt: new Date(),
+                    },
+                });
+            }
+            catch (err) {
+                console.error('[purchaseShopProduct] DB update error:', err);
+            }
         }
         return {
             user: this.toProfile(record),
@@ -2640,7 +2720,21 @@ class PrismaService {
         this.users.set(userId, record);
         if (!record.isGuest) {
             this.savePersistedUsers();
-            this.syncUserToPrisma(record).catch(() => { });
+            try {
+                await this.rawClient.user.update({
+                    where: { id: record.id },
+                    data: {
+                        coins: record.coins,
+                        gems: record.gems,
+                        xp: record.xp,
+                        level: record.level,
+                        updatedAt: new Date(),
+                    },
+                });
+            }
+            catch (err) {
+                console.error('[openChest] DB update error:', err);
+            }
         }
         const rewardText = `🎉 Sandık açıldı: +${coins} Altın, +${gems} Elmas ve +${xp} XP kazandınız!${bonusItem ? ` Bonus: ${bonusItem.name}!` : ''}`;
         return {
@@ -2757,7 +2851,21 @@ class PrismaService {
         this.users.set(userId, record);
         if (!record.isGuest) {
             this.savePersistedUsers();
-            this.syncUserToPrisma(record).catch(() => { });
+            try {
+                await this.rawClient.user.update({
+                    where: { id: record.id },
+                    data: {
+                        coins: record.coins,
+                        gems: record.gems,
+                        xp: record.xp,
+                        level: record.level,
+                        updatedAt: new Date(),
+                    },
+                });
+            }
+            catch (err) {
+                console.error('[openChest] DB update error:', err);
+            }
         }
         return {
             user: this.toProfile(record),

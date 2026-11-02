@@ -297,10 +297,10 @@ class GameRoomManager {
             const timer = this.roundTimers.get(code);
             if (timer)
                 clearTimeout(timer);
-            // Small 600ms grace for visual feel before revealing
+            // Fast 250ms transition when all players have answered
             setTimeout(() => {
                 this.endCurrentRound(code);
-            }, 600);
+            }, 250);
         }
         return {
             accepted: true,
@@ -337,7 +337,7 @@ class GameRoomManager {
         if (this.onRoundEnd) {
             this.onRoundEnd(code, roundResult);
         }
-        // Schedule intermission or next round
+        // Schedule intermission or next round (2600ms gives comfortable time to review answer feedback)
         setTimeout(() => {
             if (room.currentRound >= room.totalRounds) {
                 this.finishGame(code);
@@ -345,7 +345,7 @@ class GameRoomManager {
             else {
                 this.advanceToNextRound(code);
             }
-        }, 3500);
+        }, 2600);
     }
     finishGame(code) {
         const room = this.getRoom(code);

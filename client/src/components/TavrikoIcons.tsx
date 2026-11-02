@@ -144,6 +144,7 @@ export const CoinIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
   </Svg>
 );
 export const CoinSvg = CoinIcon;
+export const CoinTavrikoIcon = CoinIcon;
 export const GemIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
   <Svg width={size} height={size} viewBox="0 0 64 64">
     <SharedSvgDefs />
@@ -158,6 +159,7 @@ export const GemIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
     />
   </Svg>
 );
+export const GemTavrikoIcon = GemIcon;
 export const TrophyIcon: React.FC<{ size?: number }> = ({ size = 28 }) => (
   <Svg width={size} height={size} viewBox="0 0 64 64">
     <SharedSvgDefs />
@@ -1052,10 +1054,8 @@ export const TavrikoTopBar: React.FC<{
   onGuestLoginPress,
 }) => {
   const storeUser = useGameStore((s) => s.user);
-  const candidateCoins = coins !== undefined && coins !== null ? coins : storeUser?.coins;
-  const candidateGems = gems !== undefined && gems !== null ? gems : storeUser?.gems;
-  const displayCoins = Math.max(candidateCoins ?? 0, storeUser?.coins ?? 0);
-  const displayGems = Math.max(candidateGems ?? 0, storeUser?.gems ?? 0);
+  const displayCoins = coins !== undefined && coins !== null ? coins : storeUser?.coins ?? 0;
+  const displayGems = gems !== undefined && gems !== null ? gems : storeUser?.gems ?? 0;
   const displayAvatar = avatarSeed || storeUser?.avatarUrl || storeUser?.displayName || 'av1';
 
   if (isGuest) {

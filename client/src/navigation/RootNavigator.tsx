@@ -159,6 +159,7 @@ export const RootNavigator: React.FC = () => {
   });
   const [practiceStreak, setPracticeStreak] = useState<number>(0);
   const [practiceFeedback, setPracticeFeedback] = useState<RoundFeedback | null>(null);
+  const [multiplayerFeedback, setMultiplayerFeedback] = useState<RoundFeedback | null>(null);
   const [isPracticeSummaryVisible, setIsPracticeSummaryVisible] = useState<boolean>(false);
   const [activeDailyConfig, setActiveDailyConfig] = useState<DailyChallengeConfig | null>(null);
   const [dailyResultModal, setDailyResultModal] = useState<{
@@ -243,46 +244,11 @@ export const RootNavigator: React.FC = () => {
     return () => sub.remove();
   }, []);
 
-  // Güvenli kullanıcı senkronizasyonu: Bakiye, seviye ve XP hiçbir zaman geriye düşürülemez!
+  // Yetkili sunucu senkronizasyonu: PostgreSQL'deki en güncel bakiyeyi ve envanteri alır
   const syncWithFreshUser = useCallback(
     (freshUser: UserProfile | null) => {
       if (!freshUser || !user || freshUser.id !== user.id) return;
-      const mergedCoins = Math.max(user.coins ?? 0, freshUser.coins ?? 0);
-      const mergedGems = Math.max(user.gems ?? 0, freshUser.gems ?? 0);
-      const mergedXp = Math.max(user.xp ?? 0, freshUser.xp ?? 0);
-      const mergedLevel = Math.max(user.level ?? 1, freshUser.level ?? 1);
-      const mergedRankPoints = Math.max(user.rankPoints ?? 1000, freshUser.rankPoints ?? 1000);
-
-      const mergedUser: UserProfile = {
-        ...user,
-        ...freshUser,
-        coins: mergedCoins,
-        gems: mergedGems,
-        xp: mergedXp,
-        level: mergedLevel,
-        rankPoints: mergedRankPoints,
-      };
-      setUser(mergedUser);
-
-      // Eğer yereldeki bakiye sunucudan yüksekse sunucuya da güncel halini gönderip PostgreSQL'e yazdır
-      if (
-        (user.coins ?? 0) > (freshUser.coins ?? 0) ||
-        (user.gems ?? 0) > (freshUser.gems ?? 0) ||
-        (user.xp ?? 0) > (freshUser.xp ?? 0) ||
-        (user.level ?? 1) > (freshUser.level ?? 1)
-      ) {
-        fetch(`${API_BASE}/auth/sync-wallet`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: user.id,
-            coins: mergedCoins,
-            gems: mergedGems,
-            xp: mergedXp,
-            level: mergedLevel,
-          }),
-        }).catch(() => {});
-      }
+      setUser(freshUser);
     },
     [user]
   );
@@ -346,6 +312,7 @@ export const RootNavigator: React.FC = () => {
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
       setCurrentQuestion(question);
       setRoundResult(null);
+      setMultiplayerFeedback(null);
       selectOption(null);
       setOpponentHasAnswered(false);
       if (currentScreenRef.current !== 'quiz_arena') {
@@ -356,6 +323,18 @@ export const RootNavigator: React.FC = () => {
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
       setRoundResult(result);
       const myAns = user ? result.playerAnswers[user.id] : null;
+
+      // Anlık doğru/yanlış ve bilgi açıklamasını QuizArenaScreen'e anında ver
+      const multiFeedback: RoundFeedback = {
+        isCorrect: myAns?.isCorrect ?? false,
+        isTimeout: !myAns?.selectedOptionId,
+        correctOptionId: result.correctOptionId,
+        explanation: result.explanation || '',
+        pointsAwarded: myAns?.pointsEarned ?? 0,
+        speedBonus: myAns?.speedBonus ?? 0,
+        streak: myAns?.streak ?? 0,
+      };
+      setMultiplayerFeedback(multiFeedback);
 
       // Maç sonu için yapılan doğru/yanlış/boş soru detaylarını kaydet
       if (user && currentQuestionRef.current) {
@@ -382,8 +361,6 @@ export const RootNavigator: React.FC = () => {
         sound.playSound('wrong');
         sound.triggerHaptic('error');
       }
-      // Soru aralarında modal ve intermission ekranı kaldırıldı!
-      // Oyun akıcı şekilde doğrudan devam eder ve sıradaki soru (QUESTION_START) beklenir.
     });
     const unsubGameOver = socketService.onGameOver((summary: FinalMatchSummary) => {
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
@@ -645,6 +622,7 @@ export const RootNavigator: React.FC = () => {
 
     setDuelOpponent(null);
     setOpponentHasAnswered(false);
+    setMultiplayerFeedback(null);
     setPracticeQuestions([]);
     setPracticeIndex(0);
     setPracticeStreak(0);
@@ -1496,7 +1474,7 @@ export const RootNavigator: React.FC = () => {
                   ? activeRoom.scores[user.id] || 0
                   : practiceStats.totalScore
               }
-              feedback={activeRoom ? null : practiceFeedback}
+              feedback={activeRoom ? multiplayerFeedback : practiceFeedback}
               onSelectOption={handleSubmitAnswer}
               onTimeExpired={handleTimeExpired}
               onExit={handleExitCurrentGame}

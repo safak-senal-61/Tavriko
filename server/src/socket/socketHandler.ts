@@ -19,8 +19,8 @@ export function setupSocketHandlers(
         (p) => p.isBot || p.id.startsWith('rival_bot_') || p.id.startsWith('bot_')
       );
       if (botPlayer && !botPlayer.hasAnsweredCurrentRound) {
-        // Realistic response delay between 2200ms and 5000ms
-        const responseDelay = Math.floor(2200 + Math.random() * 2800);
+        // Fast, realistic response delay between 1000ms and 2500ms
+        const responseDelay = Math.floor(1000 + Math.random() * 1500);
         // ~80% accuracy chance
         const isBotCorrect = Math.random() < 0.8;
         const currentQ = room.currentQuestion;
