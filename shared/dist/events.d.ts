@@ -25,6 +25,8 @@ export declare const SOCKET_EVENTS: {
     readonly LOBBY_MESSAGE: "room:lobby_message";
     readonly GET_PUBLIC_ROOMS: "room:get_public_rooms";
     readonly PUBLIC_ROOMS_UPDATE: "room:public_rooms_update";
+    readonly CHALLENGE_FRIEND: "social:challenge_friend";
+    readonly CHALLENGE_RECEIVED: "social:challenge_received";
     readonly ERROR: "system:error";
 };
 export type SocketEventName = typeof SOCKET_EVENTS[keyof typeof SOCKET_EVENTS];

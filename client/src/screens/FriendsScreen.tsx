@@ -27,7 +27,8 @@ interface FriendsScreenProps {
   isGuest?: boolean;
   apiBaseUrl?: string;
   onBack: () => void;
-  onInviteToMatch: (friendId: string) => void;
+  onInviteToMatch: (friendId: string, friendName?: string, roomCode?: string) => void;
+  onJoinFriendRoom?: (roomCode: string) => void;
   onNavigateTab?: (tab: 'play' | 'explore' | 'leaders' | 'friends' | 'profile') => void;
   onNotifications?: () => void;
 }
@@ -50,6 +51,8 @@ interface FriendRowItem {
   online: boolean;
   status: string;
   isFriend?: boolean;
+  inRoom?: boolean;
+  currentRoomCode?: string;
 }
 export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   user,
@@ -57,6 +60,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   apiBaseUrl,
   onBack,
   onInviteToMatch,
+  onJoinFriendRoom,
   onNavigateTab,
   onNotifications,
 }) => {
@@ -65,6 +69,8 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   const [friendCode, setFriendCode] = useState(user?.friendCode || 'TV-10000');
   const [friendsList, setFriendsList] = useState<FriendRowItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [challengeLoadingId, setChallengeLoadingId] = useState<string | null>(null);
+  const [challengeNotice, setChallengeNotice] = useState<string | null>(null);
   // Profile Inspection Modal State
   const [inspectPlayer, setInspectPlayer] = useState<FriendRowItem | null>(null);
   const [inspectDetails, setInspectDetails] = useState<any | null>(null);
@@ -169,6 +175,46 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       setAddLoading(false);
     }
   };
+
+  const handleSendChallenge = async (friend: FriendRowItem) => {
+    if (!user) {
+      sound.playSound('wrong');
+      setChallengeNotice('1v1 yarış daveti göndermek için giriş yapmalısınız.');
+      return;
+    }
+    sound.playSound('tap');
+    sound.triggerHaptic('medium');
+    setChallengeLoadingId(friend.id);
+    setChallengeNotice(null);
+
+    try {
+      const res = await fetch(`${base}/social/friends/challenge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          targetUserId: friend.id,
+          category: 'genel_kultur',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        sound.playSound('reward');
+        sound.triggerHaptic('success');
+        setChallengeNotice(`⚔️ ${friend.displayName || friend.name} oyuncusuna 1v1 düello daveti gönderildi! Odaya aktarılıyorsunuz...`);
+        setTimeout(() => {
+          onInviteToMatch(friend.id, friend.displayName || friend.name, data.roomCode);
+        }, 1000);
+      } else {
+        throw new Error(data.error || 'Düello daveti gönderilemedi.');
+      }
+    } catch (err: any) {
+      sound.playSound('wrong');
+      setChallengeNotice(`⚠️ ${err.message || 'Davet gönderilemedi.'}`);
+    } finally {
+      setChallengeLoadingId(null);
+    }
+  };
   return (
     <TavrikoScreen>
       <TavrikoTopBar
@@ -213,6 +259,11 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
             />
           </View>
         </View>
+        {challengeNotice && (
+          <View style={styles.challengeNoticeCard}>
+            <Text style={styles.challengeNoticeText}>{challengeNotice}</Text>
+          </View>
+        )}
         {/* 3 Navigation Tabs */}
         <View style={styles.tabsRow}>
           <TouchableOpacity
@@ -308,13 +359,28 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                       {f.status || (f.online ? 'Çevrimiçi' : 'Çevrimdışı')} · Profili Gör →
                     </Text>
                   </View>
-                  <Button3D
-                    title="1v1"
-                    variant="gold"
-                    onPress={() => onInviteToMatch(f.id)}
-                    style={{ minHeight: 38, paddingHorizontal: 16 }}
-                    textStyle={{ fontSize: 13 }}
-                  />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {f.inRoom && f.currentRoomCode && (
+                      <Button3D
+                        title="KATIL"
+                        variant="mint"
+                        onPress={() => {
+                          sound.playSound('tap');
+                          if (onJoinFriendRoom) onJoinFriendRoom(f.currentRoomCode!);
+                        }}
+                        style={{ minHeight: 38, paddingHorizontal: 12 }}
+                        textStyle={{ fontSize: 12 }}
+                      />
+                    )}
+                    <Button3D
+                      title={challengeLoadingId === f.id ? '...' : '1v1'}
+                      variant="gold"
+                      disabled={challengeLoadingId === f.id}
+                      onPress={() => handleSendChallenge(f)}
+                      style={{ minHeight: 38, paddingHorizontal: 14 }}
+                      textStyle={{ fontSize: 13 }}
+                    />
+                  </View>
                 </TouchableOpacity>
               );
             })
@@ -364,15 +430,18 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         {/* Tab 3: Duel Invitations */}
         {activeTab === 'requests' && (
           <View style={styles.emptyStateBox}>
-            <Text style={styles.emptyStateTitle}>Bekleyen Düello Daveti Yok</Text>
+            <Text style={styles.emptyStateTitle}>Düello & Arkadaşlık Bildirimleri</Text>
             <Text style={styles.emptyStateSub}>
-              Oyuncular sekmesinden bir arkadaşına 1v1 butonuyla anında düello daveti gönderebilirsin!
+              Gelen tüm 1v1 düello meydan okumaları ve arkadaşlık talepleri Bildirimler sayfasında anlık olarak listelenir ve kabul/reddedilebilir.
             </Text>
             <Button3D
-              title="OYUNCULARI GÖR"
+              title="BİLDİRİMLERİ AÇ"
               variant="mint"
-              onPress={() => setActiveTab('friends')}
-              style={{ marginTop: 14 }}
+              onPress={() => {
+                sound.playSound('tap');
+                if (onNotifications) onNotifications();
+              }}
+              style={{ marginTop: 14, minWidth: 200 }}
             />
           </View>
         )}
@@ -571,6 +640,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     width: '100%',
     gap: 10,
+  },
+  challengeNoticeCard: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255, 196, 61, 0.15)',
+    borderWidth: 1,
+    borderColor: '#FFC43D',
+    borderRadius: 14,
+    marginBottom: 14,
+  },
+  challengeNoticeText: {
+    color: '#FFC43D',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    lineHeight: 16,
   },
   tabsRow: {
     flexDirection: 'row',

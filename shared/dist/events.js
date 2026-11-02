@@ -33,6 +33,8 @@ exports.SOCKET_EVENTS = {
     LOBBY_MESSAGE: 'room:lobby_message',
     GET_PUBLIC_ROOMS: 'room:get_public_rooms',
     PUBLIC_ROOMS_UPDATE: 'room:public_rooms_update',
+    CHALLENGE_FRIEND: 'social:challenge_friend',
+    CHALLENGE_RECEIVED: 'social:challenge_received',
     // System
     ERROR: 'system:error',
 };

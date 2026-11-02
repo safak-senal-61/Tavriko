@@ -37,6 +37,66 @@ router.post('/friends/add', async (req: Request, res: Response): Promise<void> =
   }
 });
 
+// --- 1v1 Match Challenge (Yarış İsteği) ---
+router.post('/friends/challenge', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, targetUserId, category } = req.body;
+    if (!userId || !targetUserId) {
+      res.status(400).json({ error: 'userId ve targetUserId zorunludur.' });
+      return;
+    }
+    const result = await db.sendDuelChallenge(userId, targetUserId, category);
+    if (!result.success) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Real Notifications API ---
+router.get('/notifications/:userId', (req: Request, res: Response): void => {
+  const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+  const notifications = db.getUserNotifications(userId || 'anon');
+  res.json({
+    success: true,
+    notifications,
+  });
+});
+
+router.post('/notifications/respond', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, notificationId, action } = req.body;
+    if (!userId || !notificationId || !action) {
+      res.status(400).json({ error: 'userId, notificationId ve action zorunludur.' });
+      return;
+    }
+    const result = await db.respondToNotification(userId, notificationId, action);
+    if (!result.success) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Room Status Sync ---
+router.post('/rooms/active', (req: Request, res: Response): void => {
+  try {
+    const { userId, roomCode } = req.body;
+    if (userId) {
+      db.setUserActiveRoom(userId, roomCode || null);
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Shop Catalog & Purchasing ---
 router.get('/shop/catalog', (req: Request, res: Response): void => {
   res.json({

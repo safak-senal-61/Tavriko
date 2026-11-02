@@ -82,6 +82,7 @@ class PrismaService {
     questions = [];
     categories = [...questionsData_1.ALL_CATEGORIES];
     isJest = Boolean(process.env.JEST_WORKER_ID);
+    activeUserRooms = new Map();
     constructor() {
         this.rawClient = new client_1.PrismaClient({
             log: ['error'],
@@ -1756,6 +1757,14 @@ class PrismaService {
             .map((u) => this.toProfile(u));
         return list;
     }
+    setUserActiveRoom(userId, roomCode) {
+        if (roomCode) {
+            this.activeUserRooms.set(userId, { roomCode, joinedAt: Date.now() });
+        }
+        else {
+            this.activeUserRooms.delete(userId);
+        }
+    }
     getFriendsForUser(userId) {
         const me = this.users.get(userId);
         const friendCode = me?.friendCode || this.generateFriendCode(userId);
@@ -1765,6 +1774,9 @@ class PrismaService {
             const u = this.users.get(fId);
             if (u) {
                 const prog = (0, shared_1.calculateLevelFromXp)(u.xp || 0);
+                const roomInfo = this.activeUserRooms.get(u.id);
+                const inRoom = !!roomInfo;
+                const currentRoomCode = roomInfo ? roomInfo.roomCode : undefined;
                 explicitFriends.push({
                     id: u.id,
                     username: u.username,
@@ -1782,8 +1794,10 @@ class PrismaService {
                     countryCode: u.countryCode || 'TR',
                     countryName: u.countryName || 'Türkiye',
                     online: true,
-                    status: 'Arkadaşın · Çevrimiçi',
+                    status: inRoom ? `Oda: #${currentRoomCode} · Lobide` : 'Arkadaşın · Çevrimiçi',
                     isFriend: true,
+                    inRoom,
+                    currentRoomCode,
                 });
             }
         }
@@ -1792,6 +1806,10 @@ class PrismaService {
             .slice(0, 10)
             .map((u, idx) => {
             const prog = (0, shared_1.calculateLevelFromXp)(u.xp || 0);
+            const roomInfo = this.activeUserRooms.get(u.id);
+            // DenizPro (idx === 0) has an active demo room so users can immediately test room join
+            const inRoom = !!roomInfo || idx === 0;
+            const currentRoomCode = roomInfo ? roomInfo.roomCode : idx === 0 ? 'DENIZ1' : undefined;
             return {
                 id: u.id,
                 username: u.username,
@@ -1809,8 +1827,14 @@ class PrismaService {
                 countryCode: u.countryCode || 'TR',
                 countryName: u.countryName || 'Türkiye',
                 online: idx % 3 !== 2,
-                status: idx === 0 ? 'Oyunda · Düello' : idx % 3 !== 2 ? 'Çevrimiçi' : 'Çevrimdışı',
+                status: inRoom
+                    ? `Oda: #${currentRoomCode} · Lobide`
+                    : idx % 3 !== 2
+                        ? 'Çevrimiçi'
+                        : 'Çevrimdışı',
                 isFriend: false,
+                inRoom,
+                currentRoomCode,
             };
         });
         return { friendCode, friends: [...explicitFriends, ...otherUsers] };
@@ -1841,21 +1865,29 @@ class PrismaService {
         if (me.friendIds.includes(target.id)) {
             return { success: false, error: 'Bu kullanıcı zaten arkadaş listenizde!' };
         }
+        // Add friend request notification to target user so they can accept / decline
+        if (!target.notifications)
+            target.notifications = [];
+        // Check if an existing pending request is already present
+        const existingReq = target.notifications.find((n) => n.type === 'friend_request' && n.senderId === me.id && !n.handled);
+        if (!existingReq) {
+            target.notifications.unshift({
+                id: 'notif_fr_' + Date.now(),
+                type: 'friend_request',
+                title: `${me.displayName} sana arkadaşlık isteği gönderdi!`,
+                sub: '1v1 düello maçları ve ortak odalarda yarışmak için isteği kabul et.',
+                timeText: 'Az önce',
+                senderId: me.id,
+                senderName: me.displayName,
+                senderAvatar: me.avatarUrl || 'av1',
+                handled: null,
+            });
+        }
+        // For instantaneous convenience, also add to friend lists mutually
         me.friendIds.push(target.id);
         if (!target.friendIds.includes(me.id)) {
             target.friendIds.push(me.id);
         }
-        // Add notification to target
-        if (!target.notifications)
-            target.notifications = [];
-        target.notifications.unshift({
-            id: 'notif_fr_' + Date.now(),
-            type: 'friend',
-            title: `${me.displayName} seni arkadaş olarak ekledi!`,
-            sub: 'Artık 1v1 düello maçlarına davet edebilirsin.',
-            timeText: 'Az önce',
-            handled: null,
-        });
         this.users.set(me.id, me);
         this.users.set(target.id, target);
         this.savePersistedUsers();
@@ -1872,7 +1904,150 @@ class PrismaService {
                 rankPoints: target.rankPoints || 1000,
                 online: true,
                 status: 'Arkadaşın · Çevrimiçi',
+                isFriend: true,
             },
+        };
+    }
+    getUserNotifications(userId) {
+        const user = this.users.get(userId);
+        if (!user)
+            return [];
+        if (!user.notifications || user.notifications.length === 0) {
+            user.notifications = [
+                {
+                    id: 'notif_fr_sample',
+                    type: 'friend_request',
+                    title: 'Ece Yıldız sana arkadaşlık isteği gönderdi!',
+                    sub: '1v1 düellolar ve özel odalar için isteği kabul et.',
+                    timeText: 'Az önce',
+                    senderId: 'user_ece',
+                    senderName: 'Ece Yıldız',
+                    senderAvatar: 'av2',
+                    handled: null,
+                },
+                {
+                    id: 'notif_duel_sample',
+                    type: 'match_invite',
+                    title: 'Burak Challenge sana 1v1 Düello Meydan Okudu!',
+                    sub: 'Bilim & Genel Kültür · Hazırsan kabul et ve hemen yarış!',
+                    timeText: '3 dk önce',
+                    senderId: 'user_burak',
+                    senderName: 'Burak Challenge',
+                    senderAvatar: 'av3',
+                    roomCode: 'BURAK1',
+                    handled: null,
+                },
+                {
+                    id: 'notif_rew_sample',
+                    type: 'reward',
+                    title: 'Haftalık Katılım Ödülü Hazır!',
+                    sub: 'Tebrikler! +150 Altın ve +10 Elmas hesabına yüklendi.',
+                    timeText: 'Bugün',
+                },
+            ];
+            this.users.set(userId, user);
+            this.savePersistedUsers();
+        }
+        return user.notifications;
+    }
+    async respondToNotification(userId, notificationId, action) {
+        const finalHandled = action === 'accept' ? 'accepted' : 'declined';
+        const user = this.users.get(userId);
+        if (!user) {
+            return { success: false, handled: finalHandled, error: 'Kullanıcı bulunamadı.', message: '' };
+        }
+        if (!user.notifications)
+            user.notifications = [];
+        const notif = user.notifications.find((n) => n.id === notificationId);
+        if (!notif) {
+            return { success: false, handled: finalHandled, error: 'Bildirim bulunamadı.', message: '' };
+        }
+        notif.handled = finalHandled;
+        if (notif.type === 'friend_request' || notif.type === 'friend') {
+            if (action === 'accept') {
+                notif.sub = 'Arkadaşlık isteği kabul edildi. Artık arkadaşsınız!';
+                if (notif.senderId) {
+                    if (!user.friendIds)
+                        user.friendIds = [];
+                    if (!user.friendIds.includes(notif.senderId)) {
+                        user.friendIds.push(notif.senderId);
+                    }
+                    const sender = this.users.get(notif.senderId);
+                    if (sender) {
+                        if (!sender.friendIds)
+                            sender.friendIds = [];
+                        if (!sender.friendIds.includes(user.id)) {
+                            sender.friendIds.push(user.id);
+                        }
+                        if (!sender.notifications)
+                            sender.notifications = [];
+                        sender.notifications.unshift({
+                            id: 'notif_fra_' + Date.now(),
+                            type: 'system',
+                            title: `${user.displayName} arkadaşlık isteğini kabul etti!`,
+                            sub: 'Artık 1v1 düello maçlarına davet edebilirsin.',
+                            timeText: 'Az önce',
+                        });
+                        this.users.set(sender.id, sender);
+                    }
+                }
+            }
+            else {
+                notif.sub = 'Arkadaşlık isteği reddedildi.';
+            }
+        }
+        else if (notif.type === 'match_invite' || notif.type === 'duel') {
+            if (action === 'accept') {
+                notif.sub = 'Düello daveti kabul edildi! Odaya katıldın.';
+                this.savePersistedUsers();
+                return {
+                    success: true,
+                    handled: 'accepted',
+                    roomCode: notif.roomCode || 'BURAK1',
+                    message: 'Düello daveti kabul edildi! Odaya aktarılıyorsunuz...',
+                };
+            }
+            else {
+                notif.sub = 'Düello daveti reddedildi.';
+            }
+        }
+        this.users.set(user.id, user);
+        this.savePersistedUsers();
+        return {
+            success: true,
+            handled: finalHandled,
+            message: action === 'accept' ? 'İşlem başarıyla onaylandı.' : 'İstek reddedildi.',
+        };
+    }
+    async sendDuelChallenge(userId, targetUserId, category = 'genel_kultur') {
+        const me = this.users.get(userId);
+        if (!me)
+            return { success: false, error: 'Kullanıcı oturumu bulunamadı.', message: '' };
+        const target = this.users.get(targetUserId);
+        if (!target)
+            return { success: false, error: 'Hedef oyuncu bulunamadı.', message: '' };
+        const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        this.setUserActiveRoom(userId, roomCode);
+        if (!target.notifications)
+            target.notifications = [];
+        target.notifications.unshift({
+            id: 'notif_chal_' + Date.now(),
+            type: 'match_invite',
+            title: `${me.displayName} sana 1v1 Düello Meydan Okudu!`,
+            sub: 'Özel 1v1 düello odası hazır. Kabul et ve hemen yarışmaya başla!',
+            timeText: 'Az önce',
+            senderId: me.id,
+            senderName: me.displayName,
+            senderAvatar: me.avatarUrl || 'av1',
+            roomCode: roomCode,
+            handled: null,
+        });
+        this.users.set(target.id, target);
+        this.savePersistedUsers();
+        return {
+            success: true,
+            roomCode,
+            message: `${target.displayName} kullanıcısına 1v1 düello daveti başarıyla gönderildi!`,
         };
     }
     async purchaseShopPack(userId, pack) {

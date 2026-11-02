@@ -207,11 +207,15 @@ export interface InventoryItem {
 }
 export interface NotificationItem {
     id: string;
-    type: 'duel' | 'reward' | 'league' | 'friend' | 'system';
+    type: 'duel' | 'reward' | 'league' | 'friend' | 'system' | 'friend_request' | 'match_invite';
     title: string;
     sub: string;
     timeText: string;
     handled?: 'accepted' | 'declined' | null;
+    senderId?: string;
+    senderName?: string;
+    senderAvatar?: string;
+    roomCode?: string;
 }
 export interface UserProfile {
     id: string;

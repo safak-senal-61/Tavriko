@@ -125,11 +125,18 @@ export const RootNavigator: React.FC = () => {
   // Screen transition animation
   const screenFade = useRef(new Animated.Value(1)).current;
   const navigateTo = (nextScreen: ScreenName) => {
-    screenFade.setValue(0.35);
+    if (nextScreen === currentScreenRef.current) {
+      return;
+    }
+    // Prevent screen darkening/blinking during questions or same-mode transitions
+    if (nextScreen === 'quiz_arena' && currentScreenRef.current === 'quiz_arena') {
+      return;
+    }
+    screenFade.setValue(Platform.OS === 'web' ? 0.96 : 0.88);
     setCurrentScreen(nextScreen);
     Animated.timing(screenFade, {
       toValue: 1,
-      duration: 210,
+      duration: 150,
       useNativeDriver: Platform.OS !== 'web',
     }).start();
   };
@@ -225,7 +232,7 @@ export const RootNavigator: React.FC = () => {
 
   const currentScreenRef = useRef<ScreenName>(currentScreen);
   currentScreenRef.current = currentScreen;
-  // Keep system status bar (clock, battery, notifications) completely hidden in fullscreen mode
+  // Keep system status bar completely hidden in fullscreen mode without triggering re-layouts on screen changes
   useEffect(() => {
     StatusBar.setHidden(true, 'none');
     const sub = AppState.addEventListener('change', (state) => {
@@ -234,7 +241,7 @@ export const RootNavigator: React.FC = () => {
       }
     });
     return () => sub.remove();
-  }, [currentScreen]);
+  }, []);
   // Helper to gate non-Keşfet features when in Guest Mode
   const requireAuth = (action: () => void, featureName: string) => {
     if (isGuest || !user) {
@@ -283,7 +290,9 @@ export const RootNavigator: React.FC = () => {
       setRoundResult(null);
       selectOption(null);
       setOpponentHasAnswered(false);
-      navigateTo('quiz_arena');
+      if (currentScreenRef.current !== 'quiz_arena') {
+        navigateTo('quiz_arena');
+      }
     });
     const unsubRoundResult = socketService.onRoundResult((result: RoundResult) => {
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
@@ -532,6 +541,14 @@ export const RootNavigator: React.FC = () => {
     activeRoomRef.current = null;
     setActiveRoom(null);
 
+    if (user && !isGuest) {
+      fetch(`${API_BASE}/social/rooms/active`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, roomCode: null }),
+      }).catch(() => {});
+    }
+
     setDuelOpponent(null);
     setOpponentHasAnswered(false);
     setPracticeQuestions([]);
@@ -578,11 +595,11 @@ export const RootNavigator: React.FC = () => {
   const handleCancelMatchmaking = () => {
     handleExitCurrentGame();
   };
-  const handleCreateCustomRoom = (settings?: CustomRoomSettings) => {
+  const handleCreateCustomRoom = (settings?: CustomRoomSettings, forcedCode?: string) => {
     requireAuth(() => {
       if (!user) return;
       isGameActiveRef.current = true;
-      const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const roomCode = (forcedCode || Math.random().toString(36).substring(2, 8)).toUpperCase();
       const initialRoom: GameRoom = {
         code: roomCode,
         mode: 'custom',
@@ -616,6 +633,15 @@ export const RootNavigator: React.FC = () => {
       setActiveRoom(initialRoom);
       activeRoomRef.current = initialRoom;
       socketService.createRoom(roomCode, user.id, user.displayName, user.avatarUrl, settings);
+
+      if (!isGuest) {
+        fetch(`${API_BASE}/social/rooms/active`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, roomCode }),
+        }).catch(() => {});
+      }
+
       navigateTo('lobby');
     }, 'Özel Oda');
   };
@@ -659,6 +685,15 @@ export const RootNavigator: React.FC = () => {
         activeRoomRef.current = placeholderRoom;
       }
       socketService.joinRoom(cleanCode, user.id, user.displayName, user.avatarUrl);
+
+      if (!isGuest) {
+        fetch(`${API_BASE}/social/rooms/active`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, roomCode: cleanCode }),
+        }).catch(() => {});
+      }
+
       navigateTo('lobby');
     }, 'Özel Odaya Katılma');
   };
@@ -1467,8 +1502,15 @@ export const RootNavigator: React.FC = () => {
             isGuest={isGuest}
             apiBaseUrl={API_BASE}
             onBack={() => navigateTo('home')}
-            onInviteToMatch={() => {
-              handleCreateCustomRoom();
+            onInviteToMatch={(friendId, friendName, roomCode) => {
+              if (roomCode) {
+                handleCreateCustomRoom(undefined, roomCode);
+              } else {
+                handleCreateCustomRoom();
+              }
+            }}
+            onJoinFriendRoom={(roomCode) => {
+              handleJoinCustomRoom(roomCode);
             }}
             onNotifications={() => navigateTo('notifications')}
             onNavigateTab={(tab) => {
@@ -1524,8 +1566,25 @@ export const RootNavigator: React.FC = () => {
         {currentScreen === 'notifications' && (
           <NotificationsScreen
             user={user || undefined}
+            apiBaseUrl={API_BASE}
             onBack={() => navigateTo('home')}
-            onAcceptDuel={handleStartQuickMatch}
+            onAcceptDuel={(roomCode) => {
+              if (roomCode) {
+                handleJoinCustomRoom(roomCode);
+              } else {
+                handleStartQuickMatch();
+              }
+            }}
+            onRefreshUser={() => {
+              if (user && !isGuest) {
+                fetch(`${API_BASE}/social/profile/${user.id}`)
+                  .then((r) => (r.ok ? r.json() : null))
+                  .then((fresh) => {
+                    if (fresh) setUser(fresh);
+                  })
+                  .catch(() => {});
+              }
+            }}
           />
         )}
         {currentScreen === 'settings' && (
