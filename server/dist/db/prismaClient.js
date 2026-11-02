@@ -999,6 +999,9 @@ class PrismaService {
         for (const q of this.questions) {
             await this.syncQuestionToPrisma(q);
         }
+        for (const userRecord of this.users.values()) {
+            await this.syncUserToPrisma(userRecord);
+        }
     }
     async pushAllDataViaPrismaToSupabase() {
         await this.syncAllToPrisma();
