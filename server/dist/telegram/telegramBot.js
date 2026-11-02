@@ -273,8 +273,11 @@ class TelegramBotService {
         }
     }
     async handleJsonQuestionInput(fromId, rawJson, sourceName = 'Telegram Girişi') {
+        console.log(`🤖 [TelegramBot] handleJsonQuestionInput çağrıldı: fromId=${fromId}, source=${sourceName}, içerik boyutu=${rawJson?.length ?? 0}`);
         const importRes = (0, questionImporter_1.importQuestionsFromJson)(rawJson, this.db, `Telegram Admin (${fromId})`, true);
+        console.log(`🤖 [TelegramBot] İçe aktarma sonucu: başarı=${importRes.success}, eklenen=${importRes.importedCount}, mükerrer=${importRes.duplicateCount}, hata=${importRes.errorCount}`);
         if (!importRes.success && importRes.importedCount === 0) {
+            console.warn(`🤖 [TelegramBot] Soru içe aktarma başarısız. Hatalar:\n${importRes.errors.join('\n')}`);
             return (`❌ *Soru İçe Aktarma Başarısız Oldu*\n\n` +
                 `• Kaynak: \`${sourceName}\`\n` +
                 `• Hata Detayları:\n` +

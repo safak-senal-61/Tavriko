@@ -308,8 +308,12 @@ export class TelegramBotService {
     rawJson: string,
     sourceName = 'Telegram Girişi'
   ): Promise<string> {
+    console.log(`🤖 [TelegramBot] handleJsonQuestionInput çağrıldı: fromId=${fromId}, source=${sourceName}, içerik boyutu=${rawJson?.length ?? 0}`);
     const importRes = importQuestionsFromJson(rawJson, this.db, `Telegram Admin (${fromId})`, true);
+    console.log(`🤖 [TelegramBot] İçe aktarma sonucu: başarı=${importRes.success}, eklenen=${importRes.importedCount}, mükerrer=${importRes.duplicateCount}, hata=${importRes.errorCount}`);
+
     if (!importRes.success && importRes.importedCount === 0) {
+      console.warn(`🤖 [TelegramBot] Soru içe aktarma başarısız. Hatalar:\n${importRes.errors.join('\n')}`);
       return (
         `❌ *Soru İçe Aktarma Başarısız Oldu*\n\n` +
         `• Kaynak: \`${sourceName}\`\n` +

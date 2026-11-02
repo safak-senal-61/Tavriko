@@ -1178,7 +1178,20 @@ function createApp() {
                     <button class="btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="clearJsonText()">🧹 Temizle</button>
                   </div>
                 </div>
-                <textarea id="json-textarea" rows="8" placeholder='[&#10;  {&#10;    "text": "Soru metni...",&#10;    "options": ["A", "B", "C", "D"],&#10;    "correctAnswerIndex": 0,&#10;    "categoryId": "geography",&#10;    "difficulty": "medium"&#10;  }&#10;]'></textarea>
+                <textarea id="json-textarea" rows="9" placeholder='[&#10;  {&#10;    "text": "Soru metni...",&#10;    "options": ["A", "B", "C", "D"],&#10;    "correctAnswerIndex": 0,&#10;    "categoryId": "geography",&#10;    "difficulty": "medium",&#10;    "explanation": "Detaylı açıklama...",&#10;    "targetPool": "standard"&#10;  }&#10;]'></textarea>
+                
+                <details style="margin-top: 8px; background: rgba(255, 255, 255, 0.04); border-radius: 8px; padding: 8px 12px; font-size: 12px; color: var(--text-secondary); border: 1px solid rgba(255, 255, 255, 0.08);">
+                  <summary style="cursor: pointer; font-weight: 700; color: var(--accent-mint); outline: none;">📖 Desteklenen JSON Format Rehberi (Tıkla ve İncele)</summary>
+                  <div style="margin-top: 8px; line-height: 1.6;">
+                    <div>• <b>text</b> veya <b>soru:</b> Soru metni (Zorunlu, min 5 karakter)</div>
+                    <div>• <b>options</b> veya <b>secenekler:</b> Tam 4 adet şık dizisi <code>["A", "B", "C", "D"]</code> (Zorunlu)</div>
+                    <div>• <b>correctAnswerIndex:</b> 0 (A), 1 (B), 2 (C) veya 3 (D) (veya <b>dogruCevap:</b> "A", "B", "C", "D")</div>
+                    <div>• <b>categoryId</b> veya <b>kategori:</b> <code>bilim</code>, <code>tarih</code>, <code>cografya</code>, <code>spor</code>, <code>sinema</code>, <code>muzik</code>, <code>sanat</code>, <code>teknoloji</code>, <code>doga</code>, <code>yemek</code>, <code>edebiyat</code>, <code>uzay</code>, <code>hayvanlar</code>, <code>matematik</code>, <code>oyun</code>, <code>genel_kultur</code></div>
+                    <div>• <b>difficulty</b> veya <b>zorluk:</b> <code>kolay</code> (easy), <code>orta</code> (medium), <code>zor</code> (hard), <code>uzman</code> (expert)</div>
+                    <div>• <b>explanation</b> veya <b>aciklama:</b> Açıklama (Opsiyonel)</div>
+                    <div>• <b>targetPool</b> veya <b>havuz:</b> <code>standard</code>, <code>daily_challenge</code>, <code>custom_room</code> (Opsiyonel, varsayılan aşağıdaki seçimdir)</div>
+                  </div>
+                </details>
               </div>
 
               <div class="form-group">
@@ -1509,30 +1522,45 @@ function createApp() {
               "soru": "Periyodik tabloda 'Au' simgesi hangi elementi temsil eder?",
               "secenekler": ["Gümüş", "Altın", "Bakır", "Platin"],
               "dogruCevap": "B",
-              "kategori": "science_tech",
+              "kategori": "bilim",
               "zorluk": "orta",
               "aciklama": "Altın elementinin simgesi Latince 'Aurum'dan gelen Au'dur.",
               "havuz": "daily_challenge"
+            },
+            {
+              "text": "Fatih Sultan Mehmet İstanbul'u kaç yılında fethetmiştir?",
+              "options": ["1453", "1071", "1299", "1923"],
+              "correctAnswerIndex": 0,
+              "categoryId": "history",
+              "difficulty": "easy",
+              "explanation": "İstanbul 29 Mayıs 1453 tarihinde fethedilmiştir.",
+              "targetPool": "standard"
             }
           ], null, 2);
 
           function pasteSampleJson() {
             triggerHaptic('light');
             document.getElementById('json-textarea').value = SAMPLE_JSON_TEMPLATE;
+            console.log('📋 [Telegram WebApp] Örnek JSON şablonu textarea\'ya yerleştirildi.');
           }
 
           function clearJsonText() {
             triggerHaptic('light');
             document.getElementById('json-textarea').value = '';
+            const alertBox = document.getElementById('json-alert');
+            if (alertBox) alertBox.style.display = 'none';
+            console.log('🧹 [Telegram WebApp] JSON textarea ve uyarı kutusu temizlendi.');
           }
 
           function handleFileSelect(e) {
             const file = e.target.files[0];
             if (!file) return;
+            console.log('📁 [Telegram WebApp] Dosya seçildi:', file.name, '(' + file.size + ' bayt)');
             const reader = new FileReader();
             reader.onload = (event) => {
               document.getElementById('json-textarea').value = event.target.result;
               triggerHaptic('success');
+              console.log('✅ [Telegram WebApp] Dosya içeriği başarıyla okundu.');
             };
             reader.readAsText(file);
           }
@@ -1545,42 +1573,88 @@ function createApp() {
             const autoPublish = document.getElementById('json-autopublish').checked;
             const content = textarea.value.trim();
 
+            console.group('🚀 [Telegram WebApp] JSON Soru İçe Aktarımı');
+            console.log('📋 İçerik karakter uzunluğu:', content.length);
+            console.log('🎯 Hedef Havuz:', pool);
+            console.log('⚡ Doğrudan Yayınla (Onaysız):', autoPublish);
+
             if (!content) {
               alertBox.className = 'alert-box error';
               alertBox.style.display = 'block';
               alertBox.innerText = '⚠️ Lütfen JSON soru verisi girin veya dosya yükleyin.';
+              console.warn('⚠️ [Telegram WebApp] İçerik boş olduğundan istek gönderilmedi.');
+              console.groupEnd();
               return;
             }
 
+            // Yerel sözdizim kontrolü (Konsola ayrıntılı bilgi basmak için)
+            try {
+              const tick3 = String.fromCharCode(96, 96, 96);
+              let localCleaned = content;
+              if (localCleaned.indexOf(tick3) === 0) {
+                localCleaned = localCleaned.slice(3).replace(/^json\s*/i, '');
+                const lastIdx = localCleaned.lastIndexOf(tick3);
+                if (lastIdx !== -1) localCleaned = localCleaned.slice(0, lastIdx);
+                localCleaned = localCleaned.trim();
+              }
+              const localParsed = JSON.parse(localCleaned);
+              console.log('✅ [Telegram WebApp] Yerel JSON sözdizim kontrolü başarılı!');
+              console.log('📦 Ayrıştırılan veri:', localParsed);
+            } catch (syntaxErr) {
+              console.warn('⚠️ [Telegram WebApp] Yerel JSON.parse uyarısı (Sunucu esnek regex çözümlemesi deneyecek):', syntaxErr.message);
+            }
+
             alertBox.style.display = 'none';
+            const btn = document.getElementById('btn-import-json');
+            if (btn) btn.disabled = true;
 
             try {
+              const payload = {
+                jsonContent: content,
+                json: content,
+                defaultTargetPool: pool,
+                publishDirectly: autoPublish,
+                autoPublish: autoPublish,
+                addedBy: 'Telegram WebApp'
+              };
+
+              console.log('📡 [Telegram WebApp] POST /api/admin/questions/import-json gönderiliyor...');
               const res = await fetch('/api/admin/questions/import-json', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  jsonContent: content,
-                  defaultTargetPool: pool,
-                  autoPublish: autoPublish
-                })
+                body: JSON.stringify(payload)
               });
+
+              console.log('📥 [Telegram WebApp] Sunucu HTTP Durum Kodu:', res.status);
               const data = await res.json();
+              console.log('📊 [Telegram WebApp] Sunucu Yanıtı:', data);
+
               if (data.success && data.importedCount > 0) {
                 triggerHaptic('success');
                 alertBox.className = 'alert-box success';
                 alertBox.style.display = 'block';
                 let msg = '🎉 ' + data.importedCount + ' adet soru havuza başarıyla aktarıldı!';
                 if (data.duplicateCount > 0) msg += ' (' + data.duplicateCount + ' mükerrer atlandı)';
+                if (data.errorCount > 0) msg += ' (' + data.errorCount + ' hatalı soru atlandı)';
                 alertBox.innerText = msg;
                 textarea.value = '';
+                console.log('🎉 [Telegram WebApp] Sorular başarıyla eklendi:', data.importedCount);
               } else {
-                throw new Error((data.errors && data.errors[0]) || 'Hiçbir geçerli soru içe aktarılamadı.');
+                const errList = data.errors && data.errors.length > 0
+                  ? data.errors.join('\n• ')
+                  : (data.error || 'Hiçbir geçerli soru içe aktarılamadı.');
+                console.error('❌ [Telegram WebApp] İçe aktarma başarısız:\n• ' + errList);
+                throw new Error(errList);
               }
             } catch (err) {
               triggerHaptic('error');
               alertBox.className = 'alert-box error';
               alertBox.style.display = 'block';
               alertBox.innerText = '❌ Hata: ' + err.message;
+              console.error('❌ [Telegram WebApp] İstek hatası:', err);
+            } finally {
+              if (btn) btn.disabled = false;
+              console.groupEnd();
             }
           }
 

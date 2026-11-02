@@ -83,51 +83,119 @@ const DIFFICULTY_MAP_TR: Record<string, DifficultyLevel> = {
   expert: 'expert',
 };
 
-export function parseAndNormalizeQuestions(jsonString: string): any[] {
-  let cleaned = jsonString.trim();
+export function parseAndNormalizeQuestions(rawInput: any): any[] {
+  console.log('🔍 [questionImporter] parseAndNormalizeQuestions çağrıldı, girdi tipi:', typeof rawInput);
 
-  // Strip markdown code fences if wrapped in ```json ... ```
+  if (rawInput === undefined || rawInput === null || rawInput === '') {
+    throw new Error('JSON verisi boş gönderilemez.');
+  }
+
+  // 1. Girdi zaten bir dizi ise doğrudan dön
+  if (Array.isArray(rawInput)) {
+    console.log(`✅ [questionImporter] Girdi doğrudan ${rawInput.length} elemanlı dizi olarak algılandı.`);
+    return rawInput;
+  }
+
+  // 2. Girdi bir obje ise alt alanları incele
+  if (typeof rawInput === 'object' && rawInput !== null) {
+    if (Array.isArray(rawInput.questions)) {
+      console.log(`✅ [questionImporter] 'questions' dizisi bulundu (${rawInput.questions.length} soru).`);
+      return rawInput.questions;
+    }
+    if (Array.isArray(rawInput.sorular)) {
+      console.log(`✅ [questionImporter] 'sorular' dizisi bulundu (${rawInput.sorular.length} soru).`);
+      return rawInput.sorular;
+    }
+    if (typeof rawInput.jsonContent === 'string') {
+      return parseAndNormalizeQuestions(rawInput.jsonContent);
+    }
+    if (typeof rawInput.json === 'string') {
+      return parseAndNormalizeQuestions(rawInput.json);
+    }
+    if (typeof rawInput.content === 'string') {
+      return parseAndNormalizeQuestions(rawInput.content);
+    }
+    if (rawInput.text || rawInput.soru || rawInput.question) {
+      console.log('✅ [questionImporter] Tek bir soru objesi algılandı.');
+      return [rawInput];
+    }
+    // Sayısal indexli obje kontrolü ({ "0": {...}, "1": {...} })
+    const values = Object.values(rawInput);
+    if (values.length > 0 && typeof values[0] === 'object' && values[0] !== null) {
+      console.log(`✅ [questionImporter] Sayısal/anahtarlı obje dizisi dönüştürüldü (${values.length} soru).`);
+      return values;
+    }
+  }
+
+  // 3. Girdi string ise
+  const strInput = String(rawInput);
+  let cleaned = strInput.trim();
+
+  // Markdown kod bloklarını temizle (```json ... ``` veya ``` ... ```)
   if (cleaned.startsWith('```')) {
     cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
   }
 
-  // Attempt direct JSON parse
+  console.log(`🔍 [questionImporter] Metin ayrıştırılıyor (karakter uzunluğu: ${cleaned.length})...`);
+
+  // Doğrudan JSON.parse denemesi
   try {
     const parsed = JSON.parse(cleaned);
-    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed)) {
+      console.log(`✅ [questionImporter] Standart JSON.parse başarılı (${parsed.length} soru).`);
+      return parsed;
+    }
     if (typeof parsed === 'object' && parsed !== null) {
-      if (Array.isArray((parsed as any).questions)) return (parsed as any).questions;
-      if (Array.isArray((parsed as any).sorular)) return (parsed as any).sorular;
+      if (Array.isArray(parsed.questions)) return parsed.questions;
+      if (Array.isArray(parsed.sorular)) return parsed.sorular;
       return [parsed];
     }
-  } catch {}
+  } catch (parseError: any) {
+    console.warn(`⚠️ [questionImporter] Doğrudan JSON.parse başarısız (${parseError.message}), kurtarma deneniyor...`);
+  }
 
-  // Attempt to find JSON array regex match: [ { ... }, { ... } ]
+  // Regex kurtarma 1: Köşeli parantez içindeki dizi [ { ... }, { ... } ]
   const arrayMatch = cleaned.match(/\[\s*\{[\s\S]*\}\s*\]/);
   if (arrayMatch) {
     try {
       const parsed = JSON.parse(arrayMatch[0]);
-      if (Array.isArray(parsed)) return parsed;
-    } catch {}
+      if (Array.isArray(parsed)) {
+        console.log(`✅ [questionImporter] Regex dizi eşleşmesiyle kurtarıldı (${parsed.length} soru).`);
+        return parsed;
+      }
+    } catch (arrErr: any) {
+      console.warn('⚠️ [questionImporter] Regex dizi JSON.parse hatası:', arrErr.message);
+    }
   }
 
-  // Attempt to find single JSON object regex match: { ... }
+  // Regex kurtarma 2: Süslü parantez içindeki tekil obje { ... }
   const objMatch = cleaned.match(/\{[\s\S]*\}/);
   if (objMatch) {
     try {
       const parsed = JSON.parse(objMatch[0]);
-      if (typeof parsed === 'object' && parsed !== null) return [parsed];
-    } catch {}
+      if (typeof parsed === 'object' && parsed !== null) {
+        console.log('✅ [questionImporter] Regex tekil obje eşleşmesiyle kurtarıldı (1 soru).');
+        return [parsed];
+      }
+    } catch (objErr: any) {
+      console.warn('⚠️ [questionImporter] Regex tekil obje JSON.parse hatası:', objErr.message);
+    }
   }
 
-  throw new Error('Geçerli bir JSON formatı bulunamadı. Lütfen JSON sözdizimini kontrol edin.');
+  const snippet = cleaned.length > 140 ? cleaned.slice(0, 140) + '...' : cleaned;
+  console.error('❌ [questionImporter] Geçersiz JSON içeriği:\n', snippet);
+
+  throw new Error(
+    `Geçerli bir JSON formatı bulunamadı. Lütfen JSON sözdizimini (çift tırnaklar, virgüller, köşeli parantezler) kontrol edin.\nÖnizleme: "${snippet}"`
+  );
 }
 
 export function importQuestionsFromJson(
-  rawInput: string | any[],
+  rawInput: any,
   db: DatabaseAdapter,
   addedBy = 'Telegram Admin',
-  publishDirectly = true
+  publishDirectly = true,
+  defaultTargetPool: 'standard' | 'daily_challenge' | 'custom_room' = 'standard'
 ): ImportResult {
   const result: ImportResult = {
     success: false,
@@ -142,17 +210,16 @@ export function importQuestionsFromJson(
 
   let rawList: any[] = [];
   try {
-    if (Array.isArray(rawInput)) {
-      rawList = rawInput;
-    } else {
-      rawList = parseAndNormalizeQuestions(String(rawInput));
-    }
+    rawList = parseAndNormalizeQuestions(rawInput);
   } catch (err: any) {
+    console.error('❌ [questionImporter] Ayrıştırma hatası:', err.message);
     result.errors.push(err.message);
     return result;
   }
 
   result.totalProcessed = rawList.length;
+  console.log(`🚀 [questionImporter] Toplam ${rawList.length} soru işleniyor. Hedef Havuz: ${defaultTargetPool}, Yayın Durumu: ${publishDirectly ? 'Doğrudan Yayın' : 'Onay Sırası'}`);
+
   if (rawList.length === 0) {
     result.errors.push('İçeride soru verisi bulunamadı.');
     return result;
@@ -249,12 +316,14 @@ export function importQuestionsFromJson(
     const sourceOrVerification = (raw.sourceOrVerification || raw.kaynak || addedBy).trim();
 
     // Target pool
-    let targetPool: 'standard' | 'daily_challenge' | 'custom_room' = 'standard';
+    let targetPool: 'standard' | 'daily_challenge' | 'custom_room' = defaultTargetPool;
     const rawPool = (raw.targetPool || raw.havuz || '').toString().toLowerCase();
     if (rawPool.includes('gunluk') || rawPool.includes('daily')) {
       targetPool = 'daily_challenge';
     } else if (rawPool.includes('ozel') || rawPool.includes('custom') || rawPool.includes('oda')) {
       targetPool = 'custom_room';
+    } else if (rawPool.includes('standard') || rawPool.includes('standart') || rawPool.includes('normal')) {
+      targetPool = 'standard';
     }
 
     try {
@@ -279,13 +348,17 @@ export function importQuestionsFromJson(
       result.questions.push(created);
       existingSignatures.add(textSig);
       result.categoryBreakdown[categoryId] = (result.categoryBreakdown[categoryId] || 0) + 1;
+      console.log(`✅ [questionImporter] ${indexLabel} eklendi: "${text.slice(0, 35)}..." [${categoryId} / ${difficulty} / ${targetPool}]`);
     } catch (saveErr: any) {
       result.errorCount++;
-      result.errors.push(`${indexLabel}: Kayıt hatası: ${saveErr.message}`);
+      const errMsg = `${indexLabel}: Kayıt hatası: ${saveErr.message}`;
+      console.error(`❌ [questionImporter] ${errMsg}`);
+      result.errors.push(errMsg);
     }
   }
 
   result.success = result.importedCount > 0;
+  console.log(`🏁 [questionImporter] İşlem tamamlandı. Eklenen: ${result.importedCount}, Mükerrer: ${result.duplicateCount}, Hatalı: ${result.errorCount}`);
   return result;
 }
 

@@ -150,17 +150,53 @@ router.get('/admin/questions/stats', (req, res) => {
 // Import questions manually via JSON text or parsed array
 router.post('/admin/questions/import-json', (req, res) => {
     try {
-        const { json, questions, publishDirectly = true, addedBy = 'Web Admin' } = req.body;
-        const input = json || questions || req.body;
-        if (!input) {
-            res.status(400).json({ error: 'Geçerli bir JSON içeriği belirtilmelidir.' });
-            return;
+        const body = req.body || {};
+        console.log('📥 [/admin/questions/import-json] İstek alındı:', {
+            bodyKeys: Object.keys(body),
+            contentType: req.headers['content-type'],
+            ip: req.ip || req.headers['x-forwarded-for'],
+        });
+        // Extract input from various potential keys
+        let input = body.jsonContent ??
+            body.json ??
+            body.content ??
+            body.questions ??
+            body.sorular ??
+            body.data;
+        // If none of the specific keys matched, check if body itself is an array or string
+        if (input === undefined || input === null) {
+            input = body;
         }
-        const result = (0, questionImporter_1.importQuestionsFromJson)(input, prismaClient_1.db, addedBy, Boolean(publishDirectly));
+        const publishDirectly = body.publishDirectly !== undefined
+            ? Boolean(body.publishDirectly)
+            : body.autoPublish !== undefined
+                ? Boolean(body.autoPublish)
+                : true;
+        const defaultTargetPool = body.defaultTargetPool || body.targetPool || body.pool || 'standard';
+        const addedBy = body.addedBy || 'Web Admin';
+        console.log('🔍 [/admin/questions/import-json] İşlenecek parametreler:', {
+            hasInput: Boolean(input),
+            inputType: typeof input,
+            isArray: Array.isArray(input),
+            inputLength: typeof input === 'string' ? input.length : Array.isArray(input) ? input.length : undefined,
+            publishDirectly,
+            defaultTargetPool,
+            addedBy,
+        });
+        const result = (0, questionImporter_1.importQuestionsFromJson)(input, prismaClient_1.db, addedBy, publishDirectly, defaultTargetPool);
+        console.log('📊 [/admin/questions/import-json] İçe aktarma sonucu:', {
+            success: result.success,
+            importedCount: result.importedCount,
+            totalProcessed: result.totalProcessed,
+            duplicateCount: result.duplicateCount,
+            errorCount: result.errorCount,
+            errors: result.errors,
+        });
         res.json(result);
     }
     catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('❌ [/admin/questions/import-json] Beklenmeyen hata:', err);
+        res.status(500).json({ error: err.message, stack: err.stack });
     }
 });
 exports.default = router;
