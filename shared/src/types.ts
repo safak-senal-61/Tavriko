@@ -219,6 +219,17 @@ export interface PlayerResult {
   correctCount: number;
 }
 
+export interface MatchQuestionReviewItem {
+  roundNumber: number;
+  questionText: string;
+  userAnswerText?: string;
+  correctAnswerText: string;
+  isCorrect: boolean;
+  isTimeout: boolean;
+  pointsEarned: number;
+  explanation?: string;
+}
+
 export interface FinalMatchSummary {
   roomCode: string;
   mode: GameMode;
@@ -234,6 +245,7 @@ export interface FinalMatchSummary {
     blue: number;
     winner: 'red' | 'blue' | 'tie';
   };
+  questionReviews?: MatchQuestionReviewItem[];
 }
 
 export type ItemRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';

@@ -25,6 +25,7 @@ import {
   UserProfile,
   DailyChallengeConfig,
   CustomRoomSettings,
+  MatchQuestionReviewItem,
 } from '@trivia/shared';
 // Screens
 import { SplashScreen } from '../screens/SplashScreen';
@@ -171,6 +172,9 @@ export const RootNavigator: React.FC = () => {
     isBot?: boolean;
   } | null>(null);
   const [opponentHasAnswered, setOpponentHasAnswered] = useState<boolean>(false);
+  const [matchQuestionsReview, setMatchQuestionsReview] = useState<MatchQuestionReviewItem[]>([]);
+  const matchQuestionsReviewRef = useRef<MatchQuestionReviewItem[]>([]);
+  matchQuestionsReviewRef.current = matchQuestionsReview;
   const {
     user,
     setUser,
@@ -187,6 +191,9 @@ export const RootNavigator: React.FC = () => {
     setFinalSummary,
     resetGame,
   } = useGameStore();
+
+  const currentQuestionRef = useRef<ClientQuestion | null>(currentQuestion);
+  currentQuestionRef.current = currentQuestion;
 
   const isGameActiveRef = useRef<boolean>(false);
   const gameTimersRef = useRef<Set<any>>(new Set());
@@ -282,6 +289,25 @@ export const RootNavigator: React.FC = () => {
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
       setRoundResult(result);
       const myAns = user ? result.playerAnswers[user.id] : null;
+
+      // Maç sonu için yapılan doğru/yanlış/boş soru detaylarını kaydet
+      if (user && currentQuestionRef.current) {
+        const userOpt = currentQuestionRef.current.options?.find((o) => o.id === myAns?.selectedOptionId);
+        const correctOpt = currentQuestionRef.current.options?.find((o) => o.id === result.correctOptionId);
+
+        const reviewItem: MatchQuestionReviewItem = {
+          roundNumber: result.roundNumber,
+          questionText: currentQuestionRef.current.text,
+          userAnswerText: userOpt ? userOpt.text : undefined,
+          correctAnswerText: correctOpt ? correctOpt.text : result.correctOptionId || '',
+          isCorrect: myAns?.isCorrect ?? false,
+          isTimeout: !myAns?.selectedOptionId,
+          pointsEarned: myAns?.pointsEarned ?? 0,
+          explanation: result.explanation,
+        };
+        setMatchQuestionsReview((prev) => [...prev, reviewItem]);
+      }
+
       if (myAns?.isCorrect) {
         sound.playSound('correct');
         sound.triggerHaptic('success');
@@ -289,15 +315,17 @@ export const RootNavigator: React.FC = () => {
         sound.playSound('wrong');
         sound.triggerHaptic('error');
       }
-      scheduleGameTimeout(() => {
-        if (!isGameActiveRef.current && !activeRoomRef.current) return;
-        navigateTo('intermission');
-      }, 2500);
+      // Soru aralarında modal ve intermission ekranı kaldırıldı!
+      // Oyun akıcı şekilde doğrudan devam eder ve sıradaki soru (QUESTION_START) beklenir.
     });
     const unsubGameOver = socketService.onGameOver((summary: FinalMatchSummary) => {
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
       isGameActiveRef.current = false;
-      setFinalSummary(summary);
+      const enrichedSummary: FinalMatchSummary = {
+        ...summary,
+        questionReviews: matchQuestionsReviewRef.current,
+      };
+      setFinalSummary(enrichedSummary);
       navigateTo('match_result');
       if (user && !isGuest) {
         const myRankEntry = summary.rankings?.find((p) => p.playerId === user.id);
@@ -328,6 +356,7 @@ export const RootNavigator: React.FC = () => {
       (data: { roomCode: string; opponent?: any }) => {
         if (user) {
           isGameActiveRef.current = true;
+          setMatchQuestionsReview([]);
           setDuelOpponent(data.opponent || null);
           setOpponentHasAnswered(false);
           socketService.joinRoom(
@@ -639,6 +668,7 @@ export const RootNavigator: React.FC = () => {
     }
   };
   const handleStartGame = () => {
+    setMatchQuestionsReview([]);
     if (activeRoom && user) {
       socketService.startGame(activeRoom.code, user.id);
     }
@@ -1367,34 +1397,6 @@ export const RootNavigator: React.FC = () => {
                   : null
               }
             />
-            {/* Multiplayer Feedback Modal */}
-            {activeRoom && lastRoundResult && user && (
-              <AnswerFeedbackModal
-                visible={!!lastRoundResult}
-                isCorrect={
-                  lastRoundResult.playerAnswers[user.id]?.isCorrect ?? false
-                }
-                isTimeout={
-                  !lastRoundResult.playerAnswers[user.id]?.selectedOptionId
-                }
-                correctAnswerText={(() => {
-                  const correctOpt = currentQuestion?.options.find(
-                    (o) => o.id === lastRoundResult.correctOptionId
-                  );
-                  return correctOpt
-                    ? correctOpt.text
-                    : lastRoundResult.correctOptionId || '';
-                })()}
-                explanation={lastRoundResult.explanation}
-                pointsEarned={
-                  lastRoundResult.playerAnswers[user.id]?.pointsEarned ?? 0
-                }
-                speedBonus={
-                  lastRoundResult.playerAnswers[user.id]?.speedBonus ?? 0
-                }
-                streak={lastRoundResult.playerAnswers[user.id]?.streak ?? 0}
-              />
-            )}
             {/* Practice / Guest End of Game Summary Modal */}
             <PracticeSummaryModal
               visible={isPracticeSummaryVisible}
@@ -1448,6 +1450,7 @@ export const RootNavigator: React.FC = () => {
           <MatchResultPodiumScreen
             summary={finalSummary}
             currentUserId={user.id}
+            questionReviews={finalSummary.questionReviews || matchQuestionsReview}
             onPlayAgain={() => {
               resetGame();
               handleStartQuickMatch();

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated, Platform } from 'react-native';
-import { FinalMatchSummary } from '@trivia/shared';
+import { FinalMatchSummary, MatchQuestionReviewItem } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import {
@@ -11,29 +11,37 @@ import {
   CrownIcon,
   CoinIcon,
 } from '../components/TavrikoIcons';
+
 interface MatchResultPodiumScreenProps {
   summary: FinalMatchSummary;
   currentUserId: string;
+  questionReviews?: MatchQuestionReviewItem[];
   onPlayAgain: () => void;
   onHome: () => void;
 }
+
 export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = ({
   summary,
   currentUserId,
+  questionReviews,
   onPlayAgain,
   onHome,
 }) => {
+  const reviews = questionReviews || summary.questionReviews || [];
   const first = summary.podium?.first || { displayName: 'DenizPro', score: 780 };
   const second = summary.podium?.second || { displayName: 'Ece', score: 610 };
   const third = summary.podium?.third || { displayName: 'Mert', score: 540 };
+
   const myRanking = summary.rankings?.find((r) => r.playerId === currentUserId);
   const xpEarned = myRanking && myRanking.rank === 1 ? 160 : 60;
   const coinsEarned = myRanking && myRanking.rank === 1 ? 50 : 20;
+
   // Podium rising animations
   const col1Anim = useRef(new Animated.Value(80)).current;
   const col2Anim = useRef(new Animated.Value(80)).current;
   const col3Anim = useRef(new Animated.Value(80)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     sound.playSound('victory');
     sound.triggerHaptic('success');
@@ -62,6 +70,9 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
       ]),
     ]).start();
   }, [col1Anim, col2Anim, col3Anim, fadeAnim]);
+
+  const correctCount = reviews.filter((r) => r.isCorrect).length;
+
   return (
     <TavrikoScreen>
       <ScrollView
@@ -69,7 +80,8 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>MAÇ BİTTİ</Text>
-        <Text style={styles.subtitle}>Düello · Tamamlandı</Text>
+        <Text style={styles.subtitle}>Tavriko Arena · Sonuçlar</Text>
+
         {/* 3-Column Podium (2 - 1 - 3) */}
         <Animated.View style={[styles.podiumRow, { opacity: fadeAnim }]}>
           {/* 2nd Place */}
@@ -88,6 +100,7 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
               <Text style={styles.pillarNumber}>2</Text>
             </View>
           </Animated.View>
+
           {/* 1st Place */}
           <Animated.View
             style={[
@@ -105,6 +118,7 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
               <Text style={styles.pillarNumber}>1</Text>
             </View>
           </Animated.View>
+
           {/* 3rd Place */}
           <Animated.View
             style={[
@@ -122,6 +136,7 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
             </View>
           </Animated.View>
         </Animated.View>
+
         {/* XP & Coin Reward Card */}
         <View style={styles.rewardCard}>
           <View style={styles.rewardTopRow}>
@@ -136,6 +151,83 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
           </View>
           <TavrikoProgressBar progress={92} height={12} />
         </View>
+
+        {/* Soru Detayları / Yapılan Doğru & Yanlışlar Listesi (En Son Görüntülenir) */}
+        {reviews.length > 0 && (
+          <View style={styles.reviewSection}>
+            <View style={styles.reviewHeaderRow}>
+              <Text style={styles.reviewSectionTitle}>SORU CEVAPLARI</Text>
+              <View style={styles.reviewScorePill}>
+                <Text style={styles.reviewScoreText}>
+                  {correctCount}/{reviews.length} DOĞRU
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.reviewList}>
+              {reviews.map((item, idx) => {
+                const statusColor = item.isCorrect
+                  ? '#5ADBB5'
+                  : item.isTimeout
+                  ? '#FFC43D'
+                  : '#FF6B6B';
+                const statusBadge = item.isCorrect
+                  ? `✓ DOĞRU (+${item.pointsEarned}p)`
+                  : item.isTimeout
+                  ? '⏱️ SÜRE DOLDU'
+                  : '✕ YANLIŞ';
+
+                return (
+                  <View
+                    key={`review_${idx}`}
+                    style={[styles.reviewCard, { borderLeftColor: statusColor }]}
+                  >
+                    <View style={styles.reviewCardTop}>
+                      <Text style={styles.reviewRoundText}>
+                        Soru {item.roundNumber || idx + 1}
+                      </Text>
+                      <View
+                        style={[
+                          styles.reviewStatusBadge,
+                          { backgroundColor: statusColor + '22' },
+                        ]}
+                      >
+                        <Text style={[styles.reviewStatusText, { color: statusColor }]}>
+                          {statusBadge}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.reviewQuestionText}>{item.questionText}</Text>
+
+                    <View style={styles.reviewAnswersCol}>
+                      {item.userAnswerText && !item.isCorrect && (
+                        <Text style={styles.reviewYourAnswer}>
+                          Senin cevabın:{' '}
+                          <Text style={{ color: '#FF7A8A', fontWeight: 'bold' }}>
+                            {item.userAnswerText}
+                          </Text>
+                        </Text>
+                      )}
+                      <Text style={styles.reviewCorrectAnswer}>
+                        Doğru cevap:{' '}
+                        <Text style={{ color: '#5ADBB5', fontWeight: 'bold' }}>
+                          {item.correctAnswerText}
+                        </Text>
+                      </Text>
+                      {item.explanation ? (
+                        <Text style={styles.reviewExplanation}>
+                          💡 {item.explanation}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         {/* Action Buttons */}
         <View style={styles.actionsRow}>
           <Button3D
@@ -154,30 +246,32 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
     </TavrikoScreen>
   );
 };
+
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 32,
+    paddingBottom: 40,
+    paddingHorizontal: 16,
   },
   title: {
     fontFamily: THEME.fonts.display,
-    fontSize: 36,
+    fontSize: 34,
     color: '#FFFFFF',
     textAlign: 'center',
     marginTop: 14,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   subtitle: {
     color: '#D9CDF5',
     fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   podiumRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 8,
-    marginTop: 16,
+    marginTop: 12,
   },
   podiumCol: {
     flex: 1,
@@ -203,27 +297,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pillar1: {
-    height: 150,
+    height: 140,
     backgroundColor: '#D4982A',
   },
   pillar2: {
-    height: 110,
+    height: 105,
     backgroundColor: '#7C84A8',
   },
   pillar3: {
-    height: 86,
+    height: 80,
     backgroundColor: '#985E3E',
   },
   pillarNumber: {
     fontFamily: THEME.fonts.display,
-    fontSize: 38,
+    fontSize: 36,
     color: '#FFFFFF',
   },
   rewardCard: {
-    marginTop: 20,
+    marginTop: 16,
     padding: 16,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.14)',
   },
@@ -231,7 +325,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   xpAwardText: {
     fontFamily: THEME.fonts.display,
@@ -264,9 +358,118 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
   },
+
+  // Soru Detayları / Doğru - Yanlışlar Stili
+  reviewSection: {
+    marginTop: 20,
+    width: '100%',
+  },
+  reviewHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingHorizontal: 4,
+  },
+  reviewSectionTitle: {
+    color: '#FFC837',
+    fontSize: 13,
+    fontFamily: THEME.fonts.bold,
+    letterSpacing: 1.5,
+  },
+  reviewScorePill: {
+    backgroundColor: 'rgba(90, 219, 181, 0.15)',
+    borderWidth: 1,
+    borderColor: '#5ADBB5',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  reviewScoreText: {
+    color: '#5ADBB5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  reviewList: {
+    gap: 10,
+  },
+  reviewCard: {
+    backgroundColor: '#1E0E3D',
+    borderRadius: 16,
+    borderLeftWidth: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(154, 107, 255, 0.25)',
+    padding: 14,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#6B3CFF',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+      },
+    }),
+  },
+  reviewCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  reviewRoundText: {
+    color: '#9A8BC2',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  reviewStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  reviewStatusText: {
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  reviewQuestionText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: THEME.fonts.bold,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  reviewAnswersCol: {
+    gap: 3,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    padding: 10,
+    borderRadius: 10,
+  },
+  reviewYourAnswer: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.medium,
+  },
+  reviewCorrectAnswer: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.medium,
+  },
+  reviewExplanation: {
+    color: '#BDB3DC',
+    fontSize: 11,
+    fontFamily: THEME.fonts.medium,
+    fontStyle: 'italic',
+    marginTop: 4,
+    lineHeight: 16,
+  },
+
   actionsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 20,
+    marginTop: 22,
   },
 });

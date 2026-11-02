@@ -385,6 +385,12 @@ export class GameRoomDO extends DurableObject<Env> {
     const playerId = attachment.playerId;
     const player = this.room.players[playerId];
     if (player) {
+      // Check if there are other active websockets for this player
+      const otherSockets = this.ctx.getWebSockets(`player:${playerId}`).filter((s) => s !== ws);
+      if (otherSockets.length > 0) {
+        return;
+      }
+
       player.isConnected = false;
       const gracePeriodSec = this.env.RECONNECTION_GRACE_SEC || 60;
 
@@ -723,12 +729,14 @@ export class GameRoomDO extends DurableObject<Env> {
     // Broadcast that player answered (without revealing correctness)
     this.broadcast(SOCKET_EVENTS.PLAYER_ANSWERED, { playerId, streak: player.currentStreak });
 
-    // Check if all connected or bot participants have answered
-    const activeParticipants = Object.values(this.room.players).filter((p) => p.isConnected || p.isBot);
-    const allAnswered = activeParticipants.every((p) => p.hasAnsweredCurrentRound);
+    // Check if ALL participants in the room have answered
+    const allParticipants = Object.values(this.room.players);
+    const allAnswered =
+      allParticipants.length > 0 &&
+      allParticipants.every((p) => p.hasAnsweredCurrentRound);
 
     if (allAnswered) {
-      // Early trigger for round end
+      // Early trigger for round end ONLY when EVERY player has answered
       await this.scheduleAlarm('round_end', 450, { roundNumber: this.room.currentRound });
     }
   }
@@ -818,8 +826,8 @@ export class GameRoomDO extends DurableObject<Env> {
     // Broadcast complete round results to all players
     this.broadcast(SOCKET_EVENTS.ROUND_RESULT, roundResult);
 
-    // Schedule intermission alarm (3.5s default)
-    const intermissionSec = this.env.ROUND_INTERMISSION_SEC || 3.5;
+    // Schedule fast intermission alarm for seamless round progression
+    const intermissionSec = this.env.ROUND_INTERMISSION_SEC ? Number(this.env.ROUND_INTERMISSION_SEC) : 1.5;
     await this.scheduleAlarm('intermission', intermissionSec * 1000);
   }
 
