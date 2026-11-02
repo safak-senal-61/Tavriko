@@ -37,7 +37,8 @@ function getLocalIpAddress(): string {
 export function createApp() {
   const app = express();
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({ limit: '15mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
   // Global HTTP Request & Error Logger Middleware
   app.use((req, res, next) => {
@@ -1885,7 +1886,7 @@ export function createApp() {
             }
 
             try {
-              let cleaned = content;
+              let cleaned = content.trim();
               const tick3 = String.fromCharCode(96, 96, 96);
               if (cleaned.indexOf(tick3) === 0) {
                 cleaned = cleaned.slice(3).replace(/^json\s*/i, '');
@@ -1894,7 +1895,41 @@ export function createApp() {
                 cleaned = cleaned.trim();
               }
 
-              let parsed = JSON.parse(cleaned);
+              // Akıllı tırnak ve trailing comma temizliği
+              cleaned = cleaned
+                .replace(/[\u201C\u201D\u201E\u201F\u00AB\u00BB]/g, '"')
+                .replace(/[\u2018\u2019\u201A\u201B]/g, "'");
+
+              let parsed = null;
+              try {
+                parsed = JSON.parse(cleaned);
+              } catch (e1) {
+                try {
+                  // Trailing comma ve yorum temizliği
+                  let sanitized = cleaned
+                    .replace(/\/\/.*$/gm, '')
+                    .replace(/\/\*[\s\S]*?\*\//g, '')
+                    .replace(/,\s*([}\]])/g, '$1');
+                  parsed = JSON.parse(sanitized);
+                } catch (e2) {
+                  // Parçalı regex nesne çıkarma
+                  const extracted = [];
+                  const objRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+                  let m;
+                  while ((m = objRegex.exec(cleaned)) !== null) {
+                    try {
+                      const o = JSON.parse(m[0].replace(/,\s*}/g, '}'));
+                      if (o && (o.text || o.soru || o.question)) extracted.push(o);
+                    } catch (e3) {}
+                  }
+                  if (extracted.length > 0) parsed = extracted;
+                }
+              }
+
+              if (!parsed) {
+                throw new Error("JSON sözdizimi ayrıştırılamadı");
+              }
+
               if (!Array.isArray(parsed)) {
                 if (typeof parsed === 'object' && parsed !== null) {
                   if (Array.isArray(parsed.questions)) parsed = parsed.questions;
@@ -1941,7 +1976,15 @@ export function createApp() {
               });
               tagsEl.innerHTML = tagsHtml;
             } catch (syntaxErr) {
-              statusEl.innerHTML = '<span style="color: #F87171;">⚠️ JSON sözdizimi henüz tamamlanmadı (Tırnak veya virgülleri kontrol edin)</span>';
+              const lines = content.split('\\n');
+              let lineInfo = ' (Tırnak veya virgülleri kontrol edin)';
+              for (let i = 0; i < lines.length; i++) {
+                if (lines[i].includes('{') && !lines[i].includes('}')) {
+                  lineInfo = ' (Satır ' + (i + 1) + ' kontrol edilebilir)';
+                  break;
+                }
+              }
+              statusEl.innerHTML = '<span style="color: #F87171;">⚠️ JSON sözdizimi henüz tamamlanmadı' + lineInfo + '</span>';
               tagsEl.innerHTML = '';
             }
           }

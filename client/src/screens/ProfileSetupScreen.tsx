@@ -35,16 +35,64 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
   const [displayName, setDisplayName] = useState(
     initialDisplayName === 'Misafir Oyuncu' ? 'DenizPro' : initialDisplayName
   );
-  const [selectedIndex, setSelectedIndex] = useState(1);
+  const [selectedIndex, setSelectedIndex] = useState(() => {
+    if (initialAvatarUrl) {
+      const clean = initialAvatarUrl.toLowerCase().trim();
+      const foundIdx = AVATAR_PRESETS.findIndex((p, idx) => {
+        return (
+          p.id === clean ||
+          p.id === clean.replace('av', 'av_') ||
+          clean === `av${idx}` ||
+          clean === `av_${idx}` ||
+          clean.includes(p.name.toLowerCase())
+        );
+      });
+      if (foundIdx !== -1) return foundIdx;
+    }
+    return 1;
+  });
   const [customPhotoUri, setCustomPhotoUri] = useState<string | null>(
     initialAvatarUrl &&
       !initialAvatarUrl.includes('dicebear.com') &&
-      !initialAvatarUrl.startsWith('av')
+      !initialAvatarUrl.startsWith('av') &&
+      (initialAvatarUrl.startsWith('data:') ||
+        initialAvatarUrl.startsWith('http') ||
+        initialAvatarUrl.startsWith('blob:') ||
+        initialAvatarUrl.startsWith('file:'))
       ? initialAvatarUrl
       : null
   );
   const handlePickGalleryPhoto = async () => {
     sound.playSound('tap');
+
+    // 1. Web & Mobile Browser File Input Handler
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      try {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e: any) => {
+          const file = e.target?.files?.[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              const base64Uri = ev.target?.result as string;
+              if (base64Uri) {
+                setCustomPhotoUri(base64Uri);
+                sound.playSound('reward');
+              }
+            };
+            reader.readAsDataURL(file);
+          }
+        };
+        input.click();
+        return;
+      } catch (webErr) {
+        console.warn('Web file picker error:', webErr);
+      }
+    }
+
+    // 2. React Native Expo Image Picker Handler
     if (ImagePickerModule?.launchImageLibraryAsync) {
       try {
         const res = await ImagePickerModule.launchImageLibraryAsync({
@@ -148,7 +196,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
         </View>
         <View style={{ marginTop: 22 }}>
           <Button3D
-            title="BAŞLA"
+            title={initialAvatarUrl || initialDisplayName !== 'Misafir Oyuncu' ? 'KAYDET' : 'BAŞLA'}
             onPress={() => {
               sound.playSound('victory');
               onSave(displayName.trim() || 'DenizPro', finalAvatarValue);

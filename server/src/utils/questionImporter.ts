@@ -257,14 +257,22 @@ export function parseAndNormalizeQuestions(rawInput: any): any[] {
   const strInput = String(rawInput);
   let cleaned = strInput.trim();
 
-  // Markdown kod bloklarını temizle (```json ... ``` veya ``` ... ```)
-  if (cleaned.startsWith('```')) {
+  // Markdown kod bloklarını temizle (metin başında veya içinde ```json ... ``` varsa ayıkla)
+  const mdMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (mdMatch) {
+    cleaned = mdMatch[1].trim();
+  } else if (cleaned.startsWith('```')) {
     cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
   }
 
+  // Akıllı / kıvrık tırnakları standart tırnaklara dönüştür
+  cleaned = cleaned
+    .replace(/[\u201C\u201D\u201E\u201F\u00AB\u00BB]/g, '"')
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'");
+
   console.log(`🔍 [questionImporter] Metin ayrıştırılıyor (karakter uzunluğu: ${cleaned.length})...`);
 
-  // Doğrudan JSON.parse denemesi
+  // Adım 3.1: Doğrudan JSON.parse denemesi
   try {
     const parsed = JSON.parse(cleaned);
     if (Array.isArray(parsed)) {
@@ -277,42 +285,98 @@ export function parseAndNormalizeQuestions(rawInput: any): any[] {
       return [parsed];
     }
   } catch (parseError: any) {
-    console.warn(`⚠️ [questionImporter] Doğrudan JSON.parse başarısız (${parseError.message}), kurtarma deneniyor...`);
+    console.warn(`⚠️ [questionImporter] Standart JSON.parse başarısız (${parseError.message}), esnek onarım deneniyor...`);
   }
 
-  // Regex kurtarma 1: Köşeli parantez içindeki dizi [ { ... }, { ... } ]
-  const arrayMatch = cleaned.match(/\[\s*\{[\s\S]*\}\s*\]/);
-  if (arrayMatch) {
+  // Adım 3.2: Yorumları ve virgülden sonra gelen gereksiz virgülleri (trailing comma) temizle
+  let sanitized = cleaned
+    .replace(/\/\/.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/,\s*([}\]])/g, '$1');
+
+  try {
+    const parsed = JSON.parse(sanitized);
+    if (Array.isArray(parsed)) {
+      console.log(`✅ [questionImporter] Trailing comma temizliğiyle başarıyla çözüldü (${parsed.length} soru).`);
+      return parsed;
+    }
+    if (typeof parsed === 'object' && parsed !== null) {
+      if (Array.isArray(parsed.questions)) return parsed.questions;
+      if (Array.isArray(parsed.sorular)) return parsed.sorular;
+      return [parsed];
+    }
+  } catch {}
+
+  // Adım 3.3: Tırnaksız veya tek tırnaklı anahtarları çift tırnak yap (örn: { text: '...' } -> { "text": "..." })
+  let relaxed = sanitized
+    .replace(/([{,]\s*)(['"]?)([a-zA-Z0-9_]+)\2(\s*:)/g, '$1"$3"$4')
+    .replace(/:\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g, ': "$1"')
+    .replace(/\[\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g, '["$1"')
+    .replace(/,\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g, ', "$1"')
+    .replace(/,\s*([}\]])/g, '$1');
+
+  try {
+    const parsed = JSON.parse(relaxed);
+    if (Array.isArray(parsed)) {
+      console.log(`✅ [questionImporter] Esnek regex tırnak onarımıyla çözüldü (${parsed.length} soru).`);
+      return parsed;
+    }
+    if (typeof parsed === 'object' && parsed !== null) {
+      if (Array.isArray(parsed.questions)) return parsed.questions;
+      if (Array.isArray(parsed.sorular)) return parsed.sorular;
+      return [parsed];
+    }
+  } catch {}
+
+  // Adım 3.4: Metin içindeki tüm tekil { ... } soru objelerini ayıkla (dizi parantezi veya aradaki virgül bozuk olsa dahi kurtar)
+  const extractedList: any[] = [];
+  const objRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = objRegex.exec(sanitized)) !== null) {
+    const candidate = match[0].trim();
     try {
-      const parsed = JSON.parse(arrayMatch[0]);
-      if (Array.isArray(parsed)) {
-        console.log(`✅ [questionImporter] Regex dizi eşleşmesiyle kurtarıldı (${parsed.length} soru).`);
-        return parsed;
+      const singleObj = JSON.parse(candidate.replace(/,\s*}/g, '}'));
+      if (singleObj && (singleObj.text || singleObj.soru || singleObj.question)) {
+        extractedList.push(singleObj);
       }
-    } catch (arrErr: any) {
-      console.warn('⚠️ [questionImporter] Regex dizi JSON.parse hatası:', arrErr.message);
+    } catch {
+      try {
+        const repairedSingle = candidate
+          .replace(/([{,]\s*)(['"]?)([a-zA-Z0-9_]+)\2(\s*:)/g, '$1"$3"$4')
+          .replace(/:\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g, ': "$1"')
+          .replace(/\[\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g, '["$1"')
+          .replace(/,\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g, ', "$1"')
+          .replace(/,\s*}/g, '}');
+        const singleObj = JSON.parse(repairedSingle);
+        if (singleObj && (singleObj.text || singleObj.soru || singleObj.question)) {
+          extractedList.push(singleObj);
+        }
+      } catch {}
     }
   }
 
-  // Regex kurtarma 2: Süslü parantez içindeki tekil obje { ... }
-  const objMatch = cleaned.match(/\{[\s\S]*\}/);
-  if (objMatch) {
-    try {
-      const parsed = JSON.parse(objMatch[0]);
-      if (typeof parsed === 'object' && parsed !== null) {
-        console.log('✅ [questionImporter] Regex tekil obje eşleşmesiyle kurtarıldı (1 soru).');
-        return [parsed];
-      }
-    } catch (objErr: any) {
-      console.warn('⚠️ [questionImporter] Regex tekil obje JSON.parse hatası:', objErr.message);
+  if (extractedList.length > 0) {
+    console.log(`✅ [questionImporter] Parçalı regex kurtarma ile ${extractedList.length} adet soru objesi başarıyla kurtarıldı!`);
+    return extractedList;
+  }
+
+  // Ayrıştırma tamamen başarısız: Satır numaralı ayrıntılı hata üret
+  const lines = cleaned.split('\n');
+  let errLineNum = 1;
+  let lineSnippet = lines[0] || '';
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
+    if (line.includes('{') || line.includes('}') || line.includes('"')) {
+      errLineNum = idx + 1;
+      lineSnippet = line.trim();
     }
   }
 
-  const snippet = cleaned.length > 140 ? cleaned.slice(0, 140) + '...' : cleaned;
+  const snippet = cleaned.length > 120 ? cleaned.slice(0, 120) + '...' : cleaned;
   console.error('❌ [questionImporter] Geçersiz JSON içeriği:\n', snippet);
 
   throw new Error(
-    `Geçerli bir JSON formatı bulunamadı. Lütfen JSON sözdizimini (çift tırnaklar, virgüller, köşeli parantezler) kontrol edin.\nÖnizleme: "${snippet}"`
+    `Geçerli bir JSON formatı bulunamadı (Olası hata Satır ${errLineNum}: "${lineSnippet}"). Lütfen çift tırnak ve virgül dizilimini kontrol edin veya "Örnek Şablon" butonuna dokunarak şablonu inceleyin.`
   );
 }
 

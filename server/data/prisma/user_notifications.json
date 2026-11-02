@@ -368,5 +368,35 @@
     "timeText": "Az önce",
     "handled": null,
     "createdAt": "2026-10-31T00:58:20.198Z"
+  },
+  {
+    "id": "usr_p5jnl1z_notif_welcome",
+    "userId": "usr_p5jnl1z",
+    "type": "reward",
+    "title": "Hoş geldin Avatar Tester!",
+    "sub": "Başlangıç ödüllerin hesabına tanımlandı",
+    "timeText": "Az önce",
+    "handled": null,
+    "createdAt": "2026-11-02T19:28:55.119Z"
+  },
+  {
+    "id": "usr_p5jnl1z_notif_duel_1",
+    "userId": "usr_p5jnl1z",
+    "type": "duel",
+    "title": "Bilgi Avcısı seni düelloya davet etti",
+    "sub": "Genel Kültür · 5 soru",
+    "timeText": "5dk",
+    "handled": null,
+    "createdAt": "2026-11-02T19:28:55.121Z"
+  },
+  {
+    "id": "usr_p5jnl1z_notif_season",
+    "userId": "usr_p5jnl1z",
+    "type": "league",
+    "title": "Sezon 1 Pass aktif!",
+    "sub": "Maç kazanarak sezon kademelerini aç",
+    "timeText": "1sa",
+    "handled": null,
+    "createdAt": "2026-11-02T19:28:55.123Z"
   }
 ]

@@ -489,10 +489,13 @@ router.put('/profile', async (req, res) => {
             res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
             return;
         }
+        logger_1.logger.info('AUTH', `Profil güncelleme isteği: userId=${userId}, avatarUrl=${req.body.avatarUrl || 'değişmedi'}, displayName=${req.body.displayName || 'değişmedi'}`);
         const updated = await prismaClient_1.db.updateUserProfile(userId, req.body);
+        logger_1.logger.success('AUTH', `Profil başarıyla güncellendi ve veritabanına işlendi: ${userId} -> avatar: ${updated.avatarUrl}`);
         res.json({ success: true, user: updated });
     }
     catch (err) {
+        logger_1.logger.error('AUTH', `Profil güncelleme hatası: ${err.message}`);
         res.status(400).json({ error: err.message });
     }
 });

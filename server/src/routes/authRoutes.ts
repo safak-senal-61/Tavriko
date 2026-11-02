@@ -546,9 +546,12 @@ router.put('/profile', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    logger.info('AUTH', `Profil güncelleme isteği: userId=${userId}, avatarUrl=${req.body.avatarUrl || 'değişmedi'}, displayName=${req.body.displayName || 'değişmedi'}`);
     const updated = await db.updateUserProfile(userId, req.body);
+    logger.success('AUTH', `Profil başarıyla güncellendi ve veritabanına işlendi: ${userId} -> avatar: ${updated.avatarUrl}`);
     res.json({ success: true, user: updated });
   } catch (err: any) {
+    logger.error('AUTH', `Profil güncelleme hatası: ${err.message}`);
     res.status(400).json({ error: err.message });
   }
 });

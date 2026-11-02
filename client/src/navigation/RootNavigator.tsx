@@ -256,10 +256,33 @@ export const RootNavigator: React.FC = () => {
   useEffect(() => {
     if (!hasInitialProfileFetchedRef.current && user && !isGuest && user.id) {
       hasInitialProfileFetchedRef.current = true;
-      fetch(`${API_BASE}/social/profile/${user.id}`)
+      fetch(`${API_BASE}/social/profile/${user.id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
         .then((res) => (res.ok ? res.json() : null))
         .then((freshUser) => {
           if (freshUser && freshUser.id === user.id) {
+            // Eğer sunucudan varsayılan av1 dönerse ama yerelde kullanıcının seçtiği özel bir avatar varsa, yerel avatarı koru ve sunucuya bildir
+            if (
+              user.avatarUrl &&
+              user.avatarUrl !== 'av1' &&
+              user.avatarUrl !== 'av_1' &&
+              (!freshUser.avatarUrl || freshUser.avatarUrl === 'av1' || freshUser.avatarUrl === 'av_1')
+            ) {
+              freshUser.avatarUrl = user.avatarUrl;
+              // Sunucu veritabanını da bu avatar ile hemen kalıcı güncelle
+              fetch(`${API_BASE}/auth/profile`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({
+                  userId: user.id,
+                  avatarUrl: user.avatarUrl,
+                }),
+              }).catch(() => {});
+            }
             setUser(freshUser);
           }
         })
@@ -500,7 +523,10 @@ export const RootNavigator: React.FC = () => {
       try {
         const res = await fetch(`${API_BASE}/auth/profile`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({
             userId: user.id,
             displayName: name,
@@ -511,8 +537,8 @@ export const RootNavigator: React.FC = () => {
           const data = await res.json();
           if (data.user) setUser(data.user);
         }
-      } catch {
-        // Keep local update
+      } catch (err) {
+        console.warn('Profile update error:', err);
       }
     }
     navigateTo(isGuest ? 'categories' : 'home');
@@ -526,7 +552,10 @@ export const RootNavigator: React.FC = () => {
       try {
         const res = await fetch(`${API_BASE}/auth/profile`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({
             userId: user.id,
             avatarUrl: newAvatarUri,
@@ -536,8 +565,8 @@ export const RootNavigator: React.FC = () => {
           const data = await res.json();
           if (data.user) setUser(data.user);
         }
-      } catch {
-        // Keep local
+      } catch (err) {
+        console.warn('Direct avatar update error:', err);
       }
     }
   };

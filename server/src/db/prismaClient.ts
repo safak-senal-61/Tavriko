@@ -1407,7 +1407,15 @@ export class PrismaService {
       existingRecord = this.prismaUserToRecord(dbUser as any);
       existingRecord.displayName = payload.displayName || existingRecord.displayName;
       if (payload.fullName) existingRecord.fullName = payload.fullName;
-      if (payload.avatarUrl) existingRecord.avatarUrl = payload.avatarUrl;
+      // Do NOT overwrite user's custom chosen avatar with default 'av1' or google picture if they already have an avatar
+      if (
+        payload.avatarUrl &&
+        payload.avatarUrl !== 'av1' &&
+        payload.avatarUrl !== 'av_1' &&
+        (!existingRecord.avatarUrl || existingRecord.avatarUrl === 'av1' || existingRecord.avatarUrl === 'av_1')
+      ) {
+        existingRecord.avatarUrl = payload.avatarUrl;
+      }
       if (payload.googleId) existingRecord.googleId = payload.googleId;
       existingRecord.updatedAt = Date.now();
 
@@ -1684,7 +1692,21 @@ export class PrismaService {
       avatarUrl: string;
     }>
   ): Promise<UserProfile> {
-    const record = this.users.get(userId);
+    let record = this.users.get(userId);
+    if (!record) {
+      try {
+        const u = await this.rawClient.user.findFirst({
+          where: { OR: [{ id: userId }, { username: userId }] },
+          include: { inventoryItems: true },
+        });
+        if (u) {
+          record = this.prismaUserToRecord(u as any);
+          this.users.set(record.id, record);
+        }
+      } catch (findErr) {
+        console.warn('[updateUserProfile] Prisma search error:', findErr);
+      }
+    }
     if (!record) {
       throw new Error('Kullanıcı bulunamadı.');
     }
@@ -1700,11 +1722,45 @@ export class PrismaService {
     if (updates.birthDate !== undefined) record.birthDate = updates.birthDate.trim();
     if (updates.gender !== undefined) record.gender = updates.gender;
     if (updates.bio !== undefined) record.bio = updates.bio.trim();
-    if (updates.avatarUrl !== undefined) record.avatarUrl = updates.avatarUrl;
+    if (updates.avatarUrl !== undefined && updates.avatarUrl) {
+      record.avatarUrl = updates.avatarUrl;
+    }
 
+    record.updatedAt = Date.now();
     this.users.set(userId, record);
-    this.savePersistedUsers();
-    supabaseService.upsertUser(record).catch(() => {});
+    this.users.set(record.id, record);
+    if (record.username) this.users.set(record.username, record);
+    if (record.email) this.users.set(record.email.toLowerCase(), record);
+
+    if (!record.isGuest) {
+      this.savePersistedUsers();
+
+      // Kalıcı olarak Prisma PostgreSQL veritabanını güncelle!
+      try {
+        await this.rawClient.user.update({
+          where: { id: record.id },
+          data: {
+            displayName: record.displayName,
+            fullName: record.fullName,
+            email: record.email,
+            avatarUrl: record.avatarUrl,
+            countryCode: record.countryCode,
+            countryName: record.countryName,
+            phone: record.phone,
+            birthDate: record.birthDate,
+            gender: record.gender,
+            bio: record.bio,
+            updatedAt: new Date(),
+          },
+        });
+        console.log(`✅ [updateUserProfile] Prisma PostgreSQL kalıcı güncellendi: ${record.id} -> avatarUrl: ${record.avatarUrl}`);
+      } catch (dbErr) {
+        console.error(`⚠️ [updateUserProfile] Prisma PostgreSQL güncelleme hatası:`, dbErr);
+      }
+
+      await this.syncUserToPrisma(record).catch(() => {});
+      supabaseService.upsertUser(record).catch(() => {});
+    }
 
     return this.toProfile(record);
   }
