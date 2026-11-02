@@ -382,6 +382,48 @@ export class SocketService {
     this.sendEnvelope(SOCKET_EVENTS.SEND_EMOTE, { roomCode, playerId, emote });
   }
 
+  public onEmoteReceived(callback: (data: { roomCode: string; playerId: string; emote: string; id?: string }) => void): () => void {
+    return this.on(SOCKET_EVENTS.EMOTE_RECEIVED, callback);
+  }
+
+  public sendLobbyChat(
+    roomCode: string,
+    playerId: string,
+    displayName: string,
+    text: string,
+    avatarUrl?: string
+  ): void {
+    this.sendEnvelope(SOCKET_EVENTS.LOBBY_CHAT, {
+      roomCode,
+      playerId,
+      displayName,
+      text,
+      avatarUrl,
+    });
+  }
+
+  public onLobbyMessage(
+    callback: (data: {
+      id: string;
+      roomCode: string;
+      playerId: string;
+      displayName: string;
+      avatarUrl?: string;
+      text: string;
+      timestamp: number;
+    }) => void
+  ): () => void {
+    return this.on(SOCKET_EVENTS.LOBBY_MESSAGE, callback);
+  }
+
+  public getPublicRooms(): void {
+    this.sendEnvelope(SOCKET_EVENTS.GET_PUBLIC_ROOMS, {});
+  }
+
+  public onPublicRoomsUpdate(callback: (rooms: any[]) => void): () => void {
+    return this.on(SOCKET_EVENTS.PUBLIC_ROOMS_UPDATE, callback);
+  }
+
   // --- Subscriptions with Auto-Unsubscribe returns ---
   public onStateSync(callback: (room: GameRoom) => void): () => void {
     return this.on(SOCKET_EVENTS.ROOM_STATE_SYNC, callback);

@@ -21,6 +21,10 @@ export declare const SOCKET_EVENTS: {
     readonly SUBMIT_ANSWER: "game:submit_answer";
     readonly SEND_EMOTE: "game:send_emote";
     readonly EMOTE_RECEIVED: "game:emote_received";
+    readonly LOBBY_CHAT: "room:lobby_chat";
+    readonly LOBBY_MESSAGE: "room:lobby_message";
+    readonly GET_PUBLIC_ROOMS: "room:get_public_rooms";
+    readonly PUBLIC_ROOMS_UPDATE: "room:public_rooms_update";
     readonly ERROR: "system:error";
 };
 export type SocketEventName = typeof SOCKET_EVENTS[keyof typeof SOCKET_EVENTS];

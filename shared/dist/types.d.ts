@@ -94,6 +94,29 @@ export interface GameRoom {
     roundStartedAt?: number;
     scores: Record<string, number>;
 }
+export interface PublicRoomSummary {
+    code: string;
+    name?: string;
+    hostName: string;
+    category: string;
+    categoryName?: string;
+    playerCount: number;
+    maxPlayers: number;
+    questionTimeSec: number;
+    totalRounds: number;
+    penaltyForWrong: boolean;
+    status: RoomStatus;
+    createdAt: number;
+}
+export interface LobbyMessagePayload {
+    id: string;
+    roomCode: string;
+    playerId: string;
+    displayName: string;
+    avatarUrl?: string;
+    text: string;
+    timestamp: number;
+}
 export interface CustomRoomSettings {
     maxPlayers: number;
     totalRounds: number;

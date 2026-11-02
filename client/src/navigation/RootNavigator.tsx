@@ -1237,6 +1237,7 @@ export const RootNavigator: React.FC = () => {
             onJoinRoom={handleJoinCustomRoom}
             avatarSeed={user?.avatarUrl || user?.displayName}
             coins={user?.coins}
+            apiBaseUrl={API_BASE}
           />
         )}
         {currentScreen === 'lobby' && activeRoom && user && (

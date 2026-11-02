@@ -31,6 +31,30 @@ class GameRoomManager {
     getActiveRoomsCount() {
         return this.rooms.size;
     }
+    getPublicRooms() {
+        const list = [];
+        for (const room of this.rooms.values()) {
+            const isPublic = room.privacy === 'public' || !room.privacy;
+            const isAvailable = room.status === 'lobby';
+            const players = Object.values(room.players || {}).filter((p) => p.isConnected);
+            if (isPublic && isAvailable && players.length < room.maxPlayers) {
+                list.push({
+                    code: room.code,
+                    name: `${room.players[room.hostId]?.displayName || 'Oyuncu'} Odası`,
+                    hostName: room.players[room.hostId]?.displayName || 'Kurucu',
+                    category: room.category || 'genel_kultur',
+                    playerCount: players.length,
+                    maxPlayers: room.maxPlayers,
+                    questionTimeSec: room.questionTimeSec,
+                    totalRounds: room.totalRounds,
+                    penaltyForWrong: !!room.penaltyForWrong,
+                    status: room.status,
+                    createdAt: Date.now(),
+                });
+            }
+        }
+        return list;
+    }
     createRoom(options) {
         let code = options.code ? options.code.toUpperCase() : this.generateCode();
         while (!options.code && this.rooms.has(code)) {

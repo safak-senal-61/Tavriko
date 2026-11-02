@@ -30,6 +30,10 @@ export const SOCKET_EVENTS = {
   // Social & Chat
   SEND_EMOTE: 'game:send_emote',
   EMOTE_RECEIVED: 'game:emote_received',
+  LOBBY_CHAT: 'room:lobby_chat',
+  LOBBY_MESSAGE: 'room:lobby_message',
+  GET_PUBLIC_ROOMS: 'room:get_public_rooms',
+  PUBLIC_ROOMS_UPDATE: 'room:public_rooms_update',
 
   // System
   ERROR: 'system:error',

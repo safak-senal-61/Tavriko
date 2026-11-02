@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,14 @@ import {
   ScrollView,
   Switch,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
 import { CustomRoomSettings, CategoryId, DifficultyLevel } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
+import { socketService } from '../services/socketService';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -34,6 +36,7 @@ interface CustomRoomScreenProps {
   onJoinRoom: (roomCode: string) => void;
   avatarSeed?: string;
   coins?: number;
+  apiBaseUrl?: string;
 }
 
 const QUESTION_OPTIONS = [7, 14, 21];
@@ -113,6 +116,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   onJoinRoom,
   avatarSeed,
   coins,
+  apiBaseUrl,
 }) => {
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
 
@@ -132,6 +136,69 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   // Kategori Seçimi State
   const [selectedCategory, setSelectedCategory] = useState<CategoryData | 'mixed'>('mixed');
   const [isCategoryModalVisible, setCategoryModalVisible] = useState(false);
+
+  // Canlı Veritabanı ve WebSocket Odaları
+  const [publicRooms, setPublicRooms] = useState<PublicRoomItem[]>(PUBLIC_ROOMS);
+  const [isLoadingPublicRooms, setIsLoadingPublicRooms] = useState(false);
+
+  const fetchPublicRooms = async () => {
+    try {
+      setIsLoadingPublicRooms(true);
+      const base = apiBaseUrl || 'https://tavriko-server.onrender.com/api';
+      const cleanBase = base.replace(/\/+$/, '');
+      const res = await fetch(`${cleanBase}/trivia/rooms/public`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Array.isArray(data.rooms) && data.rooms.length > 0) {
+          const mapped: PublicRoomItem[] = data.rooms.map((r: any) => ({
+            id: r.code,
+            code: r.code,
+            title: r.name || `${r.hostName} Odası`,
+            categoryKey: r.category || 'genel_kultur',
+            categoryName: r.categoryName || 'Genel Kültür',
+            totalRounds: r.totalRounds || 7,
+            timeSec: r.questionTimeSec || 20,
+            players: r.playerCount || 1,
+            maxPlayers: r.maxPlayers || 4,
+          }));
+          setPublicRooms(mapped);
+        }
+      }
+    } catch {
+      // Bağlantı yavaşsa mevcut listeyi koru
+    } finally {
+      setIsLoadingPublicRooms(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'join') {
+      fetchPublicRooms();
+      const interval = setInterval(fetchPublicRooms, 5000);
+      const unsub = socketService.onPublicRoomsUpdate((rooms) => {
+        if (Array.isArray(rooms) && rooms.length > 0) {
+          const mapped: PublicRoomItem[] = rooms.map((r: any) => ({
+            id: r.code,
+            code: r.code,
+            title: r.name || `${r.hostName} Odası`,
+            categoryKey: r.category || 'genel_kultur',
+            categoryName: r.categoryName || 'Genel Kültür',
+            totalRounds: r.totalRounds || 7,
+            timeSec: r.questionTimeSec || 20,
+            players: r.playerCount || 1,
+            maxPlayers: r.maxPlayers || 4,
+          }));
+          setPublicRooms(mapped);
+        }
+      });
+      socketService.getPublicRooms();
+
+      return () => {
+        clearInterval(interval);
+        unsub();
+      };
+    }
+  }, [activeTab, apiBaseUrl]);
 
   const digits = Array.from({ length: 6 }).map((_, idx) => roomCode[idx] || '');
 
@@ -487,37 +554,52 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 
             {joinError && <Text style={styles.errorText}>{joinError}</Text>}
 
-            <TouchableOpacity
-              style={styles.pasteButton}
-              activeOpacity={0.8}
-              onPress={async () => {
-                sound.playSound('tap');
-                const clip = await Clipboard.getStringAsync();
-                if (clip) {
-                  const clean = clip.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-                  setRoomCode(clean);
-                }
-              }}
-            >
-              <Text style={styles.pasteButtonText}>📋 Panodan Yapıştır</Text>
-            </TouchableOpacity>
+            {/* UI Kit Odaya Katıl Aksiyon Satırı: [ 📋 Yapıştır | KATIL ] */}
+            <View style={styles.joinActionRow}>
+              <TouchableOpacity
+                style={styles.pasteButton}
+                activeOpacity={0.8}
+                onPress={async () => {
+                  sound.playSound('tap');
+                  const clip = await Clipboard.getStringAsync();
+                  if (clip) {
+                    const clean = clip.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+                    setRoomCode(clean);
+                  }
+                }}
+              >
+                <Text style={styles.pasteButtonText}>📋 Yapıştır</Text>
+              </TouchableOpacity>
 
-            <Button3D
-              title="ODAYA KATIL"
-              onPress={handleJoinPress}
-              variant="mint"
-              style={{ height: 56, marginTop: 24 }}
-            />
+              <TouchableOpacity
+                style={styles.joinPrimaryBtn}
+                activeOpacity={0.88}
+                onPress={handleJoinPress}
+              >
+                <Text style={styles.joinPrimaryBtnText}>KATIL</Text>
+              </TouchableOpacity>
+            </View>
 
-            {/* HERKESE AÇIK ODALAR (Tavriko UI Kit - Public Rooms) */}
+            {/* HERKESE AÇIK ODALAR (Canlı Veritabanı & WebSocket Senkronizasyonu) */}
             <View style={styles.publicRoomsHeaderRow}>
               <View style={styles.publicRoomsDivider} />
               <Text style={styles.publicRoomsSectionTitle}>HERKESE AÇIK ODALAR</Text>
+              <TouchableOpacity
+                onPress={fetchPublicRooms}
+                style={styles.refreshIconBtn}
+                activeOpacity={0.7}
+              >
+                {isLoadingPublicRooms ? (
+                  <ActivityIndicator size="small" color="#5ADBB5" />
+                ) : (
+                  <Text style={styles.refreshIconText}>🔄</Text>
+                )}
+              </TouchableOpacity>
               <View style={styles.publicRoomsDivider} />
             </View>
 
             <View style={styles.publicRoomsList}>
-              {PUBLIC_ROOMS.map((room) => (
+              {publicRooms.map((room) => (
                 <View key={room.id} style={styles.publicRoomCard}>
                   <View style={styles.publicRoomIconWrap}>
                     <CategorySquircleIcon category={room.categoryKey} size={42} />
@@ -844,19 +926,65 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 6,
   },
+  joinActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 14,
+    width: '100%',
+  },
   pasteButton: {
-    alignSelf: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    flex: 1,
+    height: 52,
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    marginTop: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pasteButtonText: {
     fontSize: 13,
     fontFamily: THEME.fonts.extraBold,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  joinPrimaryBtn: {
+    flex: 1.5,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: '#5ADBB5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#5ADBB5',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.35,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 4px 14px rgba(90, 219, 181, 0.4)',
+      },
+    }),
+  },
+  joinPrimaryBtnText: {
+    color: '#082520',
+    fontSize: 16,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  refreshIconBtn: {
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  refreshIconText: {
+    fontSize: 14,
   },
   publicRoomsHeaderRow: {
     flexDirection: 'row',

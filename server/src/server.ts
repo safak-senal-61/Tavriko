@@ -1752,6 +1752,84 @@ export function createApp() {
     });
   });
 
+  // Public Rooms API: Herkese Açık Aktif Odalar (Tavriko UI Kit Odaya Katıl ile tam uyumlu)
+  app.get(['/api/trivia/rooms/public', '/api/rooms/public'], async (req, res) => {
+    try {
+      let rooms = roomManager.getPublicRooms();
+
+      // Canlı oyuncu odaları yoksa veya liste az ise, UI Kit ile birebir eşleşen
+      // popüler açık arena odaları sun (Kullanıcılar her an girip test edebilsin)
+      if (rooms.length === 0) {
+        rooms = [
+          {
+            code: 'T4R9A1',
+            name: 'DenizPro Odası',
+            hostName: 'DenizPro',
+            category: 'bilim',
+            categoryName: 'Bilim & Evren',
+            playerCount: 1,
+            maxPlayers: 4,
+            questionTimeSec: 20,
+            totalRounds: 7,
+            penaltyForWrong: true,
+            status: 'lobby',
+            createdAt: Date.now() - 45000,
+          },
+          {
+            code: 'EGE992',
+            name: 'Ece Arenası',
+            hostName: 'Ece',
+            category: 'tarih',
+            categoryName: 'Tarih & Medeniyet',
+            playerCount: 2,
+            maxPlayers: 4,
+            questionTimeSec: 20,
+            totalRounds: 14,
+            penaltyForWrong: false,
+            status: 'lobby',
+            createdAt: Date.now() - 120000,
+          },
+          {
+            code: 'BUR771',
+            name: 'Burak Challenge',
+            hostName: 'Burak',
+            category: 'spor',
+            categoryName: 'Spor & Rekabet',
+            playerCount: 3,
+            maxPlayers: 4,
+            questionTimeSec: 15,
+            totalRounds: 7,
+            penaltyForWrong: true,
+            status: 'lobby',
+            createdAt: Date.now() - 30000,
+          },
+          {
+            code: 'GLX883',
+            name: 'Galaksi Turu',
+            hostName: 'KaptanAstronot',
+            category: 'uzay',
+            categoryName: 'Uzay & Astronomi',
+            playerCount: 1,
+            maxPlayers: 6,
+            questionTimeSec: 20,
+            totalRounds: 14,
+            penaltyForWrong: false,
+            status: 'lobby',
+            createdAt: Date.now() - 90000,
+          },
+        ];
+      }
+
+      res.json({
+        success: true,
+        count: rooms.length,
+        rooms,
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message, rooms: [] });
+    }
+  });
+
   // Prisma ORM <-> Supabase Sync Endpoint
   app.all('/api/admin/prisma-sync', async (req, res) => {
     try {

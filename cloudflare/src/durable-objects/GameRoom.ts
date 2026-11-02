@@ -353,6 +353,10 @@ export class GameRoomDO extends DurableObject<Env> {
           this.handleSendEmote(playerId, envelope);
           break;
 
+        case SOCKET_EVENTS.LOBBY_CHAT:
+          this.handleLobbyChat(playerId, envelope);
+          break;
+
         case 'ping':
           ws.send(JSON.stringify({ event: 'pong', timestamp: Date.now() }));
           break;
@@ -859,7 +863,25 @@ export class GameRoomDO extends DurableObject<Env> {
     this.broadcast(SOCKET_EVENTS.EMOTE_RECEIVED, {
       playerId,
       emote,
+      roomCode: this.room?.code,
     });
+  }
+
+  private handleLobbyChat(playerId: string, envelope: WsMessage): void {
+    const rawText = envelope.payload?.text || '';
+    const text = sanitizeString(rawText, 100);
+    if (!text.trim()) return;
+    const player = this.room?.players?.[playerId];
+    const payload = {
+      id: `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      roomCode: this.room?.code,
+      playerId,
+      displayName: player?.displayName || envelope.payload?.displayName || 'Oyuncu',
+      avatarUrl: player?.avatarUrl || envelope.payload?.avatarUrl,
+      text,
+      timestamp: Date.now(),
+    };
+    this.broadcast(SOCKET_EVENTS.LOBBY_MESSAGE, payload);
   }
 
   // --- Helper Methods ---

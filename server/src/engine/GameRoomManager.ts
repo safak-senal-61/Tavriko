@@ -11,6 +11,7 @@ import {
   RoundResult,
   FinalMatchSummary,
   PlayerScoreSummary,
+  PublicRoomSummary,
 } from '@trivia/shared';
 import { GameStateMachine } from './GameStateMachine';
 
@@ -87,6 +88,31 @@ export class GameRoomManager {
 
   public getActiveRoomsCount(): number {
     return this.rooms.size;
+  }
+
+  public getPublicRooms(): PublicRoomSummary[] {
+    const list: PublicRoomSummary[] = [];
+    for (const room of this.rooms.values()) {
+      const isPublic = room.privacy === 'public' || !room.privacy;
+      const isAvailable = room.status === 'lobby';
+      const players = Object.values(room.players || {}).filter((p) => p.isConnected);
+      if (isPublic && isAvailable && players.length < room.maxPlayers) {
+        list.push({
+          code: room.code,
+          name: `${room.players[room.hostId]?.displayName || 'Oyuncu'} Odası`,
+          hostName: room.players[room.hostId]?.displayName || 'Kurucu',
+          category: room.category || 'genel_kultur',
+          playerCount: players.length,
+          maxPlayers: room.maxPlayers,
+          questionTimeSec: room.questionTimeSec,
+          totalRounds: room.totalRounds,
+          penaltyForWrong: !!room.penaltyForWrong,
+          status: room.status,
+          createdAt: Date.now(),
+        });
+      }
+    }
+    return list;
   }
 
   public createRoom(options: CreateRoomOptions): GameRoom {

@@ -3,6 +3,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  TextInput,
   StyleSheet,
   ScrollView,
   Share,
@@ -14,6 +15,7 @@ import * as Clipboard from 'expo-clipboard';
 import { GameRoom } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
+import { socketService } from '../services/socketService';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -81,6 +83,99 @@ const CheckSvgIcon = ({ size = 18, color = '#5ADBB5' }: { size?: number; color?:
   </Svg>
 );
 
+const QUICK_CHAT_CHIPS = [
+  'Selam 👋',
+  'Hazırım! ⚡',
+  'Hadi başla! 🚀',
+  'Bol şans! 🎯',
+  'Buradayım 🔥',
+];
+
+interface FloatingItemData {
+  id: string;
+  type: 'emoji' | 'message';
+  content: string;
+  senderName?: string;
+  avatarSeed?: string;
+  xOffset: number;
+}
+
+const FloatingLobbyItem: React.FC<{
+  item: FloatingItemData;
+  onComplete: () => void;
+}> = ({ item, onComplete }) => {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: item.type === 'message' ? 3400 : 1300,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start(() => onComplete());
+  }, []);
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 0.15, 0.8, 1],
+    outputRange: [0, -30, -110, -180],
+  });
+
+  const opacity = anim.interpolate({
+    inputRange: [0, 0.12, 0.78, 1],
+    outputRange: [0, 1, 0.95, 0],
+  });
+
+  const scale = anim.interpolate({
+    inputRange: [0, 0.15, 0.85, 1],
+    outputRange: [0.75, 1.08, 1, 0.9],
+  });
+
+  if (item.type === 'emoji') {
+    return (
+      <Animated.View
+        style={[
+          styles.floatingEmojiWrap,
+          {
+            transform: [
+              { translateX: item.xOffset },
+              { translateY },
+              { scale },
+            ],
+            opacity,
+          },
+        ]}
+      >
+        <Text style={styles.floatingEmojiText}>{item.content}</Text>
+      </Animated.View>
+    );
+  }
+
+  return (
+    <Animated.View
+      style={[
+        styles.floatingChatBubble,
+        {
+          transform: [
+            { translateX: item.xOffset },
+            { translateY },
+            { scale },
+          ],
+          opacity,
+        },
+      ]}
+    >
+      <View style={styles.floatingChatAvatarWrap}>
+        <CharacterAvatar seed={item.avatarSeed || item.senderName} size={24} />
+      </View>
+      <View style={styles.floatingChatTextCol}>
+        <Text style={styles.floatingChatSender} numberOfLines={1}>
+          {item.senderName}
+        </Text>
+        <Text style={styles.floatingChatBody}>{item.content}</Text>
+      </View>
+    </Animated.View>
+  );
+};
+
 export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   room,
   currentUserId,
@@ -90,6 +185,9 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   onKickPlayer,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [chatText, setChatText] = useState('');
+  const [floatingItems, setFloatingItems] = useState<FloatingItemData[]>([]);
+
   const players = Object.values(room.players);
   const maxPlayers = room.maxPlayers || 4;
   const emptySlotCount = Math.max(0, maxPlayers - players.length);
@@ -97,6 +195,70 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   const myPlayer = room.players[currentUserId];
   const isReady = myPlayer?.isReady ?? false;
   const canStart = players.length >= 2;
+
+  // Real-time WebSocket Reaksiyonları ve Canlı Süzülen Mesajlar (Veritabanına kaydedilmez)
+  useEffect(() => {
+    const unsubEmote = socketService.onEmoteReceived((data) => {
+      if (data.roomCode === room.code) {
+        const id = `emote_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const xOffset = (Math.random() - 0.5) * 160;
+        setFloatingItems((prev) => [
+          ...prev.slice(-12),
+          { id, type: 'emoji', content: data.emote, xOffset },
+        ]);
+      }
+    });
+
+    const unsubChat = socketService.onLobbyMessage((data) => {
+      if (data.roomCode === room.code) {
+        sound.playSound('tap');
+        sound.triggerHaptic('medium');
+        const id = `chat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const xOffset = (Math.random() - 0.5) * 80;
+        setFloatingItems((prev) => [
+          ...prev.slice(-12),
+          {
+            id,
+            type: 'message',
+            content: data.text,
+            senderName: data.displayName,
+            avatarSeed: data.avatarUrl || data.displayName,
+            xOffset,
+          },
+        ]);
+      }
+    });
+
+    return () => {
+      unsubEmote();
+      unsubChat();
+    };
+  }, [room.code]);
+
+  const removeFloatingItem = (id: string) => {
+    setFloatingItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleSendReaction = (emoji: string) => {
+    sound.playSound('tap');
+    sound.triggerHaptic('light');
+    socketService.sendEmote(room.code, currentUserId, emoji);
+  };
+
+  const handleSendChat = (presetText?: string) => {
+    const textToSend = (presetText || chatText).trim();
+    if (!textToSend) return;
+    sound.playSound('tap');
+    sound.triggerHaptic('medium');
+    socketService.sendLobbyChat(
+      room.code,
+      currentUserId,
+      myPlayer?.displayName || 'Oyuncu',
+      textToSend,
+      myPlayer?.avatarUrl || myPlayer?.displayName
+    );
+    if (!presetText) setChatText('');
+  };
 
   // Nefes alma (pulsing) animasyonu
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
@@ -141,6 +303,17 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   return (
     <TavrikoScreen>
       <TavrikoTopBar leftType="back" onLeftPress={onBack} />
+
+      {/* Süzülen Anlık Reaksiyonlar ve Uçuşan Mesajlar (Veritabanına kaydedilmez, sadece WebSocket) */}
+      <View style={styles.floatingLayer} pointerEvents="none">
+        {floatingItems.map((item) => (
+          <FloatingLobbyItem
+            key={item.id}
+            item={item}
+            onComplete={() => removeFloatingItem(item.id)}
+          />
+        ))}
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -260,8 +433,49 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           ))}
         </View>
 
-        {/* 4. MODERN, ŞIK VE İNCE REAKSİYON KAPSÜLÜ */}
-        <LobbyReactions />
+        {/* 4. MODERN, ŞIK VE İNCE REAKSİYON KAPSÜLÜ (WebSocket Canlı Yayın) */}
+        <LobbyReactions onReactionSent={handleSendReaction} />
+
+        {/* 4.5. ANLIK SÜZÜLEN LOBİ SOHBETİ (Veritabanına kaydedilmez, anlık süzülür) */}
+        <View style={styles.quickChatContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickChipsScroll}
+          >
+            {QUICK_CHAT_CHIPS.map((chip) => (
+              <TouchableOpacity
+                key={chip}
+                style={styles.quickChip}
+                activeOpacity={0.75}
+                onPress={() => handleSendChat(chip)}
+              >
+                <Text style={styles.quickChipText}>{chip}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <View style={styles.chatInputRow}>
+            <TextInput
+              style={styles.chatInput}
+              value={chatText}
+              onChangeText={setChatText}
+              placeholder="Lobiye mesaj yaz (anlık süzülür)..."
+              placeholderTextColor="#9A8BC2"
+              maxLength={70}
+              returnKeyType="send"
+              onSubmitEditing={() => handleSendChat()}
+            />
+            <TouchableOpacity
+              style={[styles.chatSendBtn, !chatText.trim() && styles.chatSendBtnDisabled]}
+              onPress={() => handleSendChat()}
+              activeOpacity={0.8}
+              disabled={!chatText.trim()}
+            >
+              <Text style={styles.chatSendBtnText}>➤</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* 5. ALT BAŞLATMA ALANI (Tek, net ve modern aksiyon) */}
         <View style={styles.controlsWrap}>
@@ -655,5 +869,131 @@ const styles = StyleSheet.create({
     color: '#D9CDF5',
     fontSize: 12,
     fontFamily: THEME.fonts.bold,
+  },
+  floatingLayer: {
+    position: 'absolute',
+    top: 70,
+    bottom: 120,
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    zIndex: 999,
+  },
+  floatingEmojiWrap: {
+    position: 'absolute',
+    bottom: 40,
+  },
+  floatingEmojiText: {
+    fontSize: 38,
+  },
+  floatingChatBubble: {
+    position: 'absolute',
+    bottom: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: 'rgba(23, 11, 51, 0.94)',
+    borderWidth: 1.5,
+    borderColor: '#5ADBB5',
+    maxWidth: 280,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#5ADBB5',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+      web: {
+        boxShadow: '0 4px 16px rgba(90, 219, 181, 0.35)',
+      },
+    }),
+  },
+  floatingChatAvatarWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    overflow: 'hidden',
+  },
+  floatingChatTextCol: {
+    flexShrink: 1,
+  },
+  floatingChatSender: {
+    color: '#FFE27A',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+    fontWeight: '800',
+  },
+  floatingChatBody: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontFamily: THEME.fonts.bold,
+    fontWeight: '700',
+  },
+  quickChatContainer: {
+    width: '100%',
+    maxWidth: 380,
+    marginTop: 6,
+    marginBottom: 8,
+    gap: 8,
+  },
+  quickChipsScroll: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: 2,
+  },
+  quickChip: {
+    paddingVertical: 5,
+    paddingHorizontal: 11,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+  },
+  quickChipText: {
+    color: '#D9CDF5',
+    fontSize: 11.5,
+    fontFamily: THEME.fonts.bold,
+    fontWeight: '700',
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+  },
+  chatInput: {
+    flex: 1,
+    height: 42,
+    backgroundColor: 'rgba(10, 4, 30, 0.75)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(154, 107, 255, 0.35)',
+    borderRadius: 21,
+    paddingHorizontal: 16,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.medium,
+  },
+  chatSendBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#5ADBB5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatSendBtnDisabled: {
+    opacity: 0.4,
+  },
+  chatSendBtnText: {
+    color: '#082520',
+    fontSize: 16,
+    fontWeight: '900',
   },
 });

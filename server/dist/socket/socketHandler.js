@@ -207,8 +207,52 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
         socket.on(shared_1.SOCKET_EVENTS.CANCEL_MATCH, (data) => {
             matchmaker.dequeue(data.playerId);
         });
+        socket.on(shared_1.SOCKET_EVENTS.CREATE_ROOM, (data) => {
+            const { roomCode, playerId, displayName, avatarUrl, settings } = data;
+            socketMeta.set(socket.id, { playerId, roomCode });
+            socket.join(roomCode);
+            const room = roomManager.createRoom({
+                code: roomCode,
+                hostId: playerId,
+                hostName: displayName,
+                avatarUrl,
+                category: settings?.categories?.[0] || 'general_culture',
+                difficulty: settings?.difficulty || 'medium',
+                maxPlayers: settings?.maxPlayers || 4,
+                totalRounds: settings?.totalRounds || 7,
+                questionTimeSec: settings?.questionTimeSec || 20,
+                penaltyForWrong: settings?.penaltyForWrong ?? true,
+                privacy: settings?.privacy || 'public',
+            });
+            io.to(roomCode).emit(shared_1.SOCKET_EVENTS.ROOM_STATE_SYNC, room);
+            io.emit(shared_1.SOCKET_EVENTS.PUBLIC_ROOMS_UPDATE, roomManager.getPublicRooms());
+        });
+        socket.on(shared_1.SOCKET_EVENTS.GET_PUBLIC_ROOMS, () => {
+            socket.emit(shared_1.SOCKET_EVENTS.PUBLIC_ROOMS_UPDATE, roomManager.getPublicRooms());
+        });
         socket.on(shared_1.SOCKET_EVENTS.SEND_EMOTE, (data) => {
-            io.to(data.roomCode).emit(shared_1.SOCKET_EVENTS.EMOTE_RECEIVED, data);
+            io.to(data.roomCode).emit(shared_1.SOCKET_EVENTS.EMOTE_RECEIVED, {
+                ...data,
+                id: `emote_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            });
+        });
+        socket.on(shared_1.SOCKET_EVENTS.LOBBY_CHAT, (data) => {
+            if (!data.text || !data.roomCode)
+                return;
+            const cleanText = data.text.trim().slice(0, 100);
+            if (!cleanText)
+                return;
+            const payload = {
+                id: `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                roomCode: data.roomCode,
+                playerId: data.playerId,
+                displayName: data.displayName || 'Oyuncu',
+                avatarUrl: data.avatarUrl,
+                text: cleanText,
+                timestamp: Date.now(),
+            };
+            // Broadcast to all sockets in that room (EPHEMERAL, no DB save)
+            io.to(data.roomCode).emit(shared_1.SOCKET_EVENTS.LOBBY_MESSAGE, payload);
         });
         socket.on('disconnect', () => {
             const meta = socketMeta.get(socket.id);
