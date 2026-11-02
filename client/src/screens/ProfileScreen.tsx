@@ -81,8 +81,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       <TavrikoTopBar
         leftType="back"
         onLeftPress={onBack}
-        coins={user.coins ?? 500}
-        gems={user.gems ?? 14}
+        coins={user.coins ?? 0}
+        gems={user.gems ?? 0}
         avatarSeed={user.avatarUrl || user.displayName}
         onAvatarPress={onEditProfile}
       />

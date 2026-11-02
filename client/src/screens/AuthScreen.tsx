@@ -307,11 +307,43 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   }) => {
     setLoading(true);
     try {
+      // Local permanent wallet check
+      let clientCoins: number | undefined;
+      let clientGems: number | undefined;
+      let clientXp: number | undefined;
+      let clientLevel: number | undefined;
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          const rawPerm = window.localStorage.getItem('tavriko_permanent_wallet');
+          if (rawPerm) {
+            const p = JSON.parse(rawPerm);
+            clientCoins = p.coins;
+            clientGems = p.gems;
+            clientXp = p.xp;
+            clientLevel = p.level;
+          }
+          if (payload.email) {
+            const rawEmail = window.localStorage.getItem(`tavriko_wallet_${payload.email.toLowerCase()}`);
+            if (rawEmail) {
+              const ep = JSON.parse(rawEmail);
+              clientCoins = Math.max(clientCoins || 0, ep.coins || 0);
+              clientGems = Math.max(clientGems || 0, ep.gems || 0);
+              clientXp = Math.max(clientXp || 0, ep.xp || 0);
+              clientLevel = Math.max(clientLevel || 1, ep.level || 1);
+            }
+          }
+        } catch {}
+      }
+
       const res = await fetch(`${apiBaseUrl}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...payload,
+          clientCoins,
+          clientGems,
+          clientXp,
+          clientLevel,
           clientId: GOOGLE_CLIENT_ID,
           country: `${selectedCountry.flag} ${selectedCountry.name}`,
         }),

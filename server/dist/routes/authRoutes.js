@@ -327,7 +327,7 @@ router.get('/google/callback', (req, res) => {
 });
 router.post('/google', async (req, res) => {
     try {
-        const { idToken, accessToken, email, displayName, fullName, avatarUrl, countryCode, countryName, phone, birthDate, } = req.body;
+        const { idToken, accessToken, email, displayName, fullName, avatarUrl, countryCode, countryName, phone, birthDate, clientCoins, clientGems, clientXp, clientLevel, } = req.body;
         let verifiedEmail = email;
         let verifiedName = displayName || fullName;
         let verifiedPicture = avatarUrl;
@@ -404,6 +404,20 @@ router.post('/google', async (req, res) => {
             phone,
             birthDate,
         });
+        if ((typeof clientCoins === 'number' && clientCoins > (result.user.coins ?? 0)) ||
+            (typeof clientGems === 'number' && clientGems > (result.user.gems ?? 0)) ||
+            (typeof clientXp === 'number' && clientXp > (result.user.xp ?? 0)) ||
+            (typeof clientLevel === 'number' && clientLevel > (result.user.level ?? 1))) {
+            const synced = await prismaClient_1.db.syncWallet(result.user.id, {
+                coins: clientCoins,
+                gems: clientGems,
+                xp: clientXp,
+                level: clientLevel,
+            });
+            if (synced) {
+                result.user = synced;
+            }
+        }
         res.json({
             ...result,
             googleClientId: GOOGLE_CLIENT_ID,
@@ -498,6 +512,20 @@ router.post('/stats', async (req, res) => {
             won,
         });
         res.json({ success: true, user: updated });
+    }
+    catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+router.post('/sync-wallet', async (req, res) => {
+    try {
+        const { userId, coins, gems, xp, level } = req.body;
+        if (!userId) {
+            res.status(400).json({ error: 'userId gereklidir' });
+            return;
+        }
+        const updatedUser = await prismaClient_1.db.syncWallet(userId, { coins, gems, xp, level });
+        res.json({ success: true, user: updatedUser });
     }
     catch (err) {
         res.status(400).json({ error: err.message });

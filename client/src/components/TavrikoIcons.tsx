@@ -1052,8 +1052,10 @@ export const TavrikoTopBar: React.FC<{
   onGuestLoginPress,
 }) => {
   const storeUser = useGameStore((s) => s.user);
-  const displayCoins = coins !== undefined ? coins : storeUser?.coins ?? 500;
-  const displayGems = gems !== undefined ? gems : storeUser?.gems ?? 15;
+  const candidateCoins = coins !== undefined && coins !== null ? coins : storeUser?.coins;
+  const candidateGems = gems !== undefined && gems !== null ? gems : storeUser?.gems;
+  const displayCoins = Math.max(candidateCoins ?? 0, storeUser?.coins ?? 0);
+  const displayGems = Math.max(candidateGems ?? 0, storeUser?.gems ?? 0);
   const displayAvatar = avatarSeed || storeUser?.avatarUrl || storeUser?.displayName || 'av1';
 
   if (isGuest) {

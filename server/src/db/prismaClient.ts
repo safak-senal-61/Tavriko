@@ -1364,13 +1364,14 @@ export class PrismaService {
           (payload.googleId && u.googleId === payload.googleId))
     );
 
-    // 2. Search in PostgreSQL database
+    // 2. Search in PostgreSQL database (order by latest update)
     let dbUser: PrismaUser | null = null;
     if (existingRecord) {
       dbUser = await this.rawClient.user
         .findUnique({ where: { id: existingRecord.id } })
         .catch(() => null);
-    } else {
+    }
+    if (!dbUser) {
       dbUser = await this.rawClient.user
         .findFirst({
           where: {
@@ -1379,13 +1380,25 @@ export class PrismaService {
               payload.googleId ? { googleId: payload.googleId } : {},
             ].filter((x) => Object.keys(x).length > 0) as any,
           },
+          orderBy: { updatedAt: 'desc' },
         })
         .catch(() => null);
+    }
 
-      if (dbUser) {
-        existingRecord = this.prismaUserToRecord(dbUser);
-        this.users.set(existingRecord.id, existingRecord);
+    if (dbUser) {
+      const fromDb = this.prismaUserToRecord(dbUser);
+      if (existingRecord) {
+        existingRecord.coins = Math.max(existingRecord.coins || 0, fromDb.coins || 0);
+        existingRecord.gems = Math.max(existingRecord.gems || 0, fromDb.gems || 0);
+        existingRecord.xp = Math.max(existingRecord.xp || 0, fromDb.xp || 0);
+        existingRecord.level = Math.max(existingRecord.level || 1, fromDb.level || 1);
+        if (fromDb.inventory && fromDb.inventory.length > (existingRecord.inventory?.length || 0)) {
+          existingRecord.inventory = fromDb.inventory;
+        }
+      } else {
+        existingRecord = fromDb;
       }
+      this.users.set(existingRecord.id, existingRecord);
     }
 
     let isNewUser = false;
@@ -1520,6 +1533,10 @@ export class PrismaService {
               fullName: existingRecord.fullName,
               avatarUrl: existingRecord.avatarUrl,
               googleId: existingRecord.googleId,
+              coins: existingRecord.coins,
+              gems: existingRecord.gems,
+              xp: existingRecord.xp,
+              level: existingRecord.level,
               updatedAt: now,
             },
           });
@@ -1693,7 +1710,18 @@ export class PrismaService {
       won?: boolean;
     }
   ): Promise<UserProfile | null> {
-    const record = this.users.get(userId);
+    let record = this.users.get(userId);
+    if (!record) {
+      try {
+        const u = await this.rawClient.user.findFirst({
+          where: { OR: [{ id: userId }, { username: userId }] },
+        });
+        if (u) {
+          record = this.prismaUserToRecord(u);
+          this.users.set(record.id, record);
+        }
+      } catch {}
+    }
     if (!record) return null;
 
     // Balanced RPG XP curve: Cap single match XP to prevent rapid leveling
@@ -1713,6 +1741,7 @@ export class PrismaService {
     record.stats.correctAnswers += delta.correctAnswers;
     record.stats.totalAnswers += delta.totalAnswers;
     record.stats.bestStreak = Math.max(record.stats.bestStreak || 0, delta.bestStreak);
+    record.updatedAt = Date.now();
 
     // Automatically update live event progress ONLY for tasks the user actively started and not completed yet
     this.updateStartedEvents(record, {
@@ -1725,8 +1754,81 @@ export class PrismaService {
     this.users.set(userId, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
-      supabaseService.upsertUser(record).catch(() => {});
+      try {
+        await this.rawClient.user.update({
+          where: { id: record.id },
+          data: {
+            coins: record.coins,
+            gems: record.gems,
+            xp: record.xp,
+            level: record.level,
+            seasonXp: record.seasonXp || 0,
+            rankTitle: record.rankTitle,
+            totalMatches: record.stats.totalMatches,
+            wins: record.stats.wins,
+            correctAnswers: record.stats.correctAnswers,
+            totalAnswers: record.stats.totalAnswers,
+            bestStreak: record.stats.bestStreak,
+            updatedAt: new Date(),
+          },
+        });
+      } catch (err) {
+        console.error('[recordGameStats] PostgreSQL update error:', err);
+      }
     }
+    return this.toProfile(record);
+  }
+
+  public async syncWallet(
+    userId: string,
+    data: { coins?: number; gems?: number; xp?: number; level?: number }
+  ): Promise<UserProfile | null> {
+    let record = this.users.get(userId);
+    if (!record) {
+      try {
+        const u = await this.rawClient.user.findFirst({
+          where: { OR: [{ id: userId }, { username: userId }] },
+        });
+        if (u) {
+          record = this.prismaUserToRecord(u);
+          this.users.set(record.id, record);
+        }
+      } catch {}
+    }
+    if (!record) return null;
+
+    if (typeof data.coins === 'number' && data.coins > 0) {
+      record.coins = Math.max(record.coins || 0, data.coins);
+    }
+    if (typeof data.gems === 'number' && data.gems > 0) {
+      record.gems = Math.max(record.gems || 0, data.gems);
+    }
+    if (typeof data.xp === 'number' && data.xp > 0) {
+      record.xp = Math.max(record.xp || 0, data.xp);
+    }
+    if (typeof data.level === 'number' && data.level > 0) {
+      record.level = Math.max(record.level || 1, data.level);
+    }
+    record.updatedAt = Date.now();
+
+    this.users.set(record.id, record);
+    this.savePersistedUsers();
+
+    try {
+      await this.rawClient.user.update({
+        where: { id: record.id },
+        data: {
+          coins: record.coins,
+          gems: record.gems,
+          xp: record.xp,
+          level: record.level,
+          updatedAt: new Date(),
+        },
+      });
+    } catch (err) {
+      console.error('[syncWallet] PostgreSQL update error:', err);
+    }
+
     return this.toProfile(record);
   }
 
@@ -1785,6 +1887,7 @@ export class PrismaService {
           where: {
             OR: [{ id: userId }, { username: userId }],
           },
+          orderBy: { updatedAt: 'desc' },
         });
         if (u) {
           record = this.prismaUserToRecord(u);

@@ -18,6 +18,8 @@ import {
   Button3D,
   CharacterAvatar,
   BRAND_APP_ICON,
+  CoinTavrikoIcon,
+  GemTavrikoIcon,
 } from '../components/TavrikoIcons';
 
 interface SettingsScreenProps {
@@ -27,6 +29,7 @@ interface SettingsScreenProps {
   onLogout: () => void;
   onDeleteAccount: () => Promise<void>;
   onDeveloper?: () => void;
+  onSyncWallet?: () => Promise<void>;
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
@@ -36,28 +39,49 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onLogout,
   onDeleteAccount,
   onDeveloper,
+  onSyncWallet,
 }) => {
+  // Sync state
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncNotice, setSyncNotice] = useState<string | null>(null);
+
   // Audio & Haptics
   const [sfxEnabled, setSfxEnabled] = useState(sound.isSoundEnabled());
+  const [sfxVolume, setSfxVolume] = useState<'25' | '50' | '75' | '100'>('100');
   const [musicEnabled, setMusicEnabled] = useState(false);
+  const [musicVolume, setMusicVolume] = useState<'25' | '50' | '75' | '100'>('50');
   const [hapticsEnabled, setHapticsEnabled] = useState(sound.isHapticsEnabled());
+  const [hapticIntensity, setHapticIntensity] = useState<'light' | 'medium' | 'strong'>('medium');
   const [timerAlertSound, setTimerAlertSound] = useState(true);
+  const [victoryMelody, setVictoryMelody] = useState(true);
 
   // Visual & Performance
   const [smoothAnimations, setSmoothAnimations] = useState(true);
   const [batterySaver, setBatterySaver] = useState(false);
   const [ambientGlow, setAmbientGlow] = useState(true);
+  const [textSize, setTextSize] = useState<'normal' | 'large'>('normal');
+  const [buttonSpring, setButtonSpring] = useState(true);
 
   // Gameplay Preferences
   const [defaultDifficulty, setDefaultDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [questionCount, setQuestionCount] = useState<number>(5);
   const [questionTimeSec, setQuestionTimeSec] = useState<number>(20);
+  const [penaltyForWrong, setPenaltyForWrong] = useState(true);
+  const [autoNextQuestion, setAutoNextQuestion] = useState(true);
+  const [doubleTapProtection, setDoubleTapProtection] = useState(false);
 
   // Social & Privacy
   const [notifsEnabled, setNotifsEnabled] = useState(true);
-  const [onlineStatusVisible, setOnlineStatusVisible] = useState(true);
   const [duelInvitesAllowed, setDuelInvitesAllowed] = useState(true);
+  const [roomInvitesAllowed, setRoomInvitesAllowed] = useState(true);
+  const [onlineStatusVisible, setOnlineStatusVisible] = useState(true);
   const [profilePublic, setProfilePublic] = useState(true);
+  const [friendRequestsAllowed, setFriendRequestsAllowed] = useState(true);
+
+  // Notifications
+  const [dailyReminder, setDailyReminder] = useState(true);
+  const [seasonAlerts, setSeasonAlerts] = useState(true);
+  const [friendActivity, setFriendActivity] = useState(true);
 
   // Feedback & Modal state
   const [cacheClearedNotice, setCacheClearedNotice] = useState(false);
@@ -85,6 +109,25 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       />
     </TouchableOpacity>
   );
+
+  const handleManualSync = async () => {
+    if (!onSyncWallet || isSyncing) return;
+    setIsSyncing(true);
+    sound.playSound('tap');
+    sound.triggerHaptic('light');
+    try {
+      await onSyncWallet();
+      sound.playSound('reward');
+      sound.triggerHaptic('success');
+      setSyncNotice(`✓ Buluta Yazıldı! (${user?.coins ?? 0} Altın, ${user?.gems ?? 0} Elmas)`);
+      setTimeout(() => setSyncNotice(null), 3500);
+    } catch {
+      setSyncNotice('❌ Senkronizasyon sırasında hata oluştu.');
+      setTimeout(() => setSyncNotice(null), 3500);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleClearCache = () => {
     sound.playSound('reward');
@@ -118,13 +161,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       >
         <Text style={styles.title}>AYARLAR</Text>
 
-        {/* 1. Account Summary Card */}
+        {/* 1. Account Summary & Live Cloud Persistence Card */}
         {user && (
           <View style={styles.profileCard}>
             <View style={styles.profileRow}>
               <CharacterAvatar
                 seed={user.avatarUrl || user.displayName}
-                size={52}
+                size={54}
               />
               <View style={{ flex: 1 }}>
                 <Text style={styles.profileDisplayName} numberOfLines={1}>
@@ -140,13 +183,47 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     </Text>
                   </View>
                   <View style={styles.verifiedBadge}>
-                    <Text style={styles.verifiedBadgeText}>✓ Güvenli Oturum</Text>
+                    <Text style={styles.verifiedBadgeText}>✓ Supabase Bulut Koruması</Text>
                   </View>
                 </View>
               </View>
             </View>
+
+            {/* Live Wallet Balances */}
+            <View style={styles.walletDisplayRow}>
+              <View style={styles.walletStatPill}>
+                <CoinTavrikoIcon size={18} />
+                <Text style={styles.walletStatText}>{user.coins ?? 0} Altın</Text>
+              </View>
+              <View style={styles.walletStatPill}>
+                <GemTavrikoIcon size={18} />
+                <Text style={styles.walletStatText}>{user.gems ?? 0} Elmas</Text>
+              </View>
+              <View style={styles.walletStatPill}>
+                <Text style={[styles.walletStatText, { color: '#00F0FF' }]}>⚡ {user.xp ?? 0} XP</Text>
+              </View>
+            </View>
+
+            {/* Cloud Sync CTA Button */}
+            <TouchableOpacity
+              style={[styles.syncButton, isSyncing && { opacity: 0.7 }]}
+              onPress={handleManualSync}
+              disabled={isSyncing}
+              activeOpacity={0.8}
+            >
+              {isSyncing ? (
+                <ActivityIndicator size="small" color="#FFC43D" />
+              ) : (
+                <Text style={styles.syncButtonText}>☁️ Veritabanı ile Şimdi Senkronize Et</Text>
+              )}
+            </TouchableOpacity>
+
+            {syncNotice && (
+              <Text style={styles.syncSuccessNotice}>{syncNotice}</Text>
+            )}
+
             <Text style={styles.syncNoticeText}>
-              🛡️ Seviyeniz, altınlarınız ({user.coins ?? 0}) ve elmaslarınız ({user.gems ?? 0}) hesabınıza kaydedilir.
+              🛡️ Oturumu kapatsanız veya sayfayı yenileseniz dahi altınlarınız ({user.coins ?? 0}) ve elmaslarınız ({user.gems ?? 0}) silinmez; yalnızca "Hesabımı Kalıcı Olarak Sil" dendiğinde sıfırlanır.
             </Text>
           </View>
         )}
@@ -165,6 +242,32 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               sound.setSoundEnabled(next);
             })}
           </View>
+
+          {sfxEnabled && (
+            <View style={styles.multiChoiceRow}>
+              <Text style={styles.settingLabel}>Efekt Ses Düzeyi</Text>
+              <View style={styles.pillSelectorRow}>
+                {(['25', '50', '75', '100'] as const).map((vol) => {
+                  const active = sfxVolume === vol;
+                  return (
+                    <TouchableOpacity
+                      key={vol}
+                      style={[styles.miniPill, active && styles.miniPillActive]}
+                      onPress={() => {
+                        sound.playSound('tap');
+                        setSfxVolume(vol);
+                      }}
+                    >
+                      <Text style={[styles.miniPillText, active && styles.miniPillTextActive]}>
+                        %{vol}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
           <View style={styles.settingRow}>
             <View>
               <Text style={styles.settingLabel}>Arka Plan Müziği</Text>
@@ -172,6 +275,32 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </View>
             {renderSwitch(musicEnabled, () => setMusicEnabled((v) => !v))}
           </View>
+
+          {musicEnabled && (
+            <View style={styles.multiChoiceRow}>
+              <Text style={styles.settingLabel}>Müzik Ses Düzeyi</Text>
+              <View style={styles.pillSelectorRow}>
+                {(['25', '50', '75', '100'] as const).map((vol) => {
+                  const active = musicVolume === vol;
+                  return (
+                    <TouchableOpacity
+                      key={vol}
+                      style={[styles.miniPill, active && styles.miniPillActive]}
+                      onPress={() => {
+                        sound.playSound('tap');
+                        setMusicVolume(vol);
+                      }}
+                    >
+                      <Text style={[styles.miniPillText, active && styles.miniPillTextActive]}>
+                        %{vol}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
           <View style={styles.settingRow}>
             <View>
               <Text style={styles.settingLabel}>Haptik Titreşim</Text>
@@ -183,12 +312,51 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               sound.setHapticsEnabled(next);
             })}
           </View>
-          <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
+
+          {hapticsEnabled && (
+            <View style={styles.multiChoiceRow}>
+              <Text style={styles.settingLabel}>Titreşim Şiddeti</Text>
+              <View style={styles.pillSelectorRow}>
+                {[
+                  { id: 'light', label: 'Hafif' },
+                  { id: 'medium', label: 'Dengeli' },
+                  { id: 'strong', label: 'Güçlü' },
+                ].map((item) => {
+                  const active = hapticIntensity === item.id;
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[styles.miniPill, active && styles.miniPillActive]}
+                      onPress={() => {
+                        sound.playSound('tap');
+                        sound.triggerHaptic(item.id as any);
+                        setHapticIntensity(item.id as any);
+                      }}
+                    >
+                      <Text style={[styles.miniPillText, active && styles.miniPillTextActive]}>
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          <View style={styles.settingRow}>
             <View>
               <Text style={styles.settingLabel}>Süre Uyarı Sesi</Text>
               <Text style={styles.settingSub}>Son 3 saniye geri sayım tik sesi</Text>
             </View>
             {renderSwitch(timerAlertSound, () => setTimerAlertSound((v) => !v))}
+          </View>
+
+          <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
+            <View>
+              <Text style={styles.settingLabel}>Zafer & Podyum Melodisi</Text>
+              <Text style={styles.settingSub}>Maç sonunda ödül ve kupa şölen müziği</Text>
+            </View>
+            {renderSwitch(victoryMelody, () => setVictoryMelody((v) => !v))}
           </View>
         </View>
 
@@ -197,24 +365,60 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         <View style={styles.groupCard}>
           <View style={styles.settingRow}>
             <View>
-              <Text style={styles.settingLabel}>60 FPS Akıcı Animasyonlar</Text>
+              <Text style={styles.settingLabel}>60 FPS Ultra Akıcı Animasyonlar</Text>
               <Text style={styles.settingSub}>Ultra pürüzsüz kart ve soru geçişleri</Text>
             </View>
             {renderSwitch(smoothAnimations, () => setSmoothAnimations((v) => !v))}
           </View>
+
           <View style={styles.settingRow}>
             <View>
               <Text style={styles.settingLabel}>Pil Tasarruf Modu</Text>
-              <Text style={styles.settingSub}>Arka plan efektlerini hafifleterek şarj korur</Text>
+              <Text style={styles.settingSub}>Efektleri hafifleterek cihaz şarjını korur</Text>
             </View>
             {renderSwitch(batterySaver, () => setBatterySaver((v) => !v))}
           </View>
-          <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
+
+          <View style={styles.settingRow}>
             <View>
-              <Text style={styles.settingLabel}>Arka Plan Parıltıları</Text>
+              <Text style={styles.settingLabel}>Arka Plan Parıltıları & Nebula</Text>
               <Text style={styles.settingSub}>Neon nebula ve karanlık uzay parlamaları</Text>
             </View>
             {renderSwitch(ambientGlow, () => setAmbientGlow((v) => !v))}
+          </View>
+
+          <View style={styles.settingRow}>
+            <View>
+              <Text style={styles.settingLabel}>Buton Yaylanma Efekti (3D Bounce)</Text>
+              <Text style={styles.settingSub}>Dokunulduğunda yaylanan buton hissiyatı</Text>
+            </View>
+            {renderSwitch(buttonSpring, () => setButtonSpring((v) => !v))}
+          </View>
+
+          <View style={[styles.multiChoiceRow, { borderBottomWidth: 0 }]}>
+            <Text style={styles.settingLabel}>Soru Metin Boyutu</Text>
+            <View style={styles.pillSelectorRow}>
+              {[
+                { id: 'normal', label: 'Standart (16px)' },
+                { id: 'large', label: 'Büyük (19px)' },
+              ].map((item) => {
+                const active = textSize === item.id;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.miniPill, active && styles.miniPillActive]}
+                    onPress={() => {
+                      sound.playSound('tap');
+                      setTextSize(item.id as any);
+                    }}
+                  >
+                    <Text style={[styles.miniPillText, active && styles.miniPillTextActive]}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
         </View>
 
@@ -268,10 +472,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </View>
           </View>
 
-          <View style={[styles.multiChoiceRow, { borderBottomWidth: 0 }]}>
+          <View style={styles.multiChoiceRow}>
             <Text style={styles.settingLabel}>Tur Soru Sayısı</Text>
             <View style={styles.pillSelectorRow}>
-              {[5, 7, 10].map((count) => {
+              {[5, 7, 10, 15].map((count) => {
                 const active = questionCount === count;
                 return (
                   <TouchableOpacity
@@ -290,6 +494,30 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               })}
             </View>
           </View>
+
+          <View style={styles.settingRow}>
+            <View>
+              <Text style={styles.settingLabel}>Yanlış Cevap Cezası</Text>
+              <Text style={styles.settingSub}>Özel odalarda yanlış cevap başına -50 puan</Text>
+            </View>
+            {renderSwitch(penaltyForWrong, () => setPenaltyForWrong((v) => !v))}
+          </View>
+
+          <View style={styles.settingRow}>
+            <View>
+              <Text style={styles.settingLabel}>Otomatik Soru Geçişi</Text>
+              <Text style={styles.settingSub}>Tüm oyuncular cevapladığında beklemeden geç</Text>
+            </View>
+            {renderSwitch(autoNextQuestion, () => setAutoNextQuestion((v) => !v))}
+          </View>
+
+          <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
+            <View>
+              <Text style={styles.settingLabel}>Çift Dokunma Koruması</Text>
+              <Text style={styles.settingSub}>Yanlışlıkla şıkka basmayı önlemek için teyit ister</Text>
+            </View>
+            {renderSwitch(doubleTapProtection, () => setDoubleTapProtection((v) => !v))}
+          </View>
         </View>
 
         {/* 5. Social & Privacy */}
@@ -302,6 +530,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </View>
             {renderSwitch(notifsEnabled, () => setNotifsEnabled((v) => !v))}
           </View>
+
           <View style={styles.settingRow}>
             <View>
               <Text style={styles.settingLabel}>1v1 Düello Davetleri</Text>
@@ -309,6 +538,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </View>
             {renderSwitch(duelInvitesAllowed, () => setDuelInvitesAllowed((v) => !v))}
           </View>
+
+          <View style={styles.settingRow}>
+            <View>
+              <Text style={styles.settingLabel}>Özel Oda Davetleri</Text>
+              <Text style={styles.settingSub}>Arkadaşların seni doğrudan odasına çekebilsin</Text>
+            </View>
+            {renderSwitch(roomInvitesAllowed, () => setRoomInvitesAllowed((v) => !v))}
+          </View>
+
           <View style={styles.settingRow}>
             <View>
               <Text style={styles.settingLabel}>Çevrimiçi Durumu</Text>
@@ -316,6 +554,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </View>
             {renderSwitch(onlineStatusVisible, () => setOnlineStatusVisible((v) => !v))}
           </View>
+
+          <View style={styles.settingRow}>
+            <View>
+              <Text style={styles.settingLabel}>Arkadaşlık İstekleri</Text>
+              <Text style={styles.settingSub}>Yeni arkadaşlık tekliflerine açık ol</Text>
+            </View>
+            {renderSwitch(friendRequestsAllowed, () => setFriendRequestsAllowed((v) => !v))}
+          </View>
+
           <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
             <View>
               <Text style={styles.settingLabel}>Herkese Açık Profil</Text>
@@ -325,7 +572,35 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </View>
         </View>
 
-        {/* 6. Storage & Tools */}
+        {/* 6. Notifications & Alerts */}
+        <Text style={styles.sectionHeader}>BİLDİRİMLER VE ETKİNLİKLER</Text>
+        <View style={styles.groupCard}>
+          <View style={styles.settingRow}>
+            <View>
+              <Text style={styles.settingLabel}>Günlük Görev Hatırlatıcısı</Text>
+              <Text style={styles.settingSub}>Serini kaybetmemek için her akşam uyarı al</Text>
+            </View>
+            {renderSwitch(dailyReminder, () => setDailyReminder((v) => !v))}
+          </View>
+
+          <View style={styles.settingRow}>
+            <View>
+              <Text style={styles.settingLabel}>Yeni Sezon & Etkinlikler</Text>
+              <Text style={styles.settingSub}>Özel ödüllü turnuvalardan ilk senin haberin olsun</Text>
+            </View>
+            {renderSwitch(seasonAlerts, () => setSeasonAlerts((v) => !v))}
+          </View>
+
+          <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
+            <View>
+              <Text style={styles.settingLabel}>Arkadaş Giriş Bildirimi</Text>
+              <Text style={styles.settingSub}>Yakın arkadaşların lobiye girdiğinde haber ver</Text>
+            </View>
+            {renderSwitch(friendActivity, () => setFriendActivity((v) => !v))}
+          </View>
+        </View>
+
+        {/* 7. Storage & System */}
         <Text style={styles.sectionHeader}>DEPOLAMA VE SİSTEM</Text>
         <View style={styles.groupCard}>
           <TouchableOpacity
@@ -341,6 +616,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               {cacheClearedNotice ? '✓ Temizlendi' : 'Temizle ›'}
             </Text>
           </TouchableOpacity>
+
           <View style={styles.settingRow}>
             <View>
               <Text style={styles.settingLabel}>Uygulama Dili</Text>
@@ -348,6 +624,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </View>
             <Text style={styles.settingRightSub}>Değiştir ›</Text>
           </View>
+
           <TouchableOpacity
             style={[styles.settingRow, { borderBottomWidth: 0 }]}
             onPress={() => {
@@ -361,18 +638,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <Text style={[styles.settingLabel, { color: '#FFC43D' }]}>
                 🛡️ Geliştirici & Ops Paneli
               </Text>
-              <Text style={styles.settingSub}>Sunucu durumları ve canlı sistem logları</Text>
+              <Text style={styles.settingSub}>Sunucu durumları, DO podları ve canlı sistem logları</Text>
             </View>
             <Text style={[styles.settingRightSub, { color: '#FFC43D' }]}>Aç ›</Text>
           </TouchableOpacity>
         </View>
 
-        {/* 7. Account Session & Delete Section */}
-        <Text style={styles.sectionHeader}>HESAP YÖNETİMİ</Text>
+        {/* 8. Account Session & Delete Section */}
+        <Text style={styles.sectionHeader}>HESAP VE GÜVENLİK</Text>
         <View style={styles.accountActionBox}>
           {/* Safe Logout Button */}
           <Button3D
-            title="ÇIKIŞ YAP"
+            title="GÜVENLİ ÇIKIŞ YAP"
             variant="gold"
             onPress={() => {
               sound.playSound('tap');
@@ -382,7 +659,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             textStyle={{ fontSize: 14 }}
           />
           <Text style={styles.logoutNoticeText}>
-            ℹ️ Oturumu kapattığınızda altınlarınız, elmaslarınız ve seviyeniz silinmez; tekrar giriş yaptığınızda kaldığınız yerden devam edersiniz.
+            ℹ️ Oturumu kapattığınızda altınlarınız ({user?.coins ?? 0}), elmaslarınız ({user?.gems ?? 0}) ve seviyeniz silinmez; tekrar giriş yaptığınızda kaldığınız yerden devam edersiniz.
           </Text>
 
           {/* Delete Account Button */}
@@ -406,8 +683,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             style={styles.appIcon}
             resizeMode="cover"
           />
-          <Text style={styles.versionText}>Tavriko · v1.0.0 (Production Build)</Text>
-          <Text style={styles.versionSubText}>Supabase + Cloudflare Realtime DO Engine</Text>
+          <Text style={styles.versionText}>Tavriko Arena · v1.2.0 (Production Build)</Text>
+          <Text style={styles.versionSubText}>Supabase PostgreSQL + Cloudflare Realtime DO Engine</Text>
         </View>
       </ScrollView>
 
@@ -524,6 +801,52 @@ const styles = StyleSheet.create({
     color: '#3FD08A',
     fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
+  },
+  walletDisplayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+  },
+  walletStatPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  walletStatText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  syncButton: {
+    marginTop: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 196, 61, 0.15)',
+    borderWidth: 1,
+    borderColor: '#FFC43D',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  syncButtonText: {
+    color: '#FFC43D',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  syncSuccessNotice: {
+    color: '#3FD08A',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginTop: 6,
   },
   syncNoticeText: {
     color: 'rgba(217, 205, 245, 0.8)',

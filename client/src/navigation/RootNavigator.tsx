@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   Image,
 } from 'react-native';
-import { useGameStore } from '../store/gameStore';
+import { useGameStore, clearAllAccountStorage } from '../store/gameStore';
 import { socketService } from '../services/socketService';
 import { sound } from '../services/soundService';
 import { THEME } from '../theme/tokens';
@@ -243,19 +243,63 @@ export const RootNavigator: React.FC = () => {
     return () => sub.remove();
   }, []);
 
+  // Güvenli kullanıcı senkronizasyonu: Bakiye, seviye ve XP hiçbir zaman geriye düşürülemez!
+  const syncWithFreshUser = useCallback(
+    (freshUser: UserProfile | null) => {
+      if (!freshUser || !user || freshUser.id !== user.id) return;
+      const mergedCoins = Math.max(user.coins ?? 0, freshUser.coins ?? 0);
+      const mergedGems = Math.max(user.gems ?? 0, freshUser.gems ?? 0);
+      const mergedXp = Math.max(user.xp ?? 0, freshUser.xp ?? 0);
+      const mergedLevel = Math.max(user.level ?? 1, freshUser.level ?? 1);
+      const mergedRankPoints = Math.max(user.rankPoints ?? 1000, freshUser.rankPoints ?? 1000);
+
+      const mergedUser: UserProfile = {
+        ...user,
+        ...freshUser,
+        coins: mergedCoins,
+        gems: mergedGems,
+        xp: mergedXp,
+        level: mergedLevel,
+        rankPoints: mergedRankPoints,
+      };
+      setUser(mergedUser);
+
+      // Eğer yereldeki bakiye sunucudan yüksekse sunucuya da güncel halini gönderip PostgreSQL'e yazdır
+      if (
+        (user.coins ?? 0) > (freshUser.coins ?? 0) ||
+        (user.gems ?? 0) > (freshUser.gems ?? 0) ||
+        (user.xp ?? 0) > (freshUser.xp ?? 0) ||
+        (user.level ?? 1) > (freshUser.level ?? 1)
+      ) {
+        fetch(`${API_BASE}/auth/sync-wallet`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            coins: mergedCoins,
+            gems: mergedGems,
+            xp: mergedXp,
+            level: mergedLevel,
+          }),
+        }).catch(() => {});
+      }
+    },
+    [user]
+  );
+
   // Sayfa yenilendiğinde veya başlangıçta veritabanından en güncel altın, elmas ve seviyeyi senkronize et
   useEffect(() => {
     if (user && !isGuest && user.id) {
       fetch(`${API_BASE}/social/profile/${user.id}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((freshUser) => {
-          if (freshUser && freshUser.id === user.id) {
-            setUser(freshUser);
+          if (freshUser) {
+            syncWithFreshUser(freshUser);
           }
         })
         .catch(() => {});
     }
-  }, [user?.id, isGuest]);
+  }, [user?.id, isGuest, syncWithFreshUser]);
   // Helper to gate non-Keşfet features when in Guest Mode
   const requireAuth = (action: () => void, featureName: string) => {
     if (isGuest || !user) {
@@ -462,30 +506,66 @@ export const RootNavigator: React.FC = () => {
     setUser(fallbackUser, 'mock_token');
     navigateTo('categories');
   };
-  // Refresh logged-in user profile from database on key screen changes
+  // Refresh logged-in user profile from database on key screen changes (always safe merge)
   useEffect(() => {
     if (user && !isGuest && (currentScreen === 'home' || currentScreen === 'profile')) {
       fetch(`${API_BASE}/social/profile/${user.id}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((freshUser) => {
-          if (freshUser && freshUser.id === user.id) {
-            setUser(freshUser);
+          if (freshUser) {
+            syncWithFreshUser(freshUser);
           }
         })
         .catch(() => {});
     }
-  }, [currentScreen, user?.id, isGuest]);
+  }, [currentScreen, user?.id, isGuest, syncWithFreshUser]);
   const handleAuthSuccess = (loggedInUser: UserProfile, token: string) => {
     setIsGuest(false);
     setAuthRedirectNotice(null);
-    setUser(
-      {
-        ...loggedInUser,
-        avatarUrl: loggedInUser.avatarUrl || 'av1',
-      },
-      token
-    );
+
+    // Daha önce yerelde kaydedilmiş bakiye varsa onu da kontrol et
+    let cachedWallet: { coins?: number; gems?: number } | null = null;
+    if (typeof window !== 'undefined' && window.localStorage && loggedInUser.email) {
+      try {
+        const raw = window.localStorage.getItem(`tavriko_wallet_${loggedInUser.email.toLowerCase()}`);
+        if (raw) cachedWallet = JSON.parse(raw);
+      } catch {}
+    }
+
+    const finalCoins = Math.max(loggedInUser.coins ?? 0, user?.coins ?? 0, cachedWallet?.coins ?? 0);
+    const finalGems = Math.max(loggedInUser.gems ?? 0, user?.gems ?? 0, cachedWallet?.gems ?? 0);
+
+    const mergedUser: UserProfile = {
+      ...loggedInUser,
+      coins: finalCoins,
+      gems: finalGems,
+      avatarUrl: loggedInUser.avatarUrl || 'av1',
+    };
+
+    if (typeof window !== 'undefined' && window.localStorage && loggedInUser.email) {
+      try {
+        window.localStorage.setItem(
+          `tavriko_wallet_${loggedInUser.email.toLowerCase()}`,
+          JSON.stringify({ coins: finalCoins, gems: finalGems })
+        );
+      } catch {}
+    }
+
+    setUser(mergedUser, token);
     navigateTo('home');
+
+    // Eğer bakiye sunucudan yüksekse sunucuya da güncel halini gönder
+    if (finalCoins > (loggedInUser.coins ?? 0) || finalGems > (loggedInUser.gems ?? 0)) {
+      fetch(`${API_BASE}/auth/sync-wallet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: loggedInUser.id,
+          coins: finalCoins,
+          gems: finalGems,
+        }),
+      }).catch(() => {});
+    }
   };
   const handleSaveProfile = async (name: string, avatarSeedOrUri: string) => {
     if (user) {
@@ -1596,7 +1676,7 @@ export const RootNavigator: React.FC = () => {
                 fetch(`${API_BASE}/social/profile/${user.id}`)
                   .then((r) => (r.ok ? r.json() : null))
                   .then((fresh) => {
-                    if (fresh) setUser(fresh);
+                    if (fresh) syncWithFreshUser(fresh);
                   })
                   .catch(() => {});
               }
@@ -1616,6 +1696,31 @@ export const RootNavigator: React.FC = () => {
               resetGame();
               navigateTo('auth');
             }}
+            onSyncWallet={async () => {
+              if (user && !isGuest) {
+                try {
+                  const res = await fetch(`${API_BASE}/auth/sync-wallet`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      userId: user.id,
+                      coins: user.coins,
+                      gems: user.gems,
+                      xp: user.xp,
+                      level: user.level,
+                    }),
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    if (data?.user) {
+                      syncWithFreshUser(data.user);
+                    }
+                  }
+                } catch (e) {
+                  console.error('Wallet sync error:', e);
+                }
+              }
+            }}
             onDeleteAccount={async () => {
               if (user) {
                 try {
@@ -1628,6 +1733,7 @@ export const RootNavigator: React.FC = () => {
                   console.error('Delete account failed:', err);
                 }
               }
+              clearAllAccountStorage();
               setIsGuest(false);
               setAuthRedirectNotice(null);
               setUser(null, null);
