@@ -33,9 +33,18 @@
     "claimedSeasonTiers": [
       1
     ],
+    "seasonXp": 0,
+    "hasPremiumPass": false,
+    "claimedSeasonFreeTiers": [],
+    "claimedSeasonPremiumTiers": [],
+    "equippedFrame": null,
+    "equippedBadge": null,
+    "equippedNameEffect": null,
+    "equippedBackground": null,
+    "eventProgress": {},
     "friendIds": [],
-    "createdAt": "2026-10-30T22:46:43.003Z",
-    "updatedAt": "2026-10-31T21:36:34.022Z"
+    "createdAt": "2026-11-02T16:55:28.521Z",
+    "updatedAt": "2026-11-02T17:08:09.945Z"
   },
   {
     "id": "google_nus41m7",
@@ -71,9 +80,18 @@
     "claimedSeasonTiers": [
       1
     ],
+    "seasonXp": 0,
+    "hasPremiumPass": false,
+    "claimedSeasonFreeTiers": [],
+    "claimedSeasonPremiumTiers": [],
+    "equippedFrame": null,
+    "equippedBadge": null,
+    "equippedNameEffect": null,
+    "equippedBackground": null,
+    "eventProgress": {},
     "friendIds": [],
-    "createdAt": "2026-10-30T22:46:43.003Z",
-    "updatedAt": "2026-10-31T21:36:35.293Z"
+    "createdAt": "2026-11-02T16:55:30.387Z",
+    "updatedAt": "2026-11-02T17:08:09.201Z"
   },
   {
     "id": "google_xnht5bx",
@@ -109,9 +127,18 @@
     "claimedSeasonTiers": [
       1
     ],
+    "seasonXp": 0,
+    "hasPremiumPass": false,
+    "claimedSeasonFreeTiers": [],
+    "claimedSeasonPremiumTiers": [],
+    "equippedFrame": null,
+    "equippedBadge": null,
+    "equippedNameEffect": null,
+    "equippedBackground": null,
+    "eventProgress": {},
     "friendIds": [],
-    "createdAt": "2026-10-30T22:46:43.003Z",
-    "updatedAt": "2026-10-31T21:36:36.335Z"
+    "createdAt": "2026-11-02T16:55:30.651Z",
+    "updatedAt": "2026-11-02T17:08:09.200Z"
   },
   {
     "id": "bot_1",
@@ -129,12 +156,12 @@
     "bio": null,
     "avatarUrl": "av1",
     "friendCode": "TV-85094",
-    "level": 12,
+    "level": 7,
     "xp": 12400,
     "coins": 1500,
     "gems": 24,
     "dailyStreak": 7,
-    "rankTitle": "Bilgi Şövalyesi",
+    "rankTitle": "Usta Kaşif",
     "rankPoints": 4850,
     "profileCompletionPct": 57,
     "totalMatches": 288,
@@ -147,9 +174,18 @@
     "claimedSeasonTiers": [
       1
     ],
+    "seasonXp": 0,
+    "hasPremiumPass": false,
+    "claimedSeasonFreeTiers": [],
+    "claimedSeasonPremiumTiers": [],
+    "equippedFrame": null,
+    "equippedBadge": null,
+    "equippedNameEffect": null,
+    "equippedBackground": null,
+    "eventProgress": {},
     "friendIds": [],
-    "createdAt": "2026-10-30T22:46:43.004Z",
-    "updatedAt": "2026-10-31T21:36:37.659Z"
+    "createdAt": "2026-11-02T16:55:32.118Z",
+    "updatedAt": "2026-11-02T17:08:09.201Z"
   },
   {
     "id": "bot_2",
@@ -167,12 +203,12 @@
     "bio": null,
     "avatarUrl": "av1",
     "friendCode": "TV-OT293FJ",
-    "level": 10,
+    "level": 6,
     "xp": 8700,
     "coins": 1500,
     "gems": 24,
     "dailyStreak": 7,
-    "rankTitle": "Bilgi Şövalyesi",
+    "rankTitle": "Usta Kaşif",
     "rankPoints": 3920,
     "profileCompletionPct": 57,
     "totalMatches": 228,
@@ -185,9 +221,18 @@
     "claimedSeasonTiers": [
       1
     ],
+    "seasonXp": 0,
+    "hasPremiumPass": false,
+    "claimedSeasonFreeTiers": [],
+    "claimedSeasonPremiumTiers": [],
+    "equippedFrame": null,
+    "equippedBadge": null,
+    "equippedNameEffect": null,
+    "equippedBackground": null,
+    "eventProgress": {},
     "friendIds": [],
-    "createdAt": "2026-10-30T22:46:43.004Z",
-    "updatedAt": "2026-10-31T21:36:38.771Z"
+    "createdAt": "2026-11-02T16:55:32.165Z",
+    "updatedAt": "2026-11-02T17:08:09.201Z"
   },
   {
     "id": "bot_3",
@@ -205,12 +250,12 @@
     "bio": null,
     "avatarUrl": "av1",
     "friendCode": "TV-OT3W25T",
-    "level": 7,
+    "level": 5,
     "xp": 5200,
     "coins": 1500,
     "gems": 24,
     "dailyStreak": 7,
-    "rankTitle": "Usta Kaşif",
+    "rankTitle": "Yükselen Yıldız",
     "rankPoints": 3100,
     "profileCompletionPct": 57,
     "totalMatches": 180,
@@ -223,9 +268,18 @@
     "claimedSeasonTiers": [
       1
     ],
+    "seasonXp": 0,
+    "hasPremiumPass": false,
+    "claimedSeasonFreeTiers": [],
+    "claimedSeasonPremiumTiers": [],
+    "equippedFrame": null,
+    "equippedBadge": null,
+    "equippedNameEffect": null,
+    "equippedBackground": null,
+    "eventProgress": {},
     "friendIds": [],
-    "createdAt": "2026-10-30T22:46:43.009Z",
-    "updatedAt": "2026-10-31T21:36:39.852Z"
+    "createdAt": "2026-11-02T16:55:32.101Z",
+    "updatedAt": "2026-11-02T17:08:09.202Z"
   },
   {
     "id": "bot_4",
@@ -243,12 +297,12 @@
     "bio": null,
     "avatarUrl": "av1",
     "friendCode": "TV-OT4SJ8U",
-    "level": 6,
+    "level": 4,
     "xp": 3400,
     "coins": 1500,
     "gems": 24,
     "dailyStreak": 7,
-    "rankTitle": "Usta Kaşif",
+    "rankTitle": "Yükselen Yıldız",
     "rankPoints": 2400,
     "profileCompletionPct": 57,
     "totalMatches": 144,
@@ -261,9 +315,18 @@
     "claimedSeasonTiers": [
       1
     ],
+    "seasonXp": 0,
+    "hasPremiumPass": false,
+    "claimedSeasonFreeTiers": [],
+    "claimedSeasonPremiumTiers": [],
+    "equippedFrame": null,
+    "equippedBadge": null,
+    "equippedNameEffect": null,
+    "equippedBackground": null,
+    "eventProgress": {},
     "friendIds": [],
-    "createdAt": "2026-10-30T22:46:43.010Z",
-    "updatedAt": "2026-10-31T21:16:13.416Z"
+    "createdAt": "2026-11-02T16:55:32.118Z",
+    "updatedAt": "2026-11-02T17:08:09.202Z"
   },
   {
     "id": "google_lt6irpu",
@@ -282,9 +345,9 @@
     "avatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocL7tBXJ15Yi3eLqwPdmsee25IDV27J0L3Q9xt0zALEuAqsIPw=s96-c",
     "friendCode": "TV-RPUTSL6",
     "level": 2,
-    "xp": 650,
-    "coins": 550,
-    "gems": 15,
+    "xp": 800,
+    "coins": 750,
+    "gems": 25,
     "dailyStreak": 1,
     "rankTitle": "Acemi Kaşif",
     "rankPoints": 1200,
@@ -299,9 +362,18 @@
     "claimedSeasonTiers": [
       1
     ],
+    "seasonXp": 0,
+    "hasPremiumPass": false,
+    "claimedSeasonFreeTiers": [],
+    "claimedSeasonPremiumTiers": [],
+    "equippedFrame": null,
+    "equippedBadge": null,
+    "equippedNameEffect": null,
+    "equippedBackground": null,
+    "eventProgress": {},
     "friendIds": [],
-    "createdAt": "2026-10-30T22:33:19.682Z",
-    "updatedAt": "2026-10-31T00:21:44.412Z"
+    "createdAt": "2026-11-02T16:44:12.223Z",
+    "updatedAt": "2026-11-02T17:08:10.134Z"
   },
   {
     "id": "google_nc30me3",
@@ -413,9 +485,18 @@
     "claimedSeasonTiers": [
       1
     ],
+    "seasonXp": 0,
+    "hasPremiumPass": false,
+    "claimedSeasonFreeTiers": [],
+    "claimedSeasonPremiumTiers": [],
+    "equippedFrame": null,
+    "equippedBadge": null,
+    "equippedNameEffect": null,
+    "equippedBackground": null,
+    "eventProgress": {},
     "friendIds": [],
-    "createdAt": "2026-10-30T23:50:40.761Z",
-    "updatedAt": "2026-10-31T21:16:18.164Z"
+    "createdAt": "2026-11-02T16:55:31.989Z",
+    "updatedAt": "2026-11-02T17:08:09.201Z"
   },
   {
     "id": "usr_zyihjfp",

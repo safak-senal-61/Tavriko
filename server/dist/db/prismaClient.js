@@ -84,14 +84,21 @@ class PrismaService {
     isJest = Boolean(process.env.JEST_WORKER_ID);
     activeUserRooms = new Map();
     constructor() {
+        const dbUrl = process.env.DATABASE_URL ||
+            process.env.DIRECT_URL ||
+            'postgresql://postgres.rjvbgofzsfescnfohzgu:Patr10.senal61@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true';
         this.rawClient = new client_1.PrismaClient({
+            datasources: {
+                db: {
+                    url: dbUrl,
+                },
+            },
             log: ['error'],
         });
         this.loadLocalSnapshots();
         this.initQuestions();
         this.seedDefaults();
         this.loadPersistedUsers();
-        this.syncAllToPrisma().catch(() => { });
         this.syncInitialCloudState();
     }
     ensureDir() {
@@ -275,10 +282,47 @@ class PrismaService {
             return list.length;
         },
     };
+    getItemCategory(itemId) {
+        if (itemId.includes('chest'))
+            return 'chest';
+        if (itemId.includes('key'))
+            return 'key';
+        if (itemId.includes('booster'))
+            return 'booster';
+        if (itemId.includes('frame'))
+            return 'frame';
+        if (itemId.includes('badge'))
+            return 'badge';
+        if (itemId.includes('name'))
+            return 'name_effect';
+        if (itemId.includes('bg') || itemId.includes('background') || itemId.includes('theme'))
+            return 'background';
+        return 'cosmetic';
+    }
+    getItemRarity(itemId) {
+        if (itemId.includes('legendary') || itemId.includes('mythic'))
+            return 'mythic';
+        if (itemId.includes('gold') || itemId.includes('epic'))
+            return 'epic';
+        if (itemId.includes('silver') || itemId.includes('rare'))
+            return 'rare';
+        return 'common';
+    }
     // ==========================================================================
     // PRISMA MODEL DELEGATE: prisma.user
     // ==========================================================================
     prismaUserToRecord(u) {
+        let inventory = [];
+        if (Array.isArray(u.inventoryItems)) {
+            inventory = u.inventoryItems.map((item) => ({
+                id: item.itemId,
+                name: item.name,
+                desc: item.desc,
+                qty: item.qty,
+                category: this.getItemCategory(item.itemId),
+                rarity: this.getItemRarity(item.itemId),
+            }));
+        }
         return {
             id: u.id,
             username: u.username,
@@ -303,6 +347,7 @@ class PrismaService {
             rankPoints: u.rankPoints,
             friendCode: u.friendCode,
             dailyStreak: u.dailyStreak,
+            inventory,
             claimedSeasonTiers: Array.isArray(u.claimedSeasonTiers) ? u.claimedSeasonTiers : [1],
             seasonXp: u.seasonXp ?? 0,
             hasPremiumPass: !!u.hasPremiumPass,
@@ -622,23 +667,19 @@ class PrismaService {
         if (this.isJest)
             return;
         try {
-            const dbUsers = await this.rawClient.user.findMany().catch(() => []);
+            const dbUsers = await this.rawClient.user.findMany({
+                include: { inventoryItems: true },
+            }).catch(() => []);
             if (dbUsers && dbUsers.length > 0) {
                 for (const u of dbUsers) {
                     const rec = this.prismaUserToRecord(u);
                     this.users.set(rec.id, rec);
-                    this.store.users.set(u.id, u);
+                    if (rec.username)
+                        this.users.set(rec.username, rec);
+                    if (rec.email)
+                        this.users.set(rec.email.toLowerCase(), rec);
                 }
                 console.log(`[PrismaService] PostgreSQL'den ${dbUsers.length} gerçek kullanıcı senkronize edildi.`);
-            }
-            const cloudUsers = await supabaseClient_1.supabaseService.loadCloudStore('users_store.json');
-            if (cloudUsers && Array.isArray(cloudUsers)) {
-                for (const u of cloudUsers) {
-                    if (u && u.id && !this.users.has(u.id)) {
-                        this.users.set(u.id, u);
-                        this.syncUserToPrisma(u).catch(() => { });
-                    }
-                }
             }
             await supabaseClient_1.supabaseService.syncCloudStore('questions_store.json', this.questions);
             await supabaseClient_1.supabaseService.syncCloudStore('categories_store.json', this.getCategories());
@@ -670,10 +711,6 @@ class PrismaService {
             const list = Array.from(this.users.values()).filter((u) => !u.isGuest);
             if (!this.isJest) {
                 fs.writeFileSync(USERS_DB_FILE, JSON.stringify(list, null, 2), 'utf-8');
-                supabaseClient_1.supabaseService.syncCloudStore('users_store.json', list).catch(() => { });
-            }
-            for (const u of list) {
-                this.syncUserToPrisma(u).catch(() => { });
             }
         }
         catch {
@@ -962,11 +999,6 @@ class PrismaService {
         for (const q of this.questions) {
             await this.syncQuestionToPrisma(q);
         }
-        for (const u of this.users.values()) {
-            if (!u.isGuest) {
-                await this.syncUserToPrisma(u);
-            }
-        }
     }
     async pushAllDataViaPrismaToSupabase() {
         await this.syncAllToPrisma();
@@ -1152,67 +1184,125 @@ class PrismaService {
     }
     async loginOrRegisterGoogle(payload) {
         const cleanEmail = payload.email.trim().toLowerCase();
-        // 1. Search in local persistent in-memory database first
-        let existingRecord = Array.from(this.users.values()).find((u) => !u.isGuest &&
-            ((u.email && u.email.trim().toLowerCase() === cleanEmail) ||
-                (payload.googleId && u.googleId === payload.googleId)));
-        // 2. Search in PostgreSQL database (order by latest update)
-        let dbUser = null;
-        if (existingRecord) {
-            dbUser = await this.rawClient.user
-                .findUnique({ where: { id: existingRecord.id } })
-                .catch(() => null);
-        }
-        if (!dbUser) {
-            dbUser = await this.rawClient.user
-                .findFirst({
-                where: {
-                    OR: [
-                        { email: cleanEmail },
-                        payload.googleId ? { googleId: payload.googleId } : {},
-                    ].filter((x) => Object.keys(x).length > 0),
-                },
-                orderBy: { updatedAt: 'desc' },
-            })
-                .catch(() => null);
-        }
-        if (dbUser) {
-            const fromDb = this.prismaUserToRecord(dbUser);
-            if (existingRecord) {
-                existingRecord.coins = Math.max(existingRecord.coins || 0, fromDb.coins || 0);
-                existingRecord.gems = Math.max(existingRecord.gems || 0, fromDb.gems || 0);
-                existingRecord.xp = Math.max(existingRecord.xp || 0, fromDb.xp || 0);
-                existingRecord.level = Math.max(existingRecord.level || 1, fromDb.level || 1);
-                if (fromDb.inventory && fromDb.inventory.length > (existingRecord.inventory?.length || 0)) {
-                    existingRecord.inventory = fromDb.inventory;
-                }
-            }
-            else {
-                existingRecord = fromDb;
-            }
-            this.users.set(existingRecord.id, existingRecord);
-        }
+        // 1. Search in PostgreSQL database FIRST (authoritative single source of truth)
+        let dbUser = await this.rawClient.user
+            .findFirst({
+            where: {
+                OR: [
+                    { email: cleanEmail },
+                    payload.googleId ? { googleId: payload.googleId } : {},
+                ].filter((x) => Object.keys(x).length > 0),
+            },
+            include: {
+                inventoryItems: true,
+            },
+            orderBy: { updatedAt: 'desc' },
+        })
+            .catch(() => null);
         let isNewUser = false;
+        let existingRecord = null;
         const now = new Date();
-        if (!existingRecord) {
-            // Truly a brand new user
-            isNewUser = true;
-            const baseUsername = cleanEmail.split('@')[0].replace(/[^a-z0-9_]/g, '') || 'oyuncu';
-            let finalUsername = baseUsername;
-            let counter = 1;
-            while ((await this.rawClient.user.findUnique({ where: { username: finalUsername } }).catch(() => null)) ||
-                Array.from(this.users.values()).some((u) => u.username === finalUsername)) {
-                finalUsername = `${baseUsername}${counter++}`;
-            }
-            const id = 'google_' + Math.random().toString(36).substring(2, 9);
-            const bonus = this.calculateLevelBonus(payload);
-            const friendCode = this.generateFriendCode(id);
+        if (dbUser) {
+            // Existing user in PostgreSQL: PostgreSQL is MASTER!
+            existingRecord = this.prismaUserToRecord(dbUser);
+            existingRecord.displayName = payload.displayName || existingRecord.displayName;
+            if (payload.fullName)
+                existingRecord.fullName = payload.fullName;
+            if (payload.avatarUrl)
+                existingRecord.avatarUrl = payload.avatarUrl;
+            if (payload.googleId)
+                existingRecord.googleId = payload.googleId;
+            existingRecord.updatedAt = Date.now();
             try {
-                dbUser = await this.rawClient.user.create({
+                await this.rawClient.user.update({
+                    where: { id: dbUser.id },
                     data: {
+                        displayName: existingRecord.displayName,
+                        fullName: existingRecord.fullName,
+                        avatarUrl: existingRecord.avatarUrl,
+                        googleId: existingRecord.googleId,
+                        updatedAt: now,
+                    },
+                });
+            }
+            catch (err) {
+                console.error('[loginOrRegisterGoogle] DB update error:', err);
+            }
+        }
+        else {
+            // Check in-memory fallback
+            existingRecord = Array.from(this.users.values()).find((u) => !u.isGuest &&
+                ((u.email && u.email.trim().toLowerCase() === cleanEmail) ||
+                    (payload.googleId && u.googleId === payload.googleId))) || null;
+            if (!existingRecord) {
+                // Truly a brand new user
+                isNewUser = true;
+                const baseUsername = cleanEmail.split('@')[0].replace(/[^a-z0-9_]/g, '') || 'oyuncu';
+                let finalUsername = baseUsername;
+                let counter = 1;
+                while ((await this.rawClient.user.findUnique({ where: { username: finalUsername } }).catch(() => null)) ||
+                    Array.from(this.users.values()).some((u) => u.username === finalUsername)) {
+                    finalUsername = `${baseUsername}${counter++}`;
+                }
+                const id = 'google_' + Math.random().toString(36).substring(2, 9);
+                const bonus = this.calculateLevelBonus(payload);
+                const friendCode = this.generateFriendCode(id);
+                try {
+                    dbUser = await this.rawClient.user.create({
+                        data: {
+                            id,
+                            username: finalUsername,
+                            email: cleanEmail,
+                            displayName: (payload.displayName || payload.fullName || finalUsername).trim(),
+                            fullName: payload.fullName || payload.displayName || null,
+                            googleId: payload.googleId || null,
+                            countryCode: payload.countryCode || 'TR',
+                            countryName: payload.countryName || 'Türkiye',
+                            phone: payload.phone || null,
+                            birthDate: payload.birthDate || null,
+                            avatarUrl: payload.avatarUrl || 'av1',
+                            friendCode,
+                            level: bonus.level || 1,
+                            xp: bonus.xp || 0,
+                            coins: bonus.coins || 500,
+                            gems: bonus.gems || 15,
+                            dailyStreak: 1,
+                            rankTitle: bonus.rankTitle || 'Acemi Kaşif',
+                            rankPoints: 1000,
+                            profileCompletionPct: 50,
+                            totalMatches: 0,
+                            wins: 0,
+                            correctAnswers: 0,
+                            totalAnswers: 0,
+                            bestStreak: 0,
+                            avgResponseTimeMs: 0,
+                            categoryMastery: {},
+                            claimedSeasonTiers: [1],
+                            seasonXp: 0,
+                            hasPremiumPass: false,
+                            claimedSeasonFreeTiers: [],
+                            claimedSeasonPremiumTiers: [],
+                            equippedFrame: null,
+                            equippedBadge: null,
+                            equippedNameEffect: null,
+                            equippedBackground: null,
+                            eventProgress: {},
+                            friendIds: [],
+                            createdAt: now,
+                            updatedAt: now,
+                        },
+                        include: {
+                            inventoryItems: true,
+                        },
+                    });
+                }
+                catch (err) {
+                    // Fallback local creation if PostgreSQL is unreachable
+                    dbUser = {
                         id,
                         username: finalUsername,
                         email: cleanEmail,
+                        passwordHash: null,
                         displayName: (payload.displayName || payload.fullName || finalUsername).trim(),
                         fullName: payload.fullName || payload.displayName || null,
                         googleId: payload.googleId || null,
@@ -1227,6 +1317,7 @@ class PrismaService {
                         coins: bonus.coins || 500,
                         gems: bonus.gems || 15,
                         dailyStreak: 1,
+                        lastDailyDate: null,
                         rankTitle: bonus.rankTitle || 'Acemi Kaşif',
                         rankPoints: 1000,
                         profileCompletionPct: 50,
@@ -1250,89 +1341,16 @@ class PrismaService {
                         friendIds: [],
                         createdAt: now,
                         updatedAt: now,
-                    },
-                });
-            }
-            catch (err) {
-                // Fallback local creation if PostgreSQL is unreachable
-                dbUser = {
-                    id,
-                    username: finalUsername,
-                    email: cleanEmail,
-                    passwordHash: null,
-                    displayName: (payload.displayName || payload.fullName || finalUsername).trim(),
-                    fullName: payload.fullName || payload.displayName || null,
-                    googleId: payload.googleId || null,
-                    countryCode: payload.countryCode || 'TR',
-                    countryName: payload.countryName || 'Türkiye',
-                    phone: payload.phone || null,
-                    birthDate: payload.birthDate || null,
-                    avatarUrl: payload.avatarUrl || 'av1',
-                    friendCode,
-                    level: bonus.level || 1,
-                    xp: bonus.xp || 0,
-                    coins: bonus.coins || 500,
-                    gems: bonus.gems || 15,
-                    dailyStreak: 1,
-                    lastDailyDate: null,
-                    rankTitle: bonus.rankTitle || 'Acemi Kaşif',
-                    rankPoints: 1000,
-                    profileCompletionPct: 50,
-                    totalMatches: 0,
-                    wins: 0,
-                    correctAnswers: 0,
-                    totalAnswers: 0,
-                    bestStreak: 0,
-                    avgResponseTimeMs: 0,
-                    categoryMastery: {},
-                    claimedSeasonTiers: [1],
-                    seasonXp: 0,
-                    hasPremiumPass: false,
-                    claimedSeasonFreeTiers: [],
-                    claimedSeasonPremiumTiers: [],
-                    equippedFrame: null,
-                    equippedBadge: null,
-                    equippedNameEffect: null,
-                    equippedBackground: null,
-                    eventProgress: {},
-                    friendIds: [],
-                    createdAt: now,
-                    updatedAt: now,
-                };
-            }
-            existingRecord = this.prismaUserToRecord(dbUser);
-        }
-        else {
-            // Existing user: Preserve all earned stats, coins, gems, xp, and inventory!
-            existingRecord.displayName = payload.displayName || existingRecord.displayName;
-            if (payload.fullName)
-                existingRecord.fullName = payload.fullName;
-            if (payload.avatarUrl)
-                existingRecord.avatarUrl = payload.avatarUrl;
-            if (payload.googleId)
-                existingRecord.googleId = payload.googleId;
-            existingRecord.updatedAt = Date.now();
-            if (dbUser) {
-                try {
-                    dbUser = await this.rawClient.user.update({
-                        where: { id: dbUser.id },
-                        data: {
-                            displayName: existingRecord.displayName,
-                            fullName: existingRecord.fullName,
-                            avatarUrl: existingRecord.avatarUrl,
-                            googleId: existingRecord.googleId,
-                            coins: existingRecord.coins,
-                            gems: existingRecord.gems,
-                            xp: existingRecord.xp,
-                            level: existingRecord.level,
-                            updatedAt: now,
-                        },
-                    });
+                    };
                 }
-                catch { }
+                existingRecord = this.prismaUserToRecord(dbUser);
             }
         }
         this.users.set(existingRecord.id, existingRecord);
+        if (existingRecord.username)
+            this.users.set(existingRecord.username, existingRecord);
+        if (existingRecord.email)
+            this.users.set(existingRecord.email.toLowerCase(), existingRecord);
         if (dbUser) {
             this.store.users.set(dbUser.id, dbUser);
         }
@@ -1530,17 +1548,17 @@ class PrismaService {
         }
         if (!record)
             return null;
-        if (typeof data.coins === 'number' && data.coins > 0) {
-            record.coins = Math.max(record.coins || 0, data.coins);
+        if (typeof data.coins === 'number') {
+            record.coins = data.coins;
         }
-        if (typeof data.gems === 'number' && data.gems > 0) {
-            record.gems = Math.max(record.gems || 0, data.gems);
+        if (typeof data.gems === 'number') {
+            record.gems = data.gems;
         }
-        if (typeof data.xp === 'number' && data.xp > 0) {
-            record.xp = Math.max(record.xp || 0, data.xp);
+        if (typeof data.xp === 'number') {
+            record.xp = data.xp;
         }
         if (typeof data.level === 'number' && data.level > 0) {
-            record.level = Math.max(record.level || 1, data.level);
+            record.level = data.level;
         }
         record.updatedAt = Date.now();
         this.users.set(record.id, record);
@@ -1606,22 +1624,30 @@ class PrismaService {
         return record ? this.toProfile(record) : null;
     }
     async getUserProfileAsync(userId) {
-        let record = this.users.get(userId);
-        if (!record) {
-            try {
-                const u = await this.rawClient.user.findFirst({
-                    where: {
-                        OR: [{ id: userId }, { username: userId }],
-                    },
-                    orderBy: { updatedAt: 'desc' },
-                });
-                if (u) {
-                    record = this.prismaUserToRecord(u);
-                    this.users.set(record.id, record);
-                }
+        try {
+            const u = await this.rawClient.user.findFirst({
+                where: {
+                    OR: [{ id: userId }, { username: userId }, { email: userId.toLowerCase() }],
+                },
+                include: {
+                    inventoryItems: true,
+                },
+                orderBy: { updatedAt: 'desc' },
+            });
+            if (u) {
+                const record = this.prismaUserToRecord(u);
+                this.users.set(record.id, record);
+                if (record.username)
+                    this.users.set(record.username, record);
+                if (record.email)
+                    this.users.set(record.email.toLowerCase(), record);
+                return this.toProfile(record);
             }
-            catch { }
         }
+        catch (err) {
+            console.error('[getUserProfileAsync] Error querying Prisma:', err);
+        }
+        const record = this.users.get(userId);
         return record ? this.toProfile(record) : null;
     }
     async recordDailyChallengeCompletion(userId, data) {
@@ -2567,7 +2593,8 @@ class PrismaService {
         if (!record) {
             try {
                 const u = await this.rawClient.user.findFirst({
-                    where: { OR: [{ id: userId }, { username: userId }] },
+                    where: { OR: [{ id: userId }, { username: userId }, { email: userId.toLowerCase() }] },
+                    include: { inventoryItems: true },
                 });
                 if (u) {
                     record = this.prismaUserToRecord(u);
@@ -2616,9 +2643,37 @@ class PrismaService {
                         name: item.name,
                         desc: item.desc,
                         qty: item.qty,
-                        category: item.category,
-                        rarity: item.rarity,
+                        category: item.category || this.getItemCategory(item.id),
+                        rarity: item.rarity || this.getItemRarity(item.id),
                     });
+                }
+                if (!record.isGuest) {
+                    try {
+                        await this.rawClient.userInventoryItem.upsert({
+                            where: {
+                                userId_itemId: {
+                                    userId: record.id,
+                                    itemId: item.id,
+                                },
+                            },
+                            update: {
+                                qty: { increment: item.qty },
+                                name: item.name,
+                                desc: item.desc,
+                                updatedAt: new Date(),
+                            },
+                            create: {
+                                userId: record.id,
+                                itemId: item.id,
+                                name: item.name,
+                                desc: item.desc,
+                                qty: item.qty,
+                            },
+                        });
+                    }
+                    catch (itemErr) {
+                        console.error('[purchaseShopProduct] DB inventory upsert error:', itemErr);
+                    }
                 }
             }
         }
@@ -2626,6 +2681,8 @@ class PrismaService {
         this.users.set(record.id, record);
         if (record.username)
             this.users.set(record.username, record);
+        if (record.email)
+            this.users.set(record.email.toLowerCase(), record);
         if (!record.isGuest) {
             this.savePersistedUsers();
             try {
@@ -2634,6 +2691,7 @@ class PrismaService {
                     data: {
                         coins: record.coins,
                         gems: record.gems,
+                        hasPremiumPass: record.hasPremiumPass,
                         updatedAt: new Date(),
                     },
                 });
@@ -2648,7 +2706,20 @@ class PrismaService {
         };
     }
     async openChest(userId, chestId, keyId) {
-        const record = this.users.get(userId);
+        let record = this.users.get(userId);
+        if (!record) {
+            try {
+                const u = await this.rawClient.user.findFirst({
+                    where: { OR: [{ id: userId }, { username: userId }, { email: userId.toLowerCase() }] },
+                    include: { inventoryItems: true },
+                });
+                if (u) {
+                    record = this.prismaUserToRecord(u);
+                    this.users.set(record.id, record);
+                }
+            }
+            catch { }
+        }
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
         if (!record.inventory)
@@ -2739,9 +2810,49 @@ class PrismaService {
         this.users.set(record.id, record);
         if (record.username)
             this.users.set(record.username, record);
+        if (record.email)
+            this.users.set(record.email.toLowerCase(), record);
         if (!record.isGuest) {
             this.savePersistedUsers();
             try {
+                // Consumed chest in PostgreSQL
+                if (chestItem.qty <= 0) {
+                    await this.rawClient.userInventoryItem.deleteMany({
+                        where: { userId: record.id, itemId: chestId },
+                    }).catch(() => { });
+                }
+                else {
+                    await this.rawClient.userInventoryItem.update({
+                        where: { userId_itemId: { userId: record.id, itemId: chestId } },
+                        data: { qty: chestItem.qty, updatedAt: new Date() },
+                    }).catch(() => { });
+                }
+                // Consumed key in PostgreSQL
+                if (keyItem.qty <= 0) {
+                    await this.rawClient.userInventoryItem.deleteMany({
+                        where: { userId: record.id, itemId: actualKeyId },
+                    }).catch(() => { });
+                }
+                else {
+                    await this.rawClient.userInventoryItem.update({
+                        where: { userId_itemId: { userId: record.id, itemId: actualKeyId } },
+                        data: { qty: keyItem.qty, updatedAt: new Date() },
+                    }).catch(() => { });
+                }
+                // Bonus item in PostgreSQL
+                if (bonusItem) {
+                    await this.rawClient.userInventoryItem.upsert({
+                        where: { userId_itemId: { userId: record.id, itemId: bonusItem.id } },
+                        update: { qty: { increment: bonusItem.qty }, updatedAt: new Date() },
+                        create: {
+                            userId: record.id,
+                            itemId: bonusItem.id,
+                            name: bonusItem.name,
+                            desc: bonusItem.desc,
+                            qty: bonusItem.qty,
+                        },
+                    }).catch(() => { });
+                }
                 await this.rawClient.user.update({
                     where: { id: record.id },
                     data: {
@@ -2749,6 +2860,7 @@ class PrismaService {
                         gems: record.gems,
                         xp: record.xp,
                         level: record.level,
+                        rankTitle: record.rankTitle,
                         updatedAt: new Date(),
                     },
                 });

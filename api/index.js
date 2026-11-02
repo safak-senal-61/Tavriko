@@ -2,6 +2,19 @@ const path = require('path');
 const fs = require('fs');
 const Module = require('module');
 
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = "postgresql://postgres.rjvbgofzsfescnfohzgu:Patr10.senal61@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true";
+}
+if (!process.env.DIRECT_URL) {
+  process.env.DIRECT_URL = "postgresql://postgres.rjvbgofzsfescnfohzgu:Patr10.senal61@aws-0-eu-west-1.pooler.supabase.com:5432/postgres";
+}
+if (!process.env.SUPABASE_URL) {
+  process.env.SUPABASE_URL = "https://rjvbgofzsfescnfohzgu.supabase.co";
+}
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = "super_secret_jwt_key_trivia_2026_production";
+}
+
 function findSharedPath() {
   const candidates = [
     path.join(__dirname, '..', 'shared', 'dist', 'index.js'),

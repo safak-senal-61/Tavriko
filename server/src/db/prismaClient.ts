@@ -168,14 +168,22 @@ export class PrismaService {
   public activeUserRooms: Map<string, { roomCode: string; joinedAt: number }> = new Map();
 
   constructor() {
+    const dbUrl =
+      process.env.DATABASE_URL ||
+      process.env.DIRECT_URL ||
+      'postgresql://postgres.rjvbgofzsfescnfohzgu:Patr10.senal61@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true';
     this.rawClient = new PrismaClient({
+      datasources: {
+        db: {
+          url: dbUrl,
+        },
+      },
       log: ['error'],
     });
     this.loadLocalSnapshots();
     this.initQuestions();
     this.seedDefaults();
     this.loadPersistedUsers();
-    this.syncAllToPrisma().catch(() => {});
     this.syncInitialCloudState();
   }
 
@@ -382,10 +390,40 @@ export class PrismaService {
     },
   };
 
+  private getItemCategory(itemId: string): ItemCategory {
+    if (itemId.includes('chest')) return 'chest';
+    if (itemId.includes('key')) return 'key';
+    if (itemId.includes('booster')) return 'booster';
+    if (itemId.includes('frame')) return 'frame';
+    if (itemId.includes('badge')) return 'badge';
+    if (itemId.includes('name')) return 'name_effect';
+    if (itemId.includes('bg') || itemId.includes('background') || itemId.includes('theme')) return 'background';
+    return 'cosmetic';
+  }
+
+  private getItemRarity(itemId: string): ItemRarity {
+    if (itemId.includes('legendary') || itemId.includes('mythic')) return 'mythic';
+    if (itemId.includes('gold') || itemId.includes('epic')) return 'epic';
+    if (itemId.includes('silver') || itemId.includes('rare')) return 'rare';
+    return 'common';
+  }
+
   // ==========================================================================
   // PRISMA MODEL DELEGATE: prisma.user
   // ==========================================================================
-  private prismaUserToRecord(u: PrismaUser): UserRecord {
+  private prismaUserToRecord(u: PrismaUser & { inventoryItems?: PrismaUserInventoryItem[] }): UserRecord {
+    let inventory: InventoryItem[] = [];
+    if (Array.isArray((u as any).inventoryItems)) {
+      inventory = (u as any).inventoryItems.map((item: any) => ({
+        id: item.itemId,
+        name: item.name,
+        desc: item.desc,
+        qty: item.qty,
+        category: this.getItemCategory(item.itemId),
+        rarity: this.getItemRarity(item.itemId),
+      }));
+    }
+
     return {
       id: u.id,
       username: u.username,
@@ -410,6 +448,7 @@ export class PrismaService {
       rankPoints: u.rankPoints,
       friendCode: u.friendCode,
       dailyStreak: u.dailyStreak,
+      inventory,
       claimedSeasonTiers: Array.isArray(u.claimedSeasonTiers) ? (u.claimedSeasonTiers as number[]) : [1],
       seasonXp: (u as any).seasonXp ?? 0,
       hasPremiumPass: !!(u as any).hasPremiumPass,
@@ -768,24 +807,17 @@ export class PrismaService {
   private async syncInitialCloudState() {
     if (this.isJest) return;
     try {
-      const dbUsers = await this.rawClient.user.findMany().catch(() => []);
+      const dbUsers = await this.rawClient.user.findMany({
+        include: { inventoryItems: true },
+      }).catch(() => []);
       if (dbUsers && dbUsers.length > 0) {
         for (const u of dbUsers) {
-          const rec = this.prismaUserToRecord(u);
+          const rec = this.prismaUserToRecord(u as any);
           this.users.set(rec.id, rec);
-          this.store.users.set(u.id, u);
+          if (rec.username) this.users.set(rec.username, rec);
+          if (rec.email) this.users.set(rec.email.toLowerCase(), rec);
         }
         console.log(`[PrismaService] PostgreSQL'den ${dbUsers.length} gerçek kullanıcı senkronize edildi.`);
-      }
-
-      const cloudUsers = await supabaseService.loadCloudStore<UserRecord[]>('users_store.json');
-      if (cloudUsers && Array.isArray(cloudUsers)) {
-        for (const u of cloudUsers) {
-          if (u && u.id && !this.users.has(u.id)) {
-            this.users.set(u.id, u);
-            this.syncUserToPrisma(u).catch(() => {});
-          }
-        }
       }
 
       await supabaseService.syncCloudStore('questions_store.json', this.questions);
@@ -818,10 +850,6 @@ export class PrismaService {
       const list = Array.from(this.users.values()).filter((u) => !u.isGuest);
       if (!this.isJest) {
         fs.writeFileSync(USERS_DB_FILE, JSON.stringify(list, null, 2), 'utf-8');
-        supabaseService.syncCloudStore('users_store.json', list).catch(() => {});
-      }
-      for (const u of list) {
-        this.syncUserToPrisma(u).catch(() => {});
       }
     } catch {
       // Ignore write errors
@@ -1116,12 +1144,6 @@ export class PrismaService {
     for (const q of this.questions) {
       await this.syncQuestionToPrisma(q);
     }
-
-    for (const u of this.users.values()) {
-      if (!u.isGuest) {
-        await this.syncUserToPrisma(u);
-      }
-    }
   }
 
   public async pushAllDataViaPrismaToSupabase() {
@@ -1356,53 +1378,57 @@ export class PrismaService {
   }): Promise<{ token: string; user: UserProfile; isNewUser: boolean }> {
     const cleanEmail = payload.email.trim().toLowerCase();
 
-    // 1. Search in local persistent in-memory database first
-    let existingRecord = Array.from(this.users.values()).find(
-      (u) =>
-        !u.isGuest &&
-        ((u.email && u.email.trim().toLowerCase() === cleanEmail) ||
-          (payload.googleId && u.googleId === payload.googleId))
-    );
-
-    // 2. Search in PostgreSQL database (order by latest update)
-    let dbUser: PrismaUser | null = null;
-    if (existingRecord) {
-      dbUser = await this.rawClient.user
-        .findUnique({ where: { id: existingRecord.id } })
-        .catch(() => null);
-    }
-    if (!dbUser) {
-      dbUser = await this.rawClient.user
-        .findFirst({
-          where: {
-            OR: [
-              { email: cleanEmail },
-              payload.googleId ? { googleId: payload.googleId } : {},
-            ].filter((x) => Object.keys(x).length > 0) as any,
-          },
-          orderBy: { updatedAt: 'desc' },
-        })
-        .catch(() => null);
-    }
-
-    if (dbUser) {
-      const fromDb = this.prismaUserToRecord(dbUser);
-      if (existingRecord) {
-        existingRecord.coins = Math.max(existingRecord.coins || 0, fromDb.coins || 0);
-        existingRecord.gems = Math.max(existingRecord.gems || 0, fromDb.gems || 0);
-        existingRecord.xp = Math.max(existingRecord.xp || 0, fromDb.xp || 0);
-        existingRecord.level = Math.max(existingRecord.level || 1, fromDb.level || 1);
-        if (fromDb.inventory && fromDb.inventory.length > (existingRecord.inventory?.length || 0)) {
-          existingRecord.inventory = fromDb.inventory;
-        }
-      } else {
-        existingRecord = fromDb;
-      }
-      this.users.set(existingRecord.id, existingRecord);
-    }
+    // 1. Search in PostgreSQL database FIRST (authoritative single source of truth)
+    let dbUser = await this.rawClient.user
+      .findFirst({
+        where: {
+          OR: [
+            { email: cleanEmail },
+            payload.googleId ? { googleId: payload.googleId } : {},
+          ].filter((x) => Object.keys(x).length > 0) as any,
+        },
+        include: {
+          inventoryItems: true,
+        },
+        orderBy: { updatedAt: 'desc' },
+      })
+      .catch(() => null);
 
     let isNewUser = false;
+    let existingRecord: UserRecord | null = null;
     const now = new Date();
+
+    if (dbUser) {
+      // Existing user in PostgreSQL: PostgreSQL is MASTER!
+      existingRecord = this.prismaUserToRecord(dbUser as any);
+      existingRecord.displayName = payload.displayName || existingRecord.displayName;
+      if (payload.fullName) existingRecord.fullName = payload.fullName;
+      if (payload.avatarUrl) existingRecord.avatarUrl = payload.avatarUrl;
+      if (payload.googleId) existingRecord.googleId = payload.googleId;
+      existingRecord.updatedAt = Date.now();
+
+      try {
+        await this.rawClient.user.update({
+          where: { id: dbUser.id },
+          data: {
+            displayName: existingRecord.displayName,
+            fullName: existingRecord.fullName,
+            avatarUrl: existingRecord.avatarUrl,
+            googleId: existingRecord.googleId,
+            updatedAt: now,
+          },
+        });
+      } catch (err) {
+        console.error('[loginOrRegisterGoogle] DB update error:', err);
+      }
+    } else {
+      // Check in-memory fallback
+      existingRecord = Array.from(this.users.values()).find(
+        (u) =>
+          !u.isGuest &&
+          ((u.email && u.email.trim().toLowerCase() === cleanEmail) ||
+            (payload.googleId && u.googleId === payload.googleId))
+      ) || null;
 
     if (!existingRecord) {
       // Truly a brand new user
@@ -1466,6 +1492,9 @@ export class PrismaService {
             createdAt: now,
             updatedAt: now,
           },
+          include: {
+            inventoryItems: true,
+          },
         });
       } catch (err) {
         // Fallback local creation if PostgreSQL is unreachable
@@ -1516,35 +1545,12 @@ export class PrismaService {
       }
 
       existingRecord = this.prismaUserToRecord(dbUser!);
-    } else {
-      // Existing user: Preserve all earned stats, coins, gems, xp, and inventory!
-      existingRecord.displayName = payload.displayName || existingRecord.displayName;
-      if (payload.fullName) existingRecord.fullName = payload.fullName;
-      if (payload.avatarUrl) existingRecord.avatarUrl = payload.avatarUrl;
-      if (payload.googleId) existingRecord.googleId = payload.googleId;
-      existingRecord.updatedAt = Date.now();
-
-      if (dbUser) {
-        try {
-          dbUser = await this.rawClient.user.update({
-            where: { id: dbUser.id },
-            data: {
-              displayName: existingRecord.displayName,
-              fullName: existingRecord.fullName,
-              avatarUrl: existingRecord.avatarUrl,
-              googleId: existingRecord.googleId,
-              coins: existingRecord.coins,
-              gems: existingRecord.gems,
-              xp: existingRecord.xp,
-              level: existingRecord.level,
-              updatedAt: now,
-            },
-          });
-        } catch {}
       }
     }
 
     this.users.set(existingRecord.id, existingRecord);
+    if (existingRecord.username) this.users.set(existingRecord.username, existingRecord);
+    if (existingRecord.email) this.users.set(existingRecord.email.toLowerCase(), existingRecord);
     if (dbUser) {
       this.store.users.set(dbUser.id, dbUser);
     }
@@ -1799,17 +1805,17 @@ export class PrismaService {
     }
     if (!record) return null;
 
-    if (typeof data.coins === 'number' && data.coins > 0) {
-      record.coins = Math.max(record.coins || 0, data.coins);
+    if (typeof data.coins === 'number') {
+      record.coins = data.coins;
     }
-    if (typeof data.gems === 'number' && data.gems > 0) {
-      record.gems = Math.max(record.gems || 0, data.gems);
+    if (typeof data.gems === 'number') {
+      record.gems = data.gems;
     }
-    if (typeof data.xp === 'number' && data.xp > 0) {
-      record.xp = Math.max(record.xp || 0, data.xp);
+    if (typeof data.xp === 'number') {
+      record.xp = data.xp;
     }
     if (typeof data.level === 'number' && data.level > 0) {
-      record.level = Math.max(record.level || 1, data.level);
+      record.level = data.level;
     }
     record.updatedAt = Date.now();
 
@@ -1882,21 +1888,27 @@ export class PrismaService {
   }
 
   public async getUserProfileAsync(userId: string): Promise<UserProfile | null> {
-    let record = this.users.get(userId);
-    if (!record) {
-      try {
-        const u = await this.rawClient.user.findFirst({
-          where: {
-            OR: [{ id: userId }, { username: userId }],
-          },
-          orderBy: { updatedAt: 'desc' },
-        });
-        if (u) {
-          record = this.prismaUserToRecord(u);
-          this.users.set(record.id, record);
-        }
-      } catch {}
+    try {
+      const u = await this.rawClient.user.findFirst({
+        where: {
+          OR: [{ id: userId }, { username: userId }, { email: userId.toLowerCase() }],
+        },
+        include: {
+          inventoryItems: true,
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+      if (u) {
+        const record = this.prismaUserToRecord(u as any);
+        this.users.set(record.id, record);
+        if (record.username) this.users.set(record.username, record);
+        if (record.email) this.users.set(record.email.toLowerCase(), record);
+        return this.toProfile(record);
+      }
+    } catch (err) {
+      console.error('[getUserProfileAsync] Error querying Prisma:', err);
     }
+    const record = this.users.get(userId);
     return record ? this.toProfile(record) : null;
   }
 
@@ -2980,10 +2992,11 @@ export class PrismaService {
     if (!record) {
       try {
         const u = await this.rawClient.user.findFirst({
-          where: { OR: [{ id: userId }, { username: userId }] },
+          where: { OR: [{ id: userId }, { username: userId }, { email: userId.toLowerCase() }] },
+          include: { inventoryItems: true },
         });
         if (u) {
-          record = this.prismaUserToRecord(u);
+          record = this.prismaUserToRecord(u as any);
           this.users.set(record.id, record);
         }
       } catch {}
@@ -3014,6 +3027,7 @@ export class PrismaService {
     if (product.grantGems) {
       record.gems = (record.gems || 0) + product.grantGems;
     }
+
     if (product.grantItems) {
       if (!record.inventory) record.inventory = [];
       for (const item of product.grantItems) {
@@ -3026,9 +3040,37 @@ export class PrismaService {
             name: item.name,
             desc: item.desc,
             qty: item.qty,
-            category: item.category,
-            rarity: item.rarity,
+            category: item.category || this.getItemCategory(item.id),
+            rarity: item.rarity || this.getItemRarity(item.id),
           });
+        }
+
+        if (!record.isGuest) {
+          try {
+            await this.rawClient.userInventoryItem.upsert({
+              where: {
+                userId_itemId: {
+                  userId: record.id,
+                  itemId: item.id,
+                },
+              },
+              update: {
+                qty: { increment: item.qty },
+                name: item.name,
+                desc: item.desc,
+                updatedAt: new Date(),
+              },
+              create: {
+                userId: record.id,
+                itemId: item.id,
+                name: item.name,
+                desc: item.desc,
+                qty: item.qty,
+              },
+            });
+          } catch (itemErr) {
+            console.error('[purchaseShopProduct] DB inventory upsert error:', itemErr);
+          }
         }
       }
     }
@@ -3036,6 +3078,8 @@ export class PrismaService {
     this.users.set(userId, record);
     this.users.set(record.id, record);
     if (record.username) this.users.set(record.username, record);
+    if (record.email) this.users.set(record.email.toLowerCase(), record);
+
     if (!record.isGuest) {
       this.savePersistedUsers();
       try {
@@ -3044,6 +3088,7 @@ export class PrismaService {
           data: {
             coins: record.coins,
             gems: record.gems,
+            hasPremiumPass: record.hasPremiumPass,
             updatedAt: new Date(),
           },
         });
@@ -3073,7 +3118,19 @@ export class PrismaService {
       item?: InventoryItem;
     };
   }> {
-    const record = this.users.get(userId);
+    let record = this.users.get(userId);
+    if (!record) {
+      try {
+        const u = await this.rawClient.user.findFirst({
+          where: { OR: [{ id: userId }, { username: userId }, { email: userId.toLowerCase() }] },
+          include: { inventoryItems: true },
+        });
+        if (u) {
+          record = this.prismaUserToRecord(u as any);
+          this.users.set(record.id, record);
+        }
+      } catch {}
+    }
     if (!record) throw new Error('Kullanıcı bulunamadı.');
     if (!record.inventory) record.inventory = [];
 
@@ -3165,9 +3222,50 @@ export class PrismaService {
     this.users.set(userId, record);
     this.users.set(record.id, record);
     if (record.username) this.users.set(record.username, record);
+    if (record.email) this.users.set(record.email.toLowerCase(), record);
+
     if (!record.isGuest) {
       this.savePersistedUsers();
       try {
+        // Consumed chest in PostgreSQL
+        if (chestItem.qty <= 0) {
+          await this.rawClient.userInventoryItem.deleteMany({
+            where: { userId: record.id, itemId: chestId },
+          }).catch(() => {});
+        } else {
+          await this.rawClient.userInventoryItem.update({
+            where: { userId_itemId: { userId: record.id, itemId: chestId } },
+            data: { qty: chestItem.qty, updatedAt: new Date() },
+          }).catch(() => {});
+        }
+
+        // Consumed key in PostgreSQL
+        if (keyItem.qty <= 0) {
+          await this.rawClient.userInventoryItem.deleteMany({
+            where: { userId: record.id, itemId: actualKeyId },
+          }).catch(() => {});
+        } else {
+          await this.rawClient.userInventoryItem.update({
+            where: { userId_itemId: { userId: record.id, itemId: actualKeyId } },
+            data: { qty: keyItem.qty, updatedAt: new Date() },
+          }).catch(() => {});
+        }
+
+        // Bonus item in PostgreSQL
+        if (bonusItem) {
+          await this.rawClient.userInventoryItem.upsert({
+            where: { userId_itemId: { userId: record.id, itemId: bonusItem.id } },
+            update: { qty: { increment: bonusItem.qty }, updatedAt: new Date() },
+            create: {
+              userId: record.id,
+              itemId: bonusItem.id,
+              name: bonusItem.name,
+              desc: bonusItem.desc,
+              qty: bonusItem.qty,
+            },
+          }).catch(() => {});
+        }
+
         await this.rawClient.user.update({
           where: { id: record.id },
           data: {
@@ -3175,6 +3273,7 @@ export class PrismaService {
             gems: record.gems,
             xp: record.xp,
             level: record.level,
+            rankTitle: record.rankTitle,
             updatedAt: new Date(),
           },
         });
