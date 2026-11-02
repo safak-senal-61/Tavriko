@@ -112,9 +112,16 @@ export const RootNavigator: React.FC = () => {
     (window.location.search.includes('screen=developer') ||
       window.location.hash.includes('developer'));
 
-  const [currentScreen, setCurrentScreen] = useState<ScreenName>(
-    isWebOAuthReturn ? 'auth' : isWebDeveloperReturn ? 'developer' : 'splash'
-  );
+  const initialAuthUser = getStoredAuth().user;
+  const initialScreen: ScreenName = isWebOAuthReturn
+    ? 'auth'
+    : isWebDeveloperReturn
+    ? 'developer'
+    : initialAuthUser
+    ? (initialAuthUser.isGuest ? 'categories' : 'home')
+    : 'splash';
+
+  const [currentScreen, setCurrentScreen] = useState<ScreenName>(initialScreen);
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('general_culture');
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>('medium');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -244,28 +251,21 @@ export const RootNavigator: React.FC = () => {
     return () => sub.remove();
   }, []);
 
-  // Yetkili sunucu senkronizasyonu: PostgreSQL'deki en güncel bakiyeyi ve envanteri alır
-  const syncWithFreshUser = useCallback(
-    (freshUser: UserProfile | null) => {
-      if (!freshUser || !user || freshUser.id !== user.id) return;
-      setUser(freshUser);
-    },
-    [user]
-  );
-
-  // Sayfa yenilendiğinde veya başlangıçta veritabanından en güncel altın, elmas ve seviyeyi senkronize et
+  // Yetkili sunucu senkronizasyonu: Uygulama açılışında bir kez PostgreSQL'den güncel profili çeker
+  const hasInitialProfileFetchedRef = useRef(false);
   useEffect(() => {
-    if (user && !isGuest && user.id) {
+    if (!hasInitialProfileFetchedRef.current && user && !isGuest && user.id) {
+      hasInitialProfileFetchedRef.current = true;
       fetch(`${API_BASE}/social/profile/${user.id}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((freshUser) => {
-          if (freshUser) {
-            syncWithFreshUser(freshUser);
+          if (freshUser && freshUser.id === user.id) {
+            setUser(freshUser);
           }
         })
         .catch(() => {});
     }
-  }, [user?.id, isGuest, syncWithFreshUser]);
+  }, []);
   // Helper to gate non-Keşfet features when in Guest Mode
   const requireAuth = (action: () => void, featureName: string) => {
     if (isGuest || !user) {
@@ -483,66 +483,11 @@ export const RootNavigator: React.FC = () => {
     setUser(fallbackUser, 'mock_token');
     navigateTo('categories');
   };
-  // Refresh logged-in user profile from database on key screen changes (always safe merge)
-  useEffect(() => {
-    if (user && !isGuest && (currentScreen === 'home' || currentScreen === 'profile')) {
-      fetch(`${API_BASE}/social/profile/${user.id}`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((freshUser) => {
-          if (freshUser) {
-            syncWithFreshUser(freshUser);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [currentScreen, user?.id, isGuest, syncWithFreshUser]);
   const handleAuthSuccess = (loggedInUser: UserProfile, token: string) => {
     setIsGuest(false);
     setAuthRedirectNotice(null);
-
-    // Daha önce yerelde kaydedilmiş bakiye varsa onu da kontrol et
-    let cachedWallet: { coins?: number; gems?: number } | null = null;
-    if (typeof window !== 'undefined' && window.localStorage && loggedInUser.email) {
-      try {
-        const raw = window.localStorage.getItem(`tavriko_wallet_${loggedInUser.email.toLowerCase()}`);
-        if (raw) cachedWallet = JSON.parse(raw);
-      } catch {}
-    }
-
-    const finalCoins = Math.max(loggedInUser.coins ?? 0, user?.coins ?? 0, cachedWallet?.coins ?? 0);
-    const finalGems = Math.max(loggedInUser.gems ?? 0, user?.gems ?? 0, cachedWallet?.gems ?? 0);
-
-    const mergedUser: UserProfile = {
-      ...loggedInUser,
-      coins: finalCoins,
-      gems: finalGems,
-      avatarUrl: loggedInUser.avatarUrl || 'av1',
-    };
-
-    if (typeof window !== 'undefined' && window.localStorage && loggedInUser.email) {
-      try {
-        window.localStorage.setItem(
-          `tavriko_wallet_${loggedInUser.email.toLowerCase()}`,
-          JSON.stringify({ coins: finalCoins, gems: finalGems })
-        );
-      } catch {}
-    }
-
-    setUser(mergedUser, token);
+    setUser(loggedInUser, token);
     navigateTo('home');
-
-    // Eğer bakiye sunucudan yüksekse sunucuya da güncel halini gönder
-    if (finalCoins > (loggedInUser.coins ?? 0) || finalGems > (loggedInUser.gems ?? 0)) {
-      fetch(`${API_BASE}/auth/sync-wallet`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: loggedInUser.id,
-          coins: finalCoins,
-          gems: finalGems,
-        }),
-      }).catch(() => {});
-    }
   };
   const handleSaveProfile = async (name: string, avatarSeedOrUri: string) => {
     if (user) {
@@ -1110,7 +1055,7 @@ export const RootNavigator: React.FC = () => {
         setPracticeStats(updatedStats);
         scheduleGameTimeout(() => {
           advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
-        }, 2500);
+        }, 1200);
         return;
       }
     } catch {
@@ -1150,7 +1095,7 @@ export const RootNavigator: React.FC = () => {
     setPracticeStats(mockUpdatedStats);
     scheduleGameTimeout(() => {
       advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
-    }, 2500);
+    }, 1200);
   };
   const handleTimeExpired = async () => {
     if (activeRoom && user) {
@@ -1195,7 +1140,7 @@ export const RootNavigator: React.FC = () => {
         setPracticeStats(timeoutStats);
         scheduleGameTimeout(() => {
           advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
-        }, 2500);
+        }, 1200);
         return;
       }
     } catch {
@@ -1219,7 +1164,7 @@ export const RootNavigator: React.FC = () => {
     setPracticeStats(mockTimeoutStats);
     scheduleGameTimeout(() => {
       advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
-    }, 2500);
+    }, 1200);
   };
   return (
     <View style={[styles.outerWrapper, isDesktop && styles.desktopOuter]}>

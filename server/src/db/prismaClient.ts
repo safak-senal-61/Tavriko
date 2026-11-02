@@ -1752,6 +1752,8 @@ export class PrismaService {
     });
 
     this.users.set(userId, record);
+    this.users.set(record.id, record);
+    if (record.username) this.users.set(record.username, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
       try {
@@ -2724,6 +2726,8 @@ export class PrismaService {
     }
 
     this.users.set(userId, record);
+    this.users.set(record.id, record);
+    if (record.username) this.users.set(record.username, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
       try {
@@ -2801,6 +2805,8 @@ export class PrismaService {
     record.rankTitle = prog.rankTitle;
 
     this.users.set(userId, record);
+    this.users.set(record.id, record);
+    if (record.username) this.users.set(record.username, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
       try {
@@ -2905,6 +2911,8 @@ export class PrismaService {
     }
 
     this.users.set(userId, record);
+    this.users.set(record.id, record);
+    if (record.username) this.users.set(record.username, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
       try {
@@ -2941,6 +2949,8 @@ export class PrismaService {
     record.hasPremiumPass = true;
 
     this.users.set(userId, record);
+    this.users.set(record.id, record);
+    if (record.username) this.users.set(record.username, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
       try {
@@ -3024,6 +3034,8 @@ export class PrismaService {
     }
 
     this.users.set(userId, record);
+    this.users.set(record.id, record);
+    if (record.username) this.users.set(record.username, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
       try {
@@ -3151,6 +3163,8 @@ export class PrismaService {
     record.rankTitle = prog.rankTitle;
 
     this.users.set(userId, record);
+    this.users.set(record.id, record);
+    if (record.username) this.users.set(record.username, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
       try {
@@ -3295,6 +3309,8 @@ export class PrismaService {
     record.rankTitle = prog.rankTitle;
 
     this.users.set(userId, record);
+    this.users.set(record.id, record);
+    if (record.username) this.users.set(record.username, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
       try {

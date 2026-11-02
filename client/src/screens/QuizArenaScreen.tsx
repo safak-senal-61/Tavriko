@@ -165,6 +165,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   opponent = null,
   dailyChallengeInfo = null,
 }) => {
+  const [localSelectedOptionId, setLocalSelectedOptionId] = useState<string | null>(null);
   const totalMs = (question.timeLimitSec || 15) * 1000;
   const [secondsLeft, setSecondsLeft] = useState<number>(
     question.timeLimitSec || 15
@@ -198,6 +199,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   // When question changes, reset time, answer state, and timer cleanly
   useEffect(() => {
     hasExpiredRef.current = false;
+    setLocalSelectedOptionId(null);
     const newEndTime = Date.now() + totalMs;
     endTimeRef.current = newEndTime;
     setEndTime(newEndTime);
@@ -265,6 +267,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       if (onTimeExpiredRef.current) onTimeExpiredRef.current();
       return;
     }
+    setLocalSelectedOptionId(optionId);
     setAnswerState('submitting');
     sound.playSound('tap');
     sound.triggerHaptic('medium');
@@ -385,41 +388,72 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       {/* 4. Options List (.opt, .opt.sel, .opt.ok, .opt.no from page11 & page12) */}
       <View style={styles.optionsContainer}>
         {question.options.map((opt, index) => {
-          const isSelected = selectedOptionId === opt.id;
-          const isCorrect = feedback && feedback.correctOptionId === opt.id;
-          const isWrongSelected =
-            feedback && isSelected && !feedback.isCorrect;
+          const activeSelectedId = selectedOptionId || localSelectedOptionId;
+          const isMyChoice = activeSelectedId === opt.id;
+          const isCorrectChoice = !!feedback && feedback.correctOptionId === opt.id;
+          const isWrongChoice = !!feedback && isMyChoice && !isCorrectChoice;
+
           return (
             <TouchableOpacity
               key={opt.id}
               style={[
                 styles.optCard,
-                !feedback && isSelected && styles.optCardSelected,
-                feedback && isCorrect && styles.optCardCorrect,
-                feedback && isWrongSelected && styles.optCardWrong,
+                !feedback && isMyChoice && styles.optCardSelected,
+                feedback && isCorrectChoice && styles.optCardCorrect,
+                feedback && isWrongChoice && styles.optCardWrong,
                 isOptionsDisabled &&
-                  !isSelected &&
-                  !isCorrect &&
+                  !isMyChoice &&
+                  !isCorrectChoice &&
                   styles.optCardDimmed,
               ]}
               disabled={isOptionsDisabled}
               activeOpacity={0.8}
               onPress={() => handleSelect(opt.id)}
             >
-              <View style={styles.optBadge}>
-                <Text style={styles.optBadgeText}>{optionLabels[index]}</Text>
+              <View
+                style={[
+                  styles.optBadge,
+                  !feedback && isMyChoice && styles.optBadgeSelected,
+                  feedback && isCorrectChoice && styles.optBadgeCorrect,
+                  feedback && isWrongChoice && styles.optBadgeWrong,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.optBadgeText,
+                    !feedback && isMyChoice && { color: '#180B34' },
+                  ]}
+                >
+                  {optionLabels[index]}
+                </Text>
               </View>
+
               <Text style={styles.optText} numberOfLines={2}>
                 {opt.text}
               </Text>
+
+              {/* Status and Action Badges */}
               {feedback ? (
-                isCorrect ? (
-                  <CheckMarkSvg size={20} />
-                ) : isWrongSelected ? (
-                  <CrossMarkSvg size={20} />
+                isMyChoice && isCorrectChoice ? (
+                  <View style={styles.choiceTagCorrect}>
+                    <Text style={styles.choiceTagText}>Seçimin</Text>
+                    <CheckMarkSvg size={16} color="#FFFFFF" />
+                  </View>
+                ) : isWrongChoice ? (
+                  <View style={styles.choiceTagWrong}>
+                    <Text style={styles.choiceTagText}>Seçimin</Text>
+                    <CrossMarkSvg size={16} color="#FFFFFF" />
+                  </View>
+                ) : isCorrectChoice ? (
+                  <View style={styles.choiceTagAnswer}>
+                    <Text style={styles.choiceTagAnswerText}>Doğru Cevap</Text>
+                    <CheckMarkSvg size={16} color="#3FD08A" />
+                  </View>
                 ) : null
-              ) : isSelected ? (
-                <CheckMarkSvg size={20} color="#FFC43D" />
+              ) : isMyChoice ? (
+                <View style={styles.choiceTagPending}>
+                  <Text style={styles.choiceTagPendingText}>Seçildi 🔒</Text>
+                </View>
               ) : null}
             </TouchableOpacity>
           );
@@ -665,15 +699,17 @@ const styles = StyleSheet.create({
     borderColor: '#FFC43D',
   },
   optCardCorrect: {
-    backgroundColor: '#25A868',
-    borderColor: '#9FF0A8',
+    backgroundColor: 'rgba(37, 168, 104, 0.35)',
+    borderWidth: 2,
+    borderColor: '#3FD08A',
   },
   optCardWrong: {
-    backgroundColor: '#D01836',
-    borderColor: '#FFB3BB',
+    backgroundColor: 'rgba(208, 24, 54, 0.35)',
+    borderWidth: 2,
+    borderColor: '#FF5C77',
   },
   optCardDimmed: {
-    opacity: 0.65,
+    opacity: 0.45,
   },
   optBadge: {
     width: 34,
@@ -682,6 +718,67 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  optBadgeSelected: {
+    backgroundColor: '#FFC43D',
+  },
+  optBadgeCorrect: {
+    backgroundColor: '#25A868',
+  },
+  optBadgeWrong: {
+    backgroundColor: '#D01836',
+  },
+  choiceTagCorrect: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#25A868',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  choiceTagWrong: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#D01836',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  choiceTagAnswer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(63, 208, 138, 0.2)',
+    borderWidth: 1,
+    borderColor: '#3FD08A',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  choiceTagPending: {
+    backgroundColor: 'rgba(255, 196, 61, 0.2)',
+    borderWidth: 1,
+    borderColor: '#FFC43D',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  choiceTagText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  choiceTagAnswerText: {
+    color: '#3FD08A',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  choiceTagPendingText: {
+    color: '#FFC43D',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
   },
   optBadgeText: {
     fontFamily: THEME.fonts.display,

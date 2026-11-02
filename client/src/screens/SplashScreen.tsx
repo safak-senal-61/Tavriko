@@ -28,12 +28,11 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
         useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start();
-    const t1 = setTimeout(() => setProgress(78), 350);
+    const t1 = setTimeout(() => setProgress(78), 120);
     const t2 = setTimeout(() => {
       setProgress(100);
-      sound.playSound('reward');
-    }, 1100);
-    const t3 = setTimeout(() => onFinish(), 1500);
+    }, 280);
+    const t3 = setTimeout(() => onFinish(), 400);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);

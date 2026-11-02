@@ -11,46 +11,14 @@ import {
 
 const STORAGE_KEY_USER = 'tavriko_auth_user';
 const STORAGE_KEY_TOKEN = 'tavriko_auth_token';
-const STORAGE_KEY_PERMANENT_WALLET = 'tavriko_permanent_wallet';
 
-// Safe universal storage helper for Web, SSR, and Mobile with permanent balance protection
+// Safe universal storage helper for Web, SSR, and Mobile
 export const getStoredAuth = (): { user: UserProfile | null; token: string | null } => {
   if (typeof window !== 'undefined' && window.localStorage) {
     try {
       const rawUser = window.localStorage.getItem(STORAGE_KEY_USER);
       const rawToken = window.localStorage.getItem(STORAGE_KEY_TOKEN);
-      let user = rawUser ? (JSON.parse(rawUser) as UserProfile) : null;
-
-      // Check permanent wallet backup (survives logouts and page refreshes)
-      const rawPerm = window.localStorage.getItem(STORAGE_KEY_PERMANENT_WALLET);
-      let permWallet: { coins?: number; gems?: number; xp?: number; level?: number; email?: string; id?: string } | null = null;
-      if (rawPerm) {
-        try {
-          permWallet = JSON.parse(rawPerm);
-        } catch {}
-      }
-
-      if (user) {
-        if (user.email) {
-          const emailWalletRaw = window.localStorage.getItem(`tavriko_wallet_${user.email.toLowerCase()}`);
-          if (emailWalletRaw) {
-            try {
-              const emailWallet = JSON.parse(emailWalletRaw);
-              user.coins = Math.max(user.coins ?? 0, emailWallet.coins ?? 0);
-              user.gems = Math.max(user.gems ?? 0, emailWallet.gems ?? 0);
-              user.xp = Math.max(user.xp ?? 0, emailWallet.xp ?? 0);
-              user.level = Math.max(user.level ?? 1, emailWallet.level ?? 1);
-            } catch {}
-          }
-        }
-        if (permWallet && (!permWallet.email || !user.email || permWallet.email.toLowerCase() === user.email.toLowerCase())) {
-          user.coins = Math.max(user.coins ?? 0, permWallet.coins ?? 0);
-          user.gems = Math.max(user.gems ?? 0, permWallet.gems ?? 0);
-          user.xp = Math.max(user.xp ?? 0, permWallet.xp ?? 0);
-          user.level = Math.max(user.level ?? 1, permWallet.level ?? 1);
-        }
-      }
-
+      const user = rawUser ? (JSON.parse(rawUser) as UserProfile) : null;
       return { user, token: rawToken || null };
     } catch {
       return { user: null, token: null };
@@ -64,26 +32,7 @@ export const saveStoredAuth = (user: UserProfile | null, token?: string | null) 
     try {
       if (user) {
         window.localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
-
-        const permPayload = {
-          id: user.id,
-          email: user.email,
-          coins: user.coins,
-          gems: user.gems,
-          xp: user.xp,
-          level: user.level,
-          savedAt: Date.now(),
-        };
-        window.localStorage.setItem(STORAGE_KEY_PERMANENT_WALLET, JSON.stringify(permPayload));
-
-        if (user.email) {
-          window.localStorage.setItem(`tavriko_wallet_${user.email.toLowerCase()}`, JSON.stringify(permPayload));
-        }
-        if (user.id) {
-          window.localStorage.setItem(`tavriko_wallet_${user.id}`, JSON.stringify(permPayload));
-        }
       } else {
-        // Safe logout: remove active session but KEEP permanent wallet backups intact!
         window.localStorage.removeItem(STORAGE_KEY_USER);
       }
       if (token !== undefined) {
@@ -102,7 +51,7 @@ export const clearAllAccountStorage = () => {
     try {
       window.localStorage.removeItem(STORAGE_KEY_USER);
       window.localStorage.removeItem(STORAGE_KEY_TOKEN);
-      window.localStorage.removeItem(STORAGE_KEY_PERMANENT_WALLET);
+      window.localStorage.removeItem('tavriko_permanent_wallet');
       const keys = Object.keys(window.localStorage);
       for (const k of keys) {
         if (k.startsWith('tavriko_wallet_')) {
