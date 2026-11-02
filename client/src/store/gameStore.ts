@@ -8,6 +8,44 @@ import {
   CategoryId,
   DifficultyLevel,
 } from '@trivia/shared';
+
+const STORAGE_KEY_USER = 'tavriko_auth_user';
+const STORAGE_KEY_TOKEN = 'tavriko_auth_token';
+
+// Safe universal storage helper for Web, SSR, and Mobile
+const getStoredAuth = (): { user: UserProfile | null; token: string | null } => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const rawUser = window.localStorage.getItem(STORAGE_KEY_USER);
+      const rawToken = window.localStorage.getItem(STORAGE_KEY_TOKEN);
+      const user = rawUser ? (JSON.parse(rawUser) as UserProfile) : null;
+      return { user, token: rawToken || null };
+    } catch {
+      return { user: null, token: null };
+    }
+  }
+  return { user: null, token: null };
+};
+
+const saveStoredAuth = (user: UserProfile | null, token?: string | null) => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      if (user) {
+        window.localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+      } else {
+        window.localStorage.removeItem(STORAGE_KEY_USER);
+      }
+      if (token !== undefined) {
+        if (token) {
+          window.localStorage.setItem(STORAGE_KEY_TOKEN, token);
+        } else {
+          window.localStorage.removeItem(STORAGE_KEY_TOKEN);
+        }
+      }
+    } catch {}
+  }
+};
+
 interface GameState {
   // Auth & User
   user: UserProfile | null;
@@ -41,14 +79,19 @@ interface GameState {
   setSoundEnabled: (val: boolean) => void;
   setHapticsEnabled: (val: boolean) => void;
 }
+
+const initialAuth = getStoredAuth();
+
 export const useGameStore = create<GameState>((set) => ({
-  user: null,
-  token: null,
-  setUser: (user, token) =>
+  user: initialAuth.user,
+  token: initialAuth.token,
+  setUser: (user, token) => {
+    saveStoredAuth(user, token);
     set((state) => ({
       user,
       token: token !== undefined ? token : state.token,
-    })),
+    }));
+  },
   activeRoom: null,
   setActiveRoom: (activeRoom) => set({ activeRoom }),
   currentQuestion: null,

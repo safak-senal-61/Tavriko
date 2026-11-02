@@ -242,6 +242,20 @@ export const RootNavigator: React.FC = () => {
     });
     return () => sub.remove();
   }, []);
+
+  // Sayfa yenilendiğinde veya başlangıçta veritabanından en güncel altın, elmas ve seviyeyi senkronize et
+  useEffect(() => {
+    if (user && !isGuest && user.id) {
+      fetch(`${API_BASE}/social/profile/${user.id}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((freshUser) => {
+          if (freshUser && freshUser.id === user.id) {
+            setUser(freshUser);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user?.id, isGuest]);
   // Helper to gate non-Keşfet features when in Guest Mode
   const requireAuth = (action: () => void, featureName: string) => {
     if (isGuest || !user) {
@@ -1369,6 +1383,7 @@ export const RootNavigator: React.FC = () => {
             onJoinRoom={handleJoinCustomRoom}
             avatarSeed={user?.avatarUrl || user?.displayName}
             coins={user?.coins}
+            gems={user?.gems}
             apiBaseUrl={API_BASE}
           />
         )}
@@ -1376,6 +1391,7 @@ export const RootNavigator: React.FC = () => {
           <LobbyScreen
             room={activeRoom}
             currentUserId={user.id}
+            user={user}
             onBack={handleExitCurrentGame}
             onToggleReady={handleToggleReady}
             onStartGame={handleStartGame}
@@ -1589,9 +1605,29 @@ export const RootNavigator: React.FC = () => {
         )}
         {currentScreen === 'settings' && (
           <SettingsScreen
+            user={user}
+            apiBaseUrl={API_BASE}
             onBack={() => navigateTo('home')}
             onDeveloper={() => navigateTo('developer')}
             onLogout={() => {
+              setIsGuest(false);
+              setAuthRedirectNotice(null);
+              setUser(null, null);
+              resetGame();
+              navigateTo('auth');
+            }}
+            onDeleteAccount={async () => {
+              if (user) {
+                try {
+                  await fetch(`${API_BASE}/auth/delete-account`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: user.id }),
+                  });
+                } catch (err) {
+                  console.error('Delete account failed:', err);
+                }
+              }
               setIsGuest(false);
               setAuthRedirectNotice(null);
               setUser(null, null);

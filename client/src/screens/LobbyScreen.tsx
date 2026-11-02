@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
-import { GameRoom } from '@trivia/shared';
+import { GameRoom, UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
@@ -28,6 +28,7 @@ import {
 interface LobbyScreenProps {
   room: GameRoom;
   currentUserId: string;
+  user?: UserProfile | null;
   onBack: () => void;
   onToggleReady: () => void;
   onStartGame: () => void;
@@ -183,6 +184,7 @@ const FloatingLobbyItem: React.FC<{
 export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   room,
   currentUserId,
+  user,
   onBack,
   onToggleReady,
   onStartGame,
@@ -207,14 +209,21 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   useEffect(() => {
     const unsubEmote = socketService.onEmoteReceived((data) => {
       if (data.roomCode === room.code && data.playerId !== currentUserId) {
-        // Çift render ve soket yankısını engelle
-        const itemKey = data.id || `emote_${data.playerId}_${data.emote}_${Math.floor(Date.now() / 1200)}`;
-        if (processedKeysRef.current.has(itemKey)) return;
-        processedKeysRef.current.add(itemKey);
-        setTimeout(() => processedKeysRef.current.delete(itemKey), 4000);
+        // Çift render ve soket yankısını hem ID hem içerik+zaman bazlı engelle
+        const idKey = data.id;
+        const contentKey = `emote_${data.playerId}_${data.emote}_${Math.floor(Date.now() / 2000)}`;
+        if ((idKey && processedKeysRef.current.has(idKey)) || processedKeysRef.current.has(contentKey)) {
+          return;
+        }
+        if (idKey) processedKeysRef.current.add(idKey);
+        processedKeysRef.current.add(contentKey);
+        setTimeout(() => {
+          if (idKey) processedKeysRef.current.delete(idKey);
+          processedKeysRef.current.delete(contentKey);
+        }, 4000);
 
         sound.playSound('tap');
-        const id = data.id || `emote_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const id = idKey || `emote_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         const xOffset = (Math.random() - 0.5) * 160;
         setFloatingItems((prev) => [
           ...prev.slice(-12),
@@ -225,15 +234,22 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
     const unsubChat = socketService.onLobbyMessage((data) => {
       if (data.roomCode === room.code && data.playerId !== currentUserId) {
-        // Çift sohbet mesajını engelle
-        const itemKey = data.id || `chat_${data.playerId}_${data.text}_${Math.floor(Date.now() / 1500)}`;
-        if (processedKeysRef.current.has(itemKey)) return;
-        processedKeysRef.current.add(itemKey);
-        setTimeout(() => processedKeysRef.current.delete(itemKey), 4000);
+        // Çift sohbet mesajını hem ID hem içerik+zaman bazlı engelle
+        const idKey = data.id;
+        const contentKey = `chat_${data.playerId}_${data.text}_${Math.floor(Date.now() / 2500)}`;
+        if ((idKey && processedKeysRef.current.has(idKey)) || processedKeysRef.current.has(contentKey)) {
+          return;
+        }
+        if (idKey) processedKeysRef.current.add(idKey);
+        processedKeysRef.current.add(contentKey);
+        setTimeout(() => {
+          if (idKey) processedKeysRef.current.delete(idKey);
+          processedKeysRef.current.delete(contentKey);
+        }, 4000);
 
         sound.playSound('tap');
         sound.triggerHaptic('medium');
-        const id = data.id || `chat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const id = idKey || `chat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         const xOffset = (Math.random() - 0.5) * 80;
         setFloatingItems((prev) => [
           ...prev.slice(-12),
@@ -361,7 +377,13 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
   return (
     <TavrikoScreen>
-      <TavrikoTopBar leftType="back" onLeftPress={onBack} />
+      <TavrikoTopBar
+        leftType="back"
+        onLeftPress={onBack}
+        coins={user?.coins}
+        gems={user?.gems}
+        avatarSeed={user?.avatarUrl || user?.displayName}
+      />
 
       {/* Süzülen Anlık Reaksiyonlar ve Uçuşan Mesajlar (Veritabanına kaydedilmez, sadece WebSocket) */}
       <View style={styles.floatingLayer} pointerEvents="none">

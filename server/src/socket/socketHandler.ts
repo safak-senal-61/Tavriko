@@ -283,14 +283,15 @@ export function setupSocketHandlers(
       socket.emit(SOCKET_EVENTS.PUBLIC_ROOMS_UPDATE, roomManager.getPublicRooms());
     });
 
-    socket.on(SOCKET_EVENTS.SEND_EMOTE, (data: { roomCode: string; playerId: string; emote: string }) => {
+    socket.on(SOCKET_EVENTS.SEND_EMOTE, (data: { roomCode: string; playerId: string; emote: string; id?: string }) => {
       io.to(data.roomCode).emit(SOCKET_EVENTS.EMOTE_RECEIVED, {
         ...data,
-        id: `emote_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        id: data.id || `emote_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       });
     });
 
     socket.on(SOCKET_EVENTS.LOBBY_CHAT, (data: {
+      id?: string;
       roomCode: string;
       playerId: string;
       displayName: string;
@@ -302,7 +303,7 @@ export function setupSocketHandlers(
       if (!cleanText) return;
 
       const payload = {
-        id: `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        id: data.id || `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         roomCode: data.roomCode,
         playerId: data.playerId,
         displayName: data.displayName || 'Oyuncu',

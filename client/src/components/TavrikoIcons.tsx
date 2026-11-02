@@ -23,6 +23,7 @@ import Svg, {
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { CharacterAvatar, AVATAR_PRESETS, AvatarPreset } from './TavrikoAvatars';
+import { useGameStore } from '../store/gameStore';
 // Brand Assets
 export const BRAND_LOGO_MAIN = require('../../assets/images/logo_main.jpg');
 export const BRAND_LOGO_BANNER = require('../../assets/images/logo_banner.jpg');
@@ -1042,14 +1043,19 @@ export const TavrikoTopBar: React.FC<{
 }> = ({
   leftType = 'bell',
   onLeftPress,
-  coins = 500,
-  gems = 14,
-  avatarSeed = 'av1',
+  coins,
+  gems,
+  avatarSeed,
   onAvatarPress,
   onCurrencyPress,
   isGuest = false,
   onGuestLoginPress,
 }) => {
+  const storeUser = useGameStore((s) => s.user);
+  const displayCoins = coins !== undefined ? coins : storeUser?.coins ?? 500;
+  const displayGems = gems !== undefined ? gems : storeUser?.gems ?? 15;
+  const displayAvatar = avatarSeed || storeUser?.avatarUrl || storeUser?.displayName || 'av1';
+
   if (isGuest) {
     return (
       <View style={styles.topBarRow}>
@@ -1120,10 +1126,10 @@ export const TavrikoTopBar: React.FC<{
         activeOpacity={onCurrencyPress ? 0.8 : 1}
       >
         <CoinIcon size={20} />
-        <Text style={styles.currencyText}>{coins}</Text>
+        <Text style={styles.currencyText}>{displayCoins}</Text>
         <View style={{ width: 6 }} />
         <GemIcon size={20} />
-        <Text style={styles.currencyText}>{gems}</Text>
+        <Text style={styles.currencyText}>{displayGems}</Text>
       </TouchableOpacity>
       <TouchableOpacity
         onPress={() => {
@@ -1136,7 +1142,7 @@ export const TavrikoTopBar: React.FC<{
         activeOpacity={0.85}
         style={styles.avatarCircleWrap}
       >
-        <CharacterAvatar seed={avatarSeed} size={40} />
+        <CharacterAvatar seed={displayAvatar} size={40} />
       </TouchableOpacity>
     </View>
   );

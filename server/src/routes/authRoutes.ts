@@ -461,6 +461,20 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+router.post('/delete-account', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      res.status(400).json({ error: 'userId zorunludur' });
+      return;
+    }
+    const result = await db.deleteAccount(userId);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
   try {
     const { identifier, email } = req.body;

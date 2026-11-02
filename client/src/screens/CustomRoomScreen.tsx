@@ -38,6 +38,7 @@ interface CustomRoomScreenProps {
   onJoinRoom: (roomCode: string) => void;
   avatarSeed?: string;
   coins?: number;
+  gems?: number;
   apiBaseUrl?: string;
 }
 
@@ -118,6 +119,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   onJoinRoom,
   avatarSeed,
   coins,
+  gems,
   apiBaseUrl,
 }) => {
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
@@ -246,6 +248,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
         onLeftPress={onBack}
         avatarSeed={avatarSeed}
         coins={coins}
+        gems={gems}
       />
 
       <ScrollView

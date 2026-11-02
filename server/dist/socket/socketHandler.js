@@ -233,7 +233,7 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
         socket.on(shared_1.SOCKET_EVENTS.SEND_EMOTE, (data) => {
             io.to(data.roomCode).emit(shared_1.SOCKET_EVENTS.EMOTE_RECEIVED, {
                 ...data,
-                id: `emote_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                id: data.id || `emote_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
             });
         });
         socket.on(shared_1.SOCKET_EVENTS.LOBBY_CHAT, (data) => {
@@ -243,7 +243,7 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
             if (!cleanText)
                 return;
             const payload = {
-                id: `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                id: data.id || `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
                 roomCode: data.roomCode,
                 playerId: data.playerId,
                 displayName: data.displayName || 'Oyuncu',

@@ -99,6 +99,7 @@ export interface UserRecord {
     avgResponseTimeMs: number;
   };
   createdAt: number;
+  updatedAt?: number;
 }
 
 export interface RegisterPayload {
@@ -1355,20 +1356,43 @@ export class PrismaService {
   }): Promise<{ token: string; user: UserProfile; isNewUser: boolean }> {
     const cleanEmail = payload.email.trim().toLowerCase();
 
-    // 1. Search in PostgreSQL public.users directly
-    let dbUser = await this.rawClient.user.findFirst({
-      where: {
-        OR: [
-          { email: cleanEmail },
-          payload.googleId ? { googleId: payload.googleId } : {},
-        ].filter((x) => Object.keys(x).length > 0) as any,
-      },
-    }).catch(() => null);
+    // 1. Search in local persistent in-memory database first
+    let existingRecord = Array.from(this.users.values()).find(
+      (u) =>
+        !u.isGuest &&
+        ((u.email && u.email.trim().toLowerCase() === cleanEmail) ||
+          (payload.googleId && u.googleId === payload.googleId))
+    );
+
+    // 2. Search in PostgreSQL database
+    let dbUser: PrismaUser | null = null;
+    if (existingRecord) {
+      dbUser = await this.rawClient.user
+        .findUnique({ where: { id: existingRecord.id } })
+        .catch(() => null);
+    } else {
+      dbUser = await this.rawClient.user
+        .findFirst({
+          where: {
+            OR: [
+              { email: cleanEmail },
+              payload.googleId ? { googleId: payload.googleId } : {},
+            ].filter((x) => Object.keys(x).length > 0) as any,
+          },
+        })
+        .catch(() => null);
+
+      if (dbUser) {
+        existingRecord = this.prismaUserToRecord(dbUser);
+        this.users.set(existingRecord.id, existingRecord);
+      }
+    }
 
     let isNewUser = false;
     const now = new Date();
 
-    if (!dbUser) {
+    if (!existingRecord) {
+      // Truly a brand new user
       isNewUser = true;
       const baseUsername = cleanEmail.split('@')[0].replace(/[^a-z0-9_]/g, '') || 'oyuncu';
       let finalUsername = baseUsername;
@@ -1385,11 +1409,58 @@ export class PrismaService {
       const bonus = this.calculateLevelBonus(payload);
       const friendCode = this.generateFriendCode(id);
 
-      dbUser = await this.rawClient.user.create({
-        data: {
+      try {
+        dbUser = await this.rawClient.user.create({
+          data: {
+            id,
+            username: finalUsername,
+            email: cleanEmail,
+            displayName: (payload.displayName || payload.fullName || finalUsername).trim(),
+            fullName: payload.fullName || payload.displayName || null,
+            googleId: payload.googleId || null,
+            countryCode: payload.countryCode || 'TR',
+            countryName: payload.countryName || 'Türkiye',
+            phone: payload.phone || null,
+            birthDate: payload.birthDate || null,
+            avatarUrl: payload.avatarUrl || 'av1',
+            friendCode,
+            level: bonus.level || 1,
+            xp: bonus.xp || 0,
+            coins: bonus.coins || 500,
+            gems: bonus.gems || 15,
+            dailyStreak: 1,
+            rankTitle: bonus.rankTitle || 'Acemi Kaşif',
+            rankPoints: 1000,
+            profileCompletionPct: 50,
+            totalMatches: 0,
+            wins: 0,
+            correctAnswers: 0,
+            totalAnswers: 0,
+            bestStreak: 0,
+            avgResponseTimeMs: 0,
+            categoryMastery: {},
+            claimedSeasonTiers: [1],
+            seasonXp: 0,
+            hasPremiumPass: false,
+            claimedSeasonFreeTiers: [],
+            claimedSeasonPremiumTiers: [],
+            equippedFrame: null,
+            equippedBadge: null,
+            equippedNameEffect: null,
+            equippedBackground: null,
+            eventProgress: {},
+            friendIds: [],
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+      } catch (err) {
+        // Fallback local creation if PostgreSQL is unreachable
+        dbUser = {
           id,
           username: finalUsername,
           email: cleanEmail,
+          passwordHash: null,
           displayName: (payload.displayName || payload.fullName || finalUsername).trim(),
           fullName: payload.fullName || payload.displayName || null,
           googleId: payload.googleId || null,
@@ -1404,6 +1475,7 @@ export class PrismaService {
           coins: bonus.coins || 500,
           gems: bonus.gems || 15,
           dailyStreak: 1,
+          lastDailyDate: null,
           rankTitle: bonus.rankTitle || 'Acemi Kaşif',
           rankPoints: 1000,
           profileCompletionPct: 50,
@@ -1427,29 +1499,77 @@ export class PrismaService {
           friendIds: [],
           createdAt: now,
           updatedAt: now,
-        },
-      });
+        } as any;
+      }
+
+      existingRecord = this.prismaUserToRecord(dbUser!);
     } else {
-      // User exists in PostgreSQL: update display name, avatar, and googleId
-      dbUser = await this.rawClient.user.update({
-        where: { id: dbUser.id },
-        data: {
-          displayName: payload.displayName || dbUser.displayName,
-          fullName: payload.fullName || dbUser.fullName,
-          avatarUrl: payload.avatarUrl || dbUser.avatarUrl,
-          googleId: payload.googleId || dbUser.googleId,
-          updatedAt: now,
-        },
-      });
+      // Existing user: Preserve all earned stats, coins, gems, xp, and inventory!
+      existingRecord.displayName = payload.displayName || existingRecord.displayName;
+      if (payload.fullName) existingRecord.fullName = payload.fullName;
+      if (payload.avatarUrl) existingRecord.avatarUrl = payload.avatarUrl;
+      if (payload.googleId) existingRecord.googleId = payload.googleId;
+      existingRecord.updatedAt = Date.now();
+
+      if (dbUser) {
+        try {
+          dbUser = await this.rawClient.user.update({
+            where: { id: dbUser.id },
+            data: {
+              displayName: existingRecord.displayName,
+              fullName: existingRecord.fullName,
+              avatarUrl: existingRecord.avatarUrl,
+              googleId: existingRecord.googleId,
+              updatedAt: now,
+            },
+          });
+        } catch {}
+      }
     }
 
-    const record = this.prismaUserToRecord(dbUser);
-    this.users.set(record.id, record);
-    this.store.users.set(dbUser.id, dbUser);
+    this.users.set(existingRecord.id, existingRecord);
+    if (dbUser) {
+      this.store.users.set(dbUser.id, dbUser);
+    }
     this.savePersistedUsers();
 
-    const token = jwt.sign({ userId: record.id, username: record.username }, JWT_SECRET, { expiresIn: '30d' });
-    return { token, user: this.toProfile(record), isNewUser };
+    const token = jwt.sign(
+      { userId: existingRecord.id, username: existingRecord.username },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+    return { token, user: this.toProfile(existingRecord), isNewUser };
+  }
+
+  public async deleteAccount(userId: string): Promise<{ success: boolean; message: string }> {
+    const user = this.users.get(userId);
+    if (!user) {
+      return { success: false, message: 'Kullanıcı bulunamadı.' };
+    }
+
+    // 1. Remove from in-memory maps
+    this.users.delete(userId);
+    this.store.users.delete(userId);
+
+    // 2. Remove from friends lists of other users
+    for (const otherUser of this.users.values()) {
+      if (otherUser.friendIds && otherUser.friendIds.includes(userId)) {
+        otherUser.friendIds = otherUser.friendIds.filter((id) => id !== userId);
+      }
+    }
+
+    // 3. Delete from PostgreSQL
+    try {
+      await this.rawClient.user.delete({ where: { id: userId } }).catch(() => null);
+    } catch {}
+
+    // 4. Save persisted users snapshot
+    this.savePersistedUsers();
+
+    return {
+      success: true,
+      message: 'Hesabınız ve tüm oyun verileriniz kalıcı olarak silindi.',
+    };
   }
 
   public async requestPasswordReset(identifier: string): Promise<{

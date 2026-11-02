@@ -413,6 +413,20 @@ router.post('/google', async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
+router.post('/delete-account', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        if (!userId) {
+            res.status(400).json({ error: 'userId zorunludur' });
+            return;
+        }
+        const result = await prismaClient_1.db.deleteAccount(userId);
+        res.json(result);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 router.post('/forgot-password', async (req, res) => {
     try {
         const { identifier, email } = req.body;
