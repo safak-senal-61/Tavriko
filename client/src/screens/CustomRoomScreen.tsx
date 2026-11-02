@@ -16,6 +16,7 @@ import { CustomRoomSettings, CategoryId, DifficultyLevel } from '@trivia/shared'
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
+import { getApiBaseUrl } from '../config';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -144,7 +145,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   const fetchPublicRooms = async () => {
     try {
       setIsLoadingPublicRooms(true);
-      const base = apiBaseUrl || 'https://tavriko-server.onrender.com/api';
+      const base = apiBaseUrl || getApiBaseUrl();
       const cleanBase = base.replace(/\/+$/, '');
       const res = await fetch(`${cleanBase}/trivia/rooms/public`);
       if (res.ok) {

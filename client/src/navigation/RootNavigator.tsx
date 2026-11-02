@@ -554,6 +554,38 @@ export const RootNavigator: React.FC = () => {
       if (!user) return;
       isGameActiveRef.current = true;
       const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const initialRoom: GameRoom = {
+        code: roomCode,
+        mode: 'custom',
+        hostId: user.id,
+        status: 'lobby',
+        category: settings?.categories?.[0] || 'genel_kultur',
+        difficulty: settings?.difficulty || 'medium',
+        maxPlayers: settings?.maxPlayers || 4,
+        currentRound: 0,
+        totalRounds: settings?.totalRounds || 7,
+        questionTimeSec: settings?.questionTimeSec || 20,
+        penaltyForWrong: settings?.penaltyForWrong ?? true,
+        players: {
+          [user.id]: {
+            id: user.id,
+            username: user.username,
+            displayName: user.displayName,
+            avatarUrl: user.avatarUrl || 'av1',
+            score: 0,
+            currentStreak: 0,
+            isReady: true,
+            isHost: true,
+            isConnected: true,
+            hasAnsweredCurrentRound: false,
+            totalResponseTimeMs: 0,
+            correctAnswersCount: 0,
+          },
+        },
+        scores: { [user.id]: 0 },
+      };
+      setActiveRoom(initialRoom);
+      activeRoomRef.current = initialRoom;
       socketService.createRoom(roomCode, user.id, user.displayName, user.avatarUrl, settings);
       navigateTo('lobby');
     }, 'Özel Oda');
@@ -562,7 +594,42 @@ export const RootNavigator: React.FC = () => {
     requireAuth(() => {
       if (!user) return;
       isGameActiveRef.current = true;
-      socketService.joinRoom(code, user.id, user.displayName, user.avatarUrl);
+      const cleanCode = code.trim().toUpperCase();
+      if (!activeRoom || activeRoom.code !== cleanCode) {
+        const placeholderRoom: GameRoom = {
+          code: cleanCode,
+          mode: 'custom',
+          hostId: 'host_pending',
+          status: 'lobby',
+          category: 'genel_kultur',
+          difficulty: 'medium',
+          maxPlayers: 4,
+          currentRound: 0,
+          totalRounds: 7,
+          questionTimeSec: 20,
+          penaltyForWrong: true,
+          players: {
+            [user.id]: {
+              id: user.id,
+              username: user.username,
+              displayName: user.displayName,
+              avatarUrl: user.avatarUrl || 'av1',
+              score: 0,
+              currentStreak: 0,
+              isReady: false,
+              isHost: false,
+              isConnected: true,
+              hasAnsweredCurrentRound: false,
+              totalResponseTimeMs: 0,
+              correctAnswersCount: 0,
+            },
+          },
+          scores: { [user.id]: 0 },
+        };
+        setActiveRoom(placeholderRoom);
+        activeRoomRef.current = placeholderRoom;
+      }
+      socketService.joinRoom(cleanCode, user.id, user.displayName, user.avatarUrl);
       navigateTo('lobby');
     }, 'Özel Odaya Katılma');
   };

@@ -7,11 +7,21 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
+  Platform,
 } from 'react-native';
+import Svg, {
+  Defs,
+  LinearGradient,
+  RadialGradient,
+  Stop,
+  Rect,
+  Circle,
+  Path,
+} from 'react-native-svg';
 import { UserProfile, SHOP_CATALOG, ShopProduct, ShopProductCategory } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
-import { DEFAULT_API_BASE } from '../config';
+import { getApiBaseUrl } from '../config';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -20,6 +30,10 @@ import {
   ChestIcon,
   CoinIcon,
   GemIcon,
+  KeyIcon,
+  BadgeShieldIcon,
+  SpeedBoltIcon,
+  CrownIcon,
 } from '../components/TavrikoIcons';
 import { PaymentItem } from './PaymentScreen';
 
@@ -40,26 +54,163 @@ interface CategoryTabItem {
   icon: string;
 }
 
+// Tavriko UI Kit 7 Mağaza Alt Sayfası + Öne Çıkanlar
 const CATEGORY_TABS: CategoryTabItem[] = [
-  { id: 'featured', name: 'Öne Çıkanlar', icon: '🔥' },
-  { id: 'diamonds', name: 'Elmas', icon: '💎' },
-  { id: 'gold', name: 'Altın', icon: '🪙' },
+  { id: 'featured', name: 'Paketler', icon: '🎁' },
   { id: 'chests', name: 'Sandıklar', icon: '📦' },
   { id: 'keys', name: 'Anahtarlar', icon: '🗝️' },
-  { id: 'avatars', name: 'Avatarlar', icon: '🎭' },
   { id: 'frames', name: 'Çerçeveler', icon: '🖼️' },
   { id: 'badges', name: 'Rozetler', icon: '🎖️' },
   { id: 'name_effects', name: 'İsim Efekti', icon: '✨' },
   { id: 'boosters', name: 'Güçlendirici', icon: '⚡' },
   { id: 'backgrounds', name: 'Arka Plan', icon: '🌌' },
+  { id: 'diamonds', name: 'Elmas', icon: '💎' },
+  { id: 'gold', name: 'Altın', icon: '🪙' },
 ];
 
 const RARITY_COLORS: Record<string, string> = {
-  common: '#A0A0A0',
+  common: '#8A7BAF',
   rare: '#3B82F6',
   epic: '#A855F7',
   legendary: '#F59E0B',
-  mythic: '#EF4444',
+  mythic: '#FF416C',
+};
+
+// UI Kit Birebir Vektörel Ürün Görseli
+const ShopItemVisual: React.FC<{ product: ShopProduct }> = ({ product }) => {
+  const pId = product.id;
+
+  // 1. Sandıklar
+  if (product.category === 'chests' || pId.includes('chest')) {
+    let tint = '#8B5A2B'; // Wood
+    if (pId === 'chest_silver') tint = '#94A3B8';
+    if (pId === 'chest_gold') tint = '#F59E0B';
+    if (pId === 'chest_legendary') tint = '#A855F7';
+
+    return (
+      <View style={[styles.visualBox, { borderColor: tint }]}>
+        <ChestIcon size={56} />
+      </View>
+    );
+  }
+
+  // 2. Anahtarlar
+  if (product.category === 'keys' || pId.includes('key')) {
+    let keyColor = '#94A3B8';
+    if (pId === 'key_gold') keyColor = '#F59E0B';
+    if (pId === 'key_diamond') keyColor = '#00F0FF';
+
+    return (
+      <View style={[styles.visualBox, { borderColor: keyColor }]}>
+        <Svg width="54" height="54" viewBox="0 0 24 24" fill="none">
+          <Circle cx="8" cy="8" r="5" stroke={keyColor} strokeWidth="2.5" />
+          <Circle cx="8" cy="8" r="2" fill={keyColor} />
+          <Path
+            d="M12 12L20 20M17 17L19 15M15 19L17 17"
+            stroke={keyColor}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+        </Svg>
+      </View>
+    );
+  }
+
+  // 3. Çerçeveler
+  if (product.category === 'frames' || pId.includes('frame')) {
+    return (
+      <View style={styles.visualBox}>
+        <Svg width="56" height="56" viewBox="0 0 56 56">
+          <Defs>
+            <LinearGradient id="frameGrad" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor={pId === 'frame_flame' ? '#FF416C' : pId === 'frame_royal_gold' ? '#FFE27A' : '#00F0FF'} />
+              <Stop offset="1" stopColor={pId === 'frame_flame' ? '#FF9B2F' : pId === 'frame_royal_gold' ? '#FF8800' : '#FF007F'} />
+            </LinearGradient>
+          </Defs>
+          <Circle cx="28" cy="28" r="22" stroke="url(#frameGrad)" strokeWidth="4" fill="rgba(19, 9, 38, 0.8)" />
+          <Circle cx="28" cy="28" r="16" fill="rgba(255, 255, 255, 0.1)" />
+          <Text style={styles.frameEmojiInside}>👤</Text>
+        </Svg>
+      </View>
+    );
+  }
+
+  // 4. Rozetler
+  if (product.category === 'badges' || pId.includes('badge')) {
+    return (
+      <View style={styles.visualBox}>
+        <BadgeShieldIcon size={48} />
+      </View>
+    );
+  }
+
+  // 5. İsim Efekti
+  if (product.category === 'name_effects' || pId.includes('effect')) {
+    const isFire = pId === 'effect_fire_glow';
+    return (
+      <View style={[styles.visualBox, { borderColor: isFire ? '#FF9B2F' : '#FFC837' }]}>
+        <View style={styles.nameEffectPreview}>
+          <Text style={[styles.nameEffectText, isFire ? styles.nameEffectFire : styles.nameEffectGold]}>
+            Tavriko {isFire ? '🔥' : '✨'}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // 6. Güçlendiriciler
+  if (product.category === 'boosters' || pId.includes('booster')) {
+    return (
+      <View style={[styles.visualBox, { borderColor: '#5ADBB5' }]}>
+        <SpeedBoltIcon size={46} />
+        <View style={styles.boosterTag}>
+          <Text style={styles.boosterTagText}>2X</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // 7. Arka Plan
+  if (product.category === 'backgrounds' || pId.includes('bg_')) {
+    const isRoyal = pId === 'bg_royal_square';
+    return (
+      <View style={[styles.visualBox, { borderColor: isRoyal ? '#F59E0B' : '#A855F7' }]}>
+        <Svg width="54" height="42" viewBox="0 0 54 42">
+          <Defs>
+            <LinearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor={isRoyal ? '#3A0E63' : '#1A0B3B'} />
+              <Stop offset="1" stopColor={isRoyal ? '#16042B' : '#4C1D95'} />
+            </LinearGradient>
+          </Defs>
+          <Rect width="54" height="42" rx="8" fill="url(#bgGrad)" stroke="#5ADBB5" strokeWidth="1" />
+          <Circle cx="27" cy="21" r="10" fill={isRoyal ? 'rgba(255, 200, 55, 0.2)' : 'rgba(0, 240, 255, 0.2)'} />
+        </Svg>
+      </View>
+    );
+  }
+
+  // Elmas / Altın
+  if (product.category === 'diamonds') {
+    return (
+      <View style={styles.visualBox}>
+        <GemIcon size={48} />
+      </View>
+    );
+  }
+
+  if (product.category === 'gold') {
+    return (
+      <View style={styles.visualBox}>
+        <CoinIcon size={48} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.visualBox}>
+      <Text style={styles.fallbackVisualEmoji}>🎁</Text>
+    </View>
+  );
 };
 
 export const ShopScreen: React.FC<ShopScreenProps> = ({
@@ -72,7 +223,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   onProfile,
   onOpenPayment,
 }) => {
-  const [activeTab, setActiveTab] = useState<ShopProductCategory>('featured');
+  const [activeTab, setActiveTab] = useState<ShopProductCategory>('chests');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
@@ -83,7 +234,6 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const isProductOwned = (product: ShopProduct): boolean => {
     if (!user) return false;
     if (product.grantPremiumPass && user.hasPremiumPass) return true;
-    if (product.category === 'avatars' && user.inventory?.some((i) => i.id === product.id)) return true;
     if (product.category === 'frames' && user.inventory?.some((i) => i.id === product.id)) return true;
     if (product.category === 'badges' && user.inventory?.some((i) => i.id === product.id)) return true;
     if (product.category === 'name_effects' && user.inventory?.some((i) => i.id === product.id)) return true;
@@ -117,13 +267,12 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           priceNumeric: product.price,
         });
       } else {
-        // Fallback simulated payment
         setConfirmProduct(product);
       }
       return;
     }
 
-    // Check currency balance
+    // Para bakiyesi kontrolü
     if (product.currency === 'coins' && (user.coins ?? 0) < product.price) {
       sound.playSound('wrong');
       sound.triggerHaptic('error');
@@ -150,7 +299,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     setStatusMessage(null);
     setIsError(false);
 
-    const base = apiBaseUrl || DEFAULT_API_BASE;
+    const base = apiBaseUrl || getApiBaseUrl();
     try {
       const res = await fetch(`${base}/social/shop/purchase`, {
         method: 'POST',
@@ -176,7 +325,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       sound.playSound('reward');
       sound.triggerHaptic('success');
       setIsError(false);
-      setStatusMessage(data.message || `${product.name} başarıyla satın alındı!`);
+      setStatusMessage(data.message || `${product.name} başarıyla satın alındı ve envantere eklendi!`);
       if (data.user && onUpdateUser) {
         onUpdateUser(data.user);
       }
@@ -204,13 +353,12 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Hero */}
+        {/* Başlık */}
         <View style={styles.heroWrap}>
-          <Text style={styles.shopTitle}>TAVRİKO MAĞAZASI</Text>
-          <Text style={styles.shopSub}>Sandıklar, Özel Kozmetikler ve Avantajlı Paketler</Text>
+          <Text style={styles.shopTitle}>MAĞAZA</Text>
         </View>
 
-        {/* 11 Categories Horizontal Scroll */}
+        {/* Tavriko UI Kit 7 Mağaza Sekmesi */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -237,7 +385,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           })}
         </ScrollView>
 
-        {/* Status Toast / Banner */}
+        {/* Durum Bildirimi */}
         {statusMessage && (
           <View style={[styles.statusBanner, isError ? styles.statusError : styles.statusSuccess]}>
             <Text style={[styles.statusText, isError ? styles.statusTextError : styles.statusTextSuccess]}>
@@ -246,25 +394,23 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </View>
         )}
 
-        {/* Product Grid */}
+        {/* Ürün Izgarası (Tavriko UI Kit Kartları) */}
         <View style={styles.productGrid}>
           {filteredProducts.map((item) => {
             const owned = isProductOwned(item);
             const rarityColor = RARITY_COLORS[item.rarity || 'common'];
             const isBuying = purchasingId === item.id;
-            const isFeatured = activeTab === 'featured';
 
             return (
               <View
                 key={item.id}
                 style={[
                   styles.productCard,
-                  isFeatured && styles.productCardFeatured,
                   { borderColor: rarityColor },
                   owned && styles.productCardOwned,
                 ]}
               >
-                {/* Badges */}
+                {/* Rozetler */}
                 <View style={styles.badgeRow}>
                   {item.badge && (
                     <View style={styles.promoBadge}>
@@ -278,33 +424,14 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                   )}
                 </View>
 
-                {/* Product Visual */}
-                <View style={styles.visualWrap}>
-                  {item.category === 'chests' || item.id.includes('chest') ? (
-                    <ChestIcon size={64} />
-                  ) : item.category === 'diamonds' ? (
-                    <GemIcon size={56} />
-                  ) : item.category === 'gold' ? (
-                    <CoinIcon size={56} />
-                  ) : (
-                    <View style={[styles.cosmeticCircle, { borderColor: rarityColor }]}>
-                      <Text style={styles.cosmeticIcon}>
-                        {item.category === 'avatars' ? '🎭' :
-                         item.category === 'frames' ? '🖼️' :
-                         item.category === 'badges' ? '🎖️' :
-                         item.category === 'name_effects' ? '✨' :
-                         item.category === 'keys' ? '🗝️' :
-                         item.category === 'boosters' ? '⚡' : '🌌'}
-                      </Text>
-                    </View>
-                  )}
-                </View>
+                {/* Vektörel Görsel */}
+                <ShopItemVisual product={item} />
 
-                {/* Info */}
-                <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-                <Text style={styles.productDesc} numberOfLines={3}>{item.desc}</Text>
+                {/* İsim & Açıklama */}
+                <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.productDesc} numberOfLines={2}>{item.desc}</Text>
 
-                {/* Price / Purchase Button */}
+                {/* Fiyat Butonu (Tavriko Altın/Elmas Butonu) */}
                 <TouchableOpacity
                   style={[
                     styles.priceBtn,
@@ -320,11 +447,11 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                     <Text style={styles.priceBtnTextOwned}>SAHİPSİN</Text>
                   ) : (
                     <View style={styles.priceContentRow}>
-                      {item.currency === 'coins' && <CoinIcon size={16} />}
-                      {item.currency === 'gems' && <GemIcon size={16} />}
                       <Text style={styles.priceBtnText}>
                         {item.currency === 'try' ? `₺${item.price.toFixed(2)}` : item.price}
                       </Text>
+                      {item.currency === 'coins' && <CoinIcon size={16} />}
+                      {item.currency === 'gems' && <GemIcon size={16} />}
                     </View>
                   )}
                 </TouchableOpacity>
@@ -334,7 +461,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         </View>
       </ScrollView>
 
-      {/* Confirmation Modal */}
+      {/* Satın Alma Onay Modalı */}
       <Modal
         visible={!!confirmProduct}
         transparent
@@ -351,13 +478,13 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                 <View style={styles.modalCostRow}>
                   <Text style={styles.modalCostLabel}>Fiyat:</Text>
                   <View style={styles.priceContentRow}>
-                    {confirmProduct.currency === 'coins' && <CoinIcon size={18} />}
-                    {confirmProduct.currency === 'gems' && <GemIcon size={18} />}
                     <Text style={styles.modalCostVal}>
                       {confirmProduct.currency === 'try'
                         ? `₺${confirmProduct.price.toFixed(2)}`
                         : `${confirmProduct.price} ${confirmProduct.currency === 'coins' ? 'Altın' : 'Elmas'}`}
                     </Text>
+                    {confirmProduct.currency === 'coins' && <CoinIcon size={18} />}
+                    {confirmProduct.currency === 'gems' && <GemIcon size={18} />}
                   </View>
                 </View>
 
@@ -394,30 +521,22 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 160, // Ample room so bottom products never hide behind bottom nav
+    paddingBottom: 160,
     paddingHorizontal: 12,
   },
   heroWrap: {
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 12,
+    marginTop: 6,
+    marginBottom: 8,
   },
   shopTitle: {
     fontFamily: THEME.fonts.display,
-    fontSize: 28,
-    color: '#FFC43D',
-    letterSpacing: 1.5,
-  },
-  shopSub: {
-    fontFamily: THEME.fonts.medium,
-    fontSize: 12,
-    color: '#D9CDF5',
-    marginTop: 2,
-    textAlign: 'center',
+    fontSize: 26,
+    color: '#FFC837',
+    letterSpacing: 2,
   },
   categoryScroll: {
     paddingVertical: 8,
-    paddingHorizontal: 12,
     gap: 8,
   },
   categoryTab: {
@@ -427,13 +546,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 18,
-    backgroundColor: 'rgba(10, 4, 24, 0.6)',
+    backgroundColor: '#1E0E3D',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(154, 107, 255, 0.25)',
   },
   categoryTabActive: {
     backgroundColor: 'rgba(107, 60, 255, 0.45)',
-    borderColor: '#FFC43D',
+    borderColor: '#FFC837',
   },
   categoryIcon: {
     fontSize: 14,
@@ -441,58 +560,72 @@ const styles = StyleSheet.create({
   categoryName: {
     color: '#D9CDF5',
     fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
+    fontFamily: THEME.fonts.bold,
   },
   categoryNameActive: {
     color: '#FFFFFF',
   },
   statusBanner: {
     borderRadius: 14,
-    padding: 12,
-    marginVertical: 10,
-    borderWidth: 1.5,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginVertical: 8,
+    alignItems: 'center',
   },
   statusSuccess: {
-    backgroundColor: 'rgba(111, 227, 193, 0.15)',
-    borderColor: '#6FE3C1',
+    backgroundColor: 'rgba(90, 219, 181, 0.2)',
+    borderWidth: 1,
+    borderColor: '#5ADBB5',
   },
   statusError: {
-    backgroundColor: 'rgba(255, 92, 119, 0.15)',
-    borderColor: '#FF5C77',
+    backgroundColor: 'rgba(255, 65, 108, 0.2)',
+    borderWidth: 1,
+    borderColor: '#FF416C',
   },
   statusText: {
     fontSize: 13,
     fontFamily: THEME.fonts.bold,
-    textAlign: 'center',
   },
   statusTextSuccess: {
-    color: '#6FE3C1',
+    color: '#5ADBB5',
   },
   statusTextError: {
-    color: '#FF8598',
+    color: '#FF416C',
   },
   productGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 12,
+    justifyContent: 'space-between',
     marginTop: 8,
   },
   productCard: {
-    width: '48.5%',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 18,
+    width: '48%',
+    backgroundColor: '#1E0E3D',
+    borderRadius: 20,
     borderWidth: 1.5,
-    padding: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
     alignItems: 'center',
+    marginBottom: 4,
     position: 'relative',
-  },
-  productCardFeatured: {
-    width: '100%',
-    padding: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+      web: {
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
+      },
+    }),
   },
   productCardOwned: {
     opacity: 0.65,
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
   },
   badgeRow: {
     position: 'absolute',
@@ -501,10 +634,10 @@ const styles = StyleSheet.create({
     right: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    zIndex: 2,
+    zIndex: 10,
   },
   promoBadge: {
-    backgroundColor: '#FF5C77',
+    backgroundColor: '#FF416C',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
@@ -515,7 +648,7 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.extraBold,
   },
   bonusBadge: {
-    backgroundColor: '#6FE3C1',
+    backgroundColor: '#FFC837',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
@@ -525,52 +658,79 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: THEME.fonts.extraBold,
   },
-  visualWrap: {
+  visualBox: {
+    width: 72,
     height: 72,
-    justifyContent: 'center',
+    borderRadius: 20,
+    backgroundColor: 'rgba(23, 11, 51, 0.8)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(154, 107, 255, 0.35)',
     alignItems: 'center',
-    marginTop: 14,
-    marginBottom: 8,
-  },
-  cosmeticCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    backgroundColor: 'rgba(10, 4, 24, 0.5)',
     justifyContent: 'center',
-    alignItems: 'center',
+    marginVertical: 8,
+    position: 'relative',
   },
-  cosmeticIcon: {
-    fontSize: 28,
+  frameEmojiInside: {
+    position: 'absolute',
+    fontSize: 20,
+    alignSelf: 'center',
+    top: 14,
+  },
+  nameEffectPreview: {
+    paddingHorizontal: 6,
+  },
+  nameEffectText: {
+    fontSize: 11,
+    fontFamily: THEME.fonts.display,
+  },
+  nameEffectGold: {
+    color: '#FFC837',
+  },
+  nameEffectFire: {
+    color: '#FF6B2B',
+  },
+  boosterTag: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    backgroundColor: '#FF416C',
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  boosterTagText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  fallbackVisualEmoji: {
+    fontSize: 32,
   },
   productName: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 13,
-    lineHeight: 17,
     color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.bold,
     textAlign: 'center',
-    minHeight: 34,
+    marginTop: 4,
   },
   productDesc: {
-    fontFamily: THEME.fonts.medium,
+    color: '#9A8BC2',
     fontSize: 10,
-    lineHeight: 14,
-    color: '#D9CDF5',
+    fontFamily: THEME.fonts.medium,
     textAlign: 'center',
-    marginVertical: 4,
-    minHeight: 38,
+    marginTop: 2,
+    marginBottom: 8,
+    minHeight: 26,
   },
   priceBtn: {
     width: '100%',
-    paddingVertical: 9,
-    borderRadius: 12,
+    height: 38,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 6,
   },
   priceBtnActive: {
-    backgroundColor: '#FFC43D',
+    backgroundColor: '#FFC837',
   },
   priceBtnOwned: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -578,64 +738,61 @@ const styles = StyleSheet.create({
   priceContentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
   },
   priceBtnText: {
-    fontFamily: THEME.fonts.extraBold,
-    fontSize: 13,
     color: '#12052C',
+    fontSize: 13,
+    fontFamily: THEME.fonts.display,
   },
   priceBtnTextOwned: {
-    fontFamily: THEME.fonts.bold,
+    color: '#8A7BAF',
     fontSize: 11,
-    color: '#D9CDF5',
+    fontFamily: THEME.fonts.bold,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(6, 2, 16, 0.85)',
+    backgroundColor: 'rgba(9, 4, 24, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
   },
   modalSheet: {
-    backgroundColor: '#1E0E3E',
-    borderWidth: 1.5,
-    borderColor: '#FFC43D',
-    borderRadius: 24,
-    padding: 20,
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 340,
+    backgroundColor: '#1E0E3D',
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#FFC837',
+    padding: 20,
     alignItems: 'center',
   },
   modalTitle: {
+    fontSize: 16,
     fontFamily: THEME.fonts.display,
-    fontSize: 18,
-    color: '#FFC43D',
-    marginBottom: 12,
+    color: '#FFC837',
+    letterSpacing: 1,
+    marginBottom: 8,
   },
   modalProduct: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 20,
+    fontSize: 15,
+    fontFamily: THEME.fonts.bold,
     color: '#FFFFFF',
     textAlign: 'center',
   },
   modalDesc: {
-    fontFamily: THEME.fonts.medium,
     fontSize: 12,
-    color: '#D9CDF5',
+    fontFamily: THEME.fonts.medium,
+    color: '#9A8BC2',
     textAlign: 'center',
     marginTop: 4,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   modalCostRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(10, 4, 24, 0.6)',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14,
-    marginBottom: 20,
+    marginBottom: 18,
   },
   modalCostLabel: {
     color: '#D9CDF5',
@@ -643,9 +800,9 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.bold,
   },
   modalCostVal: {
-    color: '#FFC43D',
-    fontSize: 16,
-    fontFamily: THEME.fonts.display,
+    color: '#FFC837',
+    fontSize: 14,
+    fontFamily: THEME.fonts.bold,
   },
   modalButtonsRow: {
     flexDirection: 'row',
@@ -654,26 +811,28 @@ const styles = StyleSheet.create({
   },
   modalCancelBtn: {
     flex: 1,
-    paddingVertical: 12,
+    height: 44,
     borderRadius: 14,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   modalCancelText: {
-    color: '#FFFFFF',
-    fontSize: 14,
+    color: '#D9CDF5',
+    fontSize: 13,
     fontFamily: THEME.fonts.bold,
   },
   modalConfirmBtn: {
     flex: 1,
-    paddingVertical: 12,
+    height: 44,
     borderRadius: 14,
-    backgroundColor: '#FFC43D',
+    backgroundColor: '#FFC837',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   modalConfirmText: {
     color: '#12052C',
-    fontSize: 14,
-    fontFamily: THEME.fonts.extraBold,
+    fontSize: 13,
+    fontFamily: THEME.fonts.display,
   },
 });

@@ -21,8 +21,9 @@ import {
   TavrikoTopBar,
   Button3D,
   CharacterAvatar,
+  CoinIcon,
+  GemIcon,
 } from '../components/TavrikoIcons';
-import { LobbyReactions } from '../components/LobbyReactions';
 
 interface LobbyScreenProps {
   room: GameRoom;
@@ -33,7 +34,6 @@ interface LobbyScreenProps {
   onKickPlayer?: (targetPlayerId: string) => void;
 }
 
-// Minimalist Vektörel İkonlar
 const CopySvgIcon = ({ size = 18, color = '#FFFFFF' }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Rect
@@ -83,6 +83,10 @@ const CheckSvgIcon = ({ size = 18, color = '#5ADBB5' }: { size?: number; color?:
   </Svg>
 );
 
+// Tavriko UI Kit 8 Lobi Reaksiyonu
+const LOBBY_REACTION_EMOJIS = ['🔥', '👑', '👏', '😂', '❤️', '⚡', '🎯', '🚀'];
+
+// Hızlı Mesaj Çipleri
 const QUICK_CHAT_CHIPS = [
   'Selam 👋',
   'Hazırım! ⚡',
@@ -109,24 +113,24 @@ const FloatingLobbyItem: React.FC<{
   useEffect(() => {
     Animated.timing(anim, {
       toValue: 1,
-      duration: item.type === 'message' ? 3400 : 1300,
+      duration: item.type === 'message' ? 3600 : 1500,
       useNativeDriver: Platform.OS !== 'web',
     }).start(() => onComplete());
   }, []);
 
   const translateY = anim.interpolate({
-    inputRange: [0, 0.15, 0.8, 1],
-    outputRange: [0, -30, -110, -180],
+    inputRange: [0, 0.15, 0.75, 1],
+    outputRange: [0, -50, -220, -390],
   });
 
   const opacity = anim.interpolate({
-    inputRange: [0, 0.12, 0.78, 1],
+    inputRange: [0, 0.1, 0.8, 1],
     outputRange: [0, 1, 0.95, 0],
   });
 
   const scale = anim.interpolate({
     inputRange: [0, 0.15, 0.85, 1],
-    outputRange: [0.75, 1.08, 1, 0.9],
+    outputRange: [0.7, 1.15, 1, 0.85],
   });
 
   if (item.type === 'emoji') {
@@ -199,7 +203,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   // Real-time WebSocket Reaksiyonları ve Canlı Süzülen Mesajlar (Veritabanına kaydedilmez)
   useEffect(() => {
     const unsubEmote = socketService.onEmoteReceived((data) => {
-      if (data.roomCode === room.code) {
+      if (data.roomCode === room.code && data.playerId !== currentUserId) {
+        sound.playSound('tap');
         const id = `emote_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         const xOffset = (Math.random() - 0.5) * 160;
         setFloatingItems((prev) => [
@@ -210,7 +215,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
     });
 
     const unsubChat = socketService.onLobbyMessage((data) => {
-      if (data.roomCode === room.code) {
+      if (data.roomCode === room.code && data.playerId !== currentUserId) {
         sound.playSound('tap');
         sound.triggerHaptic('medium');
         const id = `chat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -233,7 +238,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
       unsubEmote();
       unsubChat();
     };
-  }, [room.code]);
+  }, [room.code, currentUserId]);
 
   const removeFloatingItem = (id: string) => {
     setFloatingItems((prev) => prev.filter((item) => item.id !== id));
@@ -242,6 +247,16 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   const handleSendReaction = (emoji: string) => {
     sound.playSound('tap');
     sound.triggerHaptic('light');
+
+    // Optimistik anlık render: Kullanıcı dokunduğu an ekranda süzülür!
+    const id = `emote_local_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const xOffset = (Math.random() - 0.5) * 160;
+    setFloatingItems((prev) => [
+      ...prev.slice(-12),
+      { id, type: 'emoji', content: emoji, xOffset },
+    ]);
+
+    // WebSocket ile odadaki diğer tüm oyunculara yayınla
     socketService.sendEmote(room.code, currentUserId, emoji);
   };
 
@@ -250,6 +265,23 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
     if (!textToSend) return;
     sound.playSound('tap');
     sound.triggerHaptic('medium');
+
+    // Optimistik anlık render: Gönderen kişinin ekranında anında süzülür!
+    const id = `chat_local_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const xOffset = (Math.random() - 0.5) * 80;
+    setFloatingItems((prev) => [
+      ...prev.slice(-12),
+      {
+        id,
+        type: 'message',
+        content: textToSend,
+        senderName: myPlayer?.displayName || 'Sen',
+        avatarSeed: myPlayer?.avatarUrl || myPlayer?.displayName,
+        xOffset,
+      },
+    ]);
+
+    // WebSocket ile odadaki diğer oyunculara yayınla (veritabanına kaydedilmez!)
     socketService.sendLobbyChat(
       room.code,
       currentUserId,
@@ -257,6 +289,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
       textToSend,
       myPlayer?.avatarUrl || myPlayer?.displayName
     );
+
     if (!presetText) setChatText('');
   };
 
@@ -319,22 +352,22 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Modern, Sade Başlık */}
+        {/* Modern, Şık Tavriko Lobi Başlığı */}
         <View style={styles.headerTitleWrap}>
           <Text style={styles.title}>ÖZEL LOBİ</Text>
         </View>
 
-        {/* 1. ODA KODU KARTI (Sade & Modern) */}
+        {/* 1. ODA KODU KARTI (Tavriko UI Kit Altın Çerçeveli) */}
         <View style={styles.codeCard}>
           <View style={styles.codeInfoLeft}>
-            <Text style={styles.codeCardLabel}>ODA KODU</Text>
-            <Text style={styles.codeValueText}>{room.code}</Text>
+            <Text style={styles.codeValueText}>{room.code.split('').join(' ')}</Text>
+            <Text style={styles.codeCardSub}>Dokun kopyala</Text>
           </View>
 
-          <View style={styles.actionBtnsRow}>
-            {/* Tek ve Net Kopyala Butonu */}
+          <View style={styles.codeActionsRow}>
+            {/* Kopyala Butonu */}
             <TouchableOpacity
-              style={[styles.actionBtn, copied && styles.actionBtnActive]}
+              style={[styles.codeIconBtn, copied && styles.codeIconBtnActive]}
               onPress={handleCopyCode}
               activeOpacity={0.8}
             >
@@ -343,14 +376,20 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
               ) : (
                 <CopySvgIcon size={18} color="#FFFFFF" />
               )}
-              <Text style={[styles.actionBtnText, copied && styles.actionBtnTextActive]}>
-                {copied ? 'Kopyalandı' : 'Kopyala'}
-              </Text>
+            </TouchableOpacity>
+
+            {/* Paylaş Butonu */}
+            <TouchableOpacity
+              style={styles.codeIconBtn}
+              onPress={handleShareCode}
+              activeOpacity={0.8}
+            >
+              <ShareSvgIcon size={18} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* 2. ODA PARAMETRELERİ (Sadeleştirilmiş Çipler) */}
+        {/* 2. ODA PARAMETRELERİ (Tavriko UI Kit Çipleri) */}
         <View style={styles.chipsRow}>
           <View style={styles.specChip}>
             <Text style={styles.specChipText}>📝 {room.totalRounds || 7} Soru</Text>
@@ -371,7 +410,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             Oyuncular ({players.length}/{maxPlayers})
           </Text>
           <Text style={styles.roomStatusTag}>
-            {canStart ? '🟢 Başlamaya Hazır' : '🟡 Bekleniyor'}
+            {canStart ? '🟢 Başlamaya Hazır' : '🟡 Katılımcı Bekleniyor'}
           </Text>
         </View>
 
@@ -388,10 +427,12 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 <CharacterAvatar seed={p.avatarUrl || p.displayName} index={index} size={42} />
 
                 <View style={styles.playerInfo}>
-                  {/* Kral ikonu kaldırıldı, sade ve modern isim görünümü */}
-                  <Text style={styles.playerName} numberOfLines={1}>
-                    {p.displayName} {isMe ? '(Sen)' : ''}
-                  </Text>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.playerName} numberOfLines={1}>
+                      {p.displayName} {isMe ? '(Sen)' : ''}
+                    </Text>
+                    {playerIsHost && <Text style={styles.crownBadge}>👑</Text>}
+                  </View>
                   <Text style={styles.playerRoleText}>
                     {playerIsHost ? 'Oda Kurucusu' : 'Yarışmacı'}
                   </Text>
@@ -425,16 +466,41 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             );
           })}
 
-          {/* Boş Slotlar: Tavriko UI Kit kesikli çizgili sade tasarım */}
+          {/* Boş Slotlar: Tavriko UI Kit kesikli çizgili kart + davet dokunması */}
           {Array.from({ length: Math.min(4, emptySlotCount) }).map((_, idx) => (
-            <View key={`empty_${idx}`} style={styles.emptySlot}>
-              <Text style={styles.emptySlotText}>Oyuncu bekleniyor...</Text>
-            </View>
+            <TouchableOpacity
+              key={`empty_${idx}`}
+              style={styles.emptySlotCard}
+              activeOpacity={0.8}
+              onPress={handleShareCode}
+            >
+              <View style={styles.emptySlotPlusCircle}>
+                <Text style={styles.emptySlotPlusText}>+</Text>
+              </View>
+              <View style={styles.emptySlotTextCol}>
+                <Text style={styles.emptySlotTitle}>Boş Oyuncu Slotu</Text>
+                <Text style={styles.emptySlotSub}>Arkadaşını odaya davet etmek için dokun 🔗</Text>
+              </View>
+            </TouchableOpacity>
           ))}
         </View>
 
-        {/* 4. MODERN, ŞIK VE İNCE REAKSİYON KAPSÜLÜ (WebSocket Canlı Yayın) */}
-        <LobbyReactions onReactionSent={handleSendReaction} />
+        {/* 4. TAVRİKO UI KIT LOBİ REAKSİYONLARI BAR (8 Emojili Canlı WebSocket Reaksiyonları) */}
+        <View style={styles.reactionsSection}>
+          <Text style={styles.reactionsHeader}>LOBİ REAKSİYONLARI</Text>
+          <View style={styles.reactionsPillBar}>
+            {LOBBY_REACTION_EMOJIS.map((emoji) => (
+              <TouchableOpacity
+                key={emoji}
+                style={styles.reactionTouch}
+                activeOpacity={0.65}
+                onPress={() => handleSendReaction(emoji)}
+              >
+                <Text style={styles.reactionEmojiText}>{emoji}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
         {/* 4.5. ANLIK SÜZÜLEN LOBİ SOHBETİ (Veritabanına kaydedilmez, anlık süzülür) */}
         <View style={styles.quickChatContainer}>
@@ -477,33 +543,36 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </View>
         </View>
 
-        {/* 5. ALT BAŞLATMA ALANI (Tek, net ve modern aksiyon) */}
+        {/* 5. ALT BAŞLATMA ALANI (Tavriko UI Kit Birebir) */}
         <View style={styles.controlsWrap}>
           {isHost ? (
             <>
               {!canStart ? (
                 <View style={styles.waitingContainer}>
-                  <Animated.Text style={[styles.waitingPulsingText, { opacity: pulseAnim }]}>
-                    Diğer oyuncular bekleniyor...
-                  </Animated.Text>
+                  <View style={styles.waitingHeaderRow}>
+                    <Text style={styles.waitingIcon}>👥</Text>
+                    <Animated.Text style={[styles.waitingPulsingText, { opacity: pulseAnim }]}>
+                      Diğer oyuncular bekleniyor...
+                    </Animated.Text>
+                  </View>
                   <Text style={styles.waitingSubNotice}>
-                    Oyunu başlatabilmek için en az 2 oyuncu olmalıdır.
+                    Oyunu başlatabilmek için en az 2 oyuncu olmalıdır ({players.length}/{maxPlayers}).
                   </Text>
 
-                  {/* Tek, modern davet butonu */}
+                  {/* UI Kit Davet Linkini Paylaş Butonu */}
                   <TouchableOpacity
-                    style={styles.singleInviteBtn}
+                    style={styles.inviteShareBtn}
                     onPress={handleShareCode}
                     activeOpacity={0.85}
                   >
-                    <ShareSvgIcon size={18} color="#0C3A33" />
-                    <Text style={styles.singleInviteBtnText}>Arkadaşını Davet Et</Text>
+                    <ShareSvgIcon size={18} color="#0B2E28" />
+                    <Text style={styles.inviteShareBtnText}>DAVET LİNKİNİ PAYLAŞ</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
                 <View style={styles.readyContainer}>
                   <Text style={styles.readyNotificationText}>
-                    ✨ Lobi hazır! Yarışmayı hemen başlatabilirsiniz.
+                    ✨ Lobi hazır! Yarışmayı hemen başlatabilirsiniz ({players.length}/{maxPlayers}).
                   </Text>
                   <Button3D
                     title="OYUNU BAŞLAT 🎮"
@@ -549,261 +618,388 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitleWrap: {
+    marginTop: 4,
+    marginBottom: 12,
     alignItems: 'center',
-    marginTop: 6,
-    marginBottom: 14,
   },
   title: {
-    fontFamily: THEME.fonts.display,
     fontSize: 26,
-    color: '#FFE27A',
-    textAlign: 'center',
+    fontFamily: THEME.fonts.display,
+    color: '#FFC837',
     letterSpacing: 2,
+    textAlign: 'center',
   },
+
+  // 1. Oda Kodu Kartı (Tavriko UI Kit Altın Çerçeveli)
   codeCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1E0E3D',
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: '#FFC43D',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     width: '100%',
-    maxWidth: 380,
+    backgroundColor: '#1E0E3D',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#FFC837',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 12,
     ...Platform.select({
       ios: {
-        shadowColor: '#FFC43D',
+        shadowColor: '#FFC837',
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.25,
-        shadowRadius: 8,
+        shadowRadius: 10,
       },
       android: {
         elevation: 6,
       },
       web: {
-        boxShadow: '0px 4px 14px rgba(255, 196, 61, 0.2)',
+        boxShadow: '0 4px 16px rgba(255, 200, 55, 0.25)',
       },
     }),
   },
   codeInfoLeft: {
-    justifyContent: 'center',
-  },
-  codeCardLabel: {
-    color: '#D9CDF5',
-    fontSize: 10,
-    fontFamily: THEME.fonts.extraBold,
-    fontWeight: '800',
-    letterSpacing: 1.2,
+    flex: 1,
   },
   codeValueText: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 26,
-    fontWeight: '900',
     color: '#FFFFFF',
-    letterSpacing: 4,
+    fontSize: 24,
+    fontFamily: THEME.fonts.display,
+    letterSpacing: 3,
+  },
+  codeCardSub: {
+    color: '#9A8BC2',
+    fontSize: 11,
+    fontFamily: THEME.fonts.medium,
     marginTop: 2,
   },
-  actionBtnsRow: {
+  codeActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
+  codeIconBtn: {
+    width: 40,
     height: 40,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
-  actionBtnActive: {
-    backgroundColor: 'rgba(90, 219, 181, 0.2)',
+  codeIconBtnActive: {
     borderColor: '#5ADBB5',
+    backgroundColor: 'rgba(90, 219, 181, 0.15)',
   },
-  actionBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: THEME.fonts.bold,
-    fontWeight: '700',
-  },
-  actionBtnTextActive: {
-    color: '#5ADBB5',
-  },
+
+  // 2. Parametre Çipleri
   chipsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
+    marginBottom: 16,
     width: '100%',
-    maxWidth: 380,
-    marginBottom: 14,
   },
   specChip: {
-    flex: 1,
-    backgroundColor: 'rgba(107, 60, 255, 0.18)',
-    paddingVertical: 7,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 14,
-    alignItems: 'center',
+    backgroundColor: 'rgba(58, 28, 113, 0.65)',
     borderWidth: 1,
     borderColor: 'rgba(154, 107, 255, 0.35)',
   },
   specChipText: {
-    color: '#FFFFFF',
+    color: '#D9CDF5',
     fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
-    fontWeight: '800',
+    fontFamily: THEME.fonts.bold,
   },
+
+  // 3. Oyuncu Listesi
   sectionTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    maxWidth: 380,
     marginBottom: 8,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
   },
   playersCountText: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontFamily: THEME.fonts.display,
-    fontWeight: '900',
+    fontFamily: THEME.fonts.bold,
   },
   roomStatusTag: {
-    color: '#5ADBB5',
+    color: '#FFC837',
     fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
-    fontWeight: '800',
+    fontFamily: THEME.fonts.bold,
   },
   playersList: {
     width: '100%',
-    maxWidth: 380,
-    gap: 8,
-    marginBottom: 4,
+    gap: 10,
+    marginBottom: 14,
   },
   playerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(154, 107, 255, 0.35)',
+    backgroundColor: '#1E0E3D',
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(154, 107, 255, 0.25)',
   },
   playerRowMe: {
-    borderColor: '#FFC43D',
-    backgroundColor: 'rgba(255, 196, 61, 0.08)',
+    borderColor: '#FFC837',
+    backgroundColor: 'rgba(255, 200, 55, 0.06)',
   },
   playerInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 10,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   playerName: {
     color: '#FFFFFF',
-    fontSize: 15,
-    fontFamily: THEME.fonts.display,
-    fontWeight: '900',
+    fontSize: 14,
+    fontFamily: THEME.fonts.bold,
+    maxWidth: 160,
+  },
+  crownBadge: {
+    fontSize: 13,
   },
   playerRoleText: {
-    color: '#D9CDF5',
-    fontSize: 12,
+    color: '#9A8BC2',
+    fontSize: 11,
     fontFamily: THEME.fonts.medium,
-    marginTop: 2,
+    marginTop: 1,
   },
   statusChip: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    borderWidth: 1.2,
+    paddingVertical: 5,
+    borderRadius: 12,
   },
   statusReady: {
-    backgroundColor: 'rgba(90, 219, 181, 0.2)',
+    backgroundColor: 'rgba(90, 219, 181, 0.15)',
+    borderWidth: 1,
     borderColor: '#5ADBB5',
   },
   statusWaiting: {
     backgroundColor: 'rgba(255, 196, 61, 0.15)',
+    borderWidth: 1,
     borderColor: '#FFC43D',
   },
   statusChipText: {
+    color: '#FFC43D',
     fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
-    fontWeight: '900',
-    color: '#FFC43D',
   },
   statusChipTextReady: {
     color: '#5ADBB5',
   },
   kickBtn: {
+    marginLeft: 8,
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: 'rgba(255, 92, 119, 0.2)',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 65, 108, 0.2)',
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#FF5C77',
-    marginLeft: 8,
+    borderColor: 'rgba(255, 65, 108, 0.4)',
   },
   kickBtnText: {
-    color: '#FF5C77',
-    fontSize: 13,
-    fontFamily: THEME.fonts.bold,
+    color: '#FF416C',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
-  emptySlot: {
-    height: 52,
-    justifyContent: 'center',
+
+  // Boş Oyuncu Slotu (Tavriko UI Kit Kesikli Kart)
+  emptySlotCard: {
+    width: '100%',
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 18,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: 'rgba(255, 255, 255, 0.22)',
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    marginBottom: 4,
+    borderColor: 'rgba(154, 107, 255, 0.35)',
+    backgroundColor: 'rgba(23, 11, 51, 0.4)',
   },
-  emptySlotText: {
+  emptySlotPlusCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(90, 219, 181, 0.15)',
+    borderWidth: 1,
+    borderColor: '#5ADBB5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  emptySlotPlusText: {
+    color: '#5ADBB5',
+    fontSize: 18,
+    fontWeight: 'bold',
+    lineHeight: 20,
+  },
+  emptySlotTextCol: {
+    flex: 1,
+  },
+  emptySlotTitle: {
     color: '#D9CDF5',
     fontSize: 13,
     fontFamily: THEME.fonts.bold,
-    fontWeight: '700',
-    letterSpacing: 0.5,
   },
+  emptySlotSub: {
+    color: '#8A7BAF',
+    fontSize: 11,
+    fontFamily: THEME.fonts.medium,
+    marginTop: 1,
+  },
+
+  // 4. Lobi Reaksiyonları Bar
+  reactionsSection: {
+    width: '100%',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  reactionsHeader: {
+    color: '#9A8BC2',
+    fontSize: 11,
+    fontFamily: THEME.fonts.bold,
+    letterSpacing: 1.5,
+    marginBottom: 6,
+  },
+  reactionsPillBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1E0E3D',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(154, 107, 255, 0.3)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    width: '100%',
+  },
+  reactionTouch: {
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+  },
+  reactionEmojiText: {
+    fontSize: 22,
+  },
+
+  // 4.5. Hızlı ve Özel Sohbet
+  quickChatContainer: {
+    width: '100%',
+    marginVertical: 4,
+  },
+  quickChipsScroll: {
+    paddingVertical: 4,
+    gap: 6,
+  },
+  quickChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  quickChipText: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
+  },
+  chatInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+    width: '100%',
+  },
+  chatInput: {
+    flex: 1,
+    height: 42,
+    backgroundColor: '#1E0E3D',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(154, 107, 255, 0.3)',
+    paddingHorizontal: 12,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.medium,
+  },
+  chatSendBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#5ADBB5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatSendBtnDisabled: {
+    opacity: 0.4,
+  },
+  chatSendBtnText: {
+    color: '#0C3A33',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+
+  // 5. Alt Kontroller
   controlsWrap: {
     width: '100%',
-    maxWidth: 380,
-    marginTop: 8,
+    marginTop: 10,
+    marginBottom: 20,
   },
   waitingContainer: {
     alignItems: 'center',
     width: '100%',
+    backgroundColor: '#1E0E3D',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(154, 107, 255, 0.3)',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  waitingHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  waitingIcon: {
+    fontSize: 16,
   },
   waitingPulsingText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontFamily: THEME.fonts.display,
-    textAlign: 'center',
-    letterSpacing: 0.5,
+    color: '#FFC837',
+    fontSize: 14,
+    fontFamily: THEME.fonts.bold,
   },
   waitingSubNotice: {
-    color: '#D9CDF5',
-    fontSize: 12,
-    fontFamily: THEME.fonts.bold,
+    color: '#9A8BC2',
+    fontSize: 11,
+    fontFamily: THEME.fonts.medium,
     textAlign: 'center',
-    marginTop: 3,
     marginBottom: 12,
   },
-  singleInviteBtn: {
+  inviteShareBtn: {
     width: '100%',
-    height: 50,
-    borderRadius: 25,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#5ADBB5',
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
     ...Platform.select({
       ios: {
@@ -813,66 +1009,67 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
       },
       android: {
-        elevation: 5,
+        elevation: 6,
       },
       web: {
-        boxShadow: '0 4px 12px rgba(90, 219, 181, 0.35)',
+        boxShadow: '0 4px 14px rgba(90, 219, 181, 0.35)',
       },
     }),
   },
-  singleInviteBtnText: {
-    color: '#0C3A33',
-    fontSize: 15,
+  inviteShareBtnText: {
+    color: '#0B2E28',
+    fontSize: 14,
     fontFamily: THEME.fonts.display,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   readyContainer: {
-    alignItems: 'center',
     width: '100%',
+    alignItems: 'center',
   },
   readyNotificationText: {
     color: '#5ADBB5',
-    fontSize: 13,
-    fontFamily: THEME.fonts.display,
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
     textAlign: 'center',
     marginBottom: 10,
   },
   guestControls: {
-    alignItems: 'center',
-    gap: 8,
     width: '100%',
+    alignItems: 'center',
   },
   readyToggleBtn: {
     width: '100%',
-    paddingVertical: 14,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    height: 52,
+    borderRadius: 24,
+    backgroundColor: 'rgba(90, 219, 181, 0.15)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
+    borderColor: '#5ADBB5',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   readyToggleBtnActive: {
     backgroundColor: '#5ADBB5',
-    borderColor: '#5ADBB5',
   },
   readyToggleText: {
-    color: '#FFFFFF',
+    color: '#5ADBB5',
     fontSize: 15,
     fontFamily: THEME.fonts.display,
-    fontWeight: '900',
+    letterSpacing: 1,
   },
   readyToggleTextActive: {
-    color: '#0C3A33',
+    color: '#0B2E28',
   },
   waitingHostText: {
-    color: '#D9CDF5',
+    color: '#9A8BC2',
     fontSize: 12,
-    fontFamily: THEME.fonts.bold,
+    fontFamily: THEME.fonts.medium,
+    marginTop: 8,
   },
+
+  // Süzülme Animasyon Katmanı
   floatingLayer: {
     position: 'absolute',
-    top: 70,
+    top: 60,
     bottom: 120,
     left: 20,
     right: 20,
@@ -925,75 +1122,13 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   floatingChatSender: {
-    color: '#FFE27A',
     fontSize: 10,
-    fontFamily: THEME.fonts.extraBold,
-    fontWeight: '800',
+    fontFamily: THEME.fonts.bold,
+    color: '#FFC837',
   },
   floatingChatBody: {
-    color: '#FFFFFF',
-    fontSize: 12.5,
-    fontFamily: THEME.fonts.bold,
-    fontWeight: '700',
-  },
-  quickChatContainer: {
-    width: '100%',
-    maxWidth: 380,
-    marginTop: 6,
-    marginBottom: 8,
-    gap: 8,
-  },
-  quickChipsScroll: {
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 2,
-  },
-  quickChip: {
-    paddingVertical: 5,
-    paddingHorizontal: 11,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-  },
-  quickChipText: {
-    color: '#D9CDF5',
-    fontSize: 11.5,
-    fontFamily: THEME.fonts.bold,
-    fontWeight: '700',
-  },
-  chatInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    width: '100%',
-  },
-  chatInput: {
-    flex: 1,
-    height: 42,
-    backgroundColor: 'rgba(10, 4, 30, 0.75)',
-    borderWidth: 1.2,
-    borderColor: 'rgba(154, 107, 255, 0.35)',
-    borderRadius: 21,
-    paddingHorizontal: 16,
-    color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: THEME.fonts.medium,
-  },
-  chatSendBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#5ADBB5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chatSendBtnDisabled: {
-    opacity: 0.4,
-  },
-  chatSendBtnText: {
-    color: '#082520',
-    fontSize: 16,
-    fontWeight: '900',
+    color: '#FFFFFF',
   },
 });
