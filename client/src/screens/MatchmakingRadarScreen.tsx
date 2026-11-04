@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Platform } from 'react-native';
 import { CategoryId, DifficultyLevel, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -18,146 +18,87 @@ interface MatchmakingRadarScreenProps {
   onCancel: () => void;
 }
 
-// Radar target configuration around a 270x270 circle (center = 135, 135)
-// theta is clock angle in degrees (0° = 12 o'clock, 90° = 3 o'clock, etc.)
-interface RadarTargetConfig {
+// 10 candidate sonar coordinates scattered around the 270x270 radar (center = 135, 135)
+interface RandomTargetPoint {
   id: string;
-  clockAngleDeg: number;
-  radius: number;
+  x: number; // left in 270x270
+  y: number; // top in 270x270
   color: string;
-  glowColor: string;
+  glow: string;
   size: number;
-  label?: string;
 }
 
-const RADAR_TARGETS: RadarTargetConfig[] = [
-  {
-    id: 't1_gold',
-    clockAngleDeg: 48,
-    radius: 86,
-    color: '#FFC43D',
-    glowColor: 'rgba(255, 196, 61, 0.45)',
-    size: 24,
-    label: 'TR',
-  },
-  {
-    id: 't2_mint',
-    clockAngleDeg: 115,
-    radius: 98,
-    color: '#6FE3C1',
-    glowColor: 'rgba(111, 227, 193, 0.45)',
-    size: 20,
-    label: 'EU',
-  },
-  {
-    id: 't3_cyan',
-    clockAngleDeg: 165,
-    radius: 68,
-    color: '#38BDF8',
-    glowColor: 'rgba(56, 189, 248, 0.45)',
-    size: 18,
-  },
-  {
-    id: 't4_purple',
-    clockAngleDeg: 215,
-    radius: 92,
-    color: '#C084FC',
-    glowColor: 'rgba(192, 132, 252, 0.45)',
-    size: 22,
-    label: 'AZ',
-  },
-  {
-    id: 't5_rose',
-    clockAngleDeg: 285,
-    radius: 78,
-    color: '#F43F5E',
-    glowColor: 'rgba(244, 63, 94, 0.45)',
-    size: 18,
-  },
-  {
-    id: 't6_amber',
-    clockAngleDeg: 340,
-    radius: 54,
-    color: '#FBBF24',
-    glowColor: 'rgba(251, 191, 36, 0.45)',
-    size: 16,
-  },
+const RADAR_POINTS: RandomTargetPoint[] = [
+  // Quadrant 1 (Top-Right)
+  { id: 'p1', x: 196, y: 68, color: '#FFC43D', glow: 'rgba(255, 196, 61, 0.45)', size: 18 },
+  { id: 'p2', x: 218, y: 130, color: '#6FE3C1', glow: 'rgba(111, 227, 193, 0.45)', size: 16 },
+  { id: 'p3', x: 172, y: 104, color: '#38BDF8', glow: 'rgba(56, 189, 248, 0.45)', size: 15 },
+
+  // Quadrant 2 (Bottom-Right)
+  { id: 'p4', x: 188, y: 198, color: '#C084FC', glow: 'rgba(192, 132, 252, 0.45)', size: 18 },
+  { id: 'p5', x: 142, y: 220, color: '#FFC43D', glow: 'rgba(255, 196, 61, 0.45)', size: 16 },
+
+  // Quadrant 3 (Bottom-Left)
+  { id: 'p6', x: 78, y: 202, color: '#6FE3C1', glow: 'rgba(111, 227, 193, 0.45)', size: 18 },
+  { id: 'p7', x: 50, y: 142, color: '#38BDF8', glow: 'rgba(56, 189, 248, 0.45)', size: 16 },
+  { id: 'p8', x: 96, y: 164, color: '#F43F5E', glow: 'rgba(244, 63, 94, 0.45)', size: 15 },
+
+  // Quadrant 4 (Top-Left)
+  { id: 'p9', x: 68, y: 76, color: '#FBBF24', glow: 'rgba(251, 191, 36, 0.45)', size: 17 },
+  { id: 'p10', x: 126, y: 52, color: '#6FE3C1', glow: 'rgba(111, 227, 193, 0.45)', size: 15 },
 ];
 
-// Single animated radar ping target component
-const DynamicSonarBlip: React.FC<{
-  target: RadarTargetConfig;
-  sweepDurationMs: number;
-}> = ({ target, sweepDurationMs }) => {
-  const pulseAnim = useRef(new Animated.Value(0)).current;
+// Single random ping target: dormant/sönük by default, bursts with light when triggered
+const RandomSonarBlip: React.FC<{
+  point: RandomTargetPoint;
+  isActive: boolean;
+}> = ({ point, isActive }) => {
+  const flashAnim = useRef(new Animated.Value(0)).current;
   const rippleAnim = useRef(new Animated.Value(0)).current;
 
-  // Calculate position in 270x270 container
-  const rad = (target.clockAngleDeg * Math.PI) / 180;
-  const posX = 135 + target.radius * Math.sin(rad) - target.size / 2;
-  const posY = 135 - target.radius * Math.cos(rad) - target.size / 2;
-
-  // Delay trigger to synchronize with 360° sweep beam arrival
-  const triggerDelay = Math.round(sweepDurationMs * (target.clockAngleDeg / 360));
-
   useEffect(() => {
-    let isMounted = true;
-    let timerId: any = null;
-    let loopPulse: Animated.CompositeAnimation | null = null;
-    let loopRipple: Animated.CompositeAnimation | null = null;
+    if (isActive) {
+      flashAnim.setValue(0);
+      rippleAnim.setValue(0);
 
-    timerId = setTimeout(() => {
-      if (!isMounted) return;
-
-      // Pulse sequence: sharp flash as beam sweeps, gentle glow decay
-      loopPulse = Animated.loop(
+      Animated.parallel([
         Animated.sequence([
-          Animated.parallel([
-            Animated.timing(pulseAnim, {
-              toValue: 1,
-              duration: 320,
-              easing: Easing.out(Easing.back(1.5)),
-              useNativeDriver: Platform.OS !== 'web',
-            }),
-            Animated.timing(rippleAnim, {
-              toValue: 1,
-              duration: 850,
-              easing: Easing.out(Easing.cubic),
-              useNativeDriver: Platform.OS !== 'web',
-            }),
-          ]),
-          Animated.timing(pulseAnim, {
-            toValue: 0.25,
-            duration: sweepDurationMs - 320,
+          Animated.timing(flashAnim, {
+            toValue: 1,
+            duration: 180,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: Platform.OS !== 'web',
+          }),
+          Animated.timing(flashAnim, {
+            toValue: 0,
+            duration: 750,
             easing: Easing.inOut(Easing.ease),
             useNativeDriver: Platform.OS !== 'web',
           }),
-        ])
-      );
-      loopPulse.start();
-    }, triggerDelay);
-
-    return () => {
-      isMounted = false;
-      if (timerId) clearTimeout(timerId);
-      if (loopPulse) loopPulse.stop();
-      if (loopRipple) loopRipple.stop();
-    };
-  }, [pulseAnim, rippleAnim, sweepDurationMs, triggerDelay]);
+        ]),
+        Animated.timing(rippleAnim, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ]).start();
+    }
+  }, [isActive, flashAnim, rippleAnim]);
 
   const rippleScale = rippleAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.8, 2.6],
+    outputRange: [0.6, 2.8],
   });
 
   const rippleOpacity = rippleAnim.interpolate({
-    inputRange: [0, 0.4, 1],
+    inputRange: [0, 0.3, 1],
     outputRange: [0.9, 0.4, 0],
   });
 
-  const blipScale = pulseAnim.interpolate({
-    inputRange: [0.25, 1],
-    outputRange: [0.75, 1.15],
+  const blipScale = flashAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.4, 1.2],
   });
 
   return (
@@ -165,40 +106,50 @@ const DynamicSonarBlip: React.FC<{
       style={[
         styles.blipWrapper,
         {
-          left: posX,
-          top: posY,
-          width: target.size,
-          height: target.size,
+          left: point.x - point.size / 2,
+          top: point.y - point.size / 2,
+          width: point.size,
+          height: point.size,
         },
       ]}
       pointerEvents="none"
     >
-      {/* Expanding shockwave ripple */}
+      {/* Sönük arka plan mikro izi (hafif, göz yormayan kılavuz nokta) */}
+      <View
+        style={[
+          styles.dormantDot,
+          {
+            backgroundColor: point.color,
+          },
+        ]}
+      />
+
+      {/* Tetiklendiğinde yayılan şok sonar dalgası */}
       <Animated.View
         style={[
           styles.blipRippleRing,
           {
-            borderColor: target.color,
-            backgroundColor: target.glowColor,
+            borderColor: point.color,
+            backgroundColor: point.glow,
             transform: [{ scale: rippleScale }],
             opacity: rippleOpacity,
           },
         ]}
       />
 
-      {/* Core glowing target badge */}
+      {/* Parlayan çekirdek ışık */}
       <Animated.View
         style={[
           styles.blipCore,
           {
-            borderColor: target.color,
-            backgroundColor: target.glowColor,
-            opacity: pulseAnim,
+            borderColor: point.color,
+            backgroundColor: point.glow,
+            opacity: flashAnim,
             transform: [{ scale: blipScale }],
           },
         ]}
       >
-        <View style={[styles.blipInnerDot, { backgroundColor: target.color }]} />
+        <View style={[styles.blipInnerDot, { backgroundColor: point.color }]} />
       </Animated.View>
     </View>
   );
@@ -211,9 +162,12 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
   onCancel,
 }) => {
   const [elapsedSec, setElapsedSec] = useState(0);
+  // Track which random point is currently pinging
+  const [activeBlipIndex, setActiveBlipIndex] = useState<number | null>(null);
+
   const catObj = ALL_CATEGORIES.find((c) => c.id === category);
 
-  const SWEEP_DURATION_MS = 2200;
+  const SWEEP_DURATION_MS = 2400;
 
   // Continuous 360-degree radar sweep rotation
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -225,7 +179,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
   const opponentPulseAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Play initial radar sonar ping
+    // Initial radar ping sound
     sound.playSound('radar_ping');
 
     // Continuous 360° sweep
@@ -288,6 +242,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
     );
     oppLoop.start();
 
+    // Timer for elapsed seconds
     const timer = setInterval(() => {
       setElapsedSec((prev) => {
         const next = prev + 1;
@@ -298,12 +253,31 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
       });
     }, 1000);
 
+    // Random Sonar Ping Trigger: Picks a random point every 750ms - 1100ms
+    let pingTimeout: any = null;
+    let lastIdx = -1;
+
+    const triggerRandomPing = () => {
+      let nextIdx = Math.floor(Math.random() * RADAR_POINTS.length);
+      if (nextIdx === lastIdx) {
+        nextIdx = (nextIdx + 1) % RADAR_POINTS.length;
+      }
+      lastIdx = nextIdx;
+      setActiveBlipIndex(nextIdx);
+
+      const nextDelay = 800 + Math.random() * 500;
+      pingTimeout = setTimeout(triggerRandomPing, nextDelay);
+    };
+
+    triggerRandomPing();
+
     return () => {
       sweepLoop.stop();
       sonarLoop.stop();
       centerLoop.stop();
       oppLoop.stop();
       clearInterval(timer);
+      if (pingTimeout) clearTimeout(pingTimeout);
     };
   }, [rotateAnim, sonarPulse, centerScale, opponentPulseAnim]);
 
@@ -327,10 +301,6 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
   const searchProgress = Math.min(100, (clampedSec / 7) * 100);
   const remainingSec = Math.max(0, 7 - clampedSec);
 
-  // Dynamic status text according to specification:
-  // 0-3 sn: "Gerçek 1v1 rakip aranıyor..."
-  // 4-6 sn: "Adaylar taranıyor..."
-  // 7. sn: "Bilgisayar rakip atanıyor..."
   const getStatusText = () => {
     if (elapsedSec < 4) {
       return 'Gerçek 1v1 rakip aranıyor...';
@@ -398,7 +368,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
         </View>
       </View>
 
-      {/* Circular Animated Radar with Multi-Target Motion Sonar */}
+      {/* Circular Animated Radar with Random Motion Sonar Pings */}
       <View style={styles.radarContainer}>
         {/* Expanding Sonar Wave Ring */}
         <Animated.View
@@ -487,12 +457,12 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
           <Text style={styles.center1v1Text}>1v1</Text>
         </Animated.View>
 
-        {/* DYNAMIC MULTI-TARGET SONAR BLIPS ACROSS ALL QUADRANTS */}
-        {RADAR_TARGETS.map((target) => (
-          <DynamicSonarBlip
-            key={target.id}
-            target={target}
-            sweepDurationMs={SWEEP_DURATION_MS}
+        {/* RANDOM SONAR BLIPS: Dormant / Sönük by default, igniting randomly */}
+        {RADAR_POINTS.map((pt, idx) => (
+          <RandomSonarBlip
+            key={pt.id}
+            point={pt}
+            isActive={activeBlipIndex === idx}
           />
         ))}
       </View>
@@ -731,6 +701,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 4,
   },
+  dormantDot: {
+    position: 'absolute',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    opacity: 0.12, // sönük kılavuz nokta
+  },
   blipRippleRing: {
     position: 'absolute',
     width: '100%',
@@ -742,14 +719,14 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 999,
-    borderWidth: 2,
+    borderWidth: 1.8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   blipInnerDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
 
   timerWrap: {

@@ -666,19 +666,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         {/* HORIZONTAL MOTION AVATAR PICKER (Soldan Sağa Kaydırmalı Karakterler) */}
         <View style={styles.avatarPickerSection}>
           <View style={styles.avatarPickerHeaderRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={styles.avatarPickerTitleWrap}>
               <Text style={styles.avatarPickerTitle}>Karakterini Değiştir</Text>
-              <View style={styles.swipeHintBadge}>
-                <Text style={styles.swipeHintText}>Soldan Sağa Kaydır ➔</Text>
-              </View>
+              <Text style={styles.avatarPickerSubtitle}>Soldan sağa kaydırarak seç</Text>
             </View>
             <TouchableOpacity
               style={styles.customPhotoChip}
               onPress={handlePickPhotoDirect}
               activeOpacity={0.8}
             >
-              <CameraVectorIcon size={13} color="#FFC43D" />
-              <Text style={styles.customPhotoChipText}>Fotoğraf Seç</Text>
+              <CameraVectorIcon size={14} color="#FFC43D" />
+              <Text style={styles.customPhotoChipText}>Fotoğraf</Text>
             </TouchableOpacity>
           </View>
 
@@ -1145,38 +1143,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
+    gap: 8,
+  },
+  avatarPickerTitleWrap: {
+    flex: 1,
   },
   avatarPickerTitle: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 14.5,
     fontFamily: THEME.fonts.display,
   },
-  swipeHintBadge: {
-    backgroundColor: 'rgba(255, 196, 61, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  swipeHintText: {
-    color: '#FFC43D',
-    fontSize: 9,
-    fontFamily: THEME.fonts.extraBold,
+  avatarPickerSubtitle: {
+    color: '#D9CDF5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.bold,
+    marginTop: 1,
+    opacity: 0.8,
   },
   customPhotoChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 196, 61, 0.4)',
+    gap: 5,
+    backgroundColor: 'rgba(255, 196, 61, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1.2,
+    borderColor: 'rgba(255, 196, 61, 0.5)',
+    flexShrink: 0,
   },
   customPhotoChipText: {
     color: '#FFC43D',
-    fontSize: 11,
+    fontSize: 11.5,
     fontFamily: THEME.fonts.extraBold,
   },
   avatarCarouselTrack: {
