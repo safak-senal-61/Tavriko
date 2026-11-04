@@ -598,6 +598,10 @@ export const RootNavigator: React.FC = () => {
         ...user,
         avatarUrl: newAvatarUri,
       });
+      socketService.setSessionContext({
+        ...socketService.lastSessionContext,
+        avatarUrl: newAvatarUri,
+      });
       try {
         const res = await fetch(`${API_BASE}/auth/profile`, {
           method: 'PUT',

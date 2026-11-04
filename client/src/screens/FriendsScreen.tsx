@@ -94,7 +94,25 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
           const seenIds = new Set<string>();
           const seenUsernames = new Set<string>();
           const seenNames = new Set<string>();
-          const cleanFriends = data.friends.filter((f: FriendRowItem) => {
+
+          // 1. Never show the current user in their own friends list
+          if (user?.id) seenIds.add(user.id);
+          if (uid && uid !== 'default') seenIds.add(uid);
+          if (user?.username) seenUsernames.add(user.username.toLowerCase().trim());
+          const myNormName = (user?.displayName || user?.fullName || user?.username || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9ğüşıöç]/gi, '')
+            .trim();
+          if (myNormName) seenNames.add(myNormName);
+
+          // 2. Prioritize friends in-room and online first before deduplicating
+          const sorted = [...data.friends].sort((a, b) => {
+            if (a.inRoom !== b.inRoom) return a.inRoom ? -1 : 1;
+            if (a.online !== b.online) return a.online ? -1 : 1;
+            return (b.xp || 0) - (a.xp || 0);
+          });
+
+          const cleanFriends = sorted.filter((f: FriendRowItem) => {
             if (!f || !f.id || seenIds.has(f.id)) return false;
             const uName = (f.username || '').toLowerCase().trim();
             const normName = (f.displayName || f.name || f.username || '')

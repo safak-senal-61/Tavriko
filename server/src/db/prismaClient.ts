@@ -2716,9 +2716,11 @@ export class PrismaService {
     const uniqueUsers: UserRecord[] = [];
     for (const u of this.users.values()) {
       const uName = (u?.username || '').toLowerCase().trim();
-      if (u && u.id && !seenUserIds.has(u.id) && (!uName || !seenUsernames.has(uName))) {
+      const dName = normalizeName(u?.displayName || u?.username);
+      if (u && u.id && !seenUserIds.has(u.id) && (!uName || !seenUsernames.has(uName)) && (!dName || !seenNormalizedNames.has(dName))) {
         seenUserIds.add(u.id);
         if (uName) seenUsernames.add(uName);
+        if (dName) seenNormalizedNames.add(dName);
         uniqueUsers.push(u);
       }
     }
