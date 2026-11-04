@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,9 @@ import {
   Image,
   Modal,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
-import { UserProfile } from '@trivia/shared';
+import { UserProfile, UserSettings } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import {
@@ -30,7 +31,29 @@ interface SettingsScreenProps {
   onDeleteAccount: () => Promise<void>;
   onDeveloper?: () => void;
   onSyncWallet?: () => Promise<void>;
+  token?: string | null;
+  onUpdateUser?: (updated: UserProfile) => void;
 }
+
+const SETTINGS_STORAGE_KEY = 'tavriko_user_settings_v1';
+
+const loadLocalSettings = (): UserSettings => {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (raw) return JSON.parse(raw) as UserSettings;
+    }
+  } catch {}
+  return {};
+};
+
+const saveLocalSettings = (settings: UserSettings) => {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    }
+  } catch {}
+};
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   user,
@@ -40,7 +63,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onDeleteAccount,
   onDeveloper,
   onSyncWallet,
+  token,
+  onUpdateUser,
 }) => {
+  // Saved settings: PostgreSQL (user.settings) takes precedence over local cache
+  const saved: UserSettings = { ...loadLocalSettings(), ...((user?.settings as UserSettings) || {}) };
+  const pick = <K extends keyof UserSettings>(key: K, fallback: NonNullable<UserSettings[K]>) =>
+    (saved[key] ?? fallback) as NonNullable<UserSettings[K]>;
+
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
@@ -57,42 +87,156 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   }, [user]);
 
   // Audio & Haptics
-  const [sfxEnabled, setSfxEnabled] = useState(sound.isSoundEnabled());
-  const [sfxVolume, setSfxVolume] = useState<'25' | '50' | '75' | '100'>('100');
-  const [musicEnabled, setMusicEnabled] = useState(false);
-  const [musicVolume, setMusicVolume] = useState<'25' | '50' | '75' | '100'>('50');
-  const [hapticsEnabled, setHapticsEnabled] = useState(sound.isHapticsEnabled());
-  const [hapticIntensity, setHapticIntensity] = useState<'light' | 'medium' | 'strong'>('medium');
-  const [timerAlertSound, setTimerAlertSound] = useState(true);
-  const [victoryMelody, setVictoryMelody] = useState(true);
+  const [sfxEnabled, setSfxEnabled] = useState<boolean>(pick('sfxEnabled', sound.isSoundEnabled()));
+  const [sfxVolume, setSfxVolume] = useState<'25' | '50' | '75' | '100'>(pick('sfxVolume', '100'));
+  const [musicEnabled, setMusicEnabled] = useState<boolean>(pick('musicEnabled', false));
+  const [musicVolume, setMusicVolume] = useState<'25' | '50' | '75' | '100'>(pick('musicVolume', '50'));
+  const [hapticsEnabled, setHapticsEnabled] = useState<boolean>(pick('hapticsEnabled', sound.isHapticsEnabled()));
+  const [hapticIntensity, setHapticIntensity] = useState<'light' | 'medium' | 'strong'>(pick('hapticIntensity', 'medium'));
+  const [timerAlertSound, setTimerAlertSound] = useState<boolean>(pick('timerAlertSound', true));
+  const [victoryMelody, setVictoryMelody] = useState<boolean>(pick('victoryMelody', true));
 
   // Visual & Performance
-  const [smoothAnimations, setSmoothAnimations] = useState(true);
-  const [batterySaver, setBatterySaver] = useState(false);
-  const [ambientGlow, setAmbientGlow] = useState(true);
-  const [textSize, setTextSize] = useState<'normal' | 'large'>('normal');
-  const [buttonSpring, setButtonSpring] = useState(true);
+  const [smoothAnimations, setSmoothAnimations] = useState<boolean>(pick('smoothAnimations', true));
+  const [batterySaver, setBatterySaver] = useState<boolean>(pick('batterySaver', false));
+  const [ambientGlow, setAmbientGlow] = useState<boolean>(pick('ambientGlow', true));
+  const [textSize, setTextSize] = useState<'normal' | 'large'>(pick('textSize', 'normal'));
+  const [buttonSpring, setButtonSpring] = useState<boolean>(pick('buttonSpring', true));
 
   // Gameplay Preferences
-  const [defaultDifficulty, setDefaultDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
-  const [questionCount, setQuestionCount] = useState<number>(5);
-  const [questionTimeSec, setQuestionTimeSec] = useState<number>(20);
-  const [penaltyForWrong, setPenaltyForWrong] = useState(true);
-  const [autoNextQuestion, setAutoNextQuestion] = useState(true);
-  const [doubleTapProtection, setDoubleTapProtection] = useState(false);
+  const [defaultDifficulty, setDefaultDifficulty] = useState<'easy' | 'medium' | 'hard'>(pick('defaultDifficulty', 'medium'));
+  const [questionCount, setQuestionCount] = useState<number>(pick('questionCount', 5));
+  const [questionTimeSec, setQuestionTimeSec] = useState<number>(pick('questionTimeSec', 20));
+  const [penaltyForWrong, setPenaltyForWrong] = useState<boolean>(pick('penaltyForWrong', true));
+  const [autoNextQuestion, setAutoNextQuestion] = useState<boolean>(pick('autoNextQuestion', true));
+  const [doubleTapProtection, setDoubleTapProtection] = useState<boolean>(pick('doubleTapProtection', false));
 
   // Social & Privacy
-  const [notifsEnabled, setNotifsEnabled] = useState(true);
-  const [duelInvitesAllowed, setDuelInvitesAllowed] = useState(true);
-  const [roomInvitesAllowed, setRoomInvitesAllowed] = useState(true);
-  const [onlineStatusVisible, setOnlineStatusVisible] = useState(true);
-  const [profilePublic, setProfilePublic] = useState(true);
-  const [friendRequestsAllowed, setFriendRequestsAllowed] = useState(true);
+  const [notifsEnabled, setNotifsEnabled] = useState<boolean>(pick('notifsEnabled', true));
+  const [duelInvitesAllowed, setDuelInvitesAllowed] = useState<boolean>(pick('duelInvitesAllowed', true));
+  const [roomInvitesAllowed, setRoomInvitesAllowed] = useState<boolean>(pick('roomInvitesAllowed', true));
+  const [onlineStatusVisible, setOnlineStatusVisible] = useState<boolean>(pick('onlineStatusVisible', true));
+  const [profilePublic, setProfilePublic] = useState<boolean>(pick('profilePublic', true));
+  const [friendRequestsAllowed, setFriendRequestsAllowed] = useState<boolean>(pick('friendRequestsAllowed', true));
 
   // Notifications
-  const [dailyReminder, setDailyReminder] = useState(true);
-  const [seasonAlerts, setSeasonAlerts] = useState(true);
-  const [friendActivity, setFriendActivity] = useState(true);
+  const [dailyReminder, setDailyReminder] = useState<boolean>(pick('dailyReminder', true));
+  const [seasonAlerts, setSeasonAlerts] = useState<boolean>(pick('seasonAlerts', true));
+  const [friendActivity, setFriendActivity] = useState<boolean>(pick('friendActivity', true));
+
+  // Persistence status
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'local' | 'error'>('idle');
+  const isFirstRenderRef = useRef(true);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Password change modal
+  const [pwModalVisible, setPwModalVisible] = useState(false);
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [newPw2, setNewPw2] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwMessage, setPwMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const currentSettings: UserSettings = {
+    sfxEnabled, sfxVolume, musicEnabled, musicVolume, hapticsEnabled, hapticIntensity,
+    timerAlertSound, victoryMelody, smoothAnimations, batterySaver, ambientGlow, textSize,
+    buttonSpring, defaultDifficulty, questionCount, questionTimeSec, penaltyForWrong,
+    autoNextQuestion, doubleTapProtection, notifsEnabled, duelInvitesAllowed, roomInvitesAllowed,
+    onlineStatusVisible, profilePublic, friendRequestsAllowed, dailyReminder, seasonAlerts,
+    friendActivity,
+  };
+  const settingsSignature = JSON.stringify(currentSettings);
+
+  // Apply audio/haptic engine state whenever relevant settings change
+  useEffect(() => {
+    const vol01 = (v: string) => Math.min(1, Math.max(0, Number(v) / 100));
+    sound.setSoundEnabled(sfxEnabled);
+    sound.setSoundVolume(vol01(sfxVolume));
+    sound.setHapticsEnabled(hapticsEnabled);
+    sound.setHapticIntensity(hapticIntensity);
+    sound.setMusicEnabled(musicEnabled);
+    sound.setMusicVolume(vol01(musicVolume));
+  }, [sfxEnabled, sfxVolume, hapticsEnabled, hapticIntensity, musicEnabled, musicVolume]);
+
+  // Debounced persistence: localStorage immediately, PostgreSQL via POST /auth/settings
+  useEffect(() => {
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      return;
+    }
+    saveLocalSettings(currentSettings);
+    if (!user || (user as any).isGuest) {
+      setSaveStatus('local');
+      return;
+    }
+    setSaveStatus('saving');
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/auth/settings`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ userId: user.id, settings: currentSettings }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+        console.log('✅ [SettingsScreen] Ayarlar PostgreSQL veritabanına kaydedildi.');
+        setSaveStatus('saved');
+        if (data?.user && onUpdateUser) onUpdateUser(data.user);
+      } catch (err: any) {
+        console.warn('⚠️ [SettingsScreen] Ayarlar sunucuya kaydedilemedi:', err?.message);
+        setSaveStatus('error');
+      }
+    }, 600);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsSignature]);
+
+  const handleChangePassword = async () => {
+    setPwMessage(null);
+    if (newPw.length < 6) {
+      setPwMessage({ ok: false, text: 'Yeni şifre en az 6 karakter olmalıdır.' });
+      return;
+    }
+    if (newPw !== newPw2) {
+      setPwMessage({ ok: false, text: 'Yeni şifreler birbiriyle eşleşmiyor.' });
+      return;
+    }
+    if (!token) {
+      setPwMessage({ ok: false, text: 'Oturum doğrulanamadı. Lütfen çıkış yapıp tekrar giriş yapın.' });
+      return;
+    }
+    setPwLoading(true);
+    try {
+      const res = await fetch(`${apiBaseUrl}/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) throw new Error(data?.error || data?.message || 'Şifre değiştirilemedi.');
+      sound.playSound('reward');
+      sound.triggerHaptic('success');
+      setPwMessage({ ok: true, text: '✓ Şifreniz başarıyla güncellendi.' });
+      setCurrentPw('');
+      setNewPw('');
+      setNewPw2('');
+      setTimeout(() => {
+        setPwModalVisible(false);
+        setPwMessage(null);
+      }, 1500);
+    } catch (err: any) {
+      sound.playSound('wrong');
+      setPwMessage({ ok: false, text: err?.message || 'Şifre değiştirilemedi.' });
+    } finally {
+      setPwLoading(false);
+    }
+  };
 
   // Feedback & Modal state
   const [cacheClearedNotice, setCacheClearedNotice] = useState(false);
@@ -171,6 +315,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>AYARLAR</Text>
+        {saveStatus !== 'idle' && (
+          <Text
+            style={[
+              styles.saveStatusText,
+              saveStatus === 'error' && { color: '#FF5A6A' },
+              saveStatus === 'saved' && { color: '#3FD08A' },
+            ]}
+          >
+            {saveStatus === 'saving' && '⏳ Ayarlar veritabanına kaydediliyor...'}
+            {saveStatus === 'saved' && '✓ Ayarlar PostgreSQL veritabanına kaydedildi'}
+            {saveStatus === 'local' && '💾 Misafir modu: ayarlar yalnızca bu cihazda saklanıyor'}
+            {saveStatus === 'error' && '⚠️ Sunucuya kaydedilemedi, bu cihazda saklandı'}
+          </Text>
+        )}
 
         {/* 1. Account Summary & Live Cloud Persistence Card */}
         {user && (
@@ -658,6 +816,20 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         {/* 8. Account Session & Delete Section */}
         <Text style={styles.sectionHeader}>HESAP VE GÜVENLİK</Text>
         <View style={styles.accountActionBox}>
+          {/* Change Password */}
+          {user && !(user as any).isGuest && (
+            <TouchableOpacity
+              style={styles.changePwBtn}
+              onPress={() => {
+                sound.playSound('tap');
+                setPwMessage(null);
+                setPwModalVisible(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.changePwBtnText}>🔑 Şifre Değiştir / Şifre Belirle</Text>
+            </TouchableOpacity>
+          )}
           {/* Safe Logout Button */}
           <Button3D
             title="GÜVENLİ ÇIKIŞ YAP"
@@ -737,11 +909,118 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </View>
         </View>
       </Modal>
+
+      {/* Password Change Modal */}
+      <Modal
+        visible={pwModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPwModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={[styles.modalWarningTitle, { color: '#FFC43D' }]}>🔑 ŞİFRE DEĞİŞTİR</Text>
+            <Text style={styles.modalWarningDesc}>
+              Google ile giriş yaptıysanız ve henüz şifreniz yoksa "Mevcut Şifre" alanını boş bırakabilirsiniz.
+            </Text>
+            <TextInput
+              style={styles.pwInput}
+              placeholder="Mevcut şifre"
+              placeholderTextColor="rgba(217,205,245,0.45)"
+              secureTextEntry
+              value={currentPw}
+              onChangeText={setCurrentPw}
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={styles.pwInput}
+              placeholder="Yeni şifre (en az 6 karakter)"
+              placeholderTextColor="rgba(217,205,245,0.45)"
+              secureTextEntry
+              value={newPw}
+              onChangeText={setNewPw}
+              autoCapitalize="none"
+            />
+            <TextInput
+              style={styles.pwInput}
+              placeholder="Yeni şifre (tekrar)"
+              placeholderTextColor="rgba(217,205,245,0.45)"
+              secureTextEntry
+              value={newPw2}
+              onChangeText={setNewPw2}
+              autoCapitalize="none"
+            />
+            {pwMessage && (
+              <Text style={[styles.pwMessage, { color: pwMessage.ok ? '#3FD08A' : '#FF5A6A' }]}>
+                {pwMessage.text}
+              </Text>
+            )}
+            <View style={styles.modalBtnRow}>
+              <Button3D
+                title="VAZGEÇ"
+                variant="gold"
+                disabled={pwLoading}
+                onPress={() => setPwModalVisible(false)}
+                style={{ flex: 1, minHeight: 44 }}
+                textStyle={{ fontSize: 13 }}
+              />
+              <Button3D
+                title={pwLoading ? 'KAYDEDİLİYOR...' : 'KAYDET'}
+                variant="mint"
+                disabled={pwLoading}
+                onPress={handleChangePassword}
+                style={{ flex: 1, minHeight: 44 }}
+                textStyle={{ fontSize: 13 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </TavrikoScreen>
   );
 };
 
 const styles = StyleSheet.create({
+  saveStatusText: {
+    color: '#D9CDF5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  changePwBtn: {
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.5)',
+    backgroundColor: 'rgba(255, 196, 61, 0.1)',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  changePwBtnText: {
+    color: '#FFC43D',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  pwInput: {
+    width: '100%',
+    backgroundColor: 'rgba(10, 4, 24, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#FFFFFF',
+    fontSize: 14,
+    marginBottom: 10,
+  },
+  pwMessage: {
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
   scrollContent: {
     paddingBottom: 48,
     paddingHorizontal: 2,

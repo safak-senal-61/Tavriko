@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
+import { loadStoredPreferences } from '../store/appPrefs';
 import { ClientQuestion, ALL_CATEGORIES } from '@trivia/shared';
 import {
   TavrikoScreen,
@@ -166,6 +167,14 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   dailyChallengeInfo = null,
 }) => {
   const [localSelectedOptionId, setLocalSelectedOptionId] = useState<string | null>(null);
+  // Settings > "Soru Metin Boyutu" (normal / large) — real, app-wide effect
+  const [isLargeText] = useState<boolean>(() => {
+    try {
+      return loadStoredPreferences().textSize === 'large';
+    } catch {
+      return false;
+    }
+  });
   const totalMs = (question.timeLimitSec || 15) * 1000;
   const [secondsLeft, setSecondsLeft] = useState<number>(
     question.timeLimitSec || 15
@@ -246,7 +255,11 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const handleSecondChange = useCallback((sec: number) => {
     setSecondsLeft(sec);
     if (sec <= 3 && sec > 0) {
-      sound.playSound('timer_tick');
+      // Settings > "Süre Uyarı Sesi" — kapalıysa geri sayım tiki çalınmaz
+      const alertOn = loadStoredPreferences().timerAlertSound !== false;
+      if (alertOn) {
+        sound.playSound('timer_tick');
+      }
     }
   }, []);
   const handleSelect = (optionId: string) => {
@@ -381,7 +394,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
             {diffMap[question.difficulty] || 'Orta'}
           </Text>
         </View>
-        <Text style={styles.questionText} numberOfLines={4}>
+        <Text style={[styles.questionText, isLargeText && styles.questionTextLarge]} numberOfLines={4}>
           {question.text}
         </Text>
       </View>
@@ -428,7 +441,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                 </Text>
               </View>
 
-              <Text style={styles.optText} numberOfLines={2}>
+              <Text style={[styles.optText, isLargeText && styles.optTextLarge]} numberOfLines={2}>
                 {opt.text}
               </Text>
 
@@ -679,6 +692,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 29,
   },
+  questionTextLarge: {
+    fontSize: 27,
+    lineHeight: 34,
+  },
   optionsContainer: {
     marginTop: 12,
     gap: 10,
@@ -790,6 +807,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontFamily: THEME.fonts.extraBold,
+  },
+  optTextLarge: {
+    fontSize: 18,
   },
   fixedBottomStatus: {
     height: 62,

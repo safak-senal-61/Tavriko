@@ -92,6 +92,7 @@ model User {
   eventProgress             Json                @default("{}")
   hasPremiumPass            Boolean             @default(false)
   seasonXp                  Int                 @default(0)
+  settings                  Json                @default("{}")
   matches                   MatchHistory[]
   inventoryItems            UserInventoryItem[]
   notifications             UserNotification[]

@@ -31,6 +31,7 @@ import {
   SeasonReward,
   ItemRarity,
   ItemCategory,
+  UserSettings,
 } from '@trivia/shared';
 import { ALL_CATEGORIES, QUESTION_BANK } from './questionsData';
 import { RICH_SEED_BANK } from '../ai/evrenLlmGenerator';
@@ -91,6 +92,7 @@ export interface UserRecord {
   friendIds?: string[];
   notifications?: NotificationItem[];
   categoryMastery?: any;
+  settings?: UserSettings;
   stats: {
     totalMatches: number;
     wins: number;
@@ -462,6 +464,7 @@ export class PrismaService {
       eventProgress: (u as any).eventProgress || {},
       friendIds: Array.isArray(u.friendIds) ? (u.friendIds as string[]) : [],
       categoryMastery: (u.categoryMastery as any) || {},
+      settings: ((u as any).settings as any) || {},
       stats: {
         totalMatches: u.totalMatches,
         wins: u.wins,
@@ -602,6 +605,7 @@ export class PrismaService {
               equippedBackground: (args.create as any).equippedBackground ?? null,
               eventProgress: ((args.create as any).eventProgress ?? {}) as any,
               friendIds: (args.create.friendIds ?? []) as any,
+              settings: (args.create.settings ?? {}) as any,
               createdAt: args.create.createdAt ?? now,
               updatedAt: args.create.updatedAt ?? now,
             };
@@ -1703,6 +1707,12 @@ export class PrismaService {
       gender: string;
       bio: string;
       avatarUrl: string;
+      rankTitle: string;
+      equippedFrame: string;
+      equippedBadge: string;
+      equippedNameEffect: string;
+      equippedBackground: string;
+      settings: Partial<UserSettings>;
     }>
   ): Promise<UserProfile> {
     let record = this.users.get(userId);
@@ -1738,6 +1748,16 @@ export class PrismaService {
     if (updates.avatarUrl !== undefined && updates.avatarUrl) {
       record.avatarUrl = updates.avatarUrl;
     }
+    if (updates.rankTitle !== undefined && updates.rankTitle.trim()) {
+      record.rankTitle = updates.rankTitle.trim();
+    }
+    if (updates.equippedFrame !== undefined) record.equippedFrame = updates.equippedFrame;
+    if (updates.equippedBadge !== undefined) record.equippedBadge = updates.equippedBadge;
+    if (updates.equippedNameEffect !== undefined) record.equippedNameEffect = updates.equippedNameEffect;
+    if (updates.equippedBackground !== undefined) record.equippedBackground = updates.equippedBackground;
+    if (updates.settings !== undefined) {
+      record.settings = { ...(record.settings || {}), ...updates.settings };
+    }
 
     record.updatedAt = Date.now();
     this.users.set(userId, record);
@@ -1763,10 +1783,16 @@ export class PrismaService {
             birthDate: record.birthDate,
             gender: record.gender,
             bio: record.bio,
+            rankTitle: record.rankTitle,
+            equippedFrame: record.equippedFrame,
+            equippedBadge: record.equippedBadge,
+            equippedNameEffect: record.equippedNameEffect,
+            equippedBackground: record.equippedBackground,
+            settings: (record.settings || {}) as any,
             updatedAt: new Date(),
           },
         });
-        console.log(`✅ [updateUserProfile] Prisma PostgreSQL kalıcı güncellendi: ${record.id} -> avatarUrl: ${record.avatarUrl}`);
+        console.log(`✅ [updateUserProfile] Prisma PostgreSQL kalıcı güncellendi: ${record.id} -> avatarUrl: ${record.avatarUrl}, title: ${record.rankTitle}`);
       } catch (dbErr) {
         console.error(`⚠️ [updateUserProfile] Prisma PostgreSQL güncelleme hatası:`, dbErr);
       }
@@ -1776,6 +1802,107 @@ export class PrismaService {
     }
 
     return this.toProfile(record);
+  }
+
+  public async updateUserSettings(
+    userId: string,
+    newSettings: Partial<UserSettings>
+  ): Promise<UserProfile> {
+    let record = this.users.get(userId);
+    if (!record) {
+      try {
+        const u = await this.rawClient.user.findFirst({
+          where: { OR: [{ id: userId }, { username: userId }] },
+        });
+        if (u) {
+          record = this.prismaUserToRecord(u as any);
+          this.users.set(record.id, record);
+        }
+      } catch {}
+    }
+    if (!record) throw new Error('Kullanıcı bulunamadı.');
+
+    record.settings = { ...(record.settings || {}), ...newSettings };
+    record.updatedAt = Date.now();
+    this.users.set(record.id, record);
+    this.savePersistedUsers();
+
+    if (!record.isGuest) {
+      try {
+        await this.rawClient.user.update({
+          where: { id: record.id },
+          data: {
+            settings: record.settings as any,
+            updatedAt: new Date(),
+          },
+        });
+        console.log(`✅ [updateUserSettings] PostgreSQL ayarlar güncellendi: ${record.id}`);
+      } catch (err: any) {
+        console.warn('[updateUserSettings] DB error:', err.message);
+      }
+    }
+
+    // If online status visibility was toggled
+    if (newSettings.onlineStatusVisible !== undefined) {
+      if (newSettings.onlineStatusVisible === false) {
+        presenceManager.broadcast('user:offline', {
+          userId: record.id,
+          presence: { userId: record.id, online: false, inRoom: false, status: 'Çevrimdışı', lastSeen: 0 },
+        });
+      } else {
+        presenceManager.touchUser(record.id);
+      }
+    }
+
+    return this.toProfile(record);
+  }
+
+  public async changeUserPassword(
+    userId: string,
+    currentPass: string,
+    newPass: string
+  ): Promise<{ success: boolean; message: string }> {
+    let record = this.users.get(userId);
+    if (!record) {
+      const u = await this.rawClient.user.findFirst({ where: { OR: [{ id: userId }, { username: userId }] } });
+      if (u) record = this.prismaUserToRecord(u);
+    }
+    if (!record) throw new Error('Kullanıcı bulunamadı.');
+
+    if (record.isGuest) throw new Error('Misafir hesaplarda şifre değiştirilemez.');
+
+    // If account has an existing passwordHash, verify it
+    if (record.passwordHash) {
+      const isMatch = bcrypt.compareSync(currentPass, record.passwordHash);
+      if (!isMatch) {
+        throw new Error('Mevcut şifreniz hatalı. Lütfen tekrar deneyin.');
+      }
+    }
+
+    if (newPass.length < 6) {
+      throw new Error('Yeni şifre en az 6 karakter olmalıdır.');
+    }
+
+    const newHash = bcrypt.hashSync(newPass, 10);
+    record.passwordHash = newHash;
+    record.updatedAt = Date.now();
+    this.users.set(record.id, record);
+    this.savePersistedUsers();
+
+    try {
+      await this.rawClient.user.update({
+        where: { id: record.id },
+        data: {
+          passwordHash: newHash,
+          updatedAt: new Date(),
+        },
+      });
+      console.log(`✅ [changeUserPassword] PostgreSQL şifre başarıyla güncellendi: ${record.id}`);
+    } catch (err: any) {
+      console.warn('[changeUserPassword] DB error:', err.message);
+    }
+
+    return { success: true, message: 'Şifreniz başarıyla değiştirildi!' };
   }
 
   public async recordGameStats(
@@ -4063,6 +4190,7 @@ export class PrismaService {
       notifications: record.notifications,
       stats: record.stats,
       categoryMastery: record.categoryMastery || {},
+      settings: record.settings || {},
     };
   }
 

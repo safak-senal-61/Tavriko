@@ -458,6 +458,15 @@ export class GameRoomDO extends DurableObject<Env> {
   // --- Core Game Flow Methods ---
   private async handleJoinRoom(ws: WebSocket, playerId: string, envelope: WsMessage): Promise<void> {
     if (!this.room) return;
+    // The WebSocket handshake URL only carries a short placeholder for big
+    // data-URI avatars; refresh the real value from the JOIN_ROOM envelope so
+    // lobby/guest opponents still see the custom profile photo
+    const payloadAvatar = (envelope as any)?.payload?.avatarUrl;
+    const roomPlayer = this.room.players[playerId];
+    if (roomPlayer && typeof payloadAvatar === 'string' && payloadAvatar && roomPlayer.avatarUrl !== payloadAvatar) {
+      roomPlayer.avatarUrl = payloadAvatar;
+      await this.persist();
+    }
     this.broadcastStateSync();
 
     // In 1v1 duel or quick match, auto-start countdown when all expected human players have connected

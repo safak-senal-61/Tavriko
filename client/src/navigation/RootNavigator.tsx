@@ -58,6 +58,8 @@ import { ShopScreen } from '../screens/ShopScreen';
 import { EventsScreen } from '../screens/EventsScreen';
 import { InventoryScreen } from '../screens/InventoryScreen';
 import { ProLeagueScreen } from '../screens/ProLeagueScreen';
+import { sanitizeAvatarForUrl, compressAvatarImageAsync } from '../utils/avatarImage';
+import { applyStoredPreferencesOnBoot } from '../store/appPrefs';
 import { PaymentScreen, PaymentItem } from '../screens/PaymentScreen';
 import { DeveloperScreen } from '../screens/DeveloperScreen';
 export type ScreenName =
@@ -208,6 +210,16 @@ export const RootNavigator: React.FC = () => {
     resetGame,
   } = useGameStore();
 
+  // Merge a fresh server-side user profile into the current store (keeps token)
+  const syncWithFreshUser = useCallback(
+    (fresh: UserProfile) => {
+      if (!fresh) return;
+      const current = useGameStore.getState().user;
+      setUser({ ...(current || {}), ...fresh } as UserProfile);
+    },
+    [setUser]
+  );
+
   const currentQuestionRef = useRef<ClientQuestion | null>(currentQuestion);
   currentQuestionRef.current = currentQuestion;
 
@@ -290,6 +302,10 @@ export const RootNavigator: React.FC = () => {
         .catch(() => {});
     }
   }, []);
+  // Apply stored user preferences (sound, music, haptics) once at app boot
+  useEffect(() => {
+    applyStoredPreferencesOnBoot();
+  }, []);
   // Helper to gate non-Keşfet features when in Guest Mode
   const requireAuth = (action: () => void, featureName: string) => {
     if (isGuest || !user) {
@@ -310,8 +326,17 @@ export const RootNavigator: React.FC = () => {
       return;
     }
 
-    const query = `playerId=${encodeURIComponent(user.id)}&displayName=${encodeURIComponent(user.displayName)}&avatarUrl=${encodeURIComponent(user.avatarUrl || 'av1')}`;
-    socketService.connect(getRealtimeWsUrl(`/ws?${query}`));
+    socketService.setAuthToken(token);
+    const playerQuery = `playerId=${encodeURIComponent(user.id)}&displayName=${encodeURIComponent(user.displayName)}`;
+    socketService.connect(
+      getRealtimeWsUrl(
+        `/ws?${playerQuery}${
+          token && !token.startsWith('mock') && !token.startsWith('guest_local')
+            ? `&token=${encodeURIComponent(token)}`
+            : `&avatarUrl=${encodeURIComponent(sanitizeAvatarForUrl(user.avatarUrl))}`
+        }`
+      )
+    );
 
     const unsubSync = socketService.onStateSync((room: GameRoom) => {
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
@@ -471,7 +496,7 @@ export const RootNavigator: React.FC = () => {
       unsubNotif();
       clearInterval(heartbeatInterval);
     };
-  }, [user?.id, user?.displayName, user?.avatarUrl, scheduleGameTimeout]);
+  }, [user?.id, user?.displayName, user?.avatarUrl, token, isGuest, scheduleGameTimeout]);
   // -------------------------------------------------------------
   // Auth & Profile Actions
   // -------------------------------------------------------------
@@ -530,8 +555,11 @@ export const RootNavigator: React.FC = () => {
     setUser(loggedInUser, token);
     navigateTo('home');
   };
-  const handleSaveProfile = async (name: string, avatarSeedOrUri: string) => {
+  const handleSaveProfile = async (name: string, rawAvatarSeedOrUri: string) => {
     if (user) {
+      // Compress picked profile photos so DB rows, REST payloads and realtime
+      // messages stay tiny (the WS URL itself only ever gets a sanitized seed)
+      const avatarSeedOrUri = await compressAvatarImageAsync(rawAvatarSeedOrUri);
       const updatedLocal = {
         ...user,
         displayName: name,
@@ -561,7 +589,8 @@ export const RootNavigator: React.FC = () => {
     }
     navigateTo(isGuest ? 'categories' : 'home');
   };
-  const handleUpdateAvatarDirect = async (newAvatarUri: string) => {
+  const handleUpdateAvatarDirect = async (rawAvatarUri: string) => {
+    const newAvatarUri = await compressAvatarImageAsync(rawAvatarUri);
     if (user) {
       setUser({
         ...user,
@@ -1590,6 +1619,9 @@ export const RootNavigator: React.FC = () => {
         {currentScreen === 'profile' && user && (
           <ProfileScreen
             user={user}
+            token={token}
+            apiBaseUrl={API_BASE}
+            onUpdateUser={syncWithFreshUser}
             onBack={() => navigateTo('home')}
             onEditProfile={() => navigateTo('profile_setup')}
             onUpdateAvatar={handleUpdateAvatarDirect}
@@ -1656,6 +1688,8 @@ export const RootNavigator: React.FC = () => {
         {currentScreen === 'settings' && (
           <SettingsScreen
             user={user}
+            token={token}
+            onUpdateUser={syncWithFreshUser}
             apiBaseUrl={API_BASE}
             onBack={() => navigateTo('home')}
             onDeveloper={() => navigateTo('developer')}

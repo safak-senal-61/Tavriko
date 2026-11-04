@@ -361,6 +361,7 @@ class PrismaService {
             eventProgress: u.eventProgress || {},
             friendIds: Array.isArray(u.friendIds) ? u.friendIds : [],
             categoryMastery: u.categoryMastery || {},
+            settings: u.settings || {},
             stats: {
                 totalMatches: u.totalMatches,
                 wins: u.wins,
@@ -495,6 +496,7 @@ class PrismaService {
                         equippedBackground: args.create.equippedBackground ?? null,
                         eventProgress: (args.create.eventProgress ?? {}),
                         friendIds: (args.create.friendIds ?? []),
+                        settings: (args.create.settings ?? {}),
                         createdAt: args.create.createdAt ?? now,
                         updatedAt: args.create.updatedAt ?? now,
                     };
@@ -1493,6 +1495,20 @@ class PrismaService {
         if (updates.avatarUrl !== undefined && updates.avatarUrl) {
             record.avatarUrl = updates.avatarUrl;
         }
+        if (updates.rankTitle !== undefined && updates.rankTitle.trim()) {
+            record.rankTitle = updates.rankTitle.trim();
+        }
+        if (updates.equippedFrame !== undefined)
+            record.equippedFrame = updates.equippedFrame;
+        if (updates.equippedBadge !== undefined)
+            record.equippedBadge = updates.equippedBadge;
+        if (updates.equippedNameEffect !== undefined)
+            record.equippedNameEffect = updates.equippedNameEffect;
+        if (updates.equippedBackground !== undefined)
+            record.equippedBackground = updates.equippedBackground;
+        if (updates.settings !== undefined) {
+            record.settings = { ...(record.settings || {}), ...updates.settings };
+        }
         record.updatedAt = Date.now();
         this.users.set(userId, record);
         this.users.set(record.id, record);
@@ -1517,10 +1533,16 @@ class PrismaService {
                         birthDate: record.birthDate,
                         gender: record.gender,
                         bio: record.bio,
+                        rankTitle: record.rankTitle,
+                        equippedFrame: record.equippedFrame,
+                        equippedBadge: record.equippedBadge,
+                        equippedNameEffect: record.equippedNameEffect,
+                        equippedBackground: record.equippedBackground,
+                        settings: (record.settings || {}),
                         updatedAt: new Date(),
                     },
                 });
-                console.log(`✅ [updateUserProfile] Prisma PostgreSQL kalıcı güncellendi: ${record.id} -> avatarUrl: ${record.avatarUrl}`);
+                console.log(`✅ [updateUserProfile] Prisma PostgreSQL kalıcı güncellendi: ${record.id} -> avatarUrl: ${record.avatarUrl}, title: ${record.rankTitle}`);
             }
             catch (dbErr) {
                 console.error(`⚠️ [updateUserProfile] Prisma PostgreSQL güncelleme hatası:`, dbErr);
@@ -1529,6 +1551,96 @@ class PrismaService {
             supabaseClient_1.supabaseService.upsertUser(record).catch(() => { });
         }
         return this.toProfile(record);
+    }
+    async updateUserSettings(userId, newSettings) {
+        let record = this.users.get(userId);
+        if (!record) {
+            try {
+                const u = await this.rawClient.user.findFirst({
+                    where: { OR: [{ id: userId }, { username: userId }] },
+                });
+                if (u) {
+                    record = this.prismaUserToRecord(u);
+                    this.users.set(record.id, record);
+                }
+            }
+            catch { }
+        }
+        if (!record)
+            throw new Error('Kullanıcı bulunamadı.');
+        record.settings = { ...(record.settings || {}), ...newSettings };
+        record.updatedAt = Date.now();
+        this.users.set(record.id, record);
+        this.savePersistedUsers();
+        if (!record.isGuest) {
+            try {
+                await this.rawClient.user.update({
+                    where: { id: record.id },
+                    data: {
+                        settings: record.settings,
+                        updatedAt: new Date(),
+                    },
+                });
+                console.log(`✅ [updateUserSettings] PostgreSQL ayarlar güncellendi: ${record.id}`);
+            }
+            catch (err) {
+                console.warn('[updateUserSettings] DB error:', err.message);
+            }
+        }
+        // If online status visibility was toggled
+        if (newSettings.onlineStatusVisible !== undefined) {
+            if (newSettings.onlineStatusVisible === false) {
+                presenceManager_1.presenceManager.broadcast('user:offline', {
+                    userId: record.id,
+                    presence: { userId: record.id, online: false, inRoom: false, status: 'Çevrimdışı', lastSeen: 0 },
+                });
+            }
+            else {
+                presenceManager_1.presenceManager.touchUser(record.id);
+            }
+        }
+        return this.toProfile(record);
+    }
+    async changeUserPassword(userId, currentPass, newPass) {
+        let record = this.users.get(userId);
+        if (!record) {
+            const u = await this.rawClient.user.findFirst({ where: { OR: [{ id: userId }, { username: userId }] } });
+            if (u)
+                record = this.prismaUserToRecord(u);
+        }
+        if (!record)
+            throw new Error('Kullanıcı bulunamadı.');
+        if (record.isGuest)
+            throw new Error('Misafir hesaplarda şifre değiştirilemez.');
+        // If account has an existing passwordHash, verify it
+        if (record.passwordHash) {
+            const isMatch = bcryptjs_1.default.compareSync(currentPass, record.passwordHash);
+            if (!isMatch) {
+                throw new Error('Mevcut şifreniz hatalı. Lütfen tekrar deneyin.');
+            }
+        }
+        if (newPass.length < 6) {
+            throw new Error('Yeni şifre en az 6 karakter olmalıdır.');
+        }
+        const newHash = bcryptjs_1.default.hashSync(newPass, 10);
+        record.passwordHash = newHash;
+        record.updatedAt = Date.now();
+        this.users.set(record.id, record);
+        this.savePersistedUsers();
+        try {
+            await this.rawClient.user.update({
+                where: { id: record.id },
+                data: {
+                    passwordHash: newHash,
+                    updatedAt: new Date(),
+                },
+            });
+            console.log(`✅ [changeUserPassword] PostgreSQL şifre başarıyla güncellendi: ${record.id}`);
+        }
+        catch (err) {
+            console.warn('[changeUserPassword] DB error:', err.message);
+        }
+        return { success: true, message: 'Şifreniz başarıyla değiştirildi!' };
     }
     async recordGameStats(userId, delta) {
         let record = this.users.get(userId);
@@ -3593,6 +3705,7 @@ class PrismaService {
             notifications: record.notifications,
             stats: record.stats,
             categoryMastery: record.categoryMastery || {},
+            settings: record.settings || {},
         };
     }
     // ==========================================================================

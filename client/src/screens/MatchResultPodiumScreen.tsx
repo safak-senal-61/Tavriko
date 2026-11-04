@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Animated, Platform } from 'react-na
 import { FinalMatchSummary, MatchQuestionReviewItem } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
+import { loadStoredPreferences } from '../store/appPrefs';
 import {
   TavrikoScreen,
   TavrikoProgressBar,
@@ -43,7 +44,10 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    sound.playSound('victory');
+    // Settings > "Zafer & Podyum Melodisi" — kapalıysa zafer melodisi çalınmaz
+    if (loadStoredPreferences().victoryMelody !== false) {
+      sound.playSound('victory');
+    }
     sound.triggerHaptic('success');
     Animated.parallel([
       Animated.timing(fadeAnim, {

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
+import { compressAvatarImageAsync } from '../utils/avatarImage';
 import {
   TavrikoScreen,
   Button3D,
@@ -75,10 +76,10 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
           const file = e.target?.files?.[0];
           if (file) {
             const reader = new FileReader();
-            reader.onload = (ev) => {
+            reader.onload = async (ev) => {
               const base64Uri = ev.target?.result as string;
               if (base64Uri) {
-                setCustomPhotoUri(base64Uri);
+                setCustomPhotoUri(await compressAvatarImageAsync(base64Uri));
                 sound.playSound('reward');
               }
             };
@@ -99,10 +100,13 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
           mediaTypes: ['images'],
           allowsEditing: true,
           aspect: [1, 1],
-          quality: 0.75,
-        });
-        if (!res.canceled && res.assets?.[0]?.uri) {
-          setCustomPhotoUri(res.assets[0].uri);
+          quality: 0.7,
+          base64: true,
+        } as any);
+        if (!res.canceled && res.assets?.length) {
+          const asset = res.assets[0];
+          const rawUri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+          setCustomPhotoUri(await compressAvatarImageAsync(rawUri));
           sound.playSound('reward');
         }
       } catch {

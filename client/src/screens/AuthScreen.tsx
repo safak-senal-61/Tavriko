@@ -15,6 +15,7 @@ import {
   Linking,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { compressAvatarImageAsync } from '../utils/avatarImage';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { createClient } from '@supabase/supabase-js';
@@ -176,10 +177,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        const uri = asset.base64
+        const rawUri = asset.base64
           ? `data:image/jpeg;base64,${asset.base64}`
           : asset.uri;
-        setCustomPhotoUri(uri);
+        setCustomPhotoUri(await compressAvatarImageAsync(rawUri));
         sound.playSound('correct');
       }
     } catch {

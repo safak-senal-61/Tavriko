@@ -61,6 +61,11 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 class SoundService {
   private soundEnabled: boolean = true;
   private hapticsEnabled: boolean = true;
+  private sfxVolume: number = 1; // 0..1 (Settings: %25/50/75/100)
+  private hapticIntensity: 'light' | 'medium' | 'strong' = 'medium';
+  private musicEnabled: boolean = false;
+  private musicVolume: number = 0.5; // 0..1
+  private musicStop: (() => void) | null = null;
   private players: Partial<Record<SoundEffect, any>> = {};
   private audioModeConfigured: boolean = false;
 
@@ -87,12 +92,135 @@ class SoundService {
     this.hapticsEnabled = enabled;
   }
 
+  /** 0..1 — Settings: %25/50/75/100 */
+  public setSoundVolume(volume01: number) {
+    this.sfxVolume = Math.min(1, Math.max(0, Number(volume01) || 0));
+  }
+
+  public getSoundVolume(): number {
+    return this.sfxVolume;
+  }
+
+  public setHapticIntensity(intensity: 'light' | 'medium' | 'strong') {
+    this.hapticIntensity = intensity;
+  }
+
+  public getHapticIntensity() {
+    return this.hapticIntensity;
+  }
+
   public isSoundEnabled(): boolean {
     return this.soundEnabled;
   }
 
   public isHapticsEnabled(): boolean {
     return this.hapticsEnabled;
+  }
+
+  // --- Background music (soft generated ambient pad, web) ---
+  public setMusicEnabled(enabled: boolean) {
+    this.musicEnabled = enabled;
+    if (enabled) this.startMusic();
+    else this.stopMusic();
+  }
+
+  public isMusicEnabled(): boolean {
+    return this.musicEnabled;
+  }
+
+  public setMusicVolume(volume01: number) {
+    this.musicVolume = Math.min(1, Math.max(0, Number(volume01) || 0));
+    if (this.musicGainNode) {
+      try {
+        this.musicGainNode.gain.setTargetAtTime(this.musicVolume * 0.12, sharedWebAudioCtx.currentTime, 0.2);
+      } catch {}
+    }
+  }
+
+  public getMusicVolume(): number {
+    return this.musicVolume;
+  }
+
+  private musicGainNode: any = null;
+  private musicOscillators: any[] = [];
+
+  private startMusic() {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      // Native platforms have no ambient music asset — keep the preference
+      // stored so it still persists per user
+      return;
+    }
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!sharedWebAudioCtx) sharedWebAudioCtx = new AudioCtx();
+      if (sharedWebAudioCtx.state === 'suspended') {
+        sharedWebAudioCtx.resume().catch(() => {});
+      }
+      if (this.musicStop) return; // already playing
+
+      const ctx = sharedWebAudioCtx;
+      const master = ctx.createGain();
+      master.gain.value = 0;
+      master.connect(ctx.destination);
+      this.musicGainNode = master;
+      master.gain.setTargetAtTime(this.musicVolume * 0.12, ctx.currentTime, 2.5);
+
+      // Slow "breathing" modulation on the pad level
+      const lfo = ctx.createOscillator();
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.06;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = this.musicVolume * 0.045;
+      lfo.connect(lfoGain);
+      lfoGain.connect(master.gain);
+      lfo.start();
+      this.musicOscillators.push(lfo);
+
+      // Gentle ambient pad chord (C3 / G3 / C4 / E4)
+      const freqs = [130.81, 196.0, 261.63, 329.63];
+      for (const f of freqs) {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = f;
+        const g = ctx.createGain();
+        g.gain.value = 0.22;
+        osc.connect(g);
+        g.connect(master);
+        osc.start();
+        this.musicOscillators.push(osc);
+      }
+
+      this.musicStop = () => {
+        try {
+          master.gain.setTargetAtTime(0, sharedWebAudioCtx.currentTime, 0.4);
+        } catch {}
+        setTimeout(() => {
+          for (const o of this.musicOscillators) {
+            try {
+              o.stop();
+              o.disconnect();
+            } catch {}
+          }
+          this.musicOscillators = [];
+          try {
+            master.disconnect();
+          } catch {}
+        }, 1200);
+        this.musicGainNode = null;
+      };
+    } catch {
+      this.musicStop = null;
+    }
+  }
+
+  private stopMusic() {
+    if (this.musicStop) {
+      try {
+        this.musicStop();
+      } catch {}
+      this.musicStop = null;
+    }
   }
 
   public playSound(effect: SoundEffect): void {
@@ -109,6 +237,11 @@ class SoundService {
         }
         if (typeof player.seekTo === 'function') {
           player.seekTo(0);
+        }
+        if ('volume' in player) {
+          try {
+            player.volume = this.sfxVolume;
+          } catch {}
         }
         if (typeof player.play === 'function') {
           player.play();
@@ -145,7 +278,11 @@ class SoundService {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        // Respect the user's SFX volume preference (Settings: %25..%100)
+        const volumeNode = ctx.createGain();
+        volumeNode.gain.value = this.sfxVolume;
+        gain.connect(volumeNode);
+        volumeNode.connect(ctx.destination);
         const now = ctx.currentTime;
 
         switch (effect) {
@@ -245,10 +382,18 @@ class SoundService {
           return;
         }
         if (expoHapticsModule.impactAsync) {
-          const style =
+          // User-controlled "Titreşim Şiddeti": strong upgrades medium hits, light softens them
+          let style =
             type === 'medium'
               ? expoHapticsModule.ImpactFeedbackStyle.Medium
               : expoHapticsModule.ImpactFeedbackStyle.Light;
+          if (
+            this.hapticIntensity === 'strong' &&
+            type === 'medium' &&
+            expoHapticsModule.ImpactFeedbackStyle.Heavy
+          ) {
+            style = expoHapticsModule.ImpactFeedbackStyle.Heavy;
+          }
           expoHapticsModule.impactAsync(style);
           return;
         }
@@ -257,13 +402,14 @@ class SoundService {
       }
     }
 
-    // 2. React Native Vibration fallback
+    // 2. React Native Vibration fallback (scaled by user's haptic intensity)
     try {
       if (Platform.OS !== 'web') {
-        if (type === 'success') Vibration.vibrate([0, 20, 40, 30]);
-        else if (type === 'error') Vibration.vibrate([0, 45, 40, 45]);
-        else if (type === 'medium') Vibration.vibrate(25);
-        else Vibration.vibrate(12);
+        const s = this.hapticIntensity === 'light' ? 0.6 : this.hapticIntensity === 'strong' ? 1.6 : 1;
+        if (type === 'success') Vibration.vibrate([0, 20 * s, 40, 30 * s]);
+        else if (type === 'error') Vibration.vibrate([0, 45 * s, 40, 45 * s]);
+        else if (type === 'medium') Vibration.vibrate(Math.round(25 * s));
+        else Vibration.vibrate(Math.round(12 * s));
       }
     } catch {
       // Ignore vibration errors

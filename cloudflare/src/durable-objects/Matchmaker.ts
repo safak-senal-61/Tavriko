@@ -149,6 +149,10 @@ export class MatchmakerDO extends DurableObject<Env> {
         const payload = envelope.payload || {};
         const updatedEntry: QueueEntry = {
           ...attachment,
+          // Avatar may have been sanitized in the upgrade URL (big data URIs
+          // break the WebSocket handshake); the FIND_MATCH envelope always
+          // carries the real (compressed) value, so refresh it here
+          avatarUrl: payload.avatarUrl || attachment.avatarUrl,
           matchId: 'match_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
           mode: payload.mode || attachment.mode || 'duel',
           category: payload.category || attachment.category || 'general_culture',

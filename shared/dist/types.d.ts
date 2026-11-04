@@ -217,6 +217,38 @@ export interface NotificationItem {
     senderAvatar?: string;
     roomCode?: string;
 }
+export interface UserSettings {
+    sfxEnabled?: boolean;
+    sfxVolume?: '25' | '50' | '75' | '100';
+    musicEnabled?: boolean;
+    musicVolume?: '25' | '50' | '75' | '100';
+    hapticsEnabled?: boolean;
+    hapticIntensity?: 'light' | 'medium' | 'strong';
+    timerAlertSound?: boolean;
+    victoryMelody?: boolean;
+    smoothAnimations?: boolean;
+    batterySaver?: boolean;
+    ambientGlow?: boolean;
+    textSize?: 'normal' | 'large';
+    buttonSpring?: boolean;
+    defaultDifficulty?: 'easy' | 'medium' | 'hard';
+    questionCount?: number;
+    questionTimeSec?: number;
+    penaltyForWrong?: boolean;
+    autoNextQuestion?: boolean;
+    doubleTapProtection?: boolean;
+    notifsEnabled?: boolean;
+    duelInvitesAllowed?: boolean;
+    roomInvitesAllowed?: boolean;
+    onlineStatusVisible?: boolean;
+    profilePublic?: boolean;
+    friendRequestsAllowed?: boolean;
+    dailyReminder?: boolean;
+    seasonAlerts?: boolean;
+    friendActivity?: boolean;
+    themeMode?: 'dark' | 'vibrant' | 'midnight';
+    equippedTitle?: string;
+}
 export interface UserProfile {
     id: string;
     username: string;
@@ -274,6 +306,7 @@ export interface UserProfile {
         level: number;
         correctCount: number;
     }>>;
+    settings?: UserSettings;
 }
 export interface QuestionStats {
     total: number;

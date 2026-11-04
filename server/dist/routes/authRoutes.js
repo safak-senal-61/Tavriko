@@ -499,6 +499,55 @@ router.put('/profile', async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
+router.post('/settings', async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        let userId = req.body.userId;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            const token = authHeader.split(' ')[1];
+            const payload = prismaClient_1.db.verifyToken(token);
+            if (payload)
+                userId = payload.userId;
+        }
+        if (!userId) {
+            res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
+            return;
+        }
+        const { settings } = req.body;
+        const updated = await prismaClient_1.db.updateUserSettings(userId, settings || {});
+        res.json({ success: true, user: updated });
+    }
+    catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+router.post('/change-password', async (req, res) => {
+    try {
+        // Security: password changes REQUIRE a verified session token (body userId is ignored)
+        const authHeader = req.headers.authorization;
+        let userId;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            const token = authHeader.split(' ')[1];
+            const payload = prismaClient_1.db.verifyToken(token);
+            if (payload)
+                userId = payload.userId;
+        }
+        if (!userId) {
+            res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
+            return;
+        }
+        const { currentPassword, newPassword } = req.body;
+        if (!newPassword) {
+            res.status(400).json({ error: 'Yeni şifre alanı zorunludur.' });
+            return;
+        }
+        const result = await prismaClient_1.db.changeUserPassword(userId, currentPassword || '', newPassword);
+        res.json(result);
+    }
+    catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
 router.post('/stats', async (req, res) => {
     try {
         const { userId, correctAnswers = 0, totalAnswers = 0, xpEarned = 0, coinsEarned = 0, bestStreak = 0, won = false } = req.body;

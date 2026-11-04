@@ -8,6 +8,7 @@ import {
   CustomRoomSettings,
 } from '@trivia/shared';
 import { getRealtimeWsUrl } from '../config';
+import { sanitizeAvatarForUrl } from '../utils/avatarImage';
 
 type EventCallback = (data: any) => void;
 
@@ -27,6 +28,10 @@ export class SocketService {
   private reconnectTimer: any = null;
   private pingInterval: any = null;
   private isManuallyClosed: boolean = false;
+  // Optional JWT auth token: when present it is sent as ?token= to the realtime
+  // DOs (they resolve displayName/avatar from it) instead of giant avatarUrl
+  // query values that can break the WebSocket upgrade
+  private authToken: string | null = null;
 
   // Track session details for automatic recovery
   private lastSessionContext: {
@@ -37,6 +42,23 @@ export class SocketService {
     isMatchmaking?: boolean;
     token?: string;
   } = {};
+
+  /** Pass the logged-in user's JWT so realtime DOs authenticate with it. */
+  public setAuthToken(token: string | null | undefined): void {
+    const clean = token && !token.startsWith('mock') && !token.startsWith('guest_local') ? token : null;
+    if (this.authToken !== clean) {
+      this.authToken = clean;
+    }
+  }
+
+  /** Safe player query: token when authenticated, tiny avatar seed otherwise. */
+  private buildPlayerQuery(playerId: string, displayName: string, avatarUrl?: string): string {
+    const base = `playerId=${encodeURIComponent(playerId)}&displayName=${encodeURIComponent(displayName)}`;
+    if (this.authToken) {
+      return `${base}&token=${encodeURIComponent(this.authToken)}`;
+    }
+    return `${base}&avatarUrl=${encodeURIComponent(sanitizeAvatarForUrl(avatarUrl))}`;
+  }
 
   public isConnected(): boolean {
     return !!(this.ws && this.ws.readyState === (typeof WebSocket !== 'undefined' ? WebSocket.OPEN : 1));
@@ -247,9 +269,7 @@ export class SocketService {
 
     const queryParts = [
       `roomCode=${cleanCode}`,
-      `playerId=${encodeURIComponent(playerId)}`,
-      `displayName=${encodeURIComponent(displayName)}`,
-      `avatarUrl=${encodeURIComponent(avatarUrl || 'av1')}`,
+      this.buildPlayerQuery(playerId, displayName, avatarUrl),
       `isHost=true`,
     ];
     if (settings) {
@@ -300,7 +320,7 @@ export class SocketService {
     };
 
     const targetUrl = getRealtimeWsUrl(
-      `/ws/room/${cleanCode}?roomCode=${cleanCode}&playerId=${encodeURIComponent(playerId)}&displayName=${encodeURIComponent(displayName)}&avatarUrl=${encodeURIComponent(avatarUrl || 'av1')}`
+      `/ws/room/${cleanCode}?roomCode=${cleanCode}&${this.buildPlayerQuery(playerId, displayName, avatarUrl)}`
     );
 
     // Switch connection if not connected to this specific room DO
@@ -357,7 +377,7 @@ export class SocketService {
     };
 
     const targetUrl = getRealtimeWsUrl(
-      `/ws/matchmaking?intent=matchmaking&playerId=${encodeURIComponent(playerId)}&displayName=${encodeURIComponent(displayName)}&avatarUrl=${encodeURIComponent(avatarUrl || 'av1')}&mode=${mode}&category=${category}&difficulty=${difficulty}`
+      `/ws/matchmaking?intent=matchmaking&${this.buildPlayerQuery(playerId, displayName, avatarUrl)}&mode=${mode}&category=${category}&difficulty=${difficulty}`
     );
 
     this.connect(targetUrl);

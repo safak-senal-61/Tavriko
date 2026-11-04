@@ -556,6 +556,60 @@ router.put('/profile', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+router.post('/settings', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    let userId = req.body.userId;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const payload = db.verifyToken(token);
+      if (payload) userId = payload.userId;
+    }
+
+    if (!userId) {
+      res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
+      return;
+    }
+
+    const { settings } = req.body;
+    const updated = await db.updateUserSettings(userId, settings || {});
+    res.json({ success: true, user: updated });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+router.post('/change-password', async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Security: password changes REQUIRE a verified session token (body userId is ignored)
+    const authHeader = req.headers.authorization;
+    let userId: string | undefined;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const payload = db.verifyToken(token);
+      if (payload) userId = payload.userId;
+    }
+
+    if (!userId) {
+      res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
+      return;
+    }
+
+    const { currentPassword, newPassword } = req.body;
+    if (!newPassword) {
+      res.status(400).json({ error: 'Yeni şifre alanı zorunludur.' });
+      return;
+    }
+
+    const result = await db.changeUserPassword(userId, currentPassword || '', newPassword);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 router.post('/stats', async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, correctAnswers = 0, totalAnswers = 0, xpEarned = 0, coinsEarned = 0, bestStreak = 0, won = false } = req.body;
