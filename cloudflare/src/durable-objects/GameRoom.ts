@@ -56,6 +56,9 @@ export class GameRoomDO extends DurableObject<Env> {
       if (storedRoom) this.room = storedRoom;
       if (storedQuestions) this.questions = storedQuestions;
       if (storedAlarm) this.alarmContext = storedAlarm;
+
+      // Eski kayıtlardan kalan botları özel odalardan temizle
+      await this.pruneBotsInCustomRoom();
     });
   }
 
@@ -97,6 +100,11 @@ export class GameRoomDO extends DurableObject<Env> {
         scores: {},
       };
       if (Array.isArray(data.players)) {
+        // Özel/kendi odalarında roller SADECE gerçek katılımcılardır — bot asla eklenmez!
+        const allowsBots = this.room.mode === 'duel' || this.room.mode === 'quick_match';
+        const acceptedPlayers = allowsBots ? data.players : data.players.filter((p: any) => !p.isBot && !String(p.id || '').startsWith('bot_'));
+      // Override'a gerek yok: gerçek oyuncular WebSocket katılımıyla eklenir, botlar tamamen yok sayılır
+      data.players = acceptedPlayers;
         for (const p of data.players) {
           this.room.players[p.id] = {
             id: p.id,
@@ -538,6 +546,10 @@ export class GameRoomDO extends DurableObject<Env> {
 
   private async handleStartGame(ws: WebSocket, playerId: string, envelope: WsMessage): Promise<void> {
     if (!this.room) return;
+
+    // Özel odada oyuna başlarken bot varsa uçur (yalnızca gerçek katılımcılar kalır)
+    await this.pruneBotsInCustomRoom();
+
     if (this.room.hostId !== playerId) {
       ws.send(createWsError('Yalnızca oda kurucusu oyunu başlatabilir', 'FORBIDDEN', envelope.requestId));
       return;
@@ -912,6 +924,35 @@ export class GameRoomDO extends DurableObject<Env> {
   }
 
   // --- Helper Methods ---
+
+  /**
+   * Özel odalar (friends_private / custom / team_battle) SADECE gerçek katılımcıları içerir.
+   * İçine sızmış ya da eski kayıttan kalmış bir bot varsa tamamen çıkarılır.
+   */
+  private async pruneBotsInCustomRoom(): Promise<boolean> {
+    if (!this.room) return false;
+    if (this.room.mode === 'duel' || this.room.mode === 'quick_match') return false;
+    const botIds = Object.values(this.room.players)
+      .filter((p) => p.isBot || p.id.startsWith('bot_') || p.id.startsWith('rival_bot_'))
+      .map((p) => p.id);
+    if (botIds.length === 0) return false;
+    for (const botId of botIds) {
+      delete this.room.players[botId];
+      delete this.room.scores[botId];
+    }
+    // Bot kaldırıldıktan sonra kimsenin kalıcı host haline gelmemesi gerçeği: host gerçeklere geçer
+    if (!this.room.players[this.room.hostId]) {
+      const firstHuman = Object.values(this.room.players).find((p) => !p.isBot);
+      if (firstHuman) {
+        this.room.hostId = firstHuman.id;
+        firstHuman.isHost = true;
+      }
+    }
+    await this.persist();
+    this.broadcastStateSync();
+    return true;
+  }
+
   private calculateLeaderboard(): PlayerScoreSummary[] {
     if (!this.room) return [];
     const playersArray = Object.values(this.room.players);

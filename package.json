@@ -26,10 +26,10 @@
     "postinstall": "npx prisma generate --schema=server/prisma/schema.prisma"
   },
   "dependencies": {
-    "@trivia/shared": "file:shared",
     "@google/genai": "^2.32.0",
     "@prisma/client": "^6.19.3",
     "@supabase/supabase-js": "^2.118.0",
+    "@trivia/shared": "file:shared",
     "@upstash/redis": "^1.40.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

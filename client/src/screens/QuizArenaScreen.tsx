@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   AppState,
   AppStateStatus,
+  Animated,
+  Platform,
 } from 'react-native';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -58,6 +60,18 @@ interface QuizArenaScreenProps {
     totalQuestions: number;
     currentCorrect: number;
   } | null;
+  /** Özel oda ilerleme yarışı: odaya katılan GERÇEK kişiler ve puanları */
+  racers?: Array<{
+    id: string;
+    displayName: string;
+    avatarUrl?: string;
+    score: number;
+    isMe?: boolean;
+    isHost?: boolean;
+    hasAnswered?: boolean;
+  }>;
+  /** İlerleme yarışının hedef puanı (varsayılan 500) */
+  targetScore?: number;
 }
 // ---------------------------------------------------------------------------
 // Smooth, 100% Reliable 30 FPS Timer Bar for Android & iOS
@@ -152,6 +166,86 @@ const SmoothTimerBar: React.FC<SmoothTimerBarProps> = React.memo(
     );
   }
 );
+// ---------------------------------------------------------------------------
+// Animasyonlu İlerleme Takibi: REAL kişiler tek yarış pistinde, hedef puana koşar
+// ---------------------------------------------------------------------------
+interface RacerInfo {
+  id: string;
+  displayName: string;
+  avatarUrl?: string;
+  score: number;
+  isMe?: boolean;
+  isHost?: boolean;
+  hasAnswered?: boolean;
+}
+
+/** Tek yarışcı şeridi: avatar hedef puana doğru yumuşak yay ile alanır */
+const RacerLane: React.FC<{
+  racer: RacerInfo;
+  targetScore: number;
+  isLeader: boolean;
+}> = ({ racer, targetScore, isLeader }) => {
+  const pos = useRef(new Animated.Value(0)).current;
+  const [trackWidth, setTrackWidth] = useState(0);
+
+  useEffect(() => {
+    const clamped = Math.min(1, Math.max(0, (racer.score || 0) / Math.max(1, targetScore)));
+    Animated.spring(pos, {
+      toValue: clamped,
+      useNativeDriver: Platform.OS !== 'web',
+      friction: 7,
+      tension: 70,
+    }).start();
+  }, [racer.score, targetScore, pos]);
+
+  const translateX =
+    trackWidth > 0
+      ? pos.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, Math.max(0, trackWidth - 34)],
+        })
+      : 0;
+
+  return (
+    <View
+      style={[styles.raceLane, racer.isMe && styles.raceLaneMe]}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        if (w > 0 && w !== trackWidth) setTrackWidth(w);
+      }}
+    >
+      {/* Track line */}
+      <View style={styles.raceTrackLine} pointerEvents="none" />
+      {/* Finish target marker */}
+      <View style={styles.raceFinishWrap} pointerEvents="none">
+        <Text style={styles.raceFinishIcon}>{'🏁'}</Text>
+      </View>
+      {/* Moving racer: avatar + name + score (whole cluster glides) */}
+      <Animated.View
+        style={[
+          styles.racerCluster,
+          isLeader && styles.racerLeaderCluster,
+          { transform: [{ translateX }] },
+        ]}
+      >
+        <CharacterAvatar seed={racer.avatarUrl || racer.displayName} size={26} />
+        <View style={[styles.racerInfoPill, racer.isMe && styles.racerInfoPillMe]}>
+          <Text style={styles.racerInfoText} numberOfLines={1}>
+            {isLeader && '👑 '}
+            {racer.displayName}
+            {racer.isMe ? ' (Sen)' : ''} · {racer.score}
+          </Text>
+        </View>
+        {racer.hasAnswered && (
+          <View style={styles.racerAnsweredBadge}>
+            <Text style={styles.racerAnsweredText}>✓</Text>
+          </View>
+        )}
+      </Animated.View>
+    </View>
+  );
+};
+
 export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   question,
   selectedOptionId,
@@ -165,7 +259,10 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   myDisplayName = 'Sen',
   opponent = null,
   dailyChallengeInfo = null,
+  racers: racersProp,
+  targetScore = 500,
 }) => {
+  const racers = racersProp || [];
   const [localSelectedOptionId, setLocalSelectedOptionId] = useState<string | null>(null);
   // Settings > "Soru Metin Boyutu" (normal / large) — real, app-wide effect
   const [isLargeText] = useState<boolean>(() => {
@@ -360,6 +457,26 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           </View>
         </View>
       )}
+      {/* Custom Oda · Animasyonlu İlerleme Takibi (Hedef Puanı Yarışı) */}
+      {racers.length > 0 && (
+        <View style={styles.raceCard}>
+          <View style={styles.raceHeaderRow}>
+            <Text style={styles.raceHeaderText}>🏆 İLERLEME TAKİBİ</Text>
+            <Text style={styles.raceTargetText}>🎯 Hedef: {targetScore} puan</Text>
+          </View>
+          {racers
+            .slice()
+            .sort((a, b) => (b.score || 0) - (a.score || 0))
+            .map((racer, idx) => (
+              <RacerLane
+                key={racer.id}
+                racer={racer}
+                targetScore={targetScore}
+                isLeader={idx === 0 && (racer.score || 0) > 0}
+              />
+            ))}
+        </View>
+      )}
       {/* 2. Second Row: Streak Pill + Smooth 30 FPS Timer Bar + Seconds (Matches page11) */}
       <View style={styles.timerRow}>
         <View style={styles.streakPill}>
@@ -518,6 +635,110 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   );
 };
 const styles = StyleSheet.create({
+  // İlerleme Takibi (Hedef Puanı Yarışı) Stilleri
+  raceCard: {
+    backgroundColor: 'rgba(10, 4, 24, 0.55)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.35)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 4,
+    gap: 6,
+  },
+  raceHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  raceHeaderText: {
+    color: '#FFC43D',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 0.6,
+  },
+  raceTargetText: {
+    color: '#D9CDF5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  raceLane: {
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    justifyContent: 'center',
+  },
+  raceLaneMe: {
+    backgroundColor: 'rgba(255, 196, 61, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.35)',
+  },
+  raceTrackLine: {
+    position: 'absolute',
+    left: 6,
+    right: 34,
+    top: '50%',
+    marginTop: -1.5,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  raceFinishWrap: {
+    position: 'absolute',
+    right: 2,
+    top: 0,
+    height: 34,
+    width: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  raceFinishIcon: {
+    fontSize: 15,
+  },
+  racerCluster: {
+    position: 'absolute',
+    left: 6,
+    top: 0,
+    height: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    zIndex: 3,
+  },
+  racerLeaderCluster: {
+    zIndex: 5,
+  },
+  racerInfoPill: {
+    maxWidth: 150,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: 'rgba(30, 14, 61, 0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(154, 107, 255, 0.35)',
+  },
+  racerInfoPillMe: {
+    borderColor: '#FFC43D',
+  },
+  racerInfoText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  racerAnsweredBadge: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#5ADBB5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  racerAnsweredText: {
+    color: '#082520',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
   screenContainer: {
     justifyContent: 'space-between',
     paddingBottom: 12,

@@ -42,7 +42,10 @@ interface ProfileScreenProps {
   token?: string | null;
   apiBaseUrl?: string;
   onBack: () => void;
+  /** Avatar/karakter seçim ekranına gider */
   onEditProfile: () => void;
+  /** Bilgilerimi Düzenle form ekranına gider (ad, ülke, telefon, doğum, cinsiyet, bio) */
+  onEditPersonalInfo?: () => void;
   onUpdateAvatar?: (uri: string) => void;
   onUpdateUser?: (updated: UserProfile) => void;
   onNavigateTab?: (tab: 'play' | 'explore' | 'leaders' | 'friends' | 'profile') => void;
@@ -91,6 +94,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   apiBaseUrl,
   onBack,
   onEditProfile,
+  onEditPersonalInfo,
   onUpdateAvatar,
   onUpdateUser,
   onNavigateTab,
@@ -327,7 +331,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           )}
 
           <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.headerActionBtn} onPress={onEditProfile}>
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={() => {
+                sound.playSound('tap');
+                if (onEditPersonalInfo) onEditPersonalInfo();
+                else onEditProfile();
+              }}
+            >
               <Text style={styles.headerActionText}>✏️ Düzenle</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.headerActionBtn} onPress={handleShareProfile}>
@@ -500,7 +511,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </Text>
               </View>
             ))}
-            <TouchableOpacity style={styles.editAccountBtn} onPress={onEditProfile}>
+            <TouchableOpacity
+              style={styles.editAccountBtn}
+              activeOpacity={0.85}
+              onPress={() => {
+                sound.playSound('tap');
+                sound.triggerHaptic('light');
+                if (onEditPersonalInfo) onEditPersonalInfo();
+                else onEditProfile();
+              }}
+            >
               <Text style={styles.editAccountText}>✏️ Bilgilerimi Düzenle</Text>
             </TouchableOpacity>
           </View>

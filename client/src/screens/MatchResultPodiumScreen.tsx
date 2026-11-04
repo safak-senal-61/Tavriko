@@ -29,9 +29,10 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
   onHome,
 }) => {
   const reviews = questionReviews || summary.questionReviews || [];
-  const first = summary.podium?.first || { displayName: 'DenizPro', score: 780 };
-  const second = summary.podium?.second || { displayName: 'Ece', score: 610 };
-  const third = summary.podium?.third || { displayName: 'Mert', score: 540 };
+  // Sadece gerçek oyuncular gösterilir — sahte dolgu isimleri yok!
+  const first = summary.podium?.first || null;
+  const second = summary.podium?.second || null;
+  const third = summary.podium?.third || null;
 
   const myRanking = summary.rankings?.find((r) => r.playerId === currentUserId);
   const xpEarned = myRanking && myRanking.rank === 1 ? 160 : 60;
@@ -86,59 +87,65 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
         <Text style={styles.title}>MAÇ BİTTİ</Text>
         <Text style={styles.subtitle}>Tavriko Arena · Sonuçlar</Text>
 
-        {/* 3-Column Podium (2 - 1 - 3) */}
+        {/* 3-Column Podium (2 - 1 - 3) — SADECE gerçek oyuncular gösterilir */}
         <Animated.View style={[styles.podiumRow, { opacity: fadeAnim }]}>
           {/* 2nd Place */}
-          <Animated.View
-            style={[
-              styles.podiumCol,
-              { transform: [{ translateY: col2Anim }] },
-            ]}
-          >
-            <CharacterAvatar seed={second.displayName} index={2} size={46} />
-            <Text style={styles.podiumName} numberOfLines={1}>
-              {second.displayName}
-            </Text>
-            <Text style={styles.podiumScore}>{second.score}</Text>
-            <View style={[styles.pillar, styles.pillar2]}>
-              <Text style={styles.pillarNumber}>2</Text>
-            </View>
-          </Animated.View>
+          {second && (
+            <Animated.View
+              style={[
+                styles.podiumCol,
+                { transform: [{ translateY: col2Anim }] },
+              ]}
+            >
+              <CharacterAvatar seed={second.avatarUrl || second.displayName} index={2} size={46} />
+              <Text style={styles.podiumName} numberOfLines={1}>
+                {second.displayName}
+              </Text>
+              <Text style={styles.podiumScore}>{second.score}</Text>
+              <View style={[styles.pillar, styles.pillar2]}>
+                <Text style={styles.pillarNumber}>2</Text>
+              </View>
+            </Animated.View>
+          )}
 
           {/* 1st Place */}
-          <Animated.View
-            style={[
-              styles.podiumCol,
-              { transform: [{ translateY: col1Anim }] },
-            ]}
-          >
-            <CrownIcon size={28} />
-            <CharacterAvatar seed={first.displayName} index={1} size={54} />
-            <Text style={styles.podiumName} numberOfLines={1}>
-              {first.displayName}
-            </Text>
-            <Text style={styles.podiumScore}>{first.score}</Text>
-            <View style={[styles.pillar, styles.pillar1]}>
-              <Text style={styles.pillarNumber}>1</Text>
-            </View>
-          </Animated.View>
+          {first && (
+            <Animated.View
+              style={[
+                styles.podiumCol,
+                { transform: [{ translateY: col1Anim }] },
+              ]}
+            >
+              <CrownIcon size={28} />
+              <CharacterAvatar seed={first.avatarUrl || first.displayName} index={1} size={54} />
+              <Text style={styles.podiumName} numberOfLines={1}>
+                {first.displayName}
+              </Text>
+              <Text style={styles.podiumScore}>{first.score}</Text>
+              <View style={[styles.pillar, styles.pillar1]}>
+                <Text style={styles.pillarNumber}>1</Text>
+              </View>
+            </Animated.View>
+          )}
 
           {/* 3rd Place */}
-          <Animated.View
-            style={[
-              styles.podiumCol,
-              { transform: [{ translateY: col3Anim }] },
-            ]}
-          >
-            <CharacterAvatar seed={third.displayName} index={3} size={44} />
-            <Text style={styles.podiumName} numberOfLines={1}>
-              {third.displayName}
-            </Text>
-            <Text style={styles.podiumScore}>{third.score}</Text>
-            <View style={[styles.pillar, styles.pillar3]}>
-              <Text style={styles.pillarNumber}>3</Text>
-            </View>
-          </Animated.View>
+          {third && (
+            <Animated.View
+              style={[
+                styles.podiumCol,
+                { transform: [{ translateY: col3Anim }] },
+              ]}
+            >
+              <CharacterAvatar seed={third.avatarUrl || third.displayName} index={3} size={44} />
+              <Text style={styles.podiumName} numberOfLines={1}>
+                {third.displayName}
+              </Text>
+              <Text style={styles.podiumScore}>{third.score}</Text>
+              <View style={[styles.pillar, styles.pillar3]}>
+                <Text style={styles.pillarNumber}>3</Text>
+              </View>
+            </Animated.View>
+          )}
         </Animated.View>
 
         {/* XP & Coin Reward Card */}

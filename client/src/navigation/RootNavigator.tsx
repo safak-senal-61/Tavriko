@@ -47,6 +47,7 @@ import { MatchResultPodiumScreen } from '../screens/MatchResultPodiumScreen';
 import { FriendsScreen } from '../screens/FriendsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { LeaderboardScreen } from '../screens/LeaderboardScreen';
+import { ProfileEditScreen } from '../screens/ProfileEditScreen';
 import { DailyChallengeScreen } from '../screens/DailyChallengeScreen';
 import { SinglePlayerPracticeScreen } from '../screens/SinglePlayerPracticeScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
@@ -78,6 +79,7 @@ export type ScreenName =
   | 'match_result'
   | 'friends'
   | 'profile'
+  | 'profile_edit'
   | 'leaderboard'
   | 'daily_challenge'
   | 'practice'
@@ -1526,6 +1528,20 @@ export const RootNavigator: React.FC = () => {
                     }
                   : null
               }
+              racers={
+                activeRoom && user && activeRoom.mode === 'custom'
+                  ? Object.values(activeRoom.players).map((p) => ({
+                      id: p.id,
+                      displayName: p.displayName,
+                      avatarUrl: p.avatarUrl,
+                      score: activeRoom.scores[p.id] ?? p.score ?? 0,
+                      isMe: p.id === user.id,
+                      isHost: p.isHost,
+                      hasAnswered: p.hasAnsweredCurrentRound,
+                    }))
+                  : []
+              }
+              targetScore={500}
             />
             {/* Practice / Guest End of Game Summary Modal */}
             <PracticeSummaryModal
@@ -1624,6 +1640,7 @@ export const RootNavigator: React.FC = () => {
             onUpdateUser={syncWithFreshUser}
             onBack={() => navigateTo('home')}
             onEditProfile={() => navigateTo('profile_setup')}
+            onEditPersonalInfo={() => navigateTo('profile_edit')}
             onUpdateAvatar={handleUpdateAvatarDirect}
             onSettings={() => navigateTo('settings')}
             onNavigateTab={(tab) => {
@@ -1632,6 +1649,15 @@ export const RootNavigator: React.FC = () => {
               else if (tab === 'leaders') navigateTo('leaderboard');
               else if (tab === 'friends') navigateTo('friends');
             }}
+          />
+        )}
+        {currentScreen === 'profile_edit' && user && (
+          <ProfileEditScreen
+            user={user}
+            token={token}
+            apiBaseUrl={API_BASE}
+            onBack={() => navigateTo('profile')}
+            onSaved={syncWithFreshUser}
           />
         )}
         {currentScreen === 'leaderboard' && (

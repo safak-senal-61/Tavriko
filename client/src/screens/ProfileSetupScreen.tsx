@@ -8,6 +8,7 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { compressAvatarImageAsync } from '../utils/avatarImage';
@@ -23,6 +24,16 @@ try {
 } catch {
   ImagePickerModule = null;
 }
+
+/*
+ * Avatarlar nadirlik sırasına göre dizilir (Nadir → Epik → Efsanevi) ve
+ * soldan sağa kademeli yaylı giriş animasyonuyla belirir (react-native-reanimated).
+ */
+const RARITY_ORDER: Record<string, number> = { Nadir: 0, Epik: 1, Efsanevi: 2 };
+const SORTED_AVATAR_PRESETS = AVATAR_PRESETS.map((preset, origIdx) => ({
+  ...preset,
+  origIdx,
+})).sort((a, b) => RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity]);
 interface ProfileSetupScreenProps {
   initialDisplayName?: string;
   initialAvatarUrl?: string;
@@ -36,21 +47,19 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
   const [displayName, setDisplayName] = useState(
     initialDisplayName === 'Misafir Oyuncu' ? 'DenizPro' : initialDisplayName
   );
-  const [selectedIndex, setSelectedIndex] = useState(() => {
+  // Seçim artık index değil, avatar kimliği (id) üzerinden yapılır
+  const [selectedId, setSelectedId] = useState<string>(() => {
     if (initialAvatarUrl) {
       const clean = initialAvatarUrl.toLowerCase().trim();
-      const foundIdx = AVATAR_PRESETS.findIndex((p, idx) => {
-        return (
-          p.id === clean ||
-          p.id === clean.replace('av', 'av_') ||
-          clean === `av${idx}` ||
-          clean === `av_${idx}` ||
-          clean.includes(p.name.toLowerCase())
-        );
+      const found = AVATAR_PRESETS.find((p) => {
+        if (p.id === clean) return true;
+        const digits = clean.replace(/^av_?/, '');
+        if (/^\d+$/.test(digits) && p.id === `av_${digits}`) return true;
+        return clean.includes(p.name.toLowerCase());
       });
-      if (foundIdx !== -1) return foundIdx;
+      if (found) return found.id;
     }
-    return 1;
+    return 'av_1';
   });
   const [customPhotoUri, setCustomPhotoUri] = useState<string | null>(
     initialAvatarUrl &&
@@ -114,7 +123,10 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
       }
     }
   };
-  const finalAvatarValue = customPhotoUri || AVATAR_PRESETS[selectedIndex].id;
+  const finalAvatarValue =
+    customPhotoUri ||
+    AVATAR_PRESETS.find((p) => p.id === selectedId)?.id ||
+    'av_1';
   return (
     <TavrikoScreen>
       <ScrollView
@@ -147,35 +159,43 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
             </Text>
           </View>
         </TouchableOpacity>
-        {/* 10 Character Avatar Grid from Tavriko UI Kit */}
+        {/* 10 Character Avatar Grid (rarity: Nadir → Epik → Efsanevi) with left→right staggered entrance animation */}
         <View style={styles.avatarGrid}>
-          {AVATAR_PRESETS.map((preset, idx) => {
-            const isSelected = !customPhotoUri && idx === selectedIndex;
+          {SORTED_AVATAR_PRESETS.map((preset, idx) => {
+            const isSelected = !customPhotoUri && preset.id === selectedId;
             return (
-              <TouchableOpacity
+              <Animated.View
                 key={preset.id}
-                style={[
-                  styles.avatarSlot,
-                  isSelected && styles.avatarSlotSelected,
-                ]}
-                onPress={() => {
-                  sound.playSound('tap');
-                  sound.triggerHaptic('light');
-                  setCustomPhotoUri(null);
-                  setSelectedIndex(idx);
-                }}
-                activeOpacity={0.85}
+                entering={FadeInDown.delay(idx * 45)
+                  .springify()
+                  .damping(15)
+                  .stiffness(120)}
               >
-                <CharacterAvatar index={idx} size={54} />
-                <Text style={styles.avatarNameText} numberOfLines={1}>
-                  {preset.name}
-                </Text>
-                <View style={[styles.avatarRarityBadge, { backgroundColor: preset.badgeBg }]}>
-                  <Text style={[styles.avatarRarityText, { color: preset.badgeFg }]}>
-                    {preset.rarity}
+                <TouchableOpacity
+                  style={[
+                    styles.avatarSlot,
+                    isSelected && styles.avatarSlotSelected,
+                  ]}
+                  onPress={() => {
+                    sound.playSound('tap');
+                    sound.triggerHaptic('light');
+                    setCustomPhotoUri(null);
+                    setSelectedId(preset.id);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  {/* Karakterler künye listesindeki orijinal sırayla çizilir */}
+                  <CharacterAvatar index={preset.origIdx} size={54} />
+                  <Text style={styles.avatarNameText} numberOfLines={1}>
+                    {preset.name}
                   </Text>
-                </View>
-              </TouchableOpacity>
+                  <View style={[styles.avatarRarityBadge, { backgroundColor: preset.badgeBg }]}>
+                    <Text style={[styles.avatarRarityText, { color: preset.badgeFg }]}>
+                      {preset.rarity}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
             );
           })}
         </View>
