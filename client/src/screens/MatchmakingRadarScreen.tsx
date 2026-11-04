@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, Platform } from 'react-native';
 import { CategoryId, DifficultyLevel, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -18,73 +18,85 @@ interface MatchmakingRadarScreenProps {
   onCancel: () => void;
 }
 
-// 10 candidate sonar coordinates scattered around the 270x270 radar (center = 135, 135)
-interface RandomTargetPoint {
-  id: string;
-  x: number; // left in 270x270
-  y: number; // top in 270x270
+// 12 farklı koordinat havuzu (merkez = 135, 135)
+interface SonarCoordinate {
+  x: number;
+  y: number;
   color: string;
   glow: string;
   size: number;
 }
 
-const RADAR_POINTS: RandomTargetPoint[] = [
-  // Quadrant 1 (Top-Right)
-  { id: 'p1', x: 196, y: 68, color: '#FFC43D', glow: 'rgba(255, 196, 61, 0.45)', size: 18 },
-  { id: 'p2', x: 218, y: 130, color: '#6FE3C1', glow: 'rgba(111, 227, 193, 0.45)', size: 16 },
-  { id: 'p3', x: 172, y: 104, color: '#38BDF8', glow: 'rgba(56, 189, 248, 0.45)', size: 15 },
+const SONAR_POOL: SonarCoordinate[] = [
+  // 1. Kadran (Kuzeydoğu)
+  { x: 198, y: 72, color: '#FFC43D', glow: 'rgba(255, 196, 61, 0.6)', size: 20 },
+  { x: 220, y: 130, color: '#6FE3C1', glow: 'rgba(111, 227, 193, 0.6)', size: 18 },
+  { x: 172, y: 104, color: '#38BDF8', glow: 'rgba(56, 189, 248, 0.6)', size: 16 },
 
-  // Quadrant 2 (Bottom-Right)
-  { id: 'p4', x: 188, y: 198, color: '#C084FC', glow: 'rgba(192, 132, 252, 0.45)', size: 18 },
-  { id: 'p5', x: 142, y: 220, color: '#FFC43D', glow: 'rgba(255, 196, 61, 0.45)', size: 16 },
+  // 2. Kadran (Güneydoğu)
+  { x: 186, y: 196, color: '#C084FC', glow: 'rgba(192, 132, 252, 0.6)', size: 20 },
+  { x: 142, y: 222, color: '#FFC43D', glow: 'rgba(255, 196, 61, 0.6)', size: 18 },
+  { x: 206, y: 162, color: '#FBBF24', glow: 'rgba(251, 191, 36, 0.6)', size: 16 },
 
-  // Quadrant 3 (Bottom-Left)
-  { id: 'p6', x: 78, y: 202, color: '#6FE3C1', glow: 'rgba(111, 227, 193, 0.45)', size: 18 },
-  { id: 'p7', x: 50, y: 142, color: '#38BDF8', glow: 'rgba(56, 189, 248, 0.45)', size: 16 },
-  { id: 'p8', x: 96, y: 164, color: '#F43F5E', glow: 'rgba(244, 63, 94, 0.45)', size: 15 },
+  // 3. Kadran (Güneybatı)
+  { x: 76, y: 200, color: '#6FE3C1', glow: 'rgba(111, 227, 193, 0.6)', size: 20 },
+  { x: 52, y: 140, color: '#38BDF8', glow: 'rgba(56, 189, 248, 0.6)', size: 18 },
+  { x: 96, y: 168, color: '#F43F5E', glow: 'rgba(244, 63, 94, 0.6)', size: 16 },
 
-  // Quadrant 4 (Top-Left)
-  { id: 'p9', x: 68, y: 76, color: '#FBBF24', glow: 'rgba(251, 191, 36, 0.45)', size: 17 },
-  { id: 'p10', x: 126, y: 52, color: '#6FE3C1', glow: 'rgba(111, 227, 193, 0.45)', size: 15 },
+  // 4. Kadran (Kuzeybatı)
+  { x: 68, y: 78, color: '#FFC43D', glow: 'rgba(255, 196, 61, 0.6)', size: 18 },
+  { x: 126, y: 54, color: '#6FE3C1', glow: 'rgba(111, 227, 193, 0.6)', size: 16 },
+  { x: 92, y: 110, color: '#C084FC', glow: 'rgba(192, 132, 252, 0.6)', size: 18 },
 ];
 
-// Single random ping target: dormant/sönük by default, bursts with light when triggered
-const RandomSonarBlip: React.FC<{
-  point: RandomTargetPoint;
-  isActive: boolean;
-}> = ({ point, isActive }) => {
+/** TEK ANLIK SONAR IŞIĞI: Sadece aktifken parlar, dalga yayar, tamamen söner ve bittiğini bildirir */
+const SingleActiveSonarPing: React.FC<{
+  coord: SonarCoordinate;
+  onFinished: () => void;
+}> = ({ coord, onFinished }) => {
   const flashAnim = useRef(new Animated.Value(0)).current;
   const rippleAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (isActive) {
-      flashAnim.setValue(0);
-      rippleAnim.setValue(0);
+    flashAnim.setValue(0);
+    rippleAnim.setValue(0);
 
-      Animated.parallel([
-        Animated.sequence([
-          Animated.timing(flashAnim, {
-            toValue: 1,
-            duration: 180,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: Platform.OS !== 'web',
-          }),
-          Animated.timing(flashAnim, {
-            toValue: 0,
-            duration: 750,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: Platform.OS !== 'web',
-          }),
-        ]),
-        Animated.timing(rippleAnim, {
+    const anim = Animated.parallel([
+      Animated.sequence([
+        // Parlayarak uyanma (150ms)
+        Animated.timing(flashAnim, {
           toValue: 1,
-          duration: 900,
-          easing: Easing.out(Easing.cubic),
+          duration: 150,
+          easing: Easing.out(Easing.ease),
           useNativeDriver: Platform.OS !== 'web',
         }),
-      ]).start();
-    }
-  }, [isActive, flashAnim, rippleAnim]);
+        // Tamamen sönme (650ms)
+        Animated.timing(flashAnim, {
+          toValue: 0,
+          duration: 650,
+          easing: Easing.in(Easing.ease),
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ]),
+      // Dışa doğru genişleyen ve kaybolan sonar şok dalgası (800ms)
+      Animated.timing(rippleAnim, {
+        toValue: 1,
+        duration: 800,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]);
+
+    anim.start(({ finished }) => {
+      if (finished) {
+        onFinished();
+      }
+    });
+
+    return () => {
+      anim.stop();
+    };
+  }, [coord, flashAnim, rippleAnim, onFinished]);
 
   const rippleScale = rippleAnim.interpolate({
     inputRange: [0, 1],
@@ -93,12 +105,12 @@ const RandomSonarBlip: React.FC<{
 
   const rippleOpacity = rippleAnim.interpolate({
     inputRange: [0, 0.3, 1],
-    outputRange: [0.9, 0.4, 0],
+    outputRange: [0.95, 0.45, 0],
   });
 
   const blipScale = flashAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.4, 1.2],
+    outputRange: [0.3, 1.25],
   });
 
   return (
@@ -106,50 +118,40 @@ const RandomSonarBlip: React.FC<{
       style={[
         styles.blipWrapper,
         {
-          left: point.x - point.size / 2,
-          top: point.y - point.size / 2,
-          width: point.size,
-          height: point.size,
+          left: coord.x - coord.size / 2,
+          top: coord.y - coord.size / 2,
+          width: coord.size,
+          height: coord.size,
         },
       ]}
       pointerEvents="none"
     >
-      {/* Sönük arka plan mikro izi (hafif, göz yormayan kılavuz nokta) */}
-      <View
-        style={[
-          styles.dormantDot,
-          {
-            backgroundColor: point.color,
-          },
-        ]}
-      />
-
-      {/* Tetiklendiğinde yayılan şok sonar dalgası */}
+      {/* Genişleyen şok halkası */}
       <Animated.View
         style={[
           styles.blipRippleRing,
           {
-            borderColor: point.color,
-            backgroundColor: point.glow,
+            borderColor: coord.color,
+            backgroundColor: coord.glow,
             transform: [{ scale: rippleScale }],
             opacity: rippleOpacity,
           },
         ]}
       />
 
-      {/* Parlayan çekirdek ışık */}
+      {/* Parlayan ve tamamen sönen çekirdek */}
       <Animated.View
         style={[
           styles.blipCore,
           {
-            borderColor: point.color,
-            backgroundColor: point.glow,
+            borderColor: coord.color,
+            backgroundColor: coord.glow,
             opacity: flashAnim,
             transform: [{ scale: blipScale }],
           },
         ]}
       >
-        <View style={[styles.blipInnerDot, { backgroundColor: point.color }]} />
+        <View style={[styles.blipInnerDot, { backgroundColor: coord.color }]} />
       </Animated.View>
     </View>
   );
@@ -162,27 +164,38 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
   onCancel,
 }) => {
   const [elapsedSec, setElapsedSec] = useState(0);
-  // Track which random point is currently pinging
-  const [activeBlipIndex, setActiveBlipIndex] = useState<number | null>(null);
+
+  // Ekranda SADECE tek bir aktif ışık tutulur: biri sönünce diğeri farklı noktada yanar!
+  const [activeCoord, setActiveCoord] = useState<{ coord: SonarCoordinate; key: number } | null>(null);
+  const lastIndexRef = useRef<number>(-1);
 
   const catObj = ALL_CATEGORIES.find((c) => c.id === category);
 
   const SWEEP_DURATION_MS = 2400;
 
-  // Continuous 360-degree radar sweep rotation
+  // 360 derece dönen radar ışını
   const rotateAnim = useRef(new Animated.Value(0)).current;
-  // Expanding pulse sonar ring
+  // Merkezden genişleyen ana sonar halkası
   const sonarPulse = useRef(new Animated.Value(0)).current;
-  // Radar center pulse
+  // Merkez çekirdeğin nefes alma animasyonu
   const centerScale = useRef(new Animated.Value(1)).current;
-  // Opponent avatar pulse
+  // Rakip aranıyor puls
   const opponentPulseAnim = useRef(new Animated.Value(0)).current;
 
+  // Sıradaki rastgele tek ışığı tetikleyen mekanizma:
+  const triggerNextPing = () => {
+    let nextIdx = Math.floor(Math.random() * SONAR_POOL.length);
+    if (nextIdx === lastIndexRef.current) {
+      nextIdx = (nextIdx + 1) % SONAR_POOL.length;
+    }
+    lastIndexRef.current = nextIdx;
+    setActiveCoord({ coord: SONAR_POOL[nextIdx], key: Date.now() });
+  };
+
   useEffect(() => {
-    // Initial radar ping sound
     sound.playSound('radar_ping');
 
-    // Continuous 360° sweep
+    // 360° döngü
     const sweepLoop = Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
@@ -193,7 +206,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
     );
     sweepLoop.start();
 
-    // Expanding sonar wave
+    // Genişleyen sonar dalgası
     const sonarLoop = Animated.loop(
       Animated.timing(sonarPulse, {
         toValue: 1,
@@ -204,7 +217,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
     );
     sonarLoop.start();
 
-    // Center icon pulse
+    // Merkez 1v1 çekirdek nabzı
     const centerLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(centerScale, {
@@ -223,7 +236,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
     );
     centerLoop.start();
 
-    // Opponent searching badge pulse
+    // Rakip kutusu puls
     const oppLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(opponentPulseAnim, {
@@ -242,7 +255,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
     );
     oppLoop.start();
 
-    // Timer for elapsed seconds
+    // Süre sayacı
     const timer = setInterval(() => {
       setElapsedSec((prev) => {
         const next = prev + 1;
@@ -253,23 +266,8 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
       });
     }, 1000);
 
-    // Random Sonar Ping Trigger: Picks a random point every 750ms - 1100ms
-    let pingTimeout: any = null;
-    let lastIdx = -1;
-
-    const triggerRandomPing = () => {
-      let nextIdx = Math.floor(Math.random() * RADAR_POINTS.length);
-      if (nextIdx === lastIdx) {
-        nextIdx = (nextIdx + 1) % RADAR_POINTS.length;
-      }
-      lastIdx = nextIdx;
-      setActiveBlipIndex(nextIdx);
-
-      const nextDelay = 800 + Math.random() * 500;
-      pingTimeout = setTimeout(triggerRandomPing, nextDelay);
-    };
-
-    triggerRandomPing();
+    // İlk ışığı başlat
+    const firstTimeout = setTimeout(triggerNextPing, 400);
 
     return () => {
       sweepLoop.stop();
@@ -277,9 +275,16 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
       centerLoop.stop();
       oppLoop.stop();
       clearInterval(timer);
-      if (pingTimeout) clearTimeout(pingTimeout);
+      clearTimeout(firstTimeout);
     };
   }, [rotateAnim, sonarPulse, centerScale, opponentPulseAnim]);
+
+  // Işık tamamen söndüğünde çağrılır: kısa bir karanlık bekleme sonrası farklı noktada yeni ışığı yakar
+  const handlePingFinished = () => {
+    setActiveCoord(null);
+    const delay = 250 + Math.random() * 350; // 250-600ms aralık
+    setTimeout(triggerNextPing, delay);
+  };
 
   const spinInterpolation = rotateAnim.interpolate({
     inputRange: [0, 1],
@@ -296,7 +301,6 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
     outputRange: [0.7, 0.25, 0],
   });
 
-  // Calculate 7-second search countdown and progress
   const clampedSec = Math.min(elapsedSec, 7);
   const searchProgress = Math.min(100, (clampedSec / 7) * 100);
   const remainingSec = Math.max(0, 7 - clampedSec);
@@ -318,9 +322,9 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
         {catObj?.name || 'Genel Kültür'} · Canlı Düello
       </Text>
 
-      {/* 1v1 Matchup Preview Cards */}
+      {/* 1v1 Önizleme Kartları */}
       <View style={styles.matchupRow}>
-        {/* Player 1 Card (You) */}
+        {/* Oyuncu 1 (Sen) */}
         <View style={styles.playerCard}>
           <View style={styles.myAvatarWrap}>
             <CharacterAvatar seed={avatarSeed || userName} size={38} />
@@ -335,12 +339,12 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
           </View>
         </View>
 
-        {/* Central VS Badge */}
+        {/* Orta VS Rozeti */}
         <View style={styles.vsBadgeSmall}>
           <Text style={styles.vsBadgeText}>VS</Text>
         </View>
 
-        {/* Player 2 Card (Opponent Searching) */}
+        {/* Oyuncu 2 (Aranıyor) */}
         <View style={[styles.playerCard, styles.opponentSearchingCard]}>
           <Animated.View
             style={[
@@ -368,9 +372,9 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
         </View>
       </View>
 
-      {/* Circular Animated Radar with Random Motion Sonar Pings */}
+      {/* Dairesel Radar Ekranı */}
       <View style={styles.radarContainer}>
-        {/* Expanding Sonar Wave Ring */}
+        {/* Genişleyen Sonar Dalgası */}
         <Animated.View
           style={[
             styles.sonarWaveRing,
@@ -381,7 +385,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
           ]}
         />
 
-        {/* Rotating Radar Sweep Container */}
+        {/* 360° Dönen Radar Işını */}
         <Animated.View
           style={[
             styles.rotatingSweepWrap,
@@ -393,7 +397,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
           <View style={styles.radarBeamLine} />
         </Animated.View>
 
-        {/* 4 Concentric Radar Distance Rings */}
+        {/* Eşmerkezli Kılavuz Çemberler */}
         <View
           style={[
             styles.ring,
@@ -443,11 +447,11 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
           ]}
         />
 
-        {/* Radar Crosshairs */}
+        {/* Radar Kılavuz Çizgileri */}
         <View style={styles.radarCrossHorizontal} />
         <View style={styles.radarCrossVertical} />
 
-        {/* Center Scanner Core */}
+        {/* Merkez 1v1 Çekirdek */}
         <Animated.View
           style={[
             styles.centerCoreWrap,
@@ -457,17 +461,17 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
           <Text style={styles.center1v1Text}>1v1</Text>
         </Animated.View>
 
-        {/* RANDOM SONAR BLIPS: Dormant / Sönük by default, igniting randomly */}
-        {RADAR_POINTS.map((pt, idx) => (
-          <RandomSonarBlip
-            key={pt.id}
-            point={pt}
-            isActive={activeBlipIndex === idx}
+        {/* SADECE TEK VE AKTİF OLAN IŞIK: Biri söndüğünde diğeri farklı koordinatta yanar! */}
+        {activeCoord && (
+          <SingleActiveSonarPing
+            key={activeCoord.key}
+            coord={activeCoord.coord}
+            onFinished={handlePingFinished}
           />
-        ))}
+        )}
       </View>
 
-      {/* 7-Second Search Countdown and Progress */}
+      {/* 7 Saniyelik Arama Sayacı ve İlerleme Çubuğu */}
       <View style={styles.timerWrap}>
         <Text style={styles.timerText}>
           00:0{clampedSec} <Text style={styles.timerMaxText}>/ 00:07</Text>
@@ -482,10 +486,10 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
         </View>
       </View>
 
-      {/* Dynamic Status Message */}
+      {/* Dinamik Durum Metni */}
       <Text style={styles.statusMessage}>{getStatusText()}</Text>
 
-      {/* Cancel Button */}
+      {/* İptal Butonu */}
       <View style={styles.cancelWrap}>
         <Button3D
           title="İPTAL"
@@ -694,19 +698,12 @@ const styles = StyleSheet.create({
     color: '#6FE3C1',
   },
 
-  // Dynamic Sonar Target Elements
+  // Tekil Parlayan Sonar Işığı
   blipWrapper: {
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 4,
-  },
-  dormantDot: {
-    position: 'absolute',
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    opacity: 0.12, // sönük kılavuz nokta
   },
   blipRippleRing: {
     position: 'absolute',
