@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
+  Animated as RNAnimated,
   View,
   Text,
   TouchableOpacity,
@@ -10,7 +11,7 @@ import {
   Platform,
   Switch,
 } from 'react-native';
-import Animated, { FadeInRight, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInRight, FadeInUp, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
 import { UserProfile, UserSettings, calculateLevelFromXp } from '@trivia/shared';
@@ -207,6 +208,28 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     const interval = setInterval(() => setWsConnected(socketService.isConnected()), 2500);
     return () => clearInterval(interval);
   }, []);
+
+  // Motion.dev-style continuous pulsing aura loop around avatar
+  const auraAnim = useRef(new (require('react-native').Animated).Value(1)).current;
+  useEffect(() => {
+    const RNAnimated = require('react-native').Animated;
+    const loop = RNAnimated.loop(
+      RNAnimated.sequence([
+        RNAnimated.timing(auraAnim, {
+          toValue: 1.15,
+          duration: 1800,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        RNAnimated.timing(auraAnim, {
+          toValue: 1.0,
+          duration: 1800,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [auraAnim]);
 
   const handlePickPhotoDirect = async () => {
     sound.playSound('tap');
@@ -1040,6 +1063,24 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 196, 61, 0.4)',
   },
   avatarHeader: { alignItems: 'center' },
+  avatarGlowContainer: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 104,
+    height: 104,
+  },
+  auraPulseRing: {
+    position: 'absolute',
+    width: 102,
+    height: 102,
+    borderRadius: 51,
+    backgroundColor: 'rgba(255, 196, 61, 0.35)',
+    shadowColor: '#FFC43D',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 16,
+  },
   goldAvatarRing: {
     padding: 4,
     borderRadius: 54,

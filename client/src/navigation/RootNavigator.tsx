@@ -1533,16 +1533,67 @@ export const RootNavigator: React.FC = () => {
                   : null
               }
               racers={
-                activeRoom && user && activeRoom.mode === 'custom'
-                  ? Object.values(activeRoom.players).map((p) => ({
-                      id: p.id,
-                      displayName: p.displayName,
-                      avatarUrl: p.avatarUrl,
-                      score: activeRoom.scores[p.id] ?? p.score ?? 0,
-                      isMe: p.id === user.id,
-                      isHost: p.isHost,
-                      hasAnswered: p.hasAnsweredCurrentRound,
-                    }))
+                activeRoom && user
+                  ? (activeRoom.mode === 'custom'
+                      ? Object.values(activeRoom.players).map((p) => ({
+                          id: p.id,
+                          displayName: p.displayName,
+                          avatarUrl: p.avatarUrl,
+                          score: activeRoom.scores[p.id] ?? p.score ?? 0,
+                          isMe: p.id === user.id,
+                          isHost: p.isHost,
+                          hasAnswered: p.hasAnsweredCurrentRound,
+                          lastAnswer: roundResult?.playerAnswers?.[p.id],
+                        }))
+                      : duelOpponent
+                      ? [
+                          {
+                            id: user.id,
+                            displayName: user.displayName || 'Sen',
+                            avatarUrl: user.avatarUrl,
+                            score: activeRoom.scores[user.id] ?? 0,
+                            isMe: true,
+                            isHost: activeRoom.hostId === user.id,
+                            hasAnswered: activeRoom.players[user.id]?.hasAnsweredCurrentRound || selectedOptionId !== null,
+                            lastAnswer: roundResult?.playerAnswers?.[user.id],
+                          },
+                          {
+                            id: duelOpponent.id,
+                            displayName: duelOpponent.displayName,
+                            avatarUrl: duelOpponent.avatarUrl,
+                            score: activeRoom.scores[duelOpponent.id] ?? duelOpponent.score ?? 0,
+                            isMe: false,
+                            isHost: false,
+                            hasAnswered: opponentHasAnswered || activeRoom.players[duelOpponent.id]?.hasAnsweredCurrentRound,
+                            lastAnswer: roundResult?.playerAnswers?.[duelOpponent.id],
+                          },
+                        ]
+                      : []
+                    )
+                  : duelOpponent
+                  ? [
+                      {
+                        id: user?.id || 'me',
+                        displayName: user?.displayName || 'Sen',
+                        avatarUrl: user?.avatarUrl,
+                        score: practiceStats.totalScore,
+                        isMe: true,
+                        hasAnswered: selectedOptionId !== null,
+                        lastAnswer: practiceFeedback ? {
+                          isCorrect: practiceFeedback.isCorrect,
+                          pointsEarned: practiceFeedback.pointsAwarded,
+                          speedBonus: practiceFeedback.speedBonus,
+                        } : undefined,
+                      },
+                      {
+                        id: duelOpponent.id,
+                        displayName: duelOpponent.displayName,
+                        avatarUrl: duelOpponent.avatarUrl,
+                        score: duelOpponent.score || 0,
+                        isMe: false,
+                        hasAnswered: opponentHasAnswered,
+                      },
+                    ]
                   : []
               }
               targetScore={500}
