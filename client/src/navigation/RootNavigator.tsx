@@ -1543,7 +1543,7 @@ export const RootNavigator: React.FC = () => {
                           isMe: p.id === user.id,
                           isHost: p.isHost,
                           hasAnswered: p.hasAnsweredCurrentRound,
-                          lastAnswer: roundResult?.playerAnswers?.[p.id],
+                          lastAnswer: lastRoundResult?.playerAnswers?.[p.id],
                         }))
                       : duelOpponent
                       ? [
@@ -1555,7 +1555,7 @@ export const RootNavigator: React.FC = () => {
                             isMe: true,
                             isHost: activeRoom.hostId === user.id,
                             hasAnswered: activeRoom.players[user.id]?.hasAnsweredCurrentRound || selectedOptionId !== null,
-                            lastAnswer: roundResult?.playerAnswers?.[user.id],
+                            lastAnswer: lastRoundResult?.playerAnswers?.[user.id],
                           },
                           {
                             id: duelOpponent.id,
@@ -1565,7 +1565,7 @@ export const RootNavigator: React.FC = () => {
                             isMe: false,
                             isHost: false,
                             hasAnswered: opponentHasAnswered || activeRoom.players[duelOpponent.id]?.hasAnsweredCurrentRound,
-                            lastAnswer: roundResult?.playerAnswers?.[duelOpponent.id],
+                            lastAnswer: lastRoundResult?.playerAnswers?.[duelOpponent.id],
                           },
                         ]
                       : []

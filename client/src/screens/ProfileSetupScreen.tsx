@@ -13,7 +13,7 @@ import Animated, { FadeInDown, FadeInRight, ZoomIn } from 'react-native-reanimat
 import Svg, { Path, Circle } from 'react-native-svg';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
-import { compressAvatarImageAsync } from '../utils/avatarImage';
+import { compressAvatarImageAsync, uploadAvatarToR2Async } from '../utils/avatarImage';
 import {
   TavrikoScreen,
   Button3D,
@@ -117,7 +117,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
             reader.onload = async (ev) => {
               const base64Uri = ev.target?.result as string;
               if (base64Uri) {
-                const compressed = await compressAvatarImageAsync(base64Uri);
+                const compressed = await uploadAvatarToR2Async(base64Uri);
                 setCustomPhotoUri(compressed);
                 sound.playSound('reward');
                 sound.triggerHaptic('success');
@@ -145,7 +145,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
         if (!res.canceled && res.assets?.length) {
           const asset = res.assets[0];
           const rawUri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
-          const compressed = await compressAvatarImageAsync(rawUri);
+          const compressed = await uploadAvatarToR2Async(rawUri);
           setCustomPhotoUri(compressed);
           sound.playSound('reward');
           sound.triggerHaptic('success');

@@ -1,6 +1,7 @@
 export interface Env {
   GAME_ROOMS: DurableObjectNamespace;
   MATCHMAKER: DurableObjectNamespace;
+  AVATAR_BUCKET?: R2Bucket;
 
   ENVIRONMENT?: string;
   BACKEND_API_URL: string;

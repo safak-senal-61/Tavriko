@@ -58,9 +58,9 @@ const COUNTRIES: Array<{ code: string; name: string }> = [
 ];
 
 const GENDERS: Array<{ id: string; label: string }> = [
-  { id: 'Kadın', label: '👩 Kadın' },
-  { id: 'Erkek', label: '👨 Erkek' },
-  { id: 'Diğer', label: '🌈 Diğer' },
+  { id: 'Kadın', label: 'Kadın' },
+  { id: 'Erkek', label: 'Erkek' },
+  { id: 'Diğer', label: 'Diğer' },
 ];
 
 const normalizeCode = (code: string) => {
@@ -239,7 +239,7 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
               activeOpacity={0.8}
             >
               <Text style={styles.selectValue}>
-                {COUNTRIES.find((c) => c.code === countryCode)?.name || countryName} 🌍
+                {COUNTRIES.find((c) => c.code === countryCode)?.name || countryName}
               </Text>
               <Text style={styles.selectChevron}>›</Text>
             </TouchableOpacity>

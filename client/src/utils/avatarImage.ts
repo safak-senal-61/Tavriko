@@ -75,3 +75,31 @@ export const sanitizeAvatarForUrl = (avatarUrl?: string | null): string => {
   if (value.length > MAX_URL_AVATAR_LENGTH) return 'custom';
   return value;
 };
+
+
+export const uploadAvatarToR2Async = async (
+  rawUri: string,
+  userId = 'user'
+): Promise<string> => {
+  try {
+    const compressed = await compressAvatarImageAsync(rawUri, 256, 0.7);
+    if (!compressed || (!compressed.startsWith('data:') && !compressed.startsWith('blob:'))) {
+      return compressed || rawUri;
+    }
+    const r2Endpoint = 'https://tavriko-realtime.uncertainidentity8.workers.dev/api/upload/avatar';
+    const res = await fetch(r2Endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: compressed, userId }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.url) {
+        return data.url;
+      }
+    }
+    return compressed;
+  } catch {
+    return rawUri;
+  }
+};

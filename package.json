@@ -9,7 +9,7 @@
     "cloudflare"
   ],
   "scripts": {
-    "build": "npx prisma generate --schema=server/prisma/schema.prisma && npm run build:shared && npm run build:server && npm run build:cloudflare",
+    "build": "npx prisma generate --schema=server/prisma/schema.prisma && npm run build:shared && npm run build:server && npm run build:client:web && npm run build:cloudflare",
     "test:all": "scripts\\run-all-tests.bat",
     "test:shared": "npm --prefix shared test",
     "test:server": "npm --prefix server test",

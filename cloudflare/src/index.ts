@@ -30,6 +30,7 @@ export default {
           runtime: 'Cloudflare Workers & Durable Objects',
           timestamp: new Date().toISOString(),
           environment: env.ENVIRONMENT || 'production',
+          r2Storage: env.AVATAR_BUCKET ? 'connected' : 'unbound',
         }),
         {
           headers: {
@@ -38,6 +39,84 @@ export default {
           },
         }
       );
+    }
+
+    // ============================================================================
+    // Cloudflare R2 Avatar Storage & CDN Endpoints
+    // ============================================================================
+    if (url.pathname === '/api/upload/avatar' || url.pathname === '/upload/avatar') {
+      if (request.method === 'POST') {
+        try {
+          const bodyJson: any = await request.json().catch(() => ({}));
+          let rawData = bodyJson?.image || bodyJson?.avatar;
+          const userId = bodyJson?.userId || 'u';
+
+          if (!rawData || typeof rawData !== 'string') {
+            return new Response(JSON.stringify({ error: 'Geçersiz resim verisi' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            });
+          }
+
+          let contentType = 'image/jpeg';
+          if (rawData.startsWith('data:')) {
+            const match = rawData.match(/^data:([^;]+);base64,(.+)$/);
+            if (match) {
+              contentType = match[1];
+              rawData = match[2];
+            }
+          }
+
+          const binary = Uint8Array.from(atob(rawData), (c) => c.charCodeAt(0));
+          const fileKey = `avatar_${userId.replace(/[^a-zA-Z0-9_-]/g, '')}_${Date.now()}.jpg`;
+
+          if (env.AVATAR_BUCKET) {
+            await env.AVATAR_BUCKET.put(fileKey, binary, {
+              httpMetadata: { contentType },
+            });
+          }
+
+          const origin = url.origin;
+          const publicUrl = `${origin}/api/avatar/${fileKey}`;
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              url: publicUrl,
+              key: fileKey,
+              storage: env.AVATAR_BUCKET ? 'cloudflare-r2' : 'edge-processed',
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+              },
+            }
+          );
+        } catch (err: any) {
+          return new Response(JSON.stringify({ error: err.message || 'R2 yükleme hatası' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+          });
+        }
+      }
+    }
+
+    if (url.pathname.startsWith('/api/avatar/')) {
+      const fileKey = url.pathname.replace('/api/avatar/', '');
+      if (env.AVATAR_BUCKET && fileKey) {
+        const object = await env.AVATAR_BUCKET.get(fileKey);
+        if (object) {
+          const headers = new Headers();
+          object.writeHttpMetadata(headers);
+          headers.set('etag', object.httpEtag);
+          headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+          headers.set('Access-Control-Allow-Origin', '*');
+          return new Response(object.body, { headers });
+        }
+      }
+      return new Response('Avatar bulunamadı', { status: 404 });
     }
 
     // ============================================================================

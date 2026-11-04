@@ -18,6 +18,192 @@ interface MatchmakingRadarScreenProps {
   onCancel: () => void;
 }
 
+// Radar target configuration around a 270x270 circle (center = 135, 135)
+// theta is clock angle in degrees (0° = 12 o'clock, 90° = 3 o'clock, etc.)
+interface RadarTargetConfig {
+  id: string;
+  clockAngleDeg: number;
+  radius: number;
+  color: string;
+  glowColor: string;
+  size: number;
+  label?: string;
+}
+
+const RADAR_TARGETS: RadarTargetConfig[] = [
+  {
+    id: 't1_gold',
+    clockAngleDeg: 48,
+    radius: 86,
+    color: '#FFC43D',
+    glowColor: 'rgba(255, 196, 61, 0.45)',
+    size: 24,
+    label: 'TR',
+  },
+  {
+    id: 't2_mint',
+    clockAngleDeg: 115,
+    radius: 98,
+    color: '#6FE3C1',
+    glowColor: 'rgba(111, 227, 193, 0.45)',
+    size: 20,
+    label: 'EU',
+  },
+  {
+    id: 't3_cyan',
+    clockAngleDeg: 165,
+    radius: 68,
+    color: '#38BDF8',
+    glowColor: 'rgba(56, 189, 248, 0.45)',
+    size: 18,
+  },
+  {
+    id: 't4_purple',
+    clockAngleDeg: 215,
+    radius: 92,
+    color: '#C084FC',
+    glowColor: 'rgba(192, 132, 252, 0.45)',
+    size: 22,
+    label: 'AZ',
+  },
+  {
+    id: 't5_rose',
+    clockAngleDeg: 285,
+    radius: 78,
+    color: '#F43F5E',
+    glowColor: 'rgba(244, 63, 94, 0.45)',
+    size: 18,
+  },
+  {
+    id: 't6_amber',
+    clockAngleDeg: 340,
+    radius: 54,
+    color: '#FBBF24',
+    glowColor: 'rgba(251, 191, 36, 0.45)',
+    size: 16,
+  },
+];
+
+// Single animated radar ping target component
+const DynamicSonarBlip: React.FC<{
+  target: RadarTargetConfig;
+  sweepDurationMs: number;
+}> = ({ target, sweepDurationMs }) => {
+  const pulseAnim = useRef(new Animated.Value(0)).current;
+  const rippleAnim = useRef(new Animated.Value(0)).current;
+
+  // Calculate position in 270x270 container
+  const rad = (target.clockAngleDeg * Math.PI) / 180;
+  const posX = 135 + target.radius * Math.sin(rad) - target.size / 2;
+  const posY = 135 - target.radius * Math.cos(rad) - target.size / 2;
+
+  // Delay trigger to synchronize with 360° sweep beam arrival
+  const triggerDelay = Math.round(sweepDurationMs * (target.clockAngleDeg / 360));
+
+  useEffect(() => {
+    let isMounted = true;
+    let timerId: any = null;
+    let loopPulse: Animated.CompositeAnimation | null = null;
+    let loopRipple: Animated.CompositeAnimation | null = null;
+
+    timerId = setTimeout(() => {
+      if (!isMounted) return;
+
+      // Pulse sequence: sharp flash as beam sweeps, gentle glow decay
+      loopPulse = Animated.loop(
+        Animated.sequence([
+          Animated.parallel([
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 320,
+              easing: Easing.out(Easing.back(1.5)),
+              useNativeDriver: Platform.OS !== 'web',
+            }),
+            Animated.timing(rippleAnim, {
+              toValue: 1,
+              duration: 850,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: Platform.OS !== 'web',
+            }),
+          ]),
+          Animated.timing(pulseAnim, {
+            toValue: 0.25,
+            duration: sweepDurationMs - 320,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: Platform.OS !== 'web',
+          }),
+        ])
+      );
+      loopPulse.start();
+    }, triggerDelay);
+
+    return () => {
+      isMounted = false;
+      if (timerId) clearTimeout(timerId);
+      if (loopPulse) loopPulse.stop();
+      if (loopRipple) loopRipple.stop();
+    };
+  }, [pulseAnim, rippleAnim, sweepDurationMs, triggerDelay]);
+
+  const rippleScale = rippleAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.8, 2.6],
+  });
+
+  const rippleOpacity = rippleAnim.interpolate({
+    inputRange: [0, 0.4, 1],
+    outputRange: [0.9, 0.4, 0],
+  });
+
+  const blipScale = pulseAnim.interpolate({
+    inputRange: [0.25, 1],
+    outputRange: [0.75, 1.15],
+  });
+
+  return (
+    <View
+      style={[
+        styles.blipWrapper,
+        {
+          left: posX,
+          top: posY,
+          width: target.size,
+          height: target.size,
+        },
+      ]}
+      pointerEvents="none"
+    >
+      {/* Expanding shockwave ripple */}
+      <Animated.View
+        style={[
+          styles.blipRippleRing,
+          {
+            borderColor: target.color,
+            backgroundColor: target.glowColor,
+            transform: [{ scale: rippleScale }],
+            opacity: rippleOpacity,
+          },
+        ]}
+      />
+
+      {/* Core glowing target badge */}
+      <Animated.View
+        style={[
+          styles.blipCore,
+          {
+            borderColor: target.color,
+            backgroundColor: target.glowColor,
+            opacity: pulseAnim,
+            transform: [{ scale: blipScale }],
+          },
+        ]}
+      >
+        <View style={[styles.blipInnerDot, { backgroundColor: target.color }]} />
+      </Animated.View>
+    </View>
+  );
+};
+
 export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
   category,
   userName = 'Sen',
@@ -27,14 +213,16 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
   const [elapsedSec, setElapsedSec] = useState(0);
   const catObj = ALL_CATEGORIES.find((c) => c.id === category);
 
+  const SWEEP_DURATION_MS = 2200;
+
   // Continuous 360-degree radar sweep rotation
   const rotateAnim = useRef(new Animated.Value(0)).current;
   // Expanding pulse sonar ring
   const sonarPulse = useRef(new Animated.Value(0)).current;
   // Radar center pulse
   const centerScale = useRef(new Animated.Value(1)).current;
-  // Single 1v1 opponent scanning blip animation
-  const opponentBlipAnim = useRef(new Animated.Value(0)).current;
+  // Opponent avatar pulse
+  const opponentPulseAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Play initial radar sonar ping
@@ -44,7 +232,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
     const sweepLoop = Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
-        duration: 2200,
+        duration: SWEEP_DURATION_MS,
         easing: Easing.linear,
         useNativeDriver: Platform.OS !== 'web',
       })
@@ -81,24 +269,24 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
     );
     centerLoop.start();
 
-    // Opponent beacon pulse on radar
-    const blipLoop = Animated.loop(
+    // Opponent searching badge pulse
+    const oppLoop = Animated.loop(
       Animated.sequence([
-        Animated.timing(opponentBlipAnim, {
+        Animated.timing(opponentPulseAnim, {
           toValue: 1,
-          duration: 900,
+          duration: 700,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: Platform.OS !== 'web',
         }),
-        Animated.timing(opponentBlipAnim, {
+        Animated.timing(opponentPulseAnim, {
           toValue: 0.35,
-          duration: 900,
+          duration: 700,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: Platform.OS !== 'web',
         }),
       ])
     );
-    blipLoop.start();
+    oppLoop.start();
 
     const timer = setInterval(() => {
       setElapsedSec((prev) => {
@@ -114,10 +302,10 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
       sweepLoop.stop();
       sonarLoop.stop();
       centerLoop.stop();
-      blipLoop.stop();
+      oppLoop.stop();
       clearInterval(timer);
     };
-  }, [rotateAnim, sonarPulse, centerScale, opponentBlipAnim]);
+  }, [rotateAnim, sonarPulse, centerScale, opponentPulseAnim]);
 
   const spinInterpolation = rotateAnim.interpolate({
     inputRange: [0, 1],
@@ -139,7 +327,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
   const searchProgress = Math.min(100, (clampedSec / 7) * 100);
   const remainingSec = Math.max(0, 7 - clampedSec);
 
-  // Dynamic status text strictly according to specification:
+  // Dynamic status text according to specification:
   // 0-3 sn: "Gerçek 1v1 rakip aranıyor..."
   // 4-6 sn: "Adaylar taranıyor..."
   // 7. sn: "Bilgisayar rakip atanıyor..."
@@ -165,11 +353,11 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
         {/* Player 1 Card (You) */}
         <View style={styles.playerCard}>
           <View style={styles.myAvatarWrap}>
-            <CharacterAvatar seed={avatarSeed || userName} size={46} />
+            <CharacterAvatar seed={avatarSeed || userName} size={38} />
           </View>
           <View style={styles.playerInfo}>
-            <Text style={styles.playerName} numberOfLines={1}>
-              {userName.toUpperCase()}
+            <Text style={styles.playerName} numberOfLines={1} ellipsizeMode="tail">
+              {userName}
             </Text>
             <View style={styles.readyBadge}>
               <Text style={styles.readyBadgeText}>✓ HAZIR</Text>
@@ -187,14 +375,14 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
           <Animated.View
             style={[
               styles.opponentAvatarWrap,
-              { opacity: opponentBlipAnim },
+              { opacity: opponentPulseAnim },
             ]}
           >
             <Text style={styles.questionMark}>?</Text>
           </Animated.View>
           <View style={styles.playerInfo}>
-            <Text style={styles.playerName} numberOfLines={1}>
-              {elapsedSec >= 7 ? 'BİLGİSAYAR' : 'RAKİP ARANIYOR'}
+            <Text style={styles.playerName} numberOfLines={1} ellipsizeMode="tail">
+              {elapsedSec >= 7 ? 'Bilgisayar' : 'Rakip Aranıyor'}
             </Text>
             <View
               style={[
@@ -203,14 +391,14 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
               ]}
             >
               <Text style={styles.searchingBadgeText}>
-                {elapsedSec >= 7 ? '🤖 BOT ATANIYOR' : '🔍 TARANIYOR'}
+                {elapsedSec >= 7 ? '🤖 BOT' : '🔍 TARANIYOR'}
               </Text>
             </View>
           </View>
         </View>
       </View>
 
-      {/* Circular Animated Radar */}
+      {/* Circular Animated Radar with Multi-Target Motion Sonar */}
       <View style={styles.radarContainer}>
         {/* Expanding Sonar Wave Ring */}
         <Animated.View
@@ -235,7 +423,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
           <View style={styles.radarBeamLine} />
         </Animated.View>
 
-        {/* 4 Concentric Rings */}
+        {/* 4 Concentric Radar Distance Rings */}
         <View
           style={[
             styles.ring,
@@ -244,7 +432,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
               left: 0,
               right: 0,
               bottom: 0,
-              borderColor: 'rgba(111, 227, 193, 0.28)',
+              borderColor: 'rgba(111, 227, 193, 0.32)',
             },
           ]}
         />
@@ -299,18 +487,14 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
           <Text style={styles.center1v1Text}>1v1</Text>
         </Animated.View>
 
-        {/* Single Opponent Radar Blip / Candidate Ping */}
-        <Animated.View
-          style={[
-            styles.opponentRadarBlip,
-            {
-              opacity: opponentBlipAnim,
-              transform: [{ scale: opponentBlipAnim }],
-            },
-          ]}
-        >
-          <View style={styles.blipInnerDot} />
-        </Animated.View>
+        {/* DYNAMIC MULTI-TARGET SONAR BLIPS ACROSS ALL QUADRANTS */}
+        {RADAR_TARGETS.map((target) => (
+          <DynamicSonarBlip
+            key={target.id}
+            target={target}
+            sweepDurationMs={SWEEP_DURATION_MS}
+          />
+        ))}
       </View>
 
       {/* 7-Second Search Countdown and Progress */}
@@ -347,10 +531,10 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
 const styles = StyleSheet.create({
   title: {
     fontFamily: THEME.fonts.display,
-    fontSize: 32,
+    fontSize: 28,
     color: '#FFFFFF',
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 6,
     marginBottom: 4,
   },
   subtitle: {
@@ -358,15 +542,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   matchupRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginHorizontal: 12,
-    marginBottom: 10,
-    gap: 8,
+    marginBottom: 8,
+    gap: 6,
   },
   playerCard: {
     flex: 1,
@@ -375,24 +559,26 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.16)',
-    borderRadius: 18,
-    padding: 10,
-    gap: 10,
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    gap: 8,
+    minHeight: 56,
   },
   opponentSearchingCard: {
     backgroundColor: 'rgba(111, 227, 193, 0.06)',
     borderColor: 'rgba(111, 227, 193, 0.3)',
   },
   myAvatarWrap: {
-    borderRadius: 24,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: '#7CFC8A',
     overflow: 'hidden',
   },
   opponentAvatarWrap: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     borderWidth: 2,
     borderColor: '#6FE3C1',
@@ -401,38 +587,39 @@ const styles = StyleSheet.create({
   },
   questionMark: {
     color: '#6FE3C1',
-    fontSize: 22,
+    fontSize: 18,
     fontFamily: THEME.fonts.display,
   },
   playerInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
   playerName: {
     fontFamily: THEME.fonts.display,
-    fontSize: 14,
+    fontSize: 12.5,
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   readyBadge: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(124, 252, 138, 0.2)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#7CFC8A',
   },
   readyBadgeText: {
     color: '#7CFC8A',
-    fontSize: 10,
+    fontSize: 9.5,
     fontFamily: THEME.fonts.extraBold,
   },
   searchingBadge: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(111, 227, 193, 0.2)',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#6FE3C1',
   },
@@ -442,29 +629,30 @@ const styles = StyleSheet.create({
   },
   searchingBadgeText: {
     color: '#6FE3C1',
-    fontSize: 10,
+    fontSize: 9.5,
     fontFamily: THEME.fonts.extraBold,
   },
   vsBadgeSmall: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#FFB21E',
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 2,
   },
   vsBadgeText: {
     fontFamily: THEME.fonts.display,
-    fontSize: 14,
+    fontSize: 13,
     color: '#2A1558',
   },
   radarContainer: {
     width: 270,
     height: 270,
     alignSelf: 'center',
-    marginVertical: 8,
+    marginVertical: 6,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
@@ -474,7 +662,7 @@ const styles = StyleSheet.create({
     width: 270,
     height: 270,
     borderRadius: 135,
-    borderWidth: 3,
+    borderWidth: 2.5,
     borderColor: '#6FE3C1',
     backgroundColor: 'rgba(111, 227, 193, 0.08)',
   },
@@ -497,7 +685,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 134,
-    width: 3,
+    width: 2.5,
     height: 135,
     backgroundColor: '#6FE3C1',
     borderRadius: 2,
@@ -520,9 +708,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(111, 227, 193, 0.15)',
   },
   centerCoreWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#2A1558',
     borderWidth: 2.5,
     borderColor: '#6FE3C1',
@@ -532,51 +720,60 @@ const styles = StyleSheet.create({
   },
   center1v1Text: {
     fontFamily: THEME.fonts.display,
-    fontSize: 18,
+    fontSize: 17,
     color: '#6FE3C1',
   },
-  opponentRadarBlip: {
+
+  // Dynamic Sonar Target Elements
+  blipWrapper: {
     position: 'absolute',
-    top: 48,
-    right: 58,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: 'rgba(255, 196, 61, 0.3)',
-    borderWidth: 2,
-    borderColor: '#FFC43D',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 4,
   },
-  blipInnerDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#FFC43D',
+  blipRippleRing: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    borderRadius: 999,
+    borderWidth: 1.5,
   },
+  blipCore: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 999,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  blipInnerDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+
   timerWrap: {
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 2,
     paddingHorizontal: 28,
   },
   timerText: {
     fontFamily: THEME.fonts.display,
-    fontSize: 32,
+    fontSize: 30,
     color: '#FFFFFF',
     textAlign: 'center',
   },
   timerMaxText: {
-    fontSize: 20,
+    fontSize: 18,
     color: 'rgba(255, 255, 255, 0.5)',
   },
   remainingHint: {
     color: 'rgba(217, 205, 245, 0.8)',
-    fontSize: 12,
+    fontSize: 11.5,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
     marginTop: 2,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   progressContainer: {
     width: '100%',
@@ -584,14 +781,14 @@ const styles = StyleSheet.create({
   },
   statusMessage: {
     color: '#6FE3C1',
-    fontSize: 14,
+    fontSize: 13.5,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 14,
+    marginTop: 6,
+    marginBottom: 12,
   },
   cancelWrap: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
 });

@@ -18,7 +18,7 @@ import { UserProfile, UserSettings, calculateLevelFromXp } from '@trivia/shared'
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
-import { compressAvatarImageAsync } from '../utils/avatarImage';
+import { compressAvatarImageAsync, uploadAvatarToR2Async } from '../utils/avatarImage';
 import { DEFAULT_API_BASE } from '../config';
 import {
   TavrikoScreen,
@@ -247,7 +247,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           const rawUri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
           setPhotoState('saving');
           try {
-            const compressed = await compressAvatarImageAsync(rawUri);
+            const compressed = await uploadAvatarToR2Async(rawUri, user.id);
             onUpdateAvatar(compressed);
             sound.playSound('reward');
             sound.triggerHaptic('success');
@@ -1054,7 +1054,7 @@ const card = {
 } as const;
 
 const styles = StyleSheet.create({
-  scrollContent: { paddingBottom: 110 },
+  scrollContent: { paddingBottom: 165 },
   heroCard: {
     ...card,
     padding: 16,

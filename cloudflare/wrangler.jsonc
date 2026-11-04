@@ -16,6 +16,12 @@
       }
     ]
   },
+  "r2_buckets": [
+    {
+      "binding": "AVATAR_BUCKET",
+      "bucket_name": "tavriko-avatars"
+    }
+  ],
   "migrations": [
     {
       "tag": "v1",
