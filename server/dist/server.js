@@ -1931,18 +1931,18 @@ function createApp() {
                 try {
                   // Trailing comma ve yorum temizliği
                   let sanitized = cleaned
-                    .replace(/\/\/.*$/gm, '')
-                    .replace(/\/\*[\s\S]*?\*\//g, '')
-                    .replace(/,\s*([}\]])/g, '$1');
+                    .replace(new RegExp('//.*$', 'gm'), '')
+                    .replace(new RegExp('/\\*[\\s\\S]*?\\*/', 'g'), '')
+                    .replace(new RegExp(',\\s*([}\\]])', 'g'), '$1');
                   parsed = JSON.parse(sanitized);
                 } catch (e2) {
                   // Parçalı regex nesne çıkarma
                   const extracted = [];
-                  const objRegex = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+                  const objRegex = new RegExp('\\{[^{}]*(?:\\{[^{}]*\\}[^{}]*)*\\}', 'g');
                   let m;
                   while ((m = objRegex.exec(cleaned)) !== null) {
                     try {
-                      const o = JSON.parse(m[0].replace(/,\s*}/g, '}'));
+                      const o = JSON.parse(m[0].replace(new RegExp(',\\s*}', 'g'), '}'));
                       if (o && (o.text || o.soru || o.question)) extracted.push(o);
                     } catch (e3) {}
                   }

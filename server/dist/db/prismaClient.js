@@ -2324,11 +2324,21 @@ class PrismaService {
         const explicitFriendIds = new Set(me?.friendIds || []);
         const seenUserIds = new Set();
         const seenUsernames = new Set();
+        const seenNormalizedNames = new Set();
+        const normalizeName = (name) => (name || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9ğüşıöç]/gi, '')
+            .trim();
         if (me?.id)
             seenUserIds.add(me.id);
         seenUserIds.add(userId);
-        if (me?.username)
+        if (me?.username) {
             seenUsernames.add(me.username.toLowerCase());
+            seenNormalizedNames.add(normalizeName(me.username));
+        }
+        if (me?.displayName) {
+            seenNormalizedNames.add(normalizeName(me.displayName));
+        }
         // Build unique user pool from memory store
         const uniqueUsers = [];
         for (const u of this.users.values()) {
@@ -2413,11 +2423,21 @@ class PrismaService {
         const explicitFriendIds = new Set(Array.isArray(me?.friendIds) ? me.friendIds : []);
         const seenUserIds = new Set();
         const seenUsernames = new Set();
+        const seenNormalizedNames = new Set();
+        const normalizeName = (name) => (name || '')
+            .toLowerCase()
+            .replace(/[^a-z0-9ğüşıöç]/gi, '')
+            .trim();
         if (me?.id)
             seenUserIds.add(me.id);
         seenUserIds.add(userId);
-        if (me?.username)
+        if (me?.username) {
             seenUsernames.add(me.username.toLowerCase());
+            seenNormalizedNames.add(normalizeName(me.username));
+        }
+        if (me?.displayName) {
+            seenNormalizedNames.add(normalizeName(me.displayName));
+        }
         const uniqueUsersMap = new Map();
         // 1. Fetch real registered users from PostgreSQL database
         try {
@@ -2428,13 +2448,15 @@ class PrismaService {
             });
             for (const dbu of dbUsers) {
                 const uName = (dbu.username || '').toLowerCase().trim();
-                if (!seenUserIds.has(dbu.id) && (!uName || !seenUsernames.has(uName))) {
+                const dName = normalizeName(dbu.displayName || dbu.username);
+                if (!seenUserIds.has(dbu.id) && (!uName || !seenUsernames.has(uName)) && (!dName || !seenNormalizedNames.has(dName))) {
                     seenUserIds.add(dbu.id);
                     if (uName)
                         seenUsernames.add(uName);
+                    if (dName)
+                        seenNormalizedNames.add(dName);
                     const rec = this.prismaUserToRecord(dbu);
                     uniqueUsersMap.set(rec.id, rec);
-                    // keep memory store warmed up
                     this.users.set(rec.id, rec);
                 }
             }
@@ -2445,10 +2467,13 @@ class PrismaService {
         // 2. Merge any memory store users not yet in DB map
         for (const u of this.users.values()) {
             const uName = (u?.username || '').toLowerCase().trim();
-            if (u && u.id && !seenUserIds.has(u.id) && (!uName || !seenUsernames.has(uName)) && !u.isGuest) {
+            const dName = normalizeName(u?.displayName || u?.username);
+            if (u && u.id && !seenUserIds.has(u.id) && (!uName || !seenUsernames.has(uName)) && (!dName || !seenNormalizedNames.has(dName)) && !u.isGuest) {
                 seenUserIds.add(u.id);
                 if (uName)
                     seenUsernames.add(uName);
+                if (dName)
+                    seenNormalizedNames.add(dName);
                 uniqueUsersMap.set(u.id, u);
             }
         }

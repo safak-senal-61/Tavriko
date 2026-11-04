@@ -90,15 +90,22 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       .then((data) => {
         if (data.friendCode) setFriendCode(data.friendCode);
         if (Array.isArray(data.friends)) {
-          // Strictly deduplicate users by ID and username
+          // Strictly deduplicate users by ID, username, and normalized display name
           const seenIds = new Set<string>();
           const seenUsernames = new Set<string>();
+          const seenNames = new Set<string>();
           const cleanFriends = data.friends.filter((f: FriendRowItem) => {
             if (!f || !f.id || seenIds.has(f.id)) return false;
-            const uName = (f.username || f.name || f.displayName || '').toLowerCase().trim();
+            const uName = (f.username || '').toLowerCase().trim();
+            const normName = (f.displayName || f.name || f.username || '')
+              .toLowerCase()
+              .replace(/[^a-z0-9ğüşıöç]/gi, '')
+              .trim();
             if (uName && seenUsernames.has(uName)) return false;
+            if (normName && seenNames.has(normName)) return false;
             seenIds.add(f.id);
             if (uName) seenUsernames.add(uName);
+            if (normName) seenNames.add(normName);
             return true;
           });
           setFriendsList(cleanFriends);
@@ -910,11 +917,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(8, 3, 20, 0.88)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 12,
   },
   profileModalCard: {
+    // Masaüstünde telefon çerçevesiyle (480px) aynı genişlikte kalır — taşmaz
     width: '100%',
-    maxHeight: '88%',
+    maxWidth: 430,
+    alignSelf: 'center',
+    maxHeight: '90%',
     backgroundColor: '#1E0E45',
     borderRadius: 26,
     borderWidth: 2,
