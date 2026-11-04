@@ -5,26 +5,80 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Image,
+  Platform,
   Modal,
   ActivityIndicator,
   TextInput,
 } from 'react-native';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { UserProfile, UserSettings } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
+import { socketService } from '../services/socketService';
 import {
   TavrikoScreen,
   TavrikoTopBar,
   Button3D,
   CharacterAvatar,
-  BRAND_APP_ICON,
   CoinTavrikoIcon,
   GemTavrikoIcon,
 } from '../components/TavrikoIcons';
 
+// ============================================================================
+// SLEEK VECTOR ICONS (No Cheesy Emojis)
+// ============================================================================
+const SpeakerIcon: React.FC<{ size?: number; color?: string }> = ({ size = 20, color = '#FFFFFF' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M11 5L6 9H2V15H6L11 19V5Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M15.54 8.46C16.48 9.4 17 10.68 17 12C17 13.32 16.48 14.6 15.54 15.54" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path d="M19.07 4.93C20.95 6.81 22 9.34 22 12C22 14.66 20.95 17.19 19.07 19.07" stroke={color} strokeWidth="2" strokeLinecap="round" />
+  </Svg>
+);
+
+const MusicIcon: React.FC<{ size?: number; color?: string }> = ({ size = 20, color = '#FFFFFF' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M9 18V5L21 3V16" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <Circle cx="6" cy="18" r="3" stroke={color} strokeWidth="2" />
+    <Circle cx="18" cy="16" r="3" stroke={color} strokeWidth="2" />
+  </Svg>
+);
+
+const VibrateIcon: React.FC<{ size?: number; color?: string }> = ({ size = 20, color = '#FFFFFF' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x="7" y="4" width="10" height="16" rx="2" stroke={color} strokeWidth="2" />
+    <Path d="M2 8L2 16M5 10L5 14M22 8L22 16M19 10L19 14" stroke={color} strokeWidth="2" strokeLinecap="round" />
+  </Svg>
+);
+
+const GamepadIcon: React.FC<{ size?: number; color?: string }> = ({ size = 20, color = '#FFFFFF' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M6 12H10M8 10V14M15 11H15.01M17 13H17.01" stroke={color} strokeWidth="2" strokeLinecap="round" />
+    <Path d="M17.5 6H6.5C4.01 6 2 8.01 2 10.5C2 13.9 4.3 17.7 7.2 17.9C8.3 18 9.3 17.3 9.9 16.3L10.7 15H13.3L14.1 16.3C14.7 17.3 15.7 18 16.8 17.9C19.7 17.7 22 13.9 22 10.5C22 8.01 19.99 6 17.5 6Z" stroke={color} strokeWidth="2" strokeLinejoin="round" />
+  </Svg>
+);
+
+const ShieldIcon: React.FC<{ size?: number; color?: string }> = ({ size = 20, color = '#FFFFFF' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M12 22C12 22 20 18 20 12V5L12 2L4 5V12C4 18 12 22 12 22Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const CloudSyncIcon: React.FC<{ size?: number; color?: string }> = ({ size = 20, color = '#FFFFFF' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M20 16.2A4.5 4.5 0 0 0 17.5 8h-1.8A7 7 0 1 0 4 14.9" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M12 13V21M12 21L9 18M12 21L15 18" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const KeyIcon: React.FC<{ size?: number; color?: string }> = ({ size = 20, color = '#FFFFFF' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="8" cy="15" r="4" stroke={color} strokeWidth="2" />
+    <Path d="M10.85 12.15L19 4M19 4L22 7M19 4L16 7M18 10L20 8" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
 interface SettingsScreenProps {
-  user?: UserProfile;
+  user?: UserProfile | null;
   apiBaseUrl?: string;
   onBack: () => void;
   onLogout: () => void;
@@ -35,7 +89,7 @@ interface SettingsScreenProps {
   onUpdateUser?: (updated: UserProfile) => void;
 }
 
-const SETTINGS_STORAGE_KEY = 'tavriko_user_settings_v1';
+const SETTINGS_STORAGE_KEY = 'tavriko_user_settings_v2';
 
 const loadLocalSettings = (): UserSettings => {
   try {
@@ -66,7 +120,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   token,
   onUpdateUser,
 }) => {
-  // Saved settings: PostgreSQL (user.settings) takes precedence over local cache
   const saved: UserSettings = { ...loadLocalSettings(), ...((user?.settings as UserSettings) || {}) };
   const pick = <K extends keyof UserSettings>(key: K, fallback: NonNullable<UserSettings[K]>) =>
     (saved[key] ?? fallback) as NonNullable<UserSettings[K]>;
@@ -74,17 +127,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    console.log('[SettingsScreen] Mount/Update | User:', {
-      id: user?.id,
-      email: user?.email,
-      coins: user?.coins,
-      gems: user?.gems,
-      xp: user?.xp,
-      level: user?.level,
-    });
-  }, [user]);
 
   // Audio & Haptics
   const [sfxEnabled, setSfxEnabled] = useState<boolean>(pick('sfxEnabled', sound.isSoundEnabled()));
@@ -99,35 +141,22 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   // Visual & Performance
   const [smoothAnimations, setSmoothAnimations] = useState<boolean>(pick('smoothAnimations', true));
   const [batterySaver, setBatterySaver] = useState<boolean>(pick('batterySaver', false));
-  const [ambientGlow, setAmbientGlow] = useState<boolean>(pick('ambientGlow', true));
-  const [textSize, setTextSize] = useState<'normal' | 'large'>(pick('textSize', 'normal'));
-  const [buttonSpring, setButtonSpring] = useState<boolean>(pick('buttonSpring', true));
 
   // Gameplay Preferences
   const [defaultDifficulty, setDefaultDifficulty] = useState<'easy' | 'medium' | 'hard'>(pick('defaultDifficulty', 'medium'));
-  const [questionCount, setQuestionCount] = useState<number>(pick('questionCount', 5));
-  const [questionTimeSec, setQuestionTimeSec] = useState<number>(pick('questionTimeSec', 20));
   const [penaltyForWrong, setPenaltyForWrong] = useState<boolean>(pick('penaltyForWrong', true));
   const [autoNextQuestion, setAutoNextQuestion] = useState<boolean>(pick('autoNextQuestion', true));
-  const [doubleTapProtection, setDoubleTapProtection] = useState<boolean>(pick('doubleTapProtection', false));
 
-  // Social & Privacy
-  const [notifsEnabled, setNotifsEnabled] = useState<boolean>(pick('notifsEnabled', true));
-  const [duelInvitesAllowed, setDuelInvitesAllowed] = useState<boolean>(pick('duelInvitesAllowed', true));
-  const [roomInvitesAllowed, setRoomInvitesAllowed] = useState<boolean>(pick('roomInvitesAllowed', true));
+  // Social & Privacy (Websocket + Postgres)
   const [onlineStatusVisible, setOnlineStatusVisible] = useState<boolean>(pick('onlineStatusVisible', true));
-  const [profilePublic, setProfilePublic] = useState<boolean>(pick('profilePublic', true));
+  const [duelInvitesAllowed, setDuelInvitesAllowed] = useState<boolean>(pick('duelInvitesAllowed', true));
   const [friendRequestsAllowed, setFriendRequestsAllowed] = useState<boolean>(pick('friendRequestsAllowed', true));
-
-  // Notifications
-  const [dailyReminder, setDailyReminder] = useState<boolean>(pick('dailyReminder', true));
-  const [seasonAlerts, setSeasonAlerts] = useState<boolean>(pick('seasonAlerts', true));
-  const [friendActivity, setFriendActivity] = useState<boolean>(pick('friendActivity', true));
+  const [profilePublic, setProfilePublic] = useState<boolean>(pick('profilePublic', true));
 
   // Persistence status
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'local' | 'error'>('idle');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const isFirstRenderRef = useRef(true);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveTimerRef = useRef<any>(null);
 
   // Password change modal
   const [pwModalVisible, setPwModalVisible] = useState(false);
@@ -137,40 +166,59 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [pwLoading, setPwLoading] = useState(false);
   const [pwMessage, setPwMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const currentSettings: UserSettings = {
-    sfxEnabled, sfxVolume, musicEnabled, musicVolume, hapticsEnabled, hapticIntensity,
-    timerAlertSound, victoryMelody, smoothAnimations, batterySaver, ambientGlow, textSize,
-    buttonSpring, defaultDifficulty, questionCount, questionTimeSec, penaltyForWrong,
-    autoNextQuestion, doubleTapProtection, notifsEnabled, duelInvitesAllowed, roomInvitesAllowed,
-    onlineStatusVisible, profilePublic, friendRequestsAllowed, dailyReminder, seasonAlerts,
-    friendActivity,
-  };
-  const settingsSignature = JSON.stringify(currentSettings);
+  // Delete modal
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Apply audio/haptic engine state whenever relevant settings change
+  // Apply engine sound/haptic state
   useEffect(() => {
-    const vol01 = (v: string) => Math.min(1, Math.max(0, Number(v) / 100));
     sound.setSoundEnabled(sfxEnabled);
-    sound.setSoundVolume(vol01(sfxVolume));
     sound.setHapticsEnabled(hapticsEnabled);
-    sound.setHapticIntensity(hapticIntensity);
-    sound.setMusicEnabled(musicEnabled);
-    sound.setMusicVolume(vol01(musicVolume));
-  }, [sfxEnabled, sfxVolume, hapticsEnabled, hapticIntensity, musicEnabled, musicVolume]);
+  }, [sfxEnabled, hapticsEnabled]);
 
-  // Debounced persistence: localStorage immediately, PostgreSQL via POST /auth/settings
+  // Aggregate current settings
+  const currentSettings: UserSettings = {
+    sfxEnabled,
+    sfxVolume,
+    musicEnabled,
+    musicVolume,
+    hapticsEnabled,
+    hapticIntensity,
+    timerAlertSound,
+    victoryMelody,
+    smoothAnimations,
+    batterySaver,
+    defaultDifficulty,
+    penaltyForWrong,
+    autoNextQuestion,
+    onlineStatusVisible,
+    duelInvitesAllowed,
+    friendRequestsAllowed,
+    profilePublic,
+  };
+  const settingsSig = JSON.stringify(currentSettings);
+
+  // Auto-save debounced to PostgreSQL via API + WebSocket Presence update
   useEffect(() => {
     if (isFirstRenderRef.current) {
       isFirstRenderRef.current = false;
       return;
     }
+
     saveLocalSettings(currentSettings);
+
+    // Broadcast presence update live over WebSocket
+    if (user?.id) {
+      socketService.updatePresence(user.id, onlineStatusVisible);
+    }
+
     if (!user || (user as any).isGuest) {
-      setSaveStatus('local');
       return;
     }
+
     setSaveStatus('saving');
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
     saveTimerRef.current = setTimeout(async () => {
       try {
         const res = await fetch(`${apiBaseUrl}/auth/settings`, {
@@ -183,87 +231,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-        console.log('✅ [SettingsScreen] Ayarlar PostgreSQL veritabanına kaydedildi.');
         setSaveStatus('saved');
         if (data?.user && onUpdateUser) onUpdateUser(data.user);
-      } catch (err: any) {
-        console.warn('⚠️ [SettingsScreen] Ayarlar sunucuya kaydedilemedi:', err?.message);
+        setTimeout(() => setSaveStatus('idle'), 2500);
+      } catch (err) {
         setSaveStatus('error');
       }
-    }, 600);
+    }, 500);
+
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settingsSignature]);
-
-  const handleChangePassword = async () => {
-    setPwMessage(null);
-    if (newPw.length < 6) {
-      setPwMessage({ ok: false, text: 'Yeni şifre en az 6 karakter olmalıdır.' });
-      return;
-    }
-    if (newPw !== newPw2) {
-      setPwMessage({ ok: false, text: 'Yeni şifreler birbiriyle eşleşmiyor.' });
-      return;
-    }
-    if (!token) {
-      setPwMessage({ ok: false, text: 'Oturum doğrulanamadı. Lütfen çıkış yapıp tekrar giriş yapın.' });
-      return;
-    }
-    setPwLoading(true);
-    try {
-      const res = await fetch(`${apiBaseUrl}/auth/change-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.success === false) throw new Error(data?.error || data?.message || 'Şifre değiştirilemedi.');
-      sound.playSound('reward');
-      sound.triggerHaptic('success');
-      setPwMessage({ ok: true, text: '✓ Şifreniz başarıyla güncellendi.' });
-      setCurrentPw('');
-      setNewPw('');
-      setNewPw2('');
-      setTimeout(() => {
-        setPwModalVisible(false);
-        setPwMessage(null);
-      }, 1500);
-    } catch (err: any) {
-      sound.playSound('wrong');
-      setPwMessage({ ok: false, text: err?.message || 'Şifre değiştirilemedi.' });
-    } finally {
-      setPwLoading(false);
-    }
-  };
-
-  // Feedback & Modal state
-  const [cacheClearedNotice, setCacheClearedNotice] = useState(false);
-  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const renderSwitch = (value: boolean, onToggle: () => void) => (
-    <TouchableOpacity
-      style={[
-        styles.switchTrack,
-        { backgroundColor: value ? '#3FD08A' : '#3A2E5E' },
-      ]}
-      onPress={() => {
-        sound.playSound('tap');
-        sound.triggerHaptic('light');
-        onToggle();
-      }}
-      activeOpacity={0.85}
-    >
-      <View
-        style={[
-          styles.switchThumb,
-          value ? { right: 3 } : { left: 3 },
-        ]}
-      />
-    </TouchableOpacity>
-  );
+  }, [settingsSig]);
 
   const handleManualSync = async () => {
     if (!onSyncWallet || isSyncing) return;
@@ -274,21 +253,57 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       await onSyncWallet();
       sound.playSound('reward');
       sound.triggerHaptic('success');
-      setSyncNotice(`✓ Buluta Yazıldı! (${user?.coins ?? 0} Altın, ${user?.gems ?? 0} Elmas)`);
-      setTimeout(() => setSyncNotice(null), 3500);
+      setSyncNotice('Bulut veritabanı ile eşitlendi');
+      setTimeout(() => setSyncNotice(null), 3000);
     } catch {
-      setSyncNotice('❌ Senkronizasyon sırasında hata oluştu.');
-      setTimeout(() => setSyncNotice(null), 3500);
+      setSyncNotice('Eşitleme sırasında bağlantı hatası');
+      setTimeout(() => setSyncNotice(null), 3000);
     } finally {
       setIsSyncing(false);
     }
   };
 
-  const handleClearCache = () => {
-    sound.playSound('reward');
-    sound.triggerHaptic('success');
-    setCacheClearedNotice(true);
-    setTimeout(() => setCacheClearedNotice(false), 2500);
+  const handleChangePassword = async () => {
+    setPwMessage(null);
+    if (newPw.length < 6) {
+      setPwMessage({ ok: false, text: 'Yeni şifre en az 6 karakter olmalıdır.' });
+      return;
+    }
+    if (newPw !== newPw2) {
+      setPwMessage({ ok: false, text: 'Şifreler eşleşmiyor.' });
+      return;
+    }
+    if (!token) {
+      setPwMessage({ ok: false, text: 'Oturum doğrulanamadı. Lütfen tekrar giriş yapın.' });
+      return;
+    }
+    setPwLoading(true);
+    try {
+      const res = await fetch(`${apiBaseUrl}/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.error || data?.message || 'Şifre güncellenemedi.');
+      }
+      sound.playSound('reward');
+      sound.triggerHaptic('success');
+      setPwMessage({ ok: true, text: 'Şifreniz başarıyla güncellendi.' });
+      setCurrentPw('');
+      setNewPw('');
+      setNewPw2('');
+      setTimeout(() => {
+        setPwModalVisible(false);
+        setPwMessage(null);
+      }, 1500);
+    } catch (err: any) {
+      sound.playSound('wrong');
+      setPwMessage({ ok: false, text: err?.message || 'İşlem başarısız oldu.' });
+    } finally {
+      setPwLoading(false);
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -300,6 +315,29 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       setDeleteModalVisible(false);
     }
   };
+
+  // Modern Sleek Toggle Switch
+  const renderToggle = (value: boolean, onToggle: () => void) => (
+    <TouchableOpacity
+      style={[
+        styles.switchTrack,
+        value ? styles.switchTrackOn : styles.switchTrackOff,
+      ]}
+      onPress={() => {
+        sound.playSound('tap');
+        sound.triggerHaptic('light');
+        onToggle();
+      }}
+      activeOpacity={0.85}
+    >
+      <View
+        style={[
+          styles.switchThumb,
+          value ? styles.switchThumbOn : styles.switchThumbOff,
+        ]}
+      />
+    </TouchableOpacity>
+  );
 
   return (
     <TavrikoScreen>
@@ -314,509 +352,360 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>AYARLAR</Text>
-        {saveStatus !== 'idle' && (
-          <Text
-            style={[
-              styles.saveStatusText,
-              saveStatus === 'error' && { color: '#FF5A6A' },
-              saveStatus === 'saved' && { color: '#3FD08A' },
-            ]}
-          >
-            {saveStatus === 'saving' && '⏳ Ayarlar veritabanına kaydediliyor...'}
-            {saveStatus === 'saved' && '✓ Ayarlar PostgreSQL veritabanına kaydedildi'}
-            {saveStatus === 'local' && '💾 Misafir modu: ayarlar yalnızca bu cihazda saklanıyor'}
-            {saveStatus === 'error' && '⚠️ Sunucuya kaydedilemedi, bu cihazda saklandı'}
-          </Text>
-        )}
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Ayarlar</Text>
+          {saveStatus !== 'idle' && (
+            <View
+              style={[
+                styles.saveIndicator,
+                saveStatus === 'saved' && styles.saveIndicatorSuccess,
+                saveStatus === 'error' && styles.saveIndicatorError,
+              ]}
+            >
+              {saveStatus === 'saving' && <ActivityIndicator size="small" color="#FFC43D" />}
+              <Text
+                style={[
+                  styles.saveIndicatorText,
+                  saveStatus === 'saved' && { color: '#3FD08A' },
+                  saveStatus === 'error' && { color: '#FF5A6A' },
+                ]}
+              >
+                {saveStatus === 'saving'
+                  ? 'Kaydediliyor...'
+                  : saveStatus === 'saved'
+                  ? 'Veritabanına kaydedildi'
+                  : 'Kayıt hatası'}
+              </Text>
+            </View>
+          )}
+        </View>
 
-        {/* 1. Account Summary & Live Cloud Persistence Card */}
+        {/* 1. Account & Database Sync Card */}
         {user && (
-          <View style={styles.profileCard}>
-            <View style={styles.profileRow}>
-              <CharacterAvatar
-                seed={user.avatarUrl || user.displayName}
-                size={54}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.profileDisplayName} numberOfLines={1}>
+          <View style={styles.accountCard}>
+            <View style={styles.accountHeader}>
+              <CharacterAvatar seed={user.avatarUrl || user.displayName} size={50} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={styles.accountName} numberOfLines={1}>
                   {user.displayName}
                 </Text>
-                <Text style={styles.profileUsername}>
-                  @{user.username || 'oyuncu'} {user.email ? `· ${user.email}` : ''}
+                <Text style={styles.accountHandle}>
+                  @{user.username} {user.email ? `· ${user.email}` : ''}
                 </Text>
-                <View style={styles.levelBadgeRow}>
+                <View style={styles.accountBadgeRow}>
                   <View style={styles.levelBadge}>
                     <Text style={styles.levelBadgeText}>
                       Seviye {user.level} · {user.rankTitle || 'Acemi Kaşif'}
                     </Text>
                   </View>
                   <View style={styles.verifiedBadge}>
-                    <Text style={styles.verifiedBadgeText}>✓ Supabase Bulut Koruması</Text>
+                    <Text style={styles.verifiedBadgeText}>PostgreSQL Bulut</Text>
                   </View>
                 </View>
               </View>
             </View>
 
-            {/* Live Wallet Balances */}
-            <View style={styles.walletDisplayRow}>
-              <View style={styles.walletStatPill}>
-                <CoinTavrikoIcon size={18} />
-                <Text style={styles.walletStatText}>{user.coins ?? 0} Altın</Text>
+            {/* Wallet Balances */}
+            <View style={styles.walletRow}>
+              <View style={styles.walletPill}>
+                <CoinTavrikoIcon size={16} />
+                <Text style={styles.walletText}>{user.coins ?? 0} Altın</Text>
               </View>
-              <View style={styles.walletStatPill}>
-                <GemTavrikoIcon size={18} />
-                <Text style={styles.walletStatText}>{user.gems ?? 0} Elmas</Text>
+              <View style={styles.walletPill}>
+                <GemTavrikoIcon size={16} />
+                <Text style={styles.walletText}>{user.gems ?? 0} Elmas</Text>
               </View>
-              <View style={styles.walletStatPill}>
-                <Text style={[styles.walletStatText, { color: '#00F0FF' }]}>⚡ {user.xp ?? 0} XP</Text>
+              <View style={styles.walletPill}>
+                <Text style={[styles.walletText, { color: '#00F0FF' }]}>⚡ {user.xp ?? 0} XP</Text>
               </View>
             </View>
 
-            {/* Cloud Sync CTA Button */}
+            {/* Cloud Sync Button */}
             <TouchableOpacity
-              style={[styles.syncButton, isSyncing && { opacity: 0.7 }]}
+              style={[styles.syncBtn, isSyncing && { opacity: 0.7 }]}
               onPress={handleManualSync}
               disabled={isSyncing}
               activeOpacity={0.8}
             >
-              {isSyncing ? (
-                <ActivityIndicator size="small" color="#FFC43D" />
-              ) : (
-                <Text style={styles.syncButtonText}>☁️ Veritabanı ile Şimdi Senkronize Et</Text>
-              )}
+              <CloudSyncIcon size={18} color="#FFC43D" />
+              <Text style={styles.syncBtnText}>
+                {isSyncing ? 'Veritabanı ile Senkronize Ediliyor...' : 'Bulut Veritabanı ile Eşitle'}
+              </Text>
             </TouchableOpacity>
 
-            {syncNotice && (
-              <Text style={styles.syncSuccessNotice}>{syncNotice}</Text>
-            )}
-
-            <Text style={styles.syncNoticeText}>
-              🛡️ Oturumu kapatsanız veya sayfayı yenileseniz dahi altınlarınız ({user.coins ?? 0}) ve elmaslarınız ({user.gems ?? 0}) silinmez; yalnızca "Hesabımı Kalıcı Olarak Sil" dendiğinde sıfırlanır.
-            </Text>
+            {syncNotice && <Text style={styles.syncFeedbackText}>{syncNotice}</Text>}
           </View>
         )}
 
-        {/* 2. Audio & Haptics */}
-        <Text style={styles.sectionHeader}>SES VE GERİ BİLDİRİM</Text>
+        {/* 2. Audio & Feedback Section */}
+        <View style={styles.sectionHeader}>
+          <SpeakerIcon size={18} color="#FFC43D" />
+          <Text style={styles.sectionTitle}>Ses ve Geri Bildirim</Text>
+        </View>
+
         <View style={styles.groupCard}>
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Ses Efektleri</Text>
-              <Text style={styles.settingSub}>Tıklama, doğru/yanlış ve zafer sesleri</Text>
+          {/* SFX Toggle */}
+          <View style={styles.itemRow}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.itemLabel}>Ses Efektleri</Text>
+              <Text style={styles.itemSub}>Tıklama, soru sonuçları ve zafer sesleri</Text>
             </View>
-            {renderSwitch(sfxEnabled, () => {
+            {renderToggle(sfxEnabled, () => {
               const next = !sfxEnabled;
               setSfxEnabled(next);
               sound.setSoundEnabled(next);
             })}
           </View>
 
+          {/* SFX Volume Segmented Control */}
           {sfxEnabled && (
-            <View style={styles.multiChoiceRow}>
-              <Text style={styles.settingLabel}>Efekt Ses Düzeyi</Text>
-              <View style={styles.pillSelectorRow}>
-                {(['25', '50', '75', '100'] as const).map((vol) => {
-                  const active = sfxVolume === vol;
-                  return (
-                    <TouchableOpacity
-                      key={vol}
-                      style={[styles.miniPill, active && styles.miniPillActive]}
-                      onPress={() => {
-                        sound.playSound('tap');
-                        setSfxVolume(vol);
-                      }}
+            <View style={styles.segmentedRow}>
+              <Text style={styles.segmentedLabel}>Efekt Düzeyi</Text>
+              <View style={styles.segmentedPills}>
+                {(['25', '50', '75', '100'] as const).map((vol) => (
+                  <TouchableOpacity
+                    key={vol}
+                    style={[styles.miniSegPill, sfxVolume === vol && styles.miniSegPillActive]}
+                    onPress={() => {
+                      sound.playSound('tap');
+                      setSfxVolume(vol);
+                    }}
+                  >
+                    <Text
+                      style={[styles.miniSegPillText, sfxVolume === vol && styles.miniSegPillTextActive]}
                     >
-                      <Text style={[styles.miniPillText, active && styles.miniPillTextActive]}>
-                        %{vol}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                      %{vol}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
           )}
 
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Arka Plan Müziği</Text>
-              <Text style={styles.settingSub}>Lobi ve menü tema ezgileri</Text>
+          {/* Music Toggle */}
+          <View style={styles.itemRow}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.itemLabel}>Arka Plan Müziği</Text>
+              <Text style={styles.itemSub}>Lobi ve menü tema melodisi</Text>
             </View>
-            {renderSwitch(musicEnabled, () => setMusicEnabled((v) => !v))}
+            {renderToggle(musicEnabled, () => setMusicEnabled((v) => !v))}
           </View>
 
+          {/* Music Volume Segmented Control */}
           {musicEnabled && (
-            <View style={styles.multiChoiceRow}>
-              <Text style={styles.settingLabel}>Müzik Ses Düzeyi</Text>
-              <View style={styles.pillSelectorRow}>
-                {(['25', '50', '75', '100'] as const).map((vol) => {
-                  const active = musicVolume === vol;
-                  return (
-                    <TouchableOpacity
-                      key={vol}
-                      style={[styles.miniPill, active && styles.miniPillActive]}
-                      onPress={() => {
-                        sound.playSound('tap');
-                        setMusicVolume(vol);
-                      }}
+            <View style={styles.segmentedRow}>
+              <Text style={styles.segmentedLabel}>Müzik Düzeyi</Text>
+              <View style={styles.segmentedPills}>
+                {(['25', '50', '75', '100'] as const).map((vol) => (
+                  <TouchableOpacity
+                    key={vol}
+                    style={[styles.miniSegPill, musicVolume === vol && styles.miniSegPillActive]}
+                    onPress={() => {
+                      sound.playSound('tap');
+                      setMusicVolume(vol);
+                    }}
+                  >
+                    <Text
+                      style={[styles.miniSegPillText, musicVolume === vol && styles.miniSegPillTextActive]}
                     >
-                      <Text style={[styles.miniPillText, active && styles.miniPillTextActive]}>
-                        %{vol}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                      %{vol}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
           )}
 
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Haptik Titreşim</Text>
-              <Text style={styles.settingSub}>Buton dokunuşları ve soru geri bildirimleri</Text>
+          {/* Haptic Toggle */}
+          <View style={styles.itemRow}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.itemLabel}>Titreşimli Geri Bildirim</Text>
+              <Text style={styles.itemSub}>Tuş dokunuşları ve soru uyarıları</Text>
             </View>
-            {renderSwitch(hapticsEnabled, () => {
+            {renderToggle(hapticsEnabled, () => {
               const next = !hapticsEnabled;
               setHapticsEnabled(next);
               sound.setHapticsEnabled(next);
             })}
           </View>
 
+          {/* Haptic Intensity */}
           {hapticsEnabled && (
-            <View style={styles.multiChoiceRow}>
-              <Text style={styles.settingLabel}>Titreşim Şiddeti</Text>
-              <View style={styles.pillSelectorRow}>
-                {[
-                  { id: 'light', label: 'Hafif' },
-                  { id: 'medium', label: 'Dengeli' },
-                  { id: 'strong', label: 'Güçlü' },
-                ].map((item) => {
-                  const active = hapticIntensity === item.id;
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={[styles.miniPill, active && styles.miniPillActive]}
-                      onPress={() => {
-                        sound.playSound('tap');
-                        sound.triggerHaptic(item.id as any);
-                        setHapticIntensity(item.id as any);
-                      }}
+            <View style={styles.segmentedRow}>
+              <Text style={styles.segmentedLabel}>Titreşim Şiddeti</Text>
+              <View style={styles.segmentedPills}>
+                {(
+                  [
+                    ['light', 'Hafif'],
+                    ['medium', 'Orta'],
+                    ['strong', 'Güçlü'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.miniSegPill, hapticIntensity === key && styles.miniSegPillActive]}
+                    onPress={() => {
+                      sound.playSound('tap');
+                      sound.triggerHaptic(key);
+                      setHapticIntensity(key);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.miniSegPillText,
+                        hapticIntensity === key && styles.miniSegPillTextActive,
+                      ]}
                     >
-                      <Text style={[styles.miniPillText, active && styles.miniPillTextActive]}>
-                        {item.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
           )}
 
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Süre Uyarı Sesi</Text>
-              <Text style={styles.settingSub}>Son 3 saniye geri sayım tik sesi</Text>
+          {/* Timer Alert Sound */}
+          <View style={[styles.itemRow, { borderBottomWidth: 0 }]}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.itemLabel}>Süre Uyarı Sesi</Text>
+              <Text style={styles.itemSub}>Son 5 saniyede geri sayım uyarısı</Text>
             </View>
-            {renderSwitch(timerAlertSound, () => setTimerAlertSound((v) => !v))}
-          </View>
-
-          <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
-            <View>
-              <Text style={styles.settingLabel}>Zafer & Podyum Melodisi</Text>
-              <Text style={styles.settingSub}>Maç sonunda ödül ve kupa şölen müziği</Text>
-            </View>
-            {renderSwitch(victoryMelody, () => setVictoryMelody((v) => !v))}
+            {renderToggle(timerAlertSound, () => setTimerAlertSound((v) => !v))}
           </View>
         </View>
 
-        {/* 3. Visual & Performance */}
-        <Text style={styles.sectionHeader}>GÖRSEL VE PERFORMANS</Text>
+        {/* 3. Gameplay & Competition Section */}
+        <View style={styles.sectionHeader}>
+          <GamepadIcon size={18} color="#FFC43D" />
+          <Text style={styles.sectionTitle}>Yarışma ve Oyun Tercihleri</Text>
+        </View>
+
         <View style={styles.groupCard}>
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>60 FPS Ultra Akıcı Animasyonlar</Text>
-              <Text style={styles.settingSub}>Ultra pürüzsüz kart ve soru geçişleri</Text>
-            </View>
-            {renderSwitch(smoothAnimations, () => setSmoothAnimations((v) => !v))}
-          </View>
-
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Pil Tasarruf Modu</Text>
-              <Text style={styles.settingSub}>Efektleri hafifleterek cihaz şarjını korur</Text>
-            </View>
-            {renderSwitch(batterySaver, () => setBatterySaver((v) => !v))}
-          </View>
-
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Arka Plan Parıltıları & Nebula</Text>
-              <Text style={styles.settingSub}>Neon nebula ve karanlık uzay parlamaları</Text>
-            </View>
-            {renderSwitch(ambientGlow, () => setAmbientGlow((v) => !v))}
-          </View>
-
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Buton Yaylanma Efekti (3D Bounce)</Text>
-              <Text style={styles.settingSub}>Dokunulduğunda yaylanan buton hissiyatı</Text>
-            </View>
-            {renderSwitch(buttonSpring, () => setButtonSpring((v) => !v))}
-          </View>
-
-          <View style={[styles.multiChoiceRow, { borderBottomWidth: 0 }]}>
-            <Text style={styles.settingLabel}>Soru Metin Boyutu</Text>
-            <View style={styles.pillSelectorRow}>
-              {[
-                { id: 'normal', label: 'Standart (16px)' },
-                { id: 'large', label: 'Büyük (19px)' },
-              ].map((item) => {
-                const active = textSize === item.id;
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[styles.miniPill, active && styles.miniPillActive]}
-                    onPress={() => {
-                      sound.playSound('tap');
-                      setTextSize(item.id as any);
-                    }}
+          {/* Default Difficulty */}
+          <View style={styles.segmentedRow}>
+            <Text style={styles.segmentedLabel}>Varsayılan Zorluk</Text>
+            <View style={styles.segmentedPills}>
+              {(
+                [
+                  ['easy', 'Kolay'],
+                  ['medium', 'Orta'],
+                  ['hard', 'Zor'],
+                ] as const
+              ).map(([diff, label]) => (
+                <TouchableOpacity
+                  key={diff}
+                  style={[styles.miniSegPill, defaultDifficulty === diff && styles.miniSegPillActive]}
+                  onPress={() => {
+                    sound.playSound('tap');
+                    setDefaultDifficulty(diff);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.miniSegPillText,
+                      defaultDifficulty === diff && styles.miniSegPillTextActive,
+                    ]}
                   >
-                    <Text style={[styles.miniPillText, active && styles.miniPillTextActive]}>
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
+          </View>
+
+          {/* Penalty for wrong answers */}
+          <View style={styles.itemRow}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.itemLabel}>Yanlış Cevap Puan Kesintisi</Text>
+              <Text style={styles.itemSub}>Rekabetçi maçlarda hatalı cevaplarda -10 RP</Text>
+            </View>
+            {renderToggle(penaltyForWrong, () => setPenaltyForWrong((v) => !v))}
+          </View>
+
+          {/* Auto next question */}
+          <View style={[styles.itemRow, { borderBottomWidth: 0 }]}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.itemLabel}>Otomatik Sonraki Soru</Text>
+              <Text style={styles.itemSub}>Cevaplandıktan 1.5 sn sonra devam et</Text>
+            </View>
+            {renderToggle(autoNextQuestion, () => setAutoNextQuestion((v) => !v))}
           </View>
         </View>
 
-        {/* 4. Gameplay Preferences */}
-        <Text style={styles.sectionHeader}>YARIŞMA TERCİHLERİ</Text>
+        {/* 4. Privacy & WebSocket Presence Section */}
+        <View style={styles.sectionHeader}>
+          <ShieldIcon size={18} color="#FFC43D" />
+          <Text style={styles.sectionTitle}>Gizlilik ve Çevrim İçi Durumu</Text>
+        </View>
+
         <View style={styles.groupCard}>
-          <View style={styles.multiChoiceRow}>
-            <Text style={styles.settingLabel}>Varsayılan Zorluk</Text>
-            <View style={styles.pillSelectorRow}>
-              {(['easy', 'medium', 'hard'] as const).map((diff) => {
-                const label = diff === 'easy' ? 'Kolay' : diff === 'medium' ? 'Orta' : 'Zor';
-                const active = defaultDifficulty === diff;
-                return (
-                  <TouchableOpacity
-                    key={diff}
-                    style={[styles.miniPill, active && styles.miniPillActive]}
-                    onPress={() => {
-                      sound.playSound('tap');
-                      setDefaultDifficulty(diff);
-                    }}
+          {/* Online Presence (Connected to Cloudflare Worker + Postgres) */}
+          <View style={styles.itemRow}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.itemLabel}>Çevrim İçi Durumu</Text>
+                <View
+                  style={[
+                    styles.statusPill,
+                    { backgroundColor: onlineStatusVisible ? 'rgba(63,208,138,0.18)' : 'rgba(107,98,136,0.2)' },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusPillText,
+                      { color: onlineStatusVisible ? '#3FD08A' : '#A594C9' },
+                    ]}
                   >
-                    <Text style={[styles.miniPillText, active && styles.miniPillTextActive]}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.multiChoiceRow}>
-            <Text style={styles.settingLabel}>Soru Başı Süre</Text>
-            <View style={styles.pillSelectorRow}>
-              {[15, 20, 30].map((sec) => {
-                const active = questionTimeSec === sec;
-                return (
-                  <TouchableOpacity
-                    key={sec}
-                    style={[styles.miniPill, active && styles.miniPillActive]}
-                    onPress={() => {
-                      sound.playSound('tap');
-                      setQuestionTimeSec(sec);
-                    }}
-                  >
-                    <Text style={[styles.miniPillText, active && styles.miniPillTextActive]}>
-                      {sec} sn
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.multiChoiceRow}>
-            <Text style={styles.settingLabel}>Tur Soru Sayısı</Text>
-            <View style={styles.pillSelectorRow}>
-              {[5, 7, 10, 15].map((count) => {
-                const active = questionCount === count;
-                return (
-                  <TouchableOpacity
-                    key={count}
-                    style={[styles.miniPill, active && styles.miniPillActive]}
-                    onPress={() => {
-                      sound.playSound('tap');
-                      setQuestionCount(count);
-                    }}
-                  >
-                    <Text style={[styles.miniPillText, active && styles.miniPillTextActive]}>
-                      {count} Soru
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Yanlış Cevap Cezası</Text>
-              <Text style={styles.settingSub}>Özel odalarda yanlış cevap başına -50 puan</Text>
-            </View>
-            {renderSwitch(penaltyForWrong, () => setPenaltyForWrong((v) => !v))}
-          </View>
-
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Otomatik Soru Geçişi</Text>
-              <Text style={styles.settingSub}>Tüm oyuncular cevapladığında beklemeden geç</Text>
-            </View>
-            {renderSwitch(autoNextQuestion, () => setAutoNextQuestion((v) => !v))}
-          </View>
-
-          <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
-            <View>
-              <Text style={styles.settingLabel}>Çift Dokunma Koruması</Text>
-              <Text style={styles.settingSub}>Yanlışlıkla şıkka basmayı önlemek için teyit ister</Text>
-            </View>
-            {renderSwitch(doubleTapProtection, () => setDoubleTapProtection((v) => !v))}
-          </View>
-        </View>
-
-        {/* 5. Social & Privacy */}
-        <Text style={styles.sectionHeader}>GİZLİLİK VE SOSYAL</Text>
-        <View style={styles.groupCard}>
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Oyun Bildirimleri</Text>
-              <Text style={styles.settingSub}>Arkadaşlık ve ödül bildirimleri</Text>
-            </View>
-            {renderSwitch(notifsEnabled, () => setNotifsEnabled((v) => !v))}
-          </View>
-
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>1v1 Düello Davetleri</Text>
-              <Text style={styles.settingSub}>Arkadaşlardan gelen meydan okumalara izin ver</Text>
-            </View>
-            {renderSwitch(duelInvitesAllowed, () => setDuelInvitesAllowed((v) => !v))}
-          </View>
-
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Özel Oda Davetleri</Text>
-              <Text style={styles.settingSub}>Arkadaşların seni doğrudan odasına çekebilsin</Text>
-            </View>
-            {renderSwitch(roomInvitesAllowed, () => setRoomInvitesAllowed((v) => !v))}
-          </View>
-
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Çevrimiçi Durumu</Text>
-              <Text style={styles.settingSub}>Arkadaş listesinde aktif görün</Text>
-            </View>
-            {renderSwitch(onlineStatusVisible, () => setOnlineStatusVisible((v) => !v))}
-          </View>
-
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Arkadaşlık İstekleri</Text>
-              <Text style={styles.settingSub}>Yeni arkadaşlık tekliflerine açık ol</Text>
-            </View>
-            {renderSwitch(friendRequestsAllowed, () => setFriendRequestsAllowed((v) => !v))}
-          </View>
-
-          <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
-            <View>
-              <Text style={styles.settingLabel}>Herkese Açık Profil</Text>
-              <Text style={styles.settingSub}>İstatistikler ve rozetler lider tablosunda görünsün</Text>
-            </View>
-            {renderSwitch(profilePublic, () => setProfilePublic((v) => !v))}
-          </View>
-        </View>
-
-        {/* 6. Notifications & Alerts */}
-        <Text style={styles.sectionHeader}>BİLDİRİMLER VE ETKİNLİKLER</Text>
-        <View style={styles.groupCard}>
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Günlük Görev Hatırlatıcısı</Text>
-              <Text style={styles.settingSub}>Serini kaybetmemek için her akşam uyarı al</Text>
-            </View>
-            {renderSwitch(dailyReminder, () => setDailyReminder((v) => !v))}
-          </View>
-
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Yeni Sezon & Etkinlikler</Text>
-              <Text style={styles.settingSub}>Özel ödüllü turnuvalardan ilk senin haberin olsun</Text>
-            </View>
-            {renderSwitch(seasonAlerts, () => setSeasonAlerts((v) => !v))}
-          </View>
-
-          <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
-            <View>
-              <Text style={styles.settingLabel}>Arkadaş Giriş Bildirimi</Text>
-              <Text style={styles.settingSub}>Yakın arkadaşların lobiye girdiğinde haber ver</Text>
-            </View>
-            {renderSwitch(friendActivity, () => setFriendActivity((v) => !v))}
-          </View>
-        </View>
-
-        {/* 7. Storage & System */}
-        <Text style={styles.sectionHeader}>DEPOLAMA VE SİSTEM</Text>
-        <View style={styles.groupCard}>
-          <TouchableOpacity
-            style={styles.settingRow}
-            onPress={handleClearCache}
-            activeOpacity={0.8}
-          >
-            <View>
-              <Text style={styles.settingLabel}>Önbelleği Temizle</Text>
-              <Text style={styles.settingSub}>Geçici ses ve grafik önbelleğini tazele</Text>
-            </View>
-            <Text style={styles.settingRightSub}>
-              {cacheClearedNotice ? '✓ Temizlendi' : 'Temizle ›'}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.settingRow}>
-            <View>
-              <Text style={styles.settingLabel}>Uygulama Dili</Text>
-              <Text style={styles.settingSub}>Türkçe (Türkiye)</Text>
-            </View>
-            <Text style={styles.settingRightSub}>Değiştir ›</Text>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.settingRow, { borderBottomWidth: 0 }]}
-            onPress={() => {
-              sound.playSound('tap');
-              if (onDeveloper) {
-                onDeveloper();
-              }
-            }}
-          >
-            <View>
-              <Text style={[styles.settingLabel, { color: '#FFC43D' }]}>
-                🛡️ Geliştirici & Ops Paneli
+                    {onlineStatusVisible ? 'Görünür' : 'Gizli'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.itemSub}>
+                Diğer oyuncular arkadaş listesinde durumunuzu canlı olarak görebilir
               </Text>
-              <Text style={styles.settingSub}>Sunucu durumları, DO podları ve canlı sistem logları</Text>
             </View>
-            <Text style={[styles.settingRightSub, { color: '#FFC43D' }]}>Aç ›</Text>
-          </TouchableOpacity>
+            {renderToggle(onlineStatusVisible, () => {
+              const next = !onlineStatusVisible;
+              setOnlineStatusVisible(next);
+              if (user?.id) socketService.updatePresence(user.id, next);
+            })}
+          </View>
+
+          {/* Duel Invites */}
+          <View style={styles.itemRow}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.itemLabel}>1v1 Düello Davetleri</Text>
+              <Text style={styles.itemSub}>Arkadaşlarınızdan gelen anlık maç bildirimleri</Text>
+            </View>
+            {renderToggle(duelInvitesAllowed, () => setDuelInvitesAllowed((v) => !v))}
+          </View>
+
+          {/* Friend Requests */}
+          <View style={styles.itemRow}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.itemLabel}>Arkadaşlık İstekleri</Text>
+              <Text style={styles.itemSub}>Kullanıcı koduyla gelen arkadaşlık talepleri</Text>
+            </View>
+            {renderToggle(friendRequestsAllowed, () => setFriendRequestsAllowed((v) => !v))}
+          </View>
+
+          {/* Public Profile */}
+          <View style={[styles.itemRow, { borderBottomWidth: 0 }]}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.itemLabel}>Herkese Açık Profil</Text>
+              <Text style={styles.itemSub}>İstatistiklerinizin liderler tablosunda incelenebilmesi</Text>
+            </View>
+            {renderToggle(profilePublic, () => setProfilePublic((v) => !v))}
+          </View>
         </View>
 
-        {/* 8. Account Session & Delete Section */}
-        <Text style={styles.sectionHeader}>HESAP VE GÜVENLİK</Text>
-        <View style={styles.accountActionBox}>
-          {/* Change Password */}
+        {/* 5. Account Security & Session Section */}
+        <View style={styles.sectionHeader}>
+          <KeyIcon size={18} color="#FFC43D" />
+          <Text style={styles.sectionTitle}>Hesap ve Güvenlik</Text>
+        </View>
+
+        <View style={styles.accountCard}>
           {user && !(user as any).isGuest && (
             <TouchableOpacity
               style={styles.changePwBtn}
@@ -827,9 +716,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               }}
               activeOpacity={0.8}
             >
-              <Text style={styles.changePwBtnText}>🔑 Şifre Değiştir / Şifre Belirle</Text>
+              <KeyIcon size={18} color="#FFC43D" />
+              <Text style={styles.changePwBtnText}>Şifre Değiştir</Text>
             </TouchableOpacity>
           )}
+
           {/* Safe Logout Button */}
           <Button3D
             title="GÜVENLİ ÇIKIŞ YAP"
@@ -838,14 +729,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               sound.playSound('tap');
               onLogout();
             }}
-            style={{ width: '100%', minHeight: 46 }}
+            style={{ width: '100%', minHeight: 46, marginTop: 8 }}
             textStyle={{ fontSize: 14 }}
           />
-          <Text style={styles.logoutNoticeText}>
-            ℹ️ Oturumu kapattığınızda altınlarınız ({user?.coins ?? 0}), elmaslarınız ({user?.gems ?? 0}) ve seviyeniz silinmez; tekrar giriş yaptığınızda kaldığınız yerden devam edersiniz.
+
+          <Text style={styles.logoutDisclaimer}>
+            Oturumu kapattığınızda altınlarınız, elmaslarınız ve seviyeniz PostgreSQL veritabanında güvenle saklanır; tekrar giriş yaptığınızda kaldığınız yerden devam edersiniz.
           </Text>
 
-          {/* Delete Account Button */}
+          {/* Delete Account */}
           <TouchableOpacity
             style={styles.deleteAccountBtn}
             onPress={() => {
@@ -855,60 +747,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             }}
             activeOpacity={0.8}
           >
-            <Text style={styles.deleteAccountBtnText}>⚠️ Hesabımı Kalıcı Olarak Sil</Text>
+            <Text style={styles.deleteAccountBtnText}>Hesabımı Kalıcı Olarak Sil</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Footer Brand & Version */}
-        <View style={styles.footerBrand}>
-          <Image
-            source={BRAND_APP_ICON}
-            style={styles.appIcon}
-            resizeMode="cover"
-          />
-          <Text style={styles.versionText}>Tavriko Arena · v1.2.0 (Production Build)</Text>
-          <Text style={styles.versionSubText}>Supabase PostgreSQL + Cloudflare Realtime DO Engine</Text>
+        {/* System & Build Footer */}
+        <View style={styles.footerWrap}>
+          <Text style={styles.footerVersion}>Tavriko Arena · Sürüm 2.4.0</Text>
+          <Text style={styles.footerArchitecture}>
+            PostgreSQL (Prisma) · Cloudflare Realtime WebSocket DO
+          </Text>
         </View>
       </ScrollView>
-
-      {/* Delete Account Confirmation Modal */}
-      <Modal
-        visible={deleteModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDeleteModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalWarningTitle}>⚠️ HESABINIZI SİLMEK ÜZERESİNİZ</Text>
-            <Text style={styles.modalWarningDesc}>
-              Bu işlem geri alınamaz! Hesabınız, kazandığınız tüm altınlar, elmaslar, seviyeniz, maç geçmişiniz ve arkadaş listeniz sunucudan kalıcı olarak silinecektir.
-            </Text>
-
-            <View style={styles.modalBtnRow}>
-              <Button3D
-                title="VAZGEÇ"
-                variant="gold"
-                disabled={isDeleting}
-                onPress={() => setDeleteModalVisible(false)}
-                style={{ flex: 1, minHeight: 44 }}
-                textStyle={{ fontSize: 13 }}
-              />
-              <Button3D
-                title={isDeleting ? 'SİLİNİYOR...' : 'EVET, SİL'}
-                variant="red"
-                disabled={isDeleting}
-                onPress={handleConfirmDelete}
-                style={{ flex: 1, minHeight: 44 }}
-                textStyle={{ fontSize: 13 }}
-              />
-            </View>
-            {isDeleting && (
-              <ActivityIndicator color="#FF5A6A" style={{ marginTop: 14 }} />
-            )}
-          </View>
-        </View>
-      </Modal>
 
       {/* Password Change Modal */}
       <Modal
@@ -919,42 +769,53 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={[styles.modalWarningTitle, { color: '#FFC43D' }]}>🔑 ŞİFRE DEĞİŞTİR</Text>
-            <Text style={styles.modalWarningDesc}>
-              Google ile giriş yaptıysanız ve henüz şifreniz yoksa "Mevcut Şifre" alanını boş bırakabilirsiniz.
+            <View style={styles.modalHeader}>
+              <KeyIcon size={24} color="#FFC43D" />
+              <Text style={styles.modalTitle}>Şifre Değiştir</Text>
+            </View>
+            <Text style={styles.modalDesc}>
+              Hesap güvenliğiniz için en az 6 karakterden oluşan güçlü bir şifre belirleyin.
             </Text>
+
             <TextInput
-              style={styles.pwInput}
-              placeholder="Mevcut şifre"
-              placeholderTextColor="rgba(217,205,245,0.45)"
+              style={styles.modalInput}
+              placeholder="Mevcut şifre (varsa)"
+              placeholderTextColor="rgba(217,205,245,0.4)"
               secureTextEntry
               value={currentPw}
               onChangeText={setCurrentPw}
               autoCapitalize="none"
             />
             <TextInput
-              style={styles.pwInput}
+              style={styles.modalInput}
               placeholder="Yeni şifre (en az 6 karakter)"
-              placeholderTextColor="rgba(217,205,245,0.45)"
+              placeholderTextColor="rgba(217,205,245,0.4)"
               secureTextEntry
               value={newPw}
               onChangeText={setNewPw}
               autoCapitalize="none"
             />
             <TextInput
-              style={styles.pwInput}
-              placeholder="Yeni şifre (tekrar)"
-              placeholderTextColor="rgba(217,205,245,0.45)"
+              style={styles.modalInput}
+              placeholder="Yeni şifre tekrar"
+              placeholderTextColor="rgba(217,205,245,0.4)"
               secureTextEntry
               value={newPw2}
               onChangeText={setNewPw2}
               autoCapitalize="none"
             />
+
             {pwMessage && (
-              <Text style={[styles.pwMessage, { color: pwMessage.ok ? '#3FD08A' : '#FF5A6A' }]}>
+              <Text
+                style={[
+                  styles.modalMessage,
+                  { color: pwMessage.ok ? '#3FD08A' : '#FF5A6A' },
+                ]}
+              >
                 {pwMessage.text}
               </Text>
             )}
+
             <View style={styles.modalBtnRow}>
               <Button3D
                 title="VAZGEÇ"
@@ -976,357 +837,437 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </View>
         </View>
       </Modal>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        visible={deleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.deleteModalTitle}>Hesabı Kalıcı Olarak Sil</Text>
+            <Text style={styles.modalDesc}>
+              Bu işlem geri alınamaz. Kazandığınız tüm altınlar, elmaslar, başarımlar ve arkadaş listeniz veritabanından tamamen silinecektir.
+            </Text>
+
+            <View style={styles.modalBtnRow}>
+              <Button3D
+                title="VAZGEÇ"
+                variant="gold"
+                disabled={isDeleting}
+                onPress={() => setDeleteModalVisible(false)}
+                style={{ flex: 1, minHeight: 44 }}
+                textStyle={{ fontSize: 13 }}
+              />
+              <Button3D
+                title={isDeleting ? 'SİLİNİYOR...' : 'EVET, SİL'}
+                variant="red"
+                disabled={isDeleting}
+                onPress={handleConfirmDelete}
+                style={{ flex: 1, minHeight: 44 }}
+                textStyle={{ fontSize: 13 }}
+              />
+            </View>
+            {isDeleting && <ActivityIndicator color="#FF5A6A" style={{ marginTop: 12 }} />}
+          </View>
+        </View>
+      </Modal>
     </TavrikoScreen>
   );
 };
 
 const styles = StyleSheet.create({
-  saveStatusText: {
-    color: '#D9CDF5',
+  scrollContent: {
+    paddingBottom: 40,
+    paddingTop: 8,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    paddingHorizontal: 4,
+  },
+  title: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 28,
+    color: '#FFFFFF',
+  },
+  saveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  saveIndicatorSuccess: {
+    backgroundColor: 'rgba(63, 208, 138, 0.15)',
+  },
+  saveIndicatorError: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  },
+  saveIndicatorText: {
     fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
-    textAlign: 'center',
-    marginBottom: 10,
+    color: '#D9CDF5',
   },
-  changePwBtn: {
-    width: '100%',
-    paddingVertical: 12,
+
+  // Account Card
+  accountCard: {
+    backgroundColor: 'rgba(26, 14, 56, 0.92)',
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    padding: 16,
+    marginBottom: 20,
+    ...Platform.select({
+      web: { boxShadow: '0 8px 30px rgba(0, 0, 0, 0.35)' },
+      default: { elevation: 4 },
+    }),
+  },
+  accountHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  accountName: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontFamily: THEME.fonts.display,
+  },
+  accountHandle: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.body,
+    marginTop: 1,
+  },
+  accountBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  levelBadge: {
+    backgroundColor: 'rgba(107, 60, 255, 0.3)',
+    borderWidth: 1,
+    borderColor: '#A855F7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  levelBadgeText: {
+    color: '#D9CDF5',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  verifiedBadge: {
+    backgroundColor: 'rgba(63, 208, 138, 0.15)',
+    borderWidth: 1,
+    borderColor: '#3FD08A',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  verifiedBadgeText: {
+    color: '#3FD08A',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  walletRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 14,
+  },
+  walletPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(10, 4, 24, 0.6)',
+    paddingVertical: 8,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 196, 61, 0.5)',
-    backgroundColor: 'rgba(255, 196, 61, 0.1)',
-    alignItems: 'center',
-    marginBottom: 12,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  changePwBtnText: {
+  walletText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  syncBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 14,
+    paddingVertical: 11,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 196, 61, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.4)',
+  },
+  syncBtnText: {
     color: '#FFC43D',
     fontSize: 13,
     fontFamily: THEME.fonts.extraBold,
   },
-  pwInput: {
-    width: '100%',
-    backgroundColor: 'rgba(10, 4, 24, 0.6)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: '#FFFFFF',
-    fontSize: 14,
-    marginBottom: 10,
-  },
-  pwMessage: {
-    fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  scrollContent: {
-    paddingBottom: 48,
-    paddingHorizontal: 2,
-  },
-  title: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 34,
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 14,
-    letterSpacing: 0.5,
-  },
-  profileCard: {
-    padding: 14,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    marginBottom: 16,
-  },
-  profileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  profileDisplayName: {
-    color: '#FFFFFF',
-    fontFamily: THEME.fonts.display,
-    fontSize: 18,
-    letterSpacing: 0.3,
-  },
-  profileUsername: {
-    color: '#D9CDF5',
-    fontFamily: THEME.fonts.extraBold,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  levelBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 6,
-    flexWrap: 'wrap',
-  },
-  levelBadge: {
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 196, 61, 0.2)',
-    borderWidth: 1,
-    borderColor: '#FFC43D',
-  },
-  levelBadgeText: {
-    color: '#FFC43D',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  verifiedBadge: {
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    backgroundColor: 'rgba(63, 208, 138, 0.2)',
-    borderWidth: 1,
-    borderColor: '#3FD08A',
-  },
-  verifiedBadgeText: {
+  syncFeedbackText: {
     color: '#3FD08A',
     fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+    marginTop: 8,
   },
-  walletDisplayRow: {
+
+  // Sections
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 12,
-  },
-  walletStatPill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 7,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  walletStatText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  syncButton: {
-    marginTop: 10,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 196, 61, 0.15)',
-    borderWidth: 1,
-    borderColor: '#FFC43D',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  syncButtonText: {
-    color: '#FFC43D',
-    fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  syncSuccessNotice: {
-    color: '#3FD08A',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-    textAlign: 'center',
-    marginTop: 6,
-  },
-  syncNoticeText: {
-    color: 'rgba(217, 205, 245, 0.8)',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-    marginTop: 10,
-    lineHeight: 15,
-  },
-  sectionHeader: {
-    fontFamily: THEME.fonts.extraBold,
-    fontSize: 12,
-    color: '#FFC43D',
-    letterSpacing: 1,
-    marginTop: 12,
     marginBottom: 8,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
+  },
+  sectionTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: THEME.fonts.display,
+    letterSpacing: 0.3,
   },
   groupCard: {
+    backgroundColor: 'rgba(26, 14, 56, 0.85)',
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    overflow: 'hidden',
-    marginBottom: 10,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    marginBottom: 20,
   },
-  settingRow: {
+  itemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 13,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-    gap: 12,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
   },
-  multiChoiceRow: {
-    flexDirection: 'column',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-    gap: 10,
-  },
-  settingLabel: {
+  itemLabel: {
     color: '#FFFFFF',
     fontSize: 14,
     fontFamily: THEME.fonts.extraBold,
   },
-  settingSub: {
+  itemSub: {
     color: '#D9CDF5',
     fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
+    fontFamily: THEME.fonts.body,
     marginTop: 2,
-    lineHeight: 14,
+    lineHeight: 15,
   },
-  settingRightSub: {
-    color: '#D9CDF5',
-    fontSize: 12,
+
+  // Segmented Controls
+  segmentedRow: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  segmentedLabel: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontFamily: THEME.fonts.extraBold,
+    marginBottom: 8,
   },
-  pillSelectorRow: {
+  segmentedPills: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
-  miniPill: {
+  miniSegPill: {
     flex: 1,
     paddingVertical: 8,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  miniPillActive: {
-    backgroundColor: '#6B3CFF',
+  miniSegPillActive: {
+    backgroundColor: 'rgba(255, 196, 61, 0.2)',
     borderColor: '#FFC43D',
   },
-  miniPillText: {
+  miniSegPillText: {
     color: '#D9CDF5',
     fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
   },
-  miniPillTextActive: {
-    color: '#FFFFFF',
+  miniSegPillTextActive: {
+    color: '#FFC43D',
   },
+
+  // Toggle Switch
   switchTrack: {
     width: 48,
     height: 28,
     borderRadius: 14,
+    padding: 3,
     justifyContent: 'center',
-    paddingHorizontal: 2,
+  },
+  switchTrackOn: {
+    backgroundColor: '#3FD08A',
+  },
+  switchTrackOff: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   switchThumb: {
     width: 22,
     height: 22,
     borderRadius: 11,
     backgroundColor: '#FFFFFF',
-    position: 'absolute',
+    ...Platform.select({
+      web: { boxShadow: '0 2px 4px rgba(0,0,0,0.3)' },
+      default: { elevation: 2 },
+    }),
   },
-  accountActionBox: {
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    marginBottom: 20,
-    gap: 12,
+  switchThumbOn: {
+    alignSelf: 'flex-end',
   },
-  logoutNoticeText: {
-    color: 'rgba(217, 205, 245, 0.75)',
-    fontSize: 11,
+  switchThumbOff: {
+    alignSelf: 'flex-start',
+  },
+
+  // Status Pill
+  statusPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  statusPillText: {
+    fontSize: 10,
     fontFamily: THEME.fonts.extraBold,
+  },
+
+  // Password & Logout
+  changePwBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.4)',
+    backgroundColor: 'rgba(255, 196, 61, 0.08)',
+    marginBottom: 6,
+  },
+  changePwBtnText: {
+    color: '#FFC43D',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  logoutDisclaimer: {
+    color: '#D9CDF5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.body,
     textAlign: 'center',
-    lineHeight: 15,
+    marginTop: 10,
+    lineHeight: 16,
+    paddingHorizontal: 4,
   },
   deleteAccountBtn: {
+    marginTop: 16,
     paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 90, 106, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 90, 106, 0.35)',
-    marginTop: 4,
+    alignItems: 'center',
   },
   deleteAccountBtnText: {
-    color: '#FF5A6A',
+    color: '#F87171',
     fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
-    textAlign: 'center',
   },
-  footerBrand: {
+
+  // Footer
+  footerWrap: {
     alignItems: 'center',
-    gap: 6,
     marginTop: 10,
+    marginBottom: 20,
   },
-  appIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    marginBottom: 4,
-  },
-  versionText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  versionSubText: {
+  footerVersion: {
     color: '#D9CDF5',
     fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
-    opacity: 0.7,
   },
+  footerArchitecture: {
+    color: 'rgba(217, 205, 245, 0.6)',
+    fontSize: 10,
+    fontFamily: THEME.fonts.body,
+    marginTop: 2,
+  },
+
+  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    alignItems: 'center',
+    backgroundColor: 'rgba(8, 3, 20, 0.88)',
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    alignItems: 'center',
+    padding: 16,
   },
   modalCard: {
     width: '100%',
-    maxWidth: 380,
-    padding: 20,
+    maxWidth: 420,
+    backgroundColor: '#1E0E45',
     borderRadius: 24,
-    backgroundColor: '#1E1238',
     borderWidth: 1.5,
-    borderColor: '#FF5A6A',
-    alignItems: 'center',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    padding: 20,
+    ...Platform.select({
+      web: { boxShadow: '0 16px 48px rgba(0,0,0,0.6)' },
+      default: { elevation: 8 },
+    }),
   },
-  modalWarningTitle: {
-    color: '#FF5A6A',
-    fontFamily: THEME.fonts.display,
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  modalTitle: {
+    color: '#FFFFFF',
     fontSize: 18,
+    fontFamily: THEME.fonts.display,
+  },
+  deleteModalTitle: {
+    color: '#EF4444',
+    fontSize: 18,
+    fontFamily: THEME.fonts.display,
+    marginBottom: 6,
+  },
+  modalDesc: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.body,
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  modalInput: {
+    backgroundColor: 'rgba(10, 4, 24, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: '#FFFFFF',
+    fontSize: 14,
+    marginBottom: 10,
+  },
+  modalMessage: {
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
     marginBottom: 10,
   },
-  modalWarningDesc: {
-    color: '#D9CDF5',
-    fontFamily: THEME.fonts.extraBold,
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 20,
-  },
   modalBtnRow: {
     flexDirection: 'row',
-    gap: 12,
-    width: '100%',
+    gap: 10,
+    marginTop: 8,
   },
 });

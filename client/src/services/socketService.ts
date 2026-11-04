@@ -163,7 +163,11 @@ export class SocketService {
     }
   }
 
-  private sendEnvelope(event: string, payload: any = {}): void {
+  public updatePresence(userId: string, online: boolean): void {
+    this.sendEnvelope('presence:update', { userId, online, timestamp: Date.now() });
+  }
+
+  public sendEnvelope(event: string, payload: any = {}): void {
     const envelope: WsMessageEnvelope = {
       event,
       requestId: `req_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,

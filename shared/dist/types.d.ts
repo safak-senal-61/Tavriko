@@ -250,6 +250,7 @@ export interface UserSettings {
     equippedTitle?: string;
 }
 export interface UserProfile {
+    isGuest?: boolean;
     id: string;
     username: string;
     displayName: string;

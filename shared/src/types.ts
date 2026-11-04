@@ -319,6 +319,7 @@ export interface UserSettings {
 }
 
 export interface UserProfile {
+  isGuest?: boolean;
   id: string;
   username: string;
   displayName: string;
