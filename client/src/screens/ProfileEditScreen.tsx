@@ -10,11 +10,17 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
+import {
+  TavrikoScreen,
+  Button3D,
+  CharacterAvatar,
+} from '../components/TavrikoIcons';
 
 interface ProfileEditScreenProps {
   user: UserProfile;
@@ -24,37 +30,37 @@ interface ProfileEditScreenProps {
   onSaved: (updated: UserProfile) => void;
 }
 
-const COUNTRIES: Array<{ code: string; name: string }> = [
-  { code: 'TR', name: 'Türkiye' },
-  { code: 'CY', name: 'Kıbrıs (KKTC dahil)' },
-  { code: 'DE', name: 'Almanya' },
-  { code: 'US', name: 'Amerika Birleşik Devletleri' },
-  { code: 'GB', name: 'Birleşik Krallık' },
-  { code: 'FR', name: 'Fransa' },
-  { code: 'IT', name: 'İtalya' },
-  { code: 'ES', name: 'İspanya' },
-  { code: 'NL', name: 'Hollanda' },
-  { code: 'BE', name: 'Belçika' },
-  { code: 'AT', name: 'Avusturya' },
-  { code: 'CH', name: 'İsviçre' },
-  { code: 'SE', name: 'İsveç' },
-  { code: 'NO', name: 'Norveç' },
-  { code: 'DK', name: 'Danimarka' },
-  { code: 'GR', name: 'Yunanistan' },
-  { code: 'AZ', name: 'Azerbaycan' },
-  { code: 'SA', name: 'Suudi Arabistan' },
-  { code: 'AE', name: 'Birleşik Arap Emirlikleri' },
-  { code: 'RU', name: 'Rusya' },
-  { code: 'CA', name: 'Kanada' },
-  { code: 'AU', name: 'Avustralya' },
-  { code: 'JP', name: 'Japonya' },
-  { code: 'CN', name: 'Çin' },
-  { code: 'KR', name: 'Güney Kore' },
-  { code: 'BR', name: 'Brezilya' },
-  { code: 'AR', name: 'Arjantin' },
-  { code: 'EG', name: 'Mısır' },
-  { code: 'MA', name: 'Fas' },
-  { code: 'IN', name: 'Hindistan' },
+const COUNTRIES: Array<{ code: string; name: string; flag: string }> = [
+  { code: 'TR', name: 'Türkiye', flag: '🇹🇷' },
+  { code: 'AZ', name: 'Azerbaycan', flag: '🇦🇿' },
+  { code: 'CY', name: 'Kıbrıs (KKTC dahil)', flag: '🇨🇾' },
+  { code: 'DE', name: 'Almanya', flag: '🇩🇪' },
+  { code: 'US', name: 'Amerika Birleşik Devletleri', flag: '🇺🇸' },
+  { code: 'GB', name: 'Birleşik Krallık', flag: '🇬🇧' },
+  { code: 'FR', name: 'Fransa', flag: '🇫🇷' },
+  { code: 'IT', name: 'İtalya', flag: '🇮🇹' },
+  { code: 'ES', name: 'İspanya', flag: '🇪🇸' },
+  { code: 'NL', name: 'Hollanda', flag: '🇳🇱' },
+  { code: 'BE', name: 'Belçika', flag: '🇧🇪' },
+  { code: 'AT', name: 'Avusturya', flag: '🇦🇹' },
+  { code: 'CH', name: 'İsviçre', flag: '🇨🇭' },
+  { code: 'SE', name: 'İsveç', flag: '🇸🇪' },
+  { code: 'NO', name: 'Norveç', flag: '🇳🇴' },
+  { code: 'DK', name: 'Danimarka', flag: '🇩🇰' },
+  { code: 'GR', name: 'Yunanistan', flag: '🇬🇷' },
+  { code: 'SA', name: 'Suudi Arabistan', flag: '🇸🇦' },
+  { code: 'AE', name: 'Birleşik Arap Emirlikleri', flag: '🇦🇪' },
+  { code: 'RU', name: 'Rusya', flag: '🇷🇺' },
+  { code: 'CA', name: 'Kanada', flag: '🇨🇦' },
+  { code: 'AU', name: 'Avustralya', flag: '🇦🇺' },
+  { code: 'JP', name: 'Japonya', flag: '🇯🇵' },
+  { code: 'CN', name: 'Çin', flag: '🇨🇳' },
+  { code: 'KR', name: 'Güney Kore', flag: '🇰🇷' },
+  { code: 'BR', name: 'Brezilya', flag: '🇧🇷' },
+  { code: 'AR', name: 'Arjantin', flag: '🇦🇷' },
+  { code: 'EG', name: 'Mısır', flag: '🇪🇬' },
+  { code: 'MA', name: 'Fas', flag: '🇲🇦' },
+  { code: 'IN', name: 'Hindistan', flag: '🇮🇳' },
 ];
 
 const GENDERS: Array<{ id: string; label: string }> = [
@@ -64,7 +70,6 @@ const GENDERS: Array<{ id: string; label: string }> = [
 ];
 
 const normalizeCode = (code: string) => {
-  // Eski kayıtlarda 'US-2' gibi hileli kodlar kalmışsa gerçek ISO koduna indir
   const base = code.split('-')[0];
   return COUNTRIES.some((c) => c.code === base) ? base : code;
 };
@@ -85,11 +90,13 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
   const [gender, setGender] = useState(user.gender || '');
   const [bio, setBio] = useState(user.bio || '');
   const [countryModalVisible, setCountryModalVisible] = useState(false);
+  const [countrySearch, setCountrySearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const birthValid = useMemo(() => {
-    if (!birthDate.trim()) return true; // opsiyonel
+    if (!birthDate.trim()) return true;
     const m = birthDate.trim().match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
     if (!m) return false;
     const day = Number(m[1]);
@@ -100,7 +107,7 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
   }, [birthDate]);
 
   const phoneValid = useMemo(() => {
-    if (!phone.trim()) return true; // opsiyonel
+    if (!phone.trim()) return true;
     return /^[+\d][\d\s\-()]{5,}$/.test(phone.trim());
   }, [phone]);
 
@@ -112,10 +119,10 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
     setCountryCode(normalizeCode(c.code));
     setCountryName(c.name);
     setCountryModalVisible(false);
+    setCountrySearch('');
   };
 
   const handleFormatBirth = (raw: string) => {
-    // Otomatik GG.AA.YYYY biçimlendirme
     const digits = raw.replace(/\D/g, '').slice(0, 8);
     let out = digits;
     if (digits.length > 4) out = `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
@@ -123,10 +130,18 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
     setBirthDate(out);
   };
 
+  const filteredCountries = useMemo(() => {
+    if (!countrySearch.trim()) return COUNTRIES;
+    const query = countrySearch.toLowerCase().trim();
+    return COUNTRIES.filter(
+      (c) => c.name.toLowerCase().includes(query) || c.code.toLowerCase().includes(query)
+    );
+  }, [countrySearch]);
+
   const handleSave = async () => {
     if (!fullNameValid || !birthValid || !phoneValid || saving) {
       sound.triggerHaptic('error');
-      setNotice({ ok: false, text: '⚠️ Lütfen kırmızı işaretli alanları düzeltin.' });
+      setNotice({ ok: false, text: 'Lütfen kırmızı işaretli alanları kontrol edin.' });
       setTimeout(() => setNotice(null), 3500);
       return;
     }
@@ -134,7 +149,7 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
     setSaving(true);
     setNotice({
       ok: true,
-      text: '⏳ Bilgileri veritabanına kaydediyoruz...',
+      text: 'Bilgiler PostgreSQL veritabanına kaydediliyor...',
     });
     try {
       const res = await fetch(`${base}/auth/profile`, {
@@ -160,7 +175,7 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
       sound.triggerHaptic('success');
       setNotice({
         ok: true,
-        text: '✓ Bilgiler güncellendi ve PostgreSQL veritabanına kaydedildi!',
+        text: '✓ Bilgiler başarıyla güncellendi!',
       });
       if (data?.user) {
         onSaved(data.user);
@@ -181,8 +196,13 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
   };
 
   return (
-    <TavrikoShell>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+    <TavrikoScreen>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Üst Navigasyon Çubuğu */}
         <Animated.View entering={FadeInDown.delay(0).springify().damping(16)}>
           <View style={styles.headerRow}>
             <TouchableOpacity
@@ -195,137 +215,270 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
             >
               <Text style={styles.backBtnText}>‹</Text>
             </TouchableOpacity>
-            <Text style={styles.title}>Bilgilerimi Düzenle</Text>
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <Text style={styles.title}>Profili Düzenle</Text>
+              <Text style={styles.subtitle}>Hesap ve kimlik bilgilerini güncelle</Text>
+            </View>
             <View style={{ width: 40 }} />
           </View>
-          <Text style={styles.subtitle}>
-            Değişiklikler kaydettiğin an PostgreSQL veritabanına kalıcı yazılır.
-          </Text>
         </Animated.View>
 
+        {/* Hero Profil Kartı (Canlı PostgreSQL Göstergesi & Avatar) */}
+        <Animated.View entering={FadeInDown.delay(60).springify().damping(16)} style={styles.heroCard}>
+          <View style={styles.heroAvatarWrap}>
+            <View style={styles.heroAvatarGlow} />
+            <View style={styles.heroAvatarBorder}>
+              <CharacterAvatar seed={user.avatarUrl || user.displayName || user.username} size={64} />
+            </View>
+          </View>
+          <View style={styles.heroInfo}>
+            <Text style={styles.heroDisplayName} numberOfLines={1}>
+              {fullName || user.displayName}
+            </Text>
+            <View style={styles.heroBadgeRow}>
+              <View style={styles.usernamePill}>
+                <Text style={styles.usernamePillText}>@{user.username}</Text>
+              </View>
+              <View style={styles.syncStatusPill}>
+                <View style={styles.syncPulseDot} />
+                <Text style={styles.syncStatusText}>PostgreSQL Canlı</Text>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* Geri Bildirim Bildirim Bandı */}
         {notice && (
-          <Text style={[styles.noticeText, { color: notice.ok ? '#3FD08A' : '#FF5A6A' }]}>
-            {notice.text}
-          </Text>
+          <Animated.View entering={ZoomIn.duration(200)} style={[styles.noticeBanner, notice.ok ? styles.noticeOk : styles.noticeError]}>
+            <Text style={[styles.noticeText, { color: notice.ok ? '#3FD08A' : '#FF5A6A' }]}>
+              {notice.text}
+            </Text>
+          </Animated.View>
         )}
 
-        <Animated.View entering={FadeInDown.delay(80).springify().damping(16)}>
-          <View style={styles.card}>
-            <Text style={styles.label}>Ad Soyad</Text>
-            <TextInput
-              style={[styles.input, !fullNameValid && fullName.length > 0 && styles.inputError]}
-              value={fullName}
-              onChangeText={setFullName}
-              placeholder="Şafak Şenal"
-              placeholderTextColor="#9A8BC2"
-              maxLength={40}
-            />
-            {!fullNameValid && fullName.length > 0 && (
-              <Text style={styles.fieldError}>En az 2 karakter girin</Text>
-            )}
-
-            <Text style={styles.label}>Kullanıcı Adı</Text>
-            <View style={[styles.input, styles.readonlyInput]}>
-              <Text style={styles.readonlyText}>@{user.username}</Text>
+        {/* Form Alanları Kartı */}
+        <Animated.View entering={FadeInDown.delay(120).springify().damping(16)} style={styles.formCard}>
+          {/* Ad Soyad */}
+          <View style={styles.fieldGroup}>
+            <View style={styles.fieldLabelRow}>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="#FFC43D" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                <Circle cx="12" cy="7" r="4" stroke="#FFC43D" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+              <Text style={styles.fieldLabel}>Ad Soyad</Text>
             </View>
-            <Text style={styles.hintText}>Kullanıcı adı oyun kimliğini temsil eder ve değiştirilemez.</Text>
+            <View
+              style={[
+                styles.inputWrapper,
+                focusedField === 'name' && styles.inputWrapperFocused,
+                !fullNameValid && fullName.length > 0 && styles.inputWrapperError,
+              ]}
+            >
+              <TextInput
+                style={styles.textInput}
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="Adın ve Soyadın"
+                placeholderTextColor="#9A8BC2"
+                maxLength={40}
+                onFocus={() => setFocusedField('name')}
+                onBlur={() => setFocusedField(null)}
+              />
+              {fullNameValid && (
+                <View style={styles.fieldCheckIcon}>
+                  <Text style={styles.fieldCheckText}>✓</Text>
+                </View>
+              )}
+            </View>
+            {!fullNameValid && fullName.length > 0 && (
+              <Text style={styles.fieldError}>En az 2 karakter girmelisiniz</Text>
+            )}
+          </View>
 
+          {/* Kullanıcı Adı (Salt Okunur) */}
+          <View style={styles.fieldGroup}>
+            <View style={styles.fieldLabelRow}>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Circle cx="12" cy="12" r="4" stroke="#A855F7" strokeWidth={2} />
+                <Path d="M16 8v5a3 3 0 006 0v-1a10 10 0 10-3.92 7.94" stroke="#A855F7" strokeWidth={2} strokeLinecap="round" />
+              </Svg>
+              <Text style={styles.fieldLabel}>Kullanıcı Adı (Oyun Kimliği)</Text>
+            </View>
+            <View style={[styles.inputWrapper, styles.readonlyWrapper]}>
+              <Text style={styles.readonlyValue}>@{user.username}</Text>
+              <View style={styles.lockBadge}>
+                <Text style={styles.lockBadgeText}>KİLİTLİ</Text>
+              </View>
+            </View>
+            <Text style={styles.fieldHint}>Kullanıcı adı sıralama ve düellolarda değişmez kimliğindir.</Text>
+          </View>
+
+          {/* Ülke Seçimi */}
+          <View style={styles.fieldGroup}>
+            <View style={styles.fieldLabelRow}>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Circle cx="12" cy="12" r="10" stroke="#38BDF8" strokeWidth={2} />
+                <Path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" stroke="#38BDF8" strokeWidth={2} />
+              </Svg>
+              <Text style={styles.fieldLabel}>Ülke</Text>
+            </View>
             <TouchableOpacity
-              style={[styles.input, styles.selectInput]}
+              style={[styles.inputWrapper, styles.selectWrapper]}
               onPress={() => {
                 sound.playSound('tap');
                 setCountryModalVisible(true);
               }}
               activeOpacity={0.8}
             >
-              <Text style={styles.selectValue}>
-                {COUNTRIES.find((c) => c.code === countryCode)?.name || countryName}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={styles.countryCodeBadge}>
+                  <Text style={styles.countryCodeText}>{countryCode}</Text>
+                </View>
+                <Text style={styles.selectText}>
+                  {COUNTRIES.find((c) => c.code === countryCode)?.name || countryName}
+                </Text>
+              </View>
               <Text style={styles.selectChevron}>›</Text>
             </TouchableOpacity>
+          </View>
 
-            <Text style={styles.label}>Telefon</Text>
-            <TextInput
-              style={[styles.input, !phoneValid && phone.length > 0 && styles.inputError]}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="+90 5xx xxx xx xx"
-              placeholderTextColor="#9A8BC2"
-              keyboardType="phone-pad"
-              maxLength={20}
-            />
+          {/* Telefon Numarası */}
+          <View style={styles.fieldGroup}>
+            <View style={styles.fieldLabelRow}>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" stroke="#5ADBB5" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+              <Text style={styles.fieldLabel}>Telefon</Text>
+            </View>
+            <View
+              style={[
+                styles.inputWrapper,
+                focusedField === 'phone' && styles.inputWrapperFocused,
+                !phoneValid && phone.length > 0 && styles.inputWrapperError,
+              ]}
+            >
+              <TextInput
+                style={styles.textInput}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="+90 5xx xxx xx xx"
+                placeholderTextColor="#9A8BC2"
+                keyboardType="phone-pad"
+                maxLength={20}
+                onFocus={() => setFocusedField('phone')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
             {!phoneValid && phone.length > 0 && (
               <Text style={styles.fieldError}>Geçerli bir telefon numarası girin</Text>
             )}
+          </View>
 
-            <Text style={styles.label}>Doğum Tarihi</Text>
-            <TextInput
-              style={[styles.input, !birthValid && birthDate.length > 0 && styles.inputError]}
-              value={birthDate}
-              onChangeText={handleFormatBirth}
-              placeholder="01.01.2000"
-              placeholderTextColor="#9A8BC2"
-              keyboardType="number-pad"
-              maxLength={10}
-            />
+          {/* Doğum Tarihi */}
+          <View style={styles.fieldGroup}>
+            <View style={styles.fieldLabelRow}>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Rect x="3" y="4" width="18" height="18" rx="2" stroke="#FFC43D" strokeWidth={2} />
+                <Path d="M16 2v4M8 2v4M3 10h18" stroke="#FFC43D" strokeWidth={2} strokeLinecap="round" />
+              </Svg>
+              <Text style={styles.fieldLabel}>Doğum Tarihi</Text>
+            </View>
+            <View
+              style={[
+                styles.inputWrapper,
+                focusedField === 'birth' && styles.inputWrapperFocused,
+                !birthValid && birthDate.length > 0 && styles.inputWrapperError,
+              ]}
+            >
+              <TextInput
+                style={styles.textInput}
+                value={birthDate}
+                onChangeText={handleFormatBirth}
+                placeholder="01.01.2000"
+                placeholderTextColor="#9A8BC2"
+                keyboardType="number-pad"
+                maxLength={10}
+                onFocus={() => setFocusedField('birth')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
             {!birthValid && birthDate.length > 0 && (
               <Text style={styles.fieldError}>GG.AA.YYYY biçiminde girin</Text>
             )}
+          </View>
 
-            <Text style={styles.label}>Cinsiyet</Text>
+          {/* Cinsiyet */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.fieldLabel}>Cinsiyet</Text>
             <View style={styles.genderRow}>
               {GENDERS.map((g) => {
                 const active = gender === g.id;
                 return (
                   <TouchableOpacity
                     key={g.id}
-                    style={[styles.genderBtn, active && styles.genderBtnActive]}
+                    style={[styles.genderPill, active && styles.genderPillActive]}
                     onPress={() => {
                       sound.playSound('tap');
                       sound.triggerHaptic('light');
                       setGender(active ? '' : g.id);
                     }}
-                    activeOpacity={0.85}
+                    activeOpacity={0.82}
                   >
-                    <Text style={[styles.genderBtnText, active && styles.genderBtnTextActive]}>
+                    <Text style={[styles.genderPillText, active && styles.genderPillTextActive]}>
                       {g.label}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
+          </View>
 
-            <Text style={styles.label}>Hakkımda (Bio)</Text>
-            <TextInput
-              style={[styles.input, styles.bioInput]}
-              value={bio}
-              onChangeText={(t) => setBio(t.slice(0, 140))}
-              placeholder="Kendini kısaca anlat..."
-              placeholderTextColor="#9A8BC2"
-              multiline
-              maxLength={140}
-            />
-            <Text style={styles.hintText}>{bio.length}/140 karakter</Text>
+          {/* Hakkımda (Bio) */}
+          <View style={styles.fieldGroup}>
+            <View style={styles.fieldLabelRow}>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="#C084FC" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+              <Text style={styles.fieldLabel}>Hakkımda (Bio)</Text>
+              <View style={{ flex: 1 }} />
+              <Text style={styles.bioCounter}>{bio.length}/140</Text>
+            </View>
+            <View
+              style={[
+                styles.inputWrapper,
+                styles.bioWrapper,
+                focusedField === 'bio' && styles.inputWrapperFocused,
+              ]}
+            >
+              <TextInput
+                style={styles.bioInput}
+                value={bio}
+                onChangeText={(t) => setBio(t.slice(0, 140))}
+                placeholder="Kendini kısaca anlat..."
+                placeholderTextColor="#9A8BC2"
+                multiline
+                maxLength={140}
+                onFocus={() => setFocusedField('bio')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
           </View>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(160).springify().damping(16)}>
-          <TouchableOpacity
-            style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+        {/* 3D Kaydet Butonu */}
+        <Animated.View entering={FadeInDown.delay(180).springify().damping(16)} style={styles.ctaWrapper}>
+          <Button3D
+            title={saving ? 'KAYDEDİLİYOR...' : 'DEĞİŞİKLİKLERİ KAYDET'}
+            variant="gold"
             onPress={handleSave}
-            disabled={saving}
-            activeOpacity={0.85}
-          >
-            {saving ? (
-              <ActivityIndicator color="#180B34" size="small" />
-            ) : (
-              <Text style={styles.saveBtnText}>💾 Kaydet</Text>
-            )}
-          </TouchableOpacity>
+            disabled={saving || !fullNameValid || !birthValid || !phoneValid}
+            style={{ width: '100%', minHeight: 56 }}
+            textStyle={{ fontSize: 16 }}
+          />
         </Animated.View>
       </ScrollView>
 
-      {/* Ülke Seçim Modalı */}
+      {/* Modern Ülke Seçim Modalı */}
       <Modal
         visible={countryModalVisible}
         transparent
@@ -335,18 +488,33 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Ülkeni Seç</Text>
+            <View style={styles.modalSearchWrapper}>
+              <TextInput
+                style={styles.modalSearchInput}
+                value={countrySearch}
+                onChangeText={setCountrySearch}
+                placeholder="Ülke ara..."
+                placeholderTextColor="#9A8BC2"
+                autoCorrect={false}
+              />
+            </View>
             <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
-              {COUNTRIES.map((c) => {
+              {filteredCountries.map((c) => {
                 const active = countryCode === normalizeCode(c.code);
                 return (
                   <TouchableOpacity
                     key={c.code}
                     style={[styles.countryRow, active && styles.countryRowActive]}
                     onPress={() => handlePickCountry(c)}
-                    activeOpacity={0.85}
+                    activeOpacity={0.82}
                   >
-                    <Text style={styles.countryName}>{c.name}</Text>
-                    <Text style={styles.countryFlag}>{active ? '✓' : ''}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Text style={styles.countryFlagEmoji}>{c.flag}</Text>
+                      <Text style={styles.countryName}>{c.name}</Text>
+                    </View>
+                    <View style={styles.countryCodePill}>
+                      <Text style={styles.countryCodePillText}>{c.code}</Text>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
@@ -361,155 +529,418 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
           </View>
         </View>
       </Modal>
-    </TavrikoShell>
+    </TavrikoScreen>
   );
 };
 
-/** Ekran kabuğu: koyu degrade arka plan */
-const TavrikoShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <View style={styles.shell}>{children}</View>
-);
-
-const card = {
-  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  borderWidth: 1,
-  borderColor: 'rgba(255, 255, 255, 0.14)',
-  borderRadius: 20,
-} as const;
-
 const styles = StyleSheet.create({
-  shell: {
-    flex: 1,
-    backgroundColor: '#180B34',
-    ...Platform.select({
-      web: { backgroundImage: 'linear-gradient(160deg, #2A1155 0%, #180B34 55%, #100629 100%)' },
-      default: {},
-    }),
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 60,
   },
-  scrollContent: { padding: 20, paddingBottom: 60 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   backBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(10, 4, 24, 0.72)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backBtnText: { color: '#FFFFFF', fontSize: 22, fontFamily: THEME.fonts.extraBold },
+  backBtnText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontFamily: THEME.fonts.extraBold,
+    marginTop: -2,
+  },
   title: {
     fontFamily: THEME.fonts.display,
     fontSize: 22,
     color: '#FFFFFF',
     textAlign: 'center',
-    flexShrink: 1,
   },
   subtitle: {
     color: '#D9CDF5',
     fontSize: 11,
-    fontFamily: THEME.fonts.body,
+    fontFamily: THEME.fonts.bold,
     textAlign: 'center',
-    marginTop: 6,
+    marginTop: 2,
+    opacity: 0.8,
   },
-  noticeText: { fontSize: 12, fontFamily: THEME.fonts.extraBold, textAlign: 'center', marginTop: 10 },
-  card: { ...card, padding: 16, marginTop: 12 },
-  label: {
+
+  // Hero Profil Kartı
+  heroCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 20,
+    padding: 14,
+    marginBottom: 14,
+    gap: 14,
+  },
+  heroAvatarWrap: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroAvatarGlow: {
+    position: 'absolute',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(255, 196, 61, 0.25)',
+  },
+  heroAvatarBorder: {
+    borderRadius: 34,
+    borderWidth: 2.5,
+    borderColor: '#FFC43D',
+    overflow: 'hidden',
+  },
+  heroInfo: {
+    flex: 1,
+  },
+  heroDisplayName: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontFamily: THEME.fonts.display,
+    marginBottom: 4,
+  },
+  heroBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  usernamePill: {
+    backgroundColor: 'rgba(107, 60, 255, 0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(154, 107, 255, 0.45)',
+  },
+  usernamePillText: {
     color: '#D9CDF5',
     fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
-    marginBottom: 6,
-    marginTop: 12,
   },
-  input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+  syncStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(63, 208, 138, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
     borderWidth: 1,
+    borderColor: '#3FD08A',
+  },
+  syncPulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#3FD08A',
+  },
+  syncStatusText: {
+    color: '#3FD08A',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
+
+  // Bildirim Bandı
+  noticeBanner: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  noticeOk: {
+    backgroundColor: 'rgba(63, 208, 138, 0.15)',
+    borderColor: '#3FD08A',
+  },
+  noticeError: {
+    backgroundColor: 'rgba(255, 90, 106, 0.15)',
+    borderColor: '#FF5A6A',
+  },
+  noticeText: {
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+  },
+
+  // Form Kartı
+  formCard: {
+    backgroundColor: 'rgba(20, 8, 48, 0.88)',
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: 'rgba(107, 60, 255, 0.45)',
+    padding: 16,
+    gap: 14,
+  },
+  fieldGroup: {
+    gap: 6,
+  },
+  fieldLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  fieldLabel: {
+    color: '#D9CDF5',
+    fontSize: 11.5,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1.2,
     borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minHeight: 46,
+  },
+  inputWrapperFocused: {
+    borderColor: '#FFC43D',
+    backgroundColor: 'rgba(255, 196, 61, 0.08)',
+  },
+  inputWrapperError: {
+    borderColor: '#FF5A6A',
+  },
+  textInput: {
+    flex: 1,
     color: '#FFFFFF',
     fontSize: 14,
     fontFamily: THEME.fonts.extraBold,
-  },
-  inputError: { borderColor: '#FF5A6A' },
-  fieldError: { color: '#FF5A6A', fontSize: 10, fontFamily: THEME.fonts.extraBold, marginTop: 4 },
-  hintText: { color: '#9A8BC2', fontSize: 10, fontFamily: THEME.fonts.body, marginTop: 4 },
-  readonlyInput: { backgroundColor: 'rgba(255, 255, 255, 0.04)' },
-  readonlyText: { color: '#D9CDF5', fontSize: 14, fontFamily: THEME.fonts.extraBold },
-  selectInput: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  selectValue: { color: '#FFFFFF', fontSize: 14, fontFamily: THEME.fonts.extraBold },
-  selectChevron: { color: '#FFC43D', fontSize: 18, fontFamily: THEME.fonts.extraBold },
-  genderRow: { flexDirection: 'row', gap: 8 },
-  genderBtn: {
-    flex: 1,
     paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    alignItems: 'center',
   },
-  genderBtnActive: {
-    borderColor: '#FFC43D',
-    backgroundColor: 'rgba(255, 196, 61, 0.15)',
-  },
-  genderBtnText: { color: '#D9CDF5', fontSize: 13, fontFamily: THEME.fonts.extraBold },
-  genderBtnTextActive: { color: '#FFC43D' },
-  bioInput: { minHeight: 80, textAlignVertical: 'top', paddingTop: 10 },
-  saveBtn: {
-    marginTop: 18,
-    paddingVertical: 14,
-    borderRadius: 18,
-    backgroundColor: '#6B3CFF',
-    alignItems: 'center',
-  },
-  saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: { color: '#FFFFFF', fontSize: 16, fontFamily: THEME.fonts.extraBold },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(10, 4, 24, 0.8)',
+  fieldCheckIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(63, 208, 138, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+  },
+  fieldCheckText: {
+    color: '#3FD08A',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  fieldError: {
+    color: '#FF5A6A',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  fieldHint: {
+    color: 'rgba(217, 205, 245, 0.65)',
+    fontSize: 10,
+    fontFamily: THEME.fonts.bold,
+  },
+
+  // Salt Okunur
+  readonlyWrapper: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    justifyContent: 'space-between',
+  },
+  readonlyValue: {
+    color: '#D9CDF5',
+    fontSize: 14,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  lockBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  lockBadgeText: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 9,
+    fontFamily: THEME.fonts.extraBold,
+  },
+
+  // Seçim Kutusu
+  selectWrapper: {
+    justifyContent: 'space-between',
+  },
+  countryCodeBadge: {
+    backgroundColor: 'rgba(56, 189, 248, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#38BDF8',
+  },
+  countryCodeText: {
+    color: '#38BDF8',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  selectText: {
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  selectChevron: {
+    color: '#FFC43D',
+    fontSize: 18,
+    fontFamily: THEME.fonts.extraBold,
+  },
+
+  // Cinsiyet Hapları
+  genderRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  genderPill: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.2,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  genderPillActive: {
+    borderColor: '#FFC43D',
+    backgroundColor: 'rgba(255, 196, 61, 0.16)',
+  },
+  genderPillText: {
+    color: '#D9CDF5',
+    fontSize: 12.5,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  genderPillTextActive: {
+    color: '#FFC43D',
+  },
+
+  // Bio
+  bioWrapper: {
+    minHeight: 80,
+    alignItems: 'flex-start',
+    paddingVertical: 8,
+  },
+  bioInput: {
+    flex: 1,
+    width: '100%',
+    color: '#FFFFFF',
+    fontSize: 13.5,
+    fontFamily: THEME.fonts.extraBold,
+    textAlignVertical: 'top',
+  },
+  bioCounter: {
+    color: 'rgba(217, 205, 245, 0.6)',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
+
+  // CTA Butonu
+  ctaWrapper: {
+    marginTop: 18,
+  },
+
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(10, 4, 24, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
   },
   modalCard: {
-    ...card,
     width: '100%',
     maxWidth: 360,
-    maxHeight: '70%',
-    padding: 16,
-    backgroundColor: '#241045',
+    maxHeight: '75%',
+    backgroundColor: '#1E0E3E',
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: '#6B3CFF',
+    padding: 18,
   },
   modalTitle: {
     color: '#FFFFFF',
-    fontWeight: '900',
     fontFamily: THEME.fonts.display,
-    fontSize: 18,
-    marginBottom: 10,
+    fontSize: 20,
     textAlign: 'center',
+    marginBottom: 12,
   },
-  modalList: { flexGrow: 0 },
+  modalSearchWrapper: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 10,
+  },
+  modalSearchInput: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  modalList: {
+    flexGrow: 0,
+    maxHeight: 280,
+  },
   countryRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 10,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     borderRadius: 10,
+    marginBottom: 2,
   },
-  countryRowActive: { backgroundColor: 'rgba(255, 196, 61, 0.15)' },
-  countryName: { color: '#FFFFFF', fontSize: 13, fontFamily: THEME.fonts.extraBold, flex: 1 },
-  countryFlag: { color: '#FFC43D', fontSize: 13, fontFamily: THEME.fonts.extraBold },
+  countryRowActive: {
+    backgroundColor: 'rgba(255, 196, 61, 0.15)',
+  },
+  countryFlagEmoji: {
+    fontSize: 18,
+  },
+  countryName: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  countryCodePill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  countryCodePillText: {
+    color: '#D9CDF5',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
   modalCloseBtn: {
-    marginTop: 10,
-    paddingVertical: 10,
+    marginTop: 14,
+    paddingVertical: 12,
     borderRadius: 14,
-    borderWidth: 1,
+    borderWidth: 1.2,
     borderColor: '#FFC43D',
+    backgroundColor: 'rgba(255, 196, 61, 0.12)',
     alignItems: 'center',
   },
-  modalCloseText: { color: '#FFC43D', fontSize: 13, fontFamily: THEME.fonts.extraBold },
+  modalCloseText: {
+    color: '#FFC43D',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+  },
 });
 
 export default ProfileEditScreen;

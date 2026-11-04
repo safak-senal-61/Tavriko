@@ -633,17 +633,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             {/* Header Actions */}
             <View style={styles.headerActions}>
               <TouchableOpacity
-                style={styles.headerActionBtn}
+                style={[styles.headerActionBtn, styles.headerActionBtnEdit]}
                 onPress={() => {
                   sound.playSound('tap');
                   if (onEditPersonalInfo) onEditPersonalInfo();
                   else onEditProfile();
                 }}
+                activeOpacity={0.82}
               >
                 <EditPencilIcon size={14} color="#FFC43D" />
-                <Text style={styles.headerActionText}>Düzenle</Text>
+                <Text style={[styles.headerActionText, styles.headerActionTextEdit]}>Düzenle</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.headerActionBtn} onPress={handleShareProfile}>
+              <TouchableOpacity style={styles.headerActionBtn} onPress={handleShareProfile} activeOpacity={0.82}>
                 <ShareVectorIcon size={14} color="#D9CDF5" />
                 <Text style={styles.headerActionText}>Paylaş</Text>
               </TouchableOpacity>
@@ -654,6 +655,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     sound.playSound('tap');
                     onSettings();
                   }}
+                  activeOpacity={0.82}
                 >
                   <ModeSquircleIcon mode="settings" size={16} />
                   <Text style={styles.headerActionText}>Tüm Ayarlar</Text>
@@ -1128,7 +1130,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
+  headerActionBtnEdit: {
+    backgroundColor: 'rgba(255, 196, 61, 0.16)',
+    borderColor: 'rgba(255, 196, 61, 0.45)',
+  },
   headerActionText: { color: '#D9CDF5', fontSize: 12, fontFamily: THEME.fonts.extraBold },
+  headerActionTextEdit: { color: '#FFC43D' },
 
   // Horizontal Motion Avatar Picker Carousel
   avatarPickerSection: {
@@ -1269,7 +1276,17 @@ const styles = StyleSheet.create({
   tabTextActive: { color: '#FFFFFF' },
 
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8, marginBottom: 14 },
-  statCard: { ...card, width: '32%', paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
+  statCard: {
+    ...card,
+    width: '32%',
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 18,
+    borderWidth: 1.2,
+    borderColor: 'rgba(154, 107, 255, 0.28)',
+  },
   statValue: { fontFamily: THEME.fonts.display, fontSize: 19, color: '#FFFFFF' },
   statLabel: { color: '#D9CDF5', fontSize: 10, fontFamily: THEME.fonts.extraBold, textAlign: 'center', marginTop: 2 },
 
