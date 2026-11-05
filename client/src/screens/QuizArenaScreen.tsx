@@ -740,34 +740,14 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   dailyChallengeInfo = null,
   racers: racersProp,
 }) => {
-  // Her oyun modunda (1v1, Arkadaşla Özel Oda, Keşfet, Günlük Görev) yarışçılar gösterilir
+  // Yarış pisti (Zirve Yarışı) YALNIZCA çok oyunculu modlarda (1v1 Düello / Özel Oda) gösterilir;
+  // tek kişilik oyunda (Keşfet / Günlük Görev) hiç gösterilmez.
   const activeRacers: RacerInfo[] = useMemo(() => {
     if (racersProp && racersProp.length > 0) {
       return racersProp;
     }
-    const fallbackList: RacerInfo[] = [
-      {
-        id: 'me',
-        displayName: myDisplayName || 'Sen',
-        score: currentScore || 0,
-        correctAnswers: dailyChallengeInfo?.currentCorrect ?? 0,
-        isMe: true,
-        hasAnswered: selectedOptionId !== null,
-      },
-    ];
-    if (opponent) {
-      fallbackList.push({
-        id: opponent.id,
-        displayName: opponent.displayName,
-        avatarUrl: opponent.avatarUrl,
-        score: opponent.score || 0,
-        correctAnswers: 0,
-        isMe: false,
-        hasAnswered: opponent.hasAnswered,
-      });
-    }
-    return fallbackList;
-  }, [racersProp, myDisplayName, currentScore, dailyChallengeInfo, selectedOptionId, opponent]);
+    return [];
+  }, [racersProp]);
   const [localSelectedOptionId, setLocalSelectedOptionId] = useState<string | null>(null);
   // Settings > "Soru Metin Boyutu" (normal / large) — real, app-wide effect
   const [isLargeText] = useState<boolean>(() => {

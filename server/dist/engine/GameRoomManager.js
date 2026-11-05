@@ -312,7 +312,7 @@ class GameRoomManager {
     }
     endCurrentRound(code) {
         const room = this.getRoom(code);
-        if (!room || !room.currentQuestion)
+        if (!room || room.status !== 'question_active' || !room.currentQuestion)
             return;
         room.status = 'round_result';
         const playerAnswers = {};
@@ -334,6 +334,9 @@ class GameRoomManager {
             playerAnswers,
             leaderboard,
         };
+        if (this.onStateSync) {
+            this.onStateSync(code, room);
+        }
         if (this.onRoundEnd) {
             this.onRoundEnd(code, roundResult);
         }
@@ -410,6 +413,7 @@ class GameRoomManager {
                 streak: p.currentStreak,
                 team: p.team,
                 isHost: p.isHost,
+                correctAnswersCount: p.correctAnswersCount,
             };
         });
     }

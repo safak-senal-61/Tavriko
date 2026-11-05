@@ -214,10 +214,17 @@ export default {
 
     const isWs = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
 
-    // Route: Matchmaking WebSocket (/ws/matchmaking or /ws?intent=matchmaking)
+    // Route: Presence, Social Notification Hub & Matchmaking (/ws/presence, /ws/matchmaking, /api/presence, /api/notify, or /ws without roomCode)
     if (
       url.pathname.startsWith('/ws/matchmaking') ||
-      url.searchParams.get('intent') === 'matchmaking'
+      url.pathname.startsWith('/ws/presence') ||
+      url.pathname === '/api/presence' ||
+      url.pathname === '/presence' ||
+      url.pathname === '/api/notify' ||
+      url.pathname === '/notify' ||
+      url.searchParams.get('intent') === 'matchmaking' ||
+      url.searchParams.get('intent') === 'presence' ||
+      (url.pathname === '/ws' && !url.searchParams.has('roomCode'))
     ) {
       const matchmakerId = env.MATCHMAKER.idFromName('global_matchmaker');
       const matchmakerStub = env.MATCHMAKER.get(matchmakerId);

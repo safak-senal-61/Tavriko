@@ -69,6 +69,9 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   const [copied, setCopied] = useState(false);
   const [friendCode, setFriendCode] = useState(user?.friendCode || 'TV-10000');
   const [friendsList, setFriendsList] = useState<FriendRowItem[]>([]);
+  const [sentRequests, setSentRequests] = useState<any[]>([]);
+  const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
+  const [respondingReqId, setRespondingReqId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [challengeLoadingId, setChallengeLoadingId] = useState<string | null>(null);
   const [challengeNotice, setChallengeNotice] = useState<string | null>(null);
@@ -85,10 +88,13 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   const fetchFriends = () => {
     const uid = user?.id || 'default';
     setLoading(true);
+    socketService.requestPresenceSnapshot();
     fetch(`${base}/social/friends/${uid}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.friendCode) setFriendCode(data.friendCode);
+        if (Array.isArray(data.sentRequests)) setSentRequests(data.sentRequests);
+        if (Array.isArray(data.incomingRequests)) setIncomingRequests(data.incomingRequests);
         if (Array.isArray(data.friends)) {
           // Strictly deduplicate users by ID, username, and normalized display name
           const seenIds = new Set<string>();
@@ -105,8 +111,29 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
             .trim();
           if (myNormName) seenNames.add(myNormName);
 
-          // 2. Prioritize friends in-room and online first before deduplicating
-          const sorted = [...data.friends].sort((a, b) => {
+          // 2. ONLY include accepted friends (f.isFriend === true) and merge Cloudflare WS presence
+          const acceptedOnly = data.friends
+            .filter((f: FriendRowItem) => f && f.isFriend !== false)
+            .map((f: FriendRowItem) => {
+              const wsPresence = socketService.getUserPresence(f.id);
+              const isOnline = Boolean(f.online || wsPresence?.online);
+              const inRoom = Boolean(f.inRoom || wsPresence?.inRoom);
+              const currentRoomCode = f.currentRoomCode || wsPresence?.currentRoomCode;
+              let status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
+              if (inRoom && currentRoomCode) {
+                status = `Oda: #${currentRoomCode} · Lobide`;
+              }
+              return {
+                ...f,
+                isFriend: true,
+                online: isOnline,
+                inRoom,
+                currentRoomCode,
+                status,
+              };
+            });
+
+          const sorted = [...acceptedOnly].sort((a, b) => {
             if (a.inRoom !== b.inRoom) return a.inRoom ? -1 : 1;
             if (a.online !== b.online) return a.online ? -1 : 1;
             return (b.xp || 0) - (a.xp || 0);
@@ -138,6 +165,27 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   useEffect(() => {
     fetchFriends();
 
+    const unsubPresenceSnapshot = socketService.on('presence:snapshot', (data: any) => {
+      if (!data || !Array.isArray(data.presences)) return;
+      const onlineMap = new Map<string, any>();
+      for (const p of data.presences) {
+        if (p && p.userId) onlineMap.set(p.userId, p);
+      }
+      setFriendsList((prev) =>
+        prev.map((f) => {
+          const p = onlineMap.get(f.id);
+          const isOnline = p ? Boolean(p.online) : f.online;
+          const inRoom = p ? Boolean(p.inRoom) : f.inRoom;
+          const currentRoomCode = p?.currentRoomCode || f.currentRoomCode;
+          let status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
+          if (inRoom && currentRoomCode) {
+            status = `Oda: #${currentRoomCode} · Lobide`;
+          }
+          return { ...f, online: isOnline, inRoom, currentRoomCode, status };
+        })
+      );
+    });
+
     // Listen to real-time presence events from WebSocket
     const unsubPresenceUpdate = socketService.on('presence:update', (data: any) => {
       if (!data || !data.userId) return;
@@ -147,13 +195,9 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
             const isOnline = data.online ?? f.online;
             const inRoom = data.inRoom ?? f.inRoom;
             const currentRoomCode = data.currentRoomCode ?? f.currentRoomCode;
-            let status = f.status;
+            let status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
             if (inRoom && currentRoomCode) {
               status = `Oda: #${currentRoomCode} · Lobide`;
-            } else if (f.isFriend) {
-              status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
-            } else {
-              status = isOnline ? 'Çevrimiçi' : 'Çevrimdışı';
             }
             return {
               ...f,
@@ -177,7 +221,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
             return {
               ...f,
               online: true,
-              status: f.isFriend ? 'Arkadaşın · Çevrimiçi' : 'Çevrimiçi',
+              status: 'Arkadaşın · Çevrimiçi',
             };
           }
           return f;
@@ -195,7 +239,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
               ...f,
               online: false,
               inRoom: false,
-              status: f.isFriend ? 'Arkadaşın · Çevrimdışı' : 'Çevrimdışı',
+              status: 'Arkadaşın · Çevrimdışı',
             };
           }
           return f;
@@ -207,11 +251,17 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       fetchFriends();
     });
 
+    const unsubNewNotif = socketService.on('notification:new', () => {
+      fetchFriends();
+    });
+
     return () => {
+      unsubPresenceSnapshot();
       unsubPresenceUpdate();
       unsubUserOnline();
       unsubUserOffline();
       unsubFriendsUpdate();
+      unsubNewNotif();
     };
   }, [apiBaseUrl, user?.id]);
   const currentCode = user?.friendCode || friendCode;
@@ -275,11 +325,17 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Arkadaş eklenemedi.');
+        throw new Error(data.error || 'Arkadaşlık isteği gönderilemedi.');
       }
-      sound.playSound('victory');
+      sound.playSound('reward');
       sound.triggerHaptic('success');
-      setAddSuccessMsg(`🎉 ${data.friend?.displayName || clean} başarıyla arkadaş listene eklendi!`);
+      if (data.friend?.id && data.notification) {
+        socketService.notifyUserRealtime(data.friend.id, 'notification:new', data.notification);
+      }
+      setAddSuccessMsg(
+        data.message ||
+          `📨 ${data.friend?.displayName || clean} oyuncusuna arkadaşlık isteği gönderildi! Kabul ettiğinde Arkadaşlarım listende görünecek.`
+      );
       setAddInput('');
       fetchFriends();
     } catch (err: any) {
@@ -287,6 +343,43 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       setAddErrorMsg(err.message || 'Kullanıcı bulunamadı.');
     } finally {
       setAddLoading(false);
+    }
+  };
+
+  const handleRespondIncomingRequest = async (req: any, action: 'accept' | 'decline') => {
+    if (!user) return;
+    sound.playSound(action === 'accept' ? 'reward' : 'tap');
+    sound.triggerHaptic(action === 'accept' ? 'success' : 'light');
+    setRespondingReqId(req.id);
+    try {
+      const res = await fetch(`${base}/social/notifications/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          notificationId: req.id,
+          action,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (action === 'accept') {
+          if (req.type === 'match_invite' || req.type === 'duel') {
+            const targetRoom = data.roomCode || req.roomCode || 'DUEL1';
+            if (onJoinFriendRoom) onJoinFriendRoom(targetRoom);
+            return;
+          }
+          if (req.senderId) {
+            socketService.notifyUserRealtime(req.senderId, 'friends:update', { friendId: user.id });
+            if (data.senderNotification) {
+              socketService.notifyUserRealtime(req.senderId, 'notification:new', data.senderNotification);
+            }
+          }
+        }
+        fetchFriends();
+      }
+    } catch {} finally {
+      setRespondingReqId(null);
     }
   };
 
@@ -315,6 +408,9 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       if (res.ok && data.success) {
         sound.playSound('reward');
         sound.triggerHaptic('success');
+        if (data.notification) {
+          socketService.notifyUserRealtime(friend.id, 'notification:new', data.notification);
+        }
         setChallengeNotice(`⚔️ ${friend.displayName || friend.name} oyuncusuna 1v1 düello daveti gönderildi! Odaya aktarılıyorsunuz...`);
         setTimeout(() => {
           onInviteToMatch(friend.id, friend.displayName || friend.name, data.roomCode);
@@ -390,7 +486,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
               setActiveTab('friends');
             }}
           >
-            <Text style={styles.tabText}>Oyuncular ({friendsList.length})</Text>
+            <Text style={styles.tabText}>Arkadaşlarım ({friendsList.length})</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
@@ -416,10 +512,12 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
               setActiveTab('requests');
             }}
           >
-            <Text style={styles.tabText}>Düello Davetleri</Text>
+            <Text style={styles.tabText}>
+              İstekler {incomingRequests.length > 0 ? `(${incomingRequests.length})` : ''}
+            </Text>
           </TouchableOpacity>
         </View>
-        {/* Tab 1: Friends List */}
+        {/* Tab 1: Friends List (ONLY ACCEPTED FRIENDS) */}
         {activeTab === 'friends' && (
           loading ? (
             <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 28 }} />
@@ -427,10 +525,10 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
             <View style={styles.emptyStateBox}>
               <Text style={styles.emptyStateTitle}>Henüz ekli arkadaşın yok</Text>
               <Text style={styles.emptyStateSub}>
-                "Arkadaş Ekle" sekmesinden kodunu girerek arkadaşını ekle veya kodunu paylaş!
+                "+ Arkadaş Ekle" sekmesinden arkadaşlık isteği gönder! Karşı taraf Bildirimler veya İstekler kısmından kabul ettiğinde burada görünecek.
               </Text>
               <Button3D
-                title="ARKADAŞ EKLE"
+                title="+ ARKADAŞLIK İSTEĞİ GÖNDER"
                 variant="gold"
                 onPress={() => setActiveTab('add')}
                 style={{ marginTop: 14 }}
@@ -451,7 +549,12 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     <View
                       style={[
                         styles.statusDot,
-                        { backgroundColor: f.online ? '#3FD08A' : '#6B6288' },
+                        {
+                          backgroundColor: f.online ? '#3FD08A' : '#6B6288',
+                          shadowColor: f.online ? '#3FD08A' : 'transparent',
+                          shadowOpacity: f.online ? 0.9 : 0,
+                          shadowRadius: f.online ? 6 : 0,
+                        },
                       ]}
                     />
                   </View>
@@ -460,17 +563,22 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                       <Text style={styles.friendName} numberOfLines={1}>
                         {playerName}
                       </Text>
-                      {f.isFriend && (
-                        <View style={styles.friendBadge}>
-                          <Text style={styles.friendBadgeText}>Arkadaş</Text>
-                        </View>
-                      )}
+                      <View style={styles.friendBadge}>
+                        <Text style={styles.friendBadgeText}>Arkadaş</Text>
+                      </View>
                     </View>
                     <Text style={styles.friendStatus} numberOfLines={1}>
                       Seviye {f.level} · {f.rankTitle}
                     </Text>
-                    <Text style={styles.friendSubStatus} numberOfLines={1}>
-                      {f.status || (f.online ? 'Çevrimiçi' : 'Çevrimdışı')} · Profili Gör →
+                    <Text
+                      style={[
+                        styles.friendSubStatus,
+                        f.online && { color: '#3FD08A', fontFamily: THEME.fonts.bold },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {f.online ? '● Çevrimiçi' : '○ Çevrimdışı'}
+                      {f.inRoom && f.currentRoomCode ? ` · Oda #${f.currentRoomCode}` : ''} · Profili Gör →
                     </Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -502,61 +610,126 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         )}
         {/* Tab 2: Add Friend Form */}
         {activeTab === 'add' && (
-          <View style={styles.addCard}>
-            <Text style={styles.addCardTitle}>YENİ ARKADAŞ EKLE</Text>
-            <Text style={styles.addCardSub}>
-              Arkadaşının 7 haneli kodunu (Örn: TV-UB1AY94) veya kullanıcı adını girerek 1v1 düello maçlarına davet et.
-            </Text>
-            <View style={styles.inputWrap}>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Örn: TV-UB1AY94 veya DenizPro"
-                placeholderTextColor="rgba(217, 205, 245, 0.45)"
-                value={addInput}
-                onChangeText={(t) => {
-                  setAddInput(t);
-                  setAddErrorMsg(null);
-                  setAddSuccessMsg(null);
-                }}
-                autoCapitalize="characters"
-                autoCorrect={false}
+          <View>
+            <View style={styles.addCard}>
+              <Text style={styles.addCardTitle}>ARKADAŞLIK İSTEĞİ GÖNDER</Text>
+              <Text style={styles.addCardSub}>
+                Arkadaşının 7 haneli kodunu (Örn: TV-UB1AY94) veya kullanıcı adını girerek arkadaşlık isteği gönder. Karşı taraf Bildirimler kısmından kabul ettiğinde arkadaş listene eklenir.
+              </Text>
+              <View style={styles.inputWrap}>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Örn: TV-UB1AY94 veya kullanıcı adı"
+                  placeholderTextColor="rgba(217, 205, 245, 0.45)"
+                  value={addInput}
+                  onChangeText={(t) => {
+                    setAddInput(t);
+                    setAddErrorMsg(null);
+                    setAddSuccessMsg(null);
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+              {addErrorMsg && (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorText}>⚠️ {addErrorMsg}</Text>
+                </View>
+              )}
+              {addSuccessMsg && (
+                <View style={styles.successBox}>
+                  <Text style={styles.successText}>{addSuccessMsg}</Text>
+                </View>
+              )}
+              <Button3D
+                title={addLoading ? 'GÖNDERİLİYOR...' : 'ARKADAŞLIK İSTEĞİ GÖNDER'}
+                variant="mint"
+                disabled={addLoading}
+                onPress={handleAddFriend}
+                style={{ marginTop: 14 }}
               />
             </View>
-            {addErrorMsg && (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>⚠️ {addErrorMsg}</Text>
+
+            {sentRequests.length > 0 && (
+              <View style={{ marginTop: 18 }}>
+                <Text
+                  style={{
+                    color: '#FFC43D',
+                    fontFamily: THEME.fonts.extraBold,
+                    fontSize: 13,
+                    marginBottom: 10,
+                    letterSpacing: 0.6,
+                  }}
+                >
+                  ⏳ GÖNDERİLEN BEKLEYEN İSTEKLER ({sentRequests.length})
+                </Text>
+                {sentRequests.map((sr) => (
+                  <View key={sr.id} style={styles.friendRow}>
+                    <View style={styles.avatarWrap}>
+                      <CharacterAvatar seed={sr.targetAvatar || sr.targetName} size={44} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.friendName}>{sr.targetName}</Text>
+                      <Text style={[styles.friendSubStatus, { color: '#FFC43D' }]}>
+                        Onay Bekliyor · Karşı taraf kabul ettiğinde eklenecek
+                      </Text>
+                    </View>
+                  </View>
+                ))}
               </View>
             )}
-            {addSuccessMsg && (
-              <View style={styles.successBox}>
-                <Text style={styles.successText}>{addSuccessMsg}</Text>
-              </View>
-            )}
-            <Button3D
-              title={addLoading ? 'EKLENİYOR...' : 'ARKADAŞI LİSTEYE EKLE'}
-              variant="mint"
-              disabled={addLoading}
-              onPress={handleAddFriend}
-              style={{ marginTop: 14 }}
-            />
           </View>
         )}
-        {/* Tab 3: Duel Invitations */}
+        {/* Tab 3: Incoming Friend Requests & Duel Invitations */}
         {activeTab === 'requests' && (
-          <View style={styles.emptyStateBox}>
-            <Text style={styles.emptyStateTitle}>Düello & Arkadaşlık Bildirimleri</Text>
-            <Text style={styles.emptyStateSub}>
-              Gelen tüm 1v1 düello meydan okumaları ve arkadaşlık talepleri Bildirimler sayfasında anlık olarak listelenir ve kabul/reddedilebilir.
-            </Text>
-            <Button3D
-              title="BİLDİRİMLERİ AÇ"
-              variant="mint"
-              onPress={() => {
-                sound.playSound('tap');
-                if (onNotifications) onNotifications();
-              }}
-              style={{ marginTop: 14, minWidth: 200 }}
-            />
+          <View>
+            {incomingRequests.length > 0 ? (
+              incomingRequests.map((req) => (
+                <View key={req.id} style={[styles.friendRow, { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <CharacterAvatar seed={req.senderAvatar || req.senderName || 'av2'} size={46} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.friendName}>{req.title}</Text>
+                      <Text style={styles.friendStatus}>{req.sub}</Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <Button3D
+                      title={respondingReqId === req.id ? '...' : '✓ KABUL ET'}
+                      variant="mint"
+                      disabled={respondingReqId === req.id}
+                      onPress={() => handleRespondIncomingRequest(req, 'accept')}
+                      style={{ flex: 1, minHeight: 40 }}
+                      textStyle={{ fontSize: 13 }}
+                    />
+                    <Button3D
+                      title="✕ REDDET"
+                      variant="purple"
+                      disabled={respondingReqId === req.id}
+                      onPress={() => handleRespondIncomingRequest(req, 'decline')}
+                      style={{ flex: 1, minHeight: 40 }}
+                      textStyle={{ fontSize: 13 }}
+                    />
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyStateBox}>
+                <Text style={styles.emptyStateTitle}>Bekleyen İstek veya Davet Yok</Text>
+                <Text style={styles.emptyStateSub}>
+                  Gelen arkadaşlık istekleri ve 1v1 düello meydan okumaları hem burada hem de Bildirimler sayfasında anlık olarak listelenir.
+                </Text>
+                <Button3D
+                  title="TÜM BİLDİRİMLERİ AÇ"
+                  variant="mint"
+                  onPress={() => {
+                    sound.playSound('tap');
+                    if (onNotifications) onNotifications();
+                  }}
+                  style={{ marginTop: 14, minWidth: 200 }}
+                />
+              </View>
+            )}
           </View>
         )}
       </ScrollView>

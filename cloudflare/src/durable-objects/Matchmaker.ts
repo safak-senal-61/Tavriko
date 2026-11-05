@@ -23,14 +23,26 @@ interface QueueEntry {
   status: 'searching' | 'matched' | 'cancelled';
 }
 
+interface PresenceEntry {
+  userId: string;
+  username: string;
+  displayName: string;
+  avatarUrl?: string;
+  online: boolean;
+  inRoom: boolean;
+  currentRoomCode?: string;
+  lastSeen: number;
+}
+
 export class MatchmakerDO extends DurableObject<Env> {
   private queue: Map<string, QueueEntry> = new Map();
+  private presences: Map<string, PresenceEntry> = new Map();
   private rateLimiters = new WeakMap<WebSocket, RateLimiter>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
-    // Restore persisted queue entries from storage
+    // Restore persisted queue entries & rebuild active socket presences
     this.ctx.blockConcurrencyWhile(async () => {
       const stored = await this.ctx.storage.get<Record<string, QueueEntry>>('match_queue');
       if (stored) {
@@ -41,17 +53,130 @@ export class MatchmakerDO extends DurableObject<Env> {
           }
         }
       }
+
+      // Rebuild presence map from currently hibernated/open WebSockets
+      for (const ws of this.ctx.getWebSockets()) {
+        try {
+          const att = ws.deserializeAttachment() as any;
+          if (att && att.playerId) {
+            this.presences.set(att.playerId, {
+              userId: att.playerId,
+              username: att.username || att.playerId,
+              displayName: att.displayName || att.username || 'Oyuncu',
+              avatarUrl: att.avatarUrl,
+              online: true,
+              inRoom: Boolean(att.inRoom),
+              currentRoomCode: att.currentRoomCode,
+              lastSeen: Date.now(),
+            });
+          }
+        } catch {}
+      }
     });
+  }
+
+  private getOnlinePresenceSnapshot(): PresenceEntry[] {
+    const activePlayerIds = new Set<string>();
+    for (const ws of this.ctx.getWebSockets()) {
+      try {
+        const att = ws.deserializeAttachment() as any;
+        if (att && att.playerId) {
+          activePlayerIds.add(att.playerId);
+          if (!this.presences.has(att.playerId)) {
+            this.presences.set(att.playerId, {
+              userId: att.playerId,
+              username: att.username || att.playerId,
+              displayName: att.displayName || att.username || 'Oyuncu',
+              avatarUrl: att.avatarUrl,
+              online: true,
+              inRoom: Boolean(att.inRoom),
+              currentRoomCode: att.currentRoomCode,
+              lastSeen: Date.now(),
+            });
+          } else {
+            const p = this.presences.get(att.playerId)!;
+            p.online = true;
+          }
+        }
+      } catch {}
+    }
+
+    const result: PresenceEntry[] = [];
+    for (const [uid, p] of this.presences.entries()) {
+      if (activePlayerIds.has(uid) || (p.online && Date.now() - p.lastSeen < 60000)) {
+        result.push({ ...p, online: true });
+      }
+    }
+    return result;
+  }
+
+  private broadcastToAll(event: string, payload: unknown): void {
+    const msg = encodeWsMessage(event, payload);
+    for (const ws of this.ctx.getWebSockets()) {
+      try {
+        ws.send(msg);
+      } catch {}
+    }
+  }
+
+  private sendToUser(targetUserId: string, event: string, payload: unknown): number {
+    const msg = encodeWsMessage(event, payload);
+    const sockets = this.ctx.getWebSockets(`player:${targetUserId}`);
+    let sent = 0;
+    for (const ws of sockets) {
+      try {
+        ws.send(msg);
+        sent++;
+      } catch {}
+    }
+    return sent;
   }
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname === '/queue-status' || request.method === 'GET' && !request.headers.get('Upgrade')) {
+    // HTTP POST /notify or /api/notify -> Relay real-time event to target user's WebSocket
+    if (
+      (url.pathname === '/notify' || url.pathname === '/api/notify') &&
+      request.method === 'POST'
+    ) {
+      try {
+        const body: any = await request.json();
+        const { targetUserId, event, data } = body || {};
+        if (targetUserId && event) {
+          const delivered = this.sendToUser(targetUserId, event, data);
+          return new Response(
+            JSON.stringify({ success: true, delivered }),
+            { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+          );
+        }
+        return new Response(
+          JSON.stringify({ success: false, error: 'Missing targetUserId or event' }),
+          { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+        );
+      } catch (e: any) {
+        return new Response(
+          JSON.stringify({ success: false, error: e.message }),
+          { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+        );
+      }
+    }
+
+    // HTTP GET /presence or /api/presence -> Return online users snapshot
+    if (
+      url.pathname === '/presence' ||
+      url.pathname === '/api/presence' ||
+      url.pathname === '/queue-status' ||
+      (request.method === 'GET' && !request.headers.get('Upgrade'))
+    ) {
+      const onlineList = this.getOnlinePresenceSnapshot();
       return new Response(
         JSON.stringify({
+          success: true,
           queuedCount: this.queue.size,
           activeSockets: this.ctx.getWebSockets().length,
+          onlineUserIds: onlineList.map((p) => p.userId),
+          presences: onlineList,
           entries: Array.from(this.queue.values()).map((e) => ({
             playerId: e.playerId,
             mode: e.mode,
@@ -60,7 +185,7 @@ export class MatchmakerDO extends DurableObject<Env> {
             waitTimeMs: Date.now() - e.queuedAt,
           })),
         }),
-        { headers: { 'Content-Type': 'application/json' } }
+        { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
       );
     }
 
@@ -79,6 +204,9 @@ export class MatchmakerDO extends DurableObject<Env> {
     const mode = (url.searchParams.get('mode') as GameMode) || 'duel';
     const category = (url.searchParams.get('category') as CategoryId) || 'general_culture';
     const difficulty = (url.searchParams.get('difficulty') as DifficultyLevel) || 'medium';
+    const isMatchmakingIntent =
+      url.pathname.startsWith('/ws/matchmaking') ||
+      url.searchParams.get('intent') === 'matchmaking';
 
     let authUser: AuthUser | undefined;
     if (token) {
@@ -98,16 +226,19 @@ export class MatchmakerDO extends DurableObject<Env> {
         avatarUrl: rawAvatarUrl || 'av1',
         isGuest: true,
       };
+    } else if (rawPlayerId && authUser.id !== rawPlayerId) {
+      // Ensure client-side playerId is also tagged if different
+      authUser.id = rawPlayerId;
     }
 
     // Accept WebSocket into hibernation
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
 
-    const tags = [`player:${authUser.id}`, 'matchmaker'];
+    const tags = [`player:${authUser.id}`, isMatchmakingIntent ? 'matchmaker' : 'presence'];
     this.ctx.acceptWebSocket(server, tags);
 
-    const attachment: QueueEntry = {
+    const attachment: QueueEntry & { inRoom?: boolean; currentRoomCode?: string } = {
       matchId: 'match_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
       playerId: authUser.id,
       username: authUser.username,
@@ -117,12 +248,42 @@ export class MatchmakerDO extends DurableObject<Env> {
       category,
       difficulty,
       queuedAt: Date.now(),
-      status: 'searching',
+      status: isMatchmakingIntent ? 'searching' : 'cancelled',
+      inRoom: false,
     };
     server.serializeAttachment(attachment);
 
-    // Auto-enqueue the player upon connection
-    await this.enqueuePlayer(attachment);
+    // Mark user online in global presence registry and broadcast green dot
+    const presenceEntry: PresenceEntry = {
+      userId: authUser.id,
+      username: authUser.username,
+      displayName: authUser.displayName || authUser.username,
+      avatarUrl: authUser.avatarUrl,
+      online: true,
+      inRoom: false,
+      lastSeen: Date.now(),
+    };
+    this.presences.set(authUser.id, presenceEntry);
+
+    // Send full snapshot of currently online users to the newly connected client
+    try {
+      const snapshot = this.getOnlinePresenceSnapshot();
+      server.send(
+        encodeWsMessage('presence:snapshot', {
+          onlineUserIds: snapshot.map((p) => p.userId),
+          presences: snapshot,
+        })
+      );
+    } catch {}
+
+    // Broadcast this user's online status to everyone
+    this.broadcastToAll('presence:update', presenceEntry);
+    this.broadcastToAll('user:online', { userId: authUser.id, presence: presenceEntry });
+
+    // Only auto-enqueue into 1v1 matchmaking if explicitly requested
+    if (isMatchmakingIntent) {
+      await this.enqueuePlayer(attachment);
+    }
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -130,7 +291,7 @@ export class MatchmakerDO extends DurableObject<Env> {
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     let limiter = this.rateLimiters.get(ws);
     if (!limiter) {
-      limiter = new RateLimiter(15, 1000);
+      limiter = new RateLimiter(30, 1000);
       this.rateLimiters.set(ws, limiter);
     }
     if (!limiter.check()) {
@@ -141,7 +302,7 @@ export class MatchmakerDO extends DurableObject<Env> {
     const envelope = decodeWsMessage(message);
     if (!envelope) return;
 
-    const attachment = ws.deserializeAttachment() as QueueEntry | null;
+    const attachment = ws.deserializeAttachment() as (QueueEntry & { inRoom?: boolean; currentRoomCode?: string }) | null;
     if (!attachment || !attachment.playerId) return;
 
     switch (envelope.event) {
@@ -149,9 +310,6 @@ export class MatchmakerDO extends DurableObject<Env> {
         const payload = envelope.payload || {};
         const updatedEntry: QueueEntry = {
           ...attachment,
-          // Avatar may have been sanitized in the upgrade URL (big data URIs
-          // break the WebSocket handshake); the FIND_MATCH envelope always
-          // carries the real (compressed) value, so refresh it here
           avatarUrl: payload.avatarUrl || attachment.avatarUrl,
           matchId: 'match_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
           mode: payload.mode || attachment.mode || 'duel',
@@ -170,6 +328,53 @@ export class MatchmakerDO extends DurableObject<Env> {
         ws.send(encodeWsMessage(SOCKET_EVENTS.CANCEL_MATCH, { success: true }));
         break;
 
+      case 'presence:ping':
+      case 'presence:update': {
+        const payload = envelope.payload || {};
+        const uid = payload.userId || attachment.playerId;
+        const isOnline = payload.online !== undefined ? Boolean(payload.online) : true;
+        const inRoom = payload.inRoom !== undefined ? Boolean(payload.inRoom) : Boolean(attachment.inRoom);
+        const currentRoomCode = payload.currentRoomCode !== undefined ? payload.currentRoomCode : attachment.currentRoomCode;
+
+        attachment.inRoom = inRoom;
+        attachment.currentRoomCode = currentRoomCode;
+        ws.serializeAttachment(attachment);
+
+        const updatedPresence: PresenceEntry = {
+          userId: uid,
+          username: attachment.username,
+          displayName: attachment.displayName,
+          avatarUrl: attachment.avatarUrl,
+          online: isOnline,
+          inRoom,
+          currentRoomCode,
+          lastSeen: Date.now(),
+        };
+        this.presences.set(uid, updatedPresence);
+        this.broadcastToAll('presence:update', updatedPresence);
+        break;
+      }
+
+      case 'presence:query': {
+        const snapshot = this.getOnlinePresenceSnapshot();
+        ws.send(
+          encodeWsMessage('presence:snapshot', {
+            onlineUserIds: snapshot.map((p) => p.userId),
+            presences: snapshot,
+          })
+        );
+        break;
+      }
+
+      case 'social:notify': {
+        const payload = envelope.payload || {};
+        const { targetUserId, targetEvent, data } = payload;
+        if (targetUserId && targetEvent) {
+          this.sendToUser(targetUserId, targetEvent, data);
+        }
+        break;
+      }
+
       case 'ping':
         ws.send(JSON.stringify({ event: 'pong', timestamp: Date.now() }));
         break;
@@ -180,6 +385,25 @@ export class MatchmakerDO extends DurableObject<Env> {
     const attachment = ws.deserializeAttachment() as QueueEntry | null;
     if (attachment && attachment.playerId) {
       await this.dequeuePlayer(attachment.playerId);
+
+      // Check if user still has another open WebSocket before marking offline
+      const remainingSockets = this.ctx.getWebSockets(`player:${attachment.playerId}`).filter((s) => s !== ws);
+      if (remainingSockets.length === 0) {
+        const existing = this.presences.get(attachment.playerId);
+        const offlinePresence: PresenceEntry = {
+          userId: attachment.playerId,
+          username: existing?.username || attachment.username,
+          displayName: existing?.displayName || attachment.displayName,
+          avatarUrl: existing?.avatarUrl || attachment.avatarUrl,
+          online: false,
+          inRoom: false,
+          currentRoomCode: undefined,
+          lastSeen: Date.now(),
+        };
+        this.presences.set(attachment.playerId, offlinePresence);
+        this.broadcastToAll('presence:update', offlinePresence);
+        this.broadcastToAll('user:offline', { userId: attachment.playerId, presence: offlinePresence });
+      }
     }
   }
 

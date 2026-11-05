@@ -329,16 +329,31 @@ export const RootNavigator: React.FC = () => {
     }
 
     socketService.setAuthToken(token);
+    socketService.connectPresence(user.id, user.displayName, user.avatarUrl);
     const playerQuery = `playerId=${encodeURIComponent(user.id)}&displayName=${encodeURIComponent(user.displayName)}`;
     socketService.connect(
       getRealtimeWsUrl(
-        `/ws?${playerQuery}${
+        `/ws?intent=presence&${playerQuery}${
           token && !token.startsWith('mock') && !token.startsWith('guest_local')
             ? `&token=${encodeURIComponent(token)}`
             : `&avatarUrl=${encodeURIComponent(sanitizeAvatarForUrl(user.avatarUrl))}`
         }`
       )
     );
+
+    const sendBackendHeartbeat = () => {
+      if (!user?.id) return;
+      fetch(`${API_BASE}/social/presence/heartbeat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          inRoom: Boolean(activeRoomRef.current?.code),
+          roomCode: activeRoomRef.current?.code || null,
+        }),
+      }).catch(() => {});
+    };
+    sendBackendHeartbeat();
 
     const unsubSync = socketService.onStateSync((room: GameRoom) => {
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
@@ -543,14 +558,27 @@ export const RootNavigator: React.FC = () => {
       sound.triggerHaptic('success');
       if (notif.type === 'match_invite' || notif.type === 'duel') {
         setAuthRedirectNotice(`⚔️ ${notif.title}\n${notif.sub}`);
+      } else if (notif.type === 'friend_request') {
+        setAuthRedirectNotice(`👥 ${notif.title}\nBildirimler sayfasından isteği kabul edebilirsin.`);
       }
+      refreshUserProfile();
+    });
+
+    const unsubFriendsSync = socketService.on('friends:update', () => {
+      refreshUserProfile();
     });
 
     const heartbeatInterval = setInterval(() => {
-      if (socketService.isConnected() && user?.id) {
-        socketService.sendEnvelope('presence:ping', { playerId: user.id });
+      if (user?.id) {
+        socketService.sendPresenceEnvelope('presence:ping', {
+          userId: user.id,
+          online: true,
+          inRoom: Boolean(activeRoomRef.current?.code),
+          currentRoomCode: activeRoomRef.current?.code,
+        });
+        sendBackendHeartbeat();
       }
-    }, 25000);
+    }, 20000);
 
     return () => {
       unsubSync();
@@ -560,6 +588,7 @@ export const RootNavigator: React.FC = () => {
       unsubMatchFound();
       unsubPlayerAnswered();
       unsubNotif();
+      unsubFriendsSync();
       clearInterval(heartbeatInterval);
     };
   }, [user?.id, user?.displayName, user?.avatarUrl, token, isGuest, scheduleGameTimeout]);
@@ -892,6 +921,11 @@ export const RootNavigator: React.FC = () => {
     isDaily: boolean = false
   ) => {
     isGameActiveRef.current = true;
+    activeRoomRef.current = null;
+    setActiveRoom(null);
+    setDuelOpponent(null);
+    setOpponentHasAnswered(false);
+    setMultiplayerFeedback(null);
     if (!isDaily) setActiveDailyConfig(null);
     setSelectedCategory(category);
     setSelectedDifficulty(difficulty);
@@ -1654,37 +1688,8 @@ export const RootNavigator: React.FC = () => {
                   }
                   return mapped;
                 }
-                const localRacers = [
-                  {
-                    id: user?.id || 'me',
-                    displayName: user?.displayName || 'Sen',
-                    avatarUrl: user?.avatarUrl,
-                    score: practiceStats.totalScore,
-                    correctAnswers: practiceStats.correctAnswers,
-                    isMe: true,
-                    hasAnswered: selectedOptionId !== null,
-                    lastAnswer: practiceFeedback
-                      ? {
-                          isCorrect: practiceFeedback.isCorrect,
-                          pointsEarned: practiceFeedback.pointsAwarded,
-                          speedBonus: practiceFeedback.speedBonus,
-                        }
-                      : undefined,
-                  },
-                ];
-                if (duelOpponent) {
-                  localRacers.push({
-                    id: duelOpponent.id,
-                    displayName: duelOpponent.displayName,
-                    avatarUrl: duelOpponent.avatarUrl,
-                    score: (duelOpponent as any).score || 0,
-                    correctAnswers: 0,
-                    isMe: false,
-                    hasAnswered: opponentHasAnswered,
-                    lastAnswer: undefined,
-                  });
-                }
-                return localRacers;
+                // Tek kişilik oyunda (Keşfet / Günlük Görev) yarış barı kesinlikle gösterilmez
+                return [];
               })()}
             />
             {/* Practice / Guest End of Game Summary Modal */}

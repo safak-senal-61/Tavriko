@@ -2339,12 +2339,14 @@ class PrismaService {
         if (me?.displayName) {
             seenNormalizedNames.add(normalizeName(me.displayName));
         }
-        // Build unique user pool from memory store
+        // Build unique user pool from memory store — ONLY ACCEPTED FRIENDS
         const uniqueUsers = [];
         for (const u of this.users.values()) {
+            if (!u || !u.id || !explicitFriendIds.has(u.id))
+                continue;
             const uName = (u?.username || '').toLowerCase().trim();
             const dName = normalizeName(u?.displayName || u?.username);
-            if (u && u.id && !seenUserIds.has(u.id) && (!uName || !seenUsernames.has(uName)) && (!dName || !seenNormalizedNames.has(dName))) {
+            if (!seenUserIds.has(u.id) && (!uName || !seenUsernames.has(uName)) && (!dName || !seenNormalizedNames.has(dName))) {
                 seenUserIds.add(u.id);
                 if (uName)
                     seenUsernames.add(uName);
@@ -2357,21 +2359,18 @@ class PrismaService {
         for (const u of uniqueUsers) {
             if (u.isGuest)
                 continue;
-            const isFriend = explicitFriendIds.has(u.id);
+            const isFriend = true;
             const prog = (0, shared_1.calculateLevelFromXp)(u.xp || 0);
             const presence = presenceManager_1.presenceManager.getUserPresence(u.id);
             const isOnline = presence.online;
             const inRoom = presence.inRoom;
             const currentRoomCode = presence.currentRoomCode;
-            let status = 'Çevrimdışı';
+            let status = 'Arkadaşın · Çevrimdışı';
             if (inRoom && currentRoomCode) {
                 status = `Oda: #${currentRoomCode} · Lobide`;
             }
-            else if (isFriend) {
-                status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
-            }
-            else {
-                status = isOnline ? 'Çevrimiçi' : 'Çevrimdışı';
+            else if (isOnline) {
+                status = 'Arkadaşın · Çevrimiçi';
             }
             friendsResult.push({
                 id: u.id,
@@ -2396,34 +2395,33 @@ class PrismaService {
                 currentRoomCode,
             });
         }
-        // Sort: Friends first, then by inRoom, then online, then XP
+        // Sort: by inRoom, then online, then XP
         friendsResult.sort((a, b) => {
-            if (a.isFriend !== b.isFriend)
-                return a.isFriend ? -1 : 1;
             if (a.inRoom !== b.inRoom)
                 return a.inRoom ? -1 : 1;
             if (a.online !== b.online)
                 return a.online ? -1 : 1;
             return (b.xp || 0) - (a.xp || 0);
         });
-        return { friendCode, friends: friendsResult };
+        const incomingRequests = (me?.notifications || []).filter((n) => (n.type === 'friend_request' || n.type === 'match_invite') && !n.handled);
+        return { friendCode, friends: friendsResult, sentRequests: [], incomingRequests };
     }
     async getFriendsForUserAsync(userId) {
         let me = this.users.get(userId);
-        if (!me) {
-            try {
-                const dbMe = await this.rawClient.user.findFirst({
-                    where: { OR: [{ id: userId }, { username: userId }] },
-                });
-                if (dbMe) {
-                    me = this.prismaUserToRecord(dbMe);
-                    this.users.set(me.id, me);
-                }
+        try {
+            const dbMe = await this.rawClient.user.findFirst({
+                where: { OR: [{ id: userId }, { username: userId }] },
+            });
+            if (dbMe) {
+                me = this.prismaUserToRecord(dbMe);
+                this.users.set(me.id, me);
             }
-            catch { }
         }
-        const friendCode = me?.friendCode || this.generateFriendCode(userId);
-        const explicitFriendIds = new Set(Array.isArray(me?.friendIds) ? me.friendIds : []);
+        catch { }
+        const myId = me?.id || userId;
+        const friendCode = me?.friendCode || this.generateFriendCode(myId);
+        const explicitFriendIdsArray = Array.isArray(me?.friendIds) ? me.friendIds.filter(Boolean) : [];
+        const explicitFriendIds = new Set(explicitFriendIdsArray);
         const seenUserIds = new Set();
         const seenUsernames = new Set();
         const seenNormalizedNames = new Set();
@@ -2442,36 +2440,39 @@ class PrismaService {
             seenNormalizedNames.add(normalizeName(me.displayName));
         }
         const uniqueUsersMap = new Map();
-        // 1. Fetch real registered users from PostgreSQL database
-        try {
-            const dbUsers = await this.rawClient.user.findMany({
-                where: { id: { not: me?.id || userId } },
-                orderBy: { xp: 'desc' },
-                take: 50,
-            });
-            for (const dbu of dbUsers) {
-                const uName = (dbu.username || '').toLowerCase().trim();
-                const dName = normalizeName(dbu.displayName || dbu.username);
-                if (!seenUserIds.has(dbu.id) && (!uName || !seenUsernames.has(uName)) && (!dName || !seenNormalizedNames.has(dName))) {
-                    seenUserIds.add(dbu.id);
-                    if (uName)
-                        seenUsernames.add(uName);
-                    if (dName)
-                        seenNormalizedNames.add(dName);
-                    const rec = this.prismaUserToRecord(dbu);
-                    uniqueUsersMap.set(rec.id, rec);
-                    this.users.set(rec.id, rec);
+        // 1. Fetch ONLY accepted friends from PostgreSQL database
+        if (explicitFriendIdsArray.length > 0) {
+            try {
+                const dbFriends = await this.rawClient.user.findMany({
+                    where: { id: { in: explicitFriendIdsArray } },
+                    orderBy: { xp: 'desc' },
+                });
+                for (const dbu of dbFriends) {
+                    const uName = (dbu.username || '').toLowerCase().trim();
+                    const dName = normalizeName(dbu.displayName || dbu.username);
+                    if (!seenUserIds.has(dbu.id) && (!uName || !seenUsernames.has(uName)) && (!dName || !seenNormalizedNames.has(dName))) {
+                        seenUserIds.add(dbu.id);
+                        if (uName)
+                            seenUsernames.add(uName);
+                        if (dName)
+                            seenNormalizedNames.add(dName);
+                        const rec = this.prismaUserToRecord(dbu);
+                        uniqueUsersMap.set(rec.id, rec);
+                        this.users.set(rec.id, rec);
+                    }
                 }
             }
+            catch (err) {
+                console.warn('[getFriendsForUserAsync] DB query warning:', err.message);
+            }
         }
-        catch (err) {
-            console.warn('[getFriendsForUserAsync] DB query warning:', err.message);
-        }
-        // 2. Merge any memory store users not yet in DB map
+        // 2. Merge any memory store accepted friends not yet in DB map
         for (const u of this.users.values()) {
+            if (!u || !u.id || !explicitFriendIds.has(u.id))
+                continue;
             const uName = (u?.username || '').toLowerCase().trim();
             const dName = normalizeName(u?.displayName || u?.username);
-            if (u && u.id && !seenUserIds.has(u.id) && (!uName || !seenUsernames.has(uName)) && (!dName || !seenNormalizedNames.has(dName)) && !u.isGuest) {
+            if (!seenUserIds.has(u.id) && (!uName || !seenUsernames.has(uName)) && (!dName || !seenNormalizedNames.has(dName)) && !u.isGuest) {
                 seenUserIds.add(u.id);
                 if (uName)
                     seenUsernames.add(uName);
@@ -2482,22 +2483,21 @@ class PrismaService {
         }
         const friendsResult = [];
         for (const u of uniqueUsersMap.values()) {
-            const isFriend = explicitFriendIds.has(u.id);
+            if (!explicitFriendIds.has(u.id))
+                continue;
+            const isFriend = true;
             const prog = (0, shared_1.calculateLevelFromXp)(u.xp || 0);
             // REAL-TIME WEBSOCKET PRESENCE
             const presence = presenceManager_1.presenceManager.getUserPresence(u.id);
             const isOnline = presence.online;
             const inRoom = presence.inRoom;
             const currentRoomCode = presence.currentRoomCode;
-            let status = 'Çevrimdışı';
+            let status = 'Arkadaşın · Çevrimdışı';
             if (inRoom && currentRoomCode) {
                 status = `Oda: #${currentRoomCode} · Lobide`;
             }
-            else if (isFriend) {
-                status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
-            }
-            else {
-                status = isOnline ? 'Çevrimiçi' : 'Çevrimdışı';
+            else if (isOnline) {
+                status = 'Arkadaşın · Çevrimiçi';
             }
             friendsResult.push({
                 id: u.id,
@@ -2522,53 +2522,115 @@ class PrismaService {
                 currentRoomCode,
             });
         }
-        // Sort: Friends first, in-room first, online first, xp descending
+        // Sort: in-room first, online first, xp descending
         friendsResult.sort((a, b) => {
-            if (a.isFriend !== b.isFriend)
-                return a.isFriend ? -1 : 1;
             if (a.inRoom !== b.inRoom)
                 return a.inRoom ? -1 : 1;
             if (a.online !== b.online)
                 return a.online ? -1 : 1;
             return (b.xp || 0) - (a.xp || 0);
         });
-        return { friendCode, friends: friendsResult };
+        // Fetch pending sent & incoming friend requests / duel invitations
+        const sentRequests = [];
+        const incomingRequests = [];
+        try {
+            const pendingSent = await this.rawClient.userNotification.findMany({
+                where: {
+                    senderId: myId,
+                    type: 'friend_request',
+                    handled: null,
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 20,
+            });
+            for (const req of pendingSent) {
+                let targetUser = this.users.get(req.userId);
+                if (!targetUser) {
+                    try {
+                        const dbu = await this.rawClient.user.findUnique({ where: { id: req.userId } });
+                        if (dbu) {
+                            targetUser = this.prismaUserToRecord(dbu);
+                            this.users.set(targetUser.id, targetUser);
+                        }
+                    }
+                    catch { }
+                }
+                sentRequests.push({
+                    id: req.id,
+                    targetUserId: req.userId,
+                    targetName: targetUser?.displayName || targetUser?.username || 'Oyuncu',
+                    targetUsername: targetUser?.username || '',
+                    targetAvatar: targetUser?.avatarUrl || 'av1',
+                    timeText: req.timeText || 'Onay bekliyor',
+                });
+            }
+            const pendingIncoming = await this.rawClient.userNotification.findMany({
+                where: {
+                    userId: myId,
+                    type: { in: ['friend_request', 'match_invite'] },
+                    handled: null,
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 25,
+            });
+            for (const n of pendingIncoming) {
+                incomingRequests.push({
+                    id: n.id,
+                    type: n.type,
+                    title: n.title,
+                    sub: n.sub,
+                    timeText: n.timeText || 'Az önce',
+                    handled: n.handled || null,
+                    senderId: n.senderId || undefined,
+                    senderName: n.senderName || undefined,
+                    senderAvatar: n.senderAvatar || undefined,
+                    roomCode: n.roomCode || undefined,
+                });
+            }
+        }
+        catch { }
+        return { friendCode, friends: friendsResult, sentRequests, incomingRequests };
     }
     async addFriend(userId, targetCodeOrUsername) {
         let me = this.users.get(userId);
-        if (!me) {
-            try {
-                const dbMe = await this.rawClient.user.findFirst({
-                    where: { OR: [{ id: userId }, { username: userId }] },
-                });
-                if (dbMe)
-                    me = this.prismaUserToRecord(dbMe);
+        try {
+            const dbMe = await this.rawClient.user.findFirst({
+                where: { OR: [{ id: userId }, { username: userId }] },
+            });
+            if (dbMe) {
+                me = this.prismaUserToRecord(dbMe);
+                this.users.set(me.id, me);
             }
-            catch { }
         }
+        catch { }
         if (!me)
             return { success: false, error: 'Kullanıcı bulunamadı.' };
         const clean = targetCodeOrUsername.trim().toUpperCase();
         const cleanLower = targetCodeOrUsername.trim().toLowerCase();
-        // 1. Find target user in memory or PostgreSQL
-        let target = Array.from(this.users.values()).find((u) => u &&
-            !u.isGuest &&
-            ((u.friendCode && u.friendCode.toUpperCase() === clean) ||
-                u.username.toLowerCase() === cleanLower));
-        if (!target) {
-            try {
-                const dbTarget = await this.rawClient.user.findFirst({
-                    where: {
-                        OR: [
-                            { friendCode: { equals: clean, mode: 'insensitive' } },
-                            { username: { equals: cleanLower, mode: 'insensitive' } },
-                        ],
-                    },
-                });
-                if (dbTarget)
-                    target = this.prismaUserToRecord(dbTarget);
+        // 1. Find target user in PostgreSQL or memory
+        let target;
+        try {
+            const dbTarget = await this.rawClient.user.findFirst({
+                where: {
+                    OR: [
+                        { friendCode: { equals: clean, mode: 'insensitive' } },
+                        { username: { equals: cleanLower, mode: 'insensitive' } },
+                        { displayName: { equals: targetCodeOrUsername.trim(), mode: 'insensitive' } },
+                    ],
+                },
+            });
+            if (dbTarget) {
+                target = this.prismaUserToRecord(dbTarget);
+                this.users.set(target.id, target);
             }
-            catch { }
+        }
+        catch { }
+        if (!target) {
+            target = Array.from(this.users.values()).find((u) => u &&
+                !u.isGuest &&
+                ((u.friendCode && u.friendCode.toUpperCase() === clean) ||
+                    u.username.toLowerCase() === cleanLower ||
+                    (u.displayName && u.displayName.toLowerCase() === cleanLower)));
         }
         if (!target) {
             return {
@@ -2584,41 +2646,38 @@ class PrismaService {
         if (!target.friendIds)
             target.friendIds = [];
         if (me.friendIds.includes(target.id)) {
-            return { success: false, error: 'Bu kullanıcı zaten arkadaş listenizde!' };
+            return { success: false, error: 'Bu oyuncu zaten arkadaş listenizde!' };
         }
-        // Bilateral friendship
-        me.friendIds.push(target.id);
-        if (!target.friendIds.includes(me.id)) {
-            target.friendIds.push(me.id);
-        }
-        // Persist bilateral friendship in PostgreSQL
+        // Check if there is already a pending request from me to target
         try {
-            await this.rawClient.user.update({
-                where: { id: me.id },
-                data: { friendIds: me.friendIds },
+            const existingPending = await this.rawClient.userNotification.findFirst({
+                where: {
+                    userId: target.id,
+                    senderId: me.id,
+                    type: 'friend_request',
+                    handled: null,
+                },
             });
-            await this.rawClient.user.update({
-                where: { id: target.id },
-                data: { friendIds: target.friendIds },
-            });
+            if (existingPending) {
+                return {
+                    success: false,
+                    error: `${target.displayName} oyuncusuna zaten arkadaşlık isteği gönderdiniz. Karşı tarafın kabul etmesi bekleniyor.`,
+                };
+            }
         }
-        catch (err) {
-            console.warn('[addFriend] DB update error:', err.message);
-        }
-        this.users.set(me.id, me);
-        this.users.set(target.id, target);
-        this.savePersistedUsers();
-        // Create real notification in PostgreSQL for target
+        catch { }
+        // Create a PENDING friend request notification for target (handled: null)
+        // Target will ONLY become a friend when they accept this notification!
         const notifItem = {
             id: 'notif_fr_' + Date.now(),
             type: 'friend_request',
-            title: `${me.displayName} seni arkadaş olarak ekledi!`,
-            sub: '1v1 düellolar ve ortak odalarda birlikte yarışabilirsiniz.',
+            title: `${me.displayName} sana arkadaşlık isteği gönderdi!`,
+            sub: 'Arkadaş olarak eklemek ve birlikte yarışmak için isteği kabul et.',
             timeText: 'Az önce',
             senderId: me.id,
             senderName: me.displayName,
             senderAvatar: me.avatarUrl || 'av1',
-            handled: 'accepted',
+            handled: null,
         };
         try {
             await this.rawClient.userNotification.create({
@@ -2629,7 +2688,7 @@ class PrismaService {
                     title: notifItem.title,
                     sub: notifItem.sub,
                     timeText: notifItem.timeText,
-                    handled: 'accepted',
+                    handled: null,
                     senderId: notifItem.senderId,
                     senderName: notifItem.senderName,
                     senderAvatar: notifItem.senderAvatar,
@@ -2642,13 +2701,17 @@ class PrismaService {
         if (!target.notifications)
             target.notifications = [];
         target.notifications.unshift(notifItem);
+        this.users.set(target.id, target);
+        this.savePersistedUsers();
         // REAL-TIME WEBSOCKET PUSH TO TARGET
         presenceManager_1.presenceManager.notifyUser(target.id, 'notification:new', notifItem);
-        presenceManager_1.presenceManager.notifyUser(target.id, 'friends:update', { friendId: me.id });
         const progress = (0, shared_1.calculateLevelFromXp)(target.xp || 0);
         const targetPresence = presenceManager_1.presenceManager.getUserPresence(target.id);
         return {
             success: true,
+            pending: true,
+            notification: notifItem,
+            message: `${target.displayName} oyuncusuna arkadaşlık isteği gönderildi! Kabul ettiğinde arkadaş listende görünecek.`,
             friend: {
                 id: target.id,
                 username: target.username,
@@ -2658,8 +2721,8 @@ class PrismaService {
                 rankTitle: progress.rankTitle,
                 rankPoints: target.rankPoints || 1000,
                 online: targetPresence.online,
-                status: targetPresence.status,
-                isFriend: true,
+                status: 'İstek Gönderildi · Onay Bekliyor',
+                isFriend: false,
             },
         };
     }
@@ -2738,16 +2801,16 @@ class PrismaService {
     async respondToNotification(userId, notificationId, action) {
         const finalHandled = action === 'accept' ? 'accepted' : 'declined';
         let user = this.users.get(userId);
-        if (!user) {
-            try {
-                const dbUser = await this.rawClient.user.findFirst({
-                    where: { OR: [{ id: userId }, { username: userId }] },
-                });
-                if (dbUser)
-                    user = this.prismaUserToRecord(dbUser);
+        try {
+            const dbUser = await this.rawClient.user.findFirst({
+                where: { OR: [{ id: userId }, { username: userId }] },
+            });
+            if (dbUser) {
+                user = this.prismaUserToRecord(dbUser);
+                this.users.set(user.id, user);
             }
-            catch { }
         }
+        catch { }
         if (!user) {
             return { success: false, handled: finalHandled, error: 'Kullanıcı bulunamadı.', message: '' };
         }
@@ -2780,6 +2843,7 @@ class PrismaService {
         catch (err) {
             console.warn('[respondToNotification] DB update error:', err.message);
         }
+        let createdSenderNotif;
         if (notif.type === 'friend_request' || notif.type === 'friend') {
             if (action === 'accept' && notif.senderId) {
                 if (!user.friendIds)
@@ -2787,14 +2851,14 @@ class PrismaService {
                 if (!user.friendIds.includes(notif.senderId))
                     user.friendIds.push(notif.senderId);
                 let sender = this.users.get(notif.senderId);
-                if (!sender) {
-                    try {
-                        const dbSender = await this.rawClient.user.findUnique({ where: { id: notif.senderId } });
-                        if (dbSender)
-                            sender = this.prismaUserToRecord(dbSender);
+                try {
+                    const dbSender = await this.rawClient.user.findUnique({ where: { id: notif.senderId } });
+                    if (dbSender) {
+                        sender = this.prismaUserToRecord(dbSender);
+                        this.users.set(sender.id, sender);
                     }
-                    catch { }
                 }
+                catch { }
                 if (sender) {
                     if (!sender.friendIds)
                         sender.friendIds = [];
@@ -2811,14 +2875,16 @@ class PrismaService {
                         });
                     }
                     catch { }
+                    this.users.set(sender.id, sender);
                     const senderNotif = {
                         id: 'notif_fra_' + Date.now(),
                         type: 'system',
                         title: `${user.displayName} arkadaşlık isteğini kabul etti!`,
-                        sub: 'Artık 1v1 düello maçlarına davet edebilirsin.',
+                        sub: 'Artık Arkadaşlarım listesinde görebilir ve 1v1 düelloya davet edebilirsin.',
                         timeText: 'Az önce',
                         handled: 'accepted',
                     };
+                    createdSenderNotif = senderNotif;
                     try {
                         await this.rawClient.userNotification.create({
                             data: {
@@ -2833,9 +2899,10 @@ class PrismaService {
                         });
                     }
                     catch { }
-                    // WebSocket notify sender
+                    // WebSocket notify sender & self
                     presenceManager_1.presenceManager.notifyUser(sender.id, 'notification:new', senderNotif);
                     presenceManager_1.presenceManager.notifyUser(sender.id, 'friends:update', { friendId: user.id });
+                    presenceManager_1.presenceManager.notifyUser(user.id, 'friends:update', { friendId: sender.id });
                 }
             }
         }
@@ -2852,6 +2919,7 @@ class PrismaService {
                     success: true,
                     handled: 'accepted',
                     roomCode: notif.roomCode || 'DUEL1',
+                    senderId: notif.senderId || undefined,
                     message: 'Düello daveti kabul edildi! Odaya aktarılıyorsunuz...',
                 };
             }
@@ -2859,6 +2927,8 @@ class PrismaService {
         return {
             success: true,
             handled: finalHandled,
+            senderId: notif.senderId || undefined,
+            senderNotification: createdSenderNotif,
             message: action === 'accept' ? 'İşlem başarıyla onaylandı.' : 'İstek reddedildi.',
         };
     }
@@ -2937,6 +3007,7 @@ class PrismaService {
         return {
             success: true,
             roomCode,
+            notification: notifItem,
             message: `${target.displayName} kullanıcısına 1v1 düello daveti başarıyla gönderildi!`,
         };
     }

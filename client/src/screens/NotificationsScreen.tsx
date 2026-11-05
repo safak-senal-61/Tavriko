@@ -159,6 +159,14 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
             if (onAcceptDuel) {
               onAcceptDuel(targetRoom);
             }
+          } else if (notification.type === 'friend_request' || notification.type === 'friend') {
+            const senderId = data.senderId || notification.senderId;
+            if (senderId) {
+              socketService.notifyUserRealtime(senderId, 'friends:update', { friendId: userId });
+              if (data.senderNotification) {
+                socketService.notifyUserRealtime(senderId, 'notification:new', data.senderNotification);
+              }
+            }
           }
           if (onRefreshUser) {
             onRefreshUser();

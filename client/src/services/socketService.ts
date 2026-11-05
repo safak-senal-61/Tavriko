@@ -22,6 +22,11 @@ interface WsMessageEnvelope<T = any> {
 export class SocketService {
   private ws: WebSocket | null = null;
   private currentUrl: string = '';
+  private presenceWs: WebSocket | null = null;
+  private presenceUrl: string = '';
+  private presenceReconnectTimer: any = null;
+  private presencePingInterval: any = null;
+  private onlineUsers: Map<string, { online: boolean; inRoom?: boolean; currentRoomCode?: string }> = new Map();
   private listeners: Map<string, Set<EventCallback>> = new Map();
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 10;
@@ -48,6 +53,113 @@ export class SocketService {
     const clean = token && !token.startsWith('mock') && !token.startsWith('guest_local') ? token : null;
     if (this.authToken !== clean) {
       this.authToken = clean;
+    }
+  }
+
+  /** Connect persistent Cloudflare Presence & Notification Hub WebSocket */
+  public connectPresence(playerId: string, displayName: string, avatarUrl?: string): void {
+    if (!playerId) return;
+    const targetUrl = getRealtimeWsUrl(
+      `/ws/presence?intent=presence&${this.buildPlayerQuery(playerId, displayName, avatarUrl)}`
+    );
+
+    if (
+      this.presenceWs &&
+      (this.presenceWs.readyState === WebSocket.OPEN || this.presenceWs.readyState === WebSocket.CONNECTING) &&
+      this.presenceUrl === targetUrl
+    ) {
+      return;
+    }
+
+    this.closePresenceInternal();
+    this.presenceUrl = targetUrl;
+    this.initPresenceWebSocket(targetUrl);
+  }
+
+  private initPresenceWebSocket(url: string): void {
+    try {
+      this.presenceWs = new WebSocket(url);
+
+      this.presenceWs.onopen = () => {
+        if (this.presencePingInterval) clearInterval(this.presencePingInterval);
+        this.presencePingInterval = setInterval(() => {
+          if (this.presenceWs && this.presenceWs.readyState === WebSocket.OPEN) {
+            this.presenceWs.send(
+              JSON.stringify({
+                event: 'presence:ping',
+                payload: {
+                  inRoom: Boolean(this.lastSessionContext.roomCode),
+                  currentRoomCode: this.lastSessionContext.roomCode,
+                },
+                timestamp: Date.now(),
+              })
+            );
+          }
+        }, 20000);
+      };
+
+      this.presenceWs.onmessage = (event: MessageEvent) => {
+        this.handleIncomingMessage(event.data);
+      };
+
+      this.presenceWs.onclose = () => {
+        if (this.presencePingInterval) {
+          clearInterval(this.presencePingInterval);
+          this.presencePingInterval = null;
+        }
+        if (!this.isManuallyClosed && this.presenceUrl) {
+          clearTimeout(this.presenceReconnectTimer);
+          this.presenceReconnectTimer = setTimeout(() => {
+            if (!this.isManuallyClosed && this.presenceUrl) {
+              this.initPresenceWebSocket(this.presenceUrl);
+            }
+          }, 3500);
+        }
+      };
+    } catch {}
+  }
+
+  private closePresenceInternal(): void {
+    if (this.presencePingInterval) {
+      clearInterval(this.presencePingInterval);
+      this.presencePingInterval = null;
+    }
+    clearTimeout(this.presenceReconnectTimer);
+    if (this.presenceWs) {
+      try {
+        this.presenceWs.close();
+      } catch {}
+      this.presenceWs = null;
+    }
+  }
+
+  public isUserOnline(userId: string): boolean {
+    return Boolean(this.onlineUsers.get(userId)?.online);
+  }
+
+  public getUserPresence(userId: string): { online: boolean; inRoom?: boolean; currentRoomCode?: string } | undefined {
+    return this.onlineUsers.get(userId);
+  }
+
+  public requestPresenceSnapshot(): void {
+    this.sendPresenceEnvelope('presence:query', {});
+  }
+
+  public notifyUserRealtime(targetUserId: string, targetEvent: string, data: any): void {
+    this.sendPresenceEnvelope('social:notify', { targetUserId, targetEvent, data });
+  }
+
+  public sendPresenceEnvelope(event: string, payload: any = {}): void {
+    const message = JSON.stringify({
+      event,
+      requestId: `preq_${Date.now()}`,
+      payload,
+      timestamp: Date.now(),
+    });
+    if (this.presenceWs && this.presenceWs.readyState === WebSocket.OPEN) {
+      this.presenceWs.send(message);
+    } else if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(message);
     }
   }
 
@@ -139,6 +251,39 @@ export class SocketService {
       const event = parsed.event;
       let payload = parsed.payload;
 
+      // Update local presence cache from Cloudflare WebSocket
+      if (event === 'presence:snapshot' && payload && Array.isArray(payload.presences)) {
+        for (const p of payload.presences) {
+          if (p && p.userId) {
+            this.onlineUsers.set(p.userId, {
+              online: Boolean(p.online),
+              inRoom: Boolean(p.inRoom),
+              currentRoomCode: p.currentRoomCode,
+            });
+          }
+        }
+      } else if (event === 'presence:update' && payload && payload.userId) {
+        this.onlineUsers.set(payload.userId, {
+          online: Boolean(payload.online),
+          inRoom: Boolean(payload.inRoom),
+          currentRoomCode: payload.currentRoomCode,
+        });
+      } else if (event === 'user:online' && payload) {
+        const uid = payload.userId || payload.presence?.userId;
+        if (uid) {
+          this.onlineUsers.set(uid, {
+            online: true,
+            inRoom: Boolean(payload.presence?.inRoom),
+            currentRoomCode: payload.presence?.currentRoomCode,
+          });
+        }
+      } else if (event === 'user:offline' && payload) {
+        const uid = payload.userId || payload.presence?.userId;
+        if (uid) {
+          this.onlineUsers.set(uid, { online: false, inRoom: false });
+        }
+      }
+
       // Unpack room if wrapped in payload
       if (event === SOCKET_EVENTS.ROOM_STATE_SYNC && payload && payload.room) {
         payload = payload.room;
@@ -164,7 +309,7 @@ export class SocketService {
   }
 
   public updatePresence(userId: string, online: boolean): void {
-    this.sendEnvelope('presence:update', { userId, online, timestamp: Date.now() });
+    this.sendPresenceEnvelope('presence:update', { userId, online, timestamp: Date.now() });
   }
 
   public sendEnvelope(event: string, payload: any = {}): void {
@@ -179,6 +324,12 @@ export class SocketService {
 
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(message);
+    } else if (
+      (event.startsWith('presence:') || event.startsWith('social:')) &&
+      this.presenceWs &&
+      this.presenceWs.readyState === WebSocket.OPEN
+    ) {
+      this.presenceWs.send(message);
     } else {
       // If connecting, wait briefly
       const checkAndSend = setInterval(() => {
@@ -223,7 +374,9 @@ export class SocketService {
   public disconnect(): void {
     this.isManuallyClosed = true;
     this.closeInternal();
+    this.closePresenceInternal();
     this.currentUrl = '';
+    this.presenceUrl = '';
     this.lastSessionContext = {};
   }
 
@@ -270,6 +423,13 @@ export class SocketService {
       avatarUrl,
       isMatchmaking: false,
     };
+
+    this.sendPresenceEnvelope('presence:update', {
+      userId: playerId,
+      online: true,
+      inRoom: true,
+      currentRoomCode: cleanCode,
+    });
 
     const queryParts = [
       `roomCode=${cleanCode}`,
@@ -323,6 +483,13 @@ export class SocketService {
       isMatchmaking: false,
     };
 
+    this.sendPresenceEnvelope('presence:update', {
+      userId: playerId,
+      online: true,
+      inRoom: true,
+      currentRoomCode: cleanCode,
+    });
+
     const targetUrl = getRealtimeWsUrl(
       `/ws/room/${cleanCode}?roomCode=${cleanCode}&${this.buildPlayerQuery(playerId, displayName, avatarUrl)}`
     );
@@ -343,6 +510,12 @@ export class SocketService {
   public leaveRoom(roomCode: string, playerId: string): void {
     const cleanCode = roomCode.trim().toUpperCase();
     this.sendEnvelope(SOCKET_EVENTS.LEAVE_ROOM, { roomCode: cleanCode, playerId });
+    this.sendPresenceEnvelope('presence:update', {
+      userId: playerId,
+      online: true,
+      inRoom: false,
+      currentRoomCode: undefined,
+    });
     if (this.lastSessionContext.roomCode === cleanCode) {
       delete this.lastSessionContext.roomCode;
     }
