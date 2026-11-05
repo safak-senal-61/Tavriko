@@ -25,8 +25,6 @@
   "vars": {
     "ENVIRONMENT": "production",
     "BACKEND_API_URL": "https://tavriko-app.vercel.app",
-    "JWT_SECRET": "super_secret_jwt_key_trivia_2026_production",
-    "INTERNAL_API_SECRET": "tavriko_internal_secret_2026",
     "RECONNECTION_GRACE_SEC": 60,
     "ROUND_INTERMISSION_SEC": 3.5,
     "COUNTDOWN_DURATION_SEC": 3

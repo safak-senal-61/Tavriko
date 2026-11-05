@@ -1,4 +1,4 @@
-import { calculateScore, calculateRankings, Question, ClientQuestion, GameRoom, Player } from '@trivia/shared';
+import { calculateScore, calculateRankings, ClientQuestion } from '@trivia/shared';
 import { getFallbackQuestions } from '../src/game/defaultQuestions';
 
 describe('Game Room Lifecycle & Durable Object Logic', () => {
@@ -25,8 +25,8 @@ describe('Game Room Lifecycle & Durable Object Logic', () => {
     });
 
     expect(score2.streak).toBe(2);
-    expect(score2.pointsAwarded).toBeGreaterThan(score1.pointsAwarded); // Streak bonus (+50) applied
-    expect(score2.streakBonus).toBe(50);
+    expect(score2.pointsAwarded).toBeGreaterThan(score1.pointsAwarded); // Streak bonus (+10) applied
+    expect(score2.streakBonus).toBe(10);
 
     // Wrong answer resets streak
     const score3 = calculateScore({

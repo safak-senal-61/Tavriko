@@ -1,4 +1,4 @@
-import { PlayerResult } from './types';
+import { GameRoom, PlayerResult, PlayerScoreSummary, RoundResult, FinalMatchSummary } from './types';
 export interface ScoreInput {
     isCorrect: boolean;
     timeRemainingMs: number;
@@ -26,3 +26,22 @@ export declare function calculateScore(input: ScoreInput): ScoreCalculationResul
  * If tied, fastest average response time wins.
  */
 export declare function calculateRankings(players: PlayerResult[]): PlayerResult[];
+/**
+ * Shared authoritative helper: applies a player's submitted answer to room state,
+ * updating score, streak, response time, and correctAnswersCount (+1 for correct, +0 for wrong).
+ */
+export declare function applyPlayerRoundAnswer(room: GameRoom, playerId: string, selectedOptionId: string, elapsedMs: number): ScoreCalculationResult & {
+    isCorrect: boolean;
+};
+/**
+ * Builds the sorted leaderboard for a GameRoom, preserving each player's correctAnswersCount.
+ */
+export declare function buildRoomLeaderboard(room: GameRoom): PlayerScoreSummary[];
+/**
+ * Evaluates the current round of a GameRoom and constructs the authoritative RoundResult payload.
+ */
+export declare function evaluateRoundResult(room: GameRoom): RoundResult;
+/**
+ * Finalizes a GameRoom and returns the authoritative FinalMatchSummary.
+ */
+export declare function buildFinalMatchSummary(room: GameRoom): FinalMatchSummary;

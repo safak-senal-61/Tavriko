@@ -6,8 +6,10 @@ import {
   GameMode,
   CategoryId,
   DifficultyLevel,
-  calculateScore,
-  calculateRankings,
+  applyPlayerRoundAnswer,
+  buildRoomLeaderboard,
+  evaluateRoundResult,
+  buildFinalMatchSummary,
   RoundResult,
   FinalMatchSummary,
   PlayerScoreSummary,
@@ -354,29 +356,8 @@ export class GameRoomManager {
       return { accepted: false, reason: 'Soru süresi doldu' };
     }
 
-    const isCorrect = selectedOptionId === room.currentQuestion.correctOptionId;
-
-    const scoreResult = calculateScore({
-      isCorrect,
-      timeRemainingMs,
-      totalTimeMs,
-      currentStreak: player.currentStreak,
-      penaltyForWrong: room.penaltyForWrong,
-    });
-
-    player.hasAnsweredCurrentRound = true;
-    player.lastAnswerTimeMs = elapsedMs;
-    player.lastSelectedOptionId = selectedOptionId;
-    player.lastAnswerIsCorrect = isCorrect;
-    player.lastPointsAwarded = scoreResult.pointsAwarded;
-    player.lastSpeedBonus = scoreResult.speedBonus;
-    player.totalResponseTimeMs += elapsedMs;
-    player.score += scoreResult.pointsAwarded;
-    player.currentStreak = scoreResult.streak;
-    if (isCorrect) {
-      player.correctAnswersCount += 1;
-    }
-    room.scores[playerId] = player.score;
+    const scoreResult = applyPlayerRoundAnswer(room, playerId, selectedOptionId, elapsedMs);
+    const isCorrect = scoreResult.isCorrect;
 
     // Check if all connected players have answered
     const connectedPlayers = Object.values(room.players).filter((p) => p.isConnected);
@@ -404,29 +385,7 @@ export class GameRoomManager {
     const room = this.getRoom(code);
     if (!room || room.status !== 'question_active' || !room.currentQuestion) return;
 
-    room.status = 'round_result';
-
-    const playerAnswers: RoundResult['playerAnswers'] = {};
-    Object.values(room.players).forEach((p) => {
-      playerAnswers[p.id] = {
-        selectedOptionId: p.lastSelectedOptionId || '',
-        isCorrect: !!p.lastAnswerIsCorrect,
-        pointsEarned: p.lastPointsAwarded || 0,
-        speedBonus: p.lastSpeedBonus || 0,
-        streak: p.currentStreak,
-        timeMs: p.lastAnswerTimeMs || 0,
-      };
-    });
-
-    const leaderboard: PlayerScoreSummary[] = this.getLeaderboard(code);
-
-    const roundResult: RoundResult = {
-      roundNumber: room.currentRound,
-      correctOptionId: room.currentQuestion.correctOptionId,
-      explanation: room.currentQuestion.explanation,
-      playerAnswers,
-      leaderboard,
-    };
+    const roundResult = evaluateRoundResult(room);
 
     if (this.onStateSync) {
       this.onStateSync(code, room);
@@ -449,36 +408,7 @@ export class GameRoomManager {
     const room = this.getRoom(code);
     if (!room) return;
 
-    room.status = 'game_over';
-    const rankings = this.getLeaderboard(code);
-
-    let teamScores: FinalMatchSummary['teamScores'];
-    if (room.mode === 'team_battle') {
-      let redTotal = 0;
-      let blueTotal = 0;
-      Object.values(room.players).forEach((p) => {
-        if (p.team === 'red') redTotal += p.score;
-        if (p.team === 'blue') blueTotal += p.score;
-      });
-      teamScores = {
-        red: redTotal,
-        blue: blueTotal,
-        winner: redTotal > blueTotal ? 'red' : blueTotal > redTotal ? 'blue' : 'tie',
-      };
-    }
-
-    const summary: FinalMatchSummary = {
-      roomCode: code,
-      mode: room.mode,
-      totalRounds: room.totalRounds,
-      podium: {
-        first: rankings[0],
-        second: rankings[1],
-        third: rankings[2],
-      },
-      rankings,
-      teamScores,
-    };
+    const summary = buildFinalMatchSummary(room);
 
     if (this.onGameOver) {
       this.onGameOver(code, summary);
@@ -488,35 +418,7 @@ export class GameRoomManager {
   public getLeaderboard(code: string): PlayerScoreSummary[] {
     const room = this.getRoom(code);
     if (!room) return [];
-
-    const playersArray = Object.values(room.players);
-    const sorted = calculateRankings(
-      playersArray.map((p) => ({
-        playerId: p.id,
-        name: p.displayName,
-        score: p.score,
-        avgResponseTimeMs:
-          p.correctAnswersCount > 0
-            ? Math.round(p.totalResponseTimeMs / (p.correctAnswersCount || 1))
-            : 999999,
-        correctCount: p.correctAnswersCount,
-      }))
-    );
-
-    return sorted.map((res, index) => {
-      const p = room.players[res.playerId];
-      return {
-        playerId: p.id,
-        displayName: p.displayName,
-        avatarUrl: p.avatarUrl,
-        score: p.score,
-        rank: index + 1,
-        streak: p.currentStreak,
-        team: p.team,
-        isHost: p.isHost,
-        correctAnswersCount: p.correctAnswersCount,
-      };
-    });
+    return buildRoomLeaderboard(room);
   }
 
   public getClientQuestion(code: string): ClientQuestion | undefined {

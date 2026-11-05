@@ -49,7 +49,8 @@ const questionsData_1 = require("./questionsData");
 const evrenLlmGenerator_1 = require("../ai/evrenLlmGenerator");
 const supabaseClient_1 = require("./supabaseClient");
 const presenceManager_1 = require("../services/presenceManager");
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_trivia_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET ||
+    (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID ? 'test_jwt_secret' : '');
 const PRISMA_DATA_DIR = path.join(__dirname, '..', '..', 'data', 'prisma');
 const USERS_DB_FILE = path.join(__dirname, '..', '..', 'supabase_users_store.json');
 const QUESTIONS_DB_FILE = path.join(__dirname, '..', '..', 'supabase_questions_store.json');
@@ -85,15 +86,17 @@ class PrismaService {
     isJest = Boolean(process.env.JEST_WORKER_ID);
     activeUserRooms = new Map();
     constructor() {
-        const dbUrl = process.env.DATABASE_URL ||
-            process.env.DIRECT_URL ||
-            'postgresql://postgres.rjvbgofzsfescnfohzgu:Patr10.senal61@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true';
+        const dbUrl = process.env.DATABASE_URL || process.env.DIRECT_URL;
         this.rawClient = new client_1.PrismaClient({
-            datasources: {
-                db: {
-                    url: dbUrl,
-                },
-            },
+            ...(dbUrl
+                ? {
+                    datasources: {
+                        db: {
+                            url: dbUrl,
+                        },
+                    },
+                }
+                : {}),
             log: ['error'],
         });
         this.loadLocalSnapshots();

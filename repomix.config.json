@@ -1,0 +1,35 @@
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "removeComments": false,
+    "showLineNumbers": false
+  },
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      ".git/**",
+      ".next/**",
+      "**/coverage/**",
+      ".expo/**",
+      "**/*.lock",
+      "**/package-lock.json",
+      ".env*",
+      "**/.env*",
+      "**/assets/**",
+      "**/*.wav",
+      "**/*.ttf",
+      "**/*.png",
+      "**/*.jpg",
+      "**/*.ico",
+      "server/data/**"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  }
+}

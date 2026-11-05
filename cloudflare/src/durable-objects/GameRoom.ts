@@ -7,8 +7,10 @@ import {
   GameMode,
   CategoryId,
   DifficultyLevel,
-  calculateScore,
-  calculateRankings,
+  applyPlayerRoundAnswer,
+  buildRoomLeaderboard,
+  evaluateRoundResult,
+  buildFinalMatchSummary,
   RoundResult,
   FinalMatchSummary,
   PlayerScoreSummary,
@@ -718,32 +720,7 @@ export class GameRoomDO extends DurableObject<Env> {
     const player = this.room.players[playerId];
     if (!player || player.hasAnsweredCurrentRound) return;
 
-    const totalTimeMs = (this.room.currentQuestion.timeLimitSec || this.room.questionTimeSec || 15) * 1000;
-    const timeRemainingMs = Math.max(0, totalTimeMs - elapsedMs);
-
-    const isCorrect = selectedOptionId === this.room.currentQuestion.correctOptionId;
-
-    const scoreResult = calculateScore({
-      isCorrect,
-      timeRemainingMs,
-      totalTimeMs,
-      currentStreak: player.currentStreak,
-      penaltyForWrong: this.room.penaltyForWrong,
-    });
-
-    player.hasAnsweredCurrentRound = true;
-    player.lastAnswerTimeMs = elapsedMs;
-    player.lastSelectedOptionId = selectedOptionId;
-    player.lastAnswerIsCorrect = isCorrect;
-    player.lastPointsAwarded = scoreResult.pointsAwarded;
-    player.lastSpeedBonus = scoreResult.speedBonus;
-    player.totalResponseTimeMs += elapsedMs;
-    player.score += scoreResult.pointsAwarded;
-    player.currentStreak = scoreResult.streak;
-    if (isCorrect) {
-      player.correctAnswersCount += 1;
-    }
-    this.room.scores[playerId] = player.score;
+    applyPlayerRoundAnswer(this.room, playerId, selectedOptionId, elapsedMs);
 
     await this.persist();
 
@@ -818,29 +795,7 @@ export class GameRoomDO extends DurableObject<Env> {
   private async endCurrentRound(): Promise<void> {
     if (!this.room || this.room.status !== 'question_active' || !this.room.currentQuestion) return;
 
-    this.room.status = 'round_result';
-
-    const playerAnswers: RoundResult['playerAnswers'] = {};
-    Object.values(this.room.players).forEach((p) => {
-      playerAnswers[p.id] = {
-        selectedOptionId: p.lastSelectedOptionId || '',
-        isCorrect: !!p.lastAnswerIsCorrect,
-        pointsEarned: p.lastPointsAwarded || 0,
-        speedBonus: p.lastSpeedBonus || 0,
-        streak: p.currentStreak,
-        timeMs: p.lastAnswerTimeMs || 0,
-      };
-    });
-
-    const leaderboard: PlayerScoreSummary[] = this.calculateLeaderboard();
-
-    const roundResult: RoundResult = {
-      roundNumber: this.room.currentRound,
-      correctOptionId: this.room.currentQuestion.correctOptionId,
-      explanation: this.room.currentQuestion.explanation,
-      playerAnswers,
-      leaderboard,
-    };
+    const roundResult = evaluateRoundResult(this.room);
 
     await this.persist();
 
@@ -856,36 +811,7 @@ export class GameRoomDO extends DurableObject<Env> {
   private async finishGame(): Promise<void> {
     if (!this.room) return;
 
-    this.room.status = 'game_over';
-    const rankings = this.calculateLeaderboard();
-
-    let teamScores: FinalMatchSummary['teamScores'];
-    if (this.room.mode === 'team_battle') {
-      let redTotal = 0;
-      let blueTotal = 0;
-      Object.values(this.room.players).forEach((p) => {
-        if (p.team === 'red') redTotal += p.score;
-        if (p.team === 'blue') blueTotal += p.score;
-      });
-      teamScores = {
-        red: redTotal,
-        blue: blueTotal,
-        winner: redTotal > blueTotal ? 'red' : blueTotal > redTotal ? 'blue' : 'tie',
-      };
-    }
-
-    const summary: FinalMatchSummary = {
-      roomCode: this.room.code,
-      mode: this.room.mode,
-      totalRounds: this.room.totalRounds,
-      podium: {
-        first: rankings[0],
-        second: rankings[1],
-        third: rankings[2],
-      },
-      rankings,
-      teamScores,
-    };
+    const summary = buildFinalMatchSummary(this.room);
 
     await this.persist();
 
@@ -956,34 +882,7 @@ export class GameRoomDO extends DurableObject<Env> {
 
   private calculateLeaderboard(): PlayerScoreSummary[] {
     if (!this.room) return [];
-    const playersArray = Object.values(this.room.players);
-    const sorted = calculateRankings(
-      playersArray.map((p) => ({
-        playerId: p.id,
-        name: p.displayName,
-        score: p.score,
-        avgResponseTimeMs:
-          p.correctAnswersCount > 0
-            ? Math.round(p.totalResponseTimeMs / (p.correctAnswersCount || 1))
-            : 999999,
-        correctCount: p.correctAnswersCount,
-      }))
-    );
-
-    return sorted.map((res, index) => {
-      const p = this.room!.players[res.playerId];
-      return {
-        playerId: p.id,
-        displayName: p.displayName,
-        avatarUrl: p.avatarUrl,
-        score: p.score,
-        rank: index + 1,
-        streak: p.currentStreak,
-        team: p.team,
-        isHost: !!p.isHost,
-        correctAnswersCount: p.correctAnswersCount,
-      };
-    });
+    return buildRoomLeaderboard(this.room);
   }
 
   private getClientQuestion(): ClientQuestion | null {
