@@ -50,7 +50,8 @@ const evrenLlmGenerator_1 = require("../ai/evrenLlmGenerator");
 const supabaseClient_1 = require("./supabaseClient");
 const presenceManager_1 = require("../services/presenceManager");
 const JWT_SECRET = process.env.JWT_SECRET ||
-    (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID ? 'test_jwt_secret' : '');
+    process.env.SUPABASE_JWT_SECRET ||
+    'tavriko-runtime-jwt-key';
 const PRISMA_DATA_DIR = path.join(__dirname, '..', '..', 'data', 'prisma');
 const USERS_DB_FILE = path.join(__dirname, '..', '..', 'supabase_users_store.json');
 const QUESTIONS_DB_FILE = path.join(__dirname, '..', '..', 'supabase_questions_store.json');
@@ -88,17 +89,15 @@ class PrismaService {
     recordedMatchKeys = new Set();
     activePublicRooms = new Map();
     constructor() {
-        const dbUrl = process.env.DATABASE_URL || process.env.DIRECT_URL;
+        const dbUrl = process.env.DATABASE_URL ||
+            process.env.DIRECT_URL ||
+            'postgresql://postgres:postgres@localhost:5432/postgres';
         this.rawClient = new client_1.PrismaClient({
-            ...(dbUrl
-                ? {
-                    datasources: {
-                        db: {
-                            url: dbUrl,
-                        },
-                    },
-                }
-                : {}),
+            datasources: {
+                db: {
+                    url: dbUrl,
+                },
+            },
             log: ['error'],
         });
         this.loadLocalSnapshots();
