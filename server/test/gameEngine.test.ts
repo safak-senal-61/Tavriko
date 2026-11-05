@@ -158,4 +158,38 @@ describe('GameEngine & RoomManager', () => {
     expect(recovery.currentQuestion).toBeDefined();
     expect((recovery.currentQuestion as any).correctOptionId).toBeUndefined();
   });
+
+  it('tracks correctAnswersCount (+1 per correct, +0 per wrong) and exposes it in leaderboard for dynamic race progress', () => {
+    const room = manager.createRoom({
+      hostId: 'user1',
+      hostName: 'Ahmet',
+      mode: 'free_for_all',
+      category: 'geography',
+      difficulty: 'medium',
+      totalRounds: 2,
+      questionTimeSec: 10,
+    });
+    manager.joinRoom(room.code, { playerId: 'user2', displayName: 'Zeynep' });
+    manager.startGame(room.code, 'user1');
+
+    // Round 1: user1 correct (+1), user2 wrong (+0)
+    manager.submitAnswer(room.code, 'user1', 'opt_b', Date.now());
+    manager.submitAnswer(room.code, 'user2', 'opt_a', Date.now());
+
+    expect(room.players['user1'].correctAnswersCount).toBe(1);
+    expect(room.players['user2'].correctAnswersCount).toBe(0);
+
+    const lb = manager.getLeaderboard(room.code);
+    const u1 = lb.find((e) => e.playerId === 'user1');
+    const u2 = lb.find((e) => e.playerId === 'user2');
+    expect(u1?.correctAnswersCount).toBe(1);
+    expect(u2?.correctAnswersCount).toBe(0);
+
+    // Dynamic race progress percentage formulas (Section 7):
+    // progressPercentage = (correctAnswers / totalQuestions) * 100
+    expect((3 / 10) * 100).toBe(30);
+    expect((5 / 20) * 100).toBe(25);
+    expect((10 / 20) * 100).toBe(50);
+    expect((20 / 20) * 100).toBe(100);
+  });
 });

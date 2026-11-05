@@ -428,6 +428,9 @@ export class GameRoomManager {
       leaderboard,
     };
 
+    if (this.onStateSync) {
+      this.onStateSync(code, room);
+    }
     if (this.onRoundEnd) {
       this.onRoundEnd(code, roundResult);
     }
@@ -511,6 +514,7 @@ export class GameRoomManager {
         streak: p.currentStreak,
         team: p.team,
         isHost: p.isHost,
+        correctAnswersCount: p.correctAnswersCount,
       };
     });
   }

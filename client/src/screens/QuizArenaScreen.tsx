@@ -8,6 +8,7 @@ import {
   AppStateStatus,
   Animated,
   Platform,
+  Easing,
 } from 'react-native';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -63,22 +64,11 @@ interface QuizArenaScreenProps {
     currentCorrect: number;
   } | null;
   /** Canlı yarış pisti: hem 1v1 eşleşmeli hem özel oda yarışçıları */
-  racers?: Array<{
-    id: string;
-    displayName: string;
-    avatarUrl?: string;
-    score: number;
-    isMe?: boolean;
-    isHost?: boolean;
-    hasAnswered?: boolean;
-    lastAnswer?: {
-      isCorrect: boolean;
-      pointsEarned: number;
-      speedBonus?: number;
-      timeMs?: number;
-    };
-  }>;
-  /** İlerleme yarışının hedef puanı (varsayılan 500) */
+  racers?: RacerInfo[];
+  /**
+   * @deprecated Pist artık puana göre değil doğru cevap sayısına göre ilerler;
+   * bitiş = question.totalRounds. Geriye dönük uyumluluk için tutuluyor.
+   */
   targetScore?: number;
 }
 // ---------------------------------------------------------------------------
@@ -176,13 +166,21 @@ const SmoothTimerBar: React.FC<SmoothTimerBarProps> = React.memo(
 );
 // ---------------------------------------------------------------------------
 // ANADOLU KERVANYOLU YARIŞ PİSTİ (Anatolian Caravan Road Race Track)
+//
+// Yarış ilerlemesi YALNIZCA doğru cevap sayısına bağlıdır:
+//   requiredProgress   = totalQuestions
+//   progressPercentage = (correctAnswers / totalQuestions) * 100
+// Her doğru cevap tam 1 adım, yanlış / boş cevap 0 adım ekler. Puan, hız
+// bonusu veya sabit bir bitiş mesafesi ilerlemeyi ASLA etkilemez.
 // ---------------------------------------------------------------------------
 export interface RacerInfo {
   id: string;
   displayName: string;
   avatarUrl?: string;
+  /** Sadece bilgi amaçlı gösterilir; pist konumunu etkilemez */
   score: number;
-  steps?: number;
+  /** Pist konumunu belirleyen tek değer: bu oyunda verilen doğru cevap sayısı */
+  correctAnswers: number;
   isMe?: boolean;
   isHost?: boolean;
   hasAnswered?: boolean;
@@ -190,172 +188,309 @@ export interface RacerInfo {
     isCorrect: boolean;
     pointsEarned: number;
     speedBonus?: number;
-    stepsEarned?: number;
     timeMs?: number;
   };
 }
 
-/** Tek yarışçı Bakır Madalyonu: Kervanyolu boyunca adımlarla ilerler, çakışmayı önlemek için dikey kaydırılır */
+/** Pist geometrisi sabitleri */
+const TRACK_PADDING = 12;
+const MEDALLION_SIZE = 36;
+
+/** Doğru sayısını [0, totalQuestions] aralığına sıkıştırır; bitişe erken ulaşmayı imkânsız kılar */
+export const clampCorrect = (correct: number, totalQuestions: number): number => {
+  const total = Math.max(1, Math.floor(totalQuestions));
+  const value = Math.floor(Number.isFinite(correct) ? correct : 0);
+  return Math.min(total, Math.max(0, value));
+};
+
+/** progressPercentage = (correctAnswers / totalQuestions) * 100 */
+export const getRaceProgressPercentage = (correct: number, totalQuestions: number): number => {
+  const total = Math.max(1, Math.floor(totalQuestions));
+  return (clampCorrect(correct, total) / total) * 100;
+};
+
+/**
+ * Aynı doğru sayısındaki yarışçıları dikey olarak yayar; madalyonlar üst üste binmez.
+ * Dönüş: racerId -> dikey ofset (px)
+ */
+const computeVerticalOffsets = (
+  racers: RacerInfo[],
+  totalQuestions: number
+): Record<string, number> => {
+  const groups: Record<number, string[]> = {};
+  racers.forEach((r) => {
+    const key = clampCorrect(r.correctAnswers, totalQuestions);
+    (groups[key] = groups[key] || []).push(r.id);
+  });
+  const offsets: Record<string, number> = {};
+  Object.values(groups).forEach((ids) => {
+    const spacing = Math.min(20, 44 / Math.max(1, ids.length - 1 || 1));
+    ids.forEach((id, i) => {
+      offsets[id] = ids.length === 1 ? 0 : (i - (ids.length - 1) / 2) * spacing;
+    });
+  });
+  return offsets;
+};
+
+/** Tek yarışçı Bakır Madalyonu: doğru cevap oranına göre pistte ilerler */
 const CaravanMedallion: React.FC<{
   racer: RacerInfo;
-  finishDistance: number;
+  totalQuestions: number;
   isLeader: boolean;
   verticalOffset: number;
-  trackWidth: number;
-}> = ({ racer, finishDistance, isLeader, verticalOffset, trackWidth }) => {
-  const posAnim = useRef(new Animated.Value(0)).current;
+  travelWidth: number;
+}> = ({ racer, totalQuestions, isLeader, verticalOffset, travelWidth }) => {
+  const correct = clampCorrect(racer.correctAnswers, totalQuestions);
+  const ratio = correct / Math.max(1, totalQuestions);
+
+  const posAnim = useRef(new Animated.Value(ratio)).current;
+  const offsetAnim = useRef(new Animated.Value(verticalOffset)).current;
   const reactionAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
-  const currentSteps = racer.steps !== undefined
-    ? racer.steps
-    : Math.min(finishDistance, Math.round(((racer.score || 0) / Math.max(1, finishDistance * 50)) * finishDistance));
-
-  const progress = Math.min(1, Math.max(0, currentSteps / Math.max(1, finishDistance)));
-
+  // 600ms ease-in-out + bitişte küçük bir sekme
   useEffect(() => {
-    Animated.spring(posAnim, {
-      toValue: progress,
+    Animated.timing(posAnim, {
+      toValue: ratio,
+      duration: 600,
+      easing: Easing.out(Easing.back(1.4)),
       useNativeDriver: Platform.OS !== 'web',
-      friction: 7,
-      tension: 60,
     }).start();
-  }, [progress, posAnim]);
+  }, [ratio, posAnim]);
 
-  // Cevap verildiğinde tepki animasyonu
   useEffect(() => {
-    if (racer.lastAnswer) {
-      if (racer.lastAnswer.isCorrect) {
-        reactionAnim.setValue(0);
-        Animated.sequence([
-          Animated.spring(reactionAnim, {
-            toValue: 1,
-            friction: 4,
-            tension: 85,
+    Animated.timing(offsetAnim, {
+      toValue: verticalOffset,
+      duration: 300,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [verticalOffset, offsetAnim]);
+
+  // Doğru: yukarı süzülen "+1" rozeti. Yanlış: kırmızı sarsıntı (konum değişmez)
+  useEffect(() => {
+    if (!racer.lastAnswer) return;
+    if (racer.lastAnswer.isCorrect) {
+      reactionAnim.setValue(0);
+      Animated.sequence([
+        Animated.spring(reactionAnim, {
+          toValue: 1,
+          friction: 5,
+          tension: 85,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.delay(1600),
+        Animated.timing(reactionAnim, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ]).start();
+    } else {
+      shakeAnim.setValue(0);
+      Animated.sequence(
+        [6, -6, 4, -4, 0].map((v) =>
+          Animated.timing(shakeAnim, {
+            toValue: v,
+            duration: 60,
             useNativeDriver: Platform.OS !== 'web',
-          }),
-          Animated.delay(2200),
-          Animated.timing(reactionAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: Platform.OS !== 'web',
-          }),
-        ]).start();
-      } else {
-        shakeAnim.setValue(0);
-        Animated.sequence([
-          Animated.timing(shakeAnim, { toValue: 6, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
-          Animated.timing(shakeAnim, { toValue: -6, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
-          Animated.timing(shakeAnim, { toValue: 4, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
-          Animated.timing(shakeAnim, { toValue: -4, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
-          Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: Platform.OS !== 'web' }),
-        ]).start();
-      }
+          })
+        )
+      ).start();
     }
-  }, [racer.lastAnswer]);
+  }, [racer.lastAnswer, reactionAnim, shakeAnim]);
 
-  const maxTravel = Math.max(0, trackWidth - 64);
-  const translateX = trackWidth > 0
-    ? posAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, maxTravel],
-      })
-    : 0;
-
-  const reactionOpacity = reactionAnim.interpolate({
-    inputRange: [0, 0.2, 1],
-    outputRange: [0, 1, 1],
+  const translateX = posAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, Math.max(0, travelWidth)],
+    extrapolate: 'clamp',
   });
 
   const reactionTranslateY = reactionAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, -28],
-  });
-
-  const reactionScale = reactionAnim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [0.6, 1.2, 1],
+    outputRange: [0, -22],
   });
 
   const isCorrect = racer.lastAnswer?.isCorrect === true;
-  const isFinished = currentSteps >= finishDistance;
-  const stepsGained = racer.lastAnswer?.stepsEarned || (isCorrect ? (racer.lastAnswer?.speedBonus ? 3 : 2) : 0);
+  const isWrong = racer.lastAnswer?.isCorrect === false;
+  const isFinished = correct >= totalQuestions;
 
   return (
     <Animated.View
       style={[
         styles.caravanMedallionCluster,
         {
+          zIndex: racer.isMe ? 12 : isLeader ? 10 : 5,
           transform: [
             { translateX },
-            { translateY: verticalOffset },
+            { translateY: offsetAnim },
             { translateX: shakeAnim },
           ],
-          zIndex: isLeader ? 10 : 5,
         },
       ]}
       pointerEvents="none"
     >
-      {/* Cevap Puanı ve Adım Pop-up Rozeti */}
-      {racer.lastAnswer && (
+      {isCorrect && (
         <Animated.View
           style={[
-            styles.floatingReactionBadge,
-            isCorrect ? styles.floatingReactionCorrect : styles.floatingReactionWrong,
-            {
-              opacity: reactionOpacity,
-              transform: [
-                { translateY: reactionTranslateY },
-                { scale: reactionScale },
-              ],
-            },
+            styles.stepPopup,
+            { opacity: reactionAnim, transform: [{ translateY: reactionTranslateY }] },
           ]}
         >
-          {isCorrect ? (
-            <Text style={styles.floatingReactionCorrectText}>
-              +{racer.lastAnswer.pointsEarned}P (+{stepsGained} Adım ⚡)
-            </Text>
-          ) : (
-            <Text style={styles.floatingReactionWrongText}>✕ 0 Adım</Text>
-          )}
+          <Text style={styles.stepPopupText}>+1</Text>
         </Animated.View>
       )}
 
-      {/* Lider Tacı veya Bitiş Yıldızı */}
-      {isFinished ? (
+      {(isFinished || (isLeader && correct > 0)) && (
         <View style={styles.racerCrownBadge}>
-          <Text style={styles.racerCrownText}>🏆</Text>
+          <Text style={styles.racerCrownText}>{isFinished ? '🏆' : '👑'}</Text>
         </View>
-      ) : isLeader && (racer.score || 0) > 0 ? (
-        <View style={styles.racerCrownBadge}>
-          <Text style={styles.racerCrownText}>👑</Text>
-        </View>
-      ) : null}
+      )}
 
-      {/* Bakır Madalyon Avatarı (Anatolian Copper Medallion) */}
       <View
         style={[
           styles.copperMedallionFrame,
           isLeader && styles.copperMedallionLeader,
           isCorrect && styles.copperMedallionCorrect,
+          isWrong && styles.copperMedallionWrong,
           racer.isMe && styles.copperMedallionMe,
         ]}
       >
-        <CharacterAvatar seed={racer.avatarUrl || racer.displayName} size={30} />
+        <CharacterAvatar seed={racer.avatarUrl || racer.displayName} size={28} />
         {racer.hasAnswered ? (
           <View style={styles.racerStatusTick}>
             <Text style={styles.racerStatusTickText}>✓</Text>
           </View>
         ) : null}
       </View>
+    </Animated.View>
+  );
+};
 
-      {/* İsim ve Adım Etiketi */}
-      <View style={[styles.medallionPill, racer.isMe && styles.medallionPillMe]}>
-        <Text style={styles.medallionText} numberOfLines={1}>
-          {racer.displayName} ({currentSteps}/{finishDistance} Adım)
+/** Pist + bitiş çizgisi + soru başına kilometre taşları + yarışçı listesi */
+const CaravanRaceTrack: React.FC<{
+  racers: RacerInfo[];
+  totalQuestions: number;
+}> = ({ racers, totalQuestions }) => {
+  const [trackWidth, setTrackWidth] = useState(0);
+  const total = Math.max(1, Math.floor(totalQuestions));
+
+  // Madalyon merkezinin 0% ile 100% arasında kat edebileceği yatay mesafe
+  const travelWidth = Math.max(0, trackWidth - TRACK_PADDING * 2 - MEDALLION_SIZE);
+  const startX = TRACK_PADDING + MEDALLION_SIZE / 2;
+  const finishX = startX + travelWidth;
+
+  const sorted = useMemo(
+    () =>
+      racers
+        .slice()
+        .sort(
+          (a, b) =>
+            clampCorrect(b.correctAnswers, total) - clampCorrect(a.correctAnswers, total) ||
+            (b.score || 0) - (a.score || 0)
+        ),
+    [racers, total]
+  );
+
+  const offsets = useMemo(() => computeVerticalOffsets(sorted, total), [sorted, total]);
+  const leaderId =
+    sorted.length > 0 && clampCorrect(sorted[0].correctAnswers, total) > 0 ? sorted[0].id : null;
+
+  // Soru başına bir kilometre taşı; 20'den fazla soruda kalabalığı önlemek için seyreltilir
+  const tickEvery = total > 20 ? Math.ceil(total / 10) : 1;
+  const ticks: number[] = [];
+  for (let i = 1; i < total; i += 1) {
+    if (i % tickEvery === 0) ticks.push(i);
+  }
+
+  const recentCorrect = racers.find((r) => r.lastAnswer?.isCorrect);
+  const recentWrong = racers.find((r) => r.lastAnswer && !r.lastAnswer.isCorrect);
+
+  return (
+    <View style={styles.caravanCard}>
+      <View style={styles.caravanHeaderRow}>
+        <Text style={styles.caravanHeaderText}>ANADOLU KERVANYOLU</Text>
+        <View style={styles.caravanGoalPill}>
+          <Text style={styles.caravanGoalText}>Bitiş: {total} doğru</Text>
+        </View>
+      </View>
+
+      <View style={styles.raceTickerBanner}>
+        <Text style={styles.raceTickerText} numberOfLines={1}>
+          {recentCorrect
+            ? `${recentCorrect.displayName} doğru bildi, kervan 1 adım ilerledi`
+            : recentWrong
+            ? `${recentWrong.displayName} yanlış cevap verdi, yerinde kaldı`
+            : `Her doğru cevap 1 adım · ${total} doğruda bitiş çizgisi`}
         </Text>
       </View>
-    </Animated.View>
+
+      <View
+        style={styles.caravanTrackField}
+        onLayout={(e) => {
+          const w = e.nativeEvent.layout.width;
+          if (w > 0 && Math.abs(w - trackWidth) > 0.5) setTrackWidth(w);
+        }}
+      >
+        {trackWidth > 0 && (
+          <>
+            {/* Kum yolu: başlangıçtan bitişe */}
+            <View
+              style={[styles.caravanSandPath, { left: startX, width: travelWidth }]}
+              pointerEvents="none"
+            />
+
+            {/* Her doğru cevap için bir kilometre taşı */}
+            {ticks.map((i) => (
+              <View
+                key={i}
+                style={[styles.caravanTick, { left: startX + (i / total) * travelWidth - 1 }]}
+                pointerEvents="none"
+              />
+            ))}
+
+            {/* Bitiş çizgisi = %100 */}
+            <View style={[styles.caravanFinishLine, { left: finishX - 2 }]} pointerEvents="none" />
+            <View style={[styles.caravanFinishFlag, { left: finishX - 10 }]} pointerEvents="none">
+              <Text style={styles.caravanFinishFlagText}>🏁</Text>
+            </View>
+
+            {sorted.map((racer) => (
+              <CaravanMedallion
+                key={racer.id}
+                racer={racer}
+                totalQuestions={total}
+                isLeader={racer.id === leaderId}
+                verticalOffset={offsets[racer.id] || 0}
+                travelWidth={travelWidth}
+              />
+            ))}
+          </>
+        )}
+      </View>
+
+      {/* Yarışçı listesi: doğru sayısı ve yüzde */}
+      <View style={styles.caravanLegend}>
+        {sorted.map((racer) => {
+          const correct = clampCorrect(racer.correctAnswers, total);
+          const pct = Math.round(getRaceProgressPercentage(correct, total));
+          return (
+            <View
+              key={racer.id}
+              style={[styles.caravanLegendRow, racer.isMe && styles.caravanLegendRowMe]}
+            >
+              <Text style={styles.caravanLegendName} numberOfLines={1}>
+                {racer.displayName}
+                {racer.isMe ? ' (Sen)' : ''}
+              </Text>
+              <Text style={styles.caravanLegendValue}>
+                {correct}/{total} · %{pct}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
   );
 };
 
@@ -373,41 +508,11 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   opponent = null,
   dailyChallengeInfo = null,
   racers: racersProp,
-  targetScore = 500,
 }) => {
-  const racers = racersProp || [];
-  const activeRacers: RacerInfo[] = useMemo(() => {
-    if (racers && racers.length > 0) return racers;
-    if (isDuelMode && opponent) {
-      return [
-        {
-          id: 'me',
-          displayName: myDisplayName,
-          score: currentScore,
-          isMe: true,
-          hasAnswered: selectedOptionId !== null,
-          lastAnswer: feedback
-            ? {
-                isCorrect: feedback.isCorrect,
-                pointsEarned: feedback.pointsAwarded,
-                speedBonus: feedback.speedBonus,
-              }
-            : undefined,
-        },
-        {
-          id: opponent.id,
-          displayName: opponent.displayName,
-          avatarUrl: opponent.avatarUrl,
-          score: opponent.score,
-          isMe: false,
-          hasAnswered: opponent.hasAnswered,
-        },
-      ];
-    }
-    return [];
-  }, [racers, isDuelMode, opponent, myDisplayName, currentScore, selectedOptionId, feedback]);
+  // Yarışçılar (doğru cevap sayılarıyla birlikte) RootNavigator'dan gelir.
+  // Burada puandan doğru sayısı TAHMİN EDİLMEZ; veri yoksa pist gösterilmez.
+  const activeRacers: RacerInfo[] = racersProp || [];
   const [localSelectedOptionId, setLocalSelectedOptionId] = useState<string | null>(null);
-  const [caravanTrackWidth, setCaravanTrackWidth] = useState<number>(0);
   // Settings > "Soru Metin Boyutu" (normal / large) — real, app-wide effect
   const [isLargeText] = useState<boolean>(() => {
     try {
@@ -575,122 +680,13 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           </Text>
         </View>
       )}
-      {/* ANADOLU KERVANYOLU CANLI YARIŞ PİSTİ (Anatolian Caravan Road Race Track) */}
-      {activeRacers.length > 0 && (() => {
-        const questionCount = question.totalRounds || 10;
-        const finishDistance = questionCount * 2;
-        const sortedRacers = activeRacers.slice().sort((a, b) => (b.score || 0) - (a.score || 0));
-
-        return (
-          <View style={styles.caravanCard}>
-            {/* Üst Kervan Başlığı */}
-            <View style={styles.caravanHeaderRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={styles.caravanEmoji}>🐫</Text>
-                <Text style={styles.caravanHeaderText}>ANADOLU KERVANYOLU</Text>
-              </View>
-              <View style={styles.caravanGoalPill}>
-                <Text style={styles.caravanGoalText}>Hedef: {finishDistance} Adım 🏁</Text>
-              </View>
-            </View>
-
-            {/* Dinamik Hız & Adım Ticker'ı */}
-            {(() => {
-              const leader = sortedRacers[0];
-              const recentCorrect = activeRacers.find((r) => r.lastAnswer?.isCorrect);
-              const recentWrong = activeRacers.find((r) => r.lastAnswer && !r.lastAnswer.isCorrect);
-
-              if (recentCorrect) {
-                const earned = recentCorrect.lastAnswer?.stepsEarned || (recentCorrect.lastAnswer?.speedBonus ? 3 : 2);
-                return (
-                  <View style={styles.raceTickerBanner}>
-                    <Text style={styles.raceTickerText}>
-                      ⚡ {recentCorrect.displayName} doğru bildi! (+{recentCorrect.lastAnswer?.pointsEarned}P, +{earned} Adım Kervana Yaklaştı)
-                    </Text>
-                  </View>
-                );
-              }
-              if (recentWrong) {
-                return (
-                  <View style={[styles.raceTickerBanner, { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.35)' }]}>
-                    <Text style={[styles.raceTickerText, { color: '#FCA5A5' }]}>
-                      ✕ {recentWrong.displayName} yanlış cevap verdi (0 Adım)
-                    </Text>
-                  </View>
-                );
-              }
-              if (leader && (leader.score || 0) > 0) {
-                return (
-                  <View style={styles.raceTickerBanner}>
-                    <Text style={styles.raceTickerText}>
-                      👑 {leader.displayName} {leader.score}P ile kervanın önünde ilerliyor!
-                    </Text>
-                  </View>
-                );
-              }
-              return (
-                <View style={styles.raceTickerBanner}>
-                  <Text style={styles.raceTickerText}>
-                    İlk %30 sürede doğruya +3, orta %40 sürede +2, son %30 sürede +1 adım!
-                  </Text>
-                </View>
-              );
-            })()}
-
-            {/* Kervan Yolu Parkuru (Kum Yolu & Kilometre Taşları) */}
-            <View
-              style={styles.caravanTrackField}
-              onLayout={(e) => {
-                const w = e.nativeEvent.layout.width;
-                if (w > 0 && w !== caravanTrackWidth) setCaravanTrackWidth(w);
-              }}
-            >
-              {/* Kum Yolu Çizgisi */}
-              <View style={styles.caravanSandPath} pointerEvents="none" />
-
-              {/* Anadolu Kervan Durakları / Landmark Simgeleri */}
-              <View style={[styles.caravanLandmarkPin, { left: 4 }]} pointerEvents="none">
-                <Text style={styles.landmarkIcon}>🏕️</Text>
-                <Text style={styles.landmarkText}>Vaha</Text>
-              </View>
-              <View style={[styles.caravanLandmarkPin, { left: '26%' }]} pointerEvents="none">
-                <Text style={styles.landmarkIcon}>⛪</Text>
-                <Text style={styles.landmarkText}>Taş Kilise</Text>
-              </View>
-              <View style={[styles.caravanLandmarkPin, { left: '50%' }]} pointerEvents="none">
-                <Text style={styles.landmarkIcon}>⛰️</Text>
-                <Text style={styles.landmarkText}>Dağ Geçidi</Text>
-              </View>
-              <View style={[styles.caravanLandmarkPin, { left: '74%' }]} pointerEvents="none">
-                <Text style={styles.landmarkIcon}>🍵</Text>
-                <Text style={styles.landmarkText}>Çay Bağı</Text>
-              </View>
-              <View style={[styles.caravanLandmarkPin, { right: 4 }]} pointerEvents="none">
-                <Text style={styles.landmarkIcon}>🏁</Text>
-                <Text style={styles.landmarkText}>Bitiş</Text>
-              </View>
-
-              {/* Yarışçıların Bakır Madalyonları (Aynı Adımda Olanlar Dikey Olarak Kaydırılır) */}
-              {sortedRacers.map((racer, idx) => {
-                // Eğer iki yarışçı yakınsa dikey ofset uygula
-                const isOdd = idx % 2 === 1;
-                const vOffset = sortedRacers.length > 1 ? (isOdd ? 14 : -14) : 0;
-
-                return (
-                  <CaravanMedallion
-                    key={racer.id}
-                    racer={racer}
-                    finishDistance={finishDistance}
-                    isLeader={idx === 0 && (racer.score || 0) > 0}
-                    verticalOffset={vOffset}
-                    trackWidth={caravanTrackWidth}
-                  />
-                );
-              })}
-            </View>
-          </View>
-        );
-      })()}
+      {/* ANADOLU KERVANYOLU: ilerleme = doğru cevap sayısı / toplam soru */}
+      {activeRacers.length > 0 && (
+        <CaravanRaceTrack
+          racers={activeRacers}
+          totalQuestions={question.totalRounds || 10}
+        />
+      )}
       {/* 2. Second Row: Streak Pill + Smooth 30 FPS Timer Bar + Seconds (Matches page11) */}
       <View style={styles.timerRow}>
         <View style={styles.streakPill}>
@@ -893,20 +889,17 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.extraBold,
   },
   caravanTrackField: {
-    height: 72,
+    height: 84,
     borderRadius: 14,
     backgroundColor: '#0D333F',
     borderWidth: 1,
     borderColor: 'rgba(200, 125, 85, 0.3)',
-    justifyContent: 'center',
     position: 'relative',
     overflow: 'visible',
     marginVertical: 4,
   },
   caravanSandPath: {
     position: 'absolute',
-    left: 12,
-    right: 12,
     top: '50%',
     marginTop: -2,
     height: 4,
@@ -914,27 +907,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#C9A86A',
     opacity: 0.45,
   },
-  caravanLandmarkPin: {
+  caravanTick: {
     position: 'absolute',
-    bottom: 2,
+    top: '50%',
+    marginTop: -6,
+    width: 2,
+    height: 12,
+    borderRadius: 1,
+    backgroundColor: 'rgba(229, 195, 150, 0.35)',
+  },
+  caravanFinishLine: {
+    position: 'absolute',
+    top: 8,
+    bottom: 8,
+    width: 4,
+    borderRadius: 2,
+    backgroundColor: '#FFC43D',
+    opacity: 0.85,
+  },
+  caravanFinishFlag: {
+    position: 'absolute',
+    top: -4,
+    width: 20,
     alignItems: 'center',
   },
-  landmarkIcon: {
-    fontSize: 11,
-  },
-  landmarkText: {
-    color: '#D4A373',
-    fontSize: 8,
-    fontFamily: THEME.fonts.bold,
+  caravanFinishFlagText: {
+    fontSize: 13,
   },
   caravanMedallionCluster: {
     position: 'absolute',
-    left: 8,
+    left: 12, // TRACK_PADDING
     top: '50%',
-    marginTop: -19,
-    flexDirection: 'row',
+    marginTop: -18, // MEDALLION_SIZE / 2
+    width: 36,
+    height: 36,
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
   },
   copperMedallionFrame: {
     width: 36,
@@ -958,24 +966,55 @@ const styles = StyleSheet.create({
   copperMedallionCorrect: {
     borderColor: '#3FD08A',
   },
+  copperMedallionWrong: {
+    borderColor: '#FF5A6A',
+  },
   copperMedallionMe: {
     borderWidth: 3,
   },
-  medallionPill: {
+  stepPopup: {
+    position: 'absolute',
+    top: -16,
     paddingHorizontal: 6,
-    paddingVertical: 1.5,
+    paddingVertical: 1,
     borderRadius: 8,
-    backgroundColor: 'rgba(10, 37, 46, 0.92)',
+    backgroundColor: '#1E4631',
     borderWidth: 1,
-    borderColor: 'rgba(200, 125, 85, 0.5)',
-    maxWidth: 140,
+    borderColor: '#3FD08A',
+    zIndex: 20,
   },
-  medallionPillMe: {
-    borderColor: '#FFC43D',
+  stepPopupText: {
+    color: '#3FD08A',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
   },
-  medallionText: {
+  caravanLegend: {
+    gap: 4,
+  },
+  caravanLegendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  caravanLegendRowMe: {
+    backgroundColor: 'rgba(255, 196, 61, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.35)',
+  },
+  caravanLegendName: {
+    flex: 1,
     color: '#E5C396',
-    fontSize: 9,
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    marginRight: 8,
+  },
+  caravanLegendValue: {
+    color: '#FFFFFF',
+    fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
   },
   raceCard: {

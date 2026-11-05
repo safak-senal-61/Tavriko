@@ -130,7 +130,54 @@ export const useGameStore = create<GameState>((set) => ({
       isAnswerLocked: selectedOptionId !== null,
     }),
   setTimeRemaining: (timeRemainingSec) => set({ timeRemainingSec }),
-  setRoundResult: (lastRoundResult) => set({ lastRoundResult }),
+  setRoundResult: (lastRoundResult) =>
+    set((state) => {
+      if (!lastRoundResult || !state.activeRoom) {
+        return { lastRoundResult };
+      }
+      const alreadyApplied =
+        (state.lastRoundResult as RoundResult | null)?.roundNumber ===
+        lastRoundResult.roundNumber;
+      const nextPlayers = { ...state.activeRoom.players };
+      const nextScores = { ...state.activeRoom.scores };
+      const byLeaderboard: Record<string, number | undefined> = {};
+      for (const entry of lastRoundResult.leaderboard || []) {
+        nextScores[entry.playerId] = entry.score;
+        byLeaderboard[entry.playerId] = entry.correctAnswersCount;
+        if (nextPlayers[entry.playerId]) {
+          nextPlayers[entry.playerId] = {
+            ...nextPlayers[entry.playerId],
+            score: entry.score,
+            currentStreak: entry.streak,
+            ...(typeof entry.correctAnswersCount === 'number'
+              ? { correctAnswersCount: entry.correctAnswersCount }
+              : {}),
+          };
+        }
+      }
+      if (!alreadyApplied) {
+        for (const [pid, ans] of Object.entries(lastRoundResult.playerAnswers || {})) {
+          if (
+            nextPlayers[pid] &&
+            typeof byLeaderboard[pid] !== 'number' &&
+            ans?.isCorrect
+          ) {
+            nextPlayers[pid] = {
+              ...nextPlayers[pid],
+              correctAnswersCount: (nextPlayers[pid].correctAnswersCount || 0) + 1,
+            };
+          }
+        }
+      }
+      return {
+        lastRoundResult,
+        activeRoom: {
+          ...state.activeRoom,
+          players: nextPlayers,
+          scores: nextScores,
+        },
+      };
+    }),
   setFinalSummary: (finalSummary) => set({ finalSummary }),
   resetGame: () =>
     set({

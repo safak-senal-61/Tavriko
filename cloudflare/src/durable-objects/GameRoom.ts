@@ -844,7 +844,8 @@ export class GameRoomDO extends DurableObject<Env> {
 
     await this.persist();
 
-    // Broadcast complete round results to all players
+    // Broadcast updated room state (correctAnswersCount & scores) and round results
+    this.broadcastStateSync();
     this.broadcast(SOCKET_EVENTS.ROUND_RESULT, roundResult);
 
     // Schedule fast intermission alarm for seamless round progression
@@ -980,6 +981,7 @@ export class GameRoomDO extends DurableObject<Env> {
         streak: p.currentStreak,
         team: p.team,
         isHost: !!p.isHost,
+        correctAnswersCount: p.correctAnswersCount,
       };
     });
   }

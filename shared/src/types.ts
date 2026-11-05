@@ -209,6 +209,7 @@ export interface PlayerScoreSummary {
   team?: 'red' | 'blue';
   isHost: boolean;
   isBot?: boolean;
+  correctAnswersCount?: number;
 }
 
 export interface PlayerResult {

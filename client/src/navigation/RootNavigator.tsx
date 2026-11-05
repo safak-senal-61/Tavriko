@@ -431,7 +431,10 @@ export const RootNavigator: React.FC = () => {
           body: JSON.stringify({
             userId: user.id,
             won,
-            correctAnswers: myRankEntry ? Math.max(1, Math.round((myRankEntry.score || 0) / 1000)) : 1,
+            correctAnswers:
+              typeof myRankEntry?.correctAnswersCount === 'number'
+                ? myRankEntry.correctAnswersCount
+                : matchQuestionsReviewRef.current.filter((q) => q.isCorrect).length,
             totalAnswers: summary.totalRounds || 5,
             xpEarned: won ? 160 : 60,
             coinsEarned: won ? 50 : 20,
@@ -1540,6 +1543,7 @@ export const RootNavigator: React.FC = () => {
                           displayName: p.displayName,
                           avatarUrl: p.avatarUrl,
                           score: activeRoom.scores[p.id] ?? p.score ?? 0,
+                          correctAnswers: p.correctAnswersCount ?? 0,
                           isMe: p.id === user.id,
                           isHost: p.isHost,
                           hasAnswered: p.hasAnsweredCurrentRound,
@@ -1552,6 +1556,7 @@ export const RootNavigator: React.FC = () => {
                             displayName: user.displayName || 'Sen',
                             avatarUrl: user.avatarUrl,
                             score: activeRoom.scores[user.id] ?? 0,
+                            correctAnswers: activeRoom.players[user.id]?.correctAnswersCount ?? 0,
                             isMe: true,
                             isHost: activeRoom.hostId === user.id,
                             hasAnswered: activeRoom.players[user.id]?.hasAnsweredCurrentRound || selectedOptionId !== null,
@@ -1562,6 +1567,7 @@ export const RootNavigator: React.FC = () => {
                             displayName: duelOpponent.displayName,
                             avatarUrl: duelOpponent.avatarUrl,
                             score: activeRoom.scores[duelOpponent.id] ?? duelOpponent.score ?? 0,
+                            correctAnswers: activeRoom.players[duelOpponent.id]?.correctAnswersCount ?? 0,
                             isMe: false,
                             isHost: false,
                             hasAnswered: opponentHasAnswered || activeRoom.players[duelOpponent.id]?.hasAnsweredCurrentRound,
@@ -1577,6 +1583,7 @@ export const RootNavigator: React.FC = () => {
                         displayName: user?.displayName || 'Sen',
                         avatarUrl: user?.avatarUrl,
                         score: practiceStats.totalScore,
+                        correctAnswers: practiceStats.correctAnswers,
                         isMe: true,
                         hasAnswered: selectedOptionId !== null,
                         lastAnswer: practiceFeedback ? {
@@ -1590,13 +1597,14 @@ export const RootNavigator: React.FC = () => {
                         displayName: duelOpponent.displayName,
                         avatarUrl: duelOpponent.avatarUrl,
                         score: duelOpponent.score || 0,
+                        // Odasız düelloda rakibin doğru sayısı bilinmiyor; tahmin edilmez
+                        correctAnswers: 0,
                         isMe: false,
                         hasAnswered: opponentHasAnswered,
                       },
                     ]
                   : []
               }
-              targetScore={500}
             />
             {/* Practice / Guest End of Game Summary Modal */}
             <PracticeSummaryModal
