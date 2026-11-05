@@ -21,6 +21,8 @@ import { logger } from './utils/logger';
 import { logRouter, renderDashboardHtml } from './routes/logRoutes';
 import { FinalMatchSummary } from '@trivia/shared';
 import authRoutes from './routes/authRoutes';
+import { metricsMiddleware, metricsHandler, setSocketServer } from './utils/metrics';
+import { initErrorMonitor, captureError } from './utils/errorMonitor';
 import triviaRoutes from './routes/triviaRoutes';
 import socialRoutes from './routes/socialRoutes';
 
@@ -37,10 +39,14 @@ function getLocalIpAddress(): string {
 }
 
 export function createApp() {
+  initErrorMonitor();
   const app = express();
   app.use(cors());
   app.use(express.json({ limit: '15mb' }));
   app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+
+  // Prometheus metrik aracisi (tavriko_http_* metrikleri)
+  app.use(metricsMiddleware);
 
   // Global HTTP Request & Error Logger Middleware
   app.use((req, res, next) => {
@@ -78,6 +84,9 @@ export function createApp() {
       methods: ['GET', 'POST'],
     },
   });
+
+  // Prometheus'a canli istemci sayisini bildir
+  setSocketServer(io);
 
   // Wire up authoritative room manager with DB question provider
   const roomManager = new GameRoomManager((category, difficulty, count) => {
@@ -2605,74 +2614,55 @@ export function createApp() {
     });
   });
 
-  // Public Rooms API: Herkese Açık Aktif Odalar (Tavriko UI Kit Odaya Katıl ile tam uyumlu)
+  // Public Rooms API: Yalnızca Gerçek ve Aktif Herkese Açık Odalar (Mock/Sahte odalar kaldırıldı)
   app.get(['/api/trivia/rooms/public', '/api/rooms/public'], async (req, res) => {
     try {
-      let rooms = roomManager.getPublicRooms();
+      const localRooms = roomManager
+        .getPublicRooms()
+        .filter((r: any) => r && r.status === 'lobby' && (r.playerCount || r.players || 0) > 0 && (r.playerCount || r.players || 0) < (r.maxPlayers || 4));
+      const syncedRooms = db.getActivePublicRooms();
 
-      // Canlı oyuncu odaları yoksa veya liste az ise, UI Kit ile birebir eşleşen
-      // popüler açık arena odaları sun (Kullanıcılar her an girip test edebilsin)
-      if (rooms.length === 0) {
-        rooms = [
-          {
-            code: 'T4R9A1',
-            name: 'DenizPro Odası',
-            hostName: 'DenizPro',
-            category: 'bilim',
-            categoryName: 'Bilim & Evren',
-            playerCount: 1,
-            maxPlayers: 4,
-            questionTimeSec: 20,
-            totalRounds: 7,
-            penaltyForWrong: true,
-            status: 'lobby',
-            createdAt: Date.now() - 45000,
-          },
-          {
-            code: 'EGE992',
-            name: 'Ece Arenası',
-            hostName: 'Ece',
-            category: 'tarih',
-            categoryName: 'Tarih & Medeniyet',
-            playerCount: 2,
-            maxPlayers: 4,
-            questionTimeSec: 20,
-            totalRounds: 14,
-            penaltyForWrong: false,
-            status: 'lobby',
-            createdAt: Date.now() - 120000,
-          },
-          {
-            code: 'BUR771',
-            name: 'Burak Challenge',
-            hostName: 'Burak',
-            category: 'spor',
-            categoryName: 'Spor & Rekabet',
-            playerCount: 3,
-            maxPlayers: 4,
-            questionTimeSec: 15,
-            totalRounds: 7,
-            penaltyForWrong: true,
-            status: 'lobby',
-            createdAt: Date.now() - 30000,
-          },
-          {
-            code: 'GLX883',
-            name: 'Galaksi Turu',
-            hostName: 'KaptanAstronot',
-            category: 'uzay',
-            categoryName: 'Uzay & Astronomi',
-            playerCount: 1,
-            maxPlayers: 6,
-            questionTimeSec: 20,
-            totalRounds: 14,
-            penaltyForWrong: false,
-            status: 'lobby',
-            createdAt: Date.now() - 90000,
-          },
-        ];
+      const mergedByCode = new Map<string, any>();
+      for (const r of localRooms) {
+        mergedByCode.set(r.code, {
+          code: r.code,
+          name: r.name || `${r.hostName || 'Oyuncu'} Odası`,
+          host: r.hostName || 'Oyuncu',
+          hostName: r.hostName || 'Oyuncu',
+          category: r.categoryName || r.category || 'Genel Kültür',
+          categoryName: r.categoryName || r.category || 'Genel Kültür',
+          players: r.playerCount || 1,
+          playerCount: r.playerCount || 1,
+          maxPlayers: r.maxPlayers || 4,
+          rounds: r.totalRounds || 5,
+          totalRounds: r.totalRounds || 5,
+          timeSec: r.questionTimeSec || 15,
+          questionTimeSec: r.questionTimeSec || 15,
+          status: 'waiting',
+        });
+      }
+      for (const r of syncedRooms) {
+        if (!mergedByCode.has(r.code)) {
+          mergedByCode.set(r.code, {
+            code: r.code,
+            name: r.name,
+            host: r.host,
+            hostName: r.host,
+            category: r.category,
+            categoryName: r.category,
+            players: r.players,
+            playerCount: r.players,
+            maxPlayers: r.maxPlayers,
+            rounds: r.rounds,
+            totalRounds: r.rounds,
+            timeSec: r.timeSec,
+            questionTimeSec: r.timeSec,
+            status: 'waiting',
+          });
+        }
       }
 
+      const rooms = Array.from(mergedByCode.values());
       res.json({
         success: true,
         count: rooms.length,
@@ -2680,6 +2670,20 @@ export function createApp() {
       });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message, rooms: [] });
+    }
+  });
+
+  app.get('/api/trivia/leaderboard', async (req, res) => {
+    try {
+      const topPlayers = await db.getLeaderboardAsync(30);
+      res.json({
+        season: 'Sezon 1: Bilgi Çağı',
+        endsInDays: 45,
+        topPlayers,
+        leaders: topPlayers,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -2699,6 +2703,9 @@ export function createApp() {
       res.status(500).json({ success: false, error: err.message });
     }
   });
+
+  // Prometheus scrape endpoint (monitoring/prometheus.yml kullaniyor)
+  app.get('/metrics', metricsHandler);
 
   // REST API Routes
   app.use('/api', logRouter);
@@ -2752,6 +2759,8 @@ export function createApp() {
         },
       });
 
+      db.removePublicRoom(summary.roomCode);
+
       // Update XP and coins for participating registered users
       for (const rankItem of summary.rankings) {
         if (!rankItem.playerId || rankItem.playerId.startsWith('bot_') || rankItem.playerId.startsWith('guest_')) {
@@ -2759,16 +2768,23 @@ export function createApp() {
         }
 
         const isWinner = rankItem.rank === 1;
-        const xpEarned = isWinner ? 150 : Math.max(30, Math.round(rankItem.score / 10));
+        const xpEarned = isWinner ? 60 : 25;
         const coinsEarned = isWinner ? 50 : 15;
+        const totalRounds = Math.max(1, Number(summary.totalRounds) || 5);
+        const rawCorrect =
+          typeof (rankItem as any).correctAnswersCount === 'number'
+            ? (rankItem as any).correctAnswersCount
+            : Math.min(totalRounds, Math.round((rankItem.score || 0) / 140));
+        const safeCorrect = Math.max(0, Math.min(totalRounds, rawCorrect));
 
         await db.recordGameStats(rankItem.playerId, {
-          correctAnswers: Math.round(rankItem.score / 100),
-          totalAnswers: summary.totalRounds,
+          correctAnswers: safeCorrect,
+          totalAnswers: totalRounds,
           xpEarned,
           coinsEarned,
-          bestStreak: rankItem.streak || 0,
+          bestStreak: Math.min(safeCorrect, rankItem.streak || 0),
           won: isWinner,
+          roomCode: summary.roomCode,
         });
       }
 
@@ -2780,6 +2796,7 @@ export function createApp() {
 
       return res.json({ success: true });
     } catch (err: any) {
+      captureError(err);
       logger.error('SOCKET', `Maç sonucu kaydetme hatası: ${err.message}`, err);
       return res.status(500).json({ success: false, error: err.message });
     }

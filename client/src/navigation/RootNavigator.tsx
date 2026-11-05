@@ -366,6 +366,25 @@ export const RootNavigator: React.FC = () => {
       }
       setActiveRoom(room);
       activeRoomRef.current = room;
+      if (user && !isGuest && room.mode !== 'duel' && room.mode !== 'quick_match') {
+        const playerCount = Object.values(room.players || {}).filter((p) => !p.isBot && p.isConnected !== false).length;
+        const hostPlayer = room.players?.[room.hostId] || Object.values(room.players || {})[0];
+        fetch(`${API_BASE}/social/rooms/active`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            roomCode: room.code,
+            hostName: hostPlayer?.displayName || user.displayName,
+            category: room.category,
+            players: playerCount,
+            maxPlayers: room.maxPlayers,
+            totalRounds: room.totalRounds,
+            questionTimeSec: room.questionTimeSec,
+            status: room.status === 'lobby' ? 'lobby' : 'playing',
+          }),
+        }).catch(() => {});
+      }
       if (
         room.status === 'lobby' &&
         currentScreenRef.current !== 'lobby' &&
@@ -459,9 +478,10 @@ export const RootNavigator: React.FC = () => {
                 ? myRankEntry.correctAnswersCount
                 : matchQuestionsReviewRef.current.filter((q) => q.isCorrect).length,
             totalAnswers: summary.totalRounds || 5,
-            xpEarned: won ? 160 : 60,
+            xpEarned: won ? 80 : 30,
             coinsEarned: won ? 50 : 20,
             bestStreak: myRankEntry?.streak || 1,
+            roomCode: summary.roomCode,
           }),
         })
           .then((r) => r.json())
@@ -830,7 +850,18 @@ export const RootNavigator: React.FC = () => {
         fetch(`${API_BASE}/social/rooms/active`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id, roomCode }),
+          body: JSON.stringify({
+            userId: user.id,
+            roomCode,
+            hostName: user.displayName,
+            category: initialRoom.category,
+            players: 1,
+            maxPlayers: initialRoom.maxPlayers,
+            totalRounds: initialRoom.totalRounds,
+            questionTimeSec: initialRoom.questionTimeSec,
+            status: 'lobby',
+            privacy: settings?.privacy || 'public',
+          }),
         }).catch(() => {});
       }
 

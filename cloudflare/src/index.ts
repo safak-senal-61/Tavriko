@@ -214,7 +214,7 @@ export default {
 
     const isWs = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
 
-    // Route: Presence, Social Notification Hub & Matchmaking (/ws/presence, /ws/matchmaking, /api/presence, /api/notify, or /ws without roomCode)
+    // Route: Presence, Social Notification Hub, Public Rooms & Matchmaking
     if (
       url.pathname.startsWith('/ws/matchmaking') ||
       url.pathname.startsWith('/ws/presence') ||
@@ -222,6 +222,9 @@ export default {
       url.pathname === '/presence' ||
       url.pathname === '/api/notify' ||
       url.pathname === '/notify' ||
+      url.pathname === '/rooms/public' ||
+      url.pathname === '/api/rooms/public' ||
+      url.pathname === '/api/trivia/rooms/public' ||
       url.searchParams.get('intent') === 'matchmaking' ||
       url.searchParams.get('intent') === 'presence' ||
       (url.pathname === '/ws' && !url.searchParams.has('roomCode'))

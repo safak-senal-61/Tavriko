@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
+  Animated,
   View,
   Text,
   TouchableOpacity,
@@ -9,6 +10,7 @@ import {
   Share,
   TextInput,
   Modal,
+  Platform,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { UserProfile, calculateLevelFromXp } from '@trivia/shared';
@@ -79,6 +81,33 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   const [inspectPlayer, setInspectPlayer] = useState<FriendRowItem | null>(null);
   const [inspectDetails, setInspectDetails] = useState<any | null>(null);
   const [inspectLoading, setInspectLoading] = useState(false);
+  const [removingFriend, setRemovingFriend] = useState(false);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  // Smooth tab transition animation
+  const tabFadeAnim = useRef(new Animated.Value(1)).current;
+  const tabSlideAnim = useRef(new Animated.Value(0)).current;
+
+  const switchTabSmooth = (nextTab: 'friends' | 'add' | 'requests') => {
+    if (nextTab === activeTab) return;
+    sound.playSound('nav');
+    sound.triggerHaptic('light');
+    setActiveTab(nextTab);
+    tabFadeAnim.setValue(0.25);
+    tabSlideAnim.setValue(10);
+    Animated.parallel([
+      Animated.timing(tabFadeAnim, {
+        toValue: 1,
+        duration: 210,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.spring(tabSlideAnim, {
+        toValue: 0,
+        damping: 18,
+        stiffness: 200,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start();
+  };
   // Add Friend state
   const [addInput, setAddInput] = useState('');
   const [addLoading, setAddLoading] = useState(false);
@@ -284,6 +313,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   const handleOpenProfile = async (player: FriendRowItem) => {
     sound.playSound('tap');
     sound.triggerHaptic('light');
+    setConfirmRemoveId(null);
     setInspectPlayer(player);
     setInspectDetails(null);
     setInspectLoading(true);
@@ -297,6 +327,44 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       // offline / cached fallback
     } finally {
       setInspectLoading(false);
+    }
+  };
+
+  const handleRemoveFriend = async (targetPlayer: FriendRowItem) => {
+    if (!user || removingFriend) return;
+    sound.playSound('tap');
+    sound.triggerHaptic('medium');
+    setRemovingFriend(true);
+    try {
+      const res = await fetch(`${base}/social/friends/remove`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          friendId: targetPlayer.id,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Arkadaş çıkarılamadı.');
+      }
+      sound.playSound('reward');
+      sound.triggerHaptic('success');
+      socketService.notifyUserRealtime(targetPlayer.id, 'friends:update', {
+        removedBy: user.id,
+      });
+      setFriendsList((prev) => prev.filter((item) => item.id !== targetPlayer.id));
+      setConfirmRemoveId(null);
+      setInspectPlayer(null);
+      setChallengeNotice(
+        `${targetPlayer.displayName || targetPlayer.name} arkadaş listenden çıkarıldı.`
+      );
+      setTimeout(() => setChallengeNotice(null), 3500);
+    } catch (err: any) {
+      sound.playSound('wrong');
+      setChallengeNotice(`⚠️ ${err.message || 'Arkadaş çıkarılamadı.'}`);
+    } finally {
+      setRemovingFriend(false);
     }
   };
   const handleAddFriend = async () => {
@@ -440,33 +508,35 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>ARKADAŞLAR</Text>
-        {/* Friend Code Card (Fixed Width, No Overflow, Full Copy & Share) */}
+        {/* Compact Friend Code Card */}
         <View style={styles.codeCard}>
-          <Text style={styles.codeHeaderLabel}>SENİN ARKADAŞLIK KODUN</Text>
-          <View style={styles.codePillBox}>
-            <Text
-              style={styles.codeValueText}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-            >
-              {currentCode}
-            </Text>
-          </View>
-          <View style={styles.codeActionsRow}>
-            <Button3D
-              title={copied ? 'KOPYALANDI' : 'KOPYALA'}
-              variant="mint"
-              onPress={handleCopyCode}
-              style={{ flex: 1, minHeight: 44 }}
-              textStyle={{ fontSize: 13 }}
-            />
-            <Button3D
-              title="PAYLAŞ"
-              variant="gold"
-              onPress={handleShareCode}
-              style={{ flex: 1, minHeight: 44 }}
-              textStyle={{ fontSize: 13 }}
-            />
+          <View style={styles.codeTopRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.codeHeaderLabel}>ARKADAŞLIK KODUN</Text>
+              <Text
+                style={styles.codeValueText}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
+                {currentCode}
+              </Text>
+            </View>
+            <View style={styles.codeActionsRow}>
+              <Button3D
+                title={copied ? 'KOPYALANDI' : 'KOPYALA'}
+                variant="mint"
+                onPress={handleCopyCode}
+                style={{ minHeight: 38, paddingHorizontal: 14 }}
+                textStyle={{ fontSize: 12 }}
+              />
+              <Button3D
+                title="PAYLAŞ"
+                variant="gold"
+                onPress={handleShareCode}
+                style={{ minHeight: 38, paddingHorizontal: 14 }}
+                textStyle={{ fontSize: 12 }}
+              />
+            </View>
           </View>
         </View>
         {challengeNotice && (
@@ -481,12 +551,11 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
               styles.tabPill,
               activeTab === 'friends' && styles.tabPillActive,
             ]}
-            onPress={() => {
-              sound.playSound('nav');
-              setActiveTab('friends');
-            }}
+            onPress={() => switchTabSmooth('friends')}
           >
-            <Text style={styles.tabText}>Arkadaşlarım ({friendsList.length})</Text>
+            <Text style={styles.tabText} numberOfLines={1}>
+              Arkadaşlarım ({friendsList.length})
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
@@ -494,29 +563,31 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
               activeTab === 'add' && styles.tabPillActive,
             ]}
             onPress={() => {
-              sound.playSound('nav');
-              setActiveTab('add');
+              switchTabSmooth('add');
               setAddErrorMsg(null);
               setAddSuccessMsg(null);
             }}
           >
-            <Text style={styles.tabText}>+ Arkadaş Ekle</Text>
+            <Text style={styles.tabText} numberOfLines={1}>+ Arkadaş Ekle</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.tabPill,
               activeTab === 'requests' && styles.tabPillActive,
             ]}
-            onPress={() => {
-              sound.playSound('nav');
-              setActiveTab('requests');
-            }}
+            onPress={() => switchTabSmooth('requests')}
           >
-            <Text style={styles.tabText}>
+            <Text style={styles.tabText} numberOfLines={1}>
               İstekler {incomingRequests.length > 0 ? `(${incomingRequests.length})` : ''}
             </Text>
           </TouchableOpacity>
         </View>
+        <Animated.View
+          style={{
+            opacity: tabFadeAnim,
+            transform: [{ translateY: tabSlideAnim }],
+          }}
+        >
         {/* Tab 1: Friends List (ONLY ACCEPTED FRIENDS) */}
         {activeTab === 'friends' && (
           loading ? (
@@ -530,8 +601,9 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
               <Button3D
                 title="+ ARKADAŞLIK İSTEĞİ GÖNDER"
                 variant="gold"
-                onPress={() => setActiveTab('add')}
-                style={{ marginTop: 14 }}
+                onPress={() => switchTabSmooth('add')}
+                style={{ marginTop: 14, width: '100%', maxWidth: 280 }}
+                textStyle={{ fontSize: 13 }}
               />
             </View>
           ) : (
@@ -647,6 +719,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 disabled={addLoading}
                 onPress={handleAddFriend}
                 style={{ marginTop: 14 }}
+                textStyle={{ fontSize: 13 }}
               />
             </View>
 
@@ -732,6 +805,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
             )}
           </View>
         )}
+        </Animated.View>
       </ScrollView>
       {!isGuest && (
         <TavrikoBottomNav
@@ -776,11 +850,11 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                   <View
                     style={[
                       styles.inspectStatusBadge,
-                      { backgroundColor: inspectPlayer.online ? '#3FD08A' : '#736B92' },
+                      { backgroundColor: inspectPlayer.online ? '#123927' : '#2C234B', borderColor: inspectPlayer.online ? '#3FD08A' : '#736B92' },
                     ]}
                   >
-                    <Text style={styles.inspectStatusText}>
-                      {inspectPlayer.online ? 'ÇEVRİMİÇİ' : 'ÇEVRİMD IŞI'}
+                    <Text style={[styles.inspectStatusText, { color: inspectPlayer.online ? '#3FD08A' : '#D9CDF5' }]}>
+                      {inspectPlayer.online ? '● ÇEVRİMİÇİ' : '○ ÇEVRİMDIŞI'}
                     </Text>
                   </View>
                 </View>
@@ -790,7 +864,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 </Text>
                 <Text style={styles.inspectUsername}>
                   @{inspectDetails?.username || inspectPlayer.username || 'oyuncu'}
-                  {inspectDetails?.countryName ? ` · 🇹🇷 ${inspectDetails.countryName}` : ' · 🇹🇷 Türkiye'}
+                  {inspectDetails?.countryName ? ` · ${inspectDetails.countryName}` : ' · Türkiye'}
                 </Text>
                 {/* Level & Rank Pill */}
                 <View style={styles.inspectLevelPill}>
@@ -816,56 +890,126 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     </View>
                   );
                 })()}
-                {/* Stats Grid */}
-                <View style={styles.inspectStatsGrid}>
-                  <View style={styles.inspectStatCard}>
-                    <Text style={styles.inspectStatVal}>
-                      {inspectDetails?.stats?.totalMatches ?? inspectPlayer.totalMatches ?? 0}
-                    </Text>
-                    <Text style={styles.inspectStatLbl}>Toplam Maç</Text>
-                  </View>
-                  <View style={styles.inspectStatCard}>
-                    <Text style={[styles.inspectStatVal, { color: '#3FD08A' }]}>
-                      {inspectDetails?.stats?.wins ?? inspectPlayer.wins ?? 0}
-                    </Text>
-                    <Text style={styles.inspectStatLbl}>Galibiyet</Text>
-                  </View>
-                  <View style={styles.inspectStatCard}>
-                    <Text style={[styles.inspectStatVal, { color: '#FFC43D' }]}>
-                      {inspectDetails?.stats?.correctAnswers ?? inspectPlayer.correctAnswers ?? 0}
-                    </Text>
-                    <Text style={styles.inspectStatLbl}>Doğru Cevap</Text>
-                  </View>
-                  <View style={styles.inspectStatCard}>
-                    <Text style={[styles.inspectStatVal, { color: '#FF7A00' }]}>
-                      🔥 {inspectDetails?.stats?.bestStreak ?? inspectPlayer.bestStreak ?? 0}
-                    </Text>
-                    <Text style={styles.inspectStatLbl}>En İyi Seri</Text>
-                  </View>
-                </View>
+                {/* Sanitized & Accurate Stats Grid */}
+                {(() => {
+                  const rawMatches = Math.max(
+                    0,
+                    Number(inspectDetails?.stats?.totalMatches ?? inspectPlayer.totalMatches ?? 0)
+                  );
+                  const rawWins = Math.max(
+                    0,
+                    Number(inspectDetails?.stats?.wins ?? inspectPlayer.wins ?? 0)
+                  );
+                  const safeWins = Math.min(rawMatches, rawWins);
+                  const rawTotalAns = Math.max(
+                    0,
+                    Number(inspectDetails?.stats?.totalAnswers ?? rawMatches * 5)
+                  );
+                  const safeTotalAnswers =
+                    rawMatches === 0
+                      ? 0
+                      : Math.min(Math.max(rawMatches * 5, rawTotalAns), rawMatches * 10);
+                  const rawCorrect = Math.max(
+                    0,
+                    Number(inspectDetails?.stats?.correctAnswers ?? inspectPlayer.correctAnswers ?? 0)
+                  );
+                  const safeCorrect =
+                    rawMatches === 0 ? 0 : Math.min(safeTotalAnswers, rawCorrect);
+                  const accuracyPct =
+                    safeTotalAnswers > 0
+                      ? Math.min(100, Math.round((safeCorrect / safeTotalAnswers) * 100))
+                      : 0;
+                  const rawBestStreak = Math.max(
+                    0,
+                    Number(inspectDetails?.stats?.bestStreak ?? inspectPlayer.bestStreak ?? 0)
+                  );
+                  const safeStreak = Math.min(safeCorrect, rawBestStreak);
+
+                  return (
+                    <View style={styles.inspectStatsGrid}>
+                      <View style={styles.inspectStatCard}>
+                        <Text style={styles.inspectStatVal}>{rawMatches}</Text>
+                        <Text style={styles.inspectStatLbl}>Toplam Maç</Text>
+                      </View>
+                      <View style={styles.inspectStatCard}>
+                        <Text style={[styles.inspectStatVal, { color: '#3FD08A' }]}>{safeWins}</Text>
+                        <Text style={styles.inspectStatLbl}>Galibiyet</Text>
+                      </View>
+                      <View style={styles.inspectStatCard}>
+                        <Text style={[styles.inspectStatVal, { color: '#FFC43D' }]}>
+                          {safeCorrect}/{safeTotalAnswers}
+                        </Text>
+                        <Text style={styles.inspectStatLbl}>Doğru (%{accuracyPct})</Text>
+                      </View>
+                      <View style={styles.inspectStatCard}>
+                        <Text style={[styles.inspectStatVal, { color: '#38BDF8' }]}>
+                          {safeStreak}x
+                        </Text>
+                        <Text style={styles.inspectStatLbl}>En İyi Seri</Text>
+                      </View>
+                    </View>
+                  );
+                })()}
                 {/* Action buttons */}
                 <View style={{ width: '100%', gap: 10, marginTop: 14 }}>
                   <Button3D
-                    title="⚡ 1V1 DÜELLOYA DAVET ET"
+                    title="1V1 DÜELLOYA DAVET ET"
                     variant="gold"
                     onPress={() => {
-                      const pid = inspectPlayer.id;
+                      const target = inspectPlayer;
                       setInspectPlayer(null);
-                      onInviteToMatch(pid);
+                      handleSendChallenge(target);
                     }}
                     style={{ width: '100%' }}
+                    textStyle={{ fontSize: 13 }}
                   />
-                  {!inspectPlayer.isFriend && (
+                  {!inspectPlayer.isFriend ? (
                     <Button3D
                       title="+ ARKADAŞ OLARAK EKLE"
                       variant="mint"
                       onPress={() => {
                         setAddInput(inspectPlayer.username || inspectPlayer.id);
-                        setActiveTab('add');
+                        switchTabSmooth('add');
                         setInspectPlayer(null);
                       }}
                       style={{ width: '100%' }}
+                      textStyle={{ fontSize: 13 }}
                     />
+                  ) : confirmRemoveId === inspectPlayer.id ? (
+                    <View style={styles.removeConfirmBox}>
+                      <Text style={styles.removeConfirmText}>
+                        {inspectPlayer.displayName || inspectPlayer.name} arkadaş listenden çıkarılsın mı?
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                        <Button3D
+                          title={removingFriend ? 'ÇIKARILIYOR...' : 'EVET, ÇIKAR'}
+                          variant="red"
+                          disabled={removingFriend}
+                          onPress={() => handleRemoveFriend(inspectPlayer)}
+                          style={{ flex: 1, minHeight: 38 }}
+                          textStyle={{ fontSize: 12 }}
+                        />
+                        <Button3D
+                          title="VAZGEÇ"
+                          variant="purple"
+                          disabled={removingFriend}
+                          onPress={() => setConfirmRemoveId(null)}
+                          style={{ flex: 1, minHeight: 38 }}
+                          textStyle={{ fontSize: 12 }}
+                        />
+                      </View>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.removeFriendOutlineBtn}
+                      activeOpacity={0.82}
+                      onPress={() => {
+                        sound.playSound('tap');
+                        setConfirmRemoveId(inspectPlayer.id);
+                      }}
+                    >
+                      <Text style={styles.removeFriendOutlineText}>Arkadaşlıktan Çıkar</Text>
+                    </TouchableOpacity>
                   )}
                 </View>
               </ScrollView>
@@ -882,51 +1026,73 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: THEME.fonts.display,
-    fontSize: 34,
+    fontSize: 28,
     color: '#FFFFFF',
     textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 12,
+    marginTop: 4,
+    marginBottom: 10,
   },
   codeCard: {
-    padding: 16,
-    marginBottom: 16,
-    borderRadius: 22,
-    backgroundColor: 'rgba(28, 12, 62, 0.88)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+    borderRadius: 18,
+    backgroundColor: 'rgba(28, 12, 62, 0.9)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 196, 61, 0.45)',
+    borderColor: 'rgba(255, 196, 61, 0.4)',
+  },
+  codeTopRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
   },
   codeHeaderLabel: {
     color: '#D9CDF5',
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: THEME.fonts.extraBold,
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  codePillBox: {
-    width: '100%',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(8, 3, 20, 0.72)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
+    letterSpacing: 0.8,
   },
   codeValueText: {
     fontFamily: THEME.fonts.display,
-    fontSize: 26,
+    fontSize: 20,
     color: '#FFC43D',
-    letterSpacing: 3,
-    textAlign: 'center',
+    letterSpacing: 1.5,
+    marginTop: 2,
   },
   codeActionsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  removeFriendOutlineBtn: {
     width: '100%',
-    gap: 10,
+    paddingVertical: 11,
+    borderRadius: 14,
+    borderWidth: 1.2,
+    borderColor: 'rgba(255, 92, 119, 0.5)',
+    backgroundColor: 'rgba(255, 92, 119, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeFriendOutlineText: {
+    color: '#FF8598',
+    fontSize: 12.5,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  removeConfirmBox: {
+    width: '100%',
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 92, 119, 0.12)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255, 92, 119, 0.55)',
+  },
+  removeConfirmText: {
+    color: '#FFD1DA',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
+    textAlign: 'center',
   },
   challengeNoticeCard: {
     paddingHorizontal: 16,

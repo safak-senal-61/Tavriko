@@ -442,6 +442,7 @@ export class SocketService {
       if (settings.questionTimeSec) queryParts.push(`questionTimeSec=${settings.questionTimeSec}`);
       if (settings.penaltyForWrong !== undefined) queryParts.push(`penaltyForWrong=${settings.penaltyForWrong}`);
       if (settings.difficulty) queryParts.push(`difficulty=${settings.difficulty}`);
+      if (settings.privacy) queryParts.push(`privacy=${settings.privacy}`);
       if (settings.categories && settings.categories.length > 0) queryParts.push(`category=${settings.categories[0]}`);
     }
 

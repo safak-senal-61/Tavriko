@@ -5,13 +5,19 @@ const prismaClient_1 = require("../db/prismaClient");
 const presenceManager_1 = require("../services/presenceManager");
 const shared_1 = require("@trivia/shared");
 const router = (0, express_1.Router)();
-router.get('/leaderboard', (req, res) => {
-    const topPlayers = prismaClient_1.db.getLeaderboard(30);
-    res.json({
-        season: 'Sezon 1: Bilgi Çağı',
-        endsInDays: 45,
-        topPlayers,
-    });
+router.get('/leaderboard', async (req, res) => {
+    try {
+        const topPlayers = await prismaClient_1.db.getLeaderboardAsync(30);
+        res.json({
+            season: 'Sezon 1: Bilgi Çağı',
+            endsInDays: 45,
+            topPlayers,
+            leaders: topPlayers,
+        });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 router.get('/friends/:userId', async (req, res) => {
     try {
@@ -31,6 +37,25 @@ router.post('/friends/add', async (req, res) => {
             return;
         }
         const result = await prismaClient_1.db.addFriend(userId, codeOrUsername);
+        if (!result.success) {
+            res.status(400).json({ error: result.error });
+            return;
+        }
+        res.json(result);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/friends/remove', async (req, res) => {
+    try {
+        const { userId, friendId, targetUserId } = req.body;
+        const target = friendId || targetUserId;
+        if (!userId || !target) {
+            res.status(400).json({ error: 'userId ve friendId zorunludur.' });
+            return;
+        }
+        const result = await prismaClient_1.db.removeFriend(userId, target);
         if (!result.success) {
             res.status(400).json({ error: result.error });
             return;
@@ -117,9 +142,38 @@ router.post('/presence/heartbeat', (req, res) => {
 // --- Room Status Sync ---
 router.post('/rooms/active', (req, res) => {
     try {
-        const { userId, roomCode } = req.body;
+        const { userId, roomCode, name, hostName, category, categoryName, players, playerCount, maxPlayers, totalRounds, questionTimeSec, status, privacy, } = req.body;
+        const resolvedPlayers = typeof players === 'number' ? players : typeof playerCount === 'number' ? playerCount : undefined;
         if (userId) {
-            prismaClient_1.db.setUserActiveRoom(userId, roomCode || null);
+            prismaClient_1.db.setUserActiveRoom(userId, roomCode || null, roomCode
+                ? {
+                    name,
+                    hostName,
+                    category,
+                    categoryName,
+                    players: resolvedPlayers,
+                    maxPlayers,
+                    totalRounds,
+                    questionTimeSec,
+                    status,
+                    privacy,
+                }
+                : undefined);
+        }
+        else if (roomCode) {
+            prismaClient_1.db.upsertPublicRoom({
+                code: roomCode,
+                name,
+                hostName,
+                category,
+                categoryName,
+                players: resolvedPlayers,
+                maxPlayers,
+                totalRounds,
+                questionTimeSec,
+                status,
+                privacy,
+            });
         }
         res.json({ success: true });
     }

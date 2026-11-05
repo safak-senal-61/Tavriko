@@ -26,15 +26,30 @@ interface LeaderboardScreenProps {
 }
 interface LeaderboardEntry {
   rank: number;
+  id?: string;
   userId: string;
+  username?: string;
   displayName: string;
   avatarUrl?: string;
   rankPoints: number;
   level: number;
   xp: number;
   rankTitle: string;
-  winRate: number;
+  winRate?: number;
 }
+
+const normalizeLeaderName = (name?: string) =>
+  (name || '')
+    .toLowerCase()
+    .replace(/ş/g, 's')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c')
+    .replace(/ı/g, 'i')
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+
 export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
   user,
   apiBaseUrl,
@@ -53,9 +68,21 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
       .then((res) => res.json())
       .then((data) => {
         if (!isMounted) return;
-        const list = Array.isArray(data) ? data : data?.topPlayers;
+        const list = Array.isArray(data) ? data : data?.topPlayers || data?.leaders;
         if (Array.isArray(list)) {
-          setLeaders(list);
+          const normalized: LeaderboardEntry[] = list.map((item: any, idx: number) => ({
+            rank: idx + 1,
+            id: item.id || item.userId,
+            userId: item.userId || item.id || `u_${idx}`,
+            username: item.username,
+            displayName: item.displayName || item.username || 'Oyuncu',
+            avatarUrl: item.avatarUrl,
+            rankPoints: Number(item.rankPoints) || 1000,
+            level: Number(item.level) || 1,
+            xp: Number(item.xp) || 0,
+            rankTitle: item.rankTitle || 'Acemi Kaşif',
+          }));
+          setLeaders(normalized);
         }
       })
       .catch(() => {})
@@ -66,9 +93,25 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
       isMounted = false;
     };
   }, [apiBaseUrl, user?.rankPoints, user?.xp]);
-  const sortedLeaders = [...leaders].sort((a, b) =>
-    activeTab === 'weekly' ? b.rankPoints - a.rankPoints : b.xp - a.xp
-  );
+
+  const sortedLeaders = React.useMemo(() => {
+    const sorted = [...leaders].sort((a, b) =>
+      activeTab === 'weekly' ? b.rankPoints - a.rankPoints || b.xp - a.xp : b.xp - a.xp || b.rankPoints - a.rankPoints
+    );
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
+    const unique: LeaderboardEntry[] = [];
+    for (const entry of sorted) {
+      const uid = (entry.userId || entry.id || '').trim();
+      const nameKey = normalizeLeaderName(entry.displayName || entry.username);
+      if (uid && seenIds.has(uid)) continue;
+      if (nameKey && seenNames.has(nameKey)) continue;
+      if (uid) seenIds.add(uid);
+      if (nameKey) seenNames.add(nameKey);
+      unique.push(entry);
+    }
+    return unique;
+  }, [leaders, activeTab]);
   return (
     <TavrikoScreen>
       <TavrikoTopBar
@@ -113,7 +156,7 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
         ) : (
           <View style={styles.listCard}>
             {sortedLeaders.map((item, idx) => {
-              const isMe = user ? item.userId === user.id : false;
+              const isMe = user ? item.userId === user.id || item.id === user.id : false;
               const displayRank = idx + 1;
               return (
                 <View
@@ -125,11 +168,11 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
                     seed={item.avatarUrl || item.displayName}
                     size={36}
                   />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.nameText}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.nameText} numberOfLines={1}>
                       {item.displayName} {isMe ? '(Sen)' : ''}
                     </Text>
-                    <Text style={styles.subRankText}>
+                    <Text style={styles.subRankText} numberOfLines={1}>
                       Seviye {item.level} · {item.rankTitle}
                     </Text>
                   </View>

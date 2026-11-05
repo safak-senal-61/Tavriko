@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Modal,
   Platform,
+  Animated,
 } from 'react-native';
 import Svg, {
   Defs,
@@ -228,6 +229,38 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const [isError, setIsError] = useState<boolean>(false);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const [confirmProduct, setConfirmProduct] = useState<ShopProduct | null>(null);
+  const tabScrollRef = useRef<any>(null);
+  const contentOpacity = useRef(new Animated.Value(1)).current;
+  const contentTranslateX = useRef(new Animated.Value(0)).current;
+
+  const handleSelectCategoryTab = (catId: ShopProductCategory, idx: number) => {
+    if (catId === activeTab) return;
+    const prevIdx = CATEGORY_TABS.findIndex((c) => c.id === activeTab);
+    const direction = idx >= prevIdx ? 14 : -14;
+    sound.playSound('tap');
+    sound.triggerHaptic('light');
+    setStatusMessage(null);
+    tabScrollRef.current?.scrollTo({
+      x: Math.max(0, idx * 108 - 96),
+      animated: true,
+    });
+    contentOpacity.setValue(0.25);
+    contentTranslateX.setValue(direction);
+    setActiveTab(catId);
+    Animated.parallel([
+      Animated.timing(contentOpacity, {
+        toValue: 1,
+        duration: 210,
+        useNativeDriver: true,
+      }),
+      Animated.spring(contentTranslateX, {
+        toValue: 0,
+        damping: 18,
+        stiffness: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
   const filteredProducts = SHOP_CATALOG.filter((p) => p.category === activeTab);
 
@@ -358,23 +391,23 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           <Text style={styles.shopTitle}>MAĞAZA</Text>
         </View>
 
-        {/* Tavriko UI Kit 7 Mağaza Sekmesi */}
+        {/* Tavriko UI Kit Mağaza Sekmeleri (Yumuşak Kaydırma & Tam Kenar Geçişi) */}
         <ScrollView
+          ref={tabScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
+          decelerationRate="fast"
+          style={styles.categoryScrollWrap}
           contentContainerStyle={styles.categoryScroll}
         >
-          {CATEGORY_TABS.map((cat) => {
+          {CATEGORY_TABS.map((cat, idx) => {
             const isActive = activeTab === cat.id;
             return (
               <TouchableOpacity
                 key={cat.id}
+                activeOpacity={0.85}
                 style={[styles.categoryTab, isActive && styles.categoryTabActive]}
-                onPress={() => {
-                  sound.playSound('tap');
-                  setActiveTab(cat.id);
-                  setStatusMessage(null);
-                }}
+                onPress={() => handleSelectCategoryTab(cat.id, idx)}
               >
                 <Text style={styles.categoryIcon}>{cat.icon}</Text>
                 <Text style={[styles.categoryName, isActive && styles.categoryNameActive]}>
@@ -394,8 +427,16 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </View>
         )}
 
-        {/* Ürün Izgarası (Tavriko UI Kit Kartları) */}
-        <View style={styles.productGrid}>
+        {/* Ürün Izgarası (Yumuşak Sekme Geçiş Animasyonu ile) */}
+        <Animated.View
+          style={[
+            styles.productGrid,
+            {
+              opacity: contentOpacity,
+              transform: [{ translateX: contentTranslateX }],
+            },
+          ]}
+        >
           {filteredProducts.map((item) => {
             const owned = isProductOwned(item);
             const rarityColor = RARITY_COLORS[item.rarity || 'common'];
@@ -458,7 +499,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               </View>
             );
           })}
-        </View>
+        </Animated.View>
       </ScrollView>
 
       {/* Satın Alma Onay Modalı */}
@@ -522,7 +563,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 160,
-    paddingHorizontal: 12,
+    paddingHorizontal: 4,
   },
   heroWrap: {
     alignItems: 'center',
@@ -535,7 +576,11 @@ const styles = StyleSheet.create({
     color: '#FFC837',
     letterSpacing: 2,
   },
+  categoryScrollWrap: {
+    marginHorizontal: -22,
+  },
   categoryScroll: {
+    paddingHorizontal: 22,
     paddingVertical: 8,
     gap: 8,
   },

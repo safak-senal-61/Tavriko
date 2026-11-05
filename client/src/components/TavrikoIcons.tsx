@@ -1253,11 +1253,11 @@ export const TavrikoSecondaryBottomNav: React.FC<{
   onSelectTab: (tab: SecondaryNavTab) => void;
 }> = ({ activeTab, onSelectTab }) => {
   const items: { key: SecondaryNavTab; label: string }[] = [
-    { key: 'shop', label: 'Shop' },
-    { key: 'leagues', label: 'Leagues' },
-    { key: 'play', label: 'Play' },
-    { key: 'events', label: 'Events' },
-    { key: 'inventory', label: 'Inventory' },
+    { key: 'shop', label: 'Mağaza' },
+    { key: 'leagues', label: 'Ligler' },
+    { key: 'play', label: 'Oyna' },
+    { key: 'events', label: 'Etkinlik' },
+    { key: 'inventory', label: 'Envanter' },
   ];
   return (
     <View style={styles.bottomNav}>

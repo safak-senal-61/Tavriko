@@ -355,7 +355,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
             <Text style={styles.questionMark}>?</Text>
           </Animated.View>
           <View style={styles.playerInfo}>
-            <Text style={styles.playerName} numberOfLines={1} ellipsizeMode="tail">
+            <Text style={styles.playerName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>
               {elapsedSec >= 7 ? 'Bilgisayar' : 'Rakip Aranıyor'}
             </Text>
             <View
@@ -364,7 +364,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
                 elapsedSec >= 7 && styles.botAssigningBadge,
               ]}
             >
-              <Text style={styles.searchingBadgeText}>
+              <Text style={styles.searchingBadgeText} numberOfLines={1}>
                 {elapsedSec >= 7 ? '🤖 BOT' : '🔍 TARANIYOR'}
               </Text>
             </View>
@@ -522,62 +522,66 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginHorizontal: 12,
+    marginHorizontal: 8,
     marginBottom: 8,
-    gap: 6,
+    gap: 5,
   },
   playerCard: {
     flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    gap: 8,
-    minHeight: 56,
+    paddingVertical: 7,
+    paddingHorizontal: 7,
+    gap: 6,
+    minHeight: 54,
   },
   opponentSearchingCard: {
     backgroundColor: 'rgba(111, 227, 193, 0.06)',
     borderColor: 'rgba(111, 227, 193, 0.3)',
   },
   myAvatarWrap: {
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 2,
     borderColor: '#7CFC8A',
     overflow: 'hidden',
+    flexShrink: 0,
   },
   opponentAvatarWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
     borderWidth: 2,
     borderColor: '#6FE3C1',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   questionMark: {
     color: '#6FE3C1',
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: THEME.fonts.display,
   },
   playerInfo: {
     flex: 1,
+    minWidth: 0,
     justifyContent: 'center',
   },
   playerName: {
     fontFamily: THEME.fonts.display,
-    fontSize: 12.5,
+    fontSize: 11.5,
     color: '#FFFFFF',
     marginBottom: 3,
   },
   readyBadge: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(124, 252, 138, 0.2)',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 1.5,
     borderRadius: 6,
     borderWidth: 1,
@@ -585,17 +589,18 @@ const styles = StyleSheet.create({
   },
   readyBadgeText: {
     color: '#7CFC8A',
-    fontSize: 9.5,
+    fontSize: 9,
     fontFamily: THEME.fonts.extraBold,
   },
   searchingBadge: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(111, 227, 193, 0.2)',
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 1.5,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#6FE3C1',
+    maxWidth: '100%',
   },
   botAssigningBadge: {
     backgroundColor: 'rgba(255, 196, 61, 0.2)',
@@ -603,23 +608,24 @@ const styles = StyleSheet.create({
   },
   searchingBadgeText: {
     color: '#6FE3C1',
-    fontSize: 9.5,
+    fontSize: 9,
     fontFamily: THEME.fonts.extraBold,
   },
   vsBadgeSmall: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#FFB21E',
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
+    flexShrink: 0,
   },
   vsBadgeText: {
     fontFamily: THEME.fonts.display,
-    fontSize: 13,
+    fontSize: 11.5,
     color: '#2A1558',
   },
   radarContainer: {

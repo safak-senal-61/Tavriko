@@ -16,7 +16,7 @@ import { CustomRoomSettings, CategoryId, DifficultyLevel } from '@trivia/shared'
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
-import { getApiBaseUrl } from '../config';
+import { getApiBaseUrl, getRealtimeUrl } from '../config';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -66,52 +66,34 @@ interface PublicRoomItem {
   maxPlayers: number;
 }
 
-const PUBLIC_ROOMS: PublicRoomItem[] = [
-  {
-    id: 'pub1',
-    code: 'DNZ720',
-    title: "Deniz'in Odası",
-    categoryKey: 'bilim',
-    categoryName: 'Bilim',
-    totalRounds: 7,
-    timeSec: 20,
-    players: 3,
-    maxPlayers: 4,
-  },
-  {
-    id: 'pub2',
-    code: 'ECE40S',
-    title: 'Ece Arena',
-    categoryKey: 'genel_kultur',
-    categoryName: 'Karışık',
-    totalRounds: 14,
-    timeSec: 40,
-    players: 2,
-    maxPlayers: 6,
-  },
-  {
-    id: 'pub3',
-    code: 'BRK8SP',
-    title: 'Burak Challenge',
-    categoryKey: 'spor',
-    categoryName: 'Spor',
-    totalRounds: 7,
-    timeSec: 20,
-    players: 5,
-    maxPlayers: 8,
-  },
-  {
-    id: 'pub4',
-    code: 'GLK20S',
-    title: 'Galaksi Turu',
-    categoryKey: 'uzay',
-    categoryName: 'Uzay',
-    totalRounds: 21,
-    timeSec: 20,
-    players: 1,
-    maxPlayers: 4,
-  },
-];
+const CATEGORY_LABELS: Record<string, string> = {
+  general_culture: 'Genel Kültür',
+  genel_kultur: 'Genel Kültür',
+  science_tech: 'Bilim & Teknoloji',
+  bilim: 'Bilim & Teknoloji',
+  history: 'Tarih',
+  tarih: 'Tarih',
+  geography: 'Coğrafya',
+  cografya: 'Coğrafya',
+  sports: 'Spor',
+  spor: 'Spor',
+  cinema_tv: 'Sinema & TV',
+  sinema: 'Sinema & TV',
+  art_culture: 'Sanat & Kültür',
+  sanat: 'Sanat & Kültür',
+  mixed: 'Karışık',
+};
+
+const FAKE_ROOM_CODES = new Set([
+  'DNZ720',
+  'ECE40S',
+  'BRK8SP',
+  'GLK20S',
+  'T4R9A1',
+  'EGE992',
+  'BUR771',
+  'GLX883',
+]);
 
 export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   onBack,
@@ -141,35 +123,78 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<CategoryData | 'mixed'>('mixed');
   const [isCategoryModalVisible, setCategoryModalVisible] = useState(false);
 
-  // Canlı Veritabanı ve WebSocket Odaları
-  const [publicRooms, setPublicRooms] = useState<PublicRoomItem[]>(PUBLIC_ROOMS);
+  // Canlı Veritabanı ve WebSocket Odaları (Sahte/mock odalar kaldırıldı)
+  const [publicRooms, setPublicRooms] = useState<PublicRoomItem[]>([]);
   const [isLoadingPublicRooms, setIsLoadingPublicRooms] = useState(false);
+
+  const normalizeRoomItem = (r: any): PublicRoomItem | null => {
+    const code = String(r?.code || '').trim().toUpperCase();
+    if (!code || FAKE_ROOM_CODES.has(code)) return null;
+    const players = Number(r?.players ?? r?.playerCount ?? 0);
+    const maxPlayers = Math.max(2, Number(r?.maxPlayers ?? 4));
+    if (players <= 0 || players >= maxPlayers) return null;
+    const rawCat = String(r?.category || r?.categoryId || 'genel_kultur');
+    const categoryName =
+      CATEGORY_LABELS[rawCat] ||
+      CATEGORY_LABELS[String(r?.categoryName || '').toLowerCase()] ||
+      r?.categoryName ||
+      'Genel Kültür';
+    const hostName = r?.hostName || r?.host || 'Oyuncu';
+    return {
+      id: code,
+      code,
+      title: r?.name || `${hostName} Odası`,
+      categoryKey: rawCat,
+      categoryName,
+      totalRounds: Math.max(1, Number(r?.totalRounds ?? r?.rounds ?? 7)),
+      timeSec: Math.max(5, Number(r?.questionTimeSec ?? r?.timeSec ?? 20)),
+      players,
+      maxPlayers,
+    };
+  };
 
   const fetchPublicRooms = async () => {
     try {
       setIsLoadingPublicRooms(true);
       const base = apiBaseUrl || getApiBaseUrl();
       const cleanBase = base.replace(/\/+$/, '');
-      const res = await fetch(`${cleanBase}/trivia/rooms/public`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && Array.isArray(data.rooms) && data.rooms.length > 0) {
-          const mapped: PublicRoomItem[] = data.rooms.map((r: any) => ({
-            id: r.code,
-            code: r.code,
-            title: r.name || `${r.hostName} Odası`,
-            categoryKey: r.category || 'genel_kultur',
-            categoryName: r.categoryName || 'Genel Kültür',
-            totalRounds: r.totalRounds || 7,
-            timeSec: r.questionTimeSec || 20,
-            players: r.playerCount || 1,
-            maxPlayers: r.maxPlayers || 4,
-          }));
-          setPublicRooms(mapped);
+      const rtUrl = getRealtimeUrl()
+        .replace(/^wss:\/\//i, 'https://')
+        .replace(/^ws:\/\//i, 'http://')
+        .replace(/\/+$/, '');
+
+      const [apiRes, rtRes] = await Promise.all([
+        fetch(`${cleanBase}/trivia/rooms/public`).catch(() => null),
+        fetch(`${rtUrl}/rooms/public`).catch(() => null),
+      ]);
+
+      const byCode = new Map<string, PublicRoomItem>();
+
+      if (rtRes && rtRes.ok) {
+        const rtData = await rtRes.json().catch(() => null);
+        if (rtData && Array.isArray(rtData.rooms)) {
+          for (const r of rtData.rooms) {
+            const item = normalizeRoomItem(r);
+            if (item) byCode.set(item.code, item);
+          }
         }
       }
+
+      if (apiRes && apiRes.ok) {
+        const apiData = await apiRes.json().catch(() => null);
+        if (apiData && Array.isArray(apiData.rooms)) {
+          for (const r of apiData.rooms) {
+            const item = normalizeRoomItem(r);
+            if (item && !byCode.has(item.code)) {
+              byCode.set(item.code, item);
+            }
+          }
+        }
+      }
+
+      setPublicRooms(Array.from(byCode.values()));
     } catch {
-      // Bağlantı yavaşsa mevcut listeyi koru
+      setPublicRooms([]);
     } finally {
       setIsLoadingPublicRooms(false);
     }
@@ -178,21 +203,13 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   useEffect(() => {
     if (activeTab === 'join') {
       fetchPublicRooms();
-      const interval = setInterval(fetchPublicRooms, 5000);
+      const interval = setInterval(fetchPublicRooms, 4000);
       const unsub = socketService.onPublicRoomsUpdate((rooms) => {
-        if (Array.isArray(rooms) && rooms.length > 0) {
-          const mapped: PublicRoomItem[] = rooms.map((r: any) => ({
-            id: r.code,
-            code: r.code,
-            title: r.name || `${r.hostName} Odası`,
-            categoryKey: r.category || 'genel_kultur',
-            categoryName: r.categoryName || 'Genel Kültür',
-            totalRounds: r.totalRounds || 7,
-            timeSec: r.questionTimeSec || 20,
-            players: r.playerCount || 1,
-            maxPlayers: r.maxPlayers || 4,
-          }));
-          setPublicRooms(mapped);
+        if (Array.isArray(rooms)) {
+          const valid = rooms
+            .map((r: any) => normalizeRoomItem(r))
+            .filter((item): item is PublicRoomItem => Boolean(item));
+          setPublicRooms(valid);
         }
       });
       socketService.getPublicRooms();
@@ -607,33 +624,59 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
             </View>
 
             <View style={styles.publicRoomsList}>
-              {publicRooms.map((room) => (
-                <View key={room.id} style={styles.publicRoomCard}>
-                  <View style={styles.publicRoomIconWrap}>
-                    <CategorySquircleIcon category={room.categoryKey} size={42} />
-                  </View>
-                  <View style={styles.publicRoomInfo}>
-                    <Text style={styles.publicRoomTitle} numberOfLines={1}>{room.title}</Text>
-                    <Text style={styles.publicRoomSub}>
-                      {room.categoryName} · {room.totalRounds} soru · {room.timeSec}sn
-                    </Text>
-                  </View>
-                  <View style={styles.publicRoomPill}>
-                    <Text style={styles.publicRoomPillText}>{room.players}/{room.maxPlayers}</Text>
-                  </View>
+              {publicRooms.length === 0 ? (
+                <View style={styles.emptyPublicRoomsBox}>
+                  <Text style={styles.emptyPublicRoomsEmoji}>🏟️</Text>
+                  <Text style={styles.emptyPublicRoomsTitle}>
+                    {isLoadingPublicRooms ? 'Aktif Odalar Taranıyor...' : 'Şu An Açık Oda Yok'}
+                  </Text>
+                  <Text style={styles.emptyPublicRoomsSub}>
+                    Herkese açık bekleyen bir oda bulunmuyor. Kendi odanı kurup diğer oyuncuları bekleyebilirsin!
+                  </Text>
                   <TouchableOpacity
-                    style={styles.publicRoomJoinBtn}
+                    style={styles.emptyCreateShortcutBtn}
                     activeOpacity={0.85}
                     onPress={() => {
                       sound.playSound('tap');
-                      sound.triggerHaptic('medium');
-                      onJoinRoom(room.code);
+                      setActiveTab('create');
                     }}
                   >
-                    <Text style={styles.publicRoomJoinBtnText}>KATIL</Text>
+                    <Text style={styles.emptyCreateShortcutBtnText}>+ Hemen Oda Kur</Text>
                   </TouchableOpacity>
                 </View>
-              ))}
+              ) : (
+                publicRooms.map((room) => (
+                  <View key={room.id} style={styles.publicRoomCard}>
+                    <View style={styles.publicRoomIconWrap}>
+                      <CategorySquircleIcon category={room.categoryKey} size={42} />
+                    </View>
+                    <View style={styles.publicRoomInfo}>
+                      <Text style={styles.publicRoomTitle} numberOfLines={1}>
+                        {room.title}
+                      </Text>
+                      <Text style={styles.publicRoomSub} numberOfLines={1}>
+                        {room.categoryName} · {room.totalRounds} soru · {room.timeSec}sn
+                      </Text>
+                    </View>
+                    <View style={styles.publicRoomPill}>
+                      <Text style={styles.publicRoomPillText}>
+                        {room.players}/{room.maxPlayers} Kişi
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.publicRoomJoinBtn}
+                      activeOpacity={0.85}
+                      onPress={() => {
+                        sound.playSound('tap');
+                        sound.triggerHaptic('medium');
+                        onJoinRoom(room.code);
+                      }}
+                    >
+                      <Text style={styles.publicRoomJoinBtnText}>KATIL</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
             </View>
           </View>
         )}
@@ -1035,6 +1078,52 @@ const styles = StyleSheet.create({
   publicRoomsList: {
     width: '100%',
     gap: 8,
+  },
+  emptyPublicRoomsBox: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 22,
+    paddingHorizontal: 16,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    gap: 6,
+  },
+  emptyPublicRoomsEmoji: {
+    fontSize: 26,
+    marginBottom: 2,
+  },
+  emptyPublicRoomsTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  emptyPublicRoomsSub: {
+    color: '#A79BC4',
+    fontSize: 12,
+    fontFamily: THEME.fonts.medium,
+    textAlign: 'center',
+    lineHeight: 17,
+    maxWidth: 280,
+  },
+  emptyCreateShortcutBtn: {
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 14,
+    backgroundColor: 'rgba(107, 60, 255, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(154, 107, 255, 0.55)',
+  },
+  emptyCreateShortcutBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    fontWeight: '800',
   },
   publicRoomCard: {
     flexDirection: 'row',

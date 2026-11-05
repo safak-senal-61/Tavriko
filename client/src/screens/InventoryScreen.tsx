@@ -80,10 +80,30 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   const [isOpeningChest, setIsOpeningChest] = useState<boolean>(false);
   const [chestRewards, setChestRewards] = useState<any[] | null>(null);
 
-  // Animation values for chest opening
+  // Animation values for chest opening & smooth tab transitions
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const invTabScrollRef = useRef<any>(null);
+  const tabContentOpacity = useRef(new Animated.Value(1)).current;
+
+  const handleSelectInvTab = (tabId: InvTabType, idx: number) => {
+    if (tabId === activeTab) return;
+    sound.playSound('tap');
+    sound.triggerHaptic('light');
+    setStatusMessage(null);
+    invTabScrollRef.current?.scrollTo({
+      x: Math.max(0, idx * 105 - 90),
+      animated: true,
+    });
+    tabContentOpacity.setValue(0.25);
+    setActiveTab(tabId);
+    Animated.timing(tabContentOpacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
 
   // Real items from user inventory - NO defaultItems fallback!
   const userInventory: InventoryItem[] = user?.inventory || [];
@@ -227,21 +247,21 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 
         {/* 7 Tabs Horizontal Scroll */}
         <ScrollView
+          ref={invTabScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
+          decelerationRate="fast"
+          style={styles.tabsScrollWrap}
           contentContainerStyle={styles.tabsRow}
         >
-          {INV_TABS.map((tab) => {
+          {INV_TABS.map((tab, idx) => {
             const isActive = activeTab === tab.id;
             return (
               <TouchableOpacity
                 key={tab.id}
+                activeOpacity={0.85}
                 style={[styles.tabPill, isActive && styles.tabPillActive]}
-                onPress={() => {
-                  sound.playSound('tap');
-                  setActiveTab(tab.id);
-                  setStatusMessage(null);
-                }}
+                onPress={() => handleSelectInvTab(tab.id, idx)}
               >
                 <Text style={styles.tabIcon}>{tab.icon}</Text>
                 <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
@@ -435,7 +455,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 140,
-    paddingHorizontal: 12,
+    paddingHorizontal: 4,
   },
   heroWrap: {
     alignItems: 'center',
@@ -454,7 +474,11 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.medium,
     marginTop: 2,
   },
+  tabsScrollWrap: {
+    marginHorizontal: -22,
+  },
   tabsRow: {
+    paddingHorizontal: 22,
     paddingVertical: 10,
     gap: 8,
   },

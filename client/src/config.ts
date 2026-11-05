@@ -38,6 +38,23 @@ export const getRealtimeWsUrl = (path: string = '/ws'): string => {
   return `wss://${CLOUDFLARE_WS_DEFAULT_HOST}${cleanPath}`;
 };
 
+export const getRealtimeUrl = (): string => {
+  const envUrl = process.env.EXPO_PUBLIC_REALTIME_WS_URL;
+  if (envUrl) {
+    return envUrl
+      .replace(/^wss:\/\//i, 'https://')
+      .replace(/^ws:\/\//i, 'http://')
+      .replace(/\/+$/, '');
+  }
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocalhost) {
+      return 'http://localhost:8787';
+    }
+  }
+  return `https://${CLOUDFLARE_WS_DEFAULT_HOST}`;
+};
+
 export const getApiBaseUrl = (): string => {
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location && window.location.origin) {
     // In web browser, use current host origin to ensure SSL and zero CORS issues

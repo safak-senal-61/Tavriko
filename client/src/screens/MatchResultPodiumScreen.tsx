@@ -296,9 +296,11 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
                     <View style={styles.accordionIconCircle}>
                       <Text style={styles.accordionIconText}>📋</Text>
                     </View>
-                    <View>
-                      <Text style={styles.accordionTitle}>SORU CEVAPLARI & ANALİZ</Text>
-                      <Text style={styles.accordionSubtitle}>
+                    <View style={styles.accordionTextWrap}>
+                      <Text style={styles.accordionTitle} numberOfLines={1}>
+                        SORU CEVAPLARI & ANALİZ
+                      </Text>
+                      <Text style={styles.accordionSubtitle} numberOfLines={2}>
                         {isQuestionsMenuOpen
                           ? 'Menüyü gizlemek için dokun'
                           : 'Soruları ve doğru çözümleri görmek için dokun'}
@@ -308,12 +310,12 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
 
                   <View style={styles.accordionRightGroup}>
                     <View style={styles.reviewScorePill}>
-                      <Text style={styles.reviewScoreText}>
+                      <Text style={styles.reviewScoreText} numberOfLines={1}>
                         {correctCount}/{reviews.length} DOĞRU
                       </Text>
                     </View>
                     <View style={styles.chevronBadge}>
-                      <Text style={styles.chevronText}>
+                      <Text style={styles.chevronText} numberOfLines={1}>
                         {isQuestionsMenuOpen ? '▴ GİZLE' : '▾ AÇ'}
                       </Text>
                     </View>
@@ -727,37 +729,46 @@ const styles = StyleSheet.create({
   accordionTitleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
     flex: 1,
+    minWidth: 0,
+  },
+  accordionTextWrap: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 4,
   },
   accordionIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     backgroundColor: 'rgba(255, 196, 61, 0.16)',
     borderWidth: 1,
     borderColor: 'rgba(255, 196, 61, 0.4)',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   accordionIconText: {
-    fontSize: 17,
+    fontSize: 16,
   },
   accordionTitle: {
     color: '#FFC43D',
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
   },
   accordionSubtitle: {
     color: '#C4B5FD',
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: THEME.fonts.bold,
-    marginTop: 1,
+    marginTop: 2,
+    lineHeight: 14,
   },
   accordionRightGroup: {
     alignItems: 'flex-end',
-    gap: 5,
+    gap: 4,
+    flexShrink: 0,
   },
   reviewScorePill: {
     backgroundColor: 'rgba(63, 208, 138, 0.16)',

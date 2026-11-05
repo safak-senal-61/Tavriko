@@ -85,6 +85,8 @@ class PrismaService {
     categories = [...questionsData_1.ALL_CATEGORIES];
     isJest = Boolean(process.env.JEST_WORKER_ID);
     activeUserRooms = new Map();
+    recordedMatchKeys = new Set();
+    activePublicRooms = new Map();
     constructor() {
         const dbUrl = process.env.DATABASE_URL || process.env.DIRECT_URL;
         this.rawClient = new client_1.PrismaClient({
@@ -312,6 +314,42 @@ class PrismaService {
             return 'rare';
         return 'common';
     }
+    sanitizeUserStats(rawStats) {
+        const totalMatches = Math.max(0, Math.round(Number(rawStats?.totalMatches) || 0));
+        const wins = Math.min(totalMatches, Math.max(0, Math.round(Number(rawStats?.wins) || 0)));
+        if (totalMatches === 0) {
+            return {
+                totalMatches: 0,
+                wins: 0,
+                correctAnswers: 0,
+                totalAnswers: 0,
+                bestStreak: 0,
+                avgResponseTimeMs: Math.max(0, Math.round(Number(rawStats?.avgResponseTimeMs) || 0)),
+            };
+        }
+        const rawTotalAnswers = Math.max(0, Math.round(Number(rawStats?.totalAnswers) || 0));
+        // Every match has at least 5 questions and at most 20 questions
+        const minTotalAnswers = totalMatches * 5;
+        const maxTotalAnswers = totalMatches * 20;
+        const totalAnswers = Math.min(maxTotalAnswers, Math.max(minTotalAnswers, rawTotalAnswers));
+        let correctAnswers = Math.max(0, Math.round(Number(rawStats?.correctAnswers) || 0));
+        if (correctAnswers > totalAnswers) {
+            // Repair historical inflated values (where score/100 was added instead of 0..5)
+            correctAnswers = Math.min(totalAnswers, Math.max(wins * 4, Math.round(totalAnswers * 0.7)));
+        }
+        const rawBestStreak = Math.max(0, Math.round(Number(rawStats?.bestStreak) || 0));
+        const bestStreak = correctAnswers === 0
+            ? 0
+            : Math.min(correctAnswers, Math.max(1, rawBestStreak));
+        return {
+            totalMatches,
+            wins,
+            correctAnswers,
+            totalAnswers,
+            bestStreak,
+            avgResponseTimeMs: Math.max(0, Math.round(Number(rawStats?.avgResponseTimeMs) || 0)),
+        };
+    }
     // ==========================================================================
     // PRISMA MODEL DELEGATE: prisma.user
     // ==========================================================================
@@ -326,6 +364,32 @@ class PrismaService {
                 category: this.getItemCategory(item.itemId),
                 rarity: this.getItemRarity(item.itemId),
             }));
+        }
+        const sanitizedStats = this.sanitizeUserStats({
+            totalMatches: u.totalMatches,
+            wins: u.wins,
+            correctAnswers: u.correctAnswers,
+            totalAnswers: u.totalAnswers,
+            bestStreak: u.bestStreak,
+            avgResponseTimeMs: u.avgResponseTimeMs,
+        });
+        if (!this.isJest &&
+            u.id &&
+            (u.correctAnswers !== sanitizedStats.correctAnswers ||
+                u.totalAnswers !== sanitizedStats.totalAnswers ||
+                u.wins !== sanitizedStats.wins)) {
+            this.rawClient.user
+                .update({
+                where: { id: u.id },
+                data: {
+                    totalMatches: sanitizedStats.totalMatches,
+                    wins: sanitizedStats.wins,
+                    correctAnswers: sanitizedStats.correctAnswers,
+                    totalAnswers: sanitizedStats.totalAnswers,
+                    bestStreak: sanitizedStats.bestStreak,
+                },
+            })
+                .catch(() => { });
         }
         return {
             id: u.id,
@@ -365,14 +429,7 @@ class PrismaService {
             friendIds: Array.isArray(u.friendIds) ? u.friendIds : [],
             categoryMastery: u.categoryMastery || {},
             settings: u.settings || {},
-            stats: {
-                totalMatches: u.totalMatches,
-                wins: u.wins,
-                correctAnswers: u.correctAnswers,
-                totalAnswers: u.totalAnswers,
-                bestStreak: u.bestStreak,
-                avgResponseTimeMs: u.avgResponseTimeMs,
-            },
+            stats: sanitizedStats,
             createdAt: u.createdAt ? new Date(u.createdAt).getTime() : Date.now(),
         };
     }
@@ -706,6 +763,7 @@ class PrismaService {
                 if (Array.isArray(parsed)) {
                     for (const u of parsed) {
                         if (u && u.id) {
+                            u.stats = this.sanitizeUserStats(u.stats);
                             this.users.set(u.id, u);
                         }
                     }
@@ -716,9 +774,64 @@ class PrismaService {
             // Ignore read errors
         }
     }
+    getUniqueRegisteredUsers() {
+        const byId = new Map();
+        for (const u of this.users.values()) {
+            if (!u || !u.id || u.isGuest || u.id.startsWith('guest_'))
+                continue;
+            u.stats = this.sanitizeUserStats(u.stats);
+            const existing = byId.get(u.id);
+            if (!existing || (u.updatedAt || 0) >= (existing.updatedAt || 0)) {
+                byId.set(u.id, u);
+            }
+        }
+        // Secondary deduplication by email, username, and normalized displayName
+        // so multiple test accounts or alias keys with the same player name never repeat on Leaderboards
+        const normalizeKey = (s) => (s || '')
+            .toLowerCase()
+            .replace(/ş/g, 's')
+            .replace(/ğ/g, 'g')
+            .replace(/ü/g, 'u')
+            .replace(/ö/g, 'o')
+            .replace(/ç/g, 'c')
+            .replace(/ı/g, 'i')
+            .replace(/[^a-z0-9]/g, '')
+            .trim();
+        const sortedCandidates = Array.from(byId.values()).sort((a, b) => (b.rankPoints || 0) + (b.xp || 0) - ((a.rankPoints || 0) + (a.xp || 0)));
+        const seenEmails = new Set();
+        const seenUsernames = new Set();
+        const seenDisplayNames = new Set();
+        const deduplicated = [];
+        for (const u of sortedCandidates) {
+            const emailKey = (u.email || '').toLowerCase().trim();
+            const userKey = (u.username || '').toLowerCase().trim();
+            const nameKey = normalizeKey(u.displayName || u.username);
+            if (emailKey && seenEmails.has(emailKey))
+                continue;
+            if (userKey && seenUsernames.has(userKey))
+                continue;
+            if (nameKey && seenDisplayNames.has(nameKey))
+                continue;
+            if (emailKey)
+                seenEmails.add(emailKey);
+            if (userKey)
+                seenUsernames.add(userKey);
+            if (nameKey)
+                seenDisplayNames.add(nameKey);
+            deduplicated.push(u);
+        }
+        return deduplicated;
+    }
     savePersistedUsers() {
         try {
-            const list = Array.from(this.users.values()).filter((u) => !u.isGuest);
+            const byId = new Map();
+            for (const u of this.users.values()) {
+                if (u && u.id && !u.isGuest) {
+                    u.stats = this.sanitizeUserStats(u.stats);
+                    byId.set(u.id, u);
+                }
+            }
+            const list = Array.from(byId.values());
             if (!this.isJest) {
                 fs.writeFileSync(USERS_DB_FILE, JSON.stringify(list, null, 2), 'utf-8');
             }
@@ -1661,10 +1774,27 @@ class PrismaService {
         }
         if (!record)
             return null;
+        if (delta.roomCode) {
+            const matchKey = `${record.id}:${delta.roomCode}`;
+            if (this.recordedMatchKeys.has(matchKey)) {
+                return this.toProfile(record);
+            }
+            this.recordedMatchKeys.add(matchKey);
+            if (this.recordedMatchKeys.size > 2000) {
+                const firstKey = this.recordedMatchKeys.values().next().value;
+                if (firstKey)
+                    this.recordedMatchKeys.delete(firstKey);
+            }
+        }
+        const safeTotal = Math.max(1, Math.min(20, Math.round(Number(delta.totalAnswers) || 5)));
+        const safeCorrect = Math.max(0, Math.min(safeTotal, Math.round(Number(delta.correctAnswers) || 0)));
+        const safeStreak = Math.max(0, Math.min(safeCorrect, Math.round(Number(delta.bestStreak) || 0)));
+        // Ensure existing stats are sanitized before adding delta
+        record.stats = this.sanitizeUserStats(record.stats);
         // Balanced RPG XP curve: Cap single match XP to prevent rapid leveling
-        const cappedXp = Math.min(delta.xpEarned, delta.won ? 80 : 30);
+        const cappedXp = Math.max(0, Math.min(Number(delta.xpEarned) || 0, delta.won ? 80 : 30));
         record.xp += cappedXp;
-        record.coins += delta.coinsEarned;
+        record.coins += Math.max(0, Math.round(Number(delta.coinsEarned) || 0));
         // Season 1 Pass XP progression
         const seasonXpGain = delta.won ? 60 : 25;
         record.seasonXp = (record.seasonXp || 0) + seasonXpGain;
@@ -1674,16 +1804,17 @@ class PrismaService {
         record.stats.totalMatches += 1;
         if (delta.won)
             record.stats.wins += 1;
-        record.stats.correctAnswers += delta.correctAnswers;
-        record.stats.totalAnswers += delta.totalAnswers;
-        record.stats.bestStreak = Math.max(record.stats.bestStreak || 0, delta.bestStreak);
+        record.stats.correctAnswers += safeCorrect;
+        record.stats.totalAnswers += safeTotal;
+        record.stats.bestStreak = Math.max(record.stats.bestStreak || 0, safeStreak);
+        record.stats = this.sanitizeUserStats(record.stats);
         record.updatedAt = Date.now();
         // Automatically update live event progress ONLY for tasks the user actively started and not completed yet
         this.updateStartedEvents(record, {
             matches: 1,
             won: delta.won,
-            correctAnswers: delta.correctAnswers,
-            streak: delta.bestStreak,
+            correctAnswers: safeCorrect,
+            streak: safeStreak,
         });
         this.users.set(userId, record);
         this.users.set(record.id, record);
@@ -2304,21 +2435,135 @@ class PrismaService {
         return `TV-${clean || 'X'}${rand}`;
     }
     getLeaderboard(limit = 20) {
-        const list = Array.from(this.users.values())
-            .filter((u) => !u.isGuest)
-            .sort((a, b) => b.rankPoints - a.rankPoints || b.xp - a.xp)
+        const uniqueList = this.getUniqueRegisteredUsers();
+        return uniqueList
+            .sort((a, b) => (b.rankPoints || 0) - (a.rankPoints || 0) || (b.xp || 0) - (a.xp || 0))
             .slice(0, limit)
             .map((u) => this.toProfile(u));
-        return list;
     }
-    setUserActiveRoom(userId, roomCode) {
+    async getLeaderboardAsync(limit = 20) {
+        try {
+            const dbUsers = await this.rawClient.user.findMany({
+                orderBy: [{ rankPoints: 'desc' }, { xp: 'desc' }],
+                take: Math.max(limit * 3, 60),
+            });
+            if (dbUsers && dbUsers.length > 0) {
+                for (const u of dbUsers) {
+                    const rec = this.prismaUserToRecord(u);
+                    this.users.set(rec.id, rec);
+                }
+            }
+        }
+        catch {
+            // Fallback to in-memory deduplicated store
+        }
+        return this.getLeaderboard(limit);
+    }
+    upsertPublicRoom(room) {
+        const code = (room.code || '').trim().toUpperCase();
+        if (!code)
+            return;
+        if (room.privacy === 'private' || room.status === 'playing' || room.status === 'finished' || (typeof room.players === 'number' && room.players <= 0)) {
+            this.activePublicRooms.delete(code);
+            return;
+        }
+        const existing = this.activePublicRooms.get(code);
+        const catId = room.category || existing?.category || 'genel_kultur';
+        const catObj = this.categories.find((c) => c.id === catId);
+        const categoryName = room.categoryName || existing?.categoryName || catObj?.title || catObj?.name || 'Genel Kültür';
+        const hostName = room.hostName || existing?.hostName || 'Oyuncu';
+        const players = Math.max(1, Number(room.players ?? existing?.players ?? 1));
+        const maxPlayers = Math.max(2, Number(room.maxPlayers ?? existing?.maxPlayers ?? 4));
+        if (players >= maxPlayers) {
+            this.activePublicRooms.delete(code);
+            return;
+        }
+        this.activePublicRooms.set(code, {
+            code,
+            name: room.name || existing?.name || `${hostName} Odası`,
+            hostId: room.hostId || existing?.hostId || '',
+            hostName,
+            category: catId,
+            categoryName,
+            players,
+            maxPlayers,
+            totalRounds: Number(room.totalRounds ?? existing?.totalRounds ?? 5),
+            questionTimeSec: Number(room.questionTimeSec ?? existing?.questionTimeSec ?? 15),
+            status: room.status || existing?.status || 'lobby',
+            privacy: room.privacy || existing?.privacy || 'public',
+            updatedAt: Date.now(),
+        });
+    }
+    removePublicRoom(code) {
+        if (!code)
+            return;
+        this.activePublicRooms.delete(code.trim().toUpperCase());
+    }
+    getActivePublicRooms() {
+        const now = Date.now();
+        const maxAgeMs = 10 * 60 * 1000; // 10 minutes TTL for stale rooms
+        const result = [];
+        for (const [code, r] of this.activePublicRooms.entries()) {
+            if (now - r.updatedAt > maxAgeMs ||
+                r.privacy === 'private' ||
+                r.status !== 'lobby' ||
+                r.players <= 0 ||
+                r.players >= r.maxPlayers) {
+                this.activePublicRooms.delete(code);
+                continue;
+            }
+            result.push({
+                code: r.code,
+                name: r.name,
+                host: r.hostName,
+                category: r.categoryName,
+                categoryId: r.category,
+                players: r.players,
+                maxPlayers: r.maxPlayers,
+                rounds: r.totalRounds,
+                timeSec: r.questionTimeSec,
+                status: 'waiting',
+            });
+        }
+        return result;
+    }
+    setUserActiveRoom(userId, roomCode, roomMeta) {
+        const prev = this.activeUserRooms.get(userId);
         if (roomCode) {
-            this.activeUserRooms.set(userId, { roomCode, joinedAt: Date.now() });
-            presenceManager_1.presenceManager.setUserRoom(userId, roomCode);
+            const cleanCode = roomCode.trim().toUpperCase();
+            this.activeUserRooms.set(userId, { roomCode: cleanCode, joinedAt: Date.now() });
+            presenceManager_1.presenceManager.setUserRoom(userId, cleanCode);
+            if (roomMeta) {
+                const userRec = this.users.get(userId);
+                this.upsertPublicRoom({
+                    code: cleanCode,
+                    hostId: userId,
+                    hostName: roomMeta.hostName || userRec?.displayName || userRec?.username || 'Oyuncu',
+                    ...roomMeta,
+                });
+            }
         }
         else {
             this.activeUserRooms.delete(userId);
             presenceManager_1.presenceManager.setUserRoom(userId, null);
+            if (prev?.roomCode) {
+                const existingRoom = this.activePublicRooms.get(prev.roomCode);
+                if (existingRoom) {
+                    // Count how many active users are still in this roomCode
+                    let remaining = 0;
+                    for (const entry of this.activeUserRooms.values()) {
+                        if (entry.roomCode === prev.roomCode)
+                            remaining++;
+                    }
+                    if (remaining <= 0 || existingRoom.hostId === userId) {
+                        this.activePublicRooms.delete(prev.roomCode);
+                    }
+                    else {
+                        existingRoom.players = remaining;
+                        existingRoom.updatedAt = Date.now();
+                    }
+                }
+            }
         }
     }
     getFriendsForUser(userId) {
@@ -2364,6 +2609,7 @@ class PrismaService {
                 continue;
             const isFriend = true;
             const prog = (0, shared_1.calculateLevelFromXp)(u.xp || 0);
+            const safeStats = this.sanitizeUserStats(u.stats);
             const presence = presenceManager_1.presenceManager.getUserPresence(u.id);
             const isOnline = presence.online;
             const inRoom = presence.inRoom;
@@ -2385,10 +2631,11 @@ class PrismaService {
                 rankTitle: prog.rankTitle,
                 rankPoints: u.rankPoints || 1000,
                 xp: u.xp || 0,
-                wins: u.stats?.wins || 0,
-                totalMatches: u.stats?.totalMatches || 0,
-                correctAnswers: u.stats?.correctAnswers || 0,
-                bestStreak: u.stats?.bestStreak || 0,
+                wins: safeStats.wins,
+                totalMatches: safeStats.totalMatches,
+                correctAnswers: safeStats.correctAnswers,
+                totalAnswers: safeStats.totalAnswers,
+                bestStreak: safeStats.bestStreak,
                 countryCode: u.countryCode || 'TR',
                 countryName: u.countryName || 'Türkiye',
                 online: isOnline,
@@ -2490,6 +2737,7 @@ class PrismaService {
                 continue;
             const isFriend = true;
             const prog = (0, shared_1.calculateLevelFromXp)(u.xp || 0);
+            const safeStats = this.sanitizeUserStats(u.stats);
             // REAL-TIME WEBSOCKET PRESENCE
             const presence = presenceManager_1.presenceManager.getUserPresence(u.id);
             const isOnline = presence.online;
@@ -2512,10 +2760,11 @@ class PrismaService {
                 rankTitle: prog.rankTitle,
                 rankPoints: u.rankPoints || 1000,
                 xp: u.xp || 0,
-                wins: u.stats?.wins || 0,
-                totalMatches: u.stats?.totalMatches || 0,
-                correctAnswers: u.stats?.correctAnswers || 0,
-                bestStreak: u.stats?.bestStreak || 0,
+                wins: safeStats.wins,
+                totalMatches: safeStats.totalMatches,
+                correctAnswers: safeStats.correctAnswers,
+                totalAnswers: safeStats.totalAnswers,
+                bestStreak: safeStats.bestStreak,
                 countryCode: u.countryCode || 'TR',
                 countryName: u.countryName || 'Türkiye',
                 online: isOnline,
@@ -2727,6 +2976,100 @@ class PrismaService {
                 status: 'İstek Gönderildi · Onay Bekliyor',
                 isFriend: false,
             },
+        };
+    }
+    async removeFriend(userId, targetUserIdOrUsername) {
+        let me = this.users.get(userId);
+        try {
+            const dbMe = await this.rawClient.user.findFirst({
+                where: { OR: [{ id: userId }, { username: userId }] },
+            });
+            if (dbMe) {
+                me = this.prismaUserToRecord(dbMe);
+                this.users.set(me.id, me);
+            }
+        }
+        catch { }
+        if (!me)
+            return { success: false, error: 'Kullanıcı oturumu bulunamadı.' };
+        const cleanTarget = (targetUserIdOrUsername || '').trim();
+        const cleanLower = cleanTarget.toLowerCase();
+        let target = this.users.get(cleanTarget);
+        if (!target) {
+            try {
+                const dbTarget = await this.rawClient.user.findFirst({
+                    where: {
+                        OR: [
+                            { id: cleanTarget },
+                            { username: { equals: cleanLower, mode: 'insensitive' } },
+                            { displayName: { equals: cleanTarget, mode: 'insensitive' } },
+                        ],
+                    },
+                });
+                if (dbTarget) {
+                    target = this.prismaUserToRecord(dbTarget);
+                    this.users.set(target.id, target);
+                }
+            }
+            catch { }
+        }
+        if (!target) {
+            target = Array.from(this.users.values()).find((u) => u &&
+                (u.id === cleanTarget ||
+                    u.username?.toLowerCase() === cleanLower ||
+                    u.displayName?.toLowerCase() === cleanLower));
+        }
+        const targetId = target?.id || cleanTarget;
+        const targetName = target?.displayName || target?.username || 'Oyuncu';
+        me.friendIds = (me.friendIds || []).filter((fid) => fid !== targetId && fid !== cleanTarget);
+        this.users.set(me.id, me);
+        if (me.username)
+            this.users.set(me.username, me);
+        if (target) {
+            target.friendIds = (target.friendIds || []).filter((fid) => fid !== me.id && fid !== userId);
+            this.users.set(target.id, target);
+            if (target.username)
+                this.users.set(target.username, target);
+        }
+        try {
+            await this.rawClient.user.update({
+                where: { id: me.id },
+                data: { friendIds: me.friendIds, updatedAt: new Date() },
+            });
+        }
+        catch { }
+        if (target?.id) {
+            try {
+                await this.rawClient.user.update({
+                    where: { id: target.id },
+                    data: { friendIds: target.friendIds || [], updatedAt: new Date() },
+                });
+            }
+            catch { }
+        }
+        // Also clean up any pending/old friend_request notifications between the two users
+        try {
+            await this.rawClient.userNotification.deleteMany({
+                where: {
+                    type: 'friend_request',
+                    OR: [
+                        { userId: me.id, senderId: targetId },
+                        { userId: targetId, senderId: me.id },
+                    ],
+                },
+            });
+        }
+        catch { }
+        this.savePersistedUsers();
+        // Notify both sides via WebSocket so friend lists refresh immediately
+        presenceManager_1.presenceManager.notifyUser(me.id, 'friends:update', { removedFriendId: targetId });
+        if (targetId) {
+            presenceManager_1.presenceManager.notifyUser(targetId, 'friends:update', { removedFriendId: me.id });
+        }
+        return {
+            success: true,
+            removedFriendId: targetId,
+            message: `${targetName} arkadaş listenden çıkarıldı.`,
         };
     }
     getUserNotifications(userId) {
@@ -3762,6 +4105,7 @@ class PrismaService {
         const progress = (0, shared_1.calculateLevelFromXp)(record.xp || 0);
         record.level = progress.level;
         record.rankTitle = progress.rankTitle;
+        record.stats = this.sanitizeUserStats(record.stats);
         const todayStr = new Date().toISOString().slice(0, 10);
         const dcState = record.categoryMastery?.dailyChallenge;
         const completedToday = dcState?.lastCompletedDate === todayStr;

@@ -5,13 +5,18 @@ import { SHOP_CATALOG, SEASON_1_TIERS, EVENT_DEFINITIONS } from '@trivia/shared'
 
 const router = Router();
 
-router.get('/leaderboard', (req: Request, res: Response): void => {
-  const topPlayers = db.getLeaderboard(30);
-  res.json({
-    season: 'Sezon 1: Bilgi Çağı',
-    endsInDays: 45,
-    topPlayers,
-  });
+router.get('/leaderboard', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const topPlayers = await db.getLeaderboardAsync(30);
+    res.json({
+      season: 'Sezon 1: Bilgi Çağı',
+      endsInDays: 45,
+      topPlayers,
+      leaders: topPlayers,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.get('/friends/:userId', async (req: Request, res: Response): Promise<void> => {
@@ -32,6 +37,25 @@ router.post('/friends/add', async (req: Request, res: Response): Promise<void> =
       return;
     }
     const result = await db.addFriend(userId, codeOrUsername);
+    if (!result.success) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/friends/remove', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, friendId, targetUserId } = req.body;
+    const target = friendId || targetUserId;
+    if (!userId || !target) {
+      res.status(400).json({ error: 'userId ve friendId zorunludur.' });
+      return;
+    }
+    const result = await db.removeFriend(userId, target);
     if (!result.success) {
       res.status(400).json({ error: result.error });
       return;
@@ -119,9 +143,55 @@ router.post('/presence/heartbeat', (req: Request, res: Response): void => {
 // --- Room Status Sync ---
 router.post('/rooms/active', (req: Request, res: Response): void => {
   try {
-    const { userId, roomCode } = req.body;
+    const {
+      userId,
+      roomCode,
+      name,
+      hostName,
+      category,
+      categoryName,
+      players,
+      playerCount,
+      maxPlayers,
+      totalRounds,
+      questionTimeSec,
+      status,
+      privacy,
+    } = req.body;
+    const resolvedPlayers = typeof players === 'number' ? players : typeof playerCount === 'number' ? playerCount : undefined;
     if (userId) {
-      db.setUserActiveRoom(userId, roomCode || null);
+      db.setUserActiveRoom(
+        userId,
+        roomCode || null,
+        roomCode
+          ? {
+              name,
+              hostName,
+              category,
+              categoryName,
+              players: resolvedPlayers,
+              maxPlayers,
+              totalRounds,
+              questionTimeSec,
+              status,
+              privacy,
+            }
+          : undefined
+      );
+    } else if (roomCode) {
+      db.upsertPublicRoom({
+        code: roomCode,
+        name,
+        hostName,
+        category,
+        categoryName,
+        players: resolvedPlayers,
+        maxPlayers,
+        totalRounds,
+        questionTimeSec,
+        status,
+        privacy,
+      });
     }
     res.json({ success: true });
   } catch (err: any) {

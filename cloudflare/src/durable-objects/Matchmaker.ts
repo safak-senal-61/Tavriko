@@ -34,9 +34,28 @@ interface PresenceEntry {
   lastSeen: number;
 }
 
+interface PublicRoomEntry {
+  code: string;
+  name: string;
+  host: string;
+  hostName: string;
+  category: string;
+  categoryName: string;
+  players: number;
+  playerCount: number;
+  maxPlayers: number;
+  rounds: number;
+  totalRounds: number;
+  timeSec: number;
+  questionTimeSec: number;
+  status: 'waiting';
+  updatedAt: number;
+}
+
 export class MatchmakerDO extends DurableObject<Env> {
   private queue: Map<string, QueueEntry> = new Map();
   private presences: Map<string, PresenceEntry> = new Map();
+  private publicRooms: Map<string, PublicRoomEntry> = new Map();
   private rateLimiters = new WeakMap<WebSocket, RateLimiter>();
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -50,6 +69,15 @@ export class MatchmakerDO extends DurableObject<Env> {
           // Drop stale entries older than 2 minutes
           if (Date.now() - entry.queuedAt < 120000) {
             this.queue.set(id, entry);
+          }
+        }
+      }
+
+      const storedRooms = await this.ctx.storage.get<Record<string, PublicRoomEntry>>('public_rooms');
+      if (storedRooms) {
+        for (const [code, room] of Object.entries(storedRooms)) {
+          if (room && room.players > 0 && room.players < room.maxPlayers && Date.now() - room.updatedAt < 600000) {
+            this.publicRooms.set(code, room);
           }
         }
       }
@@ -134,6 +162,100 @@ export class MatchmakerDO extends DurableObject<Env> {
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+
+    // HTTP GET/POST /rooms/public or /api/rooms/public -> Live Public Rooms Directory
+    if (
+      url.pathname === '/rooms/public' ||
+      url.pathname === '/api/rooms/public' ||
+      url.pathname === '/api/trivia/rooms/public'
+    ) {
+      if (request.method === 'POST') {
+        try {
+          const body: any = await request.json();
+          const code = String(body?.code || body?.roomCode || '').trim().toUpperCase();
+          if (!code) {
+            return new Response(
+              JSON.stringify({ success: false, error: 'Missing room code' }),
+              { status: 400, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+            );
+          }
+
+          const players = Number(body?.players ?? body?.playerCount ?? 0);
+          const maxPlayers = Math.max(2, Number(body?.maxPlayers ?? 4));
+          const status = String(body?.status || 'lobby');
+          const privacy = String(body?.privacy || 'public');
+
+          if (
+            body?.action === 'remove' ||
+            privacy === 'private' ||
+            status !== 'lobby' ||
+            players <= 0 ||
+            players >= maxPlayers
+          ) {
+            this.publicRooms.delete(code);
+          } else {
+            const hostName = String(body?.hostName || body?.host || 'Oyuncu');
+            const categoryName = String(body?.categoryName || body?.category || 'Genel Kültür');
+            const rounds = Math.max(1, Number(body?.totalRounds ?? body?.rounds ?? 5));
+            const timeSec = Math.max(5, Number(body?.questionTimeSec ?? body?.timeSec ?? 15));
+
+            this.publicRooms.set(code, {
+              code,
+              name: String(body?.name || `${hostName} Odası`),
+              host: hostName,
+              hostName,
+              category: categoryName,
+              categoryName,
+              players,
+              playerCount: players,
+              maxPlayers,
+              rounds,
+              totalRounds: rounds,
+              timeSec,
+              questionTimeSec: timeSec,
+              status: 'waiting',
+              updatedAt: Date.now(),
+            });
+          }
+
+          await this.ctx.storage.put('public_rooms', Object.fromEntries(this.publicRooms));
+          return new Response(
+            JSON.stringify({ success: true, count: this.publicRooms.size }),
+            { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+          );
+        } catch (e: any) {
+          return new Response(
+            JSON.stringify({ success: false, error: e.message }),
+            { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+          );
+        }
+      }
+
+      // GET: prune stale/full/empty rooms and return active waiting rooms
+      const now = Date.now();
+      let changed = false;
+      const activeRooms: PublicRoomEntry[] = [];
+      for (const [code, room] of this.publicRooms.entries()) {
+        if (!room || room.players <= 0 || room.players >= room.maxPlayers || now - room.updatedAt > 600000) {
+          this.publicRooms.delete(code);
+          changed = true;
+          continue;
+        }
+        activeRooms.push(room);
+      }
+      if (changed) {
+        this.ctx.waitUntil(this.ctx.storage.put('public_rooms', Object.fromEntries(this.publicRooms)));
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          count: activeRooms.length,
+          rooms: activeRooms,
+        }),
+        { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
+      );
+    }
 
     // HTTP POST /notify or /api/notify -> Relay real-time event to target user's WebSocket
     if (

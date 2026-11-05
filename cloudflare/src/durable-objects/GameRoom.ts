@@ -42,6 +42,7 @@ export class GameRoomDO extends DurableObject<Env> {
   private room: GameRoom | null = null;
   private questions: Question[] = [];
   private alarmContext: AlarmContext | null = null;
+  private isPrivateRoom: boolean = false;
   private apiService: ApiService;
   private rateLimiters = new WeakMap<WebSocket, RateLimiter>();
 
@@ -54,10 +55,12 @@ export class GameRoomDO extends DurableObject<Env> {
       const storedRoom = await this.ctx.storage.get<GameRoom>('room');
       const storedQuestions = await this.ctx.storage.get<Question[]>('questions');
       const storedAlarm = await this.ctx.storage.get<AlarmContext>('alarmContext');
+      const storedPrivacy = await this.ctx.storage.get<boolean>('isPrivateRoom');
 
       if (storedRoom) this.room = storedRoom;
       if (storedQuestions) this.questions = storedQuestions;
       if (storedAlarm) this.alarmContext = storedAlarm;
+      if (typeof storedPrivacy === 'boolean') this.isPrivateRoom = storedPrivacy;
 
       // Eski kayıtlardan kalan botları özel odalardan temizle
       await this.pruneBotsInCustomRoom();
@@ -186,6 +189,10 @@ export class GameRoomDO extends DurableObject<Env> {
       const qpTotalRounds = parseInt(url.searchParams.get('totalRounds') || '', 10);
       const qpQuestionTime = parseInt(url.searchParams.get('questionTimeSec') || '', 10);
       const qpPenalty = url.searchParams.get('penaltyForWrong') === 'true';
+      const qpPrivacy = url.searchParams.get('privacy');
+      if (qpPrivacy === 'private') {
+        this.isPrivateRoom = true;
+      }
 
       this.room = {
         code: rawRoomCode || 'TAV-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
@@ -202,6 +209,8 @@ export class GameRoomDO extends DurableObject<Env> {
         players: {},
         scores: {},
       };
+    } else if (url.searchParams.get('privacy') === 'private' && this.room.hostId === authUser.id) {
+      this.isPrivateRoom = true;
     }
 
     const roomCode = this.room.code;
@@ -398,6 +407,24 @@ export class GameRoomDO extends DurableObject<Env> {
       // Check if there are other active websockets for this player
       const otherSockets = this.ctx.getWebSockets(`player:${playerId}`).filter((s) => s !== ws);
       if (otherSockets.length > 0) {
+        return;
+      }
+
+      if (this.room.status === 'lobby') {
+        // In lobby, remove disconnected player immediately so player count stays accurate
+        delete this.room.players[playerId];
+        delete this.room.scores[playerId];
+        const remainingHumans = Object.values(this.room.players).filter((p) => !p.isBot && p.isConnected);
+        if (remainingHumans.length === 0) {
+          this.room.players = {};
+          this.room.scores = {};
+        } else if (this.room.hostId === playerId) {
+          this.room.hostId = remainingHumans[0].id;
+          remainingHumans[0].isHost = true;
+          remainingHumans[0].isReady = true;
+        }
+        await this.persist();
+        this.broadcastStateSync();
         return;
       }
 
@@ -968,9 +995,58 @@ export class GameRoomDO extends DurableObject<Env> {
     await this.ctx.storage.setAlarm(Date.now() + Math.max(100, delayMs));
   }
 
+  private syncPublicRoomDirectory(): void {
+    if (!this.room || !this.env?.MATCHMAKER) return;
+    if (this.room.mode === 'duel' || this.room.mode === 'quick_match') return;
+
+    const connectedHumans = Object.values(this.room.players).filter((p) => !p.isBot && p.isConnected);
+    const hostPlayer =
+      this.room.players[this.room.hostId] || connectedHumans[0] || Object.values(this.room.players)[0];
+    const shouldRemove =
+      this.isPrivateRoom ||
+      this.room.status !== 'lobby' ||
+      connectedHumans.length <= 0 ||
+      connectedHumans.length >= (this.room.maxPlayers || 4);
+
+    const payload = shouldRemove
+      ? {
+          code: this.room.code,
+          action: 'remove',
+        }
+      : {
+          code: this.room.code,
+          name: `${hostPlayer?.displayName || 'Oyuncu'} Odası`,
+          hostName: hostPlayer?.displayName || 'Oyuncu',
+          category: this.room.category,
+          categoryName: this.room.category,
+          players: connectedHumans.length,
+          maxPlayers: this.room.maxPlayers || 4,
+          totalRounds: this.room.totalRounds || 5,
+          questionTimeSec: this.room.questionTimeSec || 15,
+          status: this.room.status,
+          privacy: this.isPrivateRoom ? 'private' : 'public',
+        };
+
+    try {
+      const matchmakerId = this.env.MATCHMAKER.idFromName('global_matchmaker');
+      const matchmakerStub = this.env.MATCHMAKER.get(matchmakerId);
+      this.ctx.waitUntil(
+        matchmakerStub
+          .fetch('https://internal/rooms/public', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          .catch(() => {})
+      );
+    } catch {}
+  }
+
   private async persist(): Promise<void> {
     if (this.room) {
       await this.ctx.storage.put('room', this.room);
+      await this.ctx.storage.put('isPrivateRoom', this.isPrivateRoom);
+      this.syncPublicRoomDirectory();
     }
   }
 }

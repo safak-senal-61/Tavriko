@@ -185,6 +185,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
   const base = apiBaseUrl || DEFAULT_API_BASE;
   const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
+  const [showAvatarDrawer, setShowAvatarDrawer] = useState(false);
   const [copied, setCopied] = useState(false);
   const [wsConnected, setWsConnected] = useState<boolean>(socketService.isConnected());
   const [savingTitle, setSavingTitle] = useState<string | null>(null);
@@ -193,8 +194,34 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [syncingCloud, setSyncingCloud] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
 
+  const tabContentOpacity = useRef(new RNAnimated.Value(1)).current;
+  const tabContentTranslateY = useRef(new RNAnimated.Value(0)).current;
+
+  const switchProfileTab = (nextTab: ProfileTab) => {
+    if (nextTab === activeTab) return;
+    sound.playSound('tap');
+    sound.triggerHaptic('light');
+    setActiveTab(nextTab);
+    tabContentOpacity.setValue(0.25);
+    tabContentTranslateY.setValue(10);
+    RNAnimated.parallel([
+      RNAnimated.timing(tabContentOpacity, {
+        toValue: 1,
+        duration: 210,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      RNAnimated.spring(tabContentTranslateY, {
+        toValue: 0,
+        damping: 18,
+        stiffness: 210,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start();
+  };
+
   // Quick settings local state backed by user.settings
-  const settings: UserSettings = (user.settings as UserSettings) || {};
+  const settings: UserSettings & { soundEnabled?: boolean; allowDuelChallenges?: boolean } =
+    (user.settings as any) || {};
   const [onlineStatusVisible, setOnlineStatusVisible] = useState(settings.onlineStatusVisible !== false);
   const [soundEnabled, setSoundEnabled] = useState(settings.soundEnabled !== false);
   const [hapticsEnabled, setHapticsEnabled] = useState(settings.hapticsEnabled !== false);
@@ -275,8 +302,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       onUpdateUser({ ...user, avatarUrl: preset.id });
     }
     // Broadcast via WebSocket
-    socketService.setSessionContext({
-      ...socketService.lastSessionContext,
+    socketService.connect(undefined, {
+      userId: user.id,
+      displayName: user.displayName,
       avatarUrl: preset.id,
     });
     // Persist to PostgreSQL database
@@ -337,7 +365,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         }),
       });
       if (onUpdateUser) {
-        onUpdateUser({ ...user, settings: { ...settings, soundEnabled: val } });
+        onUpdateUser({ ...user, settings: { ...settings, soundEnabled: val } as any });
       }
     } catch {}
   };
@@ -380,7 +408,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         }),
       });
       if (onUpdateUser) {
-        onUpdateUser({ ...user, settings: { ...settings, allowDuelChallenges: val } });
+        onUpdateUser({ ...user, settings: { ...settings, allowDuelChallenges: val } as any });
       }
     } catch {}
   };
@@ -425,13 +453,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     }
   };
 
-  const totalMatches = user.stats?.totalMatches || 0;
-  const wins = user.stats?.wins || 0;
+  const totalMatches = Math.max(0, Number(user.stats?.totalMatches || 0));
+  const wins = Math.min(totalMatches, Math.max(0, Number(user.stats?.wins || 0)));
   const losses = Math.max(0, totalMatches - wins);
-  const correctAnswers = user.stats?.correctAnswers || 0;
-  const totalAnswers = user.stats?.totalAnswers || 0;
-  const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
-  const accuracyRate = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 0;
+  const rawTotalAnswers = Math.max(0, Number(user.stats?.totalAnswers || 0));
+  const totalAnswers =
+    totalMatches === 0
+      ? 0
+      : Math.min(Math.max(totalMatches * 5, rawTotalAnswers || totalMatches * 5), totalMatches * 10);
+  const rawCorrectAnswers = Math.max(0, Number(user.stats?.correctAnswers || 0));
+  const correctAnswers = totalMatches === 0 ? 0 : Math.min(totalAnswers, rawCorrectAnswers);
+  const winRate = totalMatches > 0 ? Math.min(100, Math.round((wins / totalMatches) * 100)) : 0;
+  const accuracyRate = totalAnswers > 0 ? Math.min(100, Math.round((correctAnswers / totalAnswers) * 100)) : 0;
+  const safeBestStreak = Math.min(correctAnswers, Math.max(0, Number(user.stats?.bestStreak || 0)));
   const avgSec = user.stats?.avgResponseTimeMs ? (user.stats.avgResponseTimeMs / 1000).toFixed(1) : '—';
   const friendCode = user.friendCode || '—';
 
@@ -526,7 +560,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     <View style={styles.tabRow}>
       {(
         [
-          ['overview', 'Genel'],
+          ['overview', 'Özet'],
           ['mastery', 'Ustalık'],
           ['titles', 'Unvanlar'],
           ['settings', 'Ayarlar'],
@@ -538,14 +572,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <TouchableOpacity
             key={tKey}
             style={[styles.tabBtn, isActive && styles.tabBtnActive]}
-            onPress={() => {
-              sound.playSound('tap');
-              sound.triggerHaptic('light');
-              setActiveTab(tKey);
-            }}
+            onPress={() => switchProfileTab(tKey)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
+            <Text style={[styles.tabText, isActive && styles.tabTextActive]} numberOfLines={1}>
+              {label}
+            </Text>
           </TouchableOpacity>
         );
       })}
@@ -563,75 +595,156 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         onAvatarPress={onEditProfile}
       />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Main Hero Header Card */}
+        {/* Unified Compact Hero Identity Card */}
         <View style={styles.heroCard}>
-          <View style={styles.avatarHeader}>
-            <TouchableOpacity style={styles.goldAvatarRing} onPress={handlePickPhotoDirect} activeOpacity={0.85}>
-              <CharacterAvatar seed={user.avatarUrl || user.displayName} size={88} />
-            </TouchableOpacity>
-
-            {/* Cloudflare Worker Realtime Status Badge */}
-            <View
-              style={[
-                styles.presenceBadge,
-                { backgroundColor: wsConnected && onlineStatusVisible ? '#123927' : '#2A1847', borderColor: wsConnected && onlineStatusVisible ? '#3FD08A' : '#735C99' },
-              ]}
+          <View style={styles.heroTopRow}>
+            {/* Left: Avatar + Online Dot + Edit Trigger */}
+            <TouchableOpacity
+              style={styles.heroAvatarButton}
+              onPress={() => {
+                sound.playSound('tap');
+                setShowAvatarDrawer((prev) => !prev);
+              }}
+              activeOpacity={0.85}
             >
-              <RadioSignalIcon color={wsConnected && onlineStatusVisible ? '#3FD08A' : '#A992E2'} size={12} />
-              <Text
+              <View style={styles.goldAvatarRing}>
+                <CharacterAvatar seed={user.avatarUrl || user.displayName} size={68} />
+              </View>
+              <View
                 style={[
-                  styles.presenceText,
-                  { color: wsConnected && onlineStatusVisible ? '#3FD08A' : '#D9CDF5' },
-                ]}
-              >
-                {!onlineStatusVisible ? 'GİZLİ MOD' : wsConnected ? 'REALTIME ÇEVRİMİÇİ' : 'BAĞLANIYOR...'}
-              </Text>
-            </View>
-
-            <Text style={styles.displayName}>{user.fullName || user.displayName}</Text>
-
-            <View style={styles.titlePill}>
-              <XpStarIcon size={14} />
-              <Text style={styles.titlePillText}>{equippedTitle}</Text>
-            </View>
-
-            <Text style={styles.levelSub}>
-              @{user.username} · Seviye {prog.level} · {user.rankPoints ?? 1000} RP
-            </Text>
-
-            <View style={{ width: '100%', marginTop: 8 }}>
-              <TavrikoProgressBar progress={prog.progressPct} height={8} />
-              <Text style={styles.xpText}>
-                {prog.currentLevelXp} / {prog.nextLevelXpRequired} XP → Seviye {prog.level + 1}
-              </Text>
-            </View>
-
-            {user.bio ? <Text style={styles.bioText}>"{user.bio}"</Text> : null}
-
-            {photoState !== 'idle' && (
-              <Text
-                style={[
-                  styles.xpText,
+                  styles.heroOnlineDot,
                   {
-                    color:
-                      photoState === 'error'
-                        ? '#FF5A6A'
-                        : photoState === 'saved'
-                        ? '#3FD08A'
-                        : '#FFC43D',
+                    backgroundColor: wsConnected && onlineStatusVisible ? '#3FD08A' : '#735C99',
                   },
                 ]}
-              >
-                {photoState === 'saving'
-                  ? 'Fotoğraf işlenip kaydediliyor...'
-                  : photoState === 'saved'
-                  ? 'Profil fotoğrafı güncellendi'
-                  : 'Fotoğraf işlenemedi, tekrar deneyin'}
-              </Text>
-            )}
+              />
+            </TouchableOpacity>
 
-            {/* Header Actions */}
-            <View style={styles.headerActions}>
+            {/* Right: Identity, Title, Level & XP */}
+            <View style={styles.heroIdentityCol}>
+              <View style={styles.heroNameRow}>
+                <Text style={styles.displayName} numberOfLines={1}>
+                  {user.fullName || user.displayName}
+                </Text>
+              </View>
+
+              <Text style={styles.levelSub} numberOfLines={1}>
+                @{user.username} · Sv. {prog.level} · {user.rankPoints ?? 1000} RP
+              </Text>
+
+              <View style={styles.heroBadgesRow}>
+                <View style={styles.titlePill}>
+                  <XpStarIcon size={12} />
+                  <Text style={styles.titlePillText} numberOfLines={1}>
+                    {equippedTitle}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.presenceMiniPill,
+                    {
+                      backgroundColor:
+                        wsConnected && onlineStatusVisible
+                          ? 'rgba(63, 208, 138, 0.14)'
+                          : 'rgba(115, 92, 153, 0.2)',
+                      borderColor:
+                        wsConnected && onlineStatusVisible
+                          ? 'rgba(63, 208, 138, 0.45)'
+                          : 'rgba(169, 146, 226, 0.3)',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.presenceMiniText,
+                      { color: wsConnected && onlineStatusVisible ? '#3FD08A' : '#D9CDF5' },
+                    ]}
+                  >
+                    {!onlineStatusVisible ? 'Gizli' : wsConnected ? 'Çevrimiçi' : 'Bağlanıyor'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Compact XP Progress Bar */}
+          <View style={styles.heroXpWrap}>
+            <View style={styles.heroXpHeader}>
+              <Text style={styles.heroXpLabel}>Seviye {prog.level} İlerlemesi</Text>
+              <Text style={styles.heroXpVal}>
+                {prog.currentLevelXp} / {prog.nextLevelXpRequired} XP
+              </Text>
+            </View>
+            <TavrikoProgressBar progress={prog.progressPct} height={7} />
+          </View>
+
+          {user.bio ? (
+            <Text style={styles.bioText} numberOfLines={2}>
+              "{user.bio}"
+            </Text>
+          ) : null}
+
+          {photoState !== 'idle' && (
+            <Text
+              style={[
+                styles.xpText,
+                {
+                  color:
+                    photoState === 'error'
+                      ? '#FF5A6A'
+                      : photoState === 'saved'
+                      ? '#3FD08A'
+                      : '#FFC43D',
+                },
+              ]}
+            >
+              {photoState === 'saving'
+                ? 'Fotoğraf işlenip kaydediliyor...'
+                : photoState === 'saved'
+                ? 'Profil fotoğrafı güncellendi'
+                : 'Fotoğraf işlenemedi, tekrar deneyin'}
+            </Text>
+          )}
+
+          {/* Integrated Friend Code & Quick Action Strip */}
+          <View style={styles.heroBottomBar}>
+            <TouchableOpacity
+              style={styles.inlineFriendCodeBtn}
+              onPress={handleCopyCode}
+              activeOpacity={0.82}
+            >
+              <View>
+                <Text style={styles.inlineCodeLbl}>ARKADAŞ KODU</Text>
+                <Text style={styles.inlineCodeVal}>{friendCode}</Text>
+              </View>
+              <View style={styles.inlineCopyBadge}>
+                <CopyVectorIcon size={12} color="#FFC43D" />
+                <Text style={styles.inlineCopyText}>{copied ? 'Kopyalandı' : 'Kopyala'}</Text>
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.heroQuickActions}>
+              <TouchableOpacity
+                style={[
+                  styles.headerActionBtn,
+                  showAvatarDrawer && styles.headerActionBtnEdit,
+                ]}
+                onPress={() => {
+                  sound.playSound('tap');
+                  setShowAvatarDrawer((prev) => !prev);
+                }}
+                activeOpacity={0.82}
+              >
+                <Text
+                  style={[
+                    styles.headerActionText,
+                    showAvatarDrawer && styles.headerActionTextEdit,
+                  ]}
+                >
+                  {showAvatarDrawer ? 'Kapat' : 'Karakter'}
+                </Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={[styles.headerActionBtn, styles.headerActionBtnEdit]}
                 onPress={() => {
@@ -641,131 +754,143 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 }}
                 activeOpacity={0.82}
               >
-                <EditPencilIcon size={14} color="#FFC43D" />
+                <EditPencilIcon size={13} color="#FFC43D" />
                 <Text style={[styles.headerActionText, styles.headerActionTextEdit]}>Düzenle</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.headerActionBtn} onPress={handleShareProfile} activeOpacity={0.82}>
+
+              <TouchableOpacity
+                style={styles.headerActionBtnIconOnly}
+                onPress={handleShareProfile}
+                activeOpacity={0.82}
+              >
                 <ShareVectorIcon size={14} color="#D9CDF5" />
-                <Text style={styles.headerActionText}>Paylaş</Text>
               </TouchableOpacity>
-              {onSettings && (
+            </View>
+          </View>
+
+          {/* Collapsible Avatar & Photo Drawer inside Hero Card */}
+          {showAvatarDrawer && (
+            <View style={styles.avatarDrawerBox}>
+              <View style={styles.avatarPickerHeaderRow}>
+                <View style={styles.avatarPickerTitleWrap}>
+                  <Text style={styles.avatarPickerTitle}>Karakter veya Fotoğraf Seç</Text>
+                  <Text style={styles.avatarPickerSubtitle}>Kaydırarak karakterini değiştir</Text>
+                </View>
                 <TouchableOpacity
-                  style={styles.headerActionBtn}
-                  onPress={() => {
-                    sound.playSound('tap');
-                    onSettings();
-                  }}
-                  activeOpacity={0.82}
+                  style={styles.customPhotoChip}
+                  onPress={handlePickPhotoDirect}
+                  activeOpacity={0.8}
                 >
-                  <ModeSquircleIcon mode="settings" size={16} />
-                  <Text style={styles.headerActionText}>Tüm Ayarlar</Text>
+                  <CameraVectorIcon size={13} color="#FFC43D" />
+                  <Text style={styles.customPhotoChipText}>Galeri</Text>
                 </TouchableOpacity>
-              )}
-            </View>
-          </View>
-        </View>
+              </View>
 
-        {/* HORIZONTAL MOTION AVATAR PICKER (Soldan Sağa Kaydırmalı Karakterler) */}
-        <View style={styles.avatarPickerSection}>
-          <View style={styles.avatarPickerHeaderRow}>
-            <View style={styles.avatarPickerTitleWrap}>
-              <Text style={styles.avatarPickerTitle}>Karakterini Değiştir</Text>
-              <Text style={styles.avatarPickerSubtitle}>Soldan sağa kaydırarak seç</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.customPhotoChip}
-              onPress={handlePickPhotoDirect}
-              activeOpacity={0.8}
-            >
-              <CameraVectorIcon size={14} color="#FFC43D" />
-              <Text style={styles.customPhotoChipText}>Fotoğraf</Text>
-            </TouchableOpacity>
-          </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.avatarCarouselTrack}
+                decelerationRate="fast"
+              >
+                {AVATAR_PRESETS.map((preset, idx) => {
+                  const isSelected = user.avatarUrl === preset.id;
+                  const rarityTheme = RARITY_THEME[preset.rarity] || RARITY_THEME.Nadir;
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.avatarCarouselTrack}
-            decelerationRate="fast"
-            snapToInterval={96}
-          >
-            {AVATAR_PRESETS.map((preset, idx) => {
-              const isSelected = user.avatarUrl === preset.id;
-              const rarityTheme = RARITY_THEME[preset.rarity] || RARITY_THEME.Nadir;
-
-              return (
-                <Animated.View
-                  key={preset.id}
-                  entering={FadeInRight.delay(idx * 35).springify().damping(15)}
-                >
-                  <TouchableOpacity
-                    style={[
-                      styles.avatarCarouselCard,
-                      isSelected && [
-                        styles.avatarCarouselCardActive,
-                        { borderColor: rarityTheme.border, shadowColor: rarityTheme.border },
-                      ],
-                    ]}
-                    onPress={() => handleSelectAvatarPreset(preset)}
-                    activeOpacity={0.82}
-                  >
-                    {isSelected && (
-                      <View style={[styles.avatarSelectedBadge, { backgroundColor: rarityTheme.border }]}>
-                        <Text style={styles.avatarSelectedCheck}>✓</Text>
+                  return (
+                    <TouchableOpacity
+                      key={preset.id}
+                      style={[
+                        styles.avatarCarouselCard,
+                        isSelected && [
+                          styles.avatarCarouselCardActive,
+                          { borderColor: rarityTheme.border },
+                        ],
+                      ]}
+                      onPress={() => handleSelectAvatarPreset(preset)}
+                      activeOpacity={0.82}
+                    >
+                      {isSelected && (
+                        <View
+                          style={[
+                            styles.avatarSelectedBadge,
+                            { backgroundColor: rarityTheme.border },
+                          ]}
+                        >
+                          <Text style={styles.avatarSelectedCheck}>✓</Text>
+                        </View>
+                      )}
+                      <View style={styles.cardAvatarCircle}>
+                        <CharacterAvatar index={idx} size={42} />
                       </View>
-                    )}
-                    <View style={styles.cardAvatarCircle}>
-                      <CharacterAvatar index={idx} size={46} />
-                    </View>
-                    <Text style={styles.cardAvatarName} numberOfLines={1}>
-                      {preset.name}
-                    </Text>
-                    <View style={[styles.cardRarityPill, { backgroundColor: preset.badgeBg }]}>
-                      <Text style={[styles.cardRarityText, { color: preset.badgeFg }]}>
-                        {preset.rarity}
+                      <Text style={styles.cardAvatarName} numberOfLines={1}>
+                        {preset.name}
                       </Text>
-                    </View>
-                  </TouchableOpacity>
-                </Animated.View>
-              );
-            })}
-          </ScrollView>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
         </View>
-
-        {/* Friend Code Card */}
-        <TouchableOpacity style={styles.friendCodeCard} onPress={handleCopyCode} activeOpacity={0.85}>
-          <View>
-            <Text style={styles.friendCodeLabel}>SENİN ARKADAŞLIK KODUN</Text>
-            <Text style={styles.friendCodeValue}>{friendCode}</Text>
-          </View>
-          <View style={styles.copyBtnPill}>
-            <CopyVectorIcon size={14} color="#FFC43D" />
-            <Text style={styles.friendCodeCopy}>{copied ? 'Kopyalandı!' : 'Kopyala'}</Text>
-          </View>
-        </TouchableOpacity>
 
         {renderTabs()}
 
+        <RNAnimated.View
+          style={{
+            opacity: tabContentOpacity,
+            transform: [{ translateY: tabContentTranslateY }],
+          }}
+        >
         {/* TAB 1: Overview */}
         {activeTab === 'overview' && (
           <>
-            <View style={styles.statsGrid}>
-              {[
-                { v: totalMatches, l: 'Toplam Maç' },
-                { v: wins, l: 'Galibiyet' },
-                { v: losses, l: 'Mağlubiyet' },
-                { v: `%${winRate}`, l: 'Kazanma Oranı' },
-                { v: `%${accuracyRate}`, l: `İsabet (${correctAnswers}/${totalAnswers})` },
-                { v: user.stats?.bestStreak || 0, l: 'En İyi Seri' },
-                { v: `${avgSec} sn`, l: 'Ort. Cevap Süresi' },
-                { v: user.dailyStreak || user.dailyChallenge?.streakDay || 0, l: 'Günlük Seri' },
-                { v: user.xp ?? 0, l: 'Toplam XP' },
-              ].map((s) => (
-                <View key={s.l} style={styles.statCard}>
-                  <Text style={styles.statValue}>{s.v}</Text>
-                  <Text style={styles.statLabel}>{s.l}</Text>
-                </View>
-              ))}
+            {/* Primary 2x2 Key Performance Cards */}
+            <View style={styles.primaryStatsGrid}>
+              <View style={styles.primaryStatBox}>
+                <Text style={styles.primaryStatLabel}>TOPLAM MAÇ</Text>
+                <Text style={styles.primaryStatValue}>{totalMatches}</Text>
+                <Text style={styles.primaryStatSub}>
+                  {wins}G · {losses}M
+                </Text>
+              </View>
+              <View style={styles.primaryStatBox}>
+                <Text style={styles.primaryStatLabel}>KAZANMA ORANI</Text>
+                <Text style={[styles.primaryStatValue, { color: '#3FD08A' }]}>%{winRate}</Text>
+                <Text style={styles.primaryStatSub}>{wins} Galibiyet</Text>
+              </View>
+              <View style={styles.primaryStatBox}>
+                <Text style={styles.primaryStatLabel}>DOĞRU CEVAP</Text>
+                <Text style={[styles.primaryStatValue, { color: '#FFC43D' }]}>
+                  {correctAnswers}
+                  <Text style={styles.primaryStatFraction}>/{totalAnswers}</Text>
+                </Text>
+                <Text style={styles.primaryStatSub}>Toplam {totalAnswers} soru</Text>
+              </View>
+              <View style={styles.primaryStatBox}>
+                <Text style={styles.primaryStatLabel}>İSABET ORANI</Text>
+                <Text style={[styles.primaryStatValue, { color: '#38BDF8' }]}>%{accuracyRate}</Text>
+                <Text style={styles.primaryStatSub}>En iyi seri: {safeBestStreak}x</Text>
+              </View>
+            </View>
+
+            {/* Compact Secondary Metrics Strip */}
+            <View style={styles.secondaryMetricsCard}>
+              <View style={styles.secondaryMetricItem}>
+                <Text style={styles.secondaryMetricVal}>{avgSec} sn</Text>
+                <Text style={styles.secondaryMetricLbl}>Ort. Süre</Text>
+              </View>
+              <View style={styles.secondaryMetricDivider} />
+              <View style={styles.secondaryMetricItem}>
+                <Text style={styles.secondaryMetricVal}>
+                  {user.dailyStreak || user.dailyChallenge?.streakDay || 0} gün
+                </Text>
+                <Text style={styles.secondaryMetricLbl}>Günlük Seri</Text>
+              </View>
+              <View style={styles.secondaryMetricDivider} />
+              <View style={styles.secondaryMetricItem}>
+                <Text style={styles.secondaryMetricVal}>{user.xp ?? 0}</Text>
+                <Text style={styles.secondaryMetricLbl}>Toplam XP</Text>
+              </View>
             </View>
 
             {bestCategory && (
@@ -781,17 +906,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             )}
 
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Kazanılan Başarılar</Text>
+              <Text style={styles.sectionTitle}>Rozetler & Başarılar</Text>
               <Text style={styles.completionBadge}>
                 {doneAchievements}/{achievements.length}
               </Text>
             </View>
             <View style={styles.badgeGrid}>
               {achievements.map(({ name, desc, done, Icon }) => (
-                <View key={name} style={[styles.badgeCard, !done && { opacity: 0.38 }]}>
-                  <Icon size={32} />
-                  <Text style={styles.badgeName}>{name}</Text>
-                  <Text style={styles.badgeDesc}>{done ? 'Kazanıldı' : desc}</Text>
+                <View key={name} style={[styles.badgeCard, !done && { opacity: 0.42 }]}>
+                  <Icon size={28} />
+                  <Text style={styles.badgeName} numberOfLines={1}>{name}</Text>
+                  <Text style={styles.badgeDesc} numberOfLines={1}>{done ? 'Tamamlandı' : desc}</Text>
                 </View>
               ))}
             </View>
@@ -1034,6 +1159,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </TouchableOpacity>
           </View>
         )}
+        </RNAnimated.View>
       </ScrollView>
       <TavrikoBottomNav
         activeTab="profile"
@@ -1054,103 +1180,209 @@ const card = {
 } as const;
 
 const styles = StyleSheet.create({
-  scrollContent: { paddingBottom: 165 },
+  scrollContent: { paddingBottom: 150 },
   heroCard: {
     ...card,
-    padding: 16,
-    marginTop: 10,
+    padding: 14,
+    marginTop: 8,
     backgroundColor: 'rgba(24, 10, 54, 0.94)',
-    borderColor: 'rgba(255, 196, 61, 0.4)',
+    borderColor: 'rgba(255, 196, 61, 0.35)',
   },
-  avatarHeader: { alignItems: 'center' },
-  avatarGlowContainer: {
-    position: 'relative',
+  heroTopRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    width: 104,
-    height: 104,
+    gap: 12,
   },
-  auraPulseRing: {
-    position: 'absolute',
-    width: 102,
-    height: 102,
-    borderRadius: 51,
-    backgroundColor: 'rgba(255, 196, 61, 0.35)',
-    shadowColor: '#FFC43D',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 16,
+  heroAvatarButton: {
+    position: 'relative',
+    flexShrink: 0,
   },
   goldAvatarRing: {
-    padding: 4,
-    borderRadius: 54,
+    padding: 3,
+    borderRadius: 42,
     backgroundColor: '#FFB21E',
-    shadowColor: '#FFC43D',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
   },
-  presenceBadge: {
+  heroOnlineDot: {
+    position: 'absolute',
+    right: 2,
+    bottom: 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2.5,
+    borderColor: '#180A36',
+  },
+  heroIdentityCol: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+  },
+  heroNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: -10,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
   },
-  presenceText: { fontSize: 10, fontFamily: THEME.fonts.extraBold, letterSpacing: 0.5 },
-  displayName: { fontFamily: THEME.fonts.display, fontSize: 26, color: '#FFFFFF', marginTop: 8 },
+  displayName: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 21,
+    color: '#FFFFFF',
+  },
+  levelSub: {
+    color: '#D9CDF5',
+    fontSize: 11.5,
+    fontFamily: THEME.fonts.extraBold,
+    marginTop: 2,
+  },
+  heroBadgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+  },
   titlePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    marginTop: 4,
-    backgroundColor: 'rgba(255, 196, 61, 0.15)',
+    gap: 4,
+    backgroundColor: 'rgba(255, 196, 61, 0.14)',
     borderWidth: 1,
-    borderColor: '#FFC43D',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    borderColor: 'rgba(255, 196, 61, 0.5)',
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
   },
-  titlePillText: { color: '#FFC43D', fontSize: 12, fontFamily: THEME.fonts.extraBold },
-  levelSub: { color: '#D9CDF5', fontSize: 12, fontFamily: THEME.fonts.extraBold, textAlign: 'center', marginTop: 6 },
+  titlePillText: {
+    color: '#FFC43D',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  presenceMiniPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  presenceMiniText: {
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  heroXpWrap: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  heroXpHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  heroXpLabel: {
+    color: '#C4B5FD',
+    fontSize: 10.5,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  heroXpVal: {
+    color: '#FFFFFF',
+    fontSize: 10.5,
+    fontFamily: THEME.fonts.extraBold,
+  },
   xpText: { color: '#D9CDF5', fontSize: 10, fontFamily: THEME.fonts.extraBold, textAlign: 'center', marginTop: 4 },
-  bioText: { color: '#FFC43D', fontSize: 12, fontFamily: THEME.fonts.body, marginTop: 6, fontStyle: 'italic' },
-  headerActions: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  headerActionBtn: {
+  bioText: { color: '#FFC43D', fontSize: 11.5, fontFamily: THEME.fonts.body, marginTop: 8, fontStyle: 'italic' },
+  heroBottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  inlineFriendCodeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(10, 4, 24, 0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.35)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexShrink: 1,
+  },
+  inlineCodeLbl: {
+    color: '#A992E2',
+    fontSize: 8.5,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 0.4,
+  },
+  inlineCodeVal: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.display,
+  },
+  inlineCopyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(255, 196, 61, 0.14)',
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  inlineCopyText: {
+    color: '#FFC43D',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  heroQuickActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexShrink: 0,
+  },
+  headerActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: 'rgba(10, 4, 24, 0.85)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.16)',
-    borderRadius: 14,
-    paddingHorizontal: 12,
+    borderRadius: 12,
+    paddingHorizontal: 10,
     paddingVertical: 7,
+  },
+  headerActionBtnIconOnly: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(10, 4, 24, 0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.16)',
+    borderRadius: 12,
   },
   headerActionBtnEdit: {
     backgroundColor: 'rgba(255, 196, 61, 0.16)',
     borderColor: 'rgba(255, 196, 61, 0.45)',
   },
-  headerActionText: { color: '#D9CDF5', fontSize: 12, fontFamily: THEME.fonts.extraBold },
+  headerActionText: { color: '#D9CDF5', fontSize: 11, fontFamily: THEME.fonts.extraBold },
   headerActionTextEdit: { color: '#FFC43D' },
 
-  // Horizontal Motion Avatar Picker Carousel
-  avatarPickerSection: {
-    marginTop: 14,
-    backgroundColor: 'rgba(20, 8, 48, 0.88)',
-    borderRadius: 22,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: 'rgba(107, 60, 255, 0.5)',
+  // Collapsible Avatar Drawer inside Hero Card
+  avatarDrawerBox: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   avatarPickerHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
     gap: 8,
   },
   avatarPickerTitleWrap: {
@@ -1158,12 +1390,12 @@ const styles = StyleSheet.create({
   },
   avatarPickerTitle: {
     color: '#FFFFFF',
-    fontSize: 14.5,
+    fontSize: 13,
     fontFamily: THEME.fonts.display,
   },
   avatarPickerSubtitle: {
     color: '#D9CDF5',
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: THEME.fonts.bold,
     marginTop: 1,
     opacity: 0.8,
@@ -1172,52 +1404,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(255, 196, 61, 0.12)',
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 196, 61, 0.14)',
+    paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 14,
-    borderWidth: 1.2,
+    borderRadius: 12,
+    borderWidth: 1,
     borderColor: 'rgba(255, 196, 61, 0.5)',
     flexShrink: 0,
   },
   customPhotoChipText: {
     color: '#FFC43D',
-    fontSize: 11.5,
+    fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
   },
   avatarCarouselTrack: {
     paddingVertical: 4,
-    paddingRight: 10,
-    gap: 10,
+    paddingRight: 8,
+    gap: 8,
   },
   avatarCarouselCard: {
-    width: 90,
+    width: 78,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderRadius: 16,
-    padding: 8,
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.12)',
     position: 'relative',
   },
   avatarCarouselCardActive: {
-    backgroundColor: 'rgba(255, 196, 61, 0.12)',
+    backgroundColor: 'rgba(255, 196, 61, 0.14)',
     borderWidth: 2,
   },
   avatarSelectedBadge: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    top: -4,
+    right: -4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
   },
   avatarSelectedCheck: {
     color: '#1C0C3E',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
   },
   cardAvatarCircle: {
@@ -1225,70 +1458,95 @@ const styles = StyleSheet.create({
   },
   cardAvatarName: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
-    marginBottom: 4,
   },
-  cardRarityPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 6,
-  },
-  cardRarityText: {
-    fontSize: 8.5,
-    fontWeight: '900',
-  },
-
-  friendCodeCard: {
-    ...card,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 14,
-    marginTop: 12,
-  },
-  friendCodeLabel: { color: '#D9CDF5', fontSize: 10, fontFamily: THEME.fonts.extraBold, letterSpacing: 0.5 },
-  friendCodeValue: { color: '#FFFFFF', fontSize: 20, fontFamily: THEME.fonts.display, marginTop: 2 },
-  copyBtnPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 196, 61, 0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#FFC43D',
-  },
-  friendCodeCopy: { color: '#FFC43D', fontSize: 12, fontFamily: THEME.fonts.extraBold },
 
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(10, 4, 24, 0.7)',
-    borderRadius: 16,
+    backgroundColor: 'rgba(10, 4, 24, 0.72)',
+    borderRadius: 15,
     padding: 4,
-    marginVertical: 14,
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  tabBtn: { flex: 1, paddingVertical: 8, borderRadius: 12, alignItems: 'center' },
+  tabBtn: { flex: 1, paddingVertical: 8, borderRadius: 11, alignItems: 'center' },
   tabBtnActive: { backgroundColor: '#6B3CFF' },
   tabText: { color: '#D9CDF5', fontSize: 11, fontFamily: THEME.fonts.extraBold },
   tabTextActive: { color: '#FFFFFF' },
 
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 8, marginBottom: 14 },
-  statCard: {
+  primaryStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 10,
+    marginBottom: 10,
+  },
+  primaryStatBox: {
     ...card,
-    width: '32%',
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    width: '48.5%',
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(26, 11, 58, 0.9)',
     borderRadius: 18,
     borderWidth: 1.2,
     borderColor: 'rgba(154, 107, 255, 0.28)',
   },
-  statValue: { fontFamily: THEME.fonts.display, fontSize: 19, color: '#FFFFFF' },
-  statLabel: { color: '#D9CDF5', fontSize: 10, fontFamily: THEME.fonts.extraBold, textAlign: 'center', marginTop: 2 },
+  primaryStatLabel: {
+    color: '#A992E2',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 0.6,
+  },
+  primaryStatValue: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 24,
+    color: '#FFFFFF',
+    marginTop: 3,
+  },
+  primaryStatFraction: {
+    fontSize: 15,
+    color: 'rgba(255, 255, 255, 0.55)',
+  },
+  primaryStatSub: {
+    color: '#D9CDF5',
+    fontSize: 10.5,
+    fontFamily: THEME.fonts.bold,
+    marginTop: 2,
+  },
+  secondaryMetricsCard: {
+    ...card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 16,
+  },
+  secondaryMetricItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  secondaryMetricDivider: {
+    width: 1,
+    height: 26,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  secondaryMetricVal: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 15,
+    color: '#FFFFFF',
+  },
+  secondaryMetricLbl: {
+    color: '#D9CDF5',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+    marginTop: 2,
+  },
 
   highlightCard: {
     ...card,
