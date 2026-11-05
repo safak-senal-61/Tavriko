@@ -109,7 +109,39 @@ export const useGameStore = create<GameState>((set) => ({
     }));
   },
   activeRoom: null,
-  setActiveRoom: (activeRoom) => set({ activeRoom }),
+  setActiveRoom: (activeRoom) =>
+    set((state) => {
+      if (
+        !activeRoom ||
+        !state.activeRoom ||
+        state.activeRoom.code !== activeRoom.code ||
+        activeRoom.status === 'lobby'
+      ) {
+        return { activeRoom };
+      }
+      const mergedPlayers = { ...activeRoom.players };
+      const mergedScores = { ...activeRoom.scores };
+      for (const [pid, prevPlayer] of Object.entries(state.activeRoom.players || {})) {
+        if (mergedPlayers[pid]) {
+          mergedPlayers[pid] = {
+            ...mergedPlayers[pid],
+            correctAnswersCount: Math.max(
+              mergedPlayers[pid].correctAnswersCount || 0,
+              prevPlayer.correctAnswersCount || 0
+            ),
+            score: Math.max(mergedPlayers[pid].score || 0, prevPlayer.score || 0),
+          };
+          mergedScores[pid] = Math.max(mergedScores[pid] || 0, mergedPlayers[pid].score || 0);
+        }
+      }
+      return {
+        activeRoom: {
+          ...activeRoom,
+          players: mergedPlayers,
+          scores: mergedScores,
+        },
+      };
+    }),
   currentQuestion: null,
   selectedOptionId: null,
   isAnswerLocked: false,
@@ -152,6 +184,22 @@ export const useGameStore = create<GameState>((set) => ({
             ...(typeof entry.correctAnswersCount === 'number'
               ? { correctAnswersCount: entry.correctAnswersCount }
               : {}),
+          };
+        } else {
+          nextPlayers[entry.playerId] = {
+            id: entry.playerId,
+            username: entry.username || entry.displayName,
+            displayName: entry.displayName,
+            avatarUrl: entry.avatarUrl || 'av1',
+            score: entry.score,
+            currentStreak: entry.streak || 0,
+            isReady: true,
+            isHost: false,
+            isConnected: true,
+            hasAnsweredCurrentRound: true,
+            totalResponseTimeMs: 0,
+            correctAnswersCount:
+              typeof entry.correctAnswersCount === 'number' ? entry.correctAnswersCount : 0,
           };
         }
       }

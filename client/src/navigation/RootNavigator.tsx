@@ -457,6 +457,59 @@ export const RootNavigator: React.FC = () => {
           setMatchQuestionsReview([]);
           setDuelOpponent(data.opponent || null);
           setOpponentHasAnswered(false);
+          const opp = data.opponent;
+          const initialPlayers: Record<string, any> = {
+            [user.id]: {
+              id: user.id,
+              username: user.username,
+              displayName: user.displayName,
+              avatarUrl: user.avatarUrl || 'av1',
+              score: 0,
+              currentStreak: 0,
+              isReady: true,
+              isHost: true,
+              isConnected: true,
+              hasAnsweredCurrentRound: false,
+              totalResponseTimeMs: 0,
+              correctAnswersCount: 0,
+            },
+          };
+          const initialScores: Record<string, number> = { [user.id]: 0 };
+          if (opp && opp.id) {
+            initialPlayers[opp.id] = {
+              id: opp.id,
+              username: opp.username || opp.displayName || 'Rakip',
+              displayName: opp.displayName || 'Rakip',
+              avatarUrl: opp.avatarUrl || 'av2',
+              score: 0,
+              currentStreak: 0,
+              isReady: true,
+              isHost: false,
+              isConnected: true,
+              hasAnsweredCurrentRound: false,
+              totalResponseTimeMs: 0,
+              correctAnswersCount: 0,
+              isBot: !!opp.isBot,
+            };
+            initialScores[opp.id] = 0;
+          }
+          const duelRoom: GameRoom = {
+            code: data.roomCode,
+            mode: 'duel',
+            hostId: user.id,
+            status: 'countdown',
+            category: selectedCategory,
+            difficulty: selectedDifficulty,
+            maxPlayers: 2,
+            currentRound: 0,
+            totalRounds: 5,
+            questionTimeSec: 15,
+            penaltyForWrong: false,
+            players: initialPlayers,
+            scores: initialScores,
+          };
+          setActiveRoom(duelRoom);
+          activeRoomRef.current = duelRoom;
           socketService.joinRoom(
             data.roomCode,
             user.id,
@@ -1535,76 +1588,92 @@ export const RootNavigator: React.FC = () => {
                     }
                   : null
               }
-              racers={
-                activeRoom && user
-                  ? (activeRoom.mode === 'custom'
-                      ? Object.values(activeRoom.players).map((p) => ({
-                          id: p.id,
-                          displayName: p.displayName,
-                          avatarUrl: p.avatarUrl,
-                          score: activeRoom.scores[p.id] ?? p.score ?? 0,
-                          correctAnswers: p.correctAnswersCount ?? 0,
-                          isMe: p.id === user.id,
-                          isHost: p.isHost,
-                          hasAnswered: p.hasAnsweredCurrentRound,
-                          lastAnswer: lastRoundResult?.playerAnswers?.[p.id],
-                        }))
-                      : duelOpponent
-                      ? [
-                          {
-                            id: user.id,
-                            displayName: user.displayName || 'Sen',
-                            avatarUrl: user.avatarUrl,
-                            score: activeRoom.scores[user.id] ?? 0,
-                            correctAnswers: activeRoom.players[user.id]?.correctAnswersCount ?? 0,
-                            isMe: true,
-                            isHost: activeRoom.hostId === user.id,
-                            hasAnswered: activeRoom.players[user.id]?.hasAnsweredCurrentRound || selectedOptionId !== null,
-                            lastAnswer: lastRoundResult?.playerAnswers?.[user.id],
-                          },
-                          {
-                            id: duelOpponent.id,
-                            displayName: duelOpponent.displayName,
-                            avatarUrl: duelOpponent.avatarUrl,
-                            score: activeRoom.scores[duelOpponent.id] ?? duelOpponent.score ?? 0,
-                            correctAnswers: activeRoom.players[duelOpponent.id]?.correctAnswersCount ?? 0,
-                            isMe: false,
-                            isHost: false,
-                            hasAnswered: opponentHasAnswered || activeRoom.players[duelOpponent.id]?.hasAnsweredCurrentRound,
-                            lastAnswer: lastRoundResult?.playerAnswers?.[duelOpponent.id],
-                          },
-                        ]
-                      : []
-                    )
-                  : duelOpponent
-                  ? [
-                      {
-                        id: user?.id || 'me',
-                        displayName: user?.displayName || 'Sen',
-                        avatarUrl: user?.avatarUrl,
-                        score: practiceStats.totalScore,
-                        correctAnswers: practiceStats.correctAnswers,
-                        isMe: true,
-                        hasAnswered: selectedOptionId !== null,
-                        lastAnswer: practiceFeedback ? {
+              racers={(() => {
+                const myReviewedCorrect = matchQuestionsReview.filter((q) => q.isCorrect).length;
+                if (activeRoom && user) {
+                  const roomPlayers = Object.values(activeRoom.players || {});
+                  const mapped = roomPlayers.map((p) => {
+                    const isMe = p.id === user.id;
+                    const lbEntry = lastRoundResult?.leaderboard?.find((e) => e.playerId === p.id);
+                    const authoritativeCorrect = Math.max(
+                      p.correctAnswersCount ?? 0,
+                      lbEntry?.correctAnswersCount ?? 0,
+                      isMe ? myReviewedCorrect : 0
+                    );
+                    return {
+                      id: p.id,
+                      displayName: p.displayName,
+                      avatarUrl: isMe ? user.avatarUrl || p.avatarUrl : p.avatarUrl,
+                      score: activeRoom.scores[p.id] ?? lbEntry?.score ?? p.score ?? 0,
+                      correctAnswers: authoritativeCorrect,
+                      isMe,
+                      isHost: p.isHost,
+                      hasAnswered: isMe
+                        ? p.hasAnsweredCurrentRound || selectedOptionId !== null
+                        : p.hasAnsweredCurrentRound || opponentHasAnswered,
+                      lastAnswer: lastRoundResult?.playerAnswers?.[p.id],
+                    };
+                  });
+                  if (duelOpponent && !mapped.some((r) => r.id === duelOpponent.id)) {
+                    mapped.push({
+                      id: duelOpponent.id,
+                      displayName: duelOpponent.displayName,
+                      avatarUrl: duelOpponent.avatarUrl,
+                      score: activeRoom.scores[duelOpponent.id] ?? (duelOpponent as any).score ?? 0,
+                      correctAnswers: activeRoom.players[duelOpponent.id]?.correctAnswersCount ?? 0,
+                      isMe: false,
+                      isHost: false,
+                      hasAnswered: opponentHasAnswered,
+                      lastAnswer: lastRoundResult?.playerAnswers?.[duelOpponent.id],
+                    });
+                  }
+                  if (!mapped.some((r) => r.isMe)) {
+                    mapped.unshift({
+                      id: user.id,
+                      displayName: user.displayName || 'Sen',
+                      avatarUrl: user.avatarUrl,
+                      score: activeRoom.scores[user.id] ?? 0,
+                      correctAnswers: myReviewedCorrect,
+                      isMe: true,
+                      isHost: activeRoom.hostId === user.id,
+                      hasAnswered: selectedOptionId !== null,
+                      lastAnswer: lastRoundResult?.playerAnswers?.[user.id],
+                    });
+                  }
+                  return mapped;
+                }
+                const localRacers = [
+                  {
+                    id: user?.id || 'me',
+                    displayName: user?.displayName || 'Sen',
+                    avatarUrl: user?.avatarUrl,
+                    score: practiceStats.totalScore,
+                    correctAnswers: practiceStats.correctAnswers,
+                    isMe: true,
+                    hasAnswered: selectedOptionId !== null,
+                    lastAnswer: practiceFeedback
+                      ? {
                           isCorrect: practiceFeedback.isCorrect,
                           pointsEarned: practiceFeedback.pointsAwarded,
                           speedBonus: practiceFeedback.speedBonus,
-                        } : undefined,
-                      },
-                      {
-                        id: duelOpponent.id,
-                        displayName: duelOpponent.displayName,
-                        avatarUrl: duelOpponent.avatarUrl,
-                        score: duelOpponent.score || 0,
-                        // Odasız düelloda rakibin doğru sayısı bilinmiyor; tahmin edilmez
-                        correctAnswers: 0,
-                        isMe: false,
-                        hasAnswered: opponentHasAnswered,
-                      },
-                    ]
-                  : []
-              }
+                        }
+                      : undefined,
+                  },
+                ];
+                if (duelOpponent) {
+                  localRacers.push({
+                    id: duelOpponent.id,
+                    displayName: duelOpponent.displayName,
+                    avatarUrl: duelOpponent.avatarUrl,
+                    score: (duelOpponent as any).score || 0,
+                    correctAnswers: 0,
+                    isMe: false,
+                    hasAnswered: opponentHasAnswered,
+                    lastAnswer: undefined,
+                  });
+                }
+                return localRacers;
+              })()}
             />
             {/* Practice / Guest End of Game Summary Modal */}
             <PracticeSummaryModal

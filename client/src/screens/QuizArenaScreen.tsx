@@ -6,10 +6,17 @@ import {
   TouchableOpacity,
   AppState,
   AppStateStatus,
-  Animated,
-  Platform,
-  Easing,
 } from 'react-native';
+import Svg, {
+  Defs,
+  LinearGradient,
+  Stop,
+  Path,
+  Circle,
+  Line,
+  Rect,
+  G,
+} from 'react-native-svg';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { loadStoredPreferences } from '../store/appPrefs';
@@ -21,8 +28,6 @@ import {
   CheckMarkSvg,
   CrossMarkSvg,
   CharacterAvatar,
-  CrownIcon,
-  SpeedBoltIcon,
 } from '../components/TavrikoIcons';
 export type QuestionAnswerState =
   | 'answerable'
@@ -165,21 +170,23 @@ const SmoothTimerBar: React.FC<SmoothTimerBarProps> = React.memo(
   }
 );
 // ---------------------------------------------------------------------------
-// ANADOLU KERVANYOLU YARIŞ PİSTİ (Anatolian Caravan Road Race Track)
+// TRT BİL BAKALIM TARZI PANORAMİK DALGA & TEPE YARIŞ PİSTİ
+// (Scenic Bosphorus Bridge & Hill Wave Race Track)
 //
-// Yarış ilerlemesi YALNIZCA doğru cevap sayısına bağlıdır:
-//   requiredProgress   = totalQuestions
-//   progressPercentage = (correctAnswers / totalQuestions) * 100
-// Her doğru cevap tam 1 adım, yanlış / boş cevap 0 adım ekler. Puan, hız
-// bonusu veya sabit bir bitiş mesafesi ilerlemeyi ASLA etkilemez.
+// - İlerleme yüzdesi: progressPercentage = (correctAnswers / totalQuestions) * 100
+// - Her doğru cevap yarışçıyı dalga eğrisi üzerinde +1 adım zirvedeki bayrağa taşır.
+// - Yanlış veya boş cevap 0 adım ilerletir.
+// - Her yarışçının yuvarlak avatarı doğrudan beyaz tepe-vadi-zirve dalga eğrisi
+//   üzerinde (x, getHillCurveNormY(u) * H) konumlanır; üstünde sıralaması (1., 2., 3.),
+//   altında anlık puanı (306, 295, 152...) yazar.
 // ---------------------------------------------------------------------------
 export interface RacerInfo {
   id: string;
   displayName: string;
   avatarUrl?: string;
-  /** Sadece bilgi amaçlı gösterilir; pist konumunu etkilemez */
+  /** Avatarın hemen altında gösterilen anlık puan */
   score: number;
-  /** Pist konumunu belirleyen tek değer: bu oyunda verilen doğru cevap sayısı */
+  /** Eğri üzerindeki ilerleme adımını belirleyen doğru cevap sayısı */
   correctAnswers: number;
   isMe?: boolean;
   isHost?: boolean;
@@ -192,9 +199,11 @@ export interface RacerInfo {
   };
 }
 
-/** Pist geometrisi sabitleri */
-const TRACK_PADDING = 12;
-const MEDALLION_SIZE = 36;
+const WAVE_TRACK_HEIGHT = 116;
+const WAVE_U_START = 0.11;
+const WAVE_U_FINISH = 0.87;
+const RACER_NODE_W = 48;
+const RACER_AVATAR_SIZE = 34;
 
 /** Doğru sayısını [0, totalQuestions] aralığına sıkıştırır; bitişe erken ulaşmayı imkânsız kılar */
 export const clampCorrect = (correct: number, totalQuestions: number): number => {
@@ -210,176 +219,235 @@ export const getRaceProgressPercentage = (correct: number, totalQuestions: numbe
 };
 
 /**
- * Aynı doğru sayısındaki yarışçıları dikey olarak yayar; madalyonlar üst üste binmez.
- * Dönüş: racerId -> dikey ofset (px)
+ * TRT Bil Bakalım tepe-vadi-zirve dalga eğrisinin normalize Y koordinatı [0..1].
+ * u = 0.00 -> sol giriş (0.67)
+ * u = 0.18 -> ilk tepe sırtı (0.43)
+ * u = 0.45 -> orta vadi çukuru (0.74)
+ * u = 0.87 -> sağ zirve / bitiş bayrağı (0.25)
+ * u = 1.00 -> sağ iniş yamacı (0.40)
  */
-const computeVerticalOffsets = (
-  racers: RacerInfo[],
-  totalQuestions: number
-): Record<string, number> => {
-  const groups: Record<number, string[]> = {};
-  racers.forEach((r) => {
-    const key = clampCorrect(r.correctAnswers, totalQuestions);
-    (groups[key] = groups[key] || []).push(r.id);
-  });
-  const offsets: Record<string, number> = {};
-  Object.values(groups).forEach((ids) => {
-    const spacing = Math.min(20, 44 / Math.max(1, ids.length - 1 || 1));
-    ids.forEach((id, i) => {
-      offsets[id] = ids.length === 1 ? 0 : (i - (ids.length - 1) / 2) * spacing;
-    });
-  });
-  return offsets;
+const HILL_CONTROL_POINTS: ReadonlyArray<readonly [number, number]> = [
+  [0.0, 0.67],
+  [0.18, 0.43],
+  [0.45, 0.74],
+  [WAVE_U_FINISH, 0.25],
+  [1.0, 0.4],
+];
+
+export const getHillCurveNormY = (uRaw: number): number => {
+  const u = Math.max(0, Math.min(1, uRaw));
+  for (let i = 0; i < HILL_CONTROL_POINTS.length - 1; i += 1) {
+    const [u0, y0] = HILL_CONTROL_POINTS[i];
+    const [u1, y1] = HILL_CONTROL_POINTS[i + 1];
+    if (u >= u0 && u <= u1) {
+      const t = (u - u0) / Math.max(1e-6, u1 - u0);
+      const s = 0.5 - 0.5 * Math.cos(Math.PI * t);
+      return y0 + (y1 - y0) * s;
+    }
+  }
+  return HILL_CONTROL_POINTS[HILL_CONTROL_POINTS.length - 1][1];
 };
 
-/** Tek yarışçı Bakır Madalyonu: doğru cevap oranına göre pistte ilerler */
-const CaravanMedallion: React.FC<{
-  racer: RacerInfo;
-  totalQuestions: number;
-  isLeader: boolean;
-  verticalOffset: number;
-  travelWidth: number;
-}> = ({ racer, totalQuestions, isLeader, verticalOffset, travelWidth }) => {
-  const correct = clampCorrect(racer.correctAnswers, totalQuestions);
-  const ratio = correct / Math.max(1, totalQuestions);
+/**
+ * Aynı doğru sayısındaki yarışçıların eğri üzerinde birbirini kapatmaması için
+ * küçük yatay yayılım uygular (asla bir sonraki soru adımına veya bitişe taşmaz).
+ */
+const computeCurvePositionsU = (
+  sortedRacers: RacerInfo[],
+  totalQuestions: number
+): Record<string, number> => {
+  const total = Math.max(1, Math.floor(totalQuestions));
+  const span = WAVE_U_FINISH - WAVE_U_START;
+  const stepSpan = span / total;
 
-  const posAnim = useRef(new Animated.Value(ratio)).current;
-  const offsetAnim = useRef(new Animated.Value(verticalOffset)).current;
-  const reactionAnim = useRef(new Animated.Value(0)).current;
-  const shakeAnim = useRef(new Animated.Value(0)).current;
+  // Grupları doğru cevap sayısına göre ayır
+  const groups: Record<number, RacerInfo[]> = {};
+  sortedRacers.forEach((r) => {
+    const c = clampCorrect(r.correctAnswers, total);
+    (groups[c] = groups[c] || []).push(r);
+  });
 
-  // 600ms ease-in-out + bitişte küçük bir sekme
-  useEffect(() => {
-    Animated.timing(posAnim, {
-      toValue: ratio,
-      duration: 600,
-      easing: Easing.out(Easing.back(1.4)),
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
-  }, [ratio, posAnim]);
-
-  useEffect(() => {
-    Animated.timing(offsetAnim, {
-      toValue: verticalOffset,
-      duration: 300,
-      easing: Easing.inOut(Easing.ease),
-      useNativeDriver: Platform.OS !== 'web',
-    }).start();
-  }, [verticalOffset, offsetAnim]);
-
-  // Doğru: yukarı süzülen "+1" rozeti. Yanlış: kırmızı sarsıntı (konum değişmez)
-  useEffect(() => {
-    if (!racer.lastAnswer) return;
-    if (racer.lastAnswer.isCorrect) {
-      reactionAnim.setValue(0);
-      Animated.sequence([
-        Animated.spring(reactionAnim, {
-          toValue: 1,
-          friction: 5,
-          tension: 85,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-        Animated.delay(1600),
-        Animated.timing(reactionAnim, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-      ]).start();
-    } else {
-      shakeAnim.setValue(0);
-      Animated.sequence(
-        [6, -6, 4, -4, 0].map((v) =>
-          Animated.timing(shakeAnim, {
-            toValue: v,
-            duration: 60,
-            useNativeDriver: Platform.OS !== 'web',
-          })
-        )
-      ).start();
+  const result: Record<string, number> = {};
+  Object.entries(groups).forEach(([correctKey, list]) => {
+    const c = Number(correctKey);
+    const baseU = WAVE_U_START + (c / total) * span;
+    if (list.length === 1) {
+      result[list[0].id] = baseU;
+      return;
     }
-  }, [racer.lastAnswer, reactionAnim, shakeAnim]);
-
-  const translateX = posAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, Math.max(0, travelWidth)],
-    extrapolate: 'clamp',
+    // Aynı adımdaki yarışçıları puana göre yan yana diz (öndeki sağda, arkadaki solda)
+    const maxSpread = Math.min(0.055, stepSpan * 0.42);
+    const spacing = Math.min(0.036, (maxSpread * 2) / Math.max(1, list.length - 1));
+    list.forEach((racer, idx) => {
+      // idx=0 en yüksek puanlı -> biraz daha sağda; sonuncu biraz daha solda
+      const offsetOrder = (list.length - 1) / 2 - idx;
+      let u = baseU + offsetOrder * spacing;
+      if (c < total) {
+        u = Math.min(WAVE_U_FINISH - stepSpan * 0.25, Math.max(0.06, u));
+      } else {
+        u = Math.min(WAVE_U_FINISH, Math.max(0.06, u));
+      }
+      result[racer.id] = u;
+    });
   });
 
-  const reactionTranslateY = reactionAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -22],
-  });
+  return result;
+};
 
+/** Eğri üzerinde (u) değiştiğinde 60 FPS yumuşak geçiş sağlayan hook */
+const useAnimatedWaveU = (targetU: number, durationMs: number = 620): number => {
+  const [currentU, setCurrentU] = useState<number>(targetU);
+  const currentURef = useRef<number>(targetU);
+
+  useEffect(() => {
+    const startU = currentURef.current;
+    const diff = targetU - startU;
+    if (Math.abs(diff) < 0.0005) {
+      currentURef.current = targetU;
+      setCurrentU(targetU);
+      return;
+    }
+    let rafId: number | null = null;
+    const startTime = Date.now();
+
+    const step = () => {
+      const elapsed = Date.now() - startTime;
+      const t = Math.min(1, elapsed / durationMs);
+      // Cubic ease-out
+      const eased = 1 - Math.pow(1 - t, 3);
+      const nextVal = startU + diff * eased;
+      currentURef.current = nextVal;
+      setCurrentU(nextVal);
+      if (t < 1) {
+        rafId = requestAnimationFrame(step);
+      }
+    };
+
+    rafId = requestAnimationFrame(step);
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [targetU, durationMs]);
+
+  return currentU;
+};
+
+/** Eğri üzerindeki tek yarışçı düğümü: Üstte sıra (1.), ortada ışıklı avatar, altta puan */
+const WaveRacerNode: React.FC<{
+  racer: RacerInfo;
+  rank: number;
+  targetU: number;
+  trackWidth: number;
+  trackHeight: number;
+  totalQuestions: number;
+}> = ({ racer, rank, targetU, trackWidth, trackHeight, totalQuestions }) => {
+  const animU = useAnimatedWaveU(targetU, 620);
+  const [showPlusOne, setShowPlusOne] = useState(false);
+
+  const prevCorrectRef = useRef<number>(clampCorrect(racer.correctAnswers, totalQuestions));
+  const correctNow = clampCorrect(racer.correctAnswers, totalQuestions);
+
+  useEffect(() => {
+    if (correctNow > prevCorrectRef.current || racer.lastAnswer?.isCorrect) {
+      setShowPlusOne(true);
+      const timer = setTimeout(() => setShowPlusOne(false), 1600);
+      prevCorrectRef.current = correctNow;
+      return () => clearTimeout(timer);
+    }
+    prevCorrectRef.current = correctNow;
+  }, [correctNow, racer.lastAnswer]);
+
+  const x = animU * trackWidth;
+  const y = getHillCurveNormY(animU) * trackHeight;
+
+  const isLeader = rank === 1 && (correctNow > 0 || (racer.score || 0) > 0);
   const isCorrect = racer.lastAnswer?.isCorrect === true;
   const isWrong = racer.lastAnswer?.isCorrect === false;
-  const isFinished = correct >= totalQuestions;
 
   return (
-    <Animated.View
+    <View
+      pointerEvents="none"
       style={[
-        styles.caravanMedallionCluster,
+        styles.waveRacerNode,
         {
-          zIndex: racer.isMe ? 12 : isLeader ? 10 : 5,
-          transform: [
-            { translateX },
-            { translateY: offsetAnim },
-            { translateX: shakeAnim },
-          ],
+          left: x - RACER_NODE_W / 2,
+          top: y - RACER_AVATAR_SIZE / 2 - 15,
+          zIndex: racer.isMe ? 30 : 20 - rank,
         },
       ]}
-      pointerEvents="none"
     >
-      {isCorrect && (
-        <Animated.View
-          style={[
-            styles.stepPopup,
-            { opacity: reactionAnim, transform: [{ translateY: reactionTranslateY }] },
-          ]}
-        >
-          <Text style={styles.stepPopupText}>+1</Text>
-        </Animated.View>
-      )}
-
-      {(isFinished || (isLeader && correct > 0)) && (
-        <View style={styles.racerCrownBadge}>
-          <Text style={styles.racerCrownText}>{isFinished ? '🏆' : '👑'}</Text>
+      {/* Doğru cevapta yukarı süzülen +1 adım rozeti */}
+      {showPlusOne && (
+        <View style={styles.wavePlusOneBadge}>
+          <Text style={styles.wavePlusOneText}>+1</Text>
         </View>
       )}
 
+      {/* Üstte Sıralama Numarası (1., 2., 3. ...) */}
+      <Text
+        style={[
+          styles.waveRankText,
+          isLeader && styles.waveRankTextLeader,
+          racer.isMe && styles.waveRankTextMe,
+        ]}
+        numberOfLines={1}
+      >
+        {rank}.
+      </Text>
+
+      {/* Ortada Yuvarlak Avatar (TRT Bil Bakalım: Sen = Turuncu/Altın halka, Rakipler = Mavi/Beyaz halka) */}
       <View
         style={[
-          styles.copperMedallionFrame,
-          isLeader && styles.copperMedallionLeader,
-          isCorrect && styles.copperMedallionCorrect,
-          isWrong && styles.copperMedallionWrong,
-          racer.isMe && styles.copperMedallionMe,
+          styles.waveAvatarOuterGlow,
+          racer.isMe ? styles.waveAvatarGlowMe : styles.waveAvatarGlowOther,
+          isCorrect && styles.waveAvatarGlowCorrect,
+          isWrong && styles.waveAvatarGlowWrong,
         ]}
       >
-        <CharacterAvatar seed={racer.avatarUrl || racer.displayName} size={28} />
-        {racer.hasAnswered ? (
-          <View style={styles.racerStatusTick}>
-            <Text style={styles.racerStatusTickText}>✓</Text>
+        <View
+          style={[
+            styles.waveAvatarRing,
+            racer.isMe ? styles.waveAvatarRingMe : styles.waveAvatarRingOther,
+            isCorrect && styles.waveAvatarRingCorrect,
+            isWrong && styles.waveAvatarRingWrong,
+          ]}
+        >
+          <CharacterAvatar
+            seed={racer.avatarUrl || racer.displayName}
+            size={RACER_AVATAR_SIZE - 6}
+          />
+        </View>
+        {racer.hasAnswered && (
+          <View style={styles.waveAnsweredDot}>
+            <Text style={styles.waveAnsweredDotText}>✓</Text>
           </View>
-        ) : null}
+        )}
       </View>
-    </Animated.View>
+
+      {/* Altta Anlık Puan (306, 297, 152...) */}
+      <Text
+        style={[
+          styles.waveScoreText,
+          racer.isMe && styles.waveScoreTextMe,
+        ]}
+        numberOfLines={1}
+      >
+        {Math.max(0, Math.round(racer.score || 0))}
+      </Text>
+    </View>
   );
 };
 
-/** Pist + bitiş çizgisi + soru başına kilometre taşları + yarışçı listesi */
-const CaravanRaceTrack: React.FC<{
+/** TRT Bil Bakalım Tarzı Panoramik Boğaz Köprüsü & Dalga Tepesi Yarış Pisti */
+const BilBakalimWaveTrack: React.FC<{
   racers: RacerInfo[];
   totalQuestions: number;
 }> = ({ racers, totalQuestions }) => {
   const [trackWidth, setTrackWidth] = useState(0);
   const total = Math.max(1, Math.floor(totalQuestions));
+  const H = WAVE_TRACK_HEIGHT;
 
-  // Madalyon merkezinin 0% ile 100% arasında kat edebileceği yatay mesafe
-  const travelWidth = Math.max(0, trackWidth - TRACK_PADDING * 2 - MEDALLION_SIZE);
-  const startX = TRACK_PADDING + MEDALLION_SIZE / 2;
-  const finishX = startX + travelWidth;
-
+  // Sıralama: Önce doğru sayısı (pist konumu), eşitlikte puan
   const sorted = useMemo(
     () =>
       racers
@@ -387,109 +455,266 @@ const CaravanRaceTrack: React.FC<{
         .sort(
           (a, b) =>
             clampCorrect(b.correctAnswers, total) - clampCorrect(a.correctAnswers, total) ||
-            (b.score || 0) - (a.score || 0)
+            (b.score || 0) - (a.score || 0) ||
+            (b.isMe ? 1 : 0) - (a.isMe ? 1 : 0)
         ),
     [racers, total]
   );
 
-  const offsets = useMemo(() => computeVerticalOffsets(sorted, total), [sorted, total]);
-  const leaderId =
-    sorted.length > 0 && clampCorrect(sorted[0].correctAnswers, total) > 0 ? sorted[0].id : null;
+  const positionsU = useMemo(
+    () => computeCurvePositionsU(sorted, total),
+    [sorted, total]
+  );
 
-  // Soru başına bir kilometre taşı; 20'den fazla soruda kalabalığı önlemek için seyreltilir
-  const tickEvery = total > 20 ? Math.ceil(total / 10) : 1;
-  const ticks: number[] = [];
-  for (let i = 1; i < total; i += 1) {
-    if (i % tickEvery === 0) ticks.push(i);
-  }
+  const myRacer = useMemo(
+    () => sorted.find((r) => r.isMe) || sorted[0],
+    [sorted]
+  );
+  const myCorrect = myRacer ? clampCorrect(myRacer.correctAnswers, total) : 0;
+  const myPct = Math.round(getRaceProgressPercentage(myCorrect, total));
 
-  const recentCorrect = racers.find((r) => r.lastAnswer?.isCorrect);
-  const recentWrong = racers.find((r) => r.lastAnswer && !r.lastAnswer.isCorrect);
+  // SVG Eğri yolunu oluştur (80 örnek nokta ile pürüzsüz dalga)
+  const { linePath, areaPath, progressPath, stepDots, finishPoint } = useMemo(() => {
+    const W = Math.max(1, trackWidth);
+    const samples = 72;
+    const pts: Array<{ x: number; y: number; u: number }> = [];
+    for (let i = 0; i <= samples; i += 1) {
+      const u = i / samples;
+      pts.push({
+        u,
+        x: u * W,
+        y: getHillCurveNormY(u) * H,
+      });
+    }
+
+    const dLine = pts
+      .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+      .join(' ');
+
+    const dArea = `${dLine} L ${W.toFixed(1)} ${H.toFixed(1)} L 0 ${H.toFixed(1)} Z`;
+
+    // Liderin veya oyuncunun ulaştığı noktaya kadar parlak vurgu izi
+    const maxCorrect = sorted.reduce(
+      (acc, r) => Math.max(acc, clampCorrect(r.correctAnswers, total)),
+      0
+    );
+    const leaderU = WAVE_U_START + (maxCorrect / total) * (WAVE_U_FINISH - WAVE_U_START);
+    const progPts = pts.filter((p) => p.u >= WAVE_U_START && p.u <= leaderU + 0.005);
+    const dProg =
+      progPts.length >= 2
+        ? progPts
+            .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+            .join(' ')
+        : '';
+
+    // Soru adımı noktaları (1 .. total-1)
+    const tickStep = total > 15 ? 2 : 1;
+    const dots: Array<{ step: number; x: number; y: number; passed: boolean }> = [];
+    for (let s = 1; s < total; s += tickStep) {
+      const u = WAVE_U_START + (s / total) * (WAVE_U_FINISH - WAVE_U_START);
+      dots.push({
+        step: s,
+        x: u * W,
+        y: getHillCurveNormY(u) * H,
+        passed: maxCorrect >= s,
+      });
+    }
+
+    const finX = WAVE_U_FINISH * W;
+    const finY = getHillCurveNormY(WAVE_U_FINISH) * H;
+
+    return {
+      linePath: dLine,
+      areaPath: dArea,
+      progressPath: dProg,
+      stepDots: dots,
+      finishPoint: { x: finX, y: finY },
+    };
+  }, [trackWidth, H, sorted, total]);
+
+  // Boğaz Köprüsü & Silüet koordinatları
+  const W = Math.max(300, trackWidth);
+  const tower1X = W * 0.28;
+  const tower2X = W * 0.56;
+  const deckY = H * 0.48;
 
   return (
-    <View style={styles.caravanCard}>
-      <View style={styles.caravanHeaderRow}>
-        <Text style={styles.caravanHeaderText}>ANADOLU KERVANYOLU</Text>
-        <View style={styles.caravanGoalPill}>
-          <Text style={styles.caravanGoalText}>Bitiş: {total} doğru</Text>
-        </View>
-      </View>
+    <View
+      style={styles.bilBakalimWrapper}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        if (w > 0 && Math.abs(w - trackWidth) > 0.5) {
+          setTrackWidth(w);
+        }
+      }}
+    >
+      {trackWidth > 0 && (
+        <>
+          <Svg
+            width={trackWidth}
+            height={H}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          >
+            <Defs>
+              <LinearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor="#4F3FD6" />
+                <Stop offset="0.55" stopColor="#3F2EB8" />
+                <Stop offset="1" stopColor="#2A1B86" />
+              </LinearGradient>
+              <LinearGradient id="hillFillGrad" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor="#7260EE" stopOpacity="0.65" />
+                <Stop offset="0.5" stopColor="#523EC8" stopOpacity="0.82" />
+                <Stop offset="1" stopColor="#332096" stopOpacity="0.96" />
+              </LinearGradient>
+              <LinearGradient id="activeWaveGrad" x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0" stopColor="#60A5FA" />
+                <Stop offset="0.5" stopColor="#FBBF24" />
+                <Stop offset="1" stopColor="#34D399" />
+              </LinearGradient>
+            </Defs>
 
-      <View style={styles.raceTickerBanner}>
-        <Text style={styles.raceTickerText} numberOfLines={1}>
-          {recentCorrect
-            ? `${recentCorrect.displayName} doğru bildi, kervan 1 adım ilerledi`
-            : recentWrong
-            ? `${recentWrong.displayName} yanlış cevap verdi, yerinde kaldı`
-            : `Her doğru cevap 1 adım · ${total} doğruda bitiş çizgisi`}
-        </Text>
-      </View>
+            {/* 1. Gökyüzü Arka Planı */}
+            <Rect x={0} y={0} width={trackWidth} height={H} fill="url(#skyGrad)" />
 
-      <View
-        style={styles.caravanTrackField}
-        onLayout={(e) => {
-          const w = e.nativeEvent.layout.width;
-          if (w > 0 && Math.abs(w - trackWidth) > 0.5) setTrackWidth(w);
-        }}
-      >
-        {trackWidth > 0 && (
-          <>
-            {/* Kum yolu: başlangıçtan bitişe */}
-            <View
-              style={[styles.caravanSandPath, { left: startX, width: travelWidth }]}
-              pointerEvents="none"
+            {/* 2. Arka Plan Boğaz Köprüsü & Şehir Silüeti (TRT Bil Bakalım estetiği) */}
+            <G opacity={0.32}>
+              {/* Uzak Şehir & Cami/Kule Silüetleri */}
+              <Rect x={W * 0.04} y={H * 0.36} width={W * 0.04} height={H * 0.4} fill="#1E115A" rx={2} />
+              <Rect x={W * 0.09} y={H * 0.28} width={W * 0.035} height={H * 0.45} fill="#1E115A" rx={2} />
+              <Rect x={W * 0.63} y={H * 0.32} width={W * 0.045} height={H * 0.42} fill="#1E115A" rx={2} />
+              <Rect x={W * 0.69} y={H * 0.38} width={W * 0.035} height={H * 0.36} fill="#1E115A" rx={2} />
+
+              {/* Boğaz Köprüsü Kuleleri */}
+              <Rect x={tower1X - 3} y={H * 0.08} width={6} height={H * 0.62} fill="#1B0E54" rx={1.5} />
+              <Rect x={tower2X - 3} y={H * 0.14} width={6} height={H * 0.56} fill="#1B0E54" rx={1.5} />
+
+              {/* Köprü Tabliyesi */}
+              <Line
+                x1={W * 0.12}
+                y1={deckY}
+                x2={W * 0.68}
+                y2={deckY}
+                stroke="#1B0E54"
+                strokeWidth={3}
+              />
+
+              {/* Köprü Ana Askı Halatları (Parabolik) */}
+              <Path
+                d={`M ${W * 0.12} ${deckY} Q ${W * 0.21} ${deckY - 4} ${tower1X} ${H * 0.1} Q ${(tower1X + tower2X) / 2} ${deckY + 2} ${tower2X} ${H * 0.16} Q ${W * 0.62} ${deckY - 4} ${W * 0.68} ${deckY}`}
+                stroke="#1B0E54"
+                strokeWidth={2}
+                fill="none"
+              />
+
+              {/* Dikey Askı Halatları */}
+              {[0.32, 0.36, 0.4, 0.44, 0.48, 0.52].map((uCab) => (
+                <Line
+                  key={uCab}
+                  x1={W * uCab}
+                  y1={H * 0.24}
+                  x2={W * uCab}
+                  y2={deckY}
+                  stroke="#1B0E54"
+                  strokeWidth={1}
+                />
+              ))}
+            </G>
+
+            {/* 3. Dalga Eğrisi Altındaki 3B Tepe Dolgusu */}
+            <Path d={areaPath} fill="url(#hillFillGrad)" />
+
+            {/* 4. Beyaz Dalga Yolu Dış Işıması */}
+            <Path
+              d={linePath}
+              stroke="rgba(255, 255, 255, 0.26)"
+              strokeWidth={8}
+              fill="none"
+              strokeLinecap="round"
             />
 
-            {/* Her doğru cevap için bir kilometre taşı */}
-            {ticks.map((i) => (
-              <View
-                key={i}
-                style={[styles.caravanTick, { left: startX + (i / total) * travelWidth - 1 }]}
-                pointerEvents="none"
+            {/* 5. Ana Beyaz Dalga Yolu */}
+            <Path
+              d={linePath}
+              stroke="#FFFFFF"
+              strokeWidth={3.5}
+              fill="none"
+              strokeLinecap="round"
+            />
+
+            {/* 6. Aktif İlerleme İzi */}
+            {progressPath ? (
+              <Path
+                d={progressPath}
+                stroke="url(#activeWaveGrad)"
+                strokeWidth={4}
+                fill="none"
+                strokeLinecap="round"
+              />
+            ) : null}
+
+            {/* 7. Soru Adımı Noktaları */}
+            {stepDots.map((d) => (
+              <Circle
+                key={d.step}
+                cx={d.x}
+                cy={d.y}
+                r={d.passed ? 3 : 2.2}
+                fill={d.passed ? '#FBBF24' : 'rgba(255,255,255,0.65)'}
               />
             ))}
 
-            {/* Bitiş çizgisi = %100 */}
-            <View style={[styles.caravanFinishLine, { left: finishX - 2 }]} pointerEvents="none" />
-            <View style={[styles.caravanFinishFlag, { left: finishX - 10 }]} pointerEvents="none">
-              <Text style={styles.caravanFinishFlagText}>🏁</Text>
+            {/* 8. Zirvedeki Bitiş Bayrağı (%100 = totalQuestions doğru) */}
+            <G>
+              <Circle
+                cx={finishPoint.x}
+                cy={finishPoint.y}
+                r={5}
+                fill="#FFFFFF"
+                stroke="#F59E0B"
+                strokeWidth={2}
+              />
+              {/* Bayrak Direği */}
+              <Line
+                x1={finishPoint.x}
+                y1={finishPoint.y - 2}
+                x2={finishPoint.x}
+                y2={finishPoint.y - 23}
+                stroke="#FFFFFF"
+                strokeWidth={2.4}
+                strokeLinecap="round"
+              />
+              {/* Dalgalanan Beyaz/Altın Bitiş Bayrağı */}
+              <Path
+                d={`M ${finishPoint.x} ${finishPoint.y - 23} C ${finishPoint.x + 6} ${finishPoint.y - 25}, ${finishPoint.x + 11} ${finishPoint.y - 19}, ${finishPoint.x + 16} ${finishPoint.y - 21} L ${finishPoint.x + 14} ${finishPoint.y - 12} C ${finishPoint.x + 9} ${finishPoint.y - 10}, ${finishPoint.x + 5} ${finishPoint.y - 15}, ${finishPoint.x} ${finishPoint.y - 13} Z`}
+                fill="#FFFFFF"
+              />
+            </G>
+          </Svg>
+
+          {/* Sol Üst Bilgi Rozeti: Doğru Sayısı / Toplam Soru & Yüzde */}
+          <View style={styles.waveOverlayHeader} pointerEvents="none">
+            <View style={styles.waveStepBadge}>
+              <Text style={styles.waveStepBadgeText}>
+                🏁 {myCorrect}/{total} Doğru · %{myPct}
+              </Text>
             </View>
+          </View>
 
-            {sorted.map((racer) => (
-              <CaravanMedallion
-                key={racer.id}
-                racer={racer}
-                totalQuestions={total}
-                isLeader={racer.id === leaderId}
-                verticalOffset={offsets[racer.id] || 0}
-                travelWidth={travelWidth}
-              />
-            ))}
-          </>
-        )}
-      </View>
-
-      {/* Yarışçı listesi: doğru sayısı ve yüzde */}
-      <View style={styles.caravanLegend}>
-        {sorted.map((racer) => {
-          const correct = clampCorrect(racer.correctAnswers, total);
-          const pct = Math.round(getRaceProgressPercentage(correct, total));
-          return (
-            <View
+          {/* Eğri Üzerinde Hareket Eden Yarışçı Madalyonları */}
+          {sorted.map((racer, idx) => (
+            <WaveRacerNode
               key={racer.id}
-              style={[styles.caravanLegendRow, racer.isMe && styles.caravanLegendRowMe]}
-            >
-              <Text style={styles.caravanLegendName} numberOfLines={1}>
-                {racer.displayName}
-                {racer.isMe ? ' (Sen)' : ''}
-              </Text>
-              <Text style={styles.caravanLegendValue}>
-                {correct}/{total} · %{pct}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
+              racer={racer}
+              rank={idx + 1}
+              targetU={positionsU[racer.id] ?? WAVE_U_START}
+              trackWidth={trackWidth}
+              trackHeight={H}
+              totalQuestions={total}
+            />
+          ))}
+        </>
+      )}
     </View>
   );
 };
@@ -509,9 +734,34 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   dailyChallengeInfo = null,
   racers: racersProp,
 }) => {
-  // Yarışçılar (doğru cevap sayılarıyla birlikte) RootNavigator'dan gelir.
-  // Burada puandan doğru sayısı TAHMİN EDİLMEZ; veri yoksa pist gösterilmez.
-  const activeRacers: RacerInfo[] = racersProp || [];
+  // Her oyun modunda (1v1, Arkadaşla Özel Oda, Keşfet, Günlük Görev) yarışçılar gösterilir
+  const activeRacers: RacerInfo[] = useMemo(() => {
+    if (racersProp && racersProp.length > 0) {
+      return racersProp;
+    }
+    const fallbackList: RacerInfo[] = [
+      {
+        id: 'me',
+        displayName: myDisplayName || 'Sen',
+        score: currentScore || 0,
+        correctAnswers: dailyChallengeInfo?.currentCorrect ?? 0,
+        isMe: true,
+        hasAnswered: selectedOptionId !== null,
+      },
+    ];
+    if (opponent) {
+      fallbackList.push({
+        id: opponent.id,
+        displayName: opponent.displayName,
+        avatarUrl: opponent.avatarUrl,
+        score: opponent.score || 0,
+        correctAnswers: 0,
+        isMe: false,
+        hasAnswered: opponent.hasAnswered,
+      });
+    }
+    return fallbackList;
+  }, [racersProp, myDisplayName, currentScore, dailyChallengeInfo, selectedOptionId, opponent]);
   const [localSelectedOptionId, setLocalSelectedOptionId] = useState<string | null>(null);
   // Settings > "Soru Metin Boyutu" (normal / large) — real, app-wide effect
   const [isLargeText] = useState<boolean>(() => {
@@ -680,9 +930,9 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           </Text>
         </View>
       )}
-      {/* ANADOLU KERVANYOLU: ilerleme = doğru cevap sayısı / toplam soru */}
+      {/* TRT Bil Bakalım Tarzı Panoramik Dalga & Tepe Yarış Pisti */}
       {activeRacers.length > 0 && (
-        <CaravanRaceTrack
+        <BilBakalimWaveTrack
           racers={activeRacers}
           totalQuestions={question.totalRounds || 10}
         />
@@ -845,436 +1095,159 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   );
 };
 const styles = StyleSheet.create({
-  // ANADOLU KERVANYOLU PİSTİ (Warm Sand & Deep Teal & Copper Theme)
-  caravanCard: {
-    backgroundColor: '#0A252E',
+  // TRT BİL BAKALIM TARZI PANORAMİK DALGA & TEPE PİSTİ
+  bilBakalimWrapper: {
+    height: WAVE_TRACK_HEIGHT,
     borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: '#3B28A8',
     borderWidth: 1.5,
-    borderColor: '#C87D55',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 4,
-    gap: 6,
-    shadowColor: '#C87D55',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-  },
-  caravanHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 2,
-  },
-  caravanEmoji: {
-    fontSize: 14,
-  },
-  caravanHeaderText: {
-    color: '#E5C396',
-    fontSize: 11.5,
-    fontFamily: THEME.fonts.display,
-    letterSpacing: 0.8,
-  },
-  caravanGoalPill: {
-    backgroundColor: 'rgba(200, 125, 85, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 2.5,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#C87D55',
-  },
-  caravanGoalText: {
-    color: '#FFC43D',
-    fontSize: 10.5,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  caravanTrackField: {
-    height: 84,
-    borderRadius: 14,
-    backgroundColor: '#0D333F',
-    borderWidth: 1,
-    borderColor: 'rgba(200, 125, 85, 0.3)',
+    borderColor: 'rgba(167, 139, 250, 0.42)',
     position: 'relative',
-    overflow: 'visible',
-    marginVertical: 4,
-  },
-  caravanSandPath: {
-    position: 'absolute',
-    top: '50%',
-    marginTop: -2,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#C9A86A',
-    opacity: 0.45,
-  },
-  caravanTick: {
-    position: 'absolute',
-    top: '50%',
-    marginTop: -6,
-    width: 2,
-    height: 12,
-    borderRadius: 1,
-    backgroundColor: 'rgba(229, 195, 150, 0.35)',
-  },
-  caravanFinishLine: {
-    position: 'absolute',
-    top: 8,
-    bottom: 8,
-    width: 4,
-    borderRadius: 2,
-    backgroundColor: '#FFC43D',
-    opacity: 0.85,
-  },
-  caravanFinishFlag: {
-    position: 'absolute',
-    top: -4,
-    width: 20,
-    alignItems: 'center',
-  },
-  caravanFinishFlagText: {
-    fontSize: 13,
-  },
-  caravanMedallionCluster: {
-    position: 'absolute',
-    left: 12, // TRACK_PADDING
-    top: '50%',
-    marginTop: -18, // MEDALLION_SIZE / 2
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  copperMedallionFrame: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2.5,
-    borderColor: '#C87D55',
-    backgroundColor: '#0A252E',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#C87D55',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.5,
-    shadowRadius: 3,
-  },
-  copperMedallionLeader: {
-    borderColor: '#FFC43D',
-    shadowColor: '#FFC43D',
-    shadowOpacity: 0.8,
-  },
-  copperMedallionCorrect: {
-    borderColor: '#3FD08A',
-  },
-  copperMedallionWrong: {
-    borderColor: '#FF5A6A',
-  },
-  copperMedallionMe: {
-    borderWidth: 3,
-  },
-  stepPopup: {
-    position: 'absolute',
-    top: -16,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 8,
-    backgroundColor: '#1E4631',
-    borderWidth: 1,
-    borderColor: '#3FD08A',
-    zIndex: 20,
-  },
-  stepPopupText: {
-    color: '#3FD08A',
-    fontSize: 10,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  caravanLegend: {
-    gap: 4,
-  },
-  caravanLegendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-  },
-  caravanLegendRowMe: {
-    backgroundColor: 'rgba(255, 196, 61, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 196, 61, 0.35)',
-  },
-  caravanLegendName: {
-    flex: 1,
-    color: '#E5C396',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-    marginRight: 8,
-  },
-  caravanLegendValue: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  raceCard: {
-    backgroundColor: 'rgba(10, 4, 24, 0.55)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 196, 61, 0.35)',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
     marginTop: 4,
-    gap: 6,
+    shadowColor: '#1E115A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
   },
-  raceHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 2,
-  },
-  raceHeaderText: {
-    color: '#FFC43D',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-    letterSpacing: 0.6,
-  },
-  raceTargetText: {
-    color: '#D9CDF5',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  raceLane: {
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    justifyContent: 'center',
-  },
-  raceLaneMe: {
-    backgroundColor: 'rgba(255, 196, 61, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 196, 61, 0.35)',
-  },
-  raceTrackLine: {
-    position: 'absolute',
-    left: 6,
-    right: 34,
-    top: '50%',
-    marginTop: -1.5,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  raceFinishWrap: {
-    position: 'absolute',
-    right: 2,
-    top: 0,
-    height: 34,
-    width: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  raceFinishIcon: {
-    fontSize: 15,
-  },
-  racerCluster: {
-    position: 'absolute',
-    left: 6,
-    top: 0,
-    height: 34,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    zIndex: 3,
-  },
-  racerLeaderCluster: {
-    zIndex: 5,
-  },
-  racerInfoPill: {
-    maxWidth: 150,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    backgroundColor: 'rgba(30, 14, 61, 0.92)',
-    borderWidth: 1,
-    borderColor: 'rgba(154, 107, 255, 0.35)',
-  },
-  racerInfoPillMe: {
-    borderColor: '#FFC43D',
-  },
-  racerInfoText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  racerAnsweredBadge: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#5ADBB5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  racerAnsweredText: {
-    color: '#082520',
-    fontSize: 10,
-    fontFamily: THEME.fonts.extraBold,
-  },
-
-  livePulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#3FD08A',
-    shadowColor: '#3FD08A',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-  },
-  raceTargetPill: {
-    backgroundColor: 'rgba(255, 196, 61, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FFC43D',
-  },
-  raceTickerBanner: {
-    backgroundColor: 'rgba(107, 60, 255, 0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(107, 60, 255, 0.4)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginBottom: 4,
-  },
-  raceTickerText: {
-    color: '#FFC43D',
-    fontSize: 10,
-    fontFamily: THEME.fonts.extraBold,
-    textAlign: 'center',
-  },
-  raceLaneLeader: {
-    borderColor: 'rgba(255, 196, 61, 0.5)',
-  },
-  raceMilestone: {
+  waveOverlayHeader: {
     position: 'absolute',
     top: 6,
-    bottom: 6,
-    width: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 40,
   },
-  raceFinishText: {
-    color: '#FFC43D',
-    fontSize: 8.5,
-    fontFamily: THEME.fonts.extraBold,
-    marginTop: -2,
-  },
-  floatingReactionBadge: {
-    position: 'absolute',
-    top: -6,
-    left: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    zIndex: 20,
+  waveStepBadge: {
+    backgroundColor: 'rgba(19, 10, 56, 0.58)',
+    paddingHorizontal: 8,
+    paddingVertical: 2.5,
+    borderRadius: 10,
     borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
   },
-  floatingReactionCorrect: {
-    backgroundColor: '#1E4631',
-    borderColor: '#3FD08A',
-  },
-  floatingReactionCorrectText: {
-    color: '#3FD08A',
-    fontSize: 9,
+  waveStepBadgeText: {
+    color: '#F8FAFC',
+    fontSize: 10,
     fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 0.3,
   },
-  floatingReactionWrong: {
-    backgroundColor: '#47141C',
-    borderColor: '#FF5A6A',
-  },
-  floatingReactionWrongText: {
-    color: '#FF8598',
-    fontSize: 9,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  racerCrownBadge: {
+  waveRacerNode: {
     position: 'absolute',
-    top: -12,
-    left: 10,
-    zIndex: 15,
+    width: RACER_NODE_W,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  racerCrownText: {
-    fontSize: 12,
+  wavePlusOneBadge: {
+    position: 'absolute',
+    top: -15,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 8,
+    backgroundColor: '#10B981',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    zIndex: 50,
   },
-  racerAvatarFrame: {
-    position: 'relative',
-    borderRadius: 18,
+  wavePlusOneText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  waveRankText: {
+    color: '#FFFFFF',
+    fontSize: 10.5,
+    fontFamily: THEME.fonts.extraBold,
+    marginBottom: 1,
+    textShadowColor: 'rgba(10, 4, 36, 0.85)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  waveRankTextLeader: {
+    color: '#FDE047',
+  },
+  waveRankTextMe: {
+    color: '#FDBA74',
+  },
+  waveAvatarOuterGlow: {
     padding: 2,
-    borderWidth: 2,
-    borderColor: 'rgba(154, 107, 255, 0.4)',
-    backgroundColor: '#1C0C3E',
-  },
-  racerAvatarLeader: {
-    borderColor: '#FFC43D',
-    shadowColor: '#FFC43D',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 6,
-  },
-  racerAvatarCorrect: {
-    borderColor: '#3FD08A',
-    shadowColor: '#3FD08A',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
-  },
-  racerAvatarWrong: {
-    borderColor: '#FF5A6A',
-    shadowColor: '#FF5A6A',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
-  },
-  racerAvatarMe: {
-    borderColor: '#84D8FF',
-  },
-  racerStatusTick: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#3FD08A',
+    borderRadius: (RACER_AVATAR_SIZE + 4) / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#1C0C3E',
   },
-  racerStatusTickText: {
-    color: '#082520',
-    fontSize: 9,
-    fontWeight: '900',
+  waveAvatarGlowMe: {
+    backgroundColor: 'rgba(255, 159, 28, 0.32)',
+    shadowColor: '#FF9F1C',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
   },
-  racerStatusThinking: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: 'rgba(255, 196, 61, 0.25)',
+  waveAvatarGlowOther: {
+    backgroundColor: 'rgba(125, 211, 252, 0.28)',
+    shadowColor: '#7DD3FC',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.75,
+    shadowRadius: 5,
+  },
+  waveAvatarGlowCorrect: {
+    backgroundColor: 'rgba(52, 211, 153, 0.42)',
+    shadowColor: '#34D399',
+  },
+  waveAvatarGlowWrong: {
+    backgroundColor: 'rgba(251, 113, 133, 0.42)',
+    shadowColor: '#FB7185',
+  },
+  waveAvatarRing: {
+    width: RACER_AVATAR_SIZE,
+    height: RACER_AVATAR_SIZE,
+    borderRadius: RACER_AVATAR_SIZE / 2,
+    borderWidth: 2.5,
+    backgroundColor: '#1E1354',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#1C0C3E',
+    overflow: 'hidden',
   },
-  racerStatusThinkingDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#FFC43D',
+  waveAvatarRingMe: {
+    borderColor: '#FF9F1C',
+  },
+  waveAvatarRingOther: {
+    borderColor: '#7DD3FC',
+  },
+  waveAvatarRingCorrect: {
+    borderColor: '#34D399',
+  },
+  waveAvatarRingWrong: {
+    borderColor: '#FB7185',
+  },
+  waveAnsweredDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 13,
+    height: 13,
+    borderRadius: 6.5,
+    backgroundColor: '#10B981',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  waveAnsweredDotText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  waveScoreText: {
+    color: '#FFFFFF',
+    fontSize: 10.5,
+    fontFamily: THEME.fonts.extraBold,
+    marginTop: 1,
+    textShadowColor: 'rgba(10, 4, 36, 0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  waveScoreTextMe: {
+    color: '#FDE68A',
   },
 
   screenContainer: {
