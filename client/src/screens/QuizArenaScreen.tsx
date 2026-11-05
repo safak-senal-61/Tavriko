@@ -170,21 +170,21 @@ const SmoothTimerBar: React.FC<SmoothTimerBarProps> = React.memo(
   }
 );
 // ---------------------------------------------------------------------------
-// TRT BİL BAKALIM TARZI PANORAMİK DALGA & TEPE YARIŞ PİSTİ
-// (Scenic Bosphorus Bridge & Hill Wave Race Track)
+// TAVRİKO MODERN YÜKSELEN ZİRVE YARIŞ PİSTİ
+// (Modern Cosmic Ascending Energy Arc Race Track)
 //
+// - Tüm oyuncular %0 başlangıç noktasında (Adım 0) TAM OLARAK AYNI YERDEN başlar.
 // - İlerleme yüzdesi: progressPercentage = (correctAnswers / totalQuestions) * 100
-// - Her doğru cevap yarışçıyı dalga eğrisi üzerinde +1 adım zirvedeki bayrağa taşır.
+// - Her doğru cevap oyuncuyu yükselen enerji eğrisi üzerinde +1 adım (hem ileri
+//   hem yukarı) bir sonraki ışıklı kontrol noktasına taşır.
 // - Yanlış veya boş cevap 0 adım ilerletir.
-// - Her yarışçının yuvarlak avatarı doğrudan beyaz tepe-vadi-zirve dalga eğrisi
-//   üzerinde (x, getHillCurveNormY(u) * H) konumlanır; üstünde sıralaması (1., 2., 3.),
-//   altında anlık puanı (306, 295, 152...) yazar.
+// - Puanlama: Her doğru cevapta 100 taban puan + 0..50 hız bonusu (+ seri bonusu).
 // ---------------------------------------------------------------------------
 export interface RacerInfo {
   id: string;
   displayName: string;
   avatarUrl?: string;
-  /** Avatarın hemen altında gösterilen anlık puan */
+  /** Avatarın altında ve alt bilgi barında gösterilen anlık puan */
   score: number;
   /** Eğri üzerindeki ilerleme adımını belirleyen doğru cevap sayısı */
   correctAnswers: number;
@@ -199,11 +199,11 @@ export interface RacerInfo {
   };
 }
 
-const WAVE_TRACK_HEIGHT = 116;
-const WAVE_U_START = 0.11;
-const WAVE_U_FINISH = 0.87;
-const RACER_NODE_W = 48;
-const RACER_AVATAR_SIZE = 34;
+const WAVE_TRACK_HEIGHT = 96;
+const WAVE_U_START = 0.08;
+const WAVE_U_FINISH = 0.91;
+const RACER_NODE_W = 46;
+const RACER_AVATAR_SIZE = 32;
 
 /** Doğru sayısını [0, totalQuestions] aralığına sıkıştırır; bitişe erken ulaşmayı imkânsız kılar */
 export const clampCorrect = (correct: number, totalQuestions: number): number => {
@@ -218,84 +218,70 @@ export const getRaceProgressPercentage = (correct: number, totalQuestions: numbe
   return (clampCorrect(correct, total) / total) * 100;
 };
 
-/**
- * TRT Bil Bakalım tepe-vadi-zirve dalga eğrisinin normalize Y koordinatı [0..1].
- * u = 0.00 -> sol giriş (0.67)
- * u = 0.18 -> ilk tepe sırtı (0.43)
- * u = 0.45 -> orta vadi çukuru (0.74)
- * u = 0.87 -> sağ zirve / bitiş bayrağı (0.25)
- * u = 1.00 -> sağ iniş yamacı (0.40)
- */
-const HILL_CONTROL_POINTS: ReadonlyArray<readonly [number, number]> = [
-  [0.0, 0.67],
-  [0.18, 0.43],
-  [0.45, 0.74],
-  [WAVE_U_FINISH, 0.25],
-  [1.0, 0.4],
-];
-
-export const getHillCurveNormY = (uRaw: number): number => {
-  const u = Math.max(0, Math.min(1, uRaw));
-  for (let i = 0; i < HILL_CONTROL_POINTS.length - 1; i += 1) {
-    const [u0, y0] = HILL_CONTROL_POINTS[i];
-    const [u1, y1] = HILL_CONTROL_POINTS[i + 1];
-    if (u >= u0 && u <= u1) {
-      const t = (u - u0) / Math.max(1e-6, u1 - u0);
-      const s = 0.5 - 0.5 * Math.cos(Math.PI * t);
-      return y0 + (y1 - y0) * s;
-    }
+/** Eski 1000'lik ölçekten kalan puanları temiz 100-150 ölçeğine normalize eder */
+const formatCleanScore = (rawScore: number, correctAnswers: number, totalQuestions: number): number => {
+  const s = Math.max(0, Math.round(Number(rawScore) || 0));
+  const refSteps = Math.max(1, correctAnswers || 1, Math.min(3, totalQuestions));
+  if (s > refSteps * 260) {
+    return Math.round(s / 10);
   }
-  return HILL_CONTROL_POINTS[HILL_CONTROL_POINTS.length - 1][1];
+  return s;
 };
 
 /**
- * Aynı doğru sayısındaki yarışçıların eğri üzerinde birbirini kapatmaması için
- * küçük yatay yayılım uygular (asla bir sonraki soru adımına veya bitişe taşmaz).
+ * Mantıklı, Sürekli Yükselen S-Eğrisi (Monotonic Ascending Arc):
+ * Sol alttaki Başlangıç (u = 0.08, ny = 0.72) noktasından sağ üstteki
+ * Zirve Bitiş Bayrağına (u = 0.91, ny = 0.28) doğru hiç çukura düşmeden
+ * her adımda hem ileri hem yukarı yükselir.
  */
-const computeCurvePositionsU = (
+export const getHillCurveNormY = (uRaw: number): number => {
+  const u = Math.max(0, Math.min(1, uRaw));
+  const t = Math.max(0, Math.min(1, (u - WAVE_U_START) / (WAVE_U_FINISH - WAVE_U_START)));
+  // Smoothstep + hafif modern dalga harmonikleri (her zaman yukarı eğimli)
+  const smooth = t * t * (3 - 2 * t);
+  const ripple = Math.sin(t * Math.PI * 2) * 0.028;
+  return 0.72 - 0.44 * smooth - ripple;
+};
+
+/**
+ * Her oyuncu kendi doğru cevap sayısının tam adım noktasında (baseU) durur!
+ * Başlangıçta (0 doğru) herkes tam olarak aynı başlangıç noktasındadır.
+ * Aynı adımdaki oyuncular yatayda kaydırılmaz; yalnızca dikeyde (offsetY) hafif ayrılır.
+ */
+const computeStepCoordinates = (
   sortedRacers: RacerInfo[],
   totalQuestions: number
-): Record<string, number> => {
+): Record<string, { u: number; offsetY: number }> => {
   const total = Math.max(1, Math.floor(totalQuestions));
   const span = WAVE_U_FINISH - WAVE_U_START;
-  const stepSpan = span / total;
 
-  // Grupları doğru cevap sayısına göre ayır
   const groups: Record<number, RacerInfo[]> = {};
   sortedRacers.forEach((r) => {
     const c = clampCorrect(r.correctAnswers, total);
     (groups[c] = groups[c] || []).push(r);
   });
 
-  const result: Record<string, number> = {};
+  const coords: Record<string, { u: number; offsetY: number }> = {};
   Object.entries(groups).forEach(([correctKey, list]) => {
     const c = Number(correctKey);
-    const baseU = WAVE_U_START + (c / total) * span;
+    // Yatay konum (u) YALNIZCA doğru cevap sayısına bağlıdır — herkes aynı adımda aynı X'te!
+    const exactU = WAVE_U_START + (c / total) * span;
     if (list.length === 1) {
-      result[list[0].id] = baseU;
+      coords[list[0].id] = { u: exactU, offsetY: 0 };
       return;
     }
-    // Aynı adımdaki yarışçıları puana göre yan yana diz (öndeki sağda, arkadaki solda)
-    const maxSpread = Math.min(0.055, stepSpan * 0.42);
-    const spacing = Math.min(0.036, (maxSpread * 2) / Math.max(1, list.length - 1));
+    const vSpacing = Math.min(10, 20 / Math.max(1, list.length - 1));
     list.forEach((racer, idx) => {
-      // idx=0 en yüksek puanlı -> biraz daha sağda; sonuncu biraz daha solda
-      const offsetOrder = (list.length - 1) / 2 - idx;
-      let u = baseU + offsetOrder * spacing;
-      if (c < total) {
-        u = Math.min(WAVE_U_FINISH - stepSpan * 0.25, Math.max(0.06, u));
-      } else {
-        u = Math.min(WAVE_U_FINISH, Math.max(0.06, u));
-      }
-      result[racer.id] = u;
+      const offsetY = (idx - (list.length - 1) / 2) * vSpacing;
+      coords[racer.id] = { u: exactU, offsetY };
     });
   });
 
-  return result;
+  return coords;
 };
 
 /** Eğri üzerinde (u) değiştiğinde 60 FPS yumuşak geçiş sağlayan hook */
-const useAnimatedWaveU = (targetU: number, durationMs: number = 620): number => {
+const useAnimatedWaveU = (targetU: number, durationMs: number = 580): number => {
   const [currentU, setCurrentU] = useState<number>(targetU);
   const currentURef = useRef<number>(targetU);
 
@@ -313,7 +299,6 @@ const useAnimatedWaveU = (targetU: number, durationMs: number = 620): number => 
     const step = () => {
       const elapsed = Date.now() - startTime;
       const t = Math.min(1, elapsed / durationMs);
-      // Cubic ease-out
       const eased = 1 - Math.pow(1 - t, 3);
       const nextVal = startU + diff * eased;
       currentURef.current = nextVal;
@@ -332,16 +317,17 @@ const useAnimatedWaveU = (targetU: number, durationMs: number = 620): number => 
   return currentU;
 };
 
-/** Eğri üzerindeki tek yarışçı düğümü: Üstte sıra (1.), ortada ışıklı avatar, altta puan */
+/** Eğri üzerindeki tek yarışçı düğümü: Üstte sıra, ortada ışıklı avatar, altta temiz puan */
 const WaveRacerNode: React.FC<{
   racer: RacerInfo;
   rank: number;
   targetU: number;
+  offsetY: number;
   trackWidth: number;
   trackHeight: number;
   totalQuestions: number;
-}> = ({ racer, rank, targetU, trackWidth, trackHeight, totalQuestions }) => {
-  const animU = useAnimatedWaveU(targetU, 620);
+}> = ({ racer, rank, targetU, offsetY, trackWidth, trackHeight, totalQuestions }) => {
+  const animU = useAnimatedWaveU(targetU, 580);
   const [showPlusOne, setShowPlusOne] = useState(false);
 
   const prevCorrectRef = useRef<number>(clampCorrect(racer.correctAnswers, totalQuestions));
@@ -350,7 +336,7 @@ const WaveRacerNode: React.FC<{
   useEffect(() => {
     if (correctNow > prevCorrectRef.current || racer.lastAnswer?.isCorrect) {
       setShowPlusOne(true);
-      const timer = setTimeout(() => setShowPlusOne(false), 1600);
+      const timer = setTimeout(() => setShowPlusOne(false), 1500);
       prevCorrectRef.current = correctNow;
       return () => clearTimeout(timer);
     }
@@ -358,9 +344,10 @@ const WaveRacerNode: React.FC<{
   }, [correctNow, racer.lastAnswer]);
 
   const x = animU * trackWidth;
-  const y = getHillCurveNormY(animU) * trackHeight;
+  const y = getHillCurveNormY(animU) * trackHeight + offsetY;
 
-  const isLeader = rank === 1 && (correctNow > 0 || (racer.score || 0) > 0);
+  const cleanScore = formatCleanScore(racer.score || 0, correctNow, totalQuestions);
+  const isLeader = rank === 1 && (correctNow > 0 || cleanScore > 0);
   const isCorrect = racer.lastAnswer?.isCorrect === true;
   const isWrong = racer.lastAnswer?.isCorrect === false;
 
@@ -371,19 +358,19 @@ const WaveRacerNode: React.FC<{
         styles.waveRacerNode,
         {
           left: x - RACER_NODE_W / 2,
-          top: y - RACER_AVATAR_SIZE / 2 - 15,
-          zIndex: racer.isMe ? 30 : 20 - rank,
+          top: y - RACER_AVATAR_SIZE / 2 - 14,
+          zIndex: racer.isMe ? 35 : 25 - rank,
         },
       ]}
     >
       {/* Doğru cevapta yukarı süzülen +1 adım rozeti */}
       {showPlusOne && (
         <View style={styles.wavePlusOneBadge}>
-          <Text style={styles.wavePlusOneText}>+1</Text>
+          <Text style={styles.wavePlusOneText}>+1 ADIM</Text>
         </View>
       )}
 
-      {/* Üstte Sıralama Numarası (1., 2., 3. ...) */}
+      {/* Üstte Sıralama Numarası */}
       <Text
         style={[
           styles.waveRankText,
@@ -392,10 +379,10 @@ const WaveRacerNode: React.FC<{
         ]}
         numberOfLines={1}
       >
-        {rank}.
+        #{rank}
       </Text>
 
-      {/* Ortada Yuvarlak Avatar (TRT Bil Bakalım: Sen = Turuncu/Altın halka, Rakipler = Mavi/Beyaz halka) */}
+      {/* Ortada Yuvarlak Avatar (Sen = Tavriko Altın/Turuncu, Rakip = Neon Camgöbeği) */}
       <View
         style={[
           styles.waveAvatarOuterGlow,
@@ -424,21 +411,23 @@ const WaveRacerNode: React.FC<{
         )}
       </View>
 
-      {/* Altta Anlık Puan (306, 297, 152...) */}
-      <Text
-        style={[
-          styles.waveScoreText,
-          racer.isMe && styles.waveScoreTextMe,
-        ]}
-        numberOfLines={1}
-      >
-        {Math.max(0, Math.round(racer.score || 0))}
-      </Text>
+      {/* Altta Anlık Temiz Puan (örn. 0p, 135p, 280p) */}
+      <View style={[styles.waveScorePill, racer.isMe && styles.waveScorePillMe]}>
+        <Text
+          style={[
+            styles.waveScoreText,
+            racer.isMe && styles.waveScoreTextMe,
+          ]}
+          numberOfLines={1}
+        >
+          {cleanScore}p
+        </Text>
+      </View>
     </View>
   );
 };
 
-/** TRT Bil Bakalım Tarzı Panoramik Boğaz Köprüsü & Dalga Tepesi Yarış Pisti */
+/** Tavriko Modern Yükselen Zirve Yarış Pisti */
 const BilBakalimWaveTrack: React.FC<{
   racers: RacerInfo[];
   totalQuestions: number;
@@ -447,7 +436,7 @@ const BilBakalimWaveTrack: React.FC<{
   const total = Math.max(1, Math.floor(totalQuestions));
   const H = WAVE_TRACK_HEIGHT;
 
-  // Sıralama: Önce doğru sayısı (pist konumu), eşitlikte puan
+  // Sıralama: Önce doğru sayısı (pist adımı), eşitlikte puan
   const sorted = useMemo(
     () =>
       racers
@@ -455,14 +444,15 @@ const BilBakalimWaveTrack: React.FC<{
         .sort(
           (a, b) =>
             clampCorrect(b.correctAnswers, total) - clampCorrect(a.correctAnswers, total) ||
-            (b.score || 0) - (a.score || 0) ||
+            formatCleanScore(b.score || 0, b.correctAnswers, total) -
+              formatCleanScore(a.score || 0, a.correctAnswers, total) ||
             (b.isMe ? 1 : 0) - (a.isMe ? 1 : 0)
         ),
     [racers, total]
   );
 
-  const positionsU = useMemo(
-    () => computeCurvePositionsU(sorted, total),
+  const stepCoords = useMemo(
+    () => computeStepCoordinates(sorted, total),
     [sorted, total]
   );
 
@@ -473,13 +463,13 @@ const BilBakalimWaveTrack: React.FC<{
   const myCorrect = myRacer ? clampCorrect(myRacer.correctAnswers, total) : 0;
   const myPct = Math.round(getRaceProgressPercentage(myCorrect, total));
 
-  // SVG Eğri yolunu oluştur (80 örnek nokta ile pürüzsüz dalga)
-  const { linePath, areaPath, progressPath, stepDots, finishPoint } = useMemo(() => {
+  // SVG Yükselen Eğri ve Adım Noktaları (0 .. total)
+  const { linePath, areaPath, progressPath, stepNodes, startPoint, finishPoint } = useMemo(() => {
     const W = Math.max(1, trackWidth);
-    const samples = 72;
+    const samples = 64;
     const pts: Array<{ x: number; y: number; u: number }> = [];
     for (let i = 0; i <= samples; i += 1) {
-      const u = i / samples;
+      const u = WAVE_U_START + (i / samples) * (WAVE_U_FINISH - WAVE_U_START);
       pts.push({
         u,
         x: u * W,
@@ -491,230 +481,242 @@ const BilBakalimWaveTrack: React.FC<{
       .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
       .join(' ');
 
-    const dArea = `${dLine} L ${W.toFixed(1)} ${H.toFixed(1)} L 0 ${H.toFixed(1)} Z`;
+    const firstPt = pts[0];
+    const lastPt = pts[pts.length - 1];
+    const dArea = `${dLine} L ${lastPt.x.toFixed(1)} ${H.toFixed(1)} L ${firstPt.x.toFixed(1)} ${H.toFixed(1)} Z`;
 
-    // Liderin veya oyuncunun ulaştığı noktaya kadar parlak vurgu izi
     const maxCorrect = sorted.reduce(
       (acc, r) => Math.max(acc, clampCorrect(r.correctAnswers, total)),
       0
     );
     const leaderU = WAVE_U_START + (maxCorrect / total) * (WAVE_U_FINISH - WAVE_U_START);
-    const progPts = pts.filter((p) => p.u >= WAVE_U_START && p.u <= leaderU + 0.005);
+    const progPts = pts.filter((p) => p.u <= leaderU + 0.004);
     const dProg =
-      progPts.length >= 2
+      maxCorrect > 0 && progPts.length >= 2
         ? progPts
             .map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
             .join(' ')
         : '';
 
-    // Soru adımı noktaları (1 .. total-1)
-    const tickStep = total > 15 ? 2 : 1;
-    const dots: Array<{ step: number; x: number; y: number; passed: boolean }> = [];
-    for (let s = 1; s < total; s += tickStep) {
+    const nodes: Array<{ step: number; x: number; y: number; passed: boolean }> = [];
+    const tickEvery = total > 15 ? 2 : 1;
+    for (let s = 0; s <= total; s += 1) {
+      if (s !== 0 && s !== total && s % tickEvery !== 0) continue;
       const u = WAVE_U_START + (s / total) * (WAVE_U_FINISH - WAVE_U_START);
-      dots.push({
+      nodes.push({
         step: s,
         x: u * W,
         y: getHillCurveNormY(u) * H,
-        passed: maxCorrect >= s,
+        passed: maxCorrect >= s && (s === 0 || maxCorrect > 0),
       });
     }
-
-    const finX = WAVE_U_FINISH * W;
-    const finY = getHillCurveNormY(WAVE_U_FINISH) * H;
 
     return {
       linePath: dLine,
       areaPath: dArea,
       progressPath: dProg,
-      stepDots: dots,
-      finishPoint: { x: finX, y: finY },
+      stepNodes: nodes,
+      startPoint: { x: firstPt.x, y: firstPt.y },
+      finishPoint: { x: lastPt.x, y: lastPt.y },
     };
   }, [trackWidth, H, sorted, total]);
 
-  // Boğaz Köprüsü & Silüet koordinatları
-  const W = Math.max(300, trackWidth);
-  const tower1X = W * 0.28;
-  const tower2X = W * 0.56;
-  const deckY = H * 0.48;
-
   return (
-    <View
-      style={styles.bilBakalimWrapper}
-      onLayout={(e) => {
-        const w = e.nativeEvent.layout.width;
-        if (w > 0 && Math.abs(w - trackWidth) > 0.5) {
-          setTrackWidth(w);
-        }
-      }}
-    >
-      {trackWidth > 0 && (
-        <>
-          <Svg
-            width={trackWidth}
-            height={H}
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
-          >
-            <Defs>
-              <LinearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#4F3FD6" />
-                <Stop offset="0.55" stopColor="#3F2EB8" />
-                <Stop offset="1" stopColor="#2A1B86" />
-              </LinearGradient>
-              <LinearGradient id="hillFillGrad" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#7260EE" stopOpacity="0.65" />
-                <Stop offset="0.5" stopColor="#523EC8" stopOpacity="0.82" />
-                <Stop offset="1" stopColor="#332096" stopOpacity="0.96" />
-              </LinearGradient>
-              <LinearGradient id="activeWaveGrad" x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0" stopColor="#60A5FA" />
-                <Stop offset="0.5" stopColor="#FBBF24" />
-                <Stop offset="1" stopColor="#34D399" />
-              </LinearGradient>
-            </Defs>
+    <View style={styles.modernRaceCard}>
+      {/* Üst Başlık: Sol = Canlı İlerleme Adımı, Sağ = Bitiş Hedefi */}
+      <View style={styles.modernRaceTopRow}>
+        <View style={styles.modernRaceTitleGroup}>
+          <View style={styles.modernLiveDot} />
+          <Text style={styles.modernRaceTitle}>ZİRVE YARIŞI</Text>
+          <View style={styles.modernStepChip}>
+            <Text style={styles.modernStepChipText}>
+              {myCorrect}/{total} Doğru · %{myPct}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.modernGoalChip}>
+          <Text style={styles.modernGoalChipText}>Hedef: {total} Doğru 🏁</Text>
+        </View>
+      </View>
 
-            {/* 1. Gökyüzü Arka Planı */}
-            <Rect x={0} y={0} width={trackWidth} height={H} fill="url(#skyGrad)" />
+      {/* Orta Alan: Yükselen Enerji Eğrisi & Oyuncu Avatarları */}
+      <View
+        style={styles.bilBakalimWrapper}
+        onLayout={(e) => {
+          const w = e.nativeEvent.layout.width;
+          if (w > 0 && Math.abs(w - trackWidth) > 0.5) {
+            setTrackWidth(w);
+          }
+        }}
+      >
+        {trackWidth > 0 && (
+          <>
+            <Svg
+              width={trackWidth}
+              height={H}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            >
+              <Defs>
+                <LinearGradient id="skyGrad" x1="0" y1="0" x2="1" y2="1">
+                  <Stop offset="0" stopColor="#1B0C3A" />
+                  <Stop offset="0.5" stopColor="#2A135A" />
+                  <Stop offset="1" stopColor="#160830" />
+                </LinearGradient>
+                <LinearGradient id="hillFillGrad" x1="0" y1="0" x2="0" y2="1">
+                  <Stop offset="0" stopColor="#8B5CF6" stopOpacity="0.34" />
+                  <Stop offset="1" stopColor="#3B0764" stopOpacity="0.06" />
+                </LinearGradient>
+                <LinearGradient id="activeWaveGrad" x1="0" y1="0" x2="1" y2="0">
+                  <Stop offset="0" stopColor="#38BDF8" />
+                  <Stop offset="0.5" stopColor="#FFC43D" />
+                  <Stop offset="1" stopColor="#3FD08A" />
+                </LinearGradient>
+              </Defs>
 
-            {/* 2. Arka Plan Boğaz Köprüsü & Şehir Silüeti (TRT Bil Bakalım estetiği) */}
-            <G opacity={0.32}>
-              {/* Uzak Şehir & Cami/Kule Silüetleri */}
-              <Rect x={W * 0.04} y={H * 0.36} width={W * 0.04} height={H * 0.4} fill="#1E115A" rx={2} />
-              <Rect x={W * 0.09} y={H * 0.28} width={W * 0.035} height={H * 0.45} fill="#1E115A" rx={2} />
-              <Rect x={W * 0.63} y={H * 0.32} width={W * 0.045} height={H * 0.42} fill="#1E115A" rx={2} />
-              <Rect x={W * 0.69} y={H * 0.38} width={W * 0.035} height={H * 0.36} fill="#1E115A" rx={2} />
+              {/* 1. Modern Kozmik Arka Plan */}
+              <Rect x={0} y={0} width={trackWidth} height={H} fill="url(#skyGrad)" />
 
-              {/* Boğaz Köprüsü Kuleleri */}
-              <Rect x={tower1X - 3} y={H * 0.08} width={6} height={H * 0.62} fill="#1B0E54" rx={1.5} />
-              <Rect x={tower2X - 3} y={H * 0.14} width={6} height={H * 0.56} fill="#1B0E54" rx={1.5} />
+              {/* 2. İnce Modern Perspektif Kılavuz Çizgileri */}
+              <G opacity={0.14}>
+                <Line x1={0} y1={H * 0.3} x2={trackWidth} y2={H * 0.3} stroke="#A78BFA" strokeWidth={1} />
+                <Line x1={0} y1={H * 0.55} x2={trackWidth} y2={H * 0.55} stroke="#A78BFA" strokeWidth={1} />
+                <Line x1={0} y1={H * 0.8} x2={trackWidth} y2={H * 0.8} stroke="#A78BFA" strokeWidth={1} />
+              </G>
 
-              {/* Köprü Tabliyesi */}
-              <Line
-                x1={W * 0.12}
-                y1={deckY}
-                x2={W * 0.68}
-                y2={deckY}
-                stroke="#1B0E54"
-                strokeWidth={3}
-              />
+              {/* 3. Eğri Altı Neon Alan Dolgusu */}
+              <Path d={areaPath} fill="url(#hillFillGrad)" />
 
-              {/* Köprü Ana Askı Halatları (Parabolik) */}
+              {/* 4. Ana Yükselen Pist Yolu (Pasif İz) */}
               <Path
-                d={`M ${W * 0.12} ${deckY} Q ${W * 0.21} ${deckY - 4} ${tower1X} ${H * 0.1} Q ${(tower1X + tower2X) / 2} ${deckY + 2} ${tower2X} ${H * 0.16} Q ${W * 0.62} ${deckY - 4} ${W * 0.68} ${deckY}`}
-                stroke="#1B0E54"
-                strokeWidth={2}
+                d={linePath}
+                stroke="rgba(167, 139, 250, 0.25)"
+                strokeWidth={7}
                 fill="none"
+                strokeLinecap="round"
+              />
+              <Path
+                d={linePath}
+                stroke="rgba(255, 255, 255, 0.45)"
+                strokeWidth={2.5}
+                fill="none"
+                strokeLinecap="round"
               />
 
-              {/* Dikey Askı Halatları */}
-              {[0.32, 0.36, 0.4, 0.44, 0.48, 0.52].map((uCab) => (
-                <Line
-                  key={uCab}
-                  x1={W * uCab}
-                  y1={H * 0.24}
-                  x2={W * uCab}
-                  y2={deckY}
-                  stroke="#1B0E54"
-                  strokeWidth={1}
+              {/* 5. Tamamlanan Doğru Adımların Parlak Enerji İzi */}
+              {progressPath ? (
+                <>
+                  <Path
+                    d={progressPath}
+                    stroke="rgba(255, 196, 61, 0.35)"
+                    strokeWidth={9}
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                  <Path
+                    d={progressPath}
+                    stroke="url(#activeWaveGrad)"
+                    strokeWidth={4}
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                </>
+              ) : null}
+
+              {/* 6. Her Soru Adımı İçin Kontrol Noktaları (0 .. total) */}
+              {stepNodes.map((n) => (
+                <Circle
+                  key={n.step}
+                  cx={n.x}
+                  cy={n.y}
+                  r={n.step === 0 || n.step === total ? 4.5 : n.passed ? 3.5 : 2.5}
+                  fill={n.passed ? '#FFC43D' : '#2E1660'}
+                  stroke={n.passed ? '#FFFFFF' : 'rgba(255,255,255,0.45)'}
+                  strokeWidth={1.5}
                 />
               ))}
-            </G>
 
-            {/* 3. Dalga Eğrisi Altındaki 3B Tepe Dolgusu */}
-            <Path d={areaPath} fill="url(#hillFillGrad)" />
+              {/* 7. Başlangıç (0) ve Zirve Bitiş Bayrağı (%100) */}
+              <G>
+                <Circle
+                  cx={startPoint.x}
+                  cy={startPoint.y}
+                  r={5}
+                  fill="#38BDF8"
+                  stroke="#FFFFFF"
+                  strokeWidth={1.5}
+                />
+                <Circle
+                  cx={finishPoint.x}
+                  cy={finishPoint.y}
+                  r={6}
+                  fill="#FFC43D"
+                  stroke="#FFFFFF"
+                  strokeWidth={2}
+                />
+                <Line
+                  x1={finishPoint.x}
+                  y1={finishPoint.y - 2}
+                  x2={finishPoint.x}
+                  y2={finishPoint.y - 22}
+                  stroke="#FFC43D"
+                  strokeWidth={2.4}
+                  strokeLinecap="round"
+                />
+                <Path
+                  d={`M ${finishPoint.x} ${finishPoint.y - 22} L ${finishPoint.x + 15} ${finishPoint.y - 17} L ${finishPoint.x} ${finishPoint.y - 12} Z`}
+                  fill="#FFC43D"
+                />
+              </G>
+            </Svg>
 
-            {/* 4. Beyaz Dalga Yolu Dış Işıması */}
-            <Path
-              d={linePath}
-              stroke="rgba(255, 255, 255, 0.26)"
-              strokeWidth={8}
-              fill="none"
-              strokeLinecap="round"
-            />
+            {/* Eğri Üzerinde Hareket Eden Yarışçı Madalyonları */}
+            {sorted.map((racer, idx) => {
+              const coord = stepCoords[racer.id] || { u: WAVE_U_START, offsetY: 0 };
+              return (
+                <WaveRacerNode
+                  key={racer.id}
+                  racer={racer}
+                  rank={idx + 1}
+                  targetU={coord.u}
+                  offsetY={coord.offsetY}
+                  trackWidth={trackWidth}
+                  trackHeight={H}
+                  totalQuestions={total}
+                />
+              );
+            })}
+          </>
+        )}
+      </View>
 
-            {/* 5. Ana Beyaz Dalga Yolu */}
-            <Path
-              d={linePath}
-              stroke="#FFFFFF"
-              strokeWidth={3.5}
-              fill="none"
-              strokeLinecap="round"
-            />
-
-            {/* 6. Aktif İlerleme İzi */}
-            {progressPath ? (
-              <Path
-                d={progressPath}
-                stroke="url(#activeWaveGrad)"
-                strokeWidth={4}
-                fill="none"
-                strokeLinecap="round"
-              />
-            ) : null}
-
-            {/* 7. Soru Adımı Noktaları */}
-            {stepDots.map((d) => (
-              <Circle
-                key={d.step}
-                cx={d.x}
-                cy={d.y}
-                r={d.passed ? 3 : 2.2}
-                fill={d.passed ? '#FBBF24' : 'rgba(255,255,255,0.65)'}
-              />
-            ))}
-
-            {/* 8. Zirvedeki Bitiş Bayrağı (%100 = totalQuestions doğru) */}
-            <G>
-              <Circle
-                cx={finishPoint.x}
-                cy={finishPoint.y}
-                r={5}
-                fill="#FFFFFF"
-                stroke="#F59E0B"
-                strokeWidth={2}
-              />
-              {/* Bayrak Direği */}
-              <Line
-                x1={finishPoint.x}
-                y1={finishPoint.y - 2}
-                x2={finishPoint.x}
-                y2={finishPoint.y - 23}
-                stroke="#FFFFFF"
-                strokeWidth={2.4}
-                strokeLinecap="round"
-              />
-              {/* Dalgalanan Beyaz/Altın Bitiş Bayrağı */}
-              <Path
-                d={`M ${finishPoint.x} ${finishPoint.y - 23} C ${finishPoint.x + 6} ${finishPoint.y - 25}, ${finishPoint.x + 11} ${finishPoint.y - 19}, ${finishPoint.x + 16} ${finishPoint.y - 21} L ${finishPoint.x + 14} ${finishPoint.y - 12} C ${finishPoint.x + 9} ${finishPoint.y - 10}, ${finishPoint.x + 5} ${finishPoint.y - 15}, ${finishPoint.x} ${finishPoint.y - 13} Z`}
-                fill="#FFFFFF"
-              />
-            </G>
-          </Svg>
-
-          {/* Sol Üst Bilgi Rozeti: Doğru Sayısı / Toplam Soru & Yüzde */}
-          <View style={styles.waveOverlayHeader} pointerEvents="none">
-            <View style={styles.waveStepBadge}>
-              <Text style={styles.waveStepBadgeText}>
-                🏁 {myCorrect}/{total} Doğru · %{myPct}
-              </Text>
-            </View>
-          </View>
-
-          {/* Eğri Üzerinde Hareket Eden Yarışçı Madalyonları */}
-          {sorted.map((racer, idx) => (
-            <WaveRacerNode
+      {/* Alt Canlı Oyuncu Rozetleri: İsim, Doğru Adımı (c/N) ve Anlık Puan */}
+      <View style={styles.modernRacerStrip}>
+        {sorted.map((racer, idx) => {
+          const c = clampCorrect(racer.correctAnswers, total);
+          const cleanScore = formatCleanScore(racer.score || 0, c, total);
+          return (
+            <View
               key={racer.id}
-              racer={racer}
-              rank={idx + 1}
-              targetU={positionsU[racer.id] ?? WAVE_U_START}
-              trackWidth={trackWidth}
-              trackHeight={H}
-              totalQuestions={total}
-            />
-          ))}
-        </>
-      )}
+              style={[
+                styles.modernRacerChip,
+                racer.isMe && styles.modernRacerChipMe,
+              ]}
+            >
+              <Text style={[styles.modernRacerRank, idx === 0 && styles.modernRacerRankFirst]}>
+                #{idx + 1}
+              </Text>
+              <Text style={styles.modernRacerName} numberOfLines={1}>
+                {racer.displayName}
+              </Text>
+              <Text style={styles.modernRacerStep}>
+                {c}/{total}
+              </Text>
+              <Text style={styles.modernRacerScore}>{cleanScore}p</Text>
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 };
@@ -918,7 +920,13 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         </Text>
         <View style={styles.scorePill}>
           <XpStarIcon size={18} />
-          <Text style={styles.scorePillText}>{currentScore}</Text>
+          <Text style={styles.scorePillText}>
+            {formatCleanScore(
+              currentScore,
+              activeRacers.find((r) => r.isMe)?.correctAnswers || 0,
+              question.totalRounds || 10
+            )}
+          </Text>
         </View>
       </View>
       {/* Daily Challenge Banner */}
@@ -1095,42 +1103,81 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   );
 };
 const styles = StyleSheet.create({
-  // TRT BİL BAKALIM TARZI PANORAMİK DALGA & TEPE PİSTİ
-  bilBakalimWrapper: {
-    height: WAVE_TRACK_HEIGHT,
+  // TAVRİKO MODERN YÜKSELEN ZİRVE YARIŞ PİSTİ
+  modernRaceCard: {
+    backgroundColor: 'rgba(18, 8, 42, 0.86)',
     borderRadius: 18,
-    overflow: 'hidden',
-    backgroundColor: '#3B28A8',
-    borderWidth: 1.5,
-    borderColor: 'rgba(167, 139, 250, 0.42)',
-    position: 'relative',
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.35)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     marginTop: 4,
-    shadowColor: '#1E115A',
+    gap: 6,
+    shadowColor: '#090318',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.45,
     shadowRadius: 10,
   },
-  waveOverlayHeader: {
-    position: 'absolute',
-    top: 6,
-    left: 8,
+  modernRaceTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    zIndex: 40,
+    justifyContent: 'space-between',
   },
-  waveStepBadge: {
-    backgroundColor: 'rgba(19, 10, 56, 0.58)',
-    paddingHorizontal: 8,
-    paddingVertical: 2.5,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.22)',
+  modernRaceTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
-  waveStepBadgeText: {
+  modernLiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#3FD08A',
+    shadowColor: '#3FD08A',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 4,
+  },
+  modernRaceTitle: {
     color: '#F8FAFC',
+    fontSize: 11,
+    fontFamily: THEME.fonts.display,
+    letterSpacing: 0.6,
+  },
+  modernStepChip: {
+    backgroundColor: 'rgba(56, 189, 248, 0.16)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.4)',
+  },
+  modernStepChipText: {
+    color: '#7DD3FC',
     fontSize: 10,
     fontFamily: THEME.fonts.extraBold,
-    letterSpacing: 0.3,
+  },
+  modernGoalChip: {
+    backgroundColor: 'rgba(255, 196, 61, 0.14)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.42)',
+  },
+  modernGoalChipText: {
+    color: '#FFC43D',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  bilBakalimWrapper: {
+    height: WAVE_TRACK_HEIGHT,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#1B0C3A',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+    position: 'relative',
   },
   waveRacerNode: {
     position: 'absolute',
@@ -1141,8 +1188,8 @@ const styles = StyleSheet.create({
   wavePlusOneBadge: {
     position: 'absolute',
     top: -15,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
     borderRadius: 8,
     backgroundColor: '#10B981',
     borderWidth: 1,
@@ -1151,23 +1198,23 @@ const styles = StyleSheet.create({
   },
   wavePlusOneText: {
     color: '#FFFFFF',
-    fontSize: 9.5,
+    fontSize: 8.5,
     fontFamily: THEME.fonts.extraBold,
   },
   waveRankText: {
-    color: '#FFFFFF',
-    fontSize: 10.5,
+    color: '#E2E8F0',
+    fontSize: 9.5,
     fontFamily: THEME.fonts.extraBold,
     marginBottom: 1,
-    textShadowColor: 'rgba(10, 4, 36, 0.85)',
+    textShadowColor: 'rgba(10, 4, 36, 0.9)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
   waveRankTextLeader: {
-    color: '#FDE047',
+    color: '#FFC43D',
   },
   waveRankTextMe: {
-    color: '#FDBA74',
+    color: '#FFC43D',
   },
   waveAvatarOuterGlow: {
     padding: 2,
@@ -1176,78 +1223,133 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   waveAvatarGlowMe: {
-    backgroundColor: 'rgba(255, 159, 28, 0.32)',
-    shadowColor: '#FF9F1C',
+    backgroundColor: 'rgba(255, 196, 61, 0.32)',
+    shadowColor: '#FFC43D',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.9,
     shadowRadius: 6,
   },
   waveAvatarGlowOther: {
-    backgroundColor: 'rgba(125, 211, 252, 0.28)',
-    shadowColor: '#7DD3FC',
+    backgroundColor: 'rgba(56, 189, 248, 0.28)',
+    shadowColor: '#38BDF8',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.75,
     shadowRadius: 5,
   },
   waveAvatarGlowCorrect: {
-    backgroundColor: 'rgba(52, 211, 153, 0.42)',
-    shadowColor: '#34D399',
+    backgroundColor: 'rgba(63, 208, 138, 0.42)',
+    shadowColor: '#3FD08A',
   },
   waveAvatarGlowWrong: {
-    backgroundColor: 'rgba(251, 113, 133, 0.42)',
-    shadowColor: '#FB7185',
+    backgroundColor: 'rgba(255, 90, 106, 0.42)',
+    shadowColor: '#FF5A6A',
   },
   waveAvatarRing: {
     width: RACER_AVATAR_SIZE,
     height: RACER_AVATAR_SIZE,
     borderRadius: RACER_AVATAR_SIZE / 2,
-    borderWidth: 2.5,
-    backgroundColor: '#1E1354',
+    borderWidth: 2,
+    backgroundColor: '#1E1042',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
   waveAvatarRingMe: {
-    borderColor: '#FF9F1C',
+    borderColor: '#FFC43D',
   },
   waveAvatarRingOther: {
-    borderColor: '#7DD3FC',
+    borderColor: '#38BDF8',
   },
   waveAvatarRingCorrect: {
-    borderColor: '#34D399',
+    borderColor: '#3FD08A',
   },
   waveAvatarRingWrong: {
-    borderColor: '#FB7185',
+    borderColor: '#FF5A6A',
   },
   waveAnsweredDot: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 13,
-    height: 13,
-    borderRadius: 6.5,
-    backgroundColor: '#10B981',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#3FD08A',
     borderWidth: 1.5,
-    borderColor: '#FFFFFF',
+    borderColor: '#180B34',
     alignItems: 'center',
     justifyContent: 'center',
   },
   waveAnsweredDotText: {
-    color: '#FFFFFF',
-    fontSize: 8,
+    color: '#052E16',
+    fontSize: 7.5,
     fontFamily: THEME.fonts.extraBold,
+  },
+  waveScorePill: {
+    marginTop: 1,
+    paddingHorizontal: 5,
+    paddingVertical: 0.5,
+    borderRadius: 6,
+    backgroundColor: 'rgba(15, 7, 36, 0.82)',
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.3)',
+  },
+  waveScorePillMe: {
+    borderColor: 'rgba(255, 196, 61, 0.55)',
+    backgroundColor: 'rgba(40, 22, 10, 0.85)',
   },
   waveScoreText: {
     color: '#FFFFFF',
-    fontSize: 10.5,
+    fontSize: 9.5,
     fontFamily: THEME.fonts.extraBold,
-    marginTop: 1,
-    textShadowColor: 'rgba(10, 4, 36, 0.9)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   waveScoreTextMe: {
-    color: '#FDE68A',
+    color: '#FFC43D',
+  },
+  modernRacerStrip: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  modernRacerChip: {
+    flex: 1,
+    minWidth: 120,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.2)',
+  },
+  modernRacerChipMe: {
+    backgroundColor: 'rgba(255, 196, 61, 0.12)',
+    borderColor: 'rgba(255, 196, 61, 0.45)',
+  },
+  modernRacerRank: {
+    color: '#A78BFA',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  modernRacerRankFirst: {
+    color: '#FFC43D',
+  },
+  modernRacerName: {
+    flex: 1,
+    color: '#F1F5F9',
+    fontSize: 10.5,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  modernRacerStep: {
+    color: '#7DD3FC',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  modernRacerScore: {
+    color: '#FFC43D',
+    fontSize: 10.5,
+    fontFamily: THEME.fonts.extraBold,
   },
 
   screenContainer: {

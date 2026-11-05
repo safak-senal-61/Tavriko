@@ -12,11 +12,12 @@ export interface ScoreCalculationResult {
     streakBonus: number;
     streak: number;
 }
-export declare const BASE_POINTS = 1000;
-export declare const MAX_SPEED_BONUS = 500;
-export declare const WRONG_ANSWER_PENALTY = -250;
+export declare const BASE_POINTS = 100;
+export declare const MAX_SPEED_BONUS = 50;
+export declare const WRONG_ANSWER_PENALTY = 0;
 /**
  * Calculates score for a submitted answer based on correctness, speed and streak.
+ * Clean, logical scale: 100 base + 0..50 speed bonus + up to +50 streak bonus per correct answer.
  */
 export declare function calculateScore(input: ScoreInput): ScoreCalculationResult;
 /**

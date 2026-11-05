@@ -124,7 +124,8 @@ describe('GameEngine & RoomManager', () => {
     const sub1 = manager.submitAnswer(room.code, 'user1', 'opt_b', Date.now());
     expect(sub1.accepted).toBe(true);
     expect(sub1.isCorrect).toBe(true);
-    expect(sub1.pointsAwarded).toBeGreaterThan(1000);
+    expect(sub1.pointsAwarded).toBeGreaterThanOrEqual(100);
+    expect(sub1.pointsAwarded).toBeLessThanOrEqual(200);
 
     // User1 attempts to resubmit/change answer: should be rejected
     const sub1Duplicate = manager.submitAnswer(room.code, 'user1', 'opt_a', Date.now());

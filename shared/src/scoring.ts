@@ -15,19 +15,20 @@ export interface ScoreCalculationResult {
   streak: number;
 }
 
-export const BASE_POINTS = 1000;
-export const MAX_SPEED_BONUS = 500;
-export const WRONG_ANSWER_PENALTY = -250;
+export const BASE_POINTS = 100;
+export const MAX_SPEED_BONUS = 50;
+export const WRONG_ANSWER_PENALTY = 0;
 
 /**
  * Calculates score for a submitted answer based on correctness, speed and streak.
+ * Clean, logical scale: 100 base + 0..50 speed bonus + up to +50 streak bonus per correct answer.
  */
 export function calculateScore(input: ScoreInput): ScoreCalculationResult {
-  const { isCorrect, timeRemainingMs, totalTimeMs, currentStreak, penaltyForWrong } = input;
+  const { isCorrect, timeRemainingMs, totalTimeMs, currentStreak } = input;
 
   if (!isCorrect) {
     return {
-      pointsAwarded: penaltyForWrong ? WRONG_ANSWER_PENALTY : 0,
+      pointsAwarded: 0,
       speedBonus: 0,
       streakBonus: 0,
       streak: 0,
@@ -35,14 +36,14 @@ export function calculateScore(input: ScoreInput): ScoreCalculationResult {
   }
 
   // Calculate speed ratio (clamped between 0 and 1)
-  const ratio = Math.max(0, Math.min(1, timeRemainingMs / totalTimeMs));
+  const ratio = Math.max(0, Math.min(1, timeRemainingMs / Math.max(1, totalTimeMs)));
   const speedBonus = Math.round(ratio * MAX_SPEED_BONUS);
 
-  // Streak bonus: +50 for each streak level up to max +250
+  // Streak bonus: +10 for each streak level after 1, up to max +50
   const nextStreak = currentStreak + 1;
   let streakBonus = 0;
   if (nextStreak > 1) {
-    streakBonus = Math.min(250, (nextStreak - 1) * 50);
+    streakBonus = Math.min(50, (nextStreak - 1) * 10);
   }
 
   const pointsAwarded = BASE_POINTS + speedBonus + streakBonus;

@@ -375,14 +375,19 @@ export const RootNavigator: React.FC = () => {
       setRoundResult(result);
       const myAns = user ? result.playerAnswers[user.id] : null;
 
+      const rawPts = myAns?.pointsEarned ?? 0;
+      const normPts = rawPts > 300 ? Math.round(rawPts / 10) : Math.max(0, Math.round(rawPts));
+      const rawSpd = myAns?.speedBonus ?? 0;
+      const normSpd = rawSpd > 100 ? Math.round(rawSpd / 10) : Math.max(0, Math.round(rawSpd));
+
       // Anlık doğru/yanlış ve bilgi açıklamasını QuizArenaScreen'e anında ver
       const multiFeedback: RoundFeedback = {
         isCorrect: myAns?.isCorrect ?? false,
         isTimeout: !myAns?.selectedOptionId,
         correctOptionId: result.correctOptionId,
         explanation: result.explanation || '',
-        pointsAwarded: myAns?.pointsEarned ?? 0,
-        speedBonus: myAns?.speedBonus ?? 0,
+        pointsAwarded: normPts,
+        speedBonus: normSpd,
         streak: myAns?.streak ?? 0,
       };
       setMultiplayerFeedback(multiFeedback);
@@ -399,7 +404,7 @@ export const RootNavigator: React.FC = () => {
           correctAnswerText: correctOpt ? correctOpt.text : result.correctOptionId || '',
           isCorrect: myAns?.isCorrect ?? false,
           isTimeout: !myAns?.selectedOptionId,
-          pointsEarned: myAns?.pointsEarned ?? 0,
+          pointsEarned: normPts,
           explanation: result.explanation,
         };
         setMatchQuestionsReview((prev) => [...prev, reviewItem]);
@@ -1162,13 +1167,17 @@ export const RootNavigator: React.FC = () => {
       });
       if (res.ok) {
         const result = await res.json();
+        const rawPts = result.pointsAwarded || 0;
+        const normPts = rawPts > 300 ? Math.round(rawPts / 10) : Math.max(0, Math.round(rawPts));
+        const rawSpd = result.speedBonus || 0;
+        const normSpd = rawSpd > 100 ? Math.round(rawSpd / 10) : Math.max(0, Math.round(rawSpd));
         const feedback: RoundFeedback = {
           isCorrect: result.isCorrect,
           isTimeout: false,
           correctOptionId: result.correctOptionId,
           explanation: result.explanation || '',
-          pointsAwarded: result.pointsAwarded || 0,
-          speedBonus: result.speedBonus || 0,
+          pointsAwarded: normPts,
+          speedBonus: normSpd,
           streak: result.streak || 0,
         };
         setPracticeFeedback(feedback);
@@ -1202,7 +1211,7 @@ export const RootNavigator: React.FC = () => {
     // Local evaluation fallback if backend is unreachable
     const isMockCorrect =
       optionId === 'opt_b' || optionId === 'opt_c' || optionId === 'opt_a';
-    const points = isMockCorrect ? 1000 : 0;
+    const points = isMockCorrect ? 120 : 0;
     const newStreak = isMockCorrect ? practiceStreak + 1 : 0;
     if (isMockCorrect) {
       sound.playSound('correct');
@@ -1217,7 +1226,7 @@ export const RootNavigator: React.FC = () => {
       correctOptionId: 'opt_b',
       explanation: 'Doğru cevap sistem tarafından teyit edildi.',
       pointsAwarded: points,
-      speedBonus: 200,
+      speedBonus: 20,
       streak: newStreak,
     });
     setPracticeStreak(newStreak);

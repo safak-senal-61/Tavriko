@@ -98,6 +98,13 @@ interface GameState {
 
 const initialAuth = getStoredAuth();
 
+/** Eski 1000'lik ölçekten gelen puanları (örn. 1350) modern 100-150 ölçeğine (135) dönüştürür */
+const normalizeScoreScale = (score: number, roundsPlayed: number = 1): number => {
+  const s = Math.max(0, Math.round(Number(score) || 0));
+  const threshold = Math.max(1, roundsPlayed) * 260;
+  return s > threshold ? Math.round(s / 10) : s;
+};
+
 export const useGameStore = create<GameState>((set) => ({
   user: initialAuth.user,
   token: initialAuth.token,
@@ -119,8 +126,17 @@ export const useGameStore = create<GameState>((set) => ({
       ) {
         return { activeRoom };
       }
+      const rounds = Math.max(1, activeRoom.currentRound || state.activeRoom.currentRound || 1);
       const mergedPlayers = { ...activeRoom.players };
       const mergedScores = { ...activeRoom.scores };
+      for (const [pid, pObj] of Object.entries(mergedPlayers)) {
+        const normIncoming = normalizeScoreScale(pObj.score || 0, rounds);
+        mergedPlayers[pid] = {
+          ...pObj,
+          score: normIncoming,
+        };
+        mergedScores[pid] = normIncoming;
+      }
       for (const [pid, prevPlayer] of Object.entries(state.activeRoom.players || {})) {
         if (mergedPlayers[pid]) {
           mergedPlayers[pid] = {
@@ -173,13 +189,15 @@ export const useGameStore = create<GameState>((set) => ({
       const nextPlayers = { ...state.activeRoom.players };
       const nextScores = { ...state.activeRoom.scores };
       const byLeaderboard: Record<string, number | undefined> = {};
+      const rNum = Math.max(1, lastRoundResult.roundNumber || 1);
       for (const entry of lastRoundResult.leaderboard || []) {
-        nextScores[entry.playerId] = entry.score;
+        const normEntryScore = normalizeScoreScale(entry.score, rNum);
+        nextScores[entry.playerId] = normEntryScore;
         byLeaderboard[entry.playerId] = entry.correctAnswersCount;
         if (nextPlayers[entry.playerId]) {
           nextPlayers[entry.playerId] = {
             ...nextPlayers[entry.playerId],
-            score: entry.score,
+            score: normEntryScore,
             currentStreak: entry.streak,
             ...(typeof entry.correctAnswersCount === 'number'
               ? { correctAnswersCount: entry.correctAnswersCount }
@@ -191,7 +209,7 @@ export const useGameStore = create<GameState>((set) => ({
             username: entry.username || entry.displayName,
             displayName: entry.displayName,
             avatarUrl: entry.avatarUrl || 'av1',
-            score: entry.score,
+            score: normEntryScore,
             currentStreak: entry.streak || 0,
             isReady: true,
             isHost: false,
