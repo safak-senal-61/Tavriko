@@ -334,14 +334,14 @@ const WaveRacerNode: React.FC<{
   const correctNow = clampCorrect(racer.correctAnswers, totalQuestions);
 
   useEffect(() => {
-    if (correctNow > prevCorrectRef.current || racer.lastAnswer?.isCorrect) {
+    if (correctNow > prevCorrectRef.current) {
       setShowPlusOne(true);
       const timer = setTimeout(() => setShowPlusOne(false), 1500);
       prevCorrectRef.current = correctNow;
       return () => clearTimeout(timer);
     }
     prevCorrectRef.current = correctNow;
-  }, [correctNow, racer.lastAnswer]);
+  }, [correctNow]);
 
   const x = animU * trackWidth;
   const y = getHillCurveNormY(animU) * trackHeight + offsetY;
@@ -433,7 +433,11 @@ const BilBakalimWaveTrack: React.FC<{
   totalQuestions: number;
 }> = ({ racers, totalQuestions }) => {
   const [trackWidth, setTrackWidth] = useState(0);
-  const total = Math.max(1, Math.floor(totalQuestions));
+  const maxRacerCorrect = racers.reduce(
+    (acc, r) => Math.max(acc, Math.floor(Number.isFinite(r.correctAnswers) ? r.correctAnswers : 0)),
+    0
+  );
+  const total = Math.max(1, Math.floor(totalQuestions), maxRacerCorrect);
   const H = WAVE_TRACK_HEIGHT;
 
   // Sıralama: Önce doğru sayısı (pist adımı), eşitlikte puan

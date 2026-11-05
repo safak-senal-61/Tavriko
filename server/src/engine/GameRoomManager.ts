@@ -402,7 +402,7 @@ export class GameRoomManager {
 
   public endCurrentRound(code: string): void {
     const room = this.getRoom(code);
-    if (!room || !room.currentQuestion) return;
+    if (!room || room.status !== 'question_active' || !room.currentQuestion) return;
 
     room.status = 'round_result';
 

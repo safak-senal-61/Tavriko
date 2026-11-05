@@ -816,7 +816,7 @@ export class GameRoomDO extends DurableObject<Env> {
   }
 
   private async endCurrentRound(): Promise<void> {
-    if (!this.room || !this.room.currentQuestion) return;
+    if (!this.room || this.room.status !== 'question_active' || !this.room.currentQuestion) return;
 
     this.room.status = 'round_result';
 
@@ -1003,11 +1003,34 @@ export class GameRoomDO extends DurableObject<Env> {
 
   private getSanitizedRoom(): GameRoom {
     if (!this.room) throw new Error('Room not found');
-    const clone = { ...this.room };
+    const clone: GameRoom = {
+      ...this.room,
+      players: { ...this.room.players },
+      scores: { ...this.room.scores },
+    };
     if (clone.currentQuestion && clone.status !== 'round_result' && clone.status !== 'game_over') {
       // Omit correctOptionId and explanation
       const { correctOptionId, explanation, ...safeQ } = clone.currentQuestion;
       clone.currentQuestion = safeQ as Question;
+    }
+    // Tur aktifken (herkes cevaplamadan önce) ara state_sync giderse, erken cevaplayan
+    // oyuncunun ilerlemesini ve puanını tur sonuna (herkes işaretleyene) kadar gizle
+    if (clone.status === 'question_active') {
+      for (const [pid, p] of Object.entries(clone.players)) {
+        if (p.hasAnsweredCurrentRound) {
+          const preRoundScore = Math.max(0, (p.score || 0) - (p.lastPointsAwarded || 0));
+          const preRoundCorrect = Math.max(
+            0,
+            (p.correctAnswersCount || 0) - (p.lastAnswerIsCorrect ? 1 : 0)
+          );
+          clone.players[pid] = {
+            ...p,
+            score: preRoundScore,
+            correctAnswersCount: preRoundCorrect,
+          };
+          clone.scores[pid] = preRoundScore;
+        }
+      }
     }
     return clone;
   }

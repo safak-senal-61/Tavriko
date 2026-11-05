@@ -407,7 +407,10 @@ export const RootNavigator: React.FC = () => {
           pointsEarned: normPts,
           explanation: result.explanation,
         };
-        setMatchQuestionsReview((prev) => [...prev, reviewItem]);
+        setMatchQuestionsReview((prev) => {
+          const withoutDup = prev.filter((item) => item.roundNumber !== result.roundNumber);
+          return [...withoutDup, reviewItem];
+        });
       }
 
       if (myAns?.isCorrect) {
@@ -1553,7 +1556,14 @@ export const RootNavigator: React.FC = () => {
         {currentScreen === 'quiz_arena' && currentQuestion && (
           <>
             <QuizArenaScreen
-              question={currentQuestion}
+              question={{
+                ...currentQuestion,
+                totalRounds: Math.max(
+                  currentQuestion.totalRounds || 0,
+                  activeRoom?.totalRounds || 0,
+                  currentQuestion.roundNumber || 1
+                ),
+              }}
               selectedOptionId={selectedOptionId}
               isLocked={isEvaluatingRef.current}
               streak={
@@ -1598,23 +1608,16 @@ export const RootNavigator: React.FC = () => {
                   : null
               }
               racers={(() => {
-                const myReviewedCorrect = matchQuestionsReview.filter((q) => q.isCorrect).length;
                 if (activeRoom && user) {
                   const roomPlayers = Object.values(activeRoom.players || {});
                   const mapped = roomPlayers.map((p) => {
                     const isMe = p.id === user.id;
-                    const lbEntry = lastRoundResult?.leaderboard?.find((e) => e.playerId === p.id);
-                    const authoritativeCorrect = Math.max(
-                      p.correctAnswersCount ?? 0,
-                      lbEntry?.correctAnswersCount ?? 0,
-                      isMe ? myReviewedCorrect : 0
-                    );
                     return {
                       id: p.id,
                       displayName: p.displayName,
                       avatarUrl: isMe ? user.avatarUrl || p.avatarUrl : p.avatarUrl,
-                      score: activeRoom.scores[p.id] ?? lbEntry?.score ?? p.score ?? 0,
-                      correctAnswers: authoritativeCorrect,
+                      score: activeRoom.scores[p.id] ?? p.score ?? 0,
+                      correctAnswers: p.correctAnswersCount ?? 0,
                       isMe,
                       isHost: p.isHost,
                       hasAnswered: isMe
@@ -1642,7 +1645,7 @@ export const RootNavigator: React.FC = () => {
                       displayName: user.displayName || 'Sen',
                       avatarUrl: user.avatarUrl,
                       score: activeRoom.scores[user.id] ?? 0,
-                      correctAnswers: myReviewedCorrect,
+                      correctAnswers: activeRoom.players[user.id]?.correctAnswersCount ?? 0,
                       isMe: true,
                       isHost: activeRoom.hostId === user.id,
                       hasAnswered: selectedOptionId !== null,

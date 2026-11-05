@@ -76,6 +76,7 @@ interface GameState {
   isAnswerLocked: boolean;
   timeRemainingSec: number;
   lastRoundResult: RoundResult | null;
+  roundResultsByRound: Record<number, RoundResult>;
   finalSummary: FinalMatchSummary | null;
   // Actions for gameplay
   setCurrentQuestion: (q: ClientQuestion | null) => void;
@@ -105,6 +106,56 @@ const normalizeScoreScale = (score: number, roundsPlayed: number = 1): number =>
   return s > threshold ? Math.round(s / 10) : s;
 };
 
+/**
+ * Yalnızca tamamlanmış turların (ROUND_RESULT) sonuçlarından oyuncunun kesin
+ * doğru cevap sayısını hesaplar. Böylece:
+ * 1) Herkes cevabını verip tur bitmeden (ROUND_RESULT gelmeden) kimse ilerlemez.
+ * 2) ROOM_STATE_SYNC ve ROUND_RESULT üst üste gelse bile aynı tur asla 2 kez sayılmaz!
+ */
+const getCompletedCorrectCount = (
+  roundResultsByRound: Record<number, RoundResult>,
+  playerId: string
+): number => {
+  let count = 0;
+  for (const res of Object.values(roundResultsByRound)) {
+    if (res?.playerAnswers?.[playerId]?.isCorrect) {
+      count += 1;
+    }
+  }
+  return count;
+};
+
+/**
+ * Yalnızca tamamlanmış turların (ROUND_RESULT) sonuçlarından oyuncunun kesin
+ * puanını hesaplar. Tur devam ederken (diğer oyuncular beklenirken) puan değişmez.
+ */
+const getCompletedScore = (
+  roundResultsByRound: Record<number, RoundResult>,
+  playerId: string
+): number => {
+  const roundNums = Object.keys(roundResultsByRound)
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .sort((a, b) => a - b);
+  if (roundNums.length === 0) return 0;
+
+  const latestRoundNum = roundNums[roundNums.length - 1];
+  const latestRes = roundResultsByRound[latestRoundNum];
+  const lbEntry = latestRes?.leaderboard?.find((e) => e.playerId === playerId);
+  if (lbEntry && typeof lbEntry.score === 'number') {
+    return normalizeScoreScale(lbEntry.score, latestRoundNum);
+  }
+
+  let total = 0;
+  for (const rNum of roundNums) {
+    const ans = roundResultsByRound[rNum]?.playerAnswers?.[playerId];
+    if (ans && typeof ans.pointsEarned === 'number') {
+      total += normalizeScoreScale(ans.pointsEarned, 1);
+    }
+  }
+  return total;
+};
+
 export const useGameStore = create<GameState>((set) => ({
   user: initialAuth.user,
   token: initialAuth.token,
@@ -118,38 +169,72 @@ export const useGameStore = create<GameState>((set) => ({
   activeRoom: null,
   setActiveRoom: (activeRoom) =>
     set((state) => {
-      if (
-        !activeRoom ||
+      if (!activeRoom) {
+        return { activeRoom: null, roundResultsByRound: {}, lastRoundResult: null };
+      }
+      const isNewRoomOrReset =
         !state.activeRoom ||
         state.activeRoom.code !== activeRoom.code ||
-        activeRoom.status === 'lobby'
-      ) {
-        return { activeRoom };
+        activeRoom.status === 'lobby' ||
+        activeRoom.status === 'countdown';
+
+      if (isNewRoomOrReset) {
+        const cleanPlayers = { ...activeRoom.players };
+        const cleanScores = { ...activeRoom.scores };
+        if (activeRoom.status === 'lobby' || activeRoom.status === 'countdown') {
+          for (const [pid, pObj] of Object.entries(cleanPlayers)) {
+            cleanPlayers[pid] = {
+              ...pObj,
+              score: 0,
+              correctAnswersCount: 0,
+            };
+            cleanScores[pid] = 0;
+          }
+        }
+        return {
+          activeRoom: {
+            ...activeRoom,
+            players: cleanPlayers,
+            scores: cleanScores,
+          },
+          roundResultsByRound: {},
+          lastRoundResult: null,
+        };
       }
-      const rounds = Math.max(1, activeRoom.currentRound || state.activeRoom.currentRound || 1);
+
+      // Oyun aktifken (question_active veya round_result):
+      // İlerleme ve puan YALNIZCA tamamlanmış turların (roundResultsByRound) kaydından okunur!
+      // Böylece ilk cevap veren oyuncu, diğer oyuncular işaretleyip ROUND_RESULT gelene kadar
+      // pistte erken ilerlemez ve state_sync + round_result çakışmasında çift ilerleme olmaz.
+      const completedMap = state.roundResultsByRound || {};
       const mergedPlayers = { ...activeRoom.players };
       const mergedScores = { ...activeRoom.scores };
+
       for (const [pid, pObj] of Object.entries(mergedPlayers)) {
-        const normIncoming = normalizeScoreScale(pObj.score || 0, rounds);
+        const authCorrect = getCompletedCorrectCount(completedMap, pid);
+        const authScore = getCompletedScore(completedMap, pid);
         mergedPlayers[pid] = {
           ...pObj,
-          score: normIncoming,
+          correctAnswersCount: authCorrect,
+          score: authScore,
         };
-        mergedScores[pid] = normIncoming;
+        mergedScores[pid] = authScore;
       }
+
+      // Odada daha önce bilinen oyuncuları koru
       for (const [pid, prevPlayer] of Object.entries(state.activeRoom.players || {})) {
-        if (mergedPlayers[pid]) {
+        if (!mergedPlayers[pid]) {
+          const authCorrect = getCompletedCorrectCount(completedMap, pid);
+          const authScore = getCompletedScore(completedMap, pid);
           mergedPlayers[pid] = {
-            ...mergedPlayers[pid],
-            correctAnswersCount: Math.max(
-              mergedPlayers[pid].correctAnswersCount || 0,
-              prevPlayer.correctAnswersCount || 0
-            ),
-            score: Math.max(mergedPlayers[pid].score || 0, prevPlayer.score || 0),
+            ...prevPlayer,
+            correctAnswersCount: authCorrect,
+            score: authScore,
           };
-          mergedScores[pid] = Math.max(mergedScores[pid] || 0, mergedPlayers[pid].score || 0);
+          mergedScores[pid] = authScore;
         }
       }
+
       return {
         activeRoom: {
           ...activeRoom,
@@ -163,6 +248,7 @@ export const useGameStore = create<GameState>((set) => ({
   isAnswerLocked: false,
   timeRemainingSec: 15,
   lastRoundResult: null,
+  roundResultsByRound: {},
   finalSummary: null,
   setCurrentQuestion: (currentQuestion) =>
     set({
@@ -183,60 +269,63 @@ export const useGameStore = create<GameState>((set) => ({
       if (!lastRoundResult || !state.activeRoom) {
         return { lastRoundResult };
       }
-      const alreadyApplied =
-        (state.lastRoundResult as RoundResult | null)?.roundNumber ===
-        lastRoundResult.roundNumber;
+      const rNum = Math.max(1, lastRoundResult.roundNumber || state.activeRoom.currentRound || 1);
+      const nextRoundResults: Record<number, RoundResult> = {
+        ...(state.roundResultsByRound || {}),
+        [rNum]: lastRoundResult,
+      };
+
       const nextPlayers = { ...state.activeRoom.players };
       const nextScores = { ...state.activeRoom.scores };
-      const byLeaderboard: Record<string, number | undefined> = {};
-      const rNum = Math.max(1, lastRoundResult.roundNumber || 1);
+
+      // Leaderboard içindeki tüm oyuncuları da oyuncu listesine dahil et
       for (const entry of lastRoundResult.leaderboard || []) {
-        const normEntryScore = normalizeScoreScale(entry.score, rNum);
-        nextScores[entry.playerId] = normEntryScore;
-        byLeaderboard[entry.playerId] = entry.correctAnswersCount;
-        if (nextPlayers[entry.playerId]) {
-          nextPlayers[entry.playerId] = {
-            ...nextPlayers[entry.playerId],
-            score: normEntryScore,
-            currentStreak: entry.streak,
-            ...(typeof entry.correctAnswersCount === 'number'
-              ? { correctAnswersCount: entry.correctAnswersCount }
-              : {}),
-          };
-        } else {
+        if (!nextPlayers[entry.playerId]) {
           nextPlayers[entry.playerId] = {
             id: entry.playerId,
             username: entry.username || entry.displayName,
             displayName: entry.displayName,
             avatarUrl: entry.avatarUrl || 'av1',
-            score: normEntryScore,
+            score: 0,
             currentStreak: entry.streak || 0,
             isReady: true,
             isHost: false,
             isConnected: true,
             hasAnsweredCurrentRound: true,
             totalResponseTimeMs: 0,
-            correctAnswersCount:
-              typeof entry.correctAnswersCount === 'number' ? entry.correctAnswersCount : 0,
+            correctAnswersCount: 0,
+          };
+        } else {
+          nextPlayers[entry.playerId] = {
+            ...nextPlayers[entry.playerId],
+            currentStreak: entry.streak ?? nextPlayers[entry.playerId].currentStreak,
           };
         }
       }
-      if (!alreadyApplied) {
-        for (const [pid, ans] of Object.entries(lastRoundResult.playerAnswers || {})) {
-          if (
-            nextPlayers[pid] &&
-            typeof byLeaderboard[pid] !== 'number' &&
-            ans?.isCorrect
-          ) {
-            nextPlayers[pid] = {
-              ...nextPlayers[pid],
-              correctAnswersCount: (nextPlayers[pid].correctAnswersCount || 0) + 1,
-            };
-          }
+
+      // Tüm oyuncuların doğru cevap sayısını ve puanını tamamlanmış turlar tablosundan (1..rNum) kesin olarak hesapla
+      const allPlayerIds = new Set<string>([
+        ...Object.keys(nextPlayers),
+        ...Object.keys(lastRoundResult.playerAnswers || {}),
+      ]);
+
+      for (const pid of allPlayerIds) {
+        const authCorrect = getCompletedCorrectCount(nextRoundResults, pid);
+        const authScore = getCompletedScore(nextRoundResults, pid);
+        nextScores[pid] = authScore;
+        if (nextPlayers[pid]) {
+          nextPlayers[pid] = {
+            ...nextPlayers[pid],
+            correctAnswersCount: authCorrect,
+            score: authScore,
+            hasAnsweredCurrentRound: true,
+          };
         }
       }
+
       return {
         lastRoundResult,
+        roundResultsByRound: nextRoundResults,
         activeRoom: {
           ...state.activeRoom,
           players: nextPlayers,
@@ -251,6 +340,7 @@ export const useGameStore = create<GameState>((set) => ({
       selectedOptionId: null,
       isAnswerLocked: false,
       lastRoundResult: null,
+      roundResultsByRound: {},
       finalSummary: null,
       activeRoom: null,
     }),
