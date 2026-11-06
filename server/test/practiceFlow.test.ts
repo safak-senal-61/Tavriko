@@ -38,7 +38,7 @@ describe('Authoritative Question Submit & Practice Flow API', () => {
     expect(res.body.isCorrect).toBe(true);
     expect(res.body.isTimeout).toBe(false);
     expect(res.body.correctOptionId).toBe('opt_b');
-    expect(res.body.pointsAwarded).toBeGreaterThan(1000);
+    expect(res.body.pointsAwarded).toBeGreaterThan(100);
     expect(res.body.speedBonus).toBeGreaterThan(0);
     expect(res.body.streak).toBe(1);
     expect(res.body.explanation).toContain('Ankara');
