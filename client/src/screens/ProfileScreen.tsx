@@ -974,26 +974,96 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         {/* TAB 2: Category Mastery */}
         {activeTab === 'mastery' && (
           <View style={styles.detailsCard}>
-            <Text style={styles.sectionTitle}>Kategori Ustalığı</Text>
-            <Text style={styles.cardSub}>
-              Her kategoride verdiğin doğru cevaplar veritabanından canlı okunur.
-            </Text>
-            {masteryList.map((m) => (
-              <View key={m.id} style={styles.masteryRow}>
-                <View style={[styles.masteryTagBadge, { backgroundColor: m.color }]}>
-                  <Text style={styles.masteryTagText}>{m.tag}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.masteryHeader}>
-                    <Text style={styles.masteryName}>{m.name}</Text>
-                    <Text style={styles.masteryMeta}>
-                      Sv. {m.level} · {m.correctCount} doğru
-                    </Text>
-                  </View>
-                  <TavrikoProgressBar progress={Math.round((m.correctCount / maxCorrect) * 100)} height={6} />
-                </View>
+            {/* Top Spotlight Banner */}
+            <View style={styles.masterySpotlightCard}>
+              <View style={styles.masterySpotlightIconCircle}>
+                <Text style={{ fontSize: 24 }}>🎖️</Text>
               </View>
-            ))}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.masterySpotlightTitle}>BRANŞ VE USTALIK SALONU</Text>
+                <Text style={styles.masterySpotlightSub} numberOfLines={2}>
+                  {bestCategory && bestCategory.correctCount > 0
+                    ? `En İleri Branş: ${bestCategory.name} · Sv. ${bestCategory.level} (${bestCategory.correctCount} Doğru)`
+                    : 'Doğru cevaplar vererek branş seviyeni yükselt ve unvanlar kazan!'}
+                </Text>
+              </View>
+              <View style={styles.masteryTotalPill}>
+                <Text style={styles.masteryTotalPillNum}>{correctAnswers}</Text>
+                <Text style={styles.masteryTotalPillLbl}>Puan</Text>
+              </View>
+            </View>
+
+            {/* Aktif Ustalaşılan Branşlar */}
+            <View style={styles.masterySubHeaderRow}>
+              <Text style={styles.masterySubHeaderTitle}>🔥 Aktif Branşlar</Text>
+              <Text style={styles.masterySubHeaderCount}>
+                {masteryList.filter((m) => m.correctCount > 0).length} Branş
+              </Text>
+            </View>
+
+            {masteryList
+              .filter((m) => m.correctCount > 0)
+              .map((m) => {
+                const currentInLevel = m.correctCount % 5;
+                const rem = 5 - currentInLevel;
+                const progressPct = Math.round((currentInLevel / 5) * 100);
+                const rankTitle =
+                  m.level >= 4
+                    ? 'Büyük Üstat'
+                    : m.level === 3
+                    ? 'Kıdemli Usta'
+                    : m.level === 2
+                    ? 'Gelişen Usta'
+                    : 'Acemi Usta';
+                return (
+                  <View key={m.id} style={styles.activeMasteryCard}>
+                    <View style={[styles.masteryTagBadge, { backgroundColor: m.color }]}>
+                      <Text style={styles.masteryTagText}>{m.tag}</Text>
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <View style={styles.masteryHeader}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <Text style={styles.masteryName}>{m.name}</Text>
+                          <View style={styles.masteryLevelBadge}>
+                            <Text style={styles.masteryLevelBadgeText}>SV. {m.level}</Text>
+                          </View>
+                          <Text style={styles.masteryRankTitle}>· {rankTitle}</Text>
+                        </View>
+                        <Text style={styles.masteryMeta}>{m.correctCount} doğru</Text>
+                      </View>
+                      <View style={{ marginVertical: 6 }}>
+                        <TavrikoProgressBar progress={progressPct === 0 ? 100 : progressPct} height={7} />
+                      </View>
+                      <Text style={styles.masteryNextHint}>
+                        {rem === 5 ? '✓ Seviye Tamamlandı!' : `Sonraki seviyeye ${rem} doğru kaldı`}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+
+            {/* Diğer Başlangıç Branşları (Kompakt 2 sütun grid) */}
+            <View style={[styles.masterySubHeaderRow, { marginTop: 16 }]}>
+              <Text style={styles.masterySubHeaderTitle}>📚 Başlangıç Seviyesindeki Branşlar</Text>
+              <Text style={styles.masterySubHeaderCount}>
+                {masteryList.filter((m) => m.correctCount === 0).length} Branş
+              </Text>
+            </View>
+            <View style={styles.dormantMasteryGrid}>
+              {masteryList
+                .filter((m) => m.correctCount === 0)
+                .map((m) => (
+                  <View key={m.id} style={styles.dormantMasteryCard}>
+                    <View style={[styles.dormantMasteryBadge, { backgroundColor: m.color }]}>
+                      <Text style={styles.dormantMasteryBadgeText}>{m.tag}</Text>
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.dormantMasteryName} numberOfLines={1}>{m.name}</Text>
+                      <Text style={styles.dormantMasterySub}>Sv. 0 · 0 Doğru</Text>
+                    </View>
+                  </View>
+                ))}
+            </View>
           </View>
         )}
 
@@ -1531,17 +1601,40 @@ const styles = StyleSheet.create({
 
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(10, 4, 24, 0.72)',
-    borderRadius: 15,
+    backgroundColor: '#0F172A',
+    borderRadius: 16,
     padding: 4,
-    marginVertical: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    marginVertical: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    width: '100%',
+    maxWidth: 580,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  tabBtn: { flex: 1, paddingVertical: 8, borderRadius: 11, alignItems: 'center' },
-  tabBtnActive: { backgroundColor: '#F59E0B' },
-  tabText: { color: '#D9CDF5', fontSize: 11, fontFamily: THEME.fonts.extraBold },
-  tabTextActive: { color: '#0F172A', fontWeight: '900' },
+  tabBtn: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 10,
+    paddingHorizontal: 2,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabBtnActive: {
+    backgroundColor: '#F59E0B',
+  },
+  tabText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
+  },
+  tabTextActive: {
+    color: '#0F172A',
+    fontWeight: '900',
+  },
 
   primaryStatsGrid: {
     flexDirection: 'row',
@@ -1718,6 +1811,147 @@ const styles = StyleSheet.create({
   masteryHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   masteryName: { color: '#FFFFFF', fontSize: 13, fontFamily: THEME.fonts.extraBold },
   masteryMeta: { color: '#D9CDF5', fontSize: 11, fontFamily: THEME.fonts.extraBold },
+
+  masterySpotlightCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#1E293B',
+    borderRadius: 18,
+    padding: 12,
+    borderWidth: 1.2,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+    marginBottom: 14,
+  },
+  masterySpotlightIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  masterySpotlightTitle: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 0.8,
+  },
+  masterySpotlightSub: {
+    color: '#D9CDF5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.medium,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  masteryTotalPill: {
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  masteryTotalPillNum: {
+    color: '#F59E0B',
+    fontSize: 15,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '900',
+  },
+  masteryTotalPillLbl: {
+    color: '#94A3B8',
+    fontSize: 9,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  masterySubHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  masterySubHeaderTitle: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '800',
+  },
+  masterySubHeaderCount: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  activeMasteryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1.2,
+    borderColor: 'rgba(245, 158, 11, 0.25)',
+    marginBottom: 10,
+  },
+  masteryLevelBadge: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  masteryLevelBadgeText: {
+    color: '#0F172A',
+    fontSize: 9,
+    fontFamily: THEME.fonts.extraBold,
+    fontWeight: '900',
+  },
+  masteryRankTitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontFamily: THEME.fonts.medium,
+  },
+  masteryNextHint: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontFamily: THEME.fonts.medium,
+  },
+  dormantMasteryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  dormantMasteryCard: {
+    width: '48.5%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#1E293B',
+    borderRadius: 14,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  dormantMasteryBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dormantMasteryBadgeText: {
+    color: '#0F172A',
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  dormantMasteryName: {
+    color: '#E2E8F0',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  dormantMasterySub: {
+    color: '#64748B',
+    fontSize: 9.5,
+    fontFamily: THEME.fonts.medium,
+  },
 
   noticeText: { fontSize: 12, fontFamily: THEME.fonts.extraBold, marginBottom: 8 },
   titleRow: {

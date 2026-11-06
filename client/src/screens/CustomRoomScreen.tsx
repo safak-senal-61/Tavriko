@@ -280,7 +280,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   };
 
   return (
-    <TavrikoScreen>
+    <TavrikoScreen style={styles.customScreenRoot}>
       <TavrikoTopBar
         leftType="back"
         onLeftPress={onBack}
@@ -585,7 +585,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               title="ODAYI OLUŞTUR"
               onPress={handleCreateRoomPress}
               variant="gold"
-              style={{ height: 56, marginTop: 10 }}
+              style={{ height: 60, marginTop: 14 }}
             />
           </View>
         ) : (
@@ -847,8 +847,12 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  customScreenRoot: {
+    paddingHorizontal: 4,
+    maxWidth: 680,
+  },
   scrollContent: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 2,
     paddingTop: 8,
     paddingBottom: 150,
     alignItems: 'center',
@@ -857,20 +861,21 @@ const styles = StyleSheet.create({
   tabToggleRow: {
     flexDirection: 'row',
     backgroundColor: '#0F172A',
-    borderRadius: 24,
+    borderRadius: 22,
     padding: 4,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    marginBottom: 16,
+    marginBottom: 12,
     width: '100%',
-    maxWidth: 600,
+    maxWidth: 660,
   },
   tabButton: {
     flex: 1,
-    height: 44,
+    height: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
+    borderRadius: 18,
+    flexDirection: 'row',
   },
   tabButtonActiveCreate: {
     backgroundColor: '#F59E0B',
@@ -890,24 +895,25 @@ const styles = StyleSheet.create({
   },
   roomSetupCard: {
     width: '100%',
-    maxWidth: 600,
+    maxWidth: 660,
     backgroundColor: '#0F172A',
     borderRadius: 24,
     borderWidth: 1.5,
     borderColor: 'rgba(245, 158, 11, 0.35)',
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
     ...Platform.select({
       ios: {
-        shadowColor: '#6B3CFF',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.35,
-        shadowRadius: 18,
+        shadowColor: '#F59E0B',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
       },
       android: {
-        elevation: 10,
+        elevation: 8,
       },
       web: {
-        boxShadow: '0px 10px 30px rgba(107, 60, 255, 0.25)',
+        boxShadow: '0px 8px 24px rgba(245, 158, 11, 0.18)',
       },
     }),
   },
@@ -1014,16 +1020,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#F59E0B',
     ...Platform.select({
       ios: {
-        shadowColor: '#6B3CFF',
+        shadowColor: '#F59E0B',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.6,
+        shadowOpacity: 0.4,
         shadowRadius: 6,
       },
       android: {
         elevation: 4,
       },
       web: {
-        filter: 'drop-shadow(0px 2px 8px rgba(107, 60, 255, 0.6))',
+        boxShadow: '0px 2px 8px rgba(245, 158, 11, 0.4)',
       },
     }),
   },
@@ -1039,11 +1045,11 @@ const styles = StyleSheet.create({
   },
   chipRowFull: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(10, 4, 30, 0.75)',
+    backgroundColor: '#1E293B',
     borderRadius: 20,
     padding: 3,
     borderWidth: 1.2,
-    borderColor: 'rgba(154, 107, 255, 0.25)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     marginTop: 6,
     marginBottom: 14,
     justifyContent: 'space-between',
@@ -1115,10 +1121,11 @@ const styles = StyleSheet.create({
   digitsRow: {
     flexDirection: 'row',
     gap: 8,
+    justifyContent: 'center',
   },
   digitBox: {
-    width: 52,
-    height: 60,
+    width: 54,
+    height: 64,
     borderRadius: 16,
     backgroundColor: '#1E293B',
     borderWidth: 1.8,
@@ -1127,11 +1134,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   digitBoxFilled: {
-    borderColor: '#5ADBB5',
-    backgroundColor: 'rgba(90, 219, 181, 0.15)',
+    borderColor: '#10B981',
+    backgroundColor: 'rgba(16, 185, 129, 0.18)',
   },
   digitText: {
-    fontSize: 26,
+    fontSize: 28,
     fontFamily: THEME.fonts.display,
     fontWeight: '900',
     color: '#FFFFFF',
@@ -1158,48 +1165,48 @@ const styles = StyleSheet.create({
   },
   pasteButton: {
     flex: 1,
-    height: 52,
+    height: 56,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
+    backgroundColor: '#1E293B',
+    borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   pasteButtonText: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: THEME.fonts.extraBold,
     fontWeight: '800',
     color: '#FFFFFF',
   },
   joinPrimaryBtn: {
     flex: 1.5,
-    height: 52,
+    height: 56,
     borderRadius: 16,
     backgroundColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
       ios: {
-        shadowColor: '#5ADBB5',
+        shadowColor: '#10B981',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.35,
-        shadowRadius: 8,
+        shadowOpacity: 0.4,
+        shadowRadius: 10,
       },
       android: {
-        elevation: 4,
+        elevation: 6,
       },
       web: {
-        boxShadow: '0 4px 14px rgba(90, 219, 181, 0.4)',
+        boxShadow: '0 4px 16px rgba(16, 185, 129, 0.45)',
       },
     }),
   },
   joinPrimaryBtnText: {
-    color: '#082520',
     fontSize: 16,
     fontFamily: THEME.fonts.display,
     fontWeight: '900',
-    letterSpacing: 1,
+    color: '#FFFFFF',
+    letterSpacing: 1.2,
   },
   refreshIconBtn: {
     padding: 4,
