@@ -181,6 +181,12 @@ export class GameRoomDO extends DurableObject<Env> {
       const authResult = await verifyJwt(token, this.env.JWT_SECRET);
       if (authResult.isValid && authResult.user) {
         authUser = authResult.user;
+        if (rawAvatarUrl && rawAvatarUrl !== 'undefined') {
+          authUser.avatarUrl = rawAvatarUrl;
+        }
+        if (rawDisplayName) {
+          authUser.displayName = rawDisplayName;
+        }
       }
     }
 

@@ -53,7 +53,14 @@ export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>GÜNÜN MEYDAN OKUMASI</Text>
+        <Text
+          style={styles.title}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+        >
+          GÜNLÜK MEYDAN OKUMA
+        </Text>
         {/* Dynamic Streak Flame Hero */}
         <View style={styles.streakHero}>
           <View style={styles.flameContainer}>
@@ -156,8 +163,8 @@ export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({
               )}
             </View>
             <Button3D
-              title="MEYDAN OKUMAYA BAŞLA ⚡"
-              variant="mint"
+              title="MEYDAN OKUMAYA BAŞLA"
+              variant="gold"
               onPress={() => onStartDaily(cfg)}
               style={{ width: '100%' }}
             />
@@ -173,29 +180,30 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: THEME.fonts.display,
-    fontSize: 30,
+    fontSize: 22,
     color: '#FFFFFF',
     textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 8,
+    marginTop: 8,
+    marginBottom: 4,
+    letterSpacing: 0.5,
   },
   streakHero: {
     alignItems: 'center',
-    marginVertical: 12,
+    marginVertical: 8,
   },
   flameContainer: {
-    marginVertical: 4,
+    marginVertical: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   streakTitle: {
     fontFamily: THEME.fonts.display,
-    fontSize: 28,
+    fontSize: 24,
     color: '#FFFFFF',
-    marginTop: 6,
+    marginTop: 4,
   },
   streakSub: {
-    color: '#D9CDF5',
+    color: '#D1D5DB',
     fontSize: 12,
     fontFamily: THEME.fonts.bold,
     marginTop: 2,
@@ -220,76 +228,84 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
-    paddingVertical: 16,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.09)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    marginVertical: 10,
+    paddingVertical: 14,
+    borderRadius: 18,
+    backgroundColor: '#0F172A',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    marginVertical: 8,
   },
   dayCol: {
     alignItems: 'center',
     gap: 6,
   },
   dayCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   dayCircleDone: {
-    backgroundColor: '#FF8800',
+    backgroundColor: '#F59E0B',
     borderWidth: 2,
-    borderColor: '#FFC43D',
-    shadowColor: '#FF9B2F',
-    shadowOpacity: 0.9,
-    shadowRadius: 8,
-    elevation: 6,
+    borderColor: '#FCD34D',
+    shadowColor: '#F59E0B',
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    elevation: 5,
   },
   dayCircleActive: {
     borderWidth: 2,
-    borderColor: '#FFC43D',
-    backgroundColor: 'rgba(255, 196, 61, 0.18)',
+    borderColor: '#F59E0B',
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
   },
   dayCircleTodayRing: {
-    shadowColor: '#FFC43D',
+    borderColor: '#F59E0B',
+    shadowColor: '#F59E0B',
     shadowOpacity: 0.8,
     shadowRadius: 6,
     elevation: 4,
   },
   activeDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#FFC43D',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#F59E0B',
   },
   dayLabel: {
-    color: '#D9CDF5',
+    color: '#94A3B8',
     fontSize: 11,
     fontFamily: THEME.fonts.bold,
   },
   missionCard: {
-    marginTop: 14,
-    padding: 18,
-    borderRadius: 24,
-    backgroundColor: '#7A3FE0',
+    marginTop: 10,
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: '#0F172A',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 196, 61, 0.35)',
+    borderColor: 'rgba(245, 158, 11, 0.45)',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
   },
   missionCardCompleted: {
-    backgroundColor: '#1E1242',
-    borderColor: 'rgba(90, 219, 181, 0.55)',
+    backgroundColor: '#0F172A',
+    borderColor: 'rgba(16, 185, 129, 0.55)',
   },
   xpPill: {
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(10, 4, 24, 0.72)',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
+    borderColor: '#F59E0B',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 14,
   },
   xpPillText: {
     color: '#FFC43D',

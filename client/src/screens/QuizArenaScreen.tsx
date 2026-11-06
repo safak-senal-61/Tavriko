@@ -203,7 +203,7 @@ const WAVE_TRACK_HEIGHT = 48;
 const WAVE_U_START = 0.08;
 const WAVE_U_FINISH = 0.91;
 const RACER_NODE_W = 34;
-const RACER_AVATAR_SIZE = 24;
+const RACER_AVATAR_SIZE = 32;
 
 /** Doğru sayısını [0, totalQuestions] aralığına sıkıştırır; bitişe erken ulaşmayı imkânsız kılar */
 export const clampCorrect = (correct: number, totalQuestions: number): number => {
@@ -401,7 +401,7 @@ const WaveRacerNode: React.FC<{
         >
           <CharacterAvatar
             seed={racer.avatarUrl || racer.displayName}
-            size={RACER_AVATAR_SIZE - 6}
+            size={RACER_AVATAR_SIZE - 4}
           />
         </View>
         {racer.hasAnswered && (
@@ -563,13 +563,13 @@ const BilBakalimWaveTrack: React.FC<{
             >
               <Defs>
                 <LinearGradient id="skyGrad" x1="0" y1="0" x2="1" y2="1">
-                  <Stop offset="0" stopColor="#1B0C3A" />
-                  <Stop offset="0.5" stopColor="#2A135A" />
-                  <Stop offset="1" stopColor="#160830" />
+                  <Stop offset="0" stopColor="#0B0F19" />
+                  <Stop offset="0.5" stopColor="#111827" />
+                  <Stop offset="1" stopColor="#0F172A" />
                 </LinearGradient>
                 <LinearGradient id="hillFillGrad" x1="0" y1="0" x2="0" y2="1">
-                  <Stop offset="0" stopColor="#8B5CF6" stopOpacity="0.34" />
-                  <Stop offset="1" stopColor="#3B0764" stopOpacity="0.06" />
+                  <Stop offset="0" stopColor="#38BDF8" stopOpacity="0.25" />
+                  <Stop offset="1" stopColor="#0284C7" stopOpacity="0.02" />
                 </LinearGradient>
                 <LinearGradient id="activeWaveGrad" x1="0" y1="0" x2="1" y2="0">
                   <Stop offset="0" stopColor="#38BDF8" />
@@ -710,6 +710,12 @@ const BilBakalimWaveTrack: React.FC<{
               <Text style={[styles.modernRacerRank, idx === 0 && styles.modernRacerRankFirst]}>
                 #{idx + 1}
               </Text>
+              <View style={styles.modernRacerAvatarWrap}>
+                <CharacterAvatar
+                  seed={racer.avatarUrl || racer.displayName}
+                  size={20}
+                />
+              </View>
               <Text style={styles.modernRacerName} numberOfLines={1}>
                 {racer.displayName}
               </Text>
@@ -1089,10 +1095,10 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
 const styles = StyleSheet.create({
   // TAVRİKO MODERN YÜKSELEN ZİRVE YARIŞ PİSTİ (Kompakt ve Duyarlı)
   modernRaceCard: {
-    backgroundColor: 'rgba(18, 8, 42, 0.86)',
+    backgroundColor: '#0F172A',
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.35)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(245, 158, 11, 0.4)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     marginTop: 2,
@@ -1233,7 +1239,7 @@ const styles = StyleSheet.create({
     height: RACER_AVATAR_SIZE,
     borderRadius: RACER_AVATAR_SIZE / 2,
     borderWidth: 2,
-    backgroundColor: '#1E1042',
+    backgroundColor: '#0F172A',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -1310,6 +1316,15 @@ const styles = StyleSheet.create({
   modernRacerChipMe: {
     backgroundColor: 'rgba(255, 196, 61, 0.12)',
     borderColor: 'rgba(255, 196, 61, 0.45)',
+  },
+  modernRacerAvatarWrap: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   modernRacerRank: {
     color: '#A78BFA',

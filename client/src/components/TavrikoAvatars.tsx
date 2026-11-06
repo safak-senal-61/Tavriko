@@ -232,8 +232,9 @@ export const CharacterAvatar: React.FC<{
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor: '#3b6ea5',
+          backgroundColor: '#0F172A',
         }}
+        resizeMode="cover"
         onError={() => setImgError(true)}
       />
     );

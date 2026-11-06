@@ -722,7 +722,7 @@ export const RootNavigator: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.user) setUser(data.user);
+          if (data.user) setUser({ ...data.user, avatarUrl: newAvatarUri });
         }
       } catch (err) {
         console.warn('Profile update error:', err);
