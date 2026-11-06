@@ -211,6 +211,9 @@ export const CharacterAvatar: React.FC<{
   size?: number;
 }> = ({ index, seed, size = 40 }) => {
   const [imgError, setImgError] = React.useState(false);
+  React.useEffect(() => {
+    setImgError(false);
+  }, [seed]);
   const isDirectImageUri =
     !imgError &&
     typeof seed === 'string' &&

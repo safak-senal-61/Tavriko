@@ -217,7 +217,20 @@ export const RootNavigator: React.FC = () => {
     (fresh: UserProfile) => {
       if (!fresh) return;
       const current = useGameStore.getState().user;
-      setUser({ ...(current || {}), ...fresh } as UserProfile);
+      let preservedAvatar = fresh.avatarUrl;
+      const currentHasCustomPhoto =
+        current?.avatarUrl &&
+        (current.avatarUrl.startsWith('data:') ||
+          current.avatarUrl.startsWith('http') ||
+          current.avatarUrl.startsWith('blob:') ||
+          current.avatarUrl.startsWith('file:'));
+      if (
+        currentHasCustomPhoto &&
+        (!fresh.avatarUrl || fresh.avatarUrl === 'av1' || fresh.avatarUrl === 'av_1' || fresh.avatarUrl === 'custom')
+      ) {
+        preservedAvatar = current.avatarUrl;
+      }
+      setUser({ ...(current || {}), ...fresh, avatarUrl: preservedAvatar } as UserProfile);
     },
     [setUser]
   );
@@ -476,19 +489,23 @@ export const RootNavigator: React.FC = () => {
       if (user && !isGuest) {
         const myRankEntry = summary.rankings?.find((p) => p.playerId === user.id);
         const won = myRankEntry?.rank === 1 || summary.podium?.first?.playerId === user.id;
+        const correctAnswers =
+          typeof myRankEntry?.correctAnswersCount === 'number'
+            ? myRankEntry.correctAnswersCount
+            : matchQuestionsReviewRef.current.filter((q) => q.isCorrect).length;
+        const isZero = correctAnswers === 0;
+        const xpEarned = isZero ? 0 : won ? Math.min(35, correctAnswers * 5 + 10) : Math.min(15, correctAnswers * 3);
+        const coinsEarned = isZero ? 0 : won ? Math.min(15, correctAnswers * 2 + 5) : Math.min(6, correctAnswers * 1);
         fetch(`${API_BASE}/auth/stats`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: user.id,
             won,
-            correctAnswers:
-              typeof myRankEntry?.correctAnswersCount === 'number'
-                ? myRankEntry.correctAnswersCount
-                : matchQuestionsReviewRef.current.filter((q) => q.isCorrect).length,
+            correctAnswers,
             totalAnswers: summary.totalRounds || 5,
-            xpEarned: won ? 80 : 30,
-            coinsEarned: won ? 50 : 20,
+            xpEarned,
+            coinsEarned,
             bestStreak: myRankEntry?.streak || 1,
             roomCode: summary.roomCode,
           }),
@@ -1208,8 +1225,8 @@ export const RootNavigator: React.FC = () => {
             won,
             correctAnswers: correctAns,
             totalAnswers: totalAns,
-            xpEarned: Math.min(80, Math.max(25, correctAns * 15)),
-            coinsEarned: Math.min(25, Math.max(10, correctAns * 5)),
+            xpEarned: correctAns === 0 ? 0 : Math.min(25, correctAns * 4 + (won ? 8 : 0)),
+            coinsEarned: correctAns === 0 ? 0 : Math.min(8, correctAns * 1 + (won ? 3 : 0)),
             bestStreak: practiceStreak,
           }),
         })

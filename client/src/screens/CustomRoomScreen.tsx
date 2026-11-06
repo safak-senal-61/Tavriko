@@ -635,6 +635,20 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 
             {joinError && <Text style={styles.errorText}>{joinError}</Text>}
 
+            {/* Oda Şifresi (Şifreli odalar için KATIL butonundan önce girilir) */}
+            <View style={{ marginTop: 10, marginBottom: 12 }}>
+              <Text style={styles.passwordSettingLabel}>🔒 Oda Şifresi (Oda şifreli ise):</Text>
+              <TextInput
+                style={styles.passwordSettingInput}
+                value={joinPassword}
+                onChangeText={setJoinPassword}
+                placeholder="Şifre (şifresiz ise boş bırakın)"
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                maxLength={8}
+                autoCapitalize="none"
+              />
+            </View>
+
             {/* UI Kit Odaya Katıl Aksiyon Satırı: [ 📋 Yapıştır | KATIL ] */}
             <View style={styles.joinActionRow}>
               <TouchableOpacity
@@ -659,19 +673,6 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               >
                 <Text style={styles.joinPrimaryBtnText}>KATIL</Text>
               </TouchableOpacity>
-            </View>
-
-            <View style={{ marginTop: 14 }}>
-              <Text style={styles.passwordSettingLabel}>Oda Şifresi (Oda şifreli ise):</Text>
-              <TextInput
-                style={styles.passwordSettingInput}
-                value={joinPassword}
-                onChangeText={setJoinPassword}
-                placeholder="Şifre (isteğe bağlı)"
-                placeholderTextColor="rgba(255,255,255,0.4)"
-                maxLength={8}
-                autoCapitalize="none"
-              />
             </View>
 
             {/* HERKESE AÇIK ODALAR (Canlı Veritabanı & WebSocket Senkronizasyonu) */}

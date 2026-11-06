@@ -1790,12 +1790,19 @@ class PrismaService {
         const safeStreak = Math.max(0, Math.min(safeCorrect, Math.round(Number(delta.bestStreak) || 0)));
         // Ensure existing stats are sanitized before adding delta
         record.stats = this.sanitizeUserStats(record.stats);
-        // Balanced RPG XP curve: Cap single match XP to prevent rapid leveling
-        const cappedXp = Math.max(0, Math.min(Number(delta.xpEarned) || 0, delta.won ? 80 : 30));
+        // KURAL: Soru çözmeyen / 0 doğru yapan oyuncuya kesinlikle para (coin) ve XP verilmez!
+        const isZeroPerformance = safeCorrect === 0;
+        // Zorlaştırılmış ekonomi: Tek maçtan kazanılan XP ve Altın sınırlandırıldı
+        const cappedXp = isZeroPerformance
+            ? 0
+            : Math.max(0, Math.min(Number(delta.xpEarned) || 0, delta.won ? 35 : 15));
+        const cappedCoins = isZeroPerformance
+            ? 0
+            : Math.max(0, Math.min(Math.round(Number(delta.coinsEarned) || 0), delta.won ? 15 : 6));
         record.xp += cappedXp;
-        record.coins += Math.max(0, Math.round(Number(delta.coinsEarned) || 0));
-        // Season 1 Pass XP progression
-        const seasonXpGain = delta.won ? 60 : 25;
+        record.coins += cappedCoins;
+        // Season 1 Pass XP progression (0 doğru için sezon XP verilmez)
+        const seasonXpGain = isZeroPerformance ? 0 : delta.won ? 25 : 10;
         record.seasonXp = (record.seasonXp || 0) + seasonXpGain;
         const progress = (0, shared_1.calculateLevelFromXp)(record.xp);
         record.level = progress.level;

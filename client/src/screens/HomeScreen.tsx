@@ -181,43 +181,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               );
             })()}
           </TouchableOpacity>
-          {/* Hero Quick Match (1v1 Duel) Card */}
+          {/* Hero Quick Match (1v1 Duel) Card - Full bleed 3D duel banner */}
           <View style={styles.heroMatchCard}>
-            <View style={{ flex: 1, paddingRight: 105, zIndex: 2 }}>
-              <Text style={styles.onlineSub}>
-                {user.rankPoints ?? 1000} Lig Puanı · {user.stats?.totalMatches ?? 0} Düello Maçı
-              </Text>
+            <Image
+              source={require('../../assets/images/duel_arena_banner.jpg')}
+              style={StyleSheet.absoluteFillObject}
+              resizeMode="cover"
+            />
+            <View style={styles.heroMatchScrim} pointerEvents="none" />
+            <View style={styles.heroMatchContent}>
+              <View style={styles.heroMatchBadge}>
+                <Text style={styles.heroMatchBadgeText}>⚔️ 1v1 DÜELLO</Text>
+              </View>
               <Text
                 style={styles.heroMatchTitle}
                 numberOfLines={1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.75}
+                minimumFontScale={0.8}
               >
                 HIZLI EŞLEŞME
+              </Text>
+              <Text style={styles.onlineSub}>
+                {user.rankPoints ?? 1000} Lig Puanı · {user.stats?.totalMatches ?? 0} Düello Maçı
               </Text>
               <Button3D
                 title="OYNA"
                 variant="mint"
                 onPress={onQuickMatch}
                 style={styles.heroPlayButton}
-                textStyle={{ fontSize: 22 }}
+                textStyle={{ fontSize: 20 }}
               />
             </View>
-            <Animated.View
-              style={[
-                styles.heroBoltWrap,
-                { transform: [{ translateY: boltFloat }] },
-              ]}
-              pointerEvents="none"
-            >
-              <Image
-                source={require('../../assets/images/quick_match_banner.jpg')}
-                style={styles.heroMatchBannerImg}
-                resizeMode="cover"
-              />
-            </Animated.View>
           </View>
-          {/* 4 Mode Tiles Row with Rich 3D Assets */}
+          {/* 4 Mode Tiles Row with Enriched 3D Visuals and Embedded Inside Labels */}
           <View style={styles.modesRow}>
             <TouchableOpacity
               style={styles.modeTile}
@@ -233,9 +229,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 style={styles.modeTileImg}
                 resizeMode="cover"
               />
-              <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
-                Özel Oda
-              </Text>
+              <View style={styles.modeTileLabelWrap}>
+                <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
+                  Özel Oda
+                </Text>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -252,9 +250,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 style={styles.modeTileImg}
                 resizeMode="cover"
               />
-              <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
-                Tek Kişilik
-              </Text>
+              <View style={styles.modeTileLabelWrap}>
+                <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
+                  Tek Kişilik
+                </Text>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -271,9 +271,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 style={styles.modeTileImg}
                 resizeMode="cover"
               />
-              <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
-                Günlük
-              </Text>
+              <View style={styles.modeTileLabelWrap}>
+                <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
+                  Günlük
+                </Text>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -290,9 +292,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 style={styles.modeTileImg}
                 resizeMode="cover"
               />
-              <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
-                Arkadaşlar
-              </Text>
+              <View style={styles.modeTileLabelWrap}>
+                <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
+                  Arkadaşlar
+                </Text>
+              </View>
             </TouchableOpacity>
           </View>
           {/* Daily Streak Card */}
@@ -447,43 +451,63 @@ const styles = StyleSheet.create({
   },
   heroMatchCard: {
     marginTop: 16,
-    padding: 20,
-    borderRadius: 26,
-    backgroundColor: '#7A3FE0',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 196, 61, 0.35)',
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 196, 61, 0.45)',
     position: 'relative',
     overflow: 'hidden',
+    height: 170,
+    backgroundColor: '#0F0624',
+    shadowColor: '#6B3CFF',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  heroMatchScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(10, 4, 24, 0.65)',
+  },
+  heroMatchContent: {
+    flex: 1,
+    padding: 16,
+    justifyContent: 'space-between',
+    zIndex: 2,
+    maxWidth: '75%',
+  },
+  heroMatchBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255, 196, 61, 0.22)',
+    borderWidth: 1,
+    borderColor: '#FFC43D',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  heroMatchBadgeText: {
+    color: '#FFC43D',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 0.5,
   },
   onlineSub: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
+    color: '#E2D9F3',
+    fontSize: 11.5,
+    fontFamily: THEME.fonts.bold,
+    marginTop: 2,
+    marginBottom: 6,
   },
   heroMatchTitle: {
     fontFamily: THEME.fonts.display,
-    fontSize: 23,
+    fontSize: 22,
     color: '#FFFFFF',
-    marginTop: 4,
-    marginBottom: 14,
-    letterSpacing: 0.2,
+    marginTop: 2,
+    letterSpacing: 0.3,
   },
   heroPlayButton: {
     alignSelf: 'flex-start',
-    height: 54,
-    paddingHorizontal: 40,
-  },
-  heroBoltWrap: {
-    position: 'absolute',
-    right: 10,
-    top: 14,
-  },
-  heroMatchBannerImg: {
-    width: 104,
-    height: 104,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 196, 61, 0.45)',
+    height: 48,
+    paddingHorizontal: 32,
   },
   modesRow: {
     flexDirection: 'row',
@@ -493,28 +517,45 @@ const styles = StyleSheet.create({
   modeTile: {
     flex: 1,
     minWidth: 0,
-    height: 98,
-    paddingHorizontal: 4,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.09)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    height: 112,
+    borderRadius: 18,
+    backgroundColor: '#1E0E3D',
+    borderWidth: 1.5,
+    borderColor: 'rgba(154, 107, 255, 0.32)',
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
   },
   modeTileImg: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.22)',
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  modeTileLabelWrap: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 5,
+    paddingHorizontal: 2,
+    backgroundColor: 'rgba(12, 5, 28, 0.82)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modeTileText: {
     color: '#FFFFFF',
-    fontSize: 11.5,
+    fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
   streakCard: {
     marginTop: 16,

@@ -199,11 +199,11 @@ export interface RacerInfo {
   };
 }
 
-const WAVE_TRACK_HEIGHT = 96;
+const WAVE_TRACK_HEIGHT = 48;
 const WAVE_U_START = 0.08;
 const WAVE_U_FINISH = 0.91;
-const RACER_NODE_W = 46;
-const RACER_AVATAR_SIZE = 32;
+const RACER_NODE_W = 34;
+const RACER_AVATAR_SIZE = 24;
 
 /** Doğru sayısını [0, totalQuestions] aralığına sıkıştırır; bitişe erken ulaşmayı imkânsız kılar */
 export const clampCorrect = (correct: number, totalQuestions: number): number => {
@@ -358,7 +358,7 @@ const WaveRacerNode: React.FC<{
         styles.waveRacerNode,
         {
           left: x - RACER_NODE_W / 2,
-          top: y - RACER_AVATAR_SIZE / 2 - 14,
+          top: y - RACER_AVATAR_SIZE / 2 - 8,
           zIndex: racer.isMe ? 35 : 25 - rank,
         },
       ]}
@@ -1087,20 +1087,20 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   );
 };
 const styles = StyleSheet.create({
-  // TAVRİKO MODERN YÜKSELEN ZİRVE YARIŞ PİSTİ
+  // TAVRİKO MODERN YÜKSELEN ZİRVE YARIŞ PİSTİ (Kompakt ve Duyarlı)
   modernRaceCard: {
     backgroundColor: 'rgba(18, 8, 42, 0.86)',
-    borderRadius: 18,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(167, 139, 250, 0.35)',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginTop: 4,
-    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginTop: 2,
+    gap: 4,
     shadowColor: '#090318',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
   },
   modernRaceTopRow: {
     flexDirection: 'row',
@@ -1484,47 +1484,47 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.09)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderRadius: 20,
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    minHeight: 150,
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    minHeight: 85,
     alignItems: 'center',
     justifyContent: 'center',
   },
   categoryChip: {
     backgroundColor: '#6B3CFF',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 12,
-    marginBottom: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+    marginBottom: 6,
   },
   categoryChipText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
   },
   questionText: {
     fontFamily: THEME.fonts.display,
-    fontSize: 23,
+    fontSize: 18,
     color: '#FFFFFF',
     textAlign: 'center',
-    lineHeight: 29,
+    lineHeight: 23,
   },
   questionTextLarge: {
-    fontSize: 27,
-    lineHeight: 34,
+    fontSize: 21,
+    lineHeight: 27,
   },
   optionsContainer: {
-    marginTop: 12,
-    gap: 10,
+    marginTop: 8,
+    gap: 7,
   },
   optCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    height: 56,
-    paddingHorizontal: 14,
-    borderRadius: 18,
+    gap: 10,
+    height: 48,
+    paddingHorizontal: 12,
+    borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.09)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.14)',
@@ -1547,9 +1547,9 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   optBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 10,
     backgroundColor: 'rgba(0, 0, 0, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1569,7 +1569,7 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: '#25A868',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 8,
   },
   choiceTagWrong: {
@@ -1578,7 +1578,7 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: '#D01836',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 8,
   },
   choiceTagAnswer: {
@@ -1589,7 +1589,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#3FD08A',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 8,
   },
   choiceTagPending: {
@@ -1597,42 +1597,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FFC43D',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 8,
   },
   choiceTagText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: THEME.fonts.extraBold,
   },
   choiceTagAnswerText: {
     color: '#3FD08A',
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: THEME.fonts.extraBold,
   },
   choiceTagPendingText: {
     color: '#FFC43D',
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: THEME.fonts.extraBold,
   },
   optBadgeText: {
     fontFamily: THEME.fonts.display,
-    fontSize: 16,
+    fontSize: 14,
     color: '#FFFFFF',
   },
   optText: {
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: THEME.fonts.extraBold,
   },
   optTextLarge: {
-    fontSize: 18,
+    fontSize: 16,
   },
   fixedBottomStatus: {
-    height: 62,
+    minHeight: 52,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 4,
   },
   bottomHintText: {
     color: '#D9CDF5',

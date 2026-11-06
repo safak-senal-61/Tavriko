@@ -53,8 +53,25 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
   const myRanking = summary.rankings?.find((r) => r.playerId === currentUserId);
   const isWinner =
     (myRanking && myRanking.rank === 1) || first?.playerId === currentUserId;
-  const xpEarned = isWinner ? 160 : 60;
-  const coinsEarned = isWinner ? 50 : 20;
+
+  const correctCount =
+    typeof myRanking?.correctAnswersCount === 'number'
+      ? myRanking.correctAnswersCount
+      : reviews.filter((r) => r.isCorrect).length;
+  const accuracyPct = Math.round((correctCount / totalRounds) * 100);
+
+  // KURAL: 0 doğru cevap veya erken çıkışta para/XP ödülü sıfırlanır!
+  const isZeroPerformance = correctCount === 0 || (myRanking?.score || 0) <= 0;
+  const xpEarned = isZeroPerformance
+    ? 0
+    : isWinner
+    ? Math.min(35, correctCount * 5 + 10)
+    : Math.min(15, correctCount * 3);
+  const coinsEarned = isZeroPerformance
+    ? 0
+    : isWinner
+    ? Math.min(15, correctCount * 2 + 5)
+    : Math.min(6, correctCount * 1);
 
   // Açılabilir Soru Cevapları Menüsü (Varsayılan olarak kapalı; tek dokunuşla açılır/kapanır)
   const [isQuestionsMenuOpen, setIsQuestionsMenuOpen] = useState<boolean>(false);
@@ -97,11 +114,7 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
     ]).start();
   }, [col1Anim, col2Anim, col3Anim, fadeAnim]);
 
-  const correctCount =
-    typeof myRanking?.correctAnswersCount === 'number'
-      ? myRanking.correctAnswersCount
-      : reviews.filter((r) => r.isCorrect).length;
-  const accuracyPct = Math.round((correctCount / totalRounds) * 100);
+
 
   const toggleQuestionsMenu = () => {
     sound.playSound('tap');

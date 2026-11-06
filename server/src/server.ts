@@ -2770,14 +2770,25 @@ export function createApp() {
         }
 
         const isWinner = rankItem.rank === 1;
-        const xpEarned = isWinner ? 60 : 25;
-        const coinsEarned = isWinner ? 50 : 15;
         const totalRounds = Math.max(1, Number(summary.totalRounds) || 5);
         const rawCorrect =
           typeof (rankItem as any).correctAnswersCount === 'number'
             ? (rankItem as any).correctAnswersCount
             : Math.min(totalRounds, Math.round((rankItem.score || 0) / 140));
         const safeCorrect = Math.max(0, Math.min(totalRounds, rawCorrect));
+
+        // Sıfır doğru cevap veya oyundan erken ayrılmada 0 coin ve 0 xp
+        const isZero = safeCorrect === 0;
+        const coinsEarned = isZero
+          ? 0
+          : isWinner
+          ? Math.min(15, safeCorrect * 2 + 5)
+          : Math.min(6, safeCorrect * 1);
+        const xpEarned = isZero
+          ? 0
+          : isWinner
+          ? Math.min(35, safeCorrect * 5 + 10)
+          : Math.min(15, safeCorrect * 3);
 
         await db.recordGameStats(rankItem.playerId, {
           correctAnswers: safeCorrect,
