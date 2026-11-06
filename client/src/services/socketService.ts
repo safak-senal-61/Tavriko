@@ -176,6 +176,10 @@ export class SocketService {
     return !!(this.ws && this.ws.readyState === (typeof WebSocket !== 'undefined' ? WebSocket.OPEN : 1));
   }
 
+  public isPresenceConnected(): boolean {
+    return !!(this.presenceWs && this.presenceWs.readyState === (typeof WebSocket !== 'undefined' ? WebSocket.OPEN : 1));
+  }
+
   public connect(url?: string): any {
     this.isManuallyClosed = false;
     const targetUrl = url || getRealtimeWsUrl('/ws');

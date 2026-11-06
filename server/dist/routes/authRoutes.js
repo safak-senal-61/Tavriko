@@ -550,7 +550,7 @@ router.post('/change-password', async (req, res) => {
 });
 router.post('/stats', async (req, res) => {
     try {
-        const { userId, correctAnswers = 0, totalAnswers = 0, xpEarned = 0, coinsEarned = 0, bestStreak = 0, won = false, roomCode } = req.body;
+        const { userId, correctAnswers = 0, totalAnswers = 0, xpEarned = 0, coinsEarned = 0, bestStreak = 0, won = false, roomCode, category } = req.body;
         if (!userId) {
             res.status(400).json({ error: 'userId gerekli' });
             return;
@@ -563,6 +563,7 @@ router.post('/stats', async (req, res) => {
             bestStreak,
             won,
             roomCode: typeof roomCode === 'string' && roomCode.trim() ? roomCode.trim() : undefined,
+            category: typeof category === 'string' && category.trim() ? category.trim() : undefined,
         });
         res.json({ success: true, user: updated });
     }

@@ -232,7 +232,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   // Live WebSocket connection polling & heartbeat
   useEffect(() => {
-    const interval = setInterval(() => setWsConnected(socketService.isConnected()), 2500);
+    const checkConn = () =>
+      setWsConnected(socketService.isConnected() || socketService.isPresenceConnected());
+    checkConn();
+    const interval = setInterval(checkConn, 2500);
     return () => clearInterval(interval);
   }, []);
 
@@ -470,7 +473,26 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const friendCode = user.friendCode || '—';
 
   const masteryList = useMemo(() => {
-    const entries = Object.entries(user.categoryMastery || {}) as Array<
+    let rawEntries: Record<string, any> = (user.categoryMastery as any) || {};
+    const totalMastery = Object.values(rawEntries).reduce(
+      (acc: number, item: any) => acc + (Number(item?.correctCount) || 0),
+      0
+    );
+    if (totalMastery === 0 && correctAnswers > 0) {
+      const defKeys = ['general_culture', 'science_tech', 'history', 'geography', 'sports', 'cinema_tv'];
+      const portion = Math.max(1, Math.floor(correctAnswers / defKeys.length));
+      let rem = correctAnswers;
+      const fallback: Record<string, { level: number; correctCount: number }> = {};
+      for (const k of defKeys) {
+        if (rem <= 0) break;
+        const add = Math.min(portion, rem);
+        fallback[k] = { level: Math.floor(add / 5) + (add > 0 ? 1 : 0), correctCount: add };
+        rem -= add;
+      }
+      rawEntries = fallback;
+    }
+
+    const entries = Object.entries(rawEntries) as Array<
       [string, { level: number; correctCount: number } | undefined]
     >;
     return Object.keys(CATEGORY_LABELS)
@@ -486,7 +508,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         };
       })
       .sort((a, b) => b.correctCount - a.correctCount);
-  }, [user.categoryMastery]);
+  }, [user.categoryMastery, correctAnswers]);
 
   const maxCorrect = Math.max(1, ...masteryList.map((m) => m.correctCount));
   const bestCategory = masteryList[0]?.correctCount > 0 ? masteryList[0] : null;
@@ -1182,20 +1204,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 };
 
 const card = {
-  backgroundColor: 'rgba(28, 12, 62, 0.88)',
+  backgroundColor: '#0F172A',
   borderWidth: 1.5,
-  borderColor: 'rgba(107, 60, 255, 0.45)',
+  borderColor: 'rgba(255, 255, 255, 0.12)',
   borderRadius: 22,
+  width: '100%',
+  maxWidth: 580,
 } as const;
 
 const styles = StyleSheet.create({
-  scrollContent: { paddingBottom: 150 },
+  scrollContent: { paddingBottom: 150, alignItems: 'center', paddingHorizontal: 16 },
   heroCard: {
     ...card,
     padding: 14,
     marginTop: 8,
-    backgroundColor: 'rgba(24, 10, 54, 0.94)',
-    borderColor: 'rgba(255, 196, 61, 0.35)',
+    backgroundColor: '#0F172A',
+    borderColor: 'rgba(245, 158, 11, 0.35)',
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -1498,9 +1522,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   tabBtn: { flex: 1, paddingVertical: 8, borderRadius: 11, alignItems: 'center' },
-  tabBtnActive: { backgroundColor: '#6B3CFF' },
+  tabBtnActive: { backgroundColor: '#F59E0B' },
   tabText: { color: '#D9CDF5', fontSize: 11, fontFamily: THEME.fonts.extraBold },
-  tabTextActive: { color: '#FFFFFF' },
+  tabTextActive: { color: '#0F172A', fontWeight: '900' },
 
   primaryStatsGrid: {
     flexDirection: 'row',
@@ -1514,10 +1538,10 @@ const styles = StyleSheet.create({
     width: '48.5%',
     paddingVertical: 13,
     paddingHorizontal: 14,
-    backgroundColor: 'rgba(26, 11, 58, 0.9)',
+    backgroundColor: '#1E293B',
     borderRadius: 18,
     borderWidth: 1.2,
-    borderColor: 'rgba(154, 107, 255, 0.28)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   primaryStatLabel: {
     color: '#A992E2',
@@ -1549,7 +1573,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 12,
     marginBottom: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: '#1E293B',
     borderRadius: 16,
   },
   secondaryMetricItem: {

@@ -862,7 +862,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.12)',
     marginBottom: 16,
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 580,
   },
   tabButton: {
     flex: 1,
@@ -889,7 +889,7 @@ const styles = StyleSheet.create({
   },
   roomSetupCard: {
     width: '100%',
-    maxWidth: 390,
+    maxWidth: 580,
     backgroundColor: '#0F172A',
     borderRadius: 24,
     borderWidth: 1.5,
@@ -1116,9 +1116,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   digitBox: {
-    width: 44,
-    height: 52,
-    borderRadius: 14,
+    width: 52,
+    height: 60,
+    borderRadius: 16,
     backgroundColor: '#1E293B',
     borderWidth: 1.8,
     borderColor: 'rgba(255, 255, 255, 0.18)',
@@ -1130,7 +1130,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(90, 219, 181, 0.15)',
   },
   digitText: {
-    fontSize: 22,
+    fontSize: 26,
     fontFamily: THEME.fonts.display,
     fontWeight: '900',
     color: '#FFFFFF',
@@ -1175,7 +1175,7 @@ const styles = StyleSheet.create({
     flex: 1.5,
     height: 52,
     borderRadius: 16,
-    backgroundColor: '#5ADBB5',
+    backgroundColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({

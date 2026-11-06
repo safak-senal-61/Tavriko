@@ -508,6 +508,7 @@ export const RootNavigator: React.FC = () => {
             coinsEarned,
             bestStreak: myRankEntry?.streak || 1,
             roomCode: summary.roomCode,
+            category: (summary as any).category || activeRoom?.category || selectedCategory || 'general_culture',
           }),
         })
           .then((r) => r.json())
@@ -1228,6 +1229,7 @@ export const RootNavigator: React.FC = () => {
             xpEarned: correctAns === 0 ? 0 : Math.min(25, correctAns * 4 + (won ? 8 : 0)),
             coinsEarned: correctAns === 0 ? 0 : Math.min(8, correctAns * 1 + (won ? 3 : 0)),
             bestStreak: practiceStreak,
+            category: selectedCategory || (practiceCategory as any) || 'general_culture',
           }),
         })
           .then((r) => r.json())

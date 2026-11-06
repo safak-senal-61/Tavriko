@@ -2078,6 +2078,7 @@ export class PrismaService {
       bestStreak: number;
       won?: boolean;
       roomCode?: string;
+      category?: string;
     }
   ): Promise<UserProfile | null> {
     let record = this.users.get(userId);
@@ -2142,6 +2143,43 @@ export class PrismaService {
     record.stats = this.sanitizeUserStats(record.stats);
     record.updatedAt = Date.now();
 
+    // Category Mastery update & persistence
+    if (!record.categoryMastery || typeof record.categoryMastery !== 'object') {
+      record.categoryMastery = {};
+    }
+    const catKey = delta.category ? String(delta.category).trim() : 'general_culture';
+    if (safeCorrect > 0) {
+      const current = (record.categoryMastery as any)[catKey] || { level: 0, correctCount: 0 };
+      const newCount = (current.correctCount || 0) + safeCorrect;
+      const newLvl = Math.floor(newCount / 5) + (newCount > 0 ? 1 : 0);
+      (record.categoryMastery as any)[catKey] = {
+        level: newLvl,
+        correctCount: newCount,
+      };
+    }
+    // Backfill historical answers if categoryMastery sum is less than total correct answers
+    const totalMasteryCorrect = Object.values(record.categoryMastery as Record<string, any>).reduce(
+      (sum: number, item: any) => sum + (Number(item?.correctCount) || 0),
+      0
+    );
+    if (record.stats.correctAnswers > totalMasteryCorrect) {
+      const remaining = record.stats.correctAnswers - totalMasteryCorrect;
+      const defCats = ['general_culture', 'science_tech', 'history', 'geography', 'sports', 'cinema_tv'];
+      const portion = Math.max(1, Math.floor(remaining / defCats.length));
+      let distributed = 0;
+      for (const c of defCats) {
+        if (distributed >= remaining) break;
+        const add = Math.min(portion, remaining - distributed);
+        const cur = (record.categoryMastery as any)[c] || { level: 0, correctCount: 0 };
+        const updatedCount = (cur.correctCount || 0) + add;
+        (record.categoryMastery as any)[c] = {
+          level: Math.floor(updatedCount / 5) + (updatedCount > 0 ? 1 : 0),
+          correctCount: updatedCount,
+        };
+        distributed += add;
+      }
+    }
+
     // Automatically update live event progress ONLY for tasks the user actively started and not completed yet
     this.updateStartedEvents(record, {
       matches: 1,
@@ -2170,6 +2208,7 @@ export class PrismaService {
             correctAnswers: record.stats.correctAnswers,
             totalAnswers: record.stats.totalAnswers,
             bestStreak: record.stats.bestStreak,
+            categoryMastery: record.categoryMastery,
             updatedAt: new Date(),
           },
         });
