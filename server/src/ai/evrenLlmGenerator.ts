@@ -63,6 +63,16 @@ const CATEGORY_NAMES_TR: Record<string, string> = {
   food_gastronomy: 'Yemek & Mutfak',
   animals_wildlife: 'Hayvanlar Alemi',
   nature_ecology: 'Doğa & Ekoloji',
+  gaming_videogames: 'Video Oyunları',
+  anime_manga: 'Anime ve Manga',
+  cartoons_animation: 'Çizgi Film ve Animasyon',
+  comics_superheroes: 'Çizgi Roman & Süper Kahramanlar',
+  fantasy_fiction: 'Fantastik & Kurgusal Dünyalar',
+  social_internet: 'Sosyal Medya & İnternet Kültürü',
+  mythology_ancient: 'Mitoloji ve Efsaneler',
+  hobbies_leisure: 'Eğlence ve Hobiler',
+  daily_life: 'Günlük Hayat ve Toplum',
+  turkey_special: 'Türkiye’ye Özel',
   mixed: 'Karma Sorular',
 };
 
@@ -120,6 +130,16 @@ const SUBTOPIC_HINTS: Record<string, string[]> = {
   language_vocab: ['Eş anlamlı sözcükler', 'Atasözleri ve deyimler', 'Türkçe sesli harfler ve imla', 'Zıt anlamlılar', 'Kelime kökleri'],
   art_culture: ['Ünlü tablolar ve ressamlar', 'Tarihi camiler ve mimari', 'Heykel sanatı', 'Müzeler ve antik kentler', 'Geleneksel el sanatları'],
   general_culture: ['Dünya rekorları', 'İlginç doğa gerçekleri', 'Geleneksel kutlamalar', 'Masa ve zeka oyunları', 'Kültürel simgeler'],
+  gaming_videogames: ['Konsol ve PC oyunları', 'RPG ve açık dünya oyunları', 'FPS ve rekabetçi e-spor', 'Oyun şirketleri, konsollar ve mekanikler'],
+  anime_manga: ['Shonen ve popüler animeler', 'Manga yazarları ve stüdyolar', 'Anime filmleri ve müzikleri', 'Japon kültürü ve K-Drama'],
+  cartoons_animation: ['Klasik çizgi filmler', '3D animasyon şaheserleri', 'Animasyon karakterleri ve seslendirme'],
+  comics_superheroes: ['Marvel ve DC evrenleri', 'Süper güçler ve yetenekler', 'Efsanevi çizgi roman kahramanları ve yazarları'],
+  fantasy_fiction: ['Yüzüklerin Efendisi ve fantezi dünyaları', 'Ejderhalar, büyücüler ve efsanevi silahlar', 'Zaman yolculuğu ve distopyalar'],
+  social_internet: ['Sosyal medya platformları ve viral olaylar', 'Meme kültürü ve internet tarihi', 'Dijital okuryazarlık ve trendler'],
+  mythology_ancient: ['Yunan ve Roma mitolojisi', 'İskandinav ve Türk mitolojisi', 'Mısır ve antik efsaneler'],
+  hobbies_leisure: ['Kampçılık, doğa ve balıkçılık', 'Kahve ve çay kültürü', 'Fotoğrafçılık ve otomobil dünyası'],
+  daily_life: ['İlk yardım ve sağlık', 'Finans, hukuk ve meslekler', 'Psikoloji ve pratik yaşam bilgileri'],
+  turkey_special: ['Cumhuriyet tarihi ve liderler', 'Yeşilçam ve Türk sineması', 'Yöresel yemekler, İstanbul ve Anadolu mirası'],
   mixed: ['Genel kültür karma', 'Popüler bilgi karma', 'Dünya ve Türkiye karma'],
 };
 

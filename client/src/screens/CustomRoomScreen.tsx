@@ -848,12 +848,14 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 
 const styles = StyleSheet.create({
   customScreenRoot: {
-    paddingHorizontal: 4,
-    maxWidth: 680,
+    paddingHorizontal: 2,
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
   },
   scrollContent: {
-    paddingHorizontal: 2,
-    paddingTop: 8,
+    paddingHorizontal: 0,
+    paddingTop: 6,
     paddingBottom: 150,
     alignItems: 'center',
     width: '100%',
@@ -865,9 +867,10 @@ const styles = StyleSheet.create({
     padding: 4,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    marginBottom: 12,
+    marginBottom: 10,
     width: '100%',
-    maxWidth: 660,
+    maxWidth: 700,
+    alignSelf: 'stretch',
   },
   tabButton: {
     flex: 1,
@@ -895,12 +898,13 @@ const styles = StyleSheet.create({
   },
   roomSetupCard: {
     width: '100%',
-    maxWidth: 660,
+    maxWidth: 700,
+    alignSelf: 'stretch',
     backgroundColor: '#0F172A',
     borderRadius: 24,
     borderWidth: 1.5,
     borderColor: 'rgba(245, 158, 11, 0.35)',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 18,
     ...Platform.select({
       ios: {

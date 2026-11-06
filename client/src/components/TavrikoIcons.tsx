@@ -347,7 +347,21 @@ export type TavrikoCategoryKey =
   | 'hayvanlar'
   | 'matematik'
   | 'oyun'
-  | 'genel_kultur';
+  | 'genel_kultur'
+  | 'gaming_videogames'
+  | 'anime_manga'
+  | 'cartoons_animation'
+  | 'comics_superheroes'
+  | 'fantasy_fiction'
+  | 'social_internet'
+  | 'mythology_ancient'
+  | 'hobbies_leisure'
+  | 'daily_life'
+  | 'turkey_special'
+  | 'turkiye'
+  | 'mitoloji'
+  | 'anime'
+  | 'fantezi';
 export const CategorySquircleIcon: React.FC<{
   category: TavrikoCategoryKey | string;
   size?: number;
@@ -546,6 +560,136 @@ export const CategorySquircleIcon: React.FC<{
           </G>
           <Circle cx="42" cy="30" r="2.8" fill="#fff" />
           <Circle cx="48" cy="35" r="2.8" fill="#fff" />
+        </>
+      );
+    }
+    if (key.includes('gaming') || key.includes('video_oyunlari')) {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t2)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M14 24h36c5 0 8 5 8 12v4c0 6-6 8-10 4l-4-5H20l-4 5c-4 4-10 2-10-4v-4c0-7 3-12 8-12z" />
+            <Path d="M21 29v8M17 33h8" />
+          </G>
+          <Circle cx="41" cy="31" r="2.5" fill="#fff" />
+          <Circle cx="47" cy="36" r="2.5" fill="#fff" />
+        </>
+      );
+    }
+    if (key.includes('anime') || key.includes('manga')) {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t5)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M32 10L36 24L50 28L36 32L32 46L28 32L14 28L28 24Z" />
+            <Circle cx="46" cy="44" r="4" />
+            <Circle cx="18" cy="44" r="4" />
+          </G>
+        </>
+      );
+    }
+    if (key.includes('cartoons') || key.includes('cizgi_film') || key.includes('animasyon')) {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t7)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
+            <Circle cx="32" cy="34" r="16" />
+            <Circle cx="20" cy="18" r="9" />
+            <Circle cx="44" cy="18" r="9" />
+          </G>
+          <Circle cx="27" cy="32" r="2.5" fill="#fff" />
+          <Circle cx="37" cy="32" r="2.5" fill="#fff" />
+          <Path d="M28 42q4 4 8 0" stroke="#fff" strokeWidth="3" strokeLinecap="round" fill="none" />
+        </>
+      );
+    }
+    if (key.includes('comics') || key.includes('superhero') || key.includes('cizgi_roman')) {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t1)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M32 10l18 8v16c0 12-18 20-18 20S14 46 14 34V18z" />
+            <Path d="M26 28l6-6 6 6M32 22v18" />
+          </G>
+        </>
+      );
+    }
+    if (key.includes('fantasy') || key.includes('fantastik')) {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t2)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M20 48L44 14M44 14l-2 10M44 14l-10-2" />
+            <Path d="M14 42l8 8M18 38l4 4" />
+          </G>
+          <Circle cx="38" cy="38" r="3" fill="#fff" />
+          <Circle cx="26" cy="22" r="2" fill="#fff" />
+        </>
+      );
+    }
+    if (key.includes('social') || key.includes('sosyal')) {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t6)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
+            <Circle cx="32" cy="18" r="6" />
+            <Circle cx="18" cy="42" r="6" />
+            <Circle cx="46" cy="42" r="6" />
+            <Path d="M22 37l6-14M42 37l-6-14" />
+          </G>
+        </>
+      );
+    }
+    if (key.includes('mythology') || key.includes('mitoloji')) {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t7)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M36 10L22 32h10l-4 22 18-28H36z" />
+          </G>
+        </>
+      );
+    }
+    if (key.includes('hobbies') || key.includes('hobi')) {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t4)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
+            <Circle cx="32" cy="32" r="20" />
+            <Path d="M32 18l4 10 10 4-10 4-4 10-4-10-10-4 10-4z" />
+          </G>
+        </>
+      );
+    }
+    if (key.includes('daily_life') || key.includes('toplum') || key.includes('gunluk')) {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t0)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
+            <Circle cx="32" cy="20" r="7" />
+            <Path d="M18 48c0-8 6-13 14-13s14 5 14 13" />
+          </G>
+        </>
+      );
+    }
+    if (key.includes('turkey') || key.includes('turkiye')) {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t3)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M30 18a14 14 0 100 28 10 10 0 110-28z" />
+            <Path d="M42 32l4 1.5-2.5 3.5 1 4.5-4-2-4 2 1-4.5-2.5-3.5 4-1.5z" fill="#fff" />
+          </G>
         </>
       );
     }

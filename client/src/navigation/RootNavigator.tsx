@@ -2190,8 +2190,8 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.background,
   },
   desktopPhoneFrame: {
-    maxWidth: 480,
-    width: 480,
+    maxWidth: 520,
+    width: 520,
     height: '100%',
     maxHeight: '100%',
     borderLeftWidth: 1.5,
@@ -2204,7 +2204,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: THEME.colors.background,
     width: '100%',
-    maxWidth: 480,
+    maxWidth: 520,
     alignSelf: 'center',
   },
   desktopSidebarLeft: {

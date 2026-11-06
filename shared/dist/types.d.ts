@@ -1,7 +1,12 @@
-export type CategoryId = 'geography' | 'mathematics' | 'general_culture' | 'history' | 'science_tech' | 'space_astronomy' | 'sports' | 'cinema_tv' | 'music' | 'literature' | 'biology' | 'physics_chemistry' | 'logic_puzzles' | 'language_vocab' | 'art_culture' | 'food_gastronomy' | 'animals_wildlife' | 'nature_ecology' | 'mixed';
+export type CategoryId = 'geography' | 'mathematics' | 'general_culture' | 'history' | 'science_tech' | 'space_astronomy' | 'sports' | 'cinema_tv' | 'music' | 'literature' | 'biology' | 'physics_chemistry' | 'logic_puzzles' | 'language_vocab' | 'art_culture' | 'food_gastronomy' | 'animals_wildlife' | 'nature_ecology' | 'gaming_videogames' | 'anime_manga' | 'cartoons_animation' | 'comics_superheroes' | 'fantasy_fiction' | 'social_internet' | 'mythology_ancient' | 'hobbies_leisure' | 'daily_life' | 'turkey_special' | 'mixed';
 export type DifficultyLevel = 'easy' | 'medium' | 'hard' | 'expert';
 export type ReviewStatus = 'pending_review' | 'approved' | 'published' | 'rejected';
 export type GameMode = 'duel' | 'quick_match' | 'friends_private' | 'ranked_random' | 'free_for_all' | 'team_battle' | 'tournament' | 'daily_challenge' | 'single_practice';
+export interface SubCategoryInfo {
+    id: string;
+    name: string;
+    emoji: string;
+}
 export interface CategoryInfo {
     id: CategoryId;
     name: string;
@@ -10,6 +15,7 @@ export interface CategoryInfo {
     primaryColor: string;
     accentColor: string;
     totalQuestions: number;
+    subCategories?: SubCategoryInfo[];
 }
 export interface QuestionOption {
     id: string;

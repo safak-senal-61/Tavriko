@@ -1522,6 +1522,16 @@ function createApp() {
                     <option value="logic_puzzles">🎮 Mantık & Zeka</option>
                     <option value="general_culture">💡 Genel Kültür</option>
                     <option value="physics_chemistry">⚛️ Fizik & Kimya</option>
+                    <option value="gaming_videogames">🎮 Video Oyunları</option>
+                    <option value="anime_manga">🍥 Anime & Manga</option>
+                    <option value="cartoons_animation">🎠 Çizgi Film & Animasyon</option>
+                    <option value="comics_superheroes">🦸 Çizgi Roman & Süper Kahramanlar</option>
+                    <option value="fantasy_fiction">🐉 Fantastik & Kurgu</option>
+                    <option value="social_internet">📱 Sosyal Medya & İnternet</option>
+                    <option value="mythology_ancient">⚡ Mitoloji & Efsaneler</option>
+                    <option value="hobbies_leisure">🎣 Eğlence & Hobiler</option>
+                    <option value="daily_life">👨‍👩‍👧 Günlük Hayat & Toplum</option>
+                    <option value="turkey_special">🇹🇷 Türkiye'ye Özel</option>
                   </select>
                 </div>
                 <div>
@@ -1828,7 +1838,17 @@ function createApp() {
             { id: 'animals_wildlife', name: 'Hayvanlar', icon: '🐾', trKeys: ['hayvanlar', 'animals', 'animals_wildlife'] },
             { id: 'mathematics', name: 'Matematik', icon: '🔢', trKeys: ['matematik', 'mathematics', 'math'] },
             { id: 'logic_puzzles', name: 'Oyun & Zeka', icon: '🎮', trKeys: ['oyun', 'gaming', 'logic_puzzles', 'zeka'] },
-            { id: 'general_culture', name: 'Genel Kültür', icon: '💡', trKeys: ['genel', 'genel_kultur', 'general_culture'] }
+            { id: 'general_culture', name: 'Genel Kültür', icon: '💡', trKeys: ['genel', 'genel_kultur', 'general_culture'] },
+            { id: 'gaming_videogames', name: 'Video Oyunları', icon: '🎮', trKeys: ['gaming', 'video_oyunlari', 'oyunlar', 'video_games'] },
+            { id: 'anime_manga', name: 'Anime & Manga', icon: '🍥', trKeys: ['anime', 'manga', 'anime_manga'] },
+            { id: 'cartoons_animation', name: 'Çizgi Film', icon: '🎠', trKeys: ['cartoons', 'cizgifilm', 'cizgi_film', 'animasyon'] },
+            { id: 'comics_superheroes', name: 'Çizgi Roman', icon: '🦸', trKeys: ['comics', 'cizgiroman', 'cizgi_roman', 'super_kahramanlar'] },
+            { id: 'fantasy_fiction', name: 'Fantastik', icon: '🐉', trKeys: ['fantasy', 'fantastik', 'kurgusal_dunyalar'] },
+            { id: 'social_internet', name: 'Sosyal Medya', icon: '📱', trKeys: ['social', 'sosyal_medya', 'internet_kulturu'] },
+            { id: 'mythology_ancient', name: 'Mitoloji', icon: '⚡', trKeys: ['mythology', 'mitoloji', 'efsaneler'] },
+            { id: 'hobbies_leisure', name: 'Hobiler', icon: '🎣', trKeys: ['hobbies', 'hobiler', 'eglence_hobiler'] },
+            { id: 'daily_life', name: 'Günlük Hayat', icon: '👨‍👩‍👧', trKeys: ['daily_life', 'gunluk_hayat', 'toplum'] },
+            { id: 'turkey_special', name: 'Türkiye', icon: '🇹🇷', trKeys: ['turkey', 'turkiye', 'turkiyeye_ozel'] }
           ];
 
           const SPECIAL_ROOM_CATEGORIES = [

@@ -145,23 +145,33 @@ const TITLE_CATALOG: Array<{ title: string; minLevel: number; badgeColor: string
 ];
 
 const CATEGORY_LABELS: Record<string, { name: string; tag: string; color: string }> = {
-  science_tech: { name: 'Bilim', tag: 'BLM', color: '#4FC3F7' },
+  gaming_videogames: { name: 'Video Oyunları', tag: 'OYU', color: '#8B5CF6' },
+  anime_manga: { name: 'Anime & Manga', tag: 'ANM', color: '#EC4899' },
+  cartoons_animation: { name: 'Çizgi Film', tag: 'ÇZG', color: '#F59E0B' },
+  cinema_tv: { name: 'Sinema & Dizi', tag: 'SNM', color: '#BA68C8' },
+  comics_superheroes: { name: 'Çizgi Roman', tag: 'ÇZR', color: '#0284C7' },
+  fantasy_fiction: { name: 'Fantastik', tag: 'FNT', color: '#7C3AED' },
+  literature: { name: 'Edebiyat', tag: 'EDB', color: '#A1887F' },
+  music: { name: 'Müzik', tag: 'MZK', color: '#F06292' },
+  social_internet: { name: 'Sosyal Medya', tag: 'SSY', color: '#06B6D4' },
+  animals_wildlife: { name: 'Hayvanlar', tag: 'HYV', color: '#DCE775' },
+  mythology_ancient: { name: 'Mitoloji', tag: 'MTL', color: '#F59E0B' },
+  hobbies_leisure: { name: 'Hobiler', tag: 'HOB', color: '#10B981' },
   history: { name: 'Tarih', tag: 'TRH', color: '#FFB74D' },
   geography: { name: 'Coğrafya', tag: 'CĞR', color: '#81C784' },
+  art_culture: { name: 'Sanat & Kültür', tag: 'SNT', color: '#4DB6AC' },
   sports: { name: 'Spor', tag: 'SPR', color: '#FF8A65' },
-  cinema_tv: { name: 'Sinema', tag: 'SNM', color: '#BA68C8' },
-  music: { name: 'Müzik', tag: 'MZK', color: '#F06292' },
-  art_culture: { name: 'Sanat', tag: 'SNT', color: '#4DB6AC' },
-  physics_chemistry: { name: 'Teknoloji', tag: 'TKN', color: '#64B5F6' },
-  nature_ecology: { name: 'Doğa', tag: 'DOĞ', color: '#AED581' },
-  biology: { name: 'Biyoloji', tag: 'BYL', color: '#4DD0E1' },
-  food_gastronomy: { name: 'Yemek', tag: 'YMK', color: '#FFD54F' },
-  literature: { name: 'Edebiyat', tag: 'EDB', color: '#A1887F' },
-  space_astronomy: { name: 'Uzay', tag: 'UZY', color: '#9575CD' },
-  animals_wildlife: { name: 'Hayvanlar', tag: 'HYV', color: '#DCE775' },
-  mathematics: { name: 'Matematik', tag: 'MTM', color: '#4FC3F7' },
+  science_tech: { name: 'Bilim & Teknoloji', tag: 'BLM', color: '#4FC3F7' },
   logic_puzzles: { name: 'Oyun & Zeka', tag: 'ZKA', color: '#FF8A80' },
+  mathematics: { name: 'Matematik', tag: 'MTM', color: '#4FC3F7' },
+  food_gastronomy: { name: 'Yemek & Mutfak', tag: 'YMK', color: '#FFD54F' },
+  daily_life: { name: 'Günlük Hayat', tag: 'GÜN', color: '#6366F1' },
+  turkey_special: { name: 'Türkiye', tag: 'TRK', color: '#DC2626' },
+  space_astronomy: { name: 'Uzay', tag: 'UZY', color: '#9575CD' },
+  biology: { name: 'Biyoloji', tag: 'BYL', color: '#4DD0E1' },
+  physics_chemistry: { name: 'Fizik & Kimya', tag: 'FZK', color: '#64B5F6' },
   language_vocab: { name: 'Dil & Kelime', tag: 'DİL', color: '#80CBC4' },
+  nature_ecology: { name: 'Doğa & Ekoloji', tag: 'DOĞ', color: '#AED581' },
   general_culture: { name: 'Genel Kültür', tag: 'GNL', color: '#FFD180' },
 };
 
@@ -612,7 +622,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   );
 
   return (
-    <TavrikoScreen>
+    <TavrikoScreen style={styles.profileScreenRoot}>
       <TavrikoTopBar
         leftType="back"
         onLeftPress={onBack}
@@ -974,96 +984,33 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         {/* TAB 2: Category Mastery */}
         {activeTab === 'mastery' && (
           <View style={styles.detailsCard}>
-            {/* Top Spotlight Banner */}
-            <View style={styles.masterySpotlightCard}>
-              <View style={styles.masterySpotlightIconCircle}>
-                <Text style={{ fontSize: 24 }}>🎖️</Text>
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.masterySpotlightTitle}>BRANŞ VE USTALIK SALONU</Text>
-                <Text style={styles.masterySpotlightSub} numberOfLines={2}>
-                  {bestCategory && bestCategory.correctCount > 0
-                    ? `En İleri Branş: ${bestCategory.name} · Sv. ${bestCategory.level} (${bestCategory.correctCount} Doğru)`
-                    : 'Doğru cevaplar vererek branş seviyeni yükselt ve unvanlar kazan!'}
-                </Text>
-              </View>
-              <View style={styles.masteryTotalPill}>
-                <Text style={styles.masteryTotalPillNum}>{correctAnswers}</Text>
-                <Text style={styles.masteryTotalPillLbl}>Puan</Text>
-              </View>
-            </View>
-
-            {/* Aktif Ustalaşılan Branşlar */}
-            <View style={styles.masterySubHeaderRow}>
-              <Text style={styles.masterySubHeaderTitle}>🔥 Aktif Branşlar</Text>
-              <Text style={styles.masterySubHeaderCount}>
-                {masteryList.filter((m) => m.correctCount > 0).length} Branş
-              </Text>
-            </View>
-
-            {masteryList
-              .filter((m) => m.correctCount > 0)
-              .map((m) => {
-                const currentInLevel = m.correctCount % 5;
-                const rem = 5 - currentInLevel;
-                const progressPct = Math.round((currentInLevel / 5) * 100);
-                const rankTitle =
-                  m.level >= 4
-                    ? 'Büyük Üstat'
-                    : m.level === 3
-                    ? 'Kıdemli Usta'
-                    : m.level === 2
-                    ? 'Gelişen Usta'
-                    : 'Acemi Usta';
-                return (
-                  <View key={m.id} style={styles.activeMasteryCard}>
-                    <View style={[styles.masteryTagBadge, { backgroundColor: m.color }]}>
-                      <Text style={styles.masteryTagText}>{m.tag}</Text>
-                    </View>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <View style={styles.masteryHeader}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <Text style={styles.masteryName}>{m.name}</Text>
-                          <View style={styles.masteryLevelBadge}>
-                            <Text style={styles.masteryLevelBadgeText}>SV. {m.level}</Text>
-                          </View>
-                          <Text style={styles.masteryRankTitle}>· {rankTitle}</Text>
-                        </View>
-                        <Text style={styles.masteryMeta}>{m.correctCount} doğru</Text>
-                      </View>
-                      <View style={{ marginVertical: 6 }}>
-                        <TavrikoProgressBar progress={progressPct === 0 ? 100 : progressPct} height={7} />
-                      </View>
-                      <Text style={styles.masteryNextHint}>
-                        {rem === 5 ? '✓ Seviye Tamamlandı!' : `Sonraki seviyeye ${rem} doğru kaldı`}
-                      </Text>
-                    </View>
+            <Text style={styles.sectionTitle}>Kategori Ustalığı</Text>
+            <Text style={styles.cardSub}>
+              Her kategoride verdiğin doğru cevaplar veritabanından canlı okunur.
+            </Text>
+            {masteryList.map((m) => (
+              <View key={m.id} style={styles.masteryRow}>
+                <View style={[styles.masteryTagBadge, { backgroundColor: m.color }]}>
+                  <Text style={styles.masteryTagText}>{m.tag}</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={styles.masteryHeader}>
+                    <Text style={styles.masteryName} numberOfLines={1}>{m.name}</Text>
+                    <Text style={styles.masteryMeta}>
+                      Sv. {m.level} · {m.correctCount} doğru
+                    </Text>
                   </View>
-                );
-              })}
-
-            {/* Diğer Başlangıç Branşları (Kompakt 2 sütun grid) */}
-            <View style={[styles.masterySubHeaderRow, { marginTop: 16 }]}>
-              <Text style={styles.masterySubHeaderTitle}>📚 Başlangıç Seviyesindeki Branşlar</Text>
-              <Text style={styles.masterySubHeaderCount}>
-                {masteryList.filter((m) => m.correctCount === 0).length} Branş
-              </Text>
-            </View>
-            <View style={styles.dormantMasteryGrid}>
-              {masteryList
-                .filter((m) => m.correctCount === 0)
-                .map((m) => (
-                  <View key={m.id} style={styles.dormantMasteryCard}>
-                    <View style={[styles.dormantMasteryBadge, { backgroundColor: m.color }]}>
-                      <Text style={styles.dormantMasteryBadgeText}>{m.tag}</Text>
-                    </View>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={styles.dormantMasteryName} numberOfLines={1}>{m.name}</Text>
-                      <Text style={styles.dormantMasterySub}>Sv. 0 · 0 Doğru</Text>
-                    </View>
-                  </View>
-                ))}
-            </View>
+                  <TavrikoProgressBar
+                    progress={
+                      m.correctCount > 0
+                        ? Math.min(100, Math.round((m.correctCount / maxCorrect) * 100))
+                        : 0
+                    }
+                    height={6}
+                  />
+                </View>
+              </View>
+            ))}
           </View>
         )}
 
@@ -1300,7 +1247,18 @@ const card = {
 } as const;
 
 const styles = StyleSheet.create({
-  scrollContent: { paddingBottom: 150, alignItems: 'center', paddingHorizontal: 16 },
+  profileScreenRoot: {
+    paddingHorizontal: 4,
+    width: '100%',
+    maxWidth: 620,
+    alignSelf: 'center',
+  },
+  scrollContent: {
+    paddingBottom: 150,
+    alignItems: 'center',
+    paddingHorizontal: 2,
+    width: '100%',
+  },
   heroCard: {
     ...card,
     padding: 14,

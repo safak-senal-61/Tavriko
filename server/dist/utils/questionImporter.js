@@ -22,6 +22,16 @@ exports.CATEGORY_NAMES_TR = {
     logic_puzzles: { name: 'Oyun & Zeka', icon: '🎮' },
     language_vocab: { name: 'Dil & Kelime', icon: '💬' },
     general_culture: { name: 'Genel Kültür', icon: '💡' },
+    gaming_videogames: { name: 'Video Oyunları', icon: '🎮' },
+    anime_manga: { name: 'Anime & Manga', icon: '🍥' },
+    cartoons_animation: { name: 'Çizgi Film', icon: '🎠' },
+    comics_superheroes: { name: 'Çizgi Roman', icon: '🦸' },
+    fantasy_fiction: { name: 'Fantastik', icon: '🐉' },
+    social_internet: { name: 'Sosyal Medya', icon: '📱' },
+    mythology_ancient: { name: 'Mitoloji', icon: '⚡' },
+    hobbies_leisure: { name: 'Hobiler', icon: '🎣' },
+    daily_life: { name: 'Günlük Hayat', icon: '👨‍👩‍👧' },
+    turkey_special: { name: 'Türkiye', icon: '🇹🇷' },
     mixed: { name: 'Karışık Mod', icon: '🎲' },
 };
 exports.DIFFICULTY_NAMES_TR = {
@@ -36,6 +46,47 @@ exports.POOL_NAMES_TR = {
     custom_room: '⚔️ Özel Oda',
 };
 const CATEGORY_MAP_TR = {
+    // Video Oyunları
+    gaming: 'gaming_videogames',
+    gaming_videogames: 'gaming_videogames',
+    video_oyunlari: 'gaming_videogames',
+    oyunlar: 'gaming_videogames',
+    // Anime & Manga
+    anime: 'anime_manga',
+    manga: 'anime_manga',
+    anime_manga: 'anime_manga',
+    // Çizgi Film
+    cartoons: 'cartoons_animation',
+    cartoons_animation: 'cartoons_animation',
+    cizgi_film: 'cartoons_animation',
+    cizgifilm: 'cartoons_animation',
+    // Çizgi Roman
+    comics: 'comics_superheroes',
+    comics_superheroes: 'comics_superheroes',
+    cizgi_roman: 'comics_superheroes',
+    // Fantastik
+    fantasy: 'fantasy_fiction',
+    fantasy_fiction: 'fantasy_fiction',
+    fantastik: 'fantasy_fiction',
+    // Sosyal Medya
+    social: 'social_internet',
+    social_internet: 'social_internet',
+    sosyal_medya: 'social_internet',
+    // Mitoloji
+    mythology: 'mythology_ancient',
+    mythology_ancient: 'mythology_ancient',
+    mitoloji: 'mythology_ancient',
+    // Hobiler
+    hobbies: 'hobbies_leisure',
+    hobbies_leisure: 'hobbies_leisure',
+    hobiler: 'hobbies_leisure',
+    // Günlük Hayat
+    daily_life: 'daily_life',
+    gunluk_hayat: 'daily_life',
+    // Türkiye
+    turkey: 'turkey_special',
+    turkey_special: 'turkey_special',
+    turkiye: 'turkey_special',
     // Coğrafya
     cografya: 'geography',
     coğrafya: 'geography',
@@ -109,7 +160,6 @@ const CATEGORY_MAP_TR = {
     oyun: 'logic_puzzles',
     'oyun & zeka': 'logic_puzzles',
     oyun_zeka: 'logic_puzzles',
-    gaming: 'logic_puzzles',
     games: 'logic_puzzles',
     // Dil & Kelime
     dil: 'language_vocab',

@@ -17,6 +17,16 @@ export type CategoryId =
   | 'food_gastronomy'
   | 'animals_wildlife'
   | 'nature_ecology'
+  | 'gaming_videogames'
+  | 'anime_manga'
+  | 'cartoons_animation'
+  | 'comics_superheroes'
+  | 'fantasy_fiction'
+  | 'social_internet'
+  | 'mythology_ancient'
+  | 'hobbies_leisure'
+  | 'daily_life'
+  | 'turkey_special'
   | 'mixed';
 
 export type DifficultyLevel = 'easy' | 'medium' | 'hard' | 'expert';
@@ -34,6 +44,12 @@ export type GameMode =
   | 'daily_challenge'
   | 'single_practice';
 
+export interface SubCategoryInfo {
+  id: string;
+  name: string;
+  emoji: string;
+}
+
 export interface CategoryInfo {
   id: CategoryId;
   name: string;
@@ -42,6 +58,7 @@ export interface CategoryInfo {
   primaryColor: string;
   accentColor: string;
   totalQuestions: number;
+  subCategories?: SubCategoryInfo[];
 }
 
 export interface QuestionOption {
