@@ -134,6 +134,7 @@ export interface GameRoom {
   mixedCategories?: boolean;
   privacy?: 'public' | 'private' | 'password';
   password?: string;
+  hasPassword?: boolean;
   players: Record<string, Player>;
   currentQuestion?: Question;
   roundStartedAt?: number;
@@ -175,6 +176,7 @@ export interface CustomRoomSettings {
   penaltyForWrong?: boolean;
   privacy?: 'public' | 'private';
   password?: string;
+  hasPassword?: boolean;
 }
 
 export interface AnswerSubmission {

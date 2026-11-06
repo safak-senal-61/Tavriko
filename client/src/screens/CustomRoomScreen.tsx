@@ -9,6 +9,8 @@ import {
   Switch,
   Platform,
   ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView,
 } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
@@ -35,7 +37,7 @@ import {
 interface CustomRoomScreenProps {
   onBack: () => void;
   onCreateRoom: (settings: CustomRoomSettings) => void;
-  onJoinRoom: (roomCode: string) => void;
+  onJoinRoom: (roomCode: string, password?: string) => void;
   avatarSeed?: string;
   coins?: number;
   gems?: number;
@@ -64,6 +66,7 @@ interface PublicRoomItem {
   timeSec: number;
   players: number;
   maxPlayers: number;
+  hasPassword?: boolean;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -118,6 +121,14 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   const [difficulty, setDifficulty] = useState<DifficultyLevel | 'mixed'>('mixed');
   const [penaltyForWrong, setPenaltyForWrong] = useState<boolean>(true);
   const [privacy, setPrivacy] = useState<'public' | 'private'>('public');
+  const [hasRoomPassword, setHasRoomPassword] = useState<boolean>(false);
+  const [roomPassword, setRoomPassword] = useState<string>('');
+  const [joinPassword, setJoinPassword] = useState<string>('');
+
+  const [passwordModalVisible, setPasswordModalVisible] = useState<boolean>(false);
+  const [targetRoomCode, setTargetRoomCode] = useState<string>('');
+  const [enteredPassword, setEnteredPassword] = useState<string>('');
+  const [passwordModalError, setPasswordModalError] = useState<string | null>(null);
 
   // Kategori Seçimi State
   const [selectedCategory, setSelectedCategory] = useState<CategoryData | 'mixed'>('mixed');
@@ -140,6 +151,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
       r?.categoryName ||
       'Genel Kültür';
     const hostName = r?.hostName || r?.host || 'Oyuncu';
+    const hasPassword = Boolean(r?.hasPassword || r?.password);
     return {
       id: code,
       code,
@@ -150,6 +162,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
       timeSec: Math.max(5, Number(r?.questionTimeSec ?? r?.timeSec ?? 20)),
       players,
       maxPlayers,
+      hasPassword,
     };
   };
 
@@ -232,12 +245,18 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
       return;
     }
     setJoinError(null);
-    onJoinRoom(clean);
+    onJoinRoom(clean, joinPassword.trim() || undefined);
   };
 
   const handleCreateRoomPress = () => {
     sound.playSound('tap');
     sound.triggerHaptic('medium');
+
+    if (hasRoomPassword && !roomPassword.trim()) {
+      sound.playSound('wrong');
+      setJoinError('Lütfen oda şifresi belirleyin veya şifreyi kapatın.');
+      return;
+    }
 
     const isMixed = selectedCategory === 'mixed';
     const categories: CategoryId[] = isMixed
@@ -253,6 +272,8 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
       categories,
       mixedCategories: isMixed,
       privacy,
+      password: hasRoomPassword ? roomPassword.trim() : undefined,
+      hasPassword: hasRoomPassword,
     };
 
     onCreateRoom(settings);
@@ -524,6 +545,41 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               />
             </View>
 
+            {/* Oda Şifresi */}
+            <View style={styles.switchRow}>
+              <View>
+                <Text style={styles.switchLabel}>Oda Şifresi</Text>
+                <Text style={styles.switchSub}>
+                  {hasRoomPassword ? 'Şifreli Giriş (Sadece Şifreyi Bilenler)' : 'Şifresiz (Herkes Katılabilir)'}
+                </Text>
+              </View>
+              <Switch
+                value={hasRoomPassword}
+                onValueChange={(val) => {
+                  sound.playSound('tap');
+                  setHasRoomPassword(val);
+                  if (!val) setRoomPassword('');
+                }}
+                trackColor={{ false: 'rgba(255,255,255,0.2)', true: '#FFC43D' }}
+                thumbColor={hasRoomPassword ? '#12052C' : '#D9CDF5'}
+              />
+            </View>
+
+            {hasRoomPassword && (
+              <View style={styles.passwordSettingBox}>
+                <Text style={styles.passwordSettingLabel}>Oda Şifresi / PIN (4-8 Karakter):</Text>
+                <TextInput
+                  style={styles.passwordSettingInput}
+                  value={roomPassword}
+                  onChangeText={setRoomPassword}
+                  placeholder="Örn: 1234"
+                  placeholderTextColor="rgba(255,255,255,0.4)"
+                  maxLength={8}
+                  autoCapitalize="none"
+                />
+              </View>
+            )}
+
             {/* 6. TAVRİKO 3D ODA OLUŞTUR BUTONU */}
             <Button3D
               title="ODAYI OLUŞTUR"
@@ -605,6 +661,19 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               </TouchableOpacity>
             </View>
 
+            <View style={{ marginTop: 14 }}>
+              <Text style={styles.passwordSettingLabel}>Oda Şifresi (Oda şifreli ise):</Text>
+              <TextInput
+                style={styles.passwordSettingInput}
+                value={joinPassword}
+                onChangeText={setJoinPassword}
+                placeholder="Şifre (isteğe bağlı)"
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                maxLength={8}
+                autoCapitalize="none"
+              />
+            </View>
+
             {/* HERKESE AÇIK ODALAR (Canlı Veritabanı & WebSocket Senkronizasyonu) */}
             <View style={styles.publicRoomsHeaderRow}>
               <View style={styles.publicRoomsDivider} />
@@ -651,9 +720,16 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                       <CategorySquircleIcon category={room.categoryKey} size={42} />
                     </View>
                     <View style={styles.publicRoomInfo}>
-                      <Text style={styles.publicRoomTitle} numberOfLines={1}>
-                        {room.title}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.publicRoomTitle} numberOfLines={1}>
+                          {room.title}
+                        </Text>
+                        {room.hasPassword && (
+                          <Text style={{ fontSize: 13 }} accessibilityLabel="Şifreli Oda">
+                            🔒
+                          </Text>
+                        )}
+                      </View>
                       <Text style={styles.publicRoomSub} numberOfLines={1}>
                         {room.categoryName} · {room.totalRounds} soru · {room.timeSec}sn
                       </Text>
@@ -669,7 +745,14 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                       onPress={() => {
                         sound.playSound('tap');
                         sound.triggerHaptic('medium');
-                        onJoinRoom(room.code);
+                        if (room.hasPassword) {
+                          setTargetRoomCode(room.code);
+                          setEnteredPassword('');
+                          setPasswordModalError(null);
+                          setPasswordModalVisible(true);
+                        } else {
+                          onJoinRoom(room.code);
+                        }
                       }}
                     >
                       <Text style={styles.publicRoomJoinBtnText}>KATIL</Text>
@@ -681,6 +764,73 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
           </View>
         )}
       </ScrollView>
+
+      {/* ŞİFRE İSTEME MODALI */}
+      <Modal
+        visible={passwordModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPasswordModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.passwordModalOverlay}
+        >
+          <View style={styles.passwordModalCard}>
+            <Text style={styles.passwordModalTitle}>🔒 Şifreli Oda</Text>
+            <Text style={styles.passwordModalSub}>
+              {targetRoomCode} kodlu odaya katılmak için lütfen şifreyi girin:
+            </Text>
+
+            <TextInput
+              style={[styles.passwordSettingInput, { marginTop: 14 }]}
+              value={enteredPassword}
+              onChangeText={(t) => {
+                setEnteredPassword(t);
+                if (passwordModalError) setPasswordModalError(null);
+              }}
+              placeholder="Oda Şifresi"
+              placeholderTextColor="rgba(255,255,255,0.4)"
+              autoFocus
+              maxLength={8}
+              autoCapitalize="none"
+            />
+
+            {passwordModalError && (
+              <Text style={styles.errorText}>{passwordModalError}</Text>
+            )}
+
+            <View style={styles.passwordModalBtnRow}>
+              <TouchableOpacity
+                style={styles.passwordModalCancelBtn}
+                onPress={() => {
+                  sound.playSound('tap');
+                  setPasswordModalVisible(false);
+                }}
+              >
+                <Text style={styles.passwordModalCancelText}>Vazgeç</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.passwordModalConfirmBtn}
+                onPress={() => {
+                  if (!enteredPassword.trim()) {
+                    sound.playSound('wrong');
+                    setPasswordModalError('Lütfen şifreyi giriniz.');
+                    return;
+                  }
+                  sound.playSound('tap');
+                  sound.triggerHaptic('medium');
+                  setPasswordModalVisible(false);
+                  onJoinRoom(targetRoomCode, enteredPassword.trim());
+                }}
+              >
+                <Text style={styles.passwordModalConfirmText}>Giriş Yap</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* KATEGORİ SEÇİM MODALI */}
       <CategorySelectModal
@@ -699,7 +849,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 40,
+    paddingBottom: 150,
     alignItems: 'center',
   },
   tabToggleRow: {
@@ -1186,5 +1336,96 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.display,
     fontWeight: '900',
     letterSpacing: 0.5,
+  },
+  passwordSettingBox: {
+    marginTop: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.3)',
+  },
+  passwordSettingLabel: {
+    color: '#FFC43D',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
+    marginBottom: 6,
+  },
+  passwordSettingInput: {
+    backgroundColor: 'rgba(10, 4, 24, 0.8)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 196, 61, 0.5)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  passwordModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(5, 2, 14, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  passwordModalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#1E1038',
+    borderRadius: 24,
+    padding: 22,
+    borderWidth: 1.5,
+    borderColor: '#FFC43D',
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  passwordModalTitle: {
+    color: '#FFC43D',
+    fontSize: 18,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  passwordModalSub: {
+    color: '#D9CDF5',
+    fontSize: 13,
+    fontFamily: THEME.fonts.medium,
+    textAlign: 'center',
+    marginTop: 6,
+  },
+  passwordModalBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 18,
+  },
+  passwordModalCancelBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  passwordModalCancelText: {
+    color: '#D9CDF5',
+    fontSize: 14,
+    fontFamily: THEME.fonts.bold,
+  },
+  passwordModalConfirmBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#FFC43D',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  passwordModalConfirmText: {
+    color: '#12052C',
+    fontSize: 14,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '900',
   },
 });

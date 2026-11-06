@@ -1288,8 +1288,8 @@ const styles = StyleSheet.create({
   screenRoot: {
     flex: 1,
     backgroundColor: '#1B0C38',
-    paddingHorizontal: 18,
-    paddingTop: 26,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 44 : 26,
     overflow: 'hidden',
     width: '100%',
     maxWidth: 480,

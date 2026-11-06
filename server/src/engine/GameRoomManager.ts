@@ -41,6 +41,7 @@ export interface JoinRoomOptions {
   avatarUrl?: string;
   team?: 'red' | 'blue';
   isBot?: boolean;
+  password?: string;
 }
 
 export type QuestionProvider = (
@@ -155,6 +156,7 @@ export class GameRoomManager {
       mixedCategories: options.mixedCategories,
       privacy: options.privacy,
       password: options.password,
+      hasPassword: Boolean(options.password),
       players: { [options.hostId]: host },
       scores: { [options.hostId]: 0 },
     };
@@ -173,6 +175,10 @@ export class GameRoomManager {
 
     if (room.status !== 'lobby') {
       return { success: false, error: 'Oyun devam ediyor veya oda kilitli' };
+    }
+
+    if (room.password && room.password !== options.password) {
+      return { success: false, error: 'Oda şifresi yanlış veya eksik' };
     }
 
     const currentCount = Object.keys(room.players).length;

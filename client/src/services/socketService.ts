@@ -443,6 +443,7 @@ export class SocketService {
       if (settings.penaltyForWrong !== undefined) queryParts.push(`penaltyForWrong=${settings.penaltyForWrong}`);
       if (settings.difficulty) queryParts.push(`difficulty=${settings.difficulty}`);
       if (settings.privacy) queryParts.push(`privacy=${settings.privacy}`);
+      if (settings.password) queryParts.push(`password=${encodeURIComponent(settings.password)}`);
       if (settings.categories && settings.categories.length > 0) queryParts.push(`category=${settings.categories[0]}`);
     }
 
@@ -474,7 +475,7 @@ export class SocketService {
     });
   }
 
-  public joinRoom(roomCode: string, playerId: string, displayName: string, avatarUrl?: string): void {
+  public joinRoom(roomCode: string, playerId: string, displayName: string, avatarUrl?: string, password?: string): void {
     const cleanCode = roomCode.trim().toUpperCase();
     this.lastSessionContext = {
       roomCode: cleanCode,
@@ -491,8 +492,9 @@ export class SocketService {
       currentRoomCode: cleanCode,
     });
 
+    const passQuery = password ? `&password=${encodeURIComponent(password)}` : '';
     const targetUrl = getRealtimeWsUrl(
-      `/ws/room/${cleanCode}?roomCode=${cleanCode}&${this.buildPlayerQuery(playerId, displayName, avatarUrl)}`
+      `/ws/room/${cleanCode}?roomCode=${cleanCode}&${this.buildPlayerQuery(playerId, displayName, avatarUrl)}${passQuery}`
     );
 
     // Switch connection if not connected to this specific room DO
@@ -504,6 +506,7 @@ export class SocketService {
         playerId,
         displayName,
         avatarUrl,
+        password,
       });
     }
   }

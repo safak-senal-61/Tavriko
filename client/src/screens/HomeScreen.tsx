@@ -186,7 +186,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Text style={styles.onlineSub}>
               {user.rankPoints ?? 1000} Lig Puanı · {user.stats?.totalMatches ?? 0} Düello Maçı
             </Text>
-            <Text style={styles.heroMatchTitle}>HIZLI EŞLEŞME</Text>
+            <Text
+              style={styles.heroMatchTitle}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              HIZLI EŞLEŞME
+            </Text>
             <Button3D
               title="OYNA"
               variant="mint"
@@ -201,7 +208,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               ]}
               pointerEvents="none"
             >
-              <SpeedBoltIcon size={110} />
+              <SpeedBoltIcon size={96} />
             </Animated.View>
           </View>
           {/* 4 Mode Tiles Row */}
@@ -422,20 +429,22 @@ const styles = StyleSheet.create({
   },
   heroMatchTitle: {
     fontFamily: THEME.fonts.display,
-    fontSize: 32,
+    fontSize: 27,
     color: '#FFFFFF',
     marginTop: 4,
     marginBottom: 14,
+    maxWidth: '68%',
+    letterSpacing: 0.5,
   },
   heroPlayButton: {
     alignSelf: 'flex-start',
     height: 54,
-    paddingHorizontal: 44,
+    paddingHorizontal: 40,
   },
   heroBoltWrap: {
     position: 'absolute',
-    right: 6,
-    top: 10,
+    right: 4,
+    top: 8,
   },
   modesRow: {
     flexDirection: 'row',
@@ -444,7 +453,9 @@ const styles = StyleSheet.create({
   },
   modeTile: {
     flex: 1,
+    minWidth: 0,
     height: 96,
+    paddingHorizontal: 4,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.09)',
     borderWidth: 1,

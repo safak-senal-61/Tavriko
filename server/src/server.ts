@@ -19,7 +19,7 @@ import { supabaseService } from './db/supabaseClient';
 import { cacheService } from './cache/redisClient';
 import { logger } from './utils/logger';
 import { logRouter, renderDashboardHtml } from './routes/logRoutes';
-import { FinalMatchSummary } from '@trivia/shared';
+import { FinalMatchSummary, canonicalCategoryId } from '@trivia/shared';
 import authRoutes from './routes/authRoutes';
 import { metricsMiddleware, metricsHandler, setSocketServer } from './utils/metrics';
 import { initErrorMonitor, captureError } from './utils/errorMonitor';
@@ -2725,10 +2725,12 @@ export function createApp() {
     }
 
     const { categoryId, difficulty, count = 5 } = req.body || {};
+    const safeCount = Math.min(50, Math.max(1, Number(count) || 5));
+    const resolvedCat = canonicalCategoryId(categoryId || 'general_culture');
     const questions = db.getQuestions(
-      categoryId || 'general_culture',
+      resolvedCat,
       difficulty || 'medium',
-      Math.min(20, Math.max(1, Number(count) || 5))
+      safeCount
     );
 
     return res.json({ success: true, questions });

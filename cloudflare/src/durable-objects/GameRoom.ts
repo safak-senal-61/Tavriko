@@ -99,8 +99,10 @@ export class GameRoomDO extends DurableObject<Env> {
         maxPlayers: 2,
         currentRound: 0,
         totalRounds: 5,
-        questionTimeSec: 15,
-        penaltyForWrong: false,
+        questionTimeSec: data.questionTimeSec || 15,
+        penaltyForWrong: Boolean(data.penaltyForWrong),
+        password: data.password || undefined,
+        hasPassword: Boolean(data.password),
         players: {},
         scores: {},
       };
@@ -135,6 +137,18 @@ export class GameRoomDO extends DurableObject<Env> {
         5
       );
       this.questions = questions || [];
+      if (this.questions.length < (this.room.totalRounds || 5) && this.questions.length > 0) {
+        let cIdx = 1;
+        while (this.questions.length < (this.room.totalRounds || 5)) {
+          for (const baseQ of [...this.questions]) {
+            if (this.questions.length >= (this.room.totalRounds || 5)) break;
+            this.questions.push({
+              ...baseQ,
+              id: `${baseQ.id}_cycle_${cIdx++}`,
+            });
+          }
+        }
+      }
       this.room.totalRounds = this.questions.length;
       await this.persist();
       await this.ctx.storage.put('questions', this.questions);
@@ -206,6 +220,8 @@ export class GameRoomDO extends DurableObject<Env> {
         totalRounds: qpTotalRounds > 0 ? qpTotalRounds : 5,
         questionTimeSec: qpQuestionTime > 0 ? qpQuestionTime : 15,
         penaltyForWrong: qpPenalty,
+        password: url.searchParams.get('password') || undefined,
+        hasPassword: Boolean(url.searchParams.get('password')),
         players: {},
         scores: {},
       };
@@ -220,6 +236,17 @@ export class GameRoomDO extends DurableObject<Env> {
     }
 
     const isReconnecting = !!this.room.players[authUser.id];
+
+    // Password enforcement for joining players
+    if (this.room.password && !isHost && !isReconnecting) {
+      const providedPass = url.searchParams.get('password') || '';
+      if (!providedPass || providedPass !== this.room.password) {
+        return new Response(
+          JSON.stringify({ error: 'Oda şifrelidir. Geçerli bir şifre girin.', code: 'PASSWORD_REQUIRED' }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
     if (!isReconnecting) {
       // Check room full
@@ -602,7 +629,19 @@ export class GameRoomDO extends DurableObject<Env> {
     }
 
     this.questions = questions;
-    this.room.totalRounds = questions.length;
+    if (this.questions.length < (this.room.totalRounds || 5) && this.questions.length > 0) {
+      let cIdx = 1;
+      while (this.questions.length < (this.room.totalRounds || 5)) {
+        for (const baseQ of [...questions]) {
+          if (this.questions.length >= (this.room.totalRounds || 5)) break;
+          this.questions.push({
+            ...baseQ,
+            id: `${baseQ.id}_cycle_${cIdx++}`,
+          });
+        }
+      }
+    }
+    this.room.totalRounds = this.questions.length;
     this.room.currentRound = 0;
     this.room.status = 'countdown';
 
@@ -804,6 +843,18 @@ export class GameRoomDO extends DurableObject<Env> {
         this.room.totalRounds || 5
       );
       this.questions = questions || [];
+      if (this.questions.length < (this.room.totalRounds || 5) && this.questions.length > 0) {
+        let cIdx = 1;
+        while (this.questions.length < (this.room.totalRounds || 5)) {
+          for (const baseQ of [...this.questions]) {
+            if (this.questions.length >= (this.room.totalRounds || 5)) break;
+            this.questions.push({
+              ...baseQ,
+              id: `${baseQ.id}_cycle_${cIdx++}`,
+            });
+          }
+        }
+      }
       this.room.totalRounds = this.questions.length;
       await this.ctx.storage.put('questions', this.questions);
     }
@@ -931,9 +982,11 @@ export class GameRoomDO extends DurableObject<Env> {
     if (!this.room) throw new Error('Room not found');
     const clone: GameRoom = {
       ...this.room,
+      hasPassword: Boolean(this.room.password),
       players: { ...this.room.players },
       scores: { ...this.room.scores },
     };
+    delete clone.password;
     if (clone.currentQuestion && clone.status !== 'round_result' && clone.status !== 'game_over') {
       // Omit correctOptionId and explanation
       const { correctOptionId, explanation, ...safeQ } = clone.currentQuestion;
@@ -1025,6 +1078,7 @@ export class GameRoomDO extends DurableObject<Env> {
           questionTimeSec: this.room.questionTimeSec || 15,
           status: this.room.status,
           privacy: this.isPrivateRoom ? 'private' : 'public',
+          hasPassword: Boolean(this.room.password),
         };
 
     try {

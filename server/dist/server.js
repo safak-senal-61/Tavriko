@@ -25,6 +25,7 @@ const supabaseClient_1 = require("./db/supabaseClient");
 const redisClient_1 = require("./cache/redisClient");
 const logger_1 = require("./utils/logger");
 const logRoutes_1 = require("./routes/logRoutes");
+const shared_1 = require("@trivia/shared");
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const metrics_1 = require("./utils/metrics");
 const errorMonitor_1 = require("./utils/errorMonitor");
@@ -2679,7 +2680,9 @@ function createApp() {
             return res.status(403).json({ error: 'Yetkisiz erişim' });
         }
         const { categoryId, difficulty, count = 5 } = req.body || {};
-        const questions = prismaClient_1.db.getQuestions(categoryId || 'general_culture', difficulty || 'medium', Math.min(20, Math.max(1, Number(count) || 5)));
+        const safeCount = Math.min(50, Math.max(1, Number(count) || 5));
+        const resolvedCat = (0, shared_1.canonicalCategoryId)(categoryId || 'general_culture');
+        const questions = prismaClient_1.db.getQuestions(resolvedCat, difficulty || 'medium', safeCount);
         return res.json({ success: true, questions });
     });
     app.post('/api/internal/match-results', async (req, res) => {

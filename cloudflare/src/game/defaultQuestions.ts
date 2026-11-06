@@ -1,4 +1,4 @@
-import { Question, CategoryId, DifficultyLevel } from '@trivia/shared';
+import { Question, CategoryId, DifficultyLevel, canonicalCategoryId } from '@trivia/shared';
 
 export const DEFAULT_QUESTIONS: Question[] = [
   {
@@ -159,10 +159,11 @@ export function getFallbackQuestions(
   count: number = 5
 ): Question[] {
   let pool = DEFAULT_QUESTIONS;
+  const canonCat = canonicalCategoryId(categoryId);
 
-  if (categoryId && categoryId !== 'mixed') {
-    const categoryMatches = pool.filter((q) => q.categoryId === categoryId);
-    if (categoryMatches.length >= 2) {
+  if (canonCat && canonCat !== 'mixed') {
+    const categoryMatches = pool.filter((q) => canonicalCategoryId(q.categoryId) === canonCat);
+    if (categoryMatches.length > 0) {
       pool = categoryMatches;
     }
   }

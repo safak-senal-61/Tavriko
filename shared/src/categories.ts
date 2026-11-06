@@ -1,4 +1,4 @@
-import { CategoryInfo } from './types';
+import { CategoryId, CategoryInfo } from './types';
 
 export const ALL_CATEGORIES: CategoryInfo[] = [
   {
@@ -173,3 +173,57 @@ export const ALL_CATEGORIES: CategoryInfo[] = [
     totalQuestions: 160,
   },
 ];
+
+const CATEGORY_ALIAS_MAP: Record<string, CategoryId> = {
+  space: 'space_astronomy',
+  space_astronomy: 'space_astronomy',
+  uzay: 'space_astronomy',
+  animals: 'animals_wildlife',
+  animals_wildlife: 'animals_wildlife',
+  hayvanlar: 'animals_wildlife',
+  math: 'mathematics',
+  mathematics: 'mathematics',
+  matematik: 'mathematics',
+  gaming: 'logic_puzzles',
+  logic_puzzles: 'logic_puzzles',
+  oyun: 'logic_puzzles',
+  technology: 'science_tech',
+  science_tech: 'science_tech',
+  teknoloji: 'science_tech',
+  bilim: 'science_tech',
+  nature: 'nature_ecology',
+  nature_ecology: 'nature_ecology',
+  doga: 'nature_ecology',
+  food: 'food_gastronomy',
+  food_gastronomy: 'food_gastronomy',
+  yemek: 'food_gastronomy',
+  mutfak: 'food_gastronomy',
+  tarih: 'history',
+  history: 'history',
+  cografya: 'geography',
+  geography: 'geography',
+  spor: 'sports',
+  sports: 'sports',
+  sinema: 'cinema_tv',
+  cinema: 'cinema_tv',
+  cinema_tv: 'cinema_tv',
+  muzik: 'music',
+  music: 'music',
+  sanat: 'art_culture',
+  art: 'art_culture',
+  art_culture: 'art_culture',
+  edebiyat: 'literature',
+  literature: 'literature',
+  genel_kultur: 'general_culture',
+  general_culture: 'general_culture',
+  general: 'general_culture',
+  mixed: 'mixed',
+  karisik: 'mixed',
+  karma: 'mixed',
+};
+
+export function canonicalCategoryId(rawId?: string | null): CategoryId {
+  if (!rawId) return 'general_culture';
+  const clean = String(rawId).trim().toLowerCase();
+  return CATEGORY_ALIAS_MAP[clean] || (clean as CategoryId);
+}

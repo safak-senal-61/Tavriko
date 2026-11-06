@@ -253,6 +253,12 @@ export const RootNavigator: React.FC = () => {
     activeRoomRef.current = activeRoom;
   }, [activeRoom]);
 
+  const [isSinglePlayerActive, setIsSinglePlayerActive] = useState<boolean>(false);
+  const isSinglePlayerActiveRef = useRef<boolean>(false);
+  useEffect(() => {
+    isSinglePlayerActiveRef.current = isSinglePlayerActive;
+  }, [isSinglePlayerActive]);
+
   const currentScreenRef = useRef<ScreenName>(currentScreen);
   currentScreenRef.current = currentScreen;
   // Keep system status bar completely hidden in fullscreen mode without triggering re-layouts on screen changes
@@ -356,6 +362,7 @@ export const RootNavigator: React.FC = () => {
     sendBackendHeartbeat();
 
     const unsubSync = socketService.onStateSync((room: GameRoom) => {
+      if (isSinglePlayerActiveRef.current) return;
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
       // If user was in room but removed from room.players, user was kicked!
       if (user && activeRoomRef.current && !room.players[user.id] && currentScreenRef.current === 'lobby') {
@@ -394,6 +401,7 @@ export const RootNavigator: React.FC = () => {
       }
     });
     const unsubQuestion = socketService.onQuestionStart((question: ClientQuestion) => {
+      if (isSinglePlayerActiveRef.current) return;
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
       setCurrentQuestion(question);
       setRoundResult(null);
@@ -405,6 +413,7 @@ export const RootNavigator: React.FC = () => {
       }
     });
     const unsubRoundResult = socketService.onRoundResult((result: RoundResult) => {
+      if (isSinglePlayerActiveRef.current) return;
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
       setRoundResult(result);
       const myAns = user ? result.playerAnswers[user.id] : null;
@@ -741,6 +750,8 @@ export const RootNavigator: React.FC = () => {
   // -------------------------------------------------------------
   const handleExitCurrentGame = useCallback(() => {
     isGameActiveRef.current = false;
+    setIsSinglePlayerActive(false);
+    isSinglePlayerActiveRef.current = false;
     clearAllGameTimers();
 
     if (activeRoomRef.current && user) {
@@ -868,7 +879,7 @@ export const RootNavigator: React.FC = () => {
       navigateTo('lobby');
     }, 'Özel Oda');
   };
-  const handleJoinCustomRoom = (code: string) => {
+  const handleJoinCustomRoom = (code: string, password?: string) => {
     requireAuth(() => {
       if (!user) return;
       isGameActiveRef.current = true;
@@ -907,7 +918,7 @@ export const RootNavigator: React.FC = () => {
         setActiveRoom(placeholderRoom);
         activeRoomRef.current = placeholderRoom;
       }
-      socketService.joinRoom(cleanCode, user.id, user.displayName, user.avatarUrl);
+      socketService.joinRoom(cleanCode, user.id, user.displayName, user.avatarUrl, password);
 
       if (!isGuest) {
         fetch(`${API_BASE}/social/rooms/active`, {
@@ -951,7 +962,14 @@ export const RootNavigator: React.FC = () => {
     questionCount: number = 5,
     isDaily: boolean = false
   ) => {
+    if (activeRoomRef.current && user) {
+      try {
+        socketService.leaveRoom(activeRoomRef.current.code, user.id);
+      } catch {}
+    }
     isGameActiveRef.current = true;
+    setIsSinglePlayerActive(true);
+    isSinglePlayerActiveRef.current = true;
     activeRoomRef.current = null;
     setActiveRoom(null);
     setDuelOpponent(null);
@@ -1673,6 +1691,7 @@ export const RootNavigator: React.FC = () => {
                   : null
               }
               racers={(() => {
+                if (isSinglePlayerActive) return [];
                 if (activeRoom && user) {
                   const roomPlayers = Object.values(activeRoom.players || {});
                   const mapped = roomPlayers.map((p) => {
@@ -1782,6 +1801,7 @@ export const RootNavigator: React.FC = () => {
               handleStartQuickMatch();
             }}
             onHome={() => {
+              handleExitCurrentGame();
               resetGame();
               navigateTo('home');
             }}

@@ -21,13 +21,16 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
         margin: 0;
         padding: 0;
         height: 100%;
+        height: 100dvh;
         width: 100%;
         overflow: hidden;
+        -webkit-text-size-adjust: 100%;
       }
       #root {
         background-color: #090414 !important;
         display: flex;
         height: 100%;
+        height: 100dvh;
         width: 100%;
       }
       /* Custom sleek Tavriko scrollbar */

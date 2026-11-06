@@ -2296,14 +2296,15 @@ class PrismaService {
         return stats;
     }
     getQuestions(category = 'mixed', difficulty, count = 10, seenIds = []) {
+        const canonCat = (0, shared_1.canonicalCategoryId)(category);
         const allPublished = this.questions.filter((q) => q.reviewStatus === 'published');
         const pickedMap = new Map();
-        const categoryPool = category === 'mixed'
+        const categoryPool = canonCat === 'mixed'
             ? allPublished
-            : allPublished.filter((q) => q.categoryId === category);
-        let primaryPool = categoryPool;
-        if (difficulty) {
-            const withDiff = categoryPool.filter((q) => q.difficulty === difficulty);
+            : allPublished.filter((q) => (0, shared_1.canonicalCategoryId)(q.categoryId) === canonCat);
+        let primaryPool = categoryPool.length > 0 ? categoryPool : allPublished;
+        if (difficulty && difficulty !== 'mixed') {
+            const withDiff = primaryPool.filter((q) => q.difficulty === difficulty);
             if (withDiff.length > 0) {
                 primaryPool = withDiff;
             }
@@ -2345,7 +2346,7 @@ class PrismaService {
                 }
             }
         }
-        if (pickedMap.size < count && (category === 'mixed' || categoryPool.length === 0)) {
+        if (pickedMap.size < count && (canonCat === 'mixed' || categoryPool.length === 0)) {
             const fallbackPool = allPublished
                 .filter((q) => !pickedMap.has(q.id))
                 .sort(() => 0.5 - Math.random());
@@ -2355,7 +2356,22 @@ class PrismaService {
                 pickedMap.set(q.id, q);
             }
         }
-        return Array.from(pickedMap.values()).sort(() => 0.5 - Math.random());
+        const pickedList = Array.from(pickedMap.values());
+        const poolForFill = categoryPool.length > 0 ? categoryPool : allPublished;
+        if (pickedList.length < count && poolForFill.length > 0) {
+            let cycleIdx = 1;
+            while (pickedList.length < count) {
+                for (const baseQ of poolForFill) {
+                    if (pickedList.length >= count)
+                        break;
+                    pickedList.push({
+                        ...baseQ,
+                        id: `${baseQ.id}_cycle_${cycleIdx++}`,
+                    });
+                }
+            }
+        }
+        return pickedList.sort(() => 0.5 - Math.random());
     }
     getDailyChallenge() {
         const today = new Date().toISOString().split('T')[0];
