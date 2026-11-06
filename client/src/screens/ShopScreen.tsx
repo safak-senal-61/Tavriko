@@ -240,8 +240,9 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     sound.playSound('tap');
     sound.triggerHaptic('light');
     setStatusMessage(null);
+    const targetX = idx <= 1 ? 0 : Math.max(0, (idx - 1) * 105);
     tabScrollRef.current?.scrollTo({
-      x: Math.max(0, idx * 108 - 96),
+      x: targetX,
       animated: true,
     });
     contentOpacity.setValue(0.25);
@@ -577,10 +578,10 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   categoryScrollWrap: {
-    marginHorizontal: -22,
+    marginHorizontal: -16,
   },
   categoryScroll: {
-    paddingHorizontal: 22,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     gap: 8,
   },

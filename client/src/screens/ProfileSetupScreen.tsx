@@ -174,22 +174,27 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
       >
         {/* Top Header */}
         <View style={styles.headerRow}>
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>
+              Karakterini Seç
+            </Text>
+            <Text style={styles.subtitle} numberOfLines={1}>
+              Soldan sağa kaydırarak favori avatarını belirle
+            </Text>
+          </View>
           {onBack && (
             <TouchableOpacity
-              style={styles.backBtn}
+              style={styles.closeBtn}
               onPress={() => {
                 sound.playSound('tap');
                 onBack();
               }}
               activeOpacity={0.8}
+              accessibilityLabel="Kapat"
             >
-              <Text style={styles.backBtnText}>‹</Text>
+              <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
           )}
-          <View style={{ flex: 1 }}>
-            <Text style={styles.title}>Karakterini Seç</Text>
-            <Text style={styles.subtitle}>Soldan sağa kaydırarak favori avatarını belirle</Text>
-          </View>
         </View>
 
         {/* Hero Showcase Card */}
@@ -433,6 +438,21 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontFamily: THEME.fonts.extraBold,
     marginTop: -2,
+  },
+  closeBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: THEME.fonts.bold,
   },
   title: {
     fontFamily: THEME.fonts.display,

@@ -707,27 +707,40 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           )}
 
           {/* Integrated Friend Code & Quick Action Strip */}
-          <View style={styles.heroBottomBar}>
-            <TouchableOpacity
-              style={styles.inlineFriendCodeBtn}
-              onPress={handleCopyCode}
-              activeOpacity={0.82}
-            >
-              <View>
-                <Text style={styles.inlineCodeLbl}>ARKADAŞ KODU</Text>
-                <Text style={styles.inlineCodeVal}>{friendCode}</Text>
-              </View>
-              <View style={styles.inlineCopyBadge}>
-                <CopyVectorIcon size={12} color="#FFC43D" />
-                <Text style={styles.inlineCopyText}>{copied ? 'Kopyalandı' : 'Kopyala'}</Text>
-              </View>
-            </TouchableOpacity>
+          <View style={styles.heroBottomContainer}>
+            {/* Row 1: Friend Code Pill + Share Button */}
+            <View style={styles.heroCodeRow}>
+              <TouchableOpacity
+                style={styles.inlineFriendCodeBtn}
+                onPress={handleCopyCode}
+                activeOpacity={0.82}
+              >
+                <View style={styles.codeTextGroup}>
+                  <Text style={styles.inlineCodeLbl}>ARKADAŞ KODU</Text>
+                  <Text style={styles.inlineCodeVal}>{friendCode}</Text>
+                </View>
+                <View style={styles.inlineCopyBadge}>
+                  <CopyVectorIcon size={12} color="#FFC43D" />
+                  <Text style={styles.inlineCopyText}>{copied ? 'Kopyalandı' : 'Kopyala'}</Text>
+                </View>
+              </TouchableOpacity>
 
-            <View style={styles.heroQuickActions}>
+              <TouchableOpacity
+                style={styles.headerActionBtnShare}
+                onPress={handleShareProfile}
+                activeOpacity={0.82}
+                accessibilityLabel="Profili Paylaş"
+              >
+                <ShareVectorIcon size={15} color="#D9CDF5" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Row 2: Karakter Değiştir & Profili Düzenle Buttons */}
+            <View style={styles.heroActionButtonsRow}>
               <TouchableOpacity
                 style={[
-                  styles.headerActionBtn,
-                  showAvatarDrawer && styles.headerActionBtnEdit,
+                  styles.heroActionBtnHalf,
+                  showAvatarDrawer && styles.heroActionBtnHalfActive,
                 ]}
                 onPress={() => {
                   sound.playSound('tap');
@@ -735,18 +748,20 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 }}
                 activeOpacity={0.82}
               >
+                <Text style={{ fontSize: 14 }}>🎭</Text>
                 <Text
                   style={[
-                    styles.headerActionText,
-                    showAvatarDrawer && styles.headerActionTextEdit,
+                    styles.heroActionBtnText,
+                    showAvatarDrawer && styles.heroActionBtnTextActive,
                   ]}
+                  numberOfLines={1}
                 >
                   {showAvatarDrawer ? 'Kapat' : 'Karakter'}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.headerActionBtn, styles.headerActionBtnEdit]}
+                style={[styles.heroActionBtnHalf, styles.heroActionBtnEdit]}
                 onPress={() => {
                   sound.playSound('tap');
                   if (onEditPersonalInfo) onEditPersonalInfo();
@@ -754,16 +769,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 }}
                 activeOpacity={0.82}
               >
-                <EditPencilIcon size={13} color="#FFC43D" />
-                <Text style={[styles.headerActionText, styles.headerActionTextEdit]}>Düzenle</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.headerActionBtnIconOnly}
-                onPress={handleShareProfile}
-                activeOpacity={0.82}
-              >
-                <ShareVectorIcon size={14} color="#D9CDF5" />
+                <EditPencilIcon size={14} color="#FFC43D" />
+                <Text style={[styles.heroActionBtnText, { color: '#FFC43D' }]} numberOfLines={1}>
+                  Düzenle
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1290,27 +1299,32 @@ const styles = StyleSheet.create({
   },
   xpText: { color: '#D9CDF5', fontSize: 10, fontFamily: THEME.fonts.extraBold, textAlign: 'center', marginTop: 4 },
   bioText: { color: '#FFC43D', fontSize: 11.5, fontFamily: THEME.fonts.body, marginTop: 8, fontStyle: 'italic' },
-  heroBottomBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
+  heroBottomContainer: {
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 8,
   },
-  inlineFriendCodeBtn: {
+  heroCodeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  inlineFriendCodeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: 'rgba(10, 4, 24, 0.72)',
     borderWidth: 1,
     borderColor: 'rgba(255, 196, 61, 0.35)',
     borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    flexShrink: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  codeTextGroup: {
+    flexDirection: 'column',
   },
   inlineCodeLbl: {
     color: '#A992E2',
@@ -1320,56 +1334,67 @@ const styles = StyleSheet.create({
   },
   inlineCodeVal: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 13.5,
     fontFamily: THEME.fonts.display,
   },
   inlineCopyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 4,
     backgroundColor: 'rgba(255, 196, 61, 0.14)',
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
   },
   inlineCopyText: {
     color: '#FFC43D',
-    fontSize: 10,
+    fontSize: 10.5,
     fontFamily: THEME.fonts.extraBold,
   },
-  heroQuickActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexShrink: 0,
-  },
-  headerActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(10, 4, 24, 0.85)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  headerActionBtnIconOnly: {
-    width: 34,
-    height: 34,
+  headerActionBtnShare: {
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(10, 4, 24, 0.85)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: 'rgba(255,255,255,0.18)',
     borderRadius: 12,
   },
-  headerActionBtnEdit: {
-    backgroundColor: 'rgba(255, 196, 61, 0.16)',
-    borderColor: 'rgba(255, 196, 61, 0.45)',
+  heroActionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  headerActionText: { color: '#D9CDF5', fontSize: 11, fontFamily: THEME.fonts.extraBold },
-  headerActionTextEdit: { color: '#FFC43D' },
+  heroActionBtnHalf: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 38,
+    backgroundColor: 'rgba(10, 4, 24, 0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+  },
+  heroActionBtnHalfActive: {
+    backgroundColor: 'rgba(154, 107, 255, 0.25)',
+    borderColor: '#9A6BFF',
+  },
+  heroActionBtnEdit: {
+    backgroundColor: 'rgba(255, 196, 61, 0.12)',
+    borderColor: 'rgba(255, 196, 61, 0.4)',
+  },
+  heroActionBtnText: {
+    color: '#D9CDF5',
+    fontSize: 12.5,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  heroActionBtnTextActive: {
+    color: '#FFFFFF',
+  },
 
   // Collapsible Avatar Drawer inside Hero Card
   avatarDrawerBox: {

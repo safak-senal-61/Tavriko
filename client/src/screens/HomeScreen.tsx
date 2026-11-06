@@ -183,24 +183,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </TouchableOpacity>
           {/* Hero Quick Match (1v1 Duel) Card */}
           <View style={styles.heroMatchCard}>
-            <Text style={styles.onlineSub}>
-              {user.rankPoints ?? 1000} Lig Puanı · {user.stats?.totalMatches ?? 0} Düello Maçı
-            </Text>
-            <Text
-              style={styles.heroMatchTitle}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.7}
-            >
-              HIZLI EŞLEŞME
-            </Text>
-            <Button3D
-              title="OYNA"
-              variant="mint"
-              onPress={onQuickMatch}
-              style={styles.heroPlayButton}
-              textStyle={{ fontSize: 22 }}
-            />
+            <View style={{ flex: 1, paddingRight: 105, zIndex: 2 }}>
+              <Text style={styles.onlineSub}>
+                {user.rankPoints ?? 1000} Lig Puanı · {user.stats?.totalMatches ?? 0} Düello Maçı
+              </Text>
+              <Text
+                style={styles.heroMatchTitle}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
+                HIZLI EŞLEŞME
+              </Text>
+              <Button3D
+                title="OYNA"
+                variant="mint"
+                onPress={onQuickMatch}
+                style={styles.heroPlayButton}
+                textStyle={{ fontSize: 22 }}
+              />
+            </View>
             <Animated.View
               style={[
                 styles.heroBoltWrap,
@@ -208,10 +210,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               ]}
               pointerEvents="none"
             >
-              <SpeedBoltIcon size={96} />
+              <Image
+                source={require('../../assets/images/quick_match_banner.jpg')}
+                style={styles.heroMatchBannerImg}
+                resizeMode="cover"
+              />
             </Animated.View>
           </View>
-          {/* 4 Mode Tiles Row */}
+          {/* 4 Mode Tiles Row with Rich 3D Assets */}
           <View style={styles.modesRow}>
             <TouchableOpacity
               style={styles.modeTile}
@@ -222,9 +228,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               }}
               activeOpacity={0.85}
             >
-              <ModeSquircleIcon mode="custom_room" size={44} />
-              <Text style={styles.modeTileText}>Özel Oda</Text>
+              <Image
+                source={require('../../assets/images/custom_room_3d.jpg')}
+                style={styles.modeTileImg}
+                resizeMode="cover"
+              />
+              <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
+                Özel Oda
+              </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.modeTile}
               onPress={() => {
@@ -234,9 +247,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               }}
               activeOpacity={0.85}
             >
-              <ModeSquircleIcon mode="single_player" size={44} />
-              <Text style={styles.modeTileText}>Tek Kişilik</Text>
+              <Image
+                source={require('../../assets/images/single_player_3d.jpg')}
+                style={styles.modeTileImg}
+                resizeMode="cover"
+              />
+              <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
+                Tek Kişilik
+              </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.modeTile}
               onPress={() => {
@@ -246,9 +266,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               }}
               activeOpacity={0.85}
             >
-              <ModeSquircleIcon mode="daily" size={44} />
-              <Text style={styles.modeTileText}>Günlük</Text>
+              <Image
+                source={require('../../assets/images/daily_challenge_3d.jpg')}
+                style={styles.modeTileImg}
+                resizeMode="cover"
+              />
+              <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
+                Günlük
+              </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.modeTile}
               onPress={() => {
@@ -258,8 +285,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               }}
               activeOpacity={0.85}
             >
-              <ModeSquircleIcon mode="friends" size={44} />
-              <Text style={styles.modeTileText}>Arkadaşlar</Text>
+              <Image
+                source={require('../../assets/images/friends_3d.jpg')}
+                style={styles.modeTileImg}
+                resizeMode="cover"
+              />
+              <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
+                Arkadaşlar
+              </Text>
             </TouchableOpacity>
           </View>
           {/* Daily Streak Card */}
@@ -429,12 +462,11 @@ const styles = StyleSheet.create({
   },
   heroMatchTitle: {
     fontFamily: THEME.fonts.display,
-    fontSize: 27,
+    fontSize: 23,
     color: '#FFFFFF',
     marginTop: 4,
     marginBottom: 14,
-    maxWidth: '68%',
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
   heroPlayButton: {
     alignSelf: 'flex-start',
@@ -443,8 +475,15 @@ const styles = StyleSheet.create({
   },
   heroBoltWrap: {
     position: 'absolute',
-    right: 4,
-    top: 8,
+    right: 10,
+    top: 14,
+  },
+  heroMatchBannerImg: {
+    width: 104,
+    height: 104,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 196, 61, 0.45)',
   },
   modesRow: {
     flexDirection: 'row',
@@ -454,7 +493,7 @@ const styles = StyleSheet.create({
   modeTile: {
     flex: 1,
     minWidth: 0,
-    height: 96,
+    height: 98,
     paddingHorizontal: 4,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.09)',
@@ -464,9 +503,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
+  modeTileImg: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+  },
   modeTileText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 11.5,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
   },

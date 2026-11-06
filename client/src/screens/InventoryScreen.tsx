@@ -92,8 +92,9 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     sound.playSound('tap');
     sound.triggerHaptic('light');
     setStatusMessage(null);
+    const targetX = idx <= 1 ? 0 : Math.max(0, (idx - 1) * 105);
     invTabScrollRef.current?.scrollTo({
-      x: Math.max(0, idx * 105 - 90),
+      x: targetX,
       animated: true,
     });
     tabContentOpacity.setValue(0.25);
@@ -475,10 +476,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   tabsScrollWrap: {
-    marginHorizontal: -22,
+    marginHorizontal: -16,
   },
   tabsRow: {
-    paddingHorizontal: 22,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 8,
   },

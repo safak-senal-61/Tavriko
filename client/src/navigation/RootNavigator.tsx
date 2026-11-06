@@ -1484,6 +1484,7 @@ export const RootNavigator: React.FC = () => {
             initialDisplayName={user?.displayName || 'DenizPro'}
             initialAvatarUrl={user?.avatarUrl}
             onSave={handleSaveProfile}
+            onBack={() => navigateTo('profile')}
           />
         )}
         {currentScreen === 'home' && user && (
