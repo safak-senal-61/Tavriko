@@ -1292,7 +1292,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 44 : 26,
     overflow: 'hidden',
     width: '100%',
-    maxWidth: 480,
+    maxWidth: 620,
     alignSelf: 'center',
   },
   topRadialGlow: {

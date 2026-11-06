@@ -584,8 +584,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         [
           ['overview', 'Özet'],
           ['mastery', 'Ustalık'],
-          ['titles', 'Unvanlar'],
-          ['settings', 'Ayarlar'],
+          ['titles', 'Unvan'],
+          ['settings', 'Ayar'],
           ['account', 'Hesap'],
         ] as const
       ).map(([tKey, label]) => {
@@ -597,7 +597,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             onPress={() => switchProfileTab(tKey)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabText, isActive && styles.tabTextActive]} numberOfLines={1}>
+            <Text
+              style={[styles.tabText, isActive && styles.tabTextActive]}
+              numberOfLines={1}
+              adjustsFontSizeToFit={true}
+              minimumFontScale={0.72}
+            >
               {label}
             </Text>
           </TouchableOpacity>
@@ -868,6 +873,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         <RNAnimated.View
           style={{
+            width: '100%',
+            maxWidth: 580,
+            alignItems: 'center',
             opacity: tabContentOpacity,
             transform: [{ translateY: tabContentTranslateY }],
           }}
@@ -926,13 +934,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
             {bestCategory && (
               <View style={styles.highlightCard}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <StreakFlameIcon size={18} active />
-                  <Text style={styles.highlightTitle}>En Güçlü Kategori</Text>
+                <View style={styles.highlightHeaderRow}>
+                  <View style={styles.highlightIconBadge}>
+                    <StreakFlameIcon size={18} active />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.highlightTitle}>EN GÜÇLÜ KATEGORİ</Text>
+                    <Text style={styles.highlightValue}>
+                      {bestCategory.name}
+                    </Text>
+                  </View>
+                  <View style={styles.highlightCountBadge}>
+                    <Text style={styles.highlightCountText}>
+                      {bestCategory.correctCount} Doğru
+                    </Text>
+                  </View>
                 </View>
-                <Text style={styles.highlightValue}>
-                  {bestCategory.name} · {bestCategory.correctCount} doğru cevap
-                </Text>
               </View>
             )}
 
@@ -1600,12 +1617,52 @@ const styles = StyleSheet.create({
   highlightCard: {
     ...card,
     padding: 14,
-    marginBottom: 14,
-    borderColor: 'rgba(255, 196, 61, 0.4)',
-    backgroundColor: 'rgba(255, 196, 61, 0.08)',
+    marginBottom: 12,
+    backgroundColor: '#1E293B',
+    borderRadius: 18,
+    borderWidth: 1.2,
+    borderColor: 'rgba(245, 158, 11, 0.45)',
   },
-  highlightTitle: { color: '#FFC43D', fontSize: 12, fontFamily: THEME.fonts.extraBold },
-  highlightValue: { color: '#FFFFFF', fontSize: 16, fontFamily: THEME.fonts.display, marginTop: 4 },
+  highlightHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  highlightIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.5)',
+  },
+  highlightTitle: {
+    color: '#F59E0B',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 0.8,
+  },
+  highlightValue: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: THEME.fonts.display,
+    marginTop: 2,
+  },
+  highlightCountBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: 'rgba(16, 185, 129, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  highlightCountText: {
+    color: '#34D399',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
 
   detailsCard: { ...card, padding: 16, marginBottom: 16 },
   cardSub: { color: '#D9CDF5', fontSize: 11, fontFamily: THEME.fonts.body, marginTop: 4, marginBottom: 12, lineHeight: 16 },
