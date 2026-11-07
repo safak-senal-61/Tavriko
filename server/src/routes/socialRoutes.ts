@@ -148,9 +148,13 @@ router.get('/presence', rateLimit({ keyPrefix: 'presence-read', windowMs: 60 * 1
   try {
     const authUserId = (req as any).authUserId as string;
     const friendData = await db.getFriendsForUserAsync(authUserId);
-    const friendIds = new Set((friendData?.friends || []).map((friend: any) => friend.id));
+    const visibleFriendIds = new Set(
+      (friendData?.friends || [])
+        .filter((friend: any) => friend.settings?.onlineStatusVisible !== false)
+        .map((friend: any) => friend.id)
+    );
     const presences = presenceManager.getAllPresences()
-      .filter((presence: any) => friendIds.has(presence.userId))
+      .filter((presence: any) => visibleFriendIds.has(presence.userId))
       .map((presence: any) => ({
         userId: presence.userId,
         username: presence.username,
@@ -414,7 +418,7 @@ router.get('/profile/:userId', async (req: Request, res: Response): Promise<void
   }
 
   const profile = await db.getUserProfileAsync(userId);
-  if (!profile) {
+  if (!profile || profile.settings?.profilePublic === false) {
     res.status(404).json({ error: 'Profil bulunamadı' });
     return;
   }
