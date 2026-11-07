@@ -20,9 +20,10 @@ router.get('/leaderboard', async (req: Request, res: Response): Promise<void> =>
   }
 });
 
-router.get('/friends/:userId', async (req: Request, res: Response): Promise<void> => {
+router.get('/friends/:userId', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    if ((req as any).authUserId !== userId) { res.status(403).json({ error: 'Bu kaynağa erişim yetkiniz yok.' }); return; }
     const data = await db.getFriendsForUserAsync(userId || 'anon');
     res.json(data);
   } catch (err: any) {
@@ -90,6 +91,7 @@ router.post('/friends/challenge', requireUser, async (req: Request, res: Respons
 router.get('/notifications/:userId', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    if ((req as any).authUserId !== userId) { res.status(403).json({ error: 'Bu kaynağa erişim yetkiniz yok.' }); return; }
     const notifications = await db.getUserNotificationsAsync(userId || 'anon');
     res.json({
       success: true,
