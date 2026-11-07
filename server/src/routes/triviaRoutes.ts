@@ -142,7 +142,7 @@ router.get('/admin/questions/review', (req: Request, res: Response): void => {
 // Approve question to published
 router.post('/admin/questions/:id/approve', (req: Request, res: Response): void => {
   const id = String(req.params.id);
-  const reviewedBy = req.body.reviewedBy || 'admin';
+  const reviewedBy = (req as any).portalAdminEmail || 'portal_admin';
   const pool = req.body.targetPool || req.body.pool || 'standard';
   const approved = db.approveQuestion(id, reviewedBy, pool);
 
@@ -157,7 +157,8 @@ router.post('/admin/questions/:id/approve', (req: Request, res: Response): void 
 // Reject question
 router.post('/admin/questions/:id/reject', (req: Request, res: Response): void => {
   const id = String(req.params.id);
-  const { reviewedBy = 'admin', reason = 'Uygun görülmedi' } = req.body;
+  const reviewedBy = (req as any).portalAdminEmail || 'portal_admin';
+  const { reason = 'Uygun görülmedi' } = req.body;
   const rejected = db.rejectQuestion(id, reviewedBy, reason);
 
   if (!rejected) {
@@ -264,7 +265,7 @@ router.post('/admin/questions/import-json', (req: Request, res: Response): void 
     const defaultTargetPool =
       body.defaultTargetPool || body.targetPool || body.pool || 'standard';
 
-    const addedBy = body.addedBy || 'Web Admin';
+    const addedBy = (req as any).portalAdminEmail || 'portal_admin';
 
     console.log('🔍 [/admin/questions/import-json] İşlenecek parametreler:', {
       hasInput: Boolean(input),
