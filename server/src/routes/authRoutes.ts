@@ -412,26 +412,52 @@ router.post('/reset-password', rateLimit({ keyPrefix: 'reset-password', windowMs
 
 router.put('/profile', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
-    const authHeader = req.headers.authorization;
-    let userId = req.body.userId;
+    const userId = (req as any).authUserId as string;
+    const body = req.body || {};
+    const updates: Record<string, string> = {};
 
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const payload = db.verifyToken(token);
-      if (payload) userId = payload.userId;
+    const stringFields: Array<[string, number]> = [
+      ['displayName', 32],
+      ['fullName', 100],
+      ['countryCode', 2],
+      ['countryName', 80],
+      ['phone', 32],
+      ['birthDate', 10],
+      ['gender', 12],
+      ['bio', 180],
+      ['avatarUrl', 2048],
+    ];
+    for (const [field, maxLength] of stringFields) {
+      if (body[field] === undefined) continue;
+      if (typeof body[field] !== 'string' || body[field].length > maxLength) {
+        res.status(400).json({ error: `Geçersiz profil alanı: ${field}` });
+        return;
+      }
+      updates[field] = body[field].trim();
     }
 
-    if (!userId) {
-      res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
+    if (updates.gender && !['Kadın', 'Erkek', 'Diğer'].includes(updates.gender)) {
+      res.status(400).json({ error: 'Geçersiz cinsiyet değeri.' });
       return;
     }
+    if (updates.countryCode && !/^[A-Z]{2}$/.test(updates.countryCode.toUpperCase())) {
+      res.status(400).json({ error: 'Geçersiz ülke kodu.' });
+      return;
+    }
+    if (updates.avatarUrl) {
+      const isPreset = /^(av_?\d+|custom)$/i.test(updates.avatarUrl);
+      let isHttpsUrl = false;
+      try { isHttpsUrl = new URL(updates.avatarUrl).protocol === 'https:'; } catch {}
+      if (!isPreset && !isHttpsUrl) {
+        res.status(400).json({ error: 'Avatar yalnızca hazır avatar veya HTTPS adresi olabilir.' });
+        return;
+      }
+    }
 
-    logger.info('AUTH', `Profil güncelleme isteği: userId=${userId}, avatarUrl=${req.body.avatarUrl || 'değişmedi'}, displayName=${req.body.displayName || 'değişmedi'}`);
-    const updated = await db.updateUserProfile(userId, req.body);
-    logger.success('AUTH', `Profil başarıyla güncellendi ve veritabanına işlendi: ${userId} -> avatar: ${updated.avatarUrl}`);
+    const updated = await db.updateUserProfile(userId, updates);
+    res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, user: updated });
   } catch (err: any) {
-    logger.error('AUTH', `Profil güncelleme hatası: ${err.message}`);
     res.status(400).json({ error: err.message });
   }
 });
