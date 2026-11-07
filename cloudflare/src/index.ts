@@ -26,8 +26,9 @@ function isAllowedOrigin(origin: string): boolean {
     const parsed = new URL(origin);
     if (parsed.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(parsed.hostname)) return true;
     if (parsed.protocol !== 'https:') return false;
-    return ALLOWED_ORIGINS.has(origin) ||
-      (parsed.hostname.endsWith('.vercel.app') && parsed.hostname.startsWith('tavriko-'));
+    // Do not trust every tavriko-*.vercel.app deployment: preview aliases
+    // may be created by untrusted contributors or become dangling subdomains.
+    return ALLOWED_ORIGINS.has(origin);
   } catch {
     return false;
   }
