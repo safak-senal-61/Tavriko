@@ -472,24 +472,76 @@ router.put('/profile', requireUser, async (req: Request, res: Response): Promise
   }
 });
 
-router.post('/settings', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.post('/settings', rateLimit({ keyPrefix: 'user-settings', windowMs: 60 * 1000, max: 20 }), requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
-    const authHeader = req.headers.authorization;
-    let userId = req.body.userId;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const payload = db.verifyToken(token);
-      if (payload) userId = payload.userId;
-    }
-
-    if (!userId) {
-      res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
+    const userId = (req as any).authUserId as string;
+    const settings = req.body?.settings;
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+      res.status(400).json({ error: 'Geçerli ayar nesnesi gerekli.' });
       return;
     }
 
-    const { settings } = req.body;
-    const updated = await db.updateUserSettings(userId, settings || {});
+    const booleanKeys = [
+      'sfxEnabled', 'musicEnabled', 'hapticsEnabled', 'timerAlertSound', 'victoryMelody',
+      'smoothAnimations', 'batterySaver', 'ambientGlow', 'buttonSpring', 'penaltyForWrong',
+      'autoNextQuestion', 'doubleTapProtection', 'notifsEnabled', 'duelInvitesAllowed',
+      'roomInvitesAllowed', 'onlineStatusVisible', 'profilePublic', 'friendRequestsAllowed',
+      'dailyReminder', 'seasonAlerts', 'friendActivity',
+    ];
+    const enumValues: Record<string, string[]> = {
+      sfxVolume: ['25', '50', '75', '100'],
+      musicVolume: ['25', '50', '75', '100'],
+      hapticIntensity: ['light', 'medium', 'strong'],
+      textSize: ['normal', 'large'],
+      defaultDifficulty: ['easy', 'medium', 'hard'],
+      themeMode: ['dark', 'vibrant', 'midnight'],
+    };
+    const allowedKeys = new Set([
+      ...booleanKeys,
+      ...Object.keys(enumValues),
+      'questionCount',
+      'questionTimeSec',
+      'equippedTitle',
+    ]);
+    const validated: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(settings)) {
+      if (!allowedKeys.has(key)) {
+        res.status(400).json({ error: `Desteklenmeyen ayar: ${key}` });
+        return;
+      }
+      if (booleanKeys.includes(key)) {
+        if (typeof value !== 'boolean') {
+          res.status(400).json({ error: `Geçersiz ayar: ${key}` });
+          return;
+        }
+        validated[key] = value;
+      } else if (enumValues[key]) {
+        if (typeof value !== 'string' || !enumValues[key].includes(value)) {
+          res.status(400).json({ error: `Geçersiz ayar: ${key}` });
+          return;
+        }
+        validated[key] = value;
+      } else if (key === 'questionCount' || key === 'questionTimeSec') {
+        const numberValue = Number(value);
+        const min = key === 'questionCount' ? 1 : 5;
+        const max = key === 'questionCount' ? 20 : 60;
+        if (!Number.isInteger(numberValue) || numberValue < min || numberValue > max) {
+          res.status(400).json({ error: `Geçersiz ayar: ${key}` });
+          return;
+        }
+        validated[key] = numberValue;
+      } else if (key === 'equippedTitle') {
+        if (typeof value !== 'string' || value.length > 32) {
+          res.status(400).json({ error: 'Geçersiz oyuncu unvanı.' });
+          return;
+        }
+        validated[key] = value.trim();
+      }
+    }
+
+    const updated = await db.updateUserSettings(userId, validated);
+    res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, user: updated });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
