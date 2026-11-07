@@ -1,0 +1,59 @@
+name: Security and quality checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, security/harden-critical-endpoints]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tavriko-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tavriko
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/tavriko
+      JWT_SECRET: ci-only-test-secret-do-not-use-in-production-0123456789
+      SUPABASE_JWT_SECRET: ci-only-test-secret-do-not-use-in-production-0123456789
+      INTERNAL_API_SECRET: ci-only-internal-test-secret-0123456789
+      PORTAL_ADMIN_EMAIL: ci-admin@example.invalid
+      PORTAL_ADMIN_PASSWORD: ci-only-password-not-for-production
+      GOOGLE_CLIENT_ID: ci-google-client-id
+      CORS_ORIGINS: http://localhost:3000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Dependency vulnerability audit
+        run: npm audit --audit-level=high
+
+      - name: Build all workspaces
+        run: npm run build
+
+      - name: Test shared workspace
+        run: npm run test:shared
+
+      - name: Test server workspace
+        run: npm run test:server
+
+      - name: Test client workspace
+        run: npm run test:client
+
+      - name: Test Cloudflare workspace
+        run: npm run test:cloudflare
