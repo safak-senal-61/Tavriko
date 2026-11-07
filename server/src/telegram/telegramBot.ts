@@ -299,8 +299,12 @@ export class TelegramBotService {
     if (!this.bot) {
       return { success: false, message: 'Bot başlatılmamış veya token tanımlanmamış.' };
     }
+    const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET || '';
+    if (webhookSecret.length < 32) {
+      return { success: false, message: 'TELEGRAM_WEBHOOK_SECRET en az 32 karakter olarak yapılandırılmalıdır.' };
+    }
     try {
-      await this.bot.telegram.setWebhook(url, { drop_pending_updates: true });
+      await this.bot.telegram.setWebhook(url, { drop_pending_updates: true, secret_token: webhookSecret });
       const info = await this.bot.telegram.getWebhookInfo();
       this.running = true;
       logger.success('TELEGRAM', `Webhook güncellendi: ${url}`, info);
