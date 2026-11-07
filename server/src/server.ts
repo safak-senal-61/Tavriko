@@ -74,10 +74,10 @@ export function createApp() {
       logger.log(
         cat,
         lvl,
-        `${req.method} ${req.originalUrl} -> ${res.statusCode} (${duration}ms)`,
+        `${req.method} ${req.path} -> ${res.statusCode} (${duration}ms)`,
         {
           ip: req.ip,
-          query: Object.keys(req.query).length ? req.query : undefined,
+          queryKeys: Object.keys(req.query).length ? Object.keys(req.query) : undefined,
           bodyKeys: req.method !== 'GET' ? Object.keys(req.body || {}) : undefined,
         }
       );
