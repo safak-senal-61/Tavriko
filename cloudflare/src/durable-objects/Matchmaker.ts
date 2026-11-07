@@ -170,6 +170,10 @@ export class MatchmakerDO extends DurableObject<Env> {
       url.pathname === '/api/trivia/rooms/public'
     ) {
       if (request.method === 'POST') {
+        if (!this.env.INTERNAL_API_SECRET || this.env.INTERNAL_API_SECRET.length < 32 ||
+            request.headers.get('x-internal-secret') !== this.env.INTERNAL_API_SECRET) {
+          return new Response(JSON.stringify({ error: 'Yetkisiz erişim' }), { status: 403 });
+        }
         try {
           const body: any = await request.json();
           const code = String(body?.code || body?.roomCode || '').trim().toUpperCase();
@@ -302,13 +306,6 @@ export class MatchmakerDO extends DurableObject<Env> {
           activeSockets: this.ctx.getWebSockets().length,
           onlineUserIds: onlineList.map((p) => p.userId),
           presences: onlineList,
-          entries: Array.from(this.queue.values()).map((e) => ({
-            playerId: e.playerId,
-            mode: e.mode,
-            category: e.category,
-            difficulty: e.difficulty,
-            waitTimeMs: Date.now() - e.queuedAt,
-          })),
         }),
         { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
       );
@@ -341,8 +338,15 @@ export class MatchmakerDO extends DurableObject<Env> {
       }
     }
 
+    if (token && !authUser) {
+      return new Response(JSON.stringify({ error: 'Geçersiz oturum' }), { status: 401 });
+    }
+
     if (!authUser) {
       const pid = rawPlayerId || `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      if (!pid.startsWith('guest_') && !pid.startsWith('guest:')) {
+        return new Response(JSON.stringify({ error: 'Misafir kimliği geçersiz' }), { status: 401 });
+      }
       const name = sanitizeString(rawDisplayName || `Oyuncu ${pid.slice(-4)}`, 30);
       authUser = {
         id: pid,
@@ -455,7 +459,8 @@ export class MatchmakerDO extends DurableObject<Env> {
       case 'presence:ping':
       case 'presence:update': {
         const payload = envelope.payload || {};
-        const uid = payload.userId || attachment.playerId;
+        // A client may update only its own presence; never trust payload.userId.
+        const uid = attachment.playerId;
         const isOnline = payload.online !== undefined ? Boolean(payload.online) : true;
         const inRoom = payload.inRoom !== undefined ? Boolean(payload.inRoom) : Boolean(attachment.inRoom);
         const currentRoomCode = payload.currentRoomCode !== undefined ? payload.currentRoomCode : attachment.currentRoomCode;
@@ -487,15 +492,6 @@ export class MatchmakerDO extends DurableObject<Env> {
             presences: snapshot,
           })
         );
-        break;
-      }
-
-      case 'social:notify': {
-        const payload = envelope.payload || {};
-        const { targetUserId, targetEvent, data } = payload;
-        if (targetUserId && targetEvent) {
-          this.sendToUser(targetUserId, targetEvent, data);
-        }
         break;
       }
 
