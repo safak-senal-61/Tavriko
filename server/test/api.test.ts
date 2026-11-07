@@ -6,6 +6,7 @@ describe('Trivia REST API', () => {
   let app: any;
   let server: Server;
   let authToken: string;
+  let authUserId: string;
   let teardown: () => void;
 
   beforeAll((done) => {
@@ -32,6 +33,7 @@ describe('Trivia REST API', () => {
     expect(res.body.user.displayName).toBe('TestOyuncu');
     expect(res.body.user.level).toBe(1);
     authToken = res.body.token;
+    authUserId = res.body.user.id;
   });
 
   it('retrieves all trivia categories including food, nature and animals', async () => {
@@ -68,9 +70,54 @@ describe('Trivia REST API', () => {
     expect(res.body.questions.length).toBeGreaterThanOrEqual(5);
   });
 
+
+  it('requires authentication for user-specific event data', async () => {
+    const res = await request(app).get('/api/social/events');
+    expect(res.status).toBe(401);
+  });
+
+  it('prevents reading another user event data', async () => {
+    const res = await request(app)
+      .get('/api/social/events?userId=another-user-id')
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('requires authentication before starting an event', async () => {
+    const res = await request(app)
+      .post('/api/social/events/start')
+      .send({ userId: 'someone-else', eventId: 'daily_1' });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects legacy pack purchases without verified payment', async () => {
+    const res = await request(app)
+      .post('/api/social/shop/purchase')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ userId: 'someone-else', packId: 'starter_pack', cardHolder: 'Test' });
+    expect(res.status).toBe(501);
+  });
+
+  it('rejects TRY catalog purchases without a payment provider', async () => {
+    const res = await request(app)
+      .post('/api/social/shop/purchase')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ userId: authUserId, productId: 'pack_starter', paymentMethod: 'credit_card' });
+    expect(res.status).toBe(501);
+  });
+
   it('fetches global leaderboards', async () => {
     const res = await request(app).get('/api/social/leaderboard');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.topPlayers)).toBe(true);
+    for (const player of res.body.topPlayers) {
+      expect(player).not.toHaveProperty('email');
+      expect(player).not.toHaveProperty('phone');
+      expect(player).not.toHaveProperty('birthDate');
+      expect(player).not.toHaveProperty('gender');
+      expect(player).not.toHaveProperty('inventory');
+      expect(player).not.toHaveProperty('notifications');
+      expect(player).not.toHaveProperty('settings');
+    }
   });
 });
