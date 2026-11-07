@@ -106,6 +106,7 @@ router.post('/google/complete-session', rateLimit({ keyPrefix: 'google-complete'
         });
       }
     }
+    res.setHeader('Cache-Control', 'no-store');
     res.json(result);
   } catch { res.status(401).json({ error: 'Google oturumu tamamlanamadı.' }); }
 });
@@ -113,6 +114,7 @@ router.post('/guest', rateLimit({ keyPrefix: 'guest', windowMs: 15 * 60 * 1000, 
   try {
     const { displayName } = req.body;
     const result = await db.createGuest(displayName);
+    res.setHeader('Cache-Control', 'no-store');
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -158,6 +160,7 @@ router.post('/register', rateLimit({ keyPrefix: 'register', windowMs: 60 * 60 * 
       bio,
       avatarUrl,
     });
+    res.setHeader('Cache-Control', 'no-store');
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -173,6 +176,7 @@ router.post('/login', rateLimit({ keyPrefix: 'login', windowMs: 15 * 60 * 1000, 
       return;
     }
     const result = await db.login(loginId, password);
+    res.setHeader('Cache-Control', 'no-store');
     res.json(result);
   } catch (err: any) {
     res.status(401).json({ error: err.message });
@@ -181,6 +185,7 @@ router.post('/login', rateLimit({ keyPrefix: 'login', windowMs: 15 * 60 * 1000, 
 
 router.get('/google/callback', (req: Request, res: Response): void => {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
   res.send(`<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -337,6 +342,7 @@ router.post('/google', rateLimit({ keyPrefix: 'google-login', windowMs: 15 * 60 
     }
     if (!verifiedEmail || !googleSub) { res.status(401).json({ error: 'Geçerli Google kimlik doğrulaması gerekli.' }); return; }
     const result = await db.loginOrRegisterGoogle({ email: verifiedEmail, displayName: verifiedName || verifiedEmail.split('@')[0], fullName: verifiedName, avatarUrl: verifiedPicture || 'av1', googleId: googleSub, countryCode, countryName, phone, birthDate });
+    res.setHeader('Cache-Control', 'no-store');
     res.json({ ...result, googleClientId: GOOGLE_CLIENT_ID || undefined });
   } catch { res.status(401).json({ error: 'Google kimlik doğrulaması başarısız.' }); }
 });
