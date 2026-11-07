@@ -105,6 +105,31 @@ describe('Trivia REST API', () => {
     expect(res.status).toBe(400);
   });
 
+  it('rejects attempts to smuggle economy fields through user settings', async () => {
+    const res = await request(app)
+      .post('/api/auth/settings')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ settings: { coins: 999999, isAdmin: true } });
+    expect(res.status).toBe(400);
+  });
+
+  it('honors the public-profile privacy setting', async () => {
+    const hidden = await request(app)
+      .post('/api/auth/settings')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ settings: { profilePublic: false } });
+    expect(hidden.status).toBe(200);
+
+    const profile = await request(app).get(`/api/social/profile/${authUserId}`);
+    expect(profile.status).toBe(404);
+
+    const restored = await request(app)
+      .post('/api/auth/settings')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ settings: { profilePublic: true } });
+    expect(restored.status).toBe(200);
+  });
+
   it('requires authentication for user-specific event data', async () => {
     const res = await request(app).get('/api/social/events');
     expect(res.status).toBe(401);
