@@ -43,6 +43,7 @@ export function requirePortalAdmin(req: Request, res: Response, next: NextFuncti
       res.status(403).json({ error: 'Yönetici yetkisi gerekli.' });
       return;
     }
+    (req as any).portalAdminEmail = adminEmail;
     next();
   } catch {
     res.status(401).json({ error: 'Geçersiz veya süresi dolmuş yönetici oturumu.' });
