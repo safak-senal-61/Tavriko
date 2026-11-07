@@ -20,10 +20,9 @@ export class SupabaseService {
       process.env.SUPABASE_URL ||
       process.env.NEXT_PUBLIC_SUPABASE_URL ||
       process.env.EXPO_PUBLIC_SUPABASE_URL;
-    const key =
-      process.env.SUPABASE_SECRET_KEY ||
-      process.env.SUPABASE_PUBLISHABLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    // Server-side Supabase operations require the secret/service-role key.
+    // Never silently fall back to a browser publishable key for admin calls. 
+    const key = process.env.SUPABASE_SECRET_KEY;
 
     if (url && key && !url.includes('placeholder') && !url.includes('your-') && !key.includes('your-')) {
       try {
@@ -149,50 +148,44 @@ export class SupabaseService {
       let query = this.client
         .from('questions')
         .select('*')
-        .eq('review_status', 'published');
+        .eq('reviewStatus', 'published');
 
-      if (categoryId !== 'mixed') {
-        query = query.eq('category_id', categoryId);
-      }
-      if (difficulty) {
-        query = query.eq('difficulty', difficulty);
-      }
+      if (categoryId !== 'mixed') query = query.eq('categoryId', categoryId);
+      if (difficulty) query = query.eq('difficulty', difficulty);
 
-      const { data, error } = await query.limit(limit);
+      const { data, error } = await query.limit(Math.max(1, Math.min(limit, 50)));
       if (!error && data && data.length > 0) {
         return data.map((row: any) => ({
           id: row.id,
-          categoryId: row.category_id,
-          subCategory: row.sub_category,
+          categoryId: row.categoryId,
+          subCategory: row.subCategory,
           difficulty: row.difficulty,
           text: row.text,
           options: row.options,
-          correctOptionId: row.correct_option_id,
+          correctOptionId: row.correctOptionId,
           explanation: row.explanation,
-          sourceOrVerification: row.source_or_verification,
+          sourceOrVerification: row.sourceOrVerification,
           language: row.language,
-          contentHash: row.content_hash,
-          reviewStatus: row.review_status,
-          timeLimitSec: row.time_limit_sec,
-          createdAt: row.created_at,
-          reviewedBy: row.reviewed_by,
-          reviewedAt: row.reviewed_at,
-          rejectionReason: row.rejection_reason,
-          modelMetadata: row.model_metadata,
+          contentHash: row.contentHash,
+          reviewStatus: row.reviewStatus,
+          timeLimitSec: row.timeLimitSec,
+          createdAt: row.createdAt,
+          reviewedBy: row.reviewedBy,
+          reviewedAt: row.reviewedAt,
+          rejectionReason: row.rejectionReason,
         }));
       }
 
-      // Fallback to Supabase Cloud Storage questions_store.json
+      // Legacy private-bucket fallback; it is never exposed to browser clients.
       const cloudQuestions = await this.loadCloudStore<Question[]>('questions_store.json');
       if (cloudQuestions && Array.isArray(cloudQuestions)) {
         return cloudQuestions
-          .filter(
-            (q) =>
-              (q.reviewStatus || 'published') === 'published' &&
-              (categoryId === 'mixed' || q.categoryId === categoryId) &&
-              (!difficulty || q.difficulty === difficulty)
+          .filter((q) =>
+            (q.reviewStatus || 'published') === 'published' &&
+            (categoryId === 'mixed' || q.categoryId === categoryId) &&
+            (!difficulty || q.difficulty === difficulty)
           )
-          .slice(0, limit);
+          .slice(0, Math.max(1, Math.min(limit, 50)));
       }
       return null;
     } catch {
@@ -202,26 +195,23 @@ export class SupabaseService {
 
   public async insertQuestion(q: Question): Promise<boolean> {
     if (!this.client) return false;
-
     try {
       const { error } = await this.client.from('questions').insert({
         id: q.id,
-        category_id: q.categoryId,
-        sub_category: q.subCategory,
+        categoryId: q.categoryId,
+        subCategory: q.subCategory,
         difficulty: q.difficulty,
         text: q.text,
         options: q.options,
-        correct_option_id: q.correctOptionId,
+        correctOptionId: q.correctOptionId,
         explanation: q.explanation,
-        source_or_verification: q.sourceOrVerification,
+        sourceOrVerification: q.sourceOrVerification,
         language: q.language || 'tr',
-        content_hash: q.contentHash,
-        review_status: q.reviewStatus || 'pending_review',
-        time_limit_sec: q.timeLimitSec || 15,
-        model_metadata: q.modelMetadata,
-        created_at: q.createdAt,
+        contentHash: q.contentHash,
+        reviewStatus: q.reviewStatus || 'pending_review',
+        timeLimitSec: q.timeLimitSec || 15,
+        createdAt: q.createdAt,
       });
-
       return !error;
     } catch {
       return false;
@@ -230,108 +220,92 @@ export class SupabaseService {
 
   public async updateQuestionStatus(id: string, status: ReviewStatus, reviewedBy: string, reason?: string): Promise<boolean> {
     if (!this.client) return false;
-
     try {
       const { error } = await this.client
         .from('questions')
         .update({
-          review_status: status,
-          reviewed_by: reviewedBy,
-          reviewed_at: new Date().toISOString(),
-          rejection_reason: reason || null,
+          reviewStatus: status,
+          reviewedBy,
+          reviewedAt: new Date().toISOString(),
+          rejectionReason: reason || null,
         })
         .eq('id', id);
-
-      if (!error) {
-        await this.client.from('review_history').insert({
-          question_id: id,
-          action: status === 'published' ? 'approve' : 'reject',
-          reviewed_by: reviewedBy,
-          rejection_reason: reason || null,
-        });
-        return true;
-      }
-      return false;
+      return !error;
     } catch {
       return false;
     }
   }
 
-  public async upsertUser(record: any, allUsersList?: any[]): Promise<boolean> {
+  public async upsertUser(record: any, _allUsersList?: any[]): Promise<boolean> {
     if (!this.client) return false;
     try {
-      // 1. Try PostgreSQL profiles table if created
-      const { error } = await this.client.from('profiles').upsert({
+      const stats = record.stats || {};
+      const { error } = await this.client.from('users').upsert({
         id: record.id,
         username: record.username,
-        display_name: record.displayName,
         email: record.email || null,
-        full_name: record.fullName || null,
-        country_code: record.countryCode || null,
-        country_name: record.countryName || null,
+        displayName: record.displayName,
+        fullName: record.fullName || null,
+        countryCode: record.countryCode || null,
+        countryName: record.countryName || null,
         phone: record.phone || null,
-        birth_date: record.birthDate || null,
+        birthDate: record.birthDate || null,
         gender: record.gender || null,
         bio: record.bio || null,
-        avatar_url: record.avatarUrl,
-        password_hash: record.passwordHash || null,
-        level: record.level,
-        xp: record.xp,
-        coins: record.coins,
-        gems: record.gems ?? 14,
-        rank_title: record.rankTitle,
-        rank_points: record.rankPoints,
-        stats: record.stats,
-        updated_at: new Date().toISOString(),
+        avatarUrl: record.avatarUrl || 'av1',
+        passwordHash: record.passwordHash || null,
+        googleId: record.googleId || null,
+        friendCode: record.friendCode,
+        level: record.level ?? 1,
+        xp: record.xp ?? 0,
+        coins: record.coins ?? 500,
+        gems: record.gems ?? 15,
+        dailyStreak: record.dailyStreak ?? 1,
+        rankTitle: record.rankTitle || 'Acemi Kaşif',
+        rankPoints: record.rankPoints ?? 1000,
+        totalMatches: stats.totalMatches ?? record.totalMatches ?? 0,
+        wins: stats.wins ?? record.wins ?? 0,
+        correctAnswers: stats.correctAnswers ?? record.correctAnswers ?? 0,
+        totalAnswers: stats.totalAnswers ?? record.totalAnswers ?? 0,
+        bestStreak: stats.bestStreak ?? record.bestStreak ?? 0,
+        avgResponseTimeMs: stats.avgResponseTimeMs ?? record.avgResponseTimeMs ?? 0,
+        categoryMastery: record.categoryMastery || {},
+        claimedSeasonTiers: record.claimedSeasonTiers || [1],
+        friendIds: record.friendIds || [],
+        seasonXp: record.seasonXp ?? 0,
+        hasPremiumPass: record.hasPremiumPass ?? false,
+        claimedSeasonFreeTiers: record.claimedSeasonFreeTiers || [],
+        claimedSeasonPremiumTiers: record.claimedSeasonPremiumTiers || [],
+        equippedBackground: record.equippedBackground || null,
+        equippedBadge: record.equippedBadge || null,
+        equippedFrame: record.equippedFrame || null,
+        equippedNameEffect: record.equippedNameEffect || null,
+        eventProgress: record.eventProgress || {},
+        settings: record.settings || {},
+        updatedAt: new Date().toISOString(),
       });
 
-      // 2. Sync to Supabase Auth Admin user_metadata if user has email
+      // Only update metadata for an Auth identity that already exists (e.g. Google).
+      // Do not auto-create confirmed Supabase Auth accounts for custom-password users.
       if (record.email) {
         try {
-          const { data: listData } = await this.client.auth.admin.listUsers();
+          const { data: listData } = await this.client.auth.admin.listUsers({ perPage: 1000 });
           const existingAuthUser = listData?.users?.find(
             (u) => u.email?.toLowerCase() === record.email.toLowerCase()
           );
-          const metadata = {
-            tavriko_id: record.id,
-            username: record.username,
-            displayName: record.displayName,
-            fullName: record.fullName,
-            countryCode: record.countryCode,
-            countryName: record.countryName,
-            phone: record.phone,
-            birthDate: record.birthDate,
-            gender: record.gender,
-            bio: record.bio,
-            avatarUrl: record.avatarUrl,
-            level: record.level,
-            xp: record.xp,
-            coins: record.coins,
-            gems: record.gems,
-            rankTitle: record.rankTitle,
-            rankPoints: record.rankPoints,
-            stats: record.stats,
-          };
-
           if (existingAuthUser) {
             await this.client.auth.admin.updateUserById(existingAuthUser.id, {
-              user_metadata: metadata,
-            });
-          } else {
-            await this.client.auth.admin.createUser({
-              email: record.email,
-              email_confirm: true,
-              user_metadata: metadata,
+              user_metadata: {
+                tavriko_id: record.id,
+                username: record.username,
+                displayName: record.displayName,
+                avatarUrl: record.avatarUrl || 'av1',
+              },
             });
           }
         } catch {
-          // Ignore auth admin errors
+          // Auth metadata sync is best-effort; the Tavriko database remains authoritative.
         }
-      }
-
-      // 3. Also sync full users list to Supabase Cloud Storage
-      if (allUsersList) {
-        await this.syncCloudStore('users_store.json', allUsersList);
       }
 
       return !error;
@@ -345,7 +319,7 @@ export class SupabaseService {
     try {
       const clean = identifier.trim().toLowerCase();
       const { data, error } = await this.client
-        .from('profiles')
+        .from('users')
         .select('*')
         .or(`username.eq.${clean},email.eq.${clean}`)
         .limit(1)
