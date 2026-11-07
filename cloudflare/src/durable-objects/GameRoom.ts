@@ -181,9 +181,18 @@ export class GameRoomDO extends DurableObject<Env> {
     const rawDisplayName = url.searchParams.get('displayName');
     const rawAvatarUrl = url.searchParams.get('avatarUrl');
     const rawRoomCode = (url.searchParams.get('roomCode') || url.pathname.split('/').pop() || '').toUpperCase();
-    const mode = (url.searchParams.get('mode') as GameMode) || 'friends_private';
-    const category = (url.searchParams.get('category') as CategoryId) || 'general_culture';
-    const difficulty = (url.searchParams.get('difficulty') as DifficultyLevel) || 'medium';
+    const allowedModes = new Set<GameMode>([
+      'duel', 'quick_match', 'friends_private', 'ranked_random',
+      'free_for_all', 'team_battle', 'tournament', 'daily_challenge', 'single_practice',
+    ]);
+    const rawMode = url.searchParams.get('mode') as GameMode | null;
+    const mode: GameMode = rawMode && allowedModes.has(rawMode) ? rawMode : 'friends_private';
+    const rawCategory = url.searchParams.get('category') || 'general_culture';
+    const category = (/^[a-z0-9_]{1,48}$/i.test(rawCategory) ? rawCategory : 'general_culture') as CategoryId;
+    const rawDifficulty = url.searchParams.get('difficulty') as DifficultyLevel | null;
+    const difficulty: DifficultyLevel = rawDifficulty && ['easy', 'medium', 'hard'].includes(rawDifficulty)
+      ? rawDifficulty
+      : 'medium';
 
     let authUser: AuthUser | undefined;
 
@@ -226,9 +235,12 @@ export class GameRoomDO extends DurableObject<Env> {
 
     // Initialize room if not already created
     if (!this.room) {
-      const qpMaxPlayers = parseInt(url.searchParams.get('maxPlayers') || '', 10);
-      const qpTotalRounds = parseInt(url.searchParams.get('totalRounds') || '', 10);
-      const qpQuestionTime = parseInt(url.searchParams.get('questionTimeSec') || '', 10);
+      const qpMaxPlayersRaw = parseInt(url.searchParams.get('maxPlayers') || '', 10);
+      const qpTotalRoundsRaw = parseInt(url.searchParams.get('totalRounds') || '', 10);
+      const qpQuestionTimeRaw = parseInt(url.searchParams.get('questionTimeSec') || '', 10);
+      const qpMaxPlayers = Number.isInteger(qpMaxPlayersRaw) && qpMaxPlayersRaw >= 2 && qpMaxPlayersRaw <= 10 ? qpMaxPlayersRaw : 0;
+      const qpTotalRounds = Number.isInteger(qpTotalRoundsRaw) && qpTotalRoundsRaw >= 1 && qpTotalRoundsRaw <= 20 ? qpTotalRoundsRaw : 0;
+      const qpQuestionTime = Number.isInteger(qpQuestionTimeRaw) && qpQuestionTimeRaw >= 5 && qpQuestionTimeRaw <= 60 ? qpQuestionTimeRaw : 0;
       const qpPenalty = url.searchParams.get('penaltyForWrong') === 'true';
       const qpPrivacy = url.searchParams.get('privacy');
       if (qpPrivacy === 'private') {
@@ -242,7 +254,7 @@ export class GameRoomDO extends DurableObject<Env> {
         status: 'lobby',
         category,
         difficulty,
-        maxPlayers: qpMaxPlayers > 0 ? qpMaxPlayers : (mode === 'duel' ? 2 : 8),
+        maxPlayers: mode === 'duel' ? 2 : (qpMaxPlayers > 0 ? qpMaxPlayers : 8),
         currentRound: 0,
         totalRounds: qpTotalRounds > 0 ? qpTotalRounds : 5,
         questionTimeSec: qpQuestionTime > 0 ? qpQuestionTime : 15,
@@ -713,14 +725,54 @@ export class GameRoomDO extends DurableObject<Env> {
       return;
     }
     const s = envelope.payload?.settings || {};
-    if (s.maxPlayers) this.room.maxPlayers = Number(s.maxPlayers);
-    if (s.totalRounds) this.room.totalRounds = Number(s.totalRounds);
-    if (s.questionTimeSec) this.room.questionTimeSec = Number(s.questionTimeSec);
-    if (s.difficulty) this.room.difficulty = s.difficulty;
-    if (s.category) this.room.category = s.category;
-    if (s.categories) this.room.categories = s.categories;
-    if (s.mixedCategories !== undefined) this.room.mixedCategories = !!s.mixedCategories;
-    if (s.penaltyForWrong !== undefined) this.room.penaltyForWrong = !!s.penaltyForWrong;
+    if (s.maxPlayers !== undefined) {
+      const value = Number(s.maxPlayers);
+      if (!Number.isInteger(value) || value < 2 || value > 10) {
+        ws.send(createWsError('Oyuncu sayısı 2-10 arasında olmalıdır', 'BAD_REQUEST', envelope.requestId));
+        return;
+      }
+      this.room.maxPlayers = this.room.mode === 'duel' ? 2 : value;
+    }
+    if (s.totalRounds !== undefined) {
+      const value = Number(s.totalRounds);
+      if (!Number.isInteger(value) || value < 1 || value > 20) {
+        ws.send(createWsError('Tur sayısı 1-20 arasında olmalıdır', 'BAD_REQUEST', envelope.requestId));
+        return;
+      }
+      this.room.totalRounds = value;
+    }
+    if (s.questionTimeSec !== undefined) {
+      const value = Number(s.questionTimeSec);
+      if (!Number.isInteger(value) || value < 5 || value > 60) {
+        ws.send(createWsError('Soru süresi 5-60 saniye arasında olmalıdır', 'BAD_REQUEST', envelope.requestId));
+        return;
+      }
+      this.room.questionTimeSec = value;
+    }
+    if (s.difficulty !== undefined) {
+      if (!['easy', 'medium', 'hard'].includes(s.difficulty)) {
+        ws.send(createWsError('Geçersiz zorluk seviyesi', 'BAD_REQUEST', envelope.requestId));
+        return;
+      }
+      this.room.difficulty = s.difficulty;
+    }
+    if (s.category !== undefined) {
+      if (typeof s.category !== 'string' || !/^[a-z0-9_]{1,48}$/i.test(s.category)) {
+        ws.send(createWsError('Geçersiz kategori', 'BAD_REQUEST', envelope.requestId));
+        return;
+      }
+      this.room.category = s.category as CategoryId;
+    }
+    if (s.categories !== undefined) {
+      if (!Array.isArray(s.categories) || s.categories.length > 10 ||
+          s.categories.some((value: unknown) => typeof value !== 'string' || !/^[a-z0-9_]{1,48}$/i.test(value))) {
+        ws.send(createWsError('Geçersiz kategori listesi', 'BAD_REQUEST', envelope.requestId));
+        return;
+      }
+      this.room.categories = s.categories as CategoryId[];
+    }
+    if (s.mixedCategories !== undefined) this.room.mixedCategories = Boolean(s.mixedCategories);
+    if (s.penaltyForWrong !== undefined) this.room.penaltyForWrong = Boolean(s.penaltyForWrong);
     await this.persist();
     this.broadcastStateSync();
   }
