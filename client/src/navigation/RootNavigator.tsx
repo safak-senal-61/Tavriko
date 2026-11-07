@@ -800,7 +800,7 @@ export const RootNavigator: React.FC = () => {
     setDailyResultModal(null);
     setIsPracticeSummaryVisible(false);
     isEvaluatingRef.current = false;
-    practiceSessionIdRef.current = 'sess_' + Math.random().toString(36).substring(2, 9);
+    practiceSessionIdRef.current = '';
 
     const clearedStats: PracticeStats = {
       totalQuestions: 5,
@@ -1009,15 +1009,15 @@ export const RootNavigator: React.FC = () => {
     };
     practiceStatsRef.current = initStats;
     setPracticeStats(initStats);
-    practiceSessionIdRef.current =
-      'sess_' + Math.random().toString(36).substring(2, 9);
+    practiceSessionIdRef.current = '';
     try {
       const res = await fetch(
-        `${API_BASE}/questions/practice?category=${category}&difficulty=${difficulty}&count=${questionCount}&sessionId=${practiceSessionIdRef.current}`
+        `${API_BASE}/questions/practice?category=${encodeURIComponent(category)}&difficulty=${encodeURIComponent(difficulty)}&count=${questionCount}`
       );
       if (res.ok) {
         const data = await res.json();
-        if (data.questions && data.questions.length > 0) {
+        practiceSessionIdRef.current = typeof data.sessionId === 'string' ? data.sessionId : '';
+        if (data.questions && data.questions.length > 0 && practiceSessionIdRef.current) {
           setPracticeQuestions(data.questions);
           setPracticeIndex(0);
           setPracticeStats((prev) => ({
