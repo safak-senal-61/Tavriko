@@ -37,6 +37,7 @@ export class SocketService {
   // DOs (they resolve displayName/avatar from it) instead of giant avatarUrl
   // query values that can break the WebSocket upgrade
   private authToken: string | null = null;
+  private onlineStatusVisible = true;
 
   // Track session details for automatic recovery
   private lastSessionContext: {
@@ -57,10 +58,11 @@ export class SocketService {
   }
 
   /** Connect persistent Cloudflare Presence & Notification Hub WebSocket */
-  public connectPresence(playerId: string, displayName: string, avatarUrl?: string): void {
+  public connectPresence(playerId: string, displayName: string, avatarUrl?: string, onlineStatusVisible = true): void {
     if (!playerId) return;
+    this.onlineStatusVisible = onlineStatusVisible;
     const targetUrl = getRealtimeWsUrl(
-      `/ws/presence?intent=presence&${this.buildPlayerQuery(playerId, displayName, avatarUrl)}`
+      `/ws/presence?intent=presence&${this.buildPlayerQuery(playerId, displayName, avatarUrl)}&onlineStatusVisible=${this.onlineStatusVisible}`
     );
 
     if (
@@ -309,7 +311,8 @@ export class SocketService {
   }
 
   public updatePresence(userId: string, online: boolean): void {
-    this.sendPresenceEnvelope('presence:update', { userId, online, timestamp: Date.now() });
+    this.onlineStatusVisible = online;
+    this.sendPresenceEnvelope('presence:update', { userId, onlineStatusVisible: online, timestamp: Date.now() });
   }
 
   public sendEnvelope(event: string, payload: any = {}): void {
