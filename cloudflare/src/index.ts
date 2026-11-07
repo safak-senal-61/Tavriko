@@ -141,6 +141,22 @@ export default {
       url.pathname === '/api/telegram/webhook'
     ) {
       if (request.method === 'POST') {
+        const expectedSecret = env.TELEGRAM_WEBHOOK_SECRET || '';
+        const suppliedSecret = request.headers.get('x-telegram-bot-api-secret-token') || '';
+        if (expectedSecret.length < 32) {
+          return new Response(JSON.stringify({ ok: false, error: 'Webhook secret yapılandırılmamış.' }), { status: 503 });
+        }
+        if (suppliedSecret.length !== expectedSecret.length) {
+          return new Response(JSON.stringify({ ok: false, error: 'Yetkisiz webhook isteği.' }), { status: 401 });
+        }
+        let secretMismatch = 0;
+        for (let i = 0; i < expectedSecret.length; i++) {
+          secretMismatch |= expectedSecret.charCodeAt(i) ^ suppliedSecret.charCodeAt(i);
+        }
+        if (secretMismatch !== 0) {
+          return new Response(JSON.stringify({ ok: false, error: 'Yetkisiz webhook isteği.' }), { status: 401 });
+        }
+
         const backendBase = env.BACKEND_API_URL || 'https://tavriko-app.vercel.app';
         const targetUrl = `${backendBase.replace(/\/+$/, '')}/api/telegram/webhook`;
 
@@ -159,6 +175,7 @@ export default {
                 'Content-Type': 'application/json',
                 'x-forwarded-for': request.headers.get('cf-connecting-ip') || '127.0.0.1',
                 'x-cf-source': 'cloudflare-worker-edge',
+                'x-telegram-bot-api-secret-token': suppliedSecret,
               },
               body: bodyText,
             })
