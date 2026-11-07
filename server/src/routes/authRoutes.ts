@@ -426,7 +426,7 @@ router.put('/profile', requireUser, async (req: Request, res: Response): Promise
       avatarUrl: string;
     }> = {};
 
-    const stringFields: Array<[string, number]> = [
+    const stringFields: Array<[keyof typeof updates, number]> = [
       ['displayName', 32],
       ['fullName', 100],
       ['countryCode', 2],
