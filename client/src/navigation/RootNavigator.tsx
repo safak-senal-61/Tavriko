@@ -348,8 +348,8 @@ export const RootNavigator: React.FC = () => {
     }
 
     socketService.setAuthToken(token);
-    socketService.connectPresence(user.id, user.displayName, user.avatarUrl);
-    const playerQuery = `playerId=${encodeURIComponent(user.id)}&displayName=${encodeURIComponent(user.displayName)}`;
+    socketService.connectPresence(user.id, user.displayName, user.avatarUrl, user.settings?.onlineStatusVisible !== false);
+    const playerQuery = `playerId=${encodeURIComponent(user.id)}&displayName=${encodeURIComponent(user.displayName)}&onlineStatusVisible=${user.settings?.onlineStatusVisible !== false}`;
     socketService.connect(
       getRealtimeWsUrl(
         `/ws?intent=presence&${playerQuery}${
