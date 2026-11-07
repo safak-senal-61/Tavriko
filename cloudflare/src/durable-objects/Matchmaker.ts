@@ -32,6 +32,7 @@ interface PresenceEntry {
   inRoom: boolean;
   currentRoomCode?: string;
   lastSeen: number;
+  onlineStatusVisible?: boolean;
 }
 
 interface PublicRoomEntry {
@@ -103,6 +104,7 @@ export class MatchmakerDO extends DurableObject<Env> {
               inRoom: Boolean(att.inRoom),
               currentRoomCode: att.currentRoomCode,
               lastSeen: Date.now(),
+              onlineStatusVisible: att.onlineStatusVisible !== false,
             });
           }
         } catch {}
@@ -127,6 +129,7 @@ export class MatchmakerDO extends DurableObject<Env> {
               inRoom: Boolean(att.inRoom),
               currentRoomCode: att.currentRoomCode,
               lastSeen: Date.now(),
+              onlineStatusVisible: att.onlineStatusVisible !== false,
             });
           } else {
             const p = this.presences.get(att.playerId)!;
@@ -138,6 +141,7 @@ export class MatchmakerDO extends DurableObject<Env> {
 
     const result: PresenceEntry[] = [];
     for (const [uid, p] of this.presences.entries()) {
+      if (p.onlineStatusVisible === false) continue;
       if (activePlayerIds.has(uid) || (p.online && Date.now() - p.lastSeen < 60000)) {
         result.push({ ...p, online: true });
       }
@@ -372,7 +376,8 @@ export class MatchmakerDO extends DurableObject<Env> {
     const tags = [`player:${authUser.id}`, isMatchmakingIntent ? 'matchmaker' : 'presence'];
     this.ctx.acceptWebSocket(server, tags);
 
-    const attachment: QueueEntry & { inRoom?: boolean; currentRoomCode?: string } = {
+    const onlineStatusVisible = url.searchParams.get('onlineStatusVisible') !== 'false';
+    const attachment: QueueEntry & { inRoom?: boolean; currentRoomCode?: string; onlineStatusVisible?: boolean } = {
       matchId: 'match_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
       playerId: authUser.id,
       username: authUser.username,
@@ -384,6 +389,7 @@ export class MatchmakerDO extends DurableObject<Env> {
       queuedAt: Date.now(),
       status: isMatchmakingIntent ? 'searching' : 'cancelled',
       inRoom: false,
+      onlineStatusVisible,
     };
     server.serializeAttachment(attachment);
 
@@ -396,6 +402,7 @@ export class MatchmakerDO extends DurableObject<Env> {
       online: true,
       inRoom: false,
       lastSeen: Date.now(),
+      onlineStatusVisible,
     };
     this.presences.set(authUser.id, presenceEntry);
 
@@ -411,8 +418,10 @@ export class MatchmakerDO extends DurableObject<Env> {
     } catch {}
 
     // Broadcast this user's online status to everyone
-    this.broadcastToAll('presence:update', presenceEntry);
-    this.broadcastToAll('user:online', { userId: authUser.id, presence: presenceEntry });
+    if (onlineStatusVisible) {
+      this.broadcastToAll('presence:update', presenceEntry);
+      this.broadcastToAll('user:online', { userId: authUser.id, presence: presenceEntry });
+    }
 
     // Only auto-enqueue into 1v1 matchmaking if explicitly requested
     if (isMatchmakingIntent) {
@@ -436,7 +445,7 @@ export class MatchmakerDO extends DurableObject<Env> {
     const envelope = decodeWsMessage(message);
     if (!envelope) return;
 
-    const attachment = ws.deserializeAttachment() as (QueueEntry & { inRoom?: boolean; currentRoomCode?: string }) | null;
+    const attachment = ws.deserializeAttachment() as (QueueEntry & { inRoom?: boolean; currentRoomCode?: string; onlineStatusVisible?: boolean }) | null;
     if (!attachment || !attachment.playerId) return;
 
     switch (envelope.event) {
@@ -470,9 +479,11 @@ export class MatchmakerDO extends DurableObject<Env> {
         const isOnline = payload.online !== undefined ? Boolean(payload.online) : true;
         const inRoom = payload.inRoom !== undefined ? Boolean(payload.inRoom) : Boolean(attachment.inRoom);
         const currentRoomCode = payload.currentRoomCode !== undefined ? payload.currentRoomCode : attachment.currentRoomCode;
+        const onlineStatusVisible = payload.onlineStatusVisible !== undefined ? Boolean(payload.onlineStatusVisible) : attachment.onlineStatusVisible !== false;
 
         attachment.inRoom = inRoom;
         attachment.currentRoomCode = currentRoomCode;
+        attachment.onlineStatusVisible = onlineStatusVisible;
         ws.serializeAttachment(attachment);
 
         const updatedPresence: PresenceEntry = {
@@ -484,9 +495,14 @@ export class MatchmakerDO extends DurableObject<Env> {
           inRoom,
           currentRoomCode,
           lastSeen: Date.now(),
+          onlineStatusVisible,
         };
         this.presences.set(uid, updatedPresence);
-        this.broadcastToAll('presence:update', updatedPresence);
+        if (onlineStatusVisible) {
+          this.broadcastToAll('presence:update', updatedPresence);
+        } else {
+          this.broadcastToAll('presence:update', { userId: uid, online: false, inRoom: false });
+        }
         break;
       }
 
