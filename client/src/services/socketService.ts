@@ -145,10 +145,6 @@ export class SocketService {
     this.sendPresenceEnvelope('presence:query', {});
   }
 
-  public notifyUserRealtime(targetUserId: string, targetEvent: string, data: any): void {
-    this.sendPresenceEnvelope('social:notify', { targetUserId, targetEvent, data });
-  }
-
   public sendPresenceEnvelope(event: string, payload: any = {}): void {
     const message = JSON.stringify({
       event,
