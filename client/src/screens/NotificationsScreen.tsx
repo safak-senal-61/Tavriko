@@ -47,8 +47,8 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   const base = apiBaseUrl || DEFAULT_API_BASE;
   const userId = user?.id || 'anon';
 
-  const fetchNotifications = () => {
-    setLoading(true);
+  const fetchNotifications = (silent = false) => {
+    if (!silent) setLoading(true);
     fetch(`${base}/social/notifications/${userId}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -85,12 +85,13 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
         }
       })
       .finally(() => {
-        setLoading(false);
+        if (!silent) setLoading(false);
       });
   };
 
   useEffect(() => {
     fetchNotifications();
+    const refreshInterval = setInterval(() => fetchNotifications(true), 20000);
 
     // Listen to real-time incoming notifications over WebSocket
     const unsubNewNotif = socketService.on('notification:new', (newNotif: NotificationItem) => {
@@ -112,6 +113,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
     return () => {
       unsubNewNotif();
       unsubUpdateNotif();
+      clearInterval(refreshInterval);
     };
   }, [userId, base]);
 
@@ -164,10 +166,6 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
           } else if (notification.type === 'friend_request' || notification.type === 'friend') {
             const senderId = data.senderId || notification.senderId;
             if (senderId) {
-              socketService.notifyUserRealtime(senderId, 'friends:update', { friendId: userId });
-              if (data.senderNotification) {
-                socketService.notifyUserRealtime(senderId, 'notification:new', data.senderNotification);
-              }
             }
           }
           if (onRefreshUser) {
