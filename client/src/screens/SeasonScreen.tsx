@@ -29,6 +29,7 @@ import {
 
 interface SeasonScreenProps {
   user?: UserProfile;
+  token?: string;
   apiBaseUrl?: string;
   onUpdateUser?: (updatedUser: UserProfile) => void;
   onBack: () => void;
@@ -37,6 +38,7 @@ interface SeasonScreenProps {
 
 export const SeasonScreen: React.FC<SeasonScreenProps> = ({
   user,
+  token,
   apiBaseUrl,
   onUpdateUser,
   onBack,
@@ -113,7 +115,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
       sound.playSound('tap');
       const res = await fetch(`${base}/social/season/claim`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ userId: user.id, tier, track }),
       });
       const data = await res.json();
@@ -162,7 +164,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
       sound.playSound('tap');
       const res = await fetch(`${base}/social/season/premium-pass`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({ userId: user.id }),
       });
       const data = await res.json();
