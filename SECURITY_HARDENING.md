@@ -13,7 +13,6 @@ This branch introduces security controls that require coordinated environment co
 - `TELEGRAM_WEBHOOK_SECRET`: a random secret of at least 32 characters; it must match the Cloudflare Worker secret.
 - `CORS_ORIGINS`: exact comma-separated browser origins. Same-origin app requests do not need CORS.
 - `GOOGLE_CLIENT_ID`: the exact OAuth client ID used by the Google sign-in client.
-- `CORS_ORIGINS`: comma-separated exact browser origins, for example `https://example.com,https://www.example.com`.
 
 ## Required Cloudflare Worker secrets / vars
 
@@ -54,4 +53,5 @@ The migration `server/prisma/migrations/20261106000000_enable_rls_prisma_tables/
 2. Update server and Worker secrets before deploying this branch. Missing secrets intentionally cause relevant operations to fail closed.
 3. Verify all allowed frontend origins are listed in `CORS_ORIGINS`.
 4. Run the server and Worker build/test suites, then perform authenticated integration tests for login, profile, purchases, matchmaking, room creation, and final match settlement.
-5. Review Supabase RLS policies and database service-role key handling separately; this code change cannot verify dashboard-side policies.
+5. Apply the RLS migration to the live Supabase project only after confirming the server uses the server-only key, then verify all seven tables and grants with the Supabase Security Advisor.
+6. Configure `INTERNAL_API_SECRET` in both Vercel and Cloudflare, `TELEGRAM_WEBHOOK_SECRET` in Vercel and Cloudflare, and portal admin credentials in Vercel. Missing values intentionally disable the corresponding internal, webhook, or admin features.
