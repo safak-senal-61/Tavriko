@@ -204,6 +204,9 @@ export class GameRoomDO extends DurableObject<Env> {
     // Support guest identities only when no bearer token was supplied.
     if (!authUser) {
       const pid = rawPlayerId || `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      if (!pid.startsWith('guest_') && !pid.startsWith('guest:')) {
+        return new Response(JSON.stringify({ error: 'Misafir kimliği geçersiz' }), { status: 401 });
+      }
       const name = sanitizeString(rawDisplayName || `Misafir ${pid.slice(-4)}`, 30);
       authUser = {
         id: pid,
