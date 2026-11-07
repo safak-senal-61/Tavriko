@@ -102,9 +102,13 @@ export function rateLimit(options: RateLimitOptions) {
     if (rateLimitRedis) {
       try {
         const count = await rateLimitRedis.incr(key);
-        if (count === 1) await rateLimitRedis.expire(key, windowSeconds);
+        let ttl = await rateLimitRedis.ttl(key);
+        if (ttl < 0) {
+          await rateLimitRedis.expire(key, windowSeconds);
+          ttl = windowSeconds;
+        }
         if (count > options.max) {
-          res.setHeader('Retry-After', String(windowSeconds));
+          res.setHeader('Retry-After', String(Math.max(1, ttl)));
           res.status(429).json({ error: 'Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.' });
           return;
         }
