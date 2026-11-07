@@ -1860,7 +1860,6 @@ export class PrismaService {
     updates: Partial<{
       displayName: string;
       fullName: string;
-      email: string;
       countryCode: string;
       countryName: string;
       phone: string;
@@ -1868,12 +1867,7 @@ export class PrismaService {
       gender: string;
       bio: string;
       avatarUrl: string;
-      rankTitle: string;
-      equippedFrame: string;
-      equippedBadge: string;
-      equippedNameEffect: string;
-      equippedBackground: string;
-      settings: Partial<UserSettings>;
+
     }>
   ): Promise<UserProfile> {
     let record = this.users.get(userId);
@@ -1899,7 +1893,6 @@ export class PrismaService {
       record.displayName = updates.displayName.trim();
     }
     if (updates.fullName !== undefined) record.fullName = updates.fullName.trim();
-    if (updates.email !== undefined) record.email = updates.email.trim().toLowerCase();
     if (updates.countryCode !== undefined) record.countryCode = updates.countryCode;
     if (updates.countryName !== undefined) record.countryName = updates.countryName;
     if (updates.phone !== undefined) record.phone = updates.phone.trim();
@@ -1908,16 +1901,6 @@ export class PrismaService {
     if (updates.bio !== undefined) record.bio = updates.bio.trim();
     if (updates.avatarUrl !== undefined && updates.avatarUrl) {
       record.avatarUrl = updates.avatarUrl;
-    }
-    if (updates.rankTitle !== undefined && updates.rankTitle.trim()) {
-      record.rankTitle = updates.rankTitle.trim();
-    }
-    if (updates.equippedFrame !== undefined) record.equippedFrame = updates.equippedFrame;
-    if (updates.equippedBadge !== undefined) record.equippedBadge = updates.equippedBadge;
-    if (updates.equippedNameEffect !== undefined) record.equippedNameEffect = updates.equippedNameEffect;
-    if (updates.equippedBackground !== undefined) record.equippedBackground = updates.equippedBackground;
-    if (updates.settings !== undefined) {
-      record.settings = { ...(record.settings || {}), ...updates.settings };
     }
 
     record.updatedAt = Date.now();
@@ -1936,7 +1919,6 @@ export class PrismaService {
           data: {
             displayName: record.displayName,
             fullName: record.fullName,
-            email: record.email,
             avatarUrl: record.avatarUrl,
             countryCode: record.countryCode,
             countryName: record.countryName,
@@ -1944,12 +1926,6 @@ export class PrismaService {
             birthDate: record.birthDate,
             gender: record.gender,
             bio: record.bio,
-            rankTitle: record.rankTitle,
-            equippedFrame: record.equippedFrame,
-            equippedBadge: record.equippedBadge,
-            equippedNameEffect: record.equippedNameEffect,
-            equippedBackground: record.equippedBackground,
-            settings: (record.settings || {}) as any,
             updatedAt: new Date(),
           },
         });
