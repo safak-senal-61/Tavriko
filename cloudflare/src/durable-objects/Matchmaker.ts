@@ -143,7 +143,18 @@ export class MatchmakerDO extends DurableObject<Env> {
     for (const [uid, p] of this.presences.entries()) {
       if (p.onlineStatusVisible === false) continue;
       if (activePlayerIds.has(uid) || (p.online && Date.now() - p.lastSeen < 60000)) {
-        result.push({ ...p, online: true });
+        // Room codes are join credentials for non-public rooms; never leak
+        // them through the global presence snapshot.
+        result.push({
+          userId: p.userId,
+          username: p.username,
+          displayName: p.displayName,
+          avatarUrl: p.avatarUrl,
+          online: true,
+          inRoom: p.inRoom,
+          lastSeen: p.lastSeen,
+          onlineStatusVisible: p.onlineStatusVisible,
+        });
       }
     }
     return result;
@@ -499,7 +510,17 @@ export class MatchmakerDO extends DurableObject<Env> {
         };
         this.presences.set(uid, updatedPresence);
         if (onlineStatusVisible) {
-          this.broadcastToAll('presence:update', updatedPresence);
+          const publicPresence = {
+            userId: updatedPresence.userId,
+            username: updatedPresence.username,
+            displayName: updatedPresence.displayName,
+            avatarUrl: updatedPresence.avatarUrl,
+            online: updatedPresence.online,
+            inRoom: updatedPresence.inRoom,
+            onlineStatusVisible: true,
+            lastSeen: updatedPresence.lastSeen,
+          };
+          this.broadcastToAll('presence:update', publicPresence);
         } else {
           this.broadcastToAll('presence:update', { userId: uid, online: false, inRoom: false });
         }
