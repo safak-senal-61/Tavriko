@@ -27,6 +27,7 @@ import {
 } from '../components/TavrikoIcons';
 interface FriendsScreenProps {
   user?: UserProfile;
+  token?: string;
   isGuest?: boolean;
   apiBaseUrl?: string;
   onBack: () => void;
@@ -59,6 +60,7 @@ interface FriendRowItem {
 }
 export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   user,
+  token,
   isGuest = false,
   apiBaseUrl,
   onBack,
@@ -118,7 +120,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     const uid = user?.id || 'default';
     setLoading(true);
     socketService.requestPresenceSnapshot();
-    fetch(`${base}/social/friends/${uid}`)
+    fetch(`${base}/social/friends/${uid}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then((res) => res.json())
       .then((data) => {
         if (data.friendCode) setFriendCode(data.friendCode);
@@ -338,7 +340,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/friends/remove`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           userId: user.id,
           friendId: targetPlayer.id,
@@ -385,7 +387,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/friends/add`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           userId: user.id,
           codeOrUsername: clean,
@@ -422,7 +424,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/notifications/respond`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           userId: user.id,
           notificationId: req.id,
@@ -465,7 +467,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/friends/challenge`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           userId: user.id,
           targetUserId: friend.id,
