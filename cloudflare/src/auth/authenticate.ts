@@ -40,6 +40,9 @@ export async function verifyJwt(
   token: string,
   secret: string
 ): Promise<AuthResult> {
+  if (!secret || typeof secret !== 'string' || secret.length < 32) {
+    return { isValid: false, error: 'JWT verification is not configured' };
+  }
   if (!token || typeof token !== 'string') {
     return { isValid: false, error: 'Token is missing' };
   }
@@ -86,6 +89,9 @@ export async function verifyJwt(
   }
 
   // Check expiration
+  if (!payload.exp || typeof payload.exp !== 'number') {
+    return { isValid: false, error: 'Token expiration is required' };
+  }
   if (payload.exp && typeof payload.exp === 'number') {
     const nowSec = Math.floor(Date.now() / 1000);
     if (nowSec > payload.exp) {
@@ -99,29 +105,10 @@ export async function verifyJwt(
     const dataToVerify = encoder.encode(`${headerB64}.${payloadB64}`);
     const signatureBytes = base64UrlDecode(signatureB64);
 
-    // Try provided secret first, then fallback to default if different
-    const secretsToTry = [secret, 'super_secret_trivia_key_2026'];
-
-    let verified = false;
-    for (const sec of secretsToTry) {
-      if (!sec) continue;
-      const key = await crypto.subtle.importKey(
-        'raw',
-        encoder.encode(sec),
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['verify']
-      );
-
-      verified = await crypto.subtle.verify(
-        'HMAC',
-        key,
-        signatureBytes,
-        dataToVerify
-      );
-
-      if (verified) break;
-    }
+    const key = await crypto.subtle.importKey(
+      'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+    );
+    const verified = await crypto.subtle.verify('HMAC', key, signatureBytes, dataToVerify);
 
     if (!verified) {
       return { isValid: false, error: 'Invalid token signature' };
