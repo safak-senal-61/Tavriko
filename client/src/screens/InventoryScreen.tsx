@@ -30,6 +30,7 @@ import {
 
 interface InventoryScreenProps {
   user?: UserProfile;
+  token?: string;
   apiBaseUrl?: string;
   onUpdateUser?: (updatedUser: UserProfile) => void;
   onBack?: () => void;
@@ -66,6 +67,7 @@ const RARITY_COLORS: Record<string, string> = {
 
 export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   user,
+  token,
   apiBaseUrl,
   onUpdateUser,
   onBack,
@@ -172,7 +174,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/inventory/open-chest`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           userId: user.id,
           chestId: selectedChest.id,
