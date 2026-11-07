@@ -95,7 +95,22 @@ export function setupSocketHandlers(
   const socketMeta: Map<string, { playerId: string; roomCode?: string }> = new Map();
 
   io.on('connection', (socket: Socket) => {
-    const initialPlayerId = socket.handshake.query.playerId as string;
+    const initialPlayerId = String(socket.data.authUserId || '');
+    if (!initialPlayerId) {
+      socket.disconnect(true);
+      return;
+    }
+
+    // All identity-bearing event fields are overwritten with the verified
+    // connection identity; clients cannot act as another player or host.
+    socket.use(([event, payload], next) => {
+      if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+        payload.playerId = initialPlayerId;
+        payload.userId = initialPlayerId;
+        payload.hostId = initialPlayerId;
+      }
+      next();
+    });
     if (initialPlayerId) {
       socketMeta.set(socket.id, { playerId: initialPlayerId });
       presenceManager.registerSocket(initialPlayerId, socket);
