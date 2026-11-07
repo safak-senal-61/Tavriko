@@ -42,6 +42,8 @@ function getLocalIpAddress(): string {
 export function createApp() {
   initErrorMonitor();
   const app = express();
+  // Vercel is the trusted reverse proxy; rate limiting must see the client IP.
+  app.set('trust proxy', 1);
   const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map((origin) => origin.trim()).filter(Boolean);
   app.use(cors({
     origin: (origin, callback) => {
