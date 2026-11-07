@@ -226,7 +226,7 @@ router.post('/shop/purchase', requireUser, async (req: Request, res: Response): 
     }
 
     // Fallback legacy pack support
-    let resolvedPack = req.body;
+    let resolvedPack: { coinsDelta?: number; gemsDelta?: number; itemId?: string; itemQty?: number };
     let message = 'Satın alma işlemi veritabanına kaydedildi!';
     if (packId === 'starter_pack') {
       resolvedPack = { coinsDelta: 1000, gemsDelta: 50, itemId: 'chest_wood', itemQty: 1 };
@@ -243,6 +243,9 @@ router.post('/shop/purchase', requireUser, async (req: Request, res: Response): 
     } else if (packId === 'mega_chest') {
       resolvedPack = { coinsDelta: -400, gemsDelta: 0, itemId: 'chest_silver', itemQty: 2 };
       message = '2x Sandık envanterine eklendi!';
+    } else {
+      res.status(400).json({ error: 'Geçersiz mağaza ürünü.' });
+      return;
     }
 
     const updated = await db.purchaseShopPack(userId, resolvedPack);
@@ -365,6 +368,7 @@ router.post('/events/start', (req: Request, res: Response): void => {
     res.status(400).json({ error: err.message });
   }
 });
+*/
 
 // --- User Profile (Pro League & Inspect) ---
 router.get('/profile/:userId', async (req: Request, res: Response): Promise<void> => {
@@ -377,13 +381,14 @@ router.get('/profile/:userId', async (req: Request, res: Response): Promise<void
   res.json(profile);
 });
 
-router.post('/daily-challenge/complete', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.post('/daily-challenge/complete', requireUser, async (_req: Request, res: Response): Promise<void> => {
+  res.status(410).json({ error: 'Günlük görev ödülleri, sunucu tarafından doğrulanmış cevap oturumu tamamlanana kadar devre dışıdır.' });
+});
+
+/*
+router.post('/daily-challenge/complete-legacy', async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, correctAnswers, totalQuestions } = req.body;
-    if (!userId) {
-      res.status(400).json({ error: 'userId gereklidir' });
-      return;
-    }
     const result = await db.recordDailyChallengeCompletion(userId, {
       correctAnswers: Number(correctAnswers) || 0,
       totalQuestions: Number(totalQuestions) || 5,
