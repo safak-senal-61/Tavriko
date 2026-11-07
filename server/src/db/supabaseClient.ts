@@ -318,13 +318,23 @@ export class SupabaseService {
     if (!this.client) return null;
     try {
       const clean = identifier.trim().toLowerCase();
-      const { data, error } = await this.client
+      // Use separate equality filters; interpolating user input into a
+      // PostgREST .or() expression can change the filter grammar.
+      const { data: byUsername, error: usernameError } = await this.client
         .from('users')
         .select('*')
-        .or(`username.eq.${clean},email.eq.${clean}`)
+        .eq('username', clean)
         .limit(1)
         .maybeSingle();
-      if (!error && data) return data;
+      if (!usernameError && byUsername) return byUsername;
+
+      const { data: byEmail, error: emailError } = await this.client
+        .from('users')
+        .select('*')
+        .eq('email', clean)
+        .limit(1)
+        .maybeSingle();
+      if (!emailError && byEmail) return byEmail;
 
       // Fallback: check Supabase Cloud Storage users_store.json
       const cloudUsers = await this.loadCloudStore<any[]>('users_store.json');
