@@ -626,11 +626,9 @@ export class MatchmakerDO extends DurableObject<Env> {
 
   private generateRoomCode(): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = 'TAV-';
-    for (let i = 0; i < 5; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
+    const bytes = new Uint8Array(10);
+    crypto.getRandomValues(bytes);
+    return 'TAV-' + Array.from(bytes, (value) => chars[value % chars.length]).join('');
   }
 
   private async setupRoomInGameRoomDO(
