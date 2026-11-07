@@ -103,7 +103,8 @@ export function setupSocketHandlers(
 
     // All identity-bearing event fields are overwritten with the verified
     // connection identity; clients cannot act as another player or host.
-    socket.use(([event, payload], next) => {
+    socket.use((packet, next) => {
+      const payload = packet[1];
       if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
         payload.playerId = initialPlayerId;
         payload.userId = initialPlayerId;
