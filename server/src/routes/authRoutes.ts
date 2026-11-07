@@ -3,12 +3,11 @@ import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
 import { UserProfile } from '@trivia/shared';
 import { logger } from '../utils/logger';
+import { requireUser } from '../middleware/security';
 
 const router = Router();
 
-const GOOGLE_CLIENT_ID =
-  process.env.GOOGLE_CLIENT_ID ||
-  '411578437442-gs1rck2124rgr516fe9dn9tuu15ge9ig.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 
 export interface PendingGoogleSession {
   sessionId: string;
@@ -57,109 +56,20 @@ router.get('/google/session-status', (req: Request, res: Response): void => {
 
 router.post('/google/complete-session', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { sessionId, accessToken, userEmail, userName, userAvatar } = req.body;
-    logger.info('GOOGLE', `complete-session isteği alındı (sessionId: ${sessionId || 'yok'})`, {
-      hasAccessToken: !!accessToken,
-      userEmail,
-    });
-    let email = userEmail;
-    let name = userName;
-    let avatar = userAvatar;
-    let googleId = undefined;
-
-    if (accessToken) {
-      try {
-        const client = supabaseService.getClient();
-        if (client) {
-          const { data, error } = await client.auth.getUser(accessToken);
-          if (error) {
-            logger.warn('GOOGLE', `Supabase getUser uyarısı: ${error.message}`);
-          }
-          if (data?.user) {
-            email = data.user.email || email;
-            const meta = data.user.user_metadata || {};
-            name = meta.full_name || meta.name || name || email?.split('@')[0];
-            avatar = meta.avatar_url || meta.picture || avatar || 'av1';
-            googleId = data.user.id;
-            logger.info('GOOGLE', `Supabase'den Google kullanıcısı alındı: ${email} (${name})`);
-          }
-        }
-      } catch (err: any) {
-        logger.error('GOOGLE', 'Supabase token doğrulama hatası:', err);
-      }
-    }
-
-    if (!email) {
-      if (sessionId && pendingSessions.has(sessionId)) {
-        pendingSessions.set(sessionId, {
-          sessionId,
-          status: 'error',
-          error: 'E-posta bilgisi alınamadı.',
-          createdAt: Date.now(),
-        });
-      }
-      logger.error('GOOGLE', 'complete-session başarısız: E-posta bilgisi alınamadı');
-      res.status(400).json({ error: 'E-posta bilgisi alınamadı.' });
-      return;
-    }
-
-    const result = await db.loginOrRegisterGoogle({
-      email,
-      displayName: name || email.split('@')[0],
-      fullName: name,
-      avatarUrl: avatar || 'av1',
-      googleId,
-    });
-
-    logger.success('GOOGLE', `Google kullanıcısı PostgreSQL public.users tablosuna kaydedildi: ${result.user.email}`, {
-      userId: result.user.id,
-      displayName: result.user.displayName,
-      friendCode: result.user.friendCode,
-    });
-
-    // Match exact sessionId or fallback to the latest pending session (within 2 mins)
-    let targetSessionId = sessionId;
-    if (!targetSessionId || !pendingSessions.has(targetSessionId)) {
-      const now = Date.now();
-      let latestPending: PendingGoogleSession | undefined;
-      for (const s of pendingSessions.values()) {
-        if (s.status === 'pending' && (now - s.createdAt) < 120000) {
-          if (!latestPending || s.createdAt > latestPending.createdAt) {
-            latestPending = s;
-          }
-        }
-      }
-      if (latestPending) {
-        targetSessionId = latestPending.sessionId;
-      }
-    }
-
-    if (targetSessionId && pendingSessions.has(targetSessionId)) {
-      pendingSessions.set(targetSessionId, {
-        sessionId: targetSessionId,
-        status: 'ready',
-        user: result.user,
-        token: result.token,
-        createdAt: Date.now(),
-      });
-      logger.info('GOOGLE', `Oturum 'ready' durumuna getirildi: ${targetSessionId}`);
-    }
-
-    res.json({ success: true, user: result.user, token: result.token });
-  } catch (err: any) {
-    logger.error('GOOGLE', `complete-session sistem hatası: ${err.message}`, err);
-    if (req.body.sessionId && pendingSessions.has(req.body.sessionId)) {
-      pendingSessions.set(req.body.sessionId, {
-        sessionId: req.body.sessionId,
-        status: 'error',
-        error: err.message,
-        createdAt: Date.now(),
-      });
-    }
-    res.status(500).json({ error: err.message });
-  }
+    const { sessionId, accessToken } = req.body;
+    if (!accessToken || typeof accessToken !== 'string') { res.status(401).json({ error: 'Doğrulanmış erişim tokenı gerekli.' }); return; }
+    const client = supabaseService.getClient();
+    if (!client) { res.status(503).json({ error: 'Kimlik sağlayıcısı yapılandırılmamış.' }); return; }
+    const { data, error } = await client.auth.getUser(accessToken);
+    if (error || !data?.user?.email || !data.user.identities?.some((item: any) => item.provider === 'google')) { res.status(401).json({ error: 'Google kimliği doğrulanamadı.' }); return; }
+    const email = data.user.email;
+    const meta = data.user.user_metadata || {};
+    const name = meta.full_name || meta.name || email.split('@')[0];
+    const result = await db.loginOrRegisterGoogle({ email, displayName: name, fullName: name, avatarUrl: meta.avatar_url || meta.picture || 'av1', googleId: data.user.id });
+    if (sessionId && pendingSessions.has(sessionId)) pendingSessions.set(sessionId, { sessionId, status: 'ready', user: result.user, token: result.token, createdAt: Date.now() });
+    res.json(result);
+  } catch { res.status(401).json({ error: 'Google oturumu tamamlanamadı.' }); }
 });
-
 router.post('/guest', async (req: Request, res: Response): Promise<void> => {
   try {
     const { displayName } = req.body;
@@ -366,123 +276,33 @@ router.get('/google/callback', (req: Request, res: Response): void => {
 
 router.post('/google', async (req: Request, res: Response): Promise<void> => {
   try {
-    const {
-      idToken,
-      accessToken,
-      email,
-      displayName,
-      fullName,
-      avatarUrl,
-      countryCode,
-      countryName,
-      phone,
-      birthDate,
-      clientCoins,
-      clientGems,
-      clientXp,
-      clientLevel,
-    } = req.body;
-
-    let verifiedEmail = email;
-    let verifiedName = displayName || fullName;
-    let verifiedPicture = avatarUrl;
-    let googleSub = undefined;
-
-    // If an actual Google OAuth idToken or accessToken is passed, verify against Google API
-    if (idToken) {
-      try {
-        const tokenRes = await fetch(
-          `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`
-        );
-        if (tokenRes.ok) {
-          const tokenInfo: any = await tokenRes.json();
-          if (tokenInfo.email) verifiedEmail = tokenInfo.email;
-          if (tokenInfo.name) verifiedName = tokenInfo.name;
-          if (tokenInfo.picture) verifiedPicture = tokenInfo.picture;
-          googleSub = tokenInfo.sub;
+    const { idToken, accessToken, countryCode, countryName, phone, birthDate } = req.body || {};
+    let verifiedEmail: string | undefined, verifiedName: string | undefined, verifiedPicture: string | undefined, googleSub: string | undefined;
+    if (idToken && typeof idToken === 'string') {
+      const response = await fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken));
+      if (!response.ok) { res.status(401).json({ error: 'Google tokenı doğrulanamadı.' }); return; }
+      const info: any = await response.json();
+      if (!GOOGLE_CLIENT_ID || info.aud !== GOOGLE_CLIENT_ID || info.email_verified !== 'true' || !info.sub || !info.email) { res.status(401).json({ error: 'Google kimliği geçerli değil.' }); return; }
+      verifiedEmail = info.email; verifiedName = info.name; verifiedPicture = info.picture; googleSub = info.sub;
+    } else if (accessToken && typeof accessToken === 'string') {
+      const client = supabaseService.getClient();
+      if (client) {
+        const result = await client.auth.getUser(accessToken);
+        if (!result.error && result.data?.user?.email && result.data.user.identities?.some((item: any) => item.provider === 'google')) {
+          verifiedEmail = result.data.user.email; const meta = result.data.user.user_metadata || {}; verifiedName = meta.full_name || meta.name; verifiedPicture = meta.avatar_url || meta.picture; googleSub = result.data.user.id;
         }
-      } catch {
-        // Fallback to provided profile fields
       }
-    } else if (accessToken) {
-      // 1. Check if token is a Supabase JWT
-      try {
-        const client = supabaseService.getClient();
-        if (client) {
-          const { data, error } = await client.auth.getUser(accessToken);
-          if (data?.user) {
-            verifiedEmail = data.user.email || verifiedEmail;
-            const meta = data.user.user_metadata || {};
-            verifiedName = meta.full_name || meta.name || verifiedName || verifiedEmail?.split('@')[0];
-            verifiedPicture = meta.avatar_url || meta.picture || verifiedPicture || 'av1';
-            googleSub = data.user.id;
-          }
-        }
-      } catch {}
-
-      // 2. Fallback to raw Google OAuth userinfo if not verified yet
       if (!verifiedEmail) {
-        try {
-          const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          });
-          if (userRes.ok) {
-            const userInfo: any = await userRes.json();
-            if (userInfo.email) verifiedEmail = userInfo.email;
-            if (userInfo.name) verifiedName = userInfo.name;
-            if (userInfo.picture) verifiedPicture = userInfo.picture;
-            googleSub = userInfo.sub;
-          }
-        } catch {
-          // Fallback to provided profile fields
-        }
+        const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + accessToken } });
+        if (response.ok) { const info: any = await response.json(); if (info.email && info.email_verified === true && info.sub) { verifiedEmail = info.email; verifiedName = info.name; verifiedPicture = info.picture; googleSub = info.sub; } }
       }
     }
-
-    if (!verifiedEmail) {
-      res.status(400).json({ error: 'Google hesabından e-posta bilgisi alınamadı.' });
-      return;
-    }
-
-    const result = await db.loginOrRegisterGoogle({
-      email: verifiedEmail,
-      displayName: verifiedName || verifiedEmail.split('@')[0],
-      fullName: fullName || verifiedName,
-      avatarUrl: verifiedPicture,
-      googleId: googleSub,
-      countryCode,
-      countryName,
-      phone,
-      birthDate,
-    });
-
-    if (
-      (typeof clientCoins === 'number' && clientCoins > (result.user.coins ?? 0)) ||
-      (typeof clientGems === 'number' && clientGems > (result.user.gems ?? 0)) ||
-      (typeof clientXp === 'number' && clientXp > (result.user.xp ?? 0)) ||
-      (typeof clientLevel === 'number' && clientLevel > (result.user.level ?? 1))
-    ) {
-      const synced = await db.syncWallet(result.user.id, {
-        coins: clientCoins,
-        gems: clientGems,
-        xp: clientXp,
-        level: clientLevel,
-      });
-      if (synced) {
-        result.user = synced;
-      }
-    }
-
-    res.json({
-      ...result,
-      googleClientId: GOOGLE_CLIENT_ID,
-    });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
+    if (!verifiedEmail || !googleSub) { res.status(401).json({ error: 'Geçerli Google kimlik doğrulaması gerekli.' }); return; }
+    const result = await db.loginOrRegisterGoogle({ email: verifiedEmail, displayName: verifiedName || verifiedEmail.split('@')[0], fullName: verifiedName, avatarUrl: verifiedPicture || 'av1', googleId: googleSub, countryCode, countryName, phone, birthDate });
+    res.json({ ...result, googleClientId: GOOGLE_CLIENT_ID || undefined });
+  } catch { res.status(401).json({ error: 'Google kimlik doğrulaması başarısız.' }); }
 });
-
-router.post('/delete-account', async (req: Request, res: Response): Promise<void> => {
+router.post('/delete-account', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId } = req.body;
     if (!userId) {
@@ -530,7 +350,7 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
   }
 });
 
-router.put('/profile', async (req: Request, res: Response): Promise<void> => {
+router.put('/profile', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     let userId = req.body.userId;
@@ -556,7 +376,7 @@ router.put('/profile', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.post('/settings', async (req: Request, res: Response): Promise<void> => {
+router.post('/settings', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     let userId = req.body.userId;
@@ -610,41 +430,12 @@ router.post('/change-password', async (req: Request, res: Response): Promise<voi
   }
 });
 
-router.post('/stats', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { userId, correctAnswers = 0, totalAnswers = 0, xpEarned = 0, coinsEarned = 0, bestStreak = 0, won = false, roomCode, category } = req.body;
-    if (!userId) {
-      res.status(400).json({ error: 'userId gerekli' });
-      return;
-    }
-    const updated = await db.recordGameStats(userId, {
-      correctAnswers,
-      totalAnswers,
-      xpEarned,
-      coinsEarned,
-      bestStreak,
-      won,
-      roomCode: typeof roomCode === 'string' && roomCode.trim() ? roomCode.trim() : undefined,
-      category: typeof category === 'string' && category.trim() ? category.trim() : undefined,
-    });
-    res.json({ success: true, user: updated });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
+router.post('/stats', requireUser, (_req: Request, res: Response): void => {
+  res.status(410).json({ error: 'Bu işlem istemci tarafından değiştirilemez; sunucu tarafından doğrulanmış maç/ödül akışı kullanılmalıdır.' });
 });
 
-router.post('/sync-wallet', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { userId, coins, gems, xp, level } = req.body;
-    if (!userId) {
-      res.status(400).json({ error: 'userId gereklidir' });
-      return;
-    }
-    const updatedUser = await db.syncWallet(userId, { coins, gems, xp, level });
-    res.json({ success: true, user: updatedUser });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
+router.post('/sync-wallet', requireUser, (_req: Request, res: Response): void => {
+  res.status(410).json({ error: 'Bu işlem istemci tarafından değiştirilemez; sunucu tarafından doğrulanmış maç/ödül akışı kullanılmalıdır.' });
 });
 
 router.get('/me', (req: Request, res: Response): void => {
