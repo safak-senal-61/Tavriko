@@ -30,7 +30,7 @@ router.get('/friends/:userId', async (req: Request, res: Response): Promise<void
   }
 });
 
-router.post('/friends/add', async (req: Request, res: Response): Promise<void> => {
+router.post('/friends/add', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, codeOrUsername } = req.body;
     if (!userId || !codeOrUsername) {
@@ -48,7 +48,7 @@ router.post('/friends/add', async (req: Request, res: Response): Promise<void> =
   }
 });
 
-router.post('/friends/remove', async (req: Request, res: Response): Promise<void> => {
+router.post('/friends/remove', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, friendId, targetUserId } = req.body;
     const target = friendId || targetUserId;
@@ -68,7 +68,7 @@ router.post('/friends/remove', async (req: Request, res: Response): Promise<void
 });
 
 // --- 1v1 Match Challenge (Yarış İsteği) ---
-router.post('/friends/challenge', async (req: Request, res: Response): Promise<void> => {
+router.post('/friends/challenge', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, targetUserId, category } = req.body;
     if (!userId || !targetUserId) {
@@ -87,7 +87,7 @@ router.post('/friends/challenge', async (req: Request, res: Response): Promise<v
 });
 
 // --- Real Notifications API ---
-router.get('/notifications/:userId', async (req: Request, res: Response): Promise<void> => {
+router.get('/notifications/:userId', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
     const notifications = await db.getUserNotificationsAsync(userId || 'anon');
@@ -100,7 +100,7 @@ router.get('/notifications/:userId', async (req: Request, res: Response): Promis
   }
 });
 
-router.post('/notifications/respond', async (req: Request, res: Response): Promise<void> => {
+router.post('/notifications/respond', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, notificationId, action } = req.body;
     if (!userId || !notificationId || !action) {
@@ -126,7 +126,7 @@ router.get('/presence', (req: Request, res: Response): void => {
   });
 });
 
-router.post('/presence/heartbeat', (req: Request, res: Response): void => {
+router.post('/presence/heartbeat', requireUser, (req: Request, res: Response): void => {
   try {
     const { userId, inRoom, roomCode } = req.body;
     if (userId) {
@@ -142,7 +142,7 @@ router.post('/presence/heartbeat', (req: Request, res: Response): void => {
 });
 
 // --- Room Status Sync ---
-router.post('/rooms/active', (req: Request, res: Response): void => {
+router.post('/rooms/active', requireUser, (req: Request, res: Response): void => {
   try {
     const {
       userId,
@@ -251,7 +251,7 @@ router.post('/shop/purchase', requireUser, async (req: Request, res: Response): 
 });
 
 // --- Inventory & Chest Opening ---
-router.post('/inventory/use', async (req: Request, res: Response): Promise<void> => {
+router.post('/inventory/use', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, itemId } = req.body;
     if (!userId || !itemId) {
@@ -336,7 +336,7 @@ router.get('/events', (req: Request, res: Response): void => {
   }
 });
 
-router.post('/events/claim', async (req: Request, res: Response): Promise<void> => {
+router.post('/events/claim', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, eventId } = req.body;
     if (!userId || !eventId) {
@@ -375,7 +375,7 @@ router.get('/profile/:userId', async (req: Request, res: Response): Promise<void
   res.json(profile);
 });
 
-router.post('/daily-challenge/complete', async (req: Request, res: Response): Promise<void> => {
+router.post('/daily-challenge/complete', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, correctAnswers, totalQuestions } = req.body;
     if (!userId) {
