@@ -38,6 +38,13 @@ interface AlarmContext {
   disconnectedPlayerId?: string;
 }
 
+function constantTimeSecretMatch(expected: string | undefined, supplied: string | null): boolean {
+  if (!expected || expected.length < 32 || !supplied || supplied.length !== expected.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < expected.length; i++) mismatch |= expected.charCodeAt(i) ^ supplied.charCodeAt(i);
+  return mismatch === 0;
+}
+
 export class GameRoomDO extends DurableObject<Env> {
   private room: GameRoom | null = null;
   private questions: Question[] = [];
@@ -87,7 +94,7 @@ export class GameRoomDO extends DurableObject<Env> {
     }
 
     if (request.method === 'POST' && (url.pathname === '/create-match' || url.pathname.endsWith('/create-match'))) {
-      if (!this.env.INTERNAL_API_SECRET || request.headers.get('x-internal-secret') !== this.env.INTERNAL_API_SECRET) {
+      if (!constantTimeSecretMatch(this.env.INTERNAL_API_SECRET, request.headers.get('x-internal-secret'))) {
         return new Response(JSON.stringify({ error: 'Yetkisiz iç servis isteği.' }), { status: 403 });
       }
       const data = (await request.json()) as any;
