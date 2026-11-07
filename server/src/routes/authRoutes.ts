@@ -178,8 +178,9 @@ router.post('/login', rateLimit({ keyPrefix: 'login', windowMs: 15 * 60 * 1000, 
     const result = await db.login(loginId, password);
     res.setHeader('Cache-Control', 'no-store');
     res.json(result);
-  } catch (err: any) {
-    res.status(401).json({ error: err.message });
+  } catch {
+    // Avoid disclosing whether an account exists.
+    res.status(401).json({ error: 'Kullanıcı adı/e-posta veya şifre hatalı.' });
   }
 });
 
