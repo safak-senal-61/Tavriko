@@ -180,7 +180,6 @@ router.post('/login', rateLimit({ keyPrefix: 'login', windowMs: 15 * 60 * 1000, 
 });
 
 router.get('/google/callback', (req: Request, res: Response): void => {
-  const currentHost = (req.headers.host || 'tavriko-app.vercel.app').split(':')[0];
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(`<!DOCTYPE html>
 <html lang="tr">
@@ -263,7 +262,7 @@ router.get('/google/callback', (req: Request, res: Response): void => {
         return;
       }
 
-      const activeHost = window.location.hostname || '${currentHost}';
+      const activeHost = window.location.hostname || 'tavriko-app.vercel.app';
       const webTarget = '/app#' + payload;
       const isExpoClient = /Expo/i.test(navigator.userAgent);
       const btn = document.getElementById('appBtn');
