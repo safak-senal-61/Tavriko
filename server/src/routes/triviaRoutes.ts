@@ -5,8 +5,10 @@ import { generateQuestionsWithEvrenGLM } from '../ai/evrenLlmGenerator';
 import { cacheService } from '../cache/redisClient';
 import { supabaseService } from '../db/supabaseClient';
 import { importQuestionsFromJson } from '../utils/questionImporter';
+import { requirePortalAdmin } from '../middleware/security';
 
 const router = Router();
+router.use('/admin', requirePortalAdmin);
 
 // Public trivia categories
 router.get('/categories', (req: Request, res: Response): void => {
