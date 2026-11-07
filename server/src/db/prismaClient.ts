@@ -3803,6 +3803,11 @@ export class PrismaService {
       const dbNotif = await this.rawClient.userNotification.findUnique({
         where: { id: notificationId },
       });
+      // Notification IDs are not authorization. Always verify ownership before
+      // changing the row or applying friend-request side effects.
+      if (dbNotif && dbNotif.userId !== userId) {
+        return { success: false, handled: finalHandled, error: 'Bildirim bulunamadı.', message: '' };
+      }
       if (dbNotif) notif = dbNotif;
     } catch {}
 
