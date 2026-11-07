@@ -87,7 +87,7 @@ export class SupabaseService {
         return {
           configured: true,
           connected: true,
-          message: 'Supabase PostgreSQL bağlantısı ve RLS denetimi aktif.',
+          message: 'Supabase PostgreSQL bağlantısı doğrulandı; bu kontrol RLS politikalarını incelemez.',
         };
       }
 
