@@ -436,17 +436,32 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         } catch {}
       }
 
-      const onWindowMessage = (event: MessageEvent) => {
-        if (event.data?.type === 'TAVRIKO_GOOGLE_AUTH') {
-          sendClientLog('INFO', 'window.postMessage uzerinden Google yetkisi alindi', { hasUser: Boolean(event.data?.user), hasToken: Boolean(event.data?.token), hasPayload: Boolean(event.data?.payload) });
-          if (event.data.user && event.data.token) {
+      const onWindowMessage = async (event: MessageEvent) => {
+        // Never accept authentication messages from another origin.
+        if (event.origin !== window.location.origin || event.data?.type !== 'TAVRIKO_GOOGLE_AUTH') return;
+
+        sendClientLog('INFO', 'Aynı kaynaklı Google oturum mesajı alındı', {
+          hasToken: typeof event.data?.token === 'string',
+          hasPayload: typeof event.data?.payload === 'string',
+        });
+
+        if (typeof event.data?.token === 'string' && event.data.token.length > 20) {
+          try {
+            const verifyRes = await fetch(`${apiBaseUrl}/auth/me`, {
+              headers: { Authorization: `Bearer ${event.data.token}` },
+            });
+            if (!verifyRes.ok) throw new Error('Google oturumu sunucuda doğrulanamadı.');
+            const verifiedUser = await verifyRes.json();
             sound.playSound('victory');
             sound.triggerHaptic('success');
             setLoading(false);
-            onSuccess(event.data.user, event.data.token);
-          } else if (event.data.payload) {
-            handleAuthRedirectUrl(event.data.payload);
+            onSuccess(verifiedUser, event.data.token);
+          } catch (err: any) {
+            setLoading(false);
+            setErrorMsg(err.message || 'Google oturumu doğrulanamadı.');
           }
+        } else if (typeof event.data?.payload === 'string') {
+          handleAuthRedirectUrl(event.data.payload);
         }
       };
       window.addEventListener('message', onWindowMessage);
@@ -519,7 +534,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         if (initRes.ok) {
           const initData = await initRes.json();
           sessionId = initData.sessionId;
-          sendClientLog('INFO', 'Sunucu oturumu oluşturuldu', { sessionId });
+          sendClientLog('INFO', 'Sunucu oturumu oluşturuldu', { hasSessionId: Boolean(sessionId) });
         }
       } catch (initErr: any) {
         sendClientLog('WARN', 'Sunucu init-session çağrısı atlandı veya zaman aşımına uğradı', { err: initErr.message });
@@ -554,7 +569,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 try {
                   WebBrowser.dismissAuthSession();
                 } catch {}
-                sendClientLog('SUCCESS', 'Oturum hazır! Ana sayfaya yönlendiriliyor', { user: statusData.user.email });
+                sendClientLog('SUCCESS', 'Oturum hazır! Ana sayfaya yönlendiriliyor', { hasUser: Boolean(statusData.user?.id) });
                 sound.playSound('victory');
                 sound.triggerHaptic('success');
                 setLoading(false);
@@ -581,7 +596,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         queryParams.sessionId = sessionId;
       }
 
-      sendClientLog('INFO', 'Supabase OAuth URL isteniyor...', { redirectUri });
+      sendClientLog('INFO', 'Supabase OAuth URL isteniyor...', { hasRedirectUri: Boolean(redirectUri) });
       const { data, error } = await clientSupabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -599,7 +614,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         sendClientLog('ERROR', 'Supabase OAuth URL hatası', { error });
         throw new Error(error?.message || 'Google yetkilendirme linki oluşturulamadı.');
       }
-      sendClientLog('INFO', 'WebBrowser açılıyor...', { oauthUrl: data.url });
+      sendClientLog('INFO', 'WebBrowser açılıyor...', { hasOAuthUrl: Boolean(data.url) });
       // 5. Open authentic Google account selector in system browser sheet (Mobile Native)
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
       sendClientLog('INFO', 'WebBrowser kapandı/döndü', { resultType: result.type });
