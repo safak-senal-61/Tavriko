@@ -181,6 +181,9 @@ export class GameRoomDO extends DurableObject<Env> {
       const authResult = await verifyJwt(token, this.env.JWT_SECRET);
       if (authResult.isValid && authResult.user) {
         authUser = authResult.user;
+        if (rawPlayerId && rawPlayerId !== authUser.id) {
+          return new Response(JSON.stringify({ error: 'Kimlik uyuşmazlığı' }), { status: 403 });
+        }
         if (rawAvatarUrl && rawAvatarUrl !== 'undefined') {
           authUser.avatarUrl = rawAvatarUrl;
         }
@@ -190,7 +193,12 @@ export class GameRoomDO extends DurableObject<Env> {
       }
     }
 
-    // Support guests or query-based identity if token was not strictly provided
+    // A supplied but invalid token must never downgrade to an anonymous identity.
+    if (token && !authUser) {
+      return new Response(JSON.stringify({ error: 'Geçersiz oturum' }), { status: 401 });
+    }
+
+    // Support guest identities only when no bearer token was supplied.
     if (!authUser) {
       const pid = rawPlayerId || `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       const name = sanitizeString(rawDisplayName || `Misafir ${pid.slice(-4)}`, 30);
