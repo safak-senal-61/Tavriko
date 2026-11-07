@@ -385,22 +385,5 @@ router.post('/daily-challenge/complete', requireUser, async (_req: Request, res:
   res.status(410).json({ error: 'Günlük görev ödülleri, sunucu tarafından doğrulanmış cevap oturumu tamamlanana kadar devre dışıdır.' });
 });
 
-/*
-router.post('/daily-challenge/complete-legacy', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { userId, correctAnswers, totalQuestions } = req.body;
-    const result = await db.recordDailyChallengeCompletion(userId, {
-      correctAnswers: Number(correctAnswers) || 0,
-      totalQuestions: Number(totalQuestions) || 5,
-    });
-    if (!result.success) {
-      res.status(400).json({ error: result.error, user: result.user });
-      return;
-    }
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 export default router;
