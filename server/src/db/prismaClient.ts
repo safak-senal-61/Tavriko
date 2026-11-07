@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import crypto from 'crypto';
@@ -1375,7 +1376,7 @@ export class PrismaService {
   }
 
   public async createGuest(displayName?: string): Promise<{ token: string; user: UserProfile }> {
-    const id = 'guest_' + Math.random().toString(36).substring(2, 9);
+    const id = 'guest_' + randomBytes(16).toString('hex');
     const name = displayName || `Misafir_${Math.floor(1000 + Math.random() * 9000)}`;
     const record: UserRecord = {
       id,
