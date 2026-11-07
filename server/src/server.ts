@@ -195,6 +195,22 @@ export function createApp() {
 
   // Telegram Webhook endpoint (Essential for Vercel Serverless execution)
   app.post(['/api/telegram/webhook', '/telegram/webhook'], async (req, res) => {
+    const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET || '';
+    const suppliedSecret = req.header('x-telegram-bot-api-secret-token') || '';
+    if (expectedSecret.length < 32) {
+      return res.status(503).send('Webhook secret not configured');
+    }
+    if (suppliedSecret.length !== expectedSecret.length) {
+      return res.status(401).send('Unauthorized');
+    }
+    let secretMismatch = 0;
+    for (let i = 0; i < expectedSecret.length; i++) {
+      secretMismatch |= expectedSecret.charCodeAt(i) ^ suppliedSecret.charCodeAt(i);
+    }
+    if (secretMismatch !== 0) {
+      return res.status(401).send('Unauthorized');
+    }
+
     try {
       const update = req.body;
       const sender =
