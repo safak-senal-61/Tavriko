@@ -206,25 +206,8 @@ export default {
       );
     }
 
-    // Direct helper to set webhook to this Cloudflare Worker
-    if (url.pathname === '/telegram/set-webhook') {
-      const token = url.searchParams.get('token') || '';
-      if (!token || token.length < 15) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Lütfen geçerli bir token belirtin (?token=...)' }),
-          { status: 400, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
-      const cfWebhookUrl = `https://${url.host}/telegram/webhook`;
-      const tgRes = await fetch(
-        `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(cfWebhookUrl)}&drop_pending_updates=true`
-      );
-      const data = await tgRes.json();
-      return new Response(JSON.stringify({ cloudflare_gateway: cfWebhookUrl, telegram_response: data }), {
-        status: tgRes.status,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
+    // Webhook setup is managed by the authenticated backend admin route.
+    // Do not accept Telegram bot tokens in public query strings.
 
     const isWs = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
 
