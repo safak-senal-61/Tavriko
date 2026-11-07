@@ -32,7 +32,7 @@ logRouter.post('/portal/login', rateLimit({ keyPrefix: 'portal-login', windowMs:
   }
 });
 
-logRouter.get('/portal/verify', (req: Request, res: Response) => {
+logRouter.get('/portal/verify', rateLimit({ keyPrefix: 'portal-verify', windowMs: 60 * 1000, max: 30 }), (req: Request, res: Response) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!token) {
@@ -45,7 +45,7 @@ logRouter.get('/portal/verify', (req: Request, res: Response) => {
   }
   try {
     const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as any;
-    if (decoded && decoded.email === PORTAL_ADMIN_EMAIL) {
+    if (decoded && decoded.role === 'portal_super_admin' && decoded.email === PORTAL_ADMIN_EMAIL) {
       res.json({ success: true, email: decoded.email });
       return;
     }
