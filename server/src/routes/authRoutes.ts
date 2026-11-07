@@ -414,7 +414,17 @@ router.put('/profile', requireUser, async (req: Request, res: Response): Promise
   try {
     const userId = (req as any).authUserId as string;
     const body = req.body || {};
-    const updates: Record<string, string> = {};
+    const updates: Partial<{
+      displayName: string;
+      fullName: string;
+      countryCode: string;
+      countryName: string;
+      phone: string;
+      birthDate: string;
+      gender: string;
+      bio: string;
+      avatarUrl: string;
+    }> = {};
 
     const stringFields: Array<[string, number]> = [
       ['displayName', 32],
