@@ -4015,6 +4015,10 @@ export class PrismaService {
     throw new Error('Eski paket satın alma akışı devre dışı. Doğrulanmış ödeme sağlayıcısı gereklidir.');
   }
 
+  public async buyPremiumPass(userId: string): Promise<{ user: UserProfile; message: string }> {
+    return this.purchaseShopProduct(userId, 'pack_season_premium_pass', 'gems');
+  }
+
   public async purchaseShopProduct(
     userId: string,
     productId: string,
@@ -4039,6 +4043,9 @@ export class PrismaService {
     if (!product) throw new Error('Ürün mağazada bulunamadı.');
     if (product.currency === 'try') {
       throw new Error('Gerçek para ödemeleri doğrulanmış ödeme sağlayıcısı olmadan gerçekleştirilemez.');
+    }
+    if (product.grantPremiumPass && record.hasPremiumPass) {
+      throw new Error('Premium Pass hesabınızda zaten etkin.');
     }
     if (paymentMethod !== product.currency) {
       throw new Error('Ödeme yöntemi ürün para birimiyle eşleşmiyor.');
