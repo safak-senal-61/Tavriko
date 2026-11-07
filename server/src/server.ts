@@ -88,9 +88,22 @@ export function createApp() {
   const httpServer = http.createServer(app);
   const io = new SocketIOServer(httpServer, {
     cors: {
-      origin: '*',
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error('CORS origin is not allowed'));
+      },
       methods: ['GET', 'POST'],
     },
+  });
+
+  // Legacy Socket.IO transport is authenticated independently from its payload.
+  io.use((socket, next) => {
+    const rawToken = socket.handshake.auth?.token || socket.handshake.query?.token;
+    const token = typeof rawToken === 'string' ? rawToken : '';
+    const auth = token ? db.verifyToken(token) : null;
+    if (!auth?.userId) return next(new Error('Yetkisiz Socket.IO bağlantısı.'));
+    socket.data.authUserId = auth.userId;
+    next();
   });
 
   // Prometheus'a canli istemci sayisini bildir
@@ -119,48 +132,59 @@ export function createApp() {
 
   wss.on('connection', (ws: WsWebSocket, request: http.IncomingMessage) => {
     const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
-    const playerId = url.searchParams.get('playerId');
-    const roomCode = url.searchParams.get('roomCode');
+    const suppliedToken = url.searchParams.get('token') || '';
+    const suppliedPlayerId = url.searchParams.get('playerId') || '';
+    const auth = suppliedToken ? db.verifyToken(suppliedToken) : null;
 
-    if (playerId) {
-      presenceManager.registerSocket(playerId, ws);
-      if (roomCode) {
-        presenceManager.setUserRoom(playerId, roomCode);
-      }
-      ws.send(
-        JSON.stringify({
-          event: 'presence:sync',
-          payload: { presences: presenceManager.getAllPresences() },
-          timestamp: Date.now(),
-        })
-      );
+    // Invalid bearer tokens never downgrade to a caller-selected guest identity.
+    if (suppliedToken && !auth?.userId) {
+      ws.close(1008, 'Invalid session');
+      return;
     }
+
+    let playerId = auth?.userId || '';
+    if (playerId && suppliedPlayerId && playerId !== suppliedPlayerId) {
+      ws.close(1008, 'Identity mismatch');
+      return;
+    }
+    if (!playerId && (suppliedPlayerId.startsWith('guest_') || suppliedPlayerId.startsWith('guest:'))) {
+      playerId = suppliedPlayerId;
+    }
+    if (!playerId) {
+      ws.close(1008, 'Authentication required');
+      return;
+    }
+
+    const roomCode = url.searchParams.get('roomCode');
+    presenceManager.registerSocket(playerId, ws);
+    if (roomCode) presenceManager.setUserRoom(playerId, roomCode);
+    ws.send(JSON.stringify({
+      event: 'presence:sync',
+      payload: { presences: presenceManager.getAllPresences() },
+      timestamp: Date.now(),
+    }));
 
     ws.on('message', (data) => {
       try {
-        const text = data.toString();
-        const msg = JSON.parse(text);
+        const msg = JSON.parse(data.toString());
         if (msg.event === 'ping') {
           ws.send(JSON.stringify({ event: 'pong', timestamp: Date.now() }));
-        } else if (msg.event === 'presence:ping' && msg.payload?.playerId) {
-          presenceManager.touchUser(msg.payload.playerId);
-        } else if (msg.event === 'presence:register' && msg.payload?.playerId) {
-          presenceManager.registerSocket(msg.payload.playerId, ws);
-          ws.send(
-            JSON.stringify({
-              event: 'presence:sync',
-              payload: { presences: presenceManager.getAllPresences() },
-              timestamp: Date.now(),
-            })
-          );
+        } else if (msg.event === 'presence:ping') {
+          presenceManager.touchUser(playerId);
+        } else if (msg.event === 'presence:register') {
+          // A connection can register only the identity bound during handshake.
+          presenceManager.registerSocket(playerId, ws);
+          ws.send(JSON.stringify({
+            event: 'presence:sync',
+            payload: { presences: presenceManager.getAllPresences() },
+            timestamp: Date.now(),
+          }));
         }
       } catch {}
     });
 
     ws.on('close', () => {
-      if (playerId) {
-        presenceManager.unregisterSocket(playerId, ws);
-      }
+      presenceManager.unregisterSocket(playerId, ws);
     });
   });
 
