@@ -3468,6 +3468,9 @@ export class PrismaService {
     if (target.id === me.id) {
       return { success: false, error: 'Kendi kodunuzu arkadaş olarak ekleyemezsiniz!' };
     }
+    if (target.settings?.friendRequestsAllowed === false) {
+      return { success: false, error: 'Bu oyuncu arkadaşlık isteklerini kabul etmiyor.' };
+    }
 
     if (!me.friendIds) me.friendIds = [];
     if (!target.friendIds) target.friendIds = [];
@@ -3497,7 +3500,7 @@ export class PrismaService {
     // Create a PENDING friend request notification for target (handled: null)
     // Target will ONLY become a friend when they accept this notification!
     const notifItem: NotificationItem = {
-      id: 'notif_fr_' + Date.now(),
+      id: 'notif_fr_' + randomBytes(16).toString('hex'),
       type: 'friend_request',
       title: `${me.displayName} sana arkadaşlık isteği gönderdi!`,
       sub: 'Arkadaş olarak eklemek ve birlikte yarışmak için isteği kabul et.',
@@ -3938,13 +3941,21 @@ export class PrismaService {
       } catch {}
     }
     if (!target) return { success: false, error: 'Hedef oyuncu bulunamadı.', message: '' };
+    if (!me.friendIds?.includes(target.id) || !target.friendIds?.includes(me.id)) {
+      return { success: false, error: 'Yalnızca arkadaşlarınıza düello daveti gönderebilirsiniz.', message: '' };
+    }
+    if (target.settings?.duelInvitesAllowed === false || target.settings?.roomInvitesAllowed === false) {
+      return { success: false, error: 'Bu oyuncu oyun davetlerini kabul etmiyor.', message: '' };
+    }
 
-    const roomCode = 'DUEL-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+    const roomAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const roomBytes = randomBytes(8);
+    const roomCode = 'DUEL-' + Array.from(roomBytes, (value) => roomAlphabet[value % roomAlphabet.length]).join('');
     this.setUserActiveRoom(userId, roomCode);
     presenceManager.setUserRoom(userId, roomCode);
 
     const notifItem: NotificationItem = {
-      id: 'notif_chal_' + Date.now(),
+      id: 'notif_chal_' + randomBytes(16).toString('hex'),
       type: 'match_invite',
       title: `${me.displayName} sana 1v1 Düello Meydan Okudu!`,
       sub: 'Özel 1v1 düello odası hazır. Kabul et ve hemen yarışmaya başla!',
