@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { randomBytes } from 'crypto';
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
 import { UserProfile } from '@trivia/shared';
@@ -16,22 +17,43 @@ export interface PendingGoogleSession {
   token?: string;
   error?: string;
   createdAt: number;
+  expiresAt: number;
 }
 
 const pendingSessions = new Map<string, PendingGoogleSession>();
+const GOOGLE_SESSION_TTL_MS = 5 * 60 * 1000;
+const MAX_PENDING_GOOGLE_SESSIONS = 1000;
 
-export function getPendingGoogleSessions(): PendingGoogleSession[] {
-  return Array.from(pendingSessions.values()).slice(-10);
+function prunePendingGoogleSessions(): void {
+  const now = Date.now();
+  for (const [id, session] of pendingSessions) {
+    if (session.expiresAt <= now) pendingSessions.delete(id);
+  }
+  while (pendingSessions.size >= MAX_PENDING_GOOGLE_SESSIONS) {
+    const oldestId = pendingSessions.keys().next().value;
+    if (!oldestId) break;
+    pendingSessions.delete(oldestId);
+  }
+}
+
+export function getPendingGoogleSessions(): Array<Pick<PendingGoogleSession, 'status' | 'createdAt'>> {
+  return Array.from(pendingSessions.values())
+    .slice(-10)
+    .map(({ status, createdAt }) => ({ status, createdAt }));
 }
 
 router.post('/google/init-session', (req: Request, res: Response): void => {
-  const sessionId = 'gs_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+  prunePendingGoogleSessions();
+  const now = Date.now();
+  const sessionId = randomBytes(32).toString('base64url');
   pendingSessions.set(sessionId, {
     sessionId,
     status: 'pending',
-    createdAt: Date.now(),
+    createdAt: now,
+    expiresAt: now + GOOGLE_SESSION_TTL_MS,
   });
-  logger.info('GOOGLE', `Google oturumu başlatıldı: ${sessionId}`, { clientIp: req.ip });
+  logger.info('GOOGLE', 'Google oturumu başlatıldı', { clientIp: req.ip });
+  res.setHeader('Cache-Control', 'no-store');
   res.json({ sessionId });
 });
 
@@ -42,16 +64,23 @@ router.get('/google/session-status', (req: Request, res: Response): void => {
     return;
   }
   const session = pendingSessions.get(sessionId);
-  if (!session) {
+  if (!session || session.expiresAt <= Date.now()) {
+    pendingSessions.delete(sessionId);
+    res.setHeader('Cache-Control', 'no-store');
     res.json({ status: 'not_found' });
     return;
   }
+  res.setHeader('Cache-Control', 'no-store');
   res.json({
     status: session.status,
-    user: session.user,
-    token: session.token,
+    user: session.status === 'ready' ? session.user : undefined,
+    token: session.status === 'ready' ? session.token : undefined,
     error: session.error,
   });
+  // The bearer token is delivered exactly once; a second poll cannot retrieve it.
+  if (session.status === 'ready' || session.status === 'error') {
+    pendingSessions.delete(sessionId);
+  }
 });
 
 router.post('/google/complete-session', async (req: Request, res: Response): Promise<void> => {
@@ -66,7 +95,17 @@ router.post('/google/complete-session', async (req: Request, res: Response): Pro
     const meta = data.user.user_metadata || {};
     const name = meta.full_name || meta.name || email.split('@')[0];
     const result = await db.loginOrRegisterGoogle({ email, displayName: name, fullName: name, avatarUrl: meta.avatar_url || meta.picture || 'av1', googleId: data.user.id });
-    if (sessionId && pendingSessions.has(sessionId)) pendingSessions.set(sessionId, { sessionId, status: 'ready', user: result.user, token: result.token, createdAt: Date.now() });
+    if (typeof sessionId === 'string') {
+      const pending = pendingSessions.get(sessionId);
+      if (pending && pending.status === 'pending' && pending.expiresAt > Date.now()) {
+        pendingSessions.set(sessionId, {
+          ...pending,
+          status: 'ready',
+          user: result.user,
+          token: result.token,
+        });
+      }
+    }
     res.json(result);
   } catch { res.status(401).json({ error: 'Google oturumu tamamlanamadı.' }); }
 });
