@@ -29,10 +29,9 @@ Set `JWT_SECRET` to the same JWT verification secret used by the backend, `INTER
 
 ## Database access policy
 
-The migration `server/prisma/migrations/20261106000000_enable_rls_prisma_tables/migration.sql` enables RLS on all seven exposed application tables and removes broad browser-role grants.
+The migration `server/prisma/migrations/20261106000000_enable_rls_prisma_tables/migration.sql` enables RLS on all seven application tables and removes broad browser-role grants. This migration has already been applied to the live Supabase project and its RLS state, grants, and service-role policies were verified.
 
-- `categories`: browser roles (`anon`, `authenticated`) receive read-only SELECT.
-- `questions`, `users`, `user_inventory_items`, `user_notifications`, `match_history`, and `password_reset_tokens`: server/service-role only.
+- All seven tables, including `categories`, are server/service-role only. Browser roles (`anon`, `authenticated`) and `PUBLIC` have no direct table privileges; the backend must expose only the specific public data needed by the app.
 - The server must use `SUPABASE_SECRET_KEY`; the Supabase client no longer falls back to a publishable key for privileged operations.
 - This migration is committed to the repository but must still be applied to the live Supabase project and verified with the Security Advisor.
 
@@ -53,5 +52,5 @@ The migration `server/prisma/migrations/20261106000000_enable_rls_prisma_tables/
 2. Update server and Worker secrets before deploying this branch. Missing secrets intentionally cause relevant operations to fail closed.
 3. Verify all allowed frontend origins are listed in `CORS_ORIGINS`.
 4. Run the server and Worker build/test suites, then perform authenticated integration tests for login, profile, purchases, matchmaking, room creation, and final match settlement.
-5. Apply the RLS migration to the live Supabase project only after confirming the server uses the server-only key, then verify all seven tables and grants with the Supabase Security Advisor.
+5. The live RLS migration is already applied. Re-verify all seven tables and grants after any schema change with the Supabase Security Advisor.
 6. Configure `INTERNAL_API_SECRET` in both Vercel and Cloudflare, `TELEGRAM_WEBHOOK_SECRET` in Vercel and Cloudflare, and portal admin credentials in Vercel. Missing values intentionally disable the corresponding internal, webhook, or admin features.
