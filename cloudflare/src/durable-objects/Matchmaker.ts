@@ -152,6 +152,7 @@ export class MatchmakerDO extends DurableObject<Env> {
           avatarUrl: p.avatarUrl,
           online: true,
           inRoom: p.inRoom,
+          currentRoomCode: p.currentRoomCode && this.publicRooms.has(p.currentRoomCode) ? p.currentRoomCode : undefined,
           lastSeen: p.lastSeen,
           onlineStatusVisible: p.onlineStatusVisible,
         });
@@ -517,6 +518,7 @@ export class MatchmakerDO extends DurableObject<Env> {
             avatarUrl: updatedPresence.avatarUrl,
             online: updatedPresence.online,
             inRoom: updatedPresence.inRoom,
+            currentRoomCode: updatedPresence.currentRoomCode && this.publicRooms.has(updatedPresence.currentRoomCode) ? updatedPresence.currentRoomCode : undefined,
             onlineStatusVisible: true,
             lastSeen: updatedPresence.lastSeen,
           };
