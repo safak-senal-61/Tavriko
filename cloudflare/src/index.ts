@@ -6,6 +6,13 @@ import { verifyJwt } from './auth/authenticate';
 
 export { GameRoomDO, MatchmakerDO };
 
+function generateSecureRoomCode(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = new Uint8Array(10);
+  crypto.getRandomValues(bytes);
+  return 'TAV-' + Array.from(bytes, (value) => alphabet[value % alphabet.length]).join('');
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -267,7 +274,7 @@ export default {
       roomCode = sanitizeRoomCode(roomCode);
       if (!roomCode) {
         // Generate a new code if creating a fresh room
-        roomCode = 'TAV-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+        roomCode = generateSecureRoomCode();
       }
 
       const roomId = env.GAME_ROOMS.idFromName(roomCode);
