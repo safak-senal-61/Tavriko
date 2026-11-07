@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { createApp } from '../src/server';
+import { db } from '../src/db/prismaClient';
 import { cacheService } from '../src/cache/redisClient';
 
 describe('Timer Synchronization & Authoritative Answer Locking Engine', () => {
@@ -13,80 +14,76 @@ describe('Timer Synchronization & Authoritative Answer Locking Engine', () => {
     appInstance.close();
   });
 
-  it('rejects duplicate answer submissions on the same question with 409 Conflict', async () => {
-    const questionId = 'geo_1';
-    const sessionId = 'test_session_idempotency_' + Date.now();
-    const playerId = 'player_alpha';
+  async function issuePracticeQuestion() {
+    const issued = await request(appInstance.app).get('/api/questions/practice?category=geography&count=3');
+    expect(issued.status).toBe(200);
+    const questionId = issued.body.questions[0].id as string;
+    const question = db.getQuestionById(questionId);
+    if (!question) throw new Error('Test question missing from DB');
+    return { sessionId: issued.body.sessionId as string, question };
+  }
 
-    // 1st submission: should succeed
-    const res1 = await request(appInstance.app)
-      .post('/api/questions/submit')
-      .send({
-        questionId,
-        selectedOptionId: 'opt_a',
-        timeRemainingMs: 8000,
-        totalTimeMs: 15000,
-        currentStreak: 0,
-        playerId,
-        sessionId,
-      });
+  it('rejects duplicate answer submissions for the same issued session', async () => {
+    const { sessionId, question } = await issuePracticeQuestion();
+    const body = {
+      questionId: question.id,
+      selectedOptionId: question.correctOptionId,
+      timeRemainingMs: 8000,
+      totalTimeMs: 15000,
+      currentStreak: 0,
+      sessionId,
+    };
 
+    const res1 = await request(appInstance.app).post('/api/questions/submit').send(body);
     expect(res1.status).toBe(200);
-    expect(res1.body.questionId).toBe(questionId);
 
-    // 2nd submission for the exact same question/player/session: must be REJECTED!
-    const res2 = await request(appInstance.app)
-      .post('/api/questions/submit')
-      .send({
-        questionId,
-        selectedOptionId: 'opt_a',
-        timeRemainingMs: 7000,
-        totalTimeMs: 15000,
-        currentStreak: 1,
-        playerId,
-        sessionId,
-      });
-
+    const res2 = await request(appInstance.app).post('/api/questions/submit').send(body);
     expect(res2.status).toBe(409);
     expect(res2.body.code).toBe('ALREADY_ANSWERED');
   });
 
-  it('authoritatively flags question as timed out when submitted after expiration', async () => {
-    const questionId = 'math_1';
-    const sessionId = 'test_session_expiry_' + Date.now();
-    const playerId = 'player_late';
-
-    // Set expiration in cache to 1000ms ago (well past the 500ms grace window)
-    await cacheService.setQuestionExpiry(sessionId, questionId, Date.now() - 1000, 30);
+  it('rejects answers after the server-side question expiry', async () => {
+    const { sessionId, question } = await issuePracticeQuestion();
+    await cacheService.setQuestionExpiry(sessionId, question.id, Date.now() - 1000, 30);
 
     const res = await request(appInstance.app)
       .post('/api/questions/submit')
       .send({
-        questionId,
-        selectedOptionId: 'opt_b', // Even if correct option is sent
-        timeRemainingMs: 1000,     // Client attempts to claim time remained
+        questionId: question.id,
+        selectedOptionId: question.correctOptionId,
+        timeRemainingMs: 1000,
         totalTimeMs: 15000,
         currentStreak: 0,
-        playerId,
         sessionId,
       });
 
-    expect(res.status).toBe(200);
-    expect(res.body.isTimeout).toBe(true);
-    expect(res.body.isCorrect).toBe(false);
-    expect(res.body.pointsAwarded).toBe(0);
+    expect(res.status).toBe(410);
   });
 
-  it('sets expiry properly when practice questions are fetched', async () => {
-    const sessionId = 'test_session_fetch_' + Date.now();
+  it('sets expiry for each question under the server-issued session ticket', async () => {
     const res = await request(appInstance.app)
-      .get(`/api/questions/practice?category=geography&count=3&sessionId=${sessionId}`);
+      .get('/api/questions/practice?category=geography&count=3');
 
     expect(res.status).toBe(200);
     expect(res.body.questions.length).toBe(3);
+    expect(res.body.sessionId).toMatch(/^[A-Za-z0-9_-]{43}$/);
 
     const firstQ = res.body.questions[0];
-    const expiry = await cacheService.getQuestionExpiry(sessionId, firstQ.id);
+    const expiry = await cacheService.getQuestionExpiry(res.body.sessionId, firstQ.id);
     expect(expiry).toBeGreaterThan(Date.now());
+  });
+
+  it('does not reveal answers for questions outside the issued session', async () => {
+    const { sessionId, question } = await issuePracticeQuestion();
+    const otherQuestion = db.getQuestionById('math_1');
+    if (!otherQuestion) throw new Error('Expected test question missing');
+    const res = await request(appInstance.app)
+      .post('/api/questions/submit')
+      .send({
+        questionId: otherQuestion.id,
+        selectedOptionId: otherQuestion.correctOptionId,
+        sessionId,
+      });
+    expect(res.status).toBe(403);
   });
 });
