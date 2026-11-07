@@ -172,8 +172,8 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({
         showsVerticalScrollIndicator={false}
       >
         {/* Header matching Ödeme@1x.png */}
-        <Text style={styles.title}>ÖDEME</Text>
-        <Text style={styles.subtitle}>Güvenli ödeme</Text>
+        <Text style={styles.title}>ÖDEME ŞU ANDA KAPALI</Text>
+        <Text style={styles.subtitle}>Gerçek para ödemeleri henüz güvenli bir ödeme sağlayıcısına bağlanmadı. Kart bilgilerinizi girmeyin; bu ekran ödeme almaz.</Text>
         {/* Selected Package Banner Card */}
         <View style={styles.packageCard}>
           <View style={styles.packageIconWrap}>
