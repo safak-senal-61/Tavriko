@@ -2,6 +2,7 @@ import { Env } from './env';
 import { GameRoomDO } from './durable-objects/GameRoom';
 import { MatchmakerDO } from './durable-objects/Matchmaker';
 import { sanitizeRoomCode } from './websocket/validation';
+import { verifyJwt } from './auth/authenticate';
 
 export { GameRoomDO, MatchmakerDO };
 
@@ -47,28 +48,41 @@ export default {
     if (url.pathname === '/api/upload/avatar' || url.pathname === '/upload/avatar') {
       if (request.method === 'POST') {
         try {
+          const authHeader = request.headers.get('Authorization') || '';
+          const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+          const auth = await verifyJwt(bearer, env.JWT_SECRET);
+          if (!auth.isValid || !auth.user || auth.user.isGuest) {
+            return new Response(JSON.stringify({ error: 'Oturum doğrulaması gerekli.' }), { status: 401 });
+          }
           const bodyJson: any = await request.json().catch(() => ({}));
           let rawData = bodyJson?.image || bodyJson?.avatar;
-          const userId = bodyJson?.userId || 'u';
-
-          if (!rawData || typeof rawData !== 'string') {
-            return new Response(JSON.stringify({ error: 'Geçersiz resim verisi' }), {
-              status: 400,
-              headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-            });
+          if (bodyJson?.userId && bodyJson.userId !== auth.user.id) {
+            return new Response(JSON.stringify({ error: 'Kullanıcı kimliği uyuşmuyor.' }), { status: 403 });
+          }
+          if (!rawData || typeof rawData !== 'string' || rawData.length > 4 * 1024 * 1024) {
+            return new Response(JSON.stringify({ error: 'Geçersiz veya çok büyük görsel verisi.' }), { status: 400 });
           }
 
-          let contentType = 'image/jpeg';
           if (rawData.startsWith('data:')) {
-            const match = rawData.match(/^data:([^;]+);base64,(.+)$/);
-            if (match) {
-              contentType = match[1];
-              rawData = match[2];
-            }
+            const match = rawData.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+            if (!match) return new Response(JSON.stringify({ error: 'Yalnızca JPEG, PNG veya WebP görselleri kabul edilir.' }), { status: 415 });
+            rawData = match[2];
+          }
+          if (!/^[A-Za-z0-9+/]+={0,2}$/.test(rawData)) {
+            return new Response(JSON.stringify({ error: 'Geçersiz base64 görsel verisi.' }), { status: 400 });
           }
 
           const binary = Uint8Array.from(atob(rawData), (c) => c.charCodeAt(0));
-          const fileKey = `avatar_${userId.replace(/[^a-zA-Z0-9_-]/g, '')}_${Date.now()}.jpg`;
+          const isJpeg = binary[0] === 0xff && binary[1] === 0xd8 && binary[2] === 0xff;
+          const isPng = binary.length >= 8 && binary[0] === 0x89 && binary[1] === 0x50 && binary[2] === 0x4e && binary[3] === 0x47;
+          const isWebp = binary.length >= 12 && String.fromCharCode(...binary.slice(0, 4)) === 'RIFF' && String.fromCharCode(...binary.slice(8, 12)) === 'WEBP';
+          if (!isJpeg && !isPng && !isWebp) {
+            return new Response(JSON.stringify({ error: 'Dosya içeriği geçerli bir görsel değil.' }), { status: 415 });
+          }
+          const contentType = isJpeg ? 'image/jpeg' : isPng ? 'image/png' : 'image/webp';
+          const extension = isJpeg ? 'jpg' : isPng ? 'png' : 'webp';
+          const userId = auth.user.id.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+          const fileKey = `avatar_${userId}_${Date.now()}.${extension}`;
 
           if (env.AVATAR_BUCKET) {
             await env.AVATAR_BUCKET.put(fileKey, binary, {
