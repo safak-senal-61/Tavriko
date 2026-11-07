@@ -111,7 +111,7 @@ export class GameRoomDO extends DurableObject<Env> {
         ? requestedMode
         : 'duel';
       const requestedDifficulty = data.difficulty as DifficultyLevel;
-      const safeDifficulty: DifficultyLevel = ['easy', 'medium', 'hard'].includes(requestedDifficulty) ? requestedDifficulty : 'medium';
+      const safeDifficulty: DifficultyLevel = ['easy', 'medium', 'hard', 'expert'].includes(requestedDifficulty) ? requestedDifficulty : 'medium';
       const requestedQuestionTime = Number(data.questionTimeSec);
       const roomPassword = sanitizeString(data.password || '', 64) || undefined;
       this.room = {
@@ -205,7 +205,7 @@ export class GameRoomDO extends DurableObject<Env> {
     const rawCategory = url.searchParams.get('category') || 'general_culture';
     const category = (/^[a-z0-9_]{1,48}$/i.test(rawCategory) ? rawCategory : 'general_culture') as CategoryId;
     const rawDifficulty = url.searchParams.get('difficulty') as DifficultyLevel | null;
-    const difficulty: DifficultyLevel = rawDifficulty && ['easy', 'medium', 'hard'].includes(rawDifficulty)
+    const difficulty: DifficultyLevel = rawDifficulty && ['easy', 'medium', 'hard', 'expert'].includes(rawDifficulty)
       ? rawDifficulty
       : 'medium';
 
@@ -766,7 +766,7 @@ export class GameRoomDO extends DurableObject<Env> {
       this.room.questionTimeSec = value;
     }
     if (s.difficulty !== undefined) {
-      if (!['easy', 'medium', 'hard'].includes(s.difficulty)) {
+      if (!['easy', 'medium', 'hard', 'expert'].includes(s.difficulty)) {
         ws.send(createWsError('Geçersiz zorluk seviyesi', 'BAD_REQUEST', envelope.requestId));
         return;
       }
