@@ -218,38 +218,30 @@ router.post('/shop/purchase', requireUser, async (req: Request, res: Response): 
       return;
     }
 
-    const itemToBuy = productId || packId;
-    if (itemToBuy && SHOP_CATALOG.some((p) => p.id === itemToBuy)) {
-      const result = await db.purchaseShopProduct(userId, itemToBuy, paymentMethod);
-      res.json({ success: true, user: result.user, message: result.message });
+    // Legacy packId purchases had no verified payment provider/webhook and
+    // granted currency directly. Real-money purchases stay disabled until
+    // a provider verifies the transaction server-to-server.
+    if (packId || paymentMethod === 'credit_card' || paymentMethod === 'try') {
+      res.status(501).json({ error: 'Gerçek para ödemeleri henüz güvenli ödeme sağlayıcısına bağlanmadı.' });
       return;
     }
 
-    // Fallback legacy pack support
-    let resolvedPack: { coinsDelta?: number; gemsDelta?: number; itemId?: string; itemQty?: number };
-    let message = 'Satın alma işlemi veritabanına kaydedildi!';
-    if (packId === 'starter_pack') {
-      resolvedPack = { coinsDelta: 1000, gemsDelta: 50, itemId: 'chest_wood', itemQty: 1 };
-      message = 'Başlangıç Paketi (+1.000 Altın, +50 Elmas, +1 Sandık) hesabına eklendi!';
-    } else if (packId === 'gems_100') {
-      resolvedPack = { gemsDelta: 100, coinsDelta: 0, itemId: undefined, itemQty: 0 };
-      message = '+100 Elmas hesabına başarıyla eklendi!';
-    } else if (packId === 'gems_500') {
-      resolvedPack = { gemsDelta: 550, coinsDelta: 0, itemId: undefined, itemQty: 0 };
-      message = 'Ödeme Onaylandı! +550 Elmas (50 Bonus) hesabına eklendi!';
-    } else if (packId === 'coins_2000') {
-      resolvedPack = { coinsDelta: 2000, gemsDelta: -10, itemId: undefined, itemQty: 0 };
-      message = '+2.000 Altın hesabına eklendi!';
-    } else if (packId === 'mega_chest') {
-      resolvedPack = { coinsDelta: -400, gemsDelta: 0, itemId: 'chest_silver', itemQty: 2 };
-      message = '2x Sandık envanterine eklendi!';
-    } else {
+    const product = SHOP_CATALOG.find((p) => p.id === productId);
+    if (!product) {
       res.status(400).json({ error: 'Geçersiz mağaza ürünü.' });
       return;
     }
+    if (product.currency === 'try') {
+      res.status(501).json({ error: 'Bu ürün için güvenli ödeme sağlayıcısı henüz yapılandırılmadı.' });
+      return;
+    }
+    if (paymentMethod !== product.currency) {
+      res.status(400).json({ error: 'Ödeme yöntemi ürün para birimiyle eşleşmiyor.' });
+      return;
+    }
 
-    const updated = await db.purchaseShopPack(userId, resolvedPack);
-    res.json({ success: true, user: updated, message });
+    const result = await db.purchaseShopProduct(userId, product.id, paymentMethod);
+    res.json({ success: true, user: result.user, message: result.message });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
