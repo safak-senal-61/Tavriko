@@ -13,20 +13,47 @@ function generateSecureRoomCode(): string {
   return 'TAV-' + Array.from(bytes, (value) => alphabet[value % alphabet.length]).join('');
 }
 
+const ALLOWED_ORIGINS = new Set([
+  'https://gmae-taupe.vercel.app',
+  'https://tavriko-app.vercel.app',
+  'https://tavriko-game.vercel.app',
+  'https://tavriko-tavriko.vercel.app',
+  'https://tavriko-git-main-tavriko.vercel.app',
+]);
+
+function isAllowedOrigin(origin: string): boolean {
+  try {
+    const parsed = new URL(origin);
+    if (parsed.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(parsed.hostname)) return true;
+    if (parsed.protocol !== 'https:') return false;
+    return ALLOWED_ORIGINS.has(origin) ||
+      (parsed.hostname.endsWith('.vercel.app') && parsed.hostname.startsWith('tavriko-'));
+  } catch {
+    return false;
+  }
+}
+
+function corsHeaders(request: Request): Record<string, string> {
+  const origin = request.headers.get('Origin');
+  const headers: Record<string, string> = {
+    'Vary': 'Origin',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-internal-secret, x-telegram-bot-api-secret-token',
+    'Access-Control-Max-Age': '86400',
+  };
+  if (origin && isAllowedOrigin(origin)) headers['Access-Control-Allow-Origin'] = origin;
+  return headers;
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        status: 204,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-internal-secret',
-        },
-      });
+      const origin = request.headers.get('Origin');
+      if (origin && !isAllowedOrigin(origin)) return new Response('Origin not allowed', { status: 403 });
+      return new Response(null, { status: 204, headers: corsHeaders(request) });
     }
 
     // Health check & status endpoint
@@ -43,7 +70,7 @@ export default {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
+            ...corsHeaders(request),
           },
         }
       );
@@ -59,24 +86,24 @@ export default {
           const bearer = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
           const auth = await verifyJwt(bearer, env.JWT_SECRET);
           if (!auth.isValid || !auth.user || auth.user.isGuest) {
-            return new Response(JSON.stringify({ error: 'Oturum doğrulaması gerekli.' }), { status: 401 });
+            return new Response(JSON.stringify({ error: 'Oturum doğrulaması gerekli.' }), { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } });
           }
           const bodyJson: any = await request.json().catch(() => ({}));
           let rawData = bodyJson?.image || bodyJson?.avatar;
           if (bodyJson?.userId && bodyJson.userId !== auth.user.id) {
-            return new Response(JSON.stringify({ error: 'Kullanıcı kimliği uyuşmuyor.' }), { status: 403 });
+            return new Response(JSON.stringify({ error: 'Kullanıcı kimliği uyuşmuyor.' }), { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } });
           }
           if (!rawData || typeof rawData !== 'string' || rawData.length > 4 * 1024 * 1024) {
-            return new Response(JSON.stringify({ error: 'Geçersiz veya çok büyük görsel verisi.' }), { status: 400 });
+            return new Response(JSON.stringify({ error: 'Geçersiz veya çok büyük görsel verisi.' }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } });
           }
 
           if (rawData.startsWith('data:')) {
             const match = rawData.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
-            if (!match) return new Response(JSON.stringify({ error: 'Yalnızca JPEG, PNG veya WebP görselleri kabul edilir.' }), { status: 415 });
+            if (!match) return new Response(JSON.stringify({ error: 'Yalnızca JPEG, PNG veya WebP görselleri kabul edilir.' }), { status: 415, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } });
             rawData = match[2];
           }
           if (!/^[A-Za-z0-9+/]+={0,2}$/.test(rawData)) {
-            return new Response(JSON.stringify({ error: 'Geçersiz base64 görsel verisi.' }), { status: 400 });
+            return new Response(JSON.stringify({ error: 'Geçersiz base64 görsel verisi.' }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } });
           }
 
           const binary = Uint8Array.from(atob(rawData), (c) => c.charCodeAt(0));
@@ -84,7 +111,7 @@ export default {
           const isPng = binary.length >= 8 && binary[0] === 0x89 && binary[1] === 0x50 && binary[2] === 0x4e && binary[3] === 0x47;
           const isWebp = binary.length >= 12 && String.fromCharCode(...binary.slice(0, 4)) === 'RIFF' && String.fromCharCode(...binary.slice(8, 12)) === 'WEBP';
           if (!isJpeg && !isPng && !isWebp) {
-            return new Response(JSON.stringify({ error: 'Dosya içeriği geçerli bir görsel değil.' }), { status: 415 });
+            return new Response(JSON.stringify({ error: 'Dosya içeriği geçerli bir görsel değil.' }), { status: 415, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } });
           }
           const contentType = isJpeg ? 'image/jpeg' : isPng ? 'image/png' : 'image/webp';
           const extension = isJpeg ? 'jpg' : isPng ? 'png' : 'webp';
@@ -111,14 +138,14 @@ export default {
               status: 200,
               headers: {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
+                ...corsHeaders(request),
               },
             }
           );
         } catch (err: any) {
           return new Response(JSON.stringify({ error: err.message || 'R2 yükleme hatası' }), {
             status: 500,
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            headers: { 'Content-Type': 'application/json', ...corsHeaders(request) },
           });
         }
       }
@@ -133,11 +160,11 @@ export default {
           object.writeHttpMetadata(headers);
           headers.set('etag', object.httpEtag);
           headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-          headers.set('Access-Control-Allow-Origin', '*');
+          for (const [key, value] of Object.entries(corsHeaders(request))) headers.set(key, value);
           return new Response(object.body, { headers });
         }
       }
-      return new Response('Avatar bulunamadı', { status: 404 });
+      return new Response('Avatar bulunamadı', { status: 404, headers: corsHeaders(request) });
     }
 
     // ============================================================================
@@ -151,10 +178,10 @@ export default {
         const expectedSecret = env.TELEGRAM_WEBHOOK_SECRET || '';
         const suppliedSecret = request.headers.get('x-telegram-bot-api-secret-token') || '';
         if (expectedSecret.length < 32) {
-          return new Response(JSON.stringify({ ok: false, error: 'Webhook secret yapılandırılmamış.' }), { status: 503 });
+          return new Response(JSON.stringify({ ok: false, error: 'Webhook secret yapılandırılmamış.' }), { status: 503, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } });
         }
         if (suppliedSecret.length !== expectedSecret.length) {
-          return new Response(JSON.stringify({ ok: false, error: 'Yetkisiz webhook isteği.' }), { status: 401 });
+          return new Response(JSON.stringify({ ok: false, error: 'Yetkisiz webhook isteği.' }), { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } });
         }
         let secretMismatch = 0;
         for (let i = 0; i < expectedSecret.length; i++) {
@@ -204,13 +231,13 @@ export default {
             }),
             {
               status: 200,
-              headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+              headers: { 'Content-Type': 'application/json', ...corsHeaders(request) },
             }
           );
         } catch (err: any) {
           return new Response(JSON.stringify({ ok: false, error: err.message }), {
             status: 500,
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            headers: { 'Content-Type': 'application/json', ...corsHeaders(request) },
           });
         }
       }
@@ -225,7 +252,7 @@ export default {
         }),
         {
           status: 200,
-          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+          headers: { 'Content-Type': 'application/json', ...corsHeaders(request) },
         }
       );
     }
@@ -234,6 +261,8 @@ export default {
     // Do not accept Telegram bot tokens in public query strings.
 
     const isWs = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
+    const requestOrigin = request.headers.get('Origin');
+    if (isWs && requestOrigin && !isAllowedOrigin(requestOrigin)) return new Response('Origin not allowed', { status: 403 });
 
     // Route: Presence, Social Notification Hub, Public Rooms & Matchmaking
     if (
@@ -289,7 +318,7 @@ export default {
 
     return new Response(JSON.stringify({ error: 'Endpoint bulunamadı' }), {
       status: 404,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(request) },
     });
   },
 };
