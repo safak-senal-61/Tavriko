@@ -58,6 +58,7 @@ describe('Trivia REST API', () => {
     const q = res.body.questions[0];
     expect(q.text).toBeDefined();
     expect(q.options).toHaveLength(4);
+    expect(q).not.toHaveProperty('correctOptionId');
   });
 
   it('fetches the daily challenge question set', async () => {
@@ -68,6 +69,9 @@ describe('Trivia REST API', () => {
     expect(res.status).toBe(200);
     expect(res.body.date).toBeDefined();
     expect(res.body.questions.length).toBeGreaterThanOrEqual(5);
+    for (const question of res.body.questions) {
+      expect(question).not.toHaveProperty('correctOptionId');
+    }
   });
 
 
