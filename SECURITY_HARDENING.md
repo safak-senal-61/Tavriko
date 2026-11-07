@@ -8,12 +8,16 @@ This branch introduces security controls that require coordinated environment co
 - `PORTAL_ADMIN_EMAIL`: the administrator login email.
 - `PORTAL_ADMIN_PASSWORD`: a newly generated administrator password. Do not reuse the previously embedded password.
 - `INTERNAL_API_SECRET`: a newly generated random secret of at least 32 bytes, shared only by the backend and trusted Cloudflare Worker.
+- `SUPABASE_SECRET_KEY`: the server-only Supabase secret/service-role key. Never expose it through a `NEXT_PUBLIC_` or `EXPO_PUBLIC_` variable.
+- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`: required in production for distributed rate limiting.
+- `TELEGRAM_WEBHOOK_SECRET`: a random secret of at least 32 characters; it must match the Cloudflare Worker secret.
+- `CORS_ORIGINS`: exact comma-separated browser origins. Same-origin app requests do not need CORS.
 - `GOOGLE_CLIENT_ID`: the exact OAuth client ID used by the Google sign-in client.
 - `CORS_ORIGINS`: comma-separated exact browser origins, for example `https://example.com,https://www.example.com`.
 
 ## Required Cloudflare Worker secrets / vars
 
-Set `JWT_SECRET` to the same JWT verification secret used by the backend and set `INTERNAL_API_SECRET` to the same internal-service secret. Configure these as Worker secrets, not source-controlled vars.
+Set `JWT_SECRET` to the same JWT verification secret used by the backend, `INTERNAL_API_SECRET` to the same internal-service secret, and `TELEGRAM_WEBHOOK_SECRET` to the same Telegram webhook secret configured in Vercel. Configure all three as Worker secrets, not source-controlled vars.
 
 ## Compatibility notes
 
@@ -23,6 +27,26 @@ Set `JWT_SECRET` to the same JWT verification secret used by the backend and set
 - Telegram admin endpoints require portal admin authorization.
 - Avatar upload requires a verified, non-guest bearer token and accepts JPEG, PNG, or WebP payloads up to the configured request cap.
 - Room provisioning and internal match-result/question endpoints fail closed when the internal secret is missing or invalid.
+
+## Database access policy
+
+The migration `server/prisma/migrations/20261106000000_enable_rls_prisma_tables/migration.sql` enables RLS on all seven exposed application tables and removes broad browser-role grants.
+
+- `categories`: browser roles (`anon`, `authenticated`) receive read-only SELECT.
+- `questions`, `users`, `user_inventory_items`, `user_notifications`, `match_history`, and `password_reset_tokens`: server/service-role only.
+- The server must use `SUPABASE_SECRET_KEY`; the Supabase client no longer falls back to a publishable key for privileged operations.
+- This migration is committed to the repository but must still be applied to the live Supabase project and verified with the Security Advisor.
+
+## Additional hardening
+
+- Auth, guest creation, Google session polling, password reset, admin login, and client log ingestion are rate limited using Upstash Redis. Production fails closed if the rate-limit service is missing or unavailable.
+- Google login session tickets are cryptographically random, expire after five minutes, and return the Tavriko bearer token only once.
+- OAuth postMessage events require same-origin delivery and the received bearer token is verified against `/auth/me`.
+- The legacy client-to-client `social:notify` WebSocket relay is disabled because it allowed clients to forge arbitrary events for other users. Friends and notification screens refresh from authenticated APIs.
+- Unverified TRY purchases and legacy `packId` purchases are disabled until a payment provider verifies transactions server-to-server. The card checkout screen is explicitly disabled.
+- Telegram webhooks now require Telegram's `secret_token` header. Until `TELEGRAM_WEBHOOK_SECRET` is configured in both Vercel and Cloudflare, the webhook intentionally returns 503.
+- The legacy server WebSocket and Socket.IO transports now require authenticated identities; Socket.IO event identity fields are bound to the verified JWT.
+- Public leaderboard and presence responses no longer return full user profiles or other users' private presence details.
 
 ## Operational actions
 
