@@ -25,6 +25,7 @@ import {
 
 interface EventsScreenProps {
   user?: UserProfile;
+  token?: string;
   apiBaseUrl?: string;
   onUpdateUser?: (updatedUser: UserProfile) => void;
   onBack?: () => void;
@@ -38,6 +39,7 @@ type EventTab = 'daily' | 'weekly' | 'special';
 
 export const EventsScreen: React.FC<EventsScreenProps> = ({
   user,
+  token,
   apiBaseUrl,
   onUpdateUser,
   onBack,
@@ -112,7 +114,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
       try {
         const res = await fetch(`${base}/social/events/claim`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify({ userId: user.id, eventId: event.id }),
         });
 
@@ -151,7 +153,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
       try {
         const res = await fetch(`${base}/social/events/start`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify({ userId: user.id, eventId: event.id }),
         });
 
