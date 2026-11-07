@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { requireUser } from '../middleware/security';
+import { requireUser, rateLimit } from '../middleware/security';
 import { db } from '../db/prismaClient';
 import { presenceManager } from '../services/presenceManager';
 import { SHOP_CATALOG, SEASON_1_TIERS, EVENT_DEFINITIONS } from '@trivia/shared';
 
 const router = Router();
 
-router.get('/leaderboard', async (_req: Request, res: Response): Promise<void> => {
+router.get('/leaderboard', rateLimit({ keyPrefix: 'leaderboard', windowMs: 60 * 1000, max: 60 }), async (_req: Request, res: Response): Promise<void> => {
   try {
     const profiles = await db.getLeaderboardAsync(30);
     // Leaderboards are public, but full UserProfile objects contain private
@@ -39,7 +39,7 @@ router.get('/leaderboard', async (_req: Request, res: Response): Promise<void> =
   }
 });
 
-router.get('/friends/:userId', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.get('/friends/:userId', rateLimit({ keyPrefix: 'friends-read', windowMs: 60 * 1000, max: 60 }), requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
     if ((req as any).authUserId !== userId) { res.status(403).json({ error: 'Bu kaynağa erişim yetkiniz yok.' }); return; }
@@ -50,7 +50,7 @@ router.get('/friends/:userId', requireUser, async (req: Request, res: Response):
   }
 });
 
-router.post('/friends/add', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.post('/friends/add', rateLimit({ keyPrefix: 'friends-add', windowMs: 60 * 1000, max: 10 }), requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, codeOrUsername } = req.body;
     if (!userId || !codeOrUsername) {
@@ -68,7 +68,7 @@ router.post('/friends/add', requireUser, async (req: Request, res: Response): Pr
   }
 });
 
-router.post('/friends/remove', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.post('/friends/remove', rateLimit({ keyPrefix: 'friends-remove', windowMs: 60 * 1000, max: 20 }), requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, friendId, targetUserId } = req.body;
     const target = friendId || targetUserId;
@@ -88,7 +88,7 @@ router.post('/friends/remove', requireUser, async (req: Request, res: Response):
 });
 
 // --- 1v1 Match Challenge (Yarış İsteği) ---
-router.post('/friends/challenge', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.post('/friends/challenge', rateLimit({ keyPrefix: 'friends-challenge', windowMs: 60 * 1000, max: 10 }), requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, targetUserId, category } = req.body;
     if (!userId || !targetUserId) {
@@ -107,7 +107,7 @@ router.post('/friends/challenge', requireUser, async (req: Request, res: Respons
 });
 
 // --- Real Notifications API ---
-router.get('/notifications/:userId', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.get('/notifications/:userId', rateLimit({ keyPrefix: 'notifications-read', windowMs: 60 * 1000, max: 60 }), requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
     if ((req as any).authUserId !== userId) { res.status(403).json({ error: 'Bu kaynağa erişim yetkiniz yok.' }); return; }
@@ -121,7 +121,7 @@ router.get('/notifications/:userId', requireUser, async (req: Request, res: Resp
   }
 });
 
-router.post('/notifications/respond', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.post('/notifications/respond', rateLimit({ keyPrefix: 'notifications-respond', windowMs: 60 * 1000, max: 20 }), requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, notificationId, action } = req.body;
     if (!userId || typeof notificationId !== 'string' || !notificationId || notificationId.length > 128) {
@@ -144,7 +144,7 @@ router.post('/notifications/respond', requireUser, async (req: Request, res: Res
 });
 
 // --- Real-Time Presence API ---
-router.get('/presence', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.get('/presence', rateLimit({ keyPrefix: 'presence-read', windowMs: 60 * 1000, max: 60 }), requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const authUserId = (req as any).authUserId as string;
     const friendData = await db.getFriendsForUserAsync(authUserId);
@@ -165,7 +165,7 @@ router.get('/presence', requireUser, async (req: Request, res: Response): Promis
   }
 });
 
-router.post('/presence/heartbeat', requireUser, (req: Request, res: Response): void => {
+router.post('/presence/heartbeat', rateLimit({ keyPrefix: 'presence-heartbeat', windowMs: 60 * 1000, max: 20 }), requireUser, (req: Request, res: Response): void => {
   try {
     const { userId, inRoom, roomCode } = req.body;
     if (userId) {
@@ -181,7 +181,7 @@ router.post('/presence/heartbeat', requireUser, (req: Request, res: Response): v
 });
 
 // --- Room Status Sync ---
-router.post('/rooms/active', requireUser, (req: Request, res: Response): void => {
+router.post('/rooms/active', rateLimit({ keyPrefix: 'room-presence', windowMs: 60 * 1000, max: 30 }), requireUser, (req: Request, res: Response): void => {
   try {
     const {
       userId,
@@ -247,7 +247,7 @@ router.get('/shop/catalog', (req: Request, res: Response): void => {
   });
 });
 
-router.post('/shop/purchase', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.post('/shop/purchase', rateLimit({ keyPrefix: 'shop-purchase', windowMs: 60 * 1000, max: 10 }), requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, productId, packId, paymentMethod = 'coins' } = req.body;
     if (!userId) {
@@ -285,7 +285,7 @@ router.post('/shop/purchase', requireUser, async (req: Request, res: Response): 
 });
 
 // --- Inventory & Chest Opening ---
-router.post('/inventory/use', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.post('/inventory/use', rateLimit({ keyPrefix: 'inventory-use', windowMs: 60 * 1000, max: 20 }), requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, itemId } = req.body;
     if (!userId || !itemId) {
@@ -299,7 +299,7 @@ router.post('/inventory/use', requireUser, async (req: Request, res: Response): 
   }
 });
 
-router.post('/inventory/open-chest', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.post('/inventory/open-chest', rateLimit({ keyPrefix: 'inventory-chest', windowMs: 60 * 1000, max: 10 }), requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, chestId, keyId } = req.body;
     if (!userId || !chestId) {
@@ -324,7 +324,7 @@ router.get('/season/info', (req: Request, res: Response): void => {
   });
 });
 
-router.post('/season/claim', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.post('/season/claim', rateLimit({ keyPrefix: 'season-claim', windowMs: 60 * 1000, max: 15 }), requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, tier, track = 'free' } = req.body;
     if (!userId || !tier) {
@@ -338,7 +338,7 @@ router.post('/season/claim', requireUser, async (req: Request, res: Response): P
   }
 });
 
-router.post('/season/premium-pass', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.post('/season/premium-pass', rateLimit({ keyPrefix: 'season-pass', windowMs: 60 * 1000, max: 5 }), requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId } = req.body;
     if (!userId) {
@@ -357,7 +357,7 @@ router.post('/season/premium-pass', requireUser, async (req: Request, res: Respo
 });
 
 // --- Live Events ---
-router.get('/events', requireUser, (req: Request, res: Response): void => {
+router.get('/events', rateLimit({ keyPrefix: 'events-read', windowMs: 60 * 1000, max: 30 }), requireUser, (req: Request, res: Response): void => {
   try {
     const authUserId = (req as any).authUserId as string;
     const requestedUserId = (req.query.userId as string) || authUserId;
@@ -375,7 +375,7 @@ router.get('/events', requireUser, (req: Request, res: Response): void => {
   }
 });
 
-router.post('/events/claim', requireUser, async (req: Request, res: Response): Promise<void> => {
+router.post('/events/claim', rateLimit({ keyPrefix: 'events-claim', windowMs: 60 * 1000, max: 10 }), requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, eventId } = req.body;
     if (!userId || !eventId) {
@@ -389,7 +389,7 @@ router.post('/events/claim', requireUser, async (req: Request, res: Response): P
   }
 });
 
-router.post('/events/start', requireUser, (req: Request, res: Response): void => {
+router.post('/events/start', rateLimit({ keyPrefix: 'events-start', windowMs: 60 * 1000, max: 5 }), requireUser, (req: Request, res: Response): void => {
   try {
     const { userId, eventId } = req.body;
     if (!userId || !eventId) {
