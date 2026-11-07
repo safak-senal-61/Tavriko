@@ -39,8 +39,12 @@ logRouter.get('/portal/verify', (req: Request, res: Response) => {
     res.status(401).json({ success: false, error: 'Oturum tokeni eksik' });
     return;
   }
+  if (!JWT_SECRET || !PORTAL_ADMIN_EMAIL) {
+    res.status(503).json({ success: false, error: 'Yönetici oturumu yapılandırılmamış.' });
+    return;
+  }
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as any;
     if (decoded && decoded.email === PORTAL_ADMIN_EMAIL) {
       res.json({ success: true, email: decoded.email });
       return;
