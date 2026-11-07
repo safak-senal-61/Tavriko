@@ -370,15 +370,45 @@ router.post('/events/start', (req: Request, res: Response): void => {
 });
 */
 
-// --- User Profile (Pro League & Inspect) ---
+// --- Public User Profile (allowlisted fields only) ---
 router.get('/profile/:userId', async (req: Request, res: Response): Promise<void> => {
   const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+
+  // Email addresses must never be accepted as public profile lookup identifiers.
+  if (!userId || userId.includes('@')) {
+    res.status(404).json({ error: 'Profil bulunamadı' });
+    return;
+  }
+
   const profile = await db.getUserProfileAsync(userId);
   if (!profile) {
     res.status(404).json({ error: 'Profil bulunamadı' });
     return;
   }
-  res.json(profile);
+
+  // Do not serialize the complete UserProfile here: it contains private contact,
+  // account, inventory, notification, settings and progression data.
+  res.json({
+    id: profile.id,
+    username: profile.username,
+    displayName: profile.displayName,
+    avatarUrl: profile.avatarUrl,
+    bio: profile.bio,
+    level: profile.level,
+    rankTitle: profile.rankTitle,
+    rankPoints: profile.rankPoints,
+    equippedFrame: profile.equippedFrame,
+    equippedBadge: profile.equippedBadge,
+    equippedNameEffect: profile.equippedNameEffect,
+    equippedBackground: profile.equippedBackground,
+    stats: {
+      totalMatches: profile.stats?.totalMatches ?? 0,
+      wins: profile.stats?.wins ?? 0,
+      correctAnswers: profile.stats?.correctAnswers ?? 0,
+      totalAnswers: profile.stats?.totalAnswers ?? 0,
+      bestStreak: profile.stats?.bestStreak ?? 0,
+    },
+  });
 });
 
 router.post('/daily-challenge/complete', requireUser, async (_req: Request, res: Response): Promise<void> => {
