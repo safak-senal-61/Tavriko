@@ -71,6 +71,36 @@ describe('Trivia REST API', () => {
   });
 
 
+  it('binds profile updates to the authenticated user and ignores protected fields', async () => {
+    const res = await request(app)
+      .put('/api/auth/profile')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        userId: 'another-user-id',
+        fullName: 'Test User',
+        email: 'attacker@example.invalid',
+        rankTitle: 'Admin',
+        coins: 999999999,
+        gems: 999999999,
+        equippedBadge: 'premium_badge',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.user.id).toBe(authUserId);
+    expect(res.body.user.email).not.toBe('attacker@example.invalid');
+    expect(res.body.user.rankTitle).not.toBe('Admin');
+    expect(res.body.user.coins).not.toBe(999999999);
+    expect(res.body.user.gems).not.toBe(999999999);
+  });
+
+  it('rejects unsafe avatar URL schemes in profile updates', async () => {
+    const res = await request(app)
+      .put('/api/auth/profile')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ avatarUrl: 'javascript:alert(1)' });
+    expect(res.status).toBe(400);
+  });
+
   it('requires authentication for user-specific event data', async () => {
     const res = await request(app).get('/api/social/events');
     expect(res.status).toBe(401);
