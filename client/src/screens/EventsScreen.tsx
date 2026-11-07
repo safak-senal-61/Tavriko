@@ -63,7 +63,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
   const fetchEvents = () => {
     let isMounted = true;
     const url = `${base}/social/events?userId=${encodeURIComponent(user?.id || '')}`;
-    fetch(url)
+    fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then((res) => res.json())
       .then((data) => {
         if (!isMounted) return;
