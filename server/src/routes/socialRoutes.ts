@@ -124,8 +124,12 @@ router.get('/notifications/:userId', requireUser, async (req: Request, res: Resp
 router.post('/notifications/respond', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, notificationId, action } = req.body;
-    if (!userId || !notificationId || !action) {
-      res.status(400).json({ error: 'userId, notificationId ve action zorunludur.' });
+    if (!userId || typeof notificationId !== 'string' || !notificationId || notificationId.length > 128) {
+      res.status(400).json({ error: 'Geçerli bir bildirim kimliği gerekli.' });
+      return;
+    }
+    if (action !== 'accept' && action !== 'decline') {
+      res.status(400).json({ error: 'Geçersiz bildirim işlemi.' });
       return;
     }
     const result = await db.respondToNotification(userId, notificationId, action);
