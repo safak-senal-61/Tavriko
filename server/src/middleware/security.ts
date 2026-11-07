@@ -52,8 +52,8 @@ export function requirePortalAdmin(req: Request, res: Response, next: NextFuncti
 export function requireInternalSecret(req: Request, res: Response, next: NextFunction): void {
   const expected = process.env.INTERNAL_API_SECRET;
   const supplied = req.header('x-internal-secret');
-  if (!expected) {
-    res.status(503).json({ error: 'İç servis kimlik doğrulaması yapılandırılmamış.' });
+  if (!expected || expected.length < 32) {
+    res.status(503).json({ error: 'İç servis kimlik doğrulaması en az 32 karakterlik bir sır gerektirir.' });
     return;
   }
   if (!supplied || supplied.length !== expected.length) {
