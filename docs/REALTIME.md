@@ -22,7 +22,8 @@ Implemented in [`cloudflare/src/durable-objects/Matchmaker.ts`](file:///c:/Users
   - Connecting clients are tagged with `player:<userId>` and `presence` (not auto-enqueued into 1v1 matchmaking).
   - Immediately receives `presence:snapshot` (`{ onlineUserIds, presences }`) and broadcasts `presence:update` and `user:online` to all connected clients.
   - On `webSocketClose`, if no other sockets remain for `player:<userId>`, broadcasts `presence:update` (`online: false`) and `user:offline`.
-  - Relays targeted real-time social events (`social:notify` -> `notification:new`, `friends:update`, `notification:update`) to `player:<targetUserId>`.
+  - Client-originated `social:notify` relay is disabled: clients cannot forge arbitrary events for other users.
+  - Trusted backend services may send targeted events through the internal `POST /notify` endpoint, protected by `INTERNAL_API_SECRET`.
 - **1v1 Matchmaking (`/ws/matchmaking` or `matchmaking:find`)**:
   - Searches `this.queue` for another human player (`findMatchingCandidate`).
   - Schedules a Durable Object alarm for **7 seconds (`MATCH_TIMEOUT_MS = 7000`)**.
