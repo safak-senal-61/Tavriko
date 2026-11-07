@@ -4347,6 +4347,12 @@ export class PrismaService {
 
     const product = SHOP_CATALOG.find((p) => p.id === productId);
     if (!product) throw new Error('Ürün mağazada bulunamadı.');
+    if (product.currency === 'try') {
+      throw new Error('Gerçek para ödemeleri doğrulanmış ödeme sağlayıcısı olmadan gerçekleştirilemez.');
+    }
+    if (paymentMethod !== product.currency) {
+      throw new Error('Ödeme yöntemi ürün para birimiyle eşleşmiyor.');
+    }
 
     if (product.currency === 'coins') {
       if (record.coins < product.price) {
