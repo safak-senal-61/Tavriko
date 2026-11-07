@@ -4,7 +4,7 @@ import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
 import { UserProfile } from '@trivia/shared';
 import { logger } from '../utils/logger';
-import { requireUser } from '../middleware/security';
+import { requireUser, rateLimit } from '../middleware/security';
 
 const router = Router();
 
@@ -42,7 +42,7 @@ export function getPendingGoogleSessions(): Array<Pick<PendingGoogleSession, 'st
     .map(({ status, createdAt }) => ({ status, createdAt }));
 }
 
-router.post('/google/init-session', (req: Request, res: Response): void => {
+router.post('/google/init-session', rateLimit({ keyPrefix: 'google-init', windowMs: 15 * 60 * 1000, max: 8 }), (req: Request, res: Response): void => {
   prunePendingGoogleSessions();
   const now = Date.now();
   const sessionId = randomBytes(32).toString('base64url');
@@ -57,7 +57,7 @@ router.post('/google/init-session', (req: Request, res: Response): void => {
   res.json({ sessionId });
 });
 
-router.get('/google/session-status', (req: Request, res: Response): void => {
+router.get('/google/session-status', rateLimit({ keyPrefix: 'google-status', windowMs: 60 * 1000, max: 120 }), (req: Request, res: Response): void => {
   const { sessionId } = req.query;
   if (!sessionId || typeof sessionId !== 'string') {
     res.status(400).json({ error: 'sessionId zorunludur' });
@@ -83,7 +83,7 @@ router.get('/google/session-status', (req: Request, res: Response): void => {
   }
 });
 
-router.post('/google/complete-session', async (req: Request, res: Response): Promise<void> => {
+router.post('/google/complete-session', rateLimit({ keyPrefix: 'google-complete', windowMs: 15 * 60 * 1000, max: 10 }), async (req: Request, res: Response): Promise<void> => {
   try {
     const { sessionId, accessToken } = req.body;
     if (!accessToken || typeof accessToken !== 'string') { res.status(401).json({ error: 'Doğrulanmış erişim tokenı gerekli.' }); return; }
@@ -109,7 +109,7 @@ router.post('/google/complete-session', async (req: Request, res: Response): Pro
     res.json(result);
   } catch { res.status(401).json({ error: 'Google oturumu tamamlanamadı.' }); }
 });
-router.post('/guest', async (req: Request, res: Response): Promise<void> => {
+router.post('/guest', rateLimit({ keyPrefix: 'guest', windowMs: 15 * 60 * 1000, max: 25 }), async (req: Request, res: Response): Promise<void> => {
   try {
     const { displayName } = req.body;
     const result = await db.createGuest(displayName);
@@ -119,7 +119,7 @@ router.post('/guest', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.post('/register', async (req: Request, res: Response): Promise<void> => {
+router.post('/register', rateLimit({ keyPrefix: 'register', windowMs: 60 * 60 * 1000, max: 6 }), async (req: Request, res: Response): Promise<void> => {
   try {
     const {
       username,
@@ -164,7 +164,7 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.post('/login', async (req: Request, res: Response): Promise<void> => {
+router.post('/login', rateLimit({ keyPrefix: 'login', windowMs: 15 * 60 * 1000, max: 10 }), async (req: Request, res: Response): Promise<void> => {
   try {
     const { username, email, identifier, password } = req.body;
     const loginId = identifier || username || email;
@@ -313,7 +313,7 @@ router.get('/google/callback', (req: Request, res: Response): void => {
 </html>`);
 });
 
-router.post('/google', async (req: Request, res: Response): Promise<void> => {
+router.post('/google', rateLimit({ keyPrefix: 'google-login', windowMs: 15 * 60 * 1000, max: 10 }), async (req: Request, res: Response): Promise<void> => {
   try {
     const { idToken, accessToken, countryCode, countryName, phone, birthDate } = req.body || {};
     let verifiedEmail: string | undefined, verifiedName: string | undefined, verifiedPicture: string | undefined, googleSub: string | undefined;
@@ -355,7 +355,7 @@ router.post('/delete-account', requireUser, async (req: Request, res: Response):
   }
 });
 
-router.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
+router.post('/forgot-password', rateLimit({ keyPrefix: 'forgot-password', windowMs: 60 * 60 * 1000, max: 3 }), async (req: Request, res: Response): Promise<void> => {
   // The current demo reset flow returns the OTP to the caller instead of
   // delivering it through a verified email channel. Never expose that code
   // in production; keep the demo behavior limited to non-production builds.
@@ -385,7 +385,11 @@ router.post('/forgot-password', async (req: Request, res: Response): Promise<voi
   }
 });
 
-router.post('/reset-password', async (req: Request, res: Response): Promise<void> => {
+router.post('/reset-password', rateLimit({ keyPrefix: 'reset-password', windowMs: 15 * 60 * 1000, max: 5 }), async (req: Request, res: Response): Promise<void> => {
+  if (process.env.NODE_ENV === 'production') {
+    res.status(503).json({ error: 'Şifre sıfırlama e-posta hizmeti henüz yapılandırılmadı.' });
+    return;
+  }
   try {
     const { identifier, email, otpCode, code, newPassword } = req.body;
     const target = identifier || email;
