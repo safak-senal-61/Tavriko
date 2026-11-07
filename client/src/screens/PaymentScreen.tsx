@@ -49,10 +49,10 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({
   onSuccess,
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<'Kart' | 'Apple Pay' | 'Google Pay'>('Kart');
-  const [cardHolder, setCardHolder] = useState('DENİZ YILMAZ');
-  const [cardNumber, setCardNumber] = useState('4532 1234 5678 4821');
-  const [expiryDate, setExpiryDate] = useState('08 / 28');
-  const [cvv, setCvv] = useState('789');
+  const [cardHolder, setCardHolder] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [cvv, setCvv] = useState('');
   // Date picker state
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickerDate, setPickerDate] = useState(new Date(2028, 7, 1)); // August 2028 default
@@ -89,6 +89,10 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({
   };
   // Handle Payment Submit
   const handlePay = async () => {
+    setErrorMsg('Gerçek kart ödemeleri henüz güvenli bir ödeme sağlayıcısına bağlanmadı. Kart bilgisi girmeyin; bu ekran şu anda ödeme almaz.');
+    setLoading(false);
+    return;
+
     if (selectedMethod !== 'Kart') {
       sound.playSound('tap');
       setErrorMsg(`${selectedMethod} bu cihazda şu an provizyon aşamasındadır. Lütfen Kart seçeneğiyle ödeme yapın.`);
