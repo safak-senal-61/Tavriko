@@ -52,6 +52,13 @@ interface PublicRoomEntry {
   updatedAt: number;
 }
 
+function constantTimeSecretMatch(expected: string | undefined, supplied: string | null): boolean {
+  if (!expected || expected.length < 32 || !supplied || supplied.length !== expected.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < expected.length; i++) mismatch |= expected.charCodeAt(i) ^ supplied.charCodeAt(i);
+  return mismatch === 0;
+}
+
 export class MatchmakerDO extends DurableObject<Env> {
   private queue: Map<string, QueueEntry> = new Map();
   private presences: Map<string, PresenceEntry> = new Map();
@@ -170,8 +177,7 @@ export class MatchmakerDO extends DurableObject<Env> {
       url.pathname === '/api/trivia/rooms/public'
     ) {
       if (request.method === 'POST') {
-        if (!this.env.INTERNAL_API_SECRET || this.env.INTERNAL_API_SECRET.length < 32 ||
-            request.headers.get('x-internal-secret') !== this.env.INTERNAL_API_SECRET) {
+        if (!constantTimeSecretMatch(this.env.INTERNAL_API_SECRET, request.headers.get('x-internal-secret'))) {
           return new Response(JSON.stringify({ error: 'Yetkisiz erişim' }), { status: 403 });
         }
         try {
@@ -269,7 +275,7 @@ export class MatchmakerDO extends DurableObject<Env> {
       try {
         const body: any = await request.json();
         const { targetUserId, event, data } = body || {};
-        if (!this.env.INTERNAL_API_SECRET || request.headers.get('x-internal-secret') !== this.env.INTERNAL_API_SECRET) {
+        if (!constantTimeSecretMatch(this.env.INTERNAL_API_SECRET, request.headers.get('x-internal-secret'))) {
           return new Response(JSON.stringify({ error: 'Yetkisiz erişim' }), { status: 403 });
         }
         if (targetUserId && event) {
