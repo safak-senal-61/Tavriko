@@ -3794,6 +3794,9 @@ export class PrismaService {
     if (!notif) {
       return { success: false, handled: finalHandled, error: 'Bildirim bulunamadı.', message: '' };
     }
+    if (notif.handled) {
+      return { success: false, handled: finalHandled, error: 'Bu bildirim daha önce yanıtlanmış.', message: '' };
+    }
 
     notif.handled = finalHandled;
     const newSub =
