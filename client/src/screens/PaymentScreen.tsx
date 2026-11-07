@@ -263,6 +263,7 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Kart üzerindeki ad soyad</Text>
             <TextInput
+              editable={false}
               style={styles.textInput}
               value={cardHolder}
               onChangeText={(t) => {
@@ -279,6 +280,7 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Kart numarası</Text>
             <TextInput
+              editable={false}
               style={styles.textInput}
               value={cardNumber}
               onChangeText={handleCardNumberChange}
@@ -306,6 +308,7 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({
             <View style={{ flex: 1 }}>
               <Text style={styles.inputLabel}>CVV</Text>
               <TextInput
+              editable={false}
                 style={styles.textInput}
                 value={cvv}
                 onChangeText={handleCvvChange}
