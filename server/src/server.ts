@@ -2664,34 +2664,12 @@ export function createApp() {
     `);
   });
 
-  // Health check
-  app.get(['/health', '/api/health'], async (req, res) => {
-    const [supabaseHealth, prismaHealth] = await Promise.all([
-      supabaseService.checkHealth(),
-      prisma.checkHealth(),
-    ]);
-    res.json({
+  // Public health endpoint intentionally returns no infrastructure metadata.
+  app.get(['/health', '/api/health'], (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(200).json({
       status: 'ok',
       timestamp: new Date().toISOString(),
-      roomsCount: roomManager.getActiveRoomsCount(),
-      stats: db.getReviewStats(),
-      services: {
-        upstashRedis: {
-          available: cacheService.isAvailable(),
-          mode: cacheService.isAvailable() ? 'upstash_rest' : 'in_memory_simulation',
-        },
-        supabase: supabaseHealth,
-        prisma: prismaHealth,
-        evrenLLM: {
-          configured: !!process.env.EVREN_LLM_API_KEY,
-          model: process.env.EVREN_LLM_MODEL || 'evren/glm-5.3-fp8',
-          baseUrl: process.env.EVREN_LLM_BASE_URL || 'https://llmtr.com/v1',
-        },
-        telegramBot: {
-          configured: telegramBot.isRunning(),
-          tokenSet: !!(process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_BOT_TOKEN.includes('placeholder')),
-        },
-      },
     });
   });
 
@@ -2754,17 +2732,36 @@ export function createApp() {
     }
   });
 
-  app.get('/api/trivia/leaderboard', async (req, res) => {
+  app.get('/api/trivia/leaderboard', async (_req, res) => {
     try {
-      const topPlayers = await db.getLeaderboardAsync(30);
+      const profiles = await db.getLeaderboardAsync(30);
+      // Public leaderboard must never serialize complete user records.
+      const topPlayers = profiles.map((profile) => ({
+        id: profile.id,
+        username: profile.username,
+        displayName: profile.displayName,
+        avatarUrl: profile.avatarUrl,
+        level: profile.level,
+        xp: profile.xp,
+        rankTitle: profile.rankTitle,
+        rankPoints: profile.rankPoints,
+        stats: {
+          totalMatches: profile.stats?.totalMatches ?? 0,
+          wins: profile.stats?.wins ?? 0,
+          correctAnswers: profile.stats?.correctAnswers ?? 0,
+          totalAnswers: profile.stats?.totalAnswers ?? 0,
+          bestStreak: profile.stats?.bestStreak ?? 0,
+        },
+      }));
+      res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
       res.json({
         season: 'Sezon 1: Bilgi Çağı',
         endsInDays: 45,
         topPlayers,
         leaders: topPlayers,
       });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+    } catch {
+      res.status(500).json({ error: 'Liderlik tablosu şu anda alınamıyor.' });
     }
   });
 
