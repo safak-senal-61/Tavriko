@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { Redis } from '@upstash/redis';
 import { db } from '../db/prismaClient';
 
 export interface AuthenticatedRequest extends Request {
@@ -67,4 +68,77 @@ export function requireInternalSecret(req: Request, res: Response, next: NextFun
     return;
   }
   next();
+}
+
+type RateLimitOptions = {
+  windowMs: number;
+  max: number;
+  keyPrefix: string;
+};
+
+const rateLimitRedis =
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+    ? new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      })
+    : null;
+
+const localRateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+
+/**
+ * Fixed-window rate limiting backed by Upstash in deployed environments.
+ * Production fails closed when Redis is unavailable; local/test environments
+ * use an in-memory fallback so automated tests remain deterministic.
+ */
+export function rateLimit(options: RateLimitOptions) {
+  const windowSeconds = Math.max(1, Math.ceil(options.windowMs / 1000));
+
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const key = `tavriko:ratelimit:${options.keyPrefix}:${ip}`;
+
+    if (rateLimitRedis) {
+      try {
+        const count = await rateLimitRedis.incr(key);
+        if (count === 1) await rateLimitRedis.expire(key, windowSeconds);
+        if (count > options.max) {
+          res.setHeader('Retry-After', String(windowSeconds));
+          res.status(429).json({ error: 'Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.' });
+          return;
+        }
+        next();
+        return;
+      } catch {
+        if (process.env.NODE_ENV === 'production') {
+          res.status(503).json({ error: 'İstek güvenliği servisi geçici olarak kullanılamıyor.' });
+          return;
+        }
+      }
+    } else if (process.env.NODE_ENV === 'production') {
+      res.status(503).json({ error: 'İstek güvenliği servisi yapılandırılmamış.' });
+      return;
+    }
+
+    const now = Date.now();
+    if (localRateLimitBuckets.size > 10000) {
+      for (const [bucketKey, bucket] of localRateLimitBuckets) {
+        if (bucket.resetAt <= now) localRateLimitBuckets.delete(bucketKey);
+      }
+    }
+    const bucket = localRateLimitBuckets.get(key);
+    if (!bucket || bucket.resetAt <= now) {
+      localRateLimitBuckets.set(key, { count: 1, resetAt: now + options.windowMs });
+      next();
+      return;
+    }
+    bucket.count += 1;
+    if (bucket.count > options.max) {
+      const retryAfter = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+      res.setHeader('Retry-After', String(retryAfter));
+      res.status(429).json({ error: 'Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.' });
+      return;
+    }
+    next();
+  };
 }
