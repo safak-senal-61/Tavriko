@@ -198,7 +198,7 @@ export function createApp() {
   });
 
   // Telegram set webhook endpoint
-  app.get(['/api/admin/telegram/set-webhook', '/admin/telegram/set-webhook'], async (req, res) => {
+  app.get(['/api/admin/telegram/set-webhook', '/admin/telegram/set-webhook'], requirePortalAdmin, async (req, res) => {
     try {
       const cfGatewayUrl = 'https://tavriko-realtime.uncertainidentity8.workers.dev/telegram/webhook';
       const vercelUrl = 'https://tavriko-app.vercel.app/api/telegram/webhook';
@@ -216,7 +216,7 @@ export function createApp() {
   });
 
   // Telegram webhook info
-  app.get(['/api/admin/telegram/webhook-info', '/admin/telegram/webhook-info'], async (req, res) => {
+  app.get(['/api/admin/telegram/webhook-info', '/admin/telegram/webhook-info'], requirePortalAdmin, async (req, res) => {
     try {
       const info = await telegramBot.getWebhookInfo();
       return res.json({ success: true, info });
@@ -2635,7 +2635,6 @@ export function createApp() {
         telegramBot: {
           configured: telegramBot.isRunning(),
           tokenSet: !!(process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_BOT_TOKEN.includes('placeholder')),
-          activeToken: telegramBot.getActiveToken(),
         },
       },
     });
@@ -2715,7 +2714,7 @@ export function createApp() {
   });
 
   // Prisma ORM <-> Supabase Sync Endpoint
-  app.all('/api/admin/prisma-sync', async (req, res) => {
+  app.all('/api/admin/prisma-sync', requirePortalAdmin, async (req, res) => {
     try {
       const result = await db.pushAllDataViaPrismaToSupabase();
       const health = await prisma.checkHealth();
