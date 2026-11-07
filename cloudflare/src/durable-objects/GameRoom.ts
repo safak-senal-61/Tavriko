@@ -45,6 +45,13 @@ function constantTimeSecretMatch(expected: string | undefined, supplied: string 
   return mismatch === 0;
 }
 
+function generateSecureRoomCode(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = new Uint8Array(10);
+  crypto.getRandomValues(bytes);
+  return 'TAV-' + Array.from(bytes, (value) => alphabet[value % alphabet.length]).join('');
+}
+
 export class GameRoomDO extends DurableObject<Env> {
   private room: GameRoom | null = null;
   private questions: Question[] = [];
@@ -257,7 +264,7 @@ export class GameRoomDO extends DurableObject<Env> {
 
       const roomPassword = sanitizeString(url.searchParams.get('password') || '', 64) || undefined;
       this.room = {
-        code: rawRoomCode || 'TAV-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
+        code: rawRoomCode || generateSecureRoomCode(),
         mode,
         hostId: authUser.id,
         status: 'lobby',
