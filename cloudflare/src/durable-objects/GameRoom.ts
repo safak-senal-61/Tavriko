@@ -106,6 +106,7 @@ export class GameRoomDO extends DurableObject<Env> {
       const requestedDifficulty = data.difficulty as DifficultyLevel;
       const safeDifficulty: DifficultyLevel = ['easy', 'medium', 'hard'].includes(requestedDifficulty) ? requestedDifficulty : 'medium';
       const requestedQuestionTime = Number(data.questionTimeSec);
+      const roomPassword = sanitizeString(data.password || '', 64) || undefined;
       this.room = {
         code: roomCode,
         mode: safeMode,
@@ -254,6 +255,7 @@ export class GameRoomDO extends DurableObject<Env> {
         this.isPrivateRoom = true;
       }
 
+      const roomPassword = sanitizeString(url.searchParams.get('password') || '', 64) || undefined;
       this.room = {
         code: rawRoomCode || 'TAV-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
         mode,
@@ -266,8 +268,8 @@ export class GameRoomDO extends DurableObject<Env> {
         totalRounds: qpTotalRounds > 0 ? qpTotalRounds : 5,
         questionTimeSec: qpQuestionTime > 0 ? qpQuestionTime : 15,
         penaltyForWrong: qpPenalty,
-        password: sanitizeString(url.searchParams.get('password') || '', 64) || undefined,
-        hasPassword: Boolean(url.searchParams.get('password')),
+        password: roomPassword,
+        hasPassword: Boolean(roomPassword),
         players: {},
         scores: {},
       };
