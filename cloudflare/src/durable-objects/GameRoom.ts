@@ -99,17 +99,24 @@ export class GameRoomDO extends DurableObject<Env> {
       }
       const data = (await request.json()) as any;
       const roomCode = sanitizeRoomCode(data.roomCode || url.searchParams.get('roomCode') || '');
+      const requestedMode = data.mode as GameMode;
+      const safeMode: GameMode = ['duel', 'quick_match', 'friends_private', 'ranked_random', 'free_for_all', 'team_battle', 'tournament', 'daily_challenge', 'single_practice'].includes(requestedMode)
+        ? requestedMode
+        : 'duel';
+      const requestedDifficulty = data.difficulty as DifficultyLevel;
+      const safeDifficulty: DifficultyLevel = ['easy', 'medium', 'hard'].includes(requestedDifficulty) ? requestedDifficulty : 'medium';
+      const requestedQuestionTime = Number(data.questionTimeSec);
       this.room = {
         code: roomCode,
-        mode: data.mode || 'duel',
-        hostId: data.players?.[0]?.id || 'host',
+        mode: safeMode,
+        hostId: sanitizeString(data.players?.[0]?.id || 'host', 64),
         status: 'lobby',
-        category: data.category || 'general_culture',
-        difficulty: data.difficulty || 'medium',
+        category: (typeof data.category === 'string' && /^[a-z0-9_]{1,48}$/i.test(data.category) ? data.category : 'general_culture') as CategoryId,
+        difficulty: safeDifficulty,
         maxPlayers: 2,
         currentRound: 0,
         totalRounds: 5,
-        questionTimeSec: data.questionTimeSec || 15,
+        questionTimeSec: Number.isInteger(requestedQuestionTime) ? Math.max(5, Math.min(60, requestedQuestionTime)) : 15,
         penaltyForWrong: Boolean(data.penaltyForWrong),
         password: data.password || undefined,
         hasPassword: Boolean(data.password),
@@ -119,7 +126,7 @@ export class GameRoomDO extends DurableObject<Env> {
       if (Array.isArray(data.players)) {
         // Özel/kendi odalarında roller SADECE gerçek katılımcılardır — bot asla eklenmez!
         const allowsBots = this.room.mode === 'duel' || this.room.mode === 'quick_match';
-        const acceptedPlayers = allowsBots ? data.players : data.players.filter((p: any) => !p.isBot && !String(p.id || '').startsWith('bot_'));
+        const acceptedPlayers = (allowsBots ? data.players : data.players.filter((p: any) => !p.isBot && !String(p.id || '').startsWith('bot_'))).slice(0, 10);
       // Override'a gerek yok: gerçek oyuncular WebSocket katılımıyla eklenir, botlar tamamen yok sayılır
       data.players = acceptedPlayers;
         for (const p of data.players) {
@@ -180,7 +187,7 @@ export class GameRoomDO extends DurableObject<Env> {
     const rawPlayerId = url.searchParams.get('playerId');
     const rawDisplayName = url.searchParams.get('displayName');
     const rawAvatarUrl = url.searchParams.get('avatarUrl');
-    const rawRoomCode = (url.searchParams.get('roomCode') || url.pathname.split('/').pop() || '').toUpperCase();
+    const rawRoomCode = sanitizeRoomCode(url.searchParams.get('roomCode') || url.pathname.split('/').pop() || '');
     const allowedModes = new Set<GameMode>([
       'duel', 'quick_match', 'friends_private', 'ranked_random',
       'free_for_all', 'team_battle', 'tournament', 'daily_challenge', 'single_practice',
@@ -259,7 +266,7 @@ export class GameRoomDO extends DurableObject<Env> {
         totalRounds: qpTotalRounds > 0 ? qpTotalRounds : 5,
         questionTimeSec: qpQuestionTime > 0 ? qpQuestionTime : 15,
         penaltyForWrong: qpPenalty,
-        password: url.searchParams.get('password') || undefined,
+        password: sanitizeString(url.searchParams.get('password') || '', 64) || undefined,
         hasPassword: Boolean(url.searchParams.get('password')),
         players: {},
         scores: {},
