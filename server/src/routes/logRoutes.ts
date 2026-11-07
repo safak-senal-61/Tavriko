@@ -4,7 +4,7 @@ import { logger } from '../utils/logger';
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
 import { getPendingGoogleSessions } from './authRoutes';
-import { requirePortalAdmin } from '../middleware/security';
+import { requirePortalAdmin, rateLimit } from '../middleware/security';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const PORTAL_ADMIN_EMAIL = process.env.PORTAL_ADMIN_EMAIL;
@@ -12,7 +12,7 @@ const PORTAL_ADMIN_PASSWORD = process.env.PORTAL_ADMIN_PASSWORD;
 
 export const logRouter = Router();
 
-logRouter.post('/portal/login', (req: Request, res: Response) => {
+logRouter.post('/portal/login', rateLimit({ keyPrefix: 'portal-login', windowMs: 15 * 60 * 1000, max: 5 }), (req: Request, res: Response) => {
   const { email, password } = req.body;
   if (!JWT_SECRET || !PORTAL_ADMIN_EMAIL || !PORTAL_ADMIN_PASSWORD) {
     res.status(503).json({ success: false, error: 'Yönetici girişi sunucu ortamında yapılandırılmamış.' });
@@ -68,13 +68,20 @@ logRouter.get('/logs/stream', requirePortalAdmin, (req: Request, res: Response) 
   logger.info('SYSTEM', 'Yeni bir istemci SSE log akışına bağlandı');
 });
 
-logRouter.post('/logs/ingest', (req: Request, res: Response) => {
-  const { level = 'INFO', category = 'CLIENT', message, details } = req.body;
-  if (!message) {
+logRouter.post('/logs/ingest', rateLimit({ keyPrefix: 'client-log-ingest', windowMs: 60 * 1000, max: 30 }), (req: Request, res: Response) => {
+  const { level = 'INFO', category = 'CLIENT', message } = req.body || {};
+  if (typeof message !== 'string' || !message.trim()) {
     res.status(400).json({ error: 'message zorunludur' });
     return;
   }
-  logger.log(category || 'CLIENT', level || 'INFO', `[MOBİL] ${message}`, details);
+  const allowedLevels = new Set(['INFO', 'WARN', 'ERROR', 'SUCCESS', 'DEBUG']);
+  const safeLevel = allowedLevels.has(String(level).toUpperCase()) ? String(level).toUpperCase() : 'INFO';
+  const safeCategory = typeof category === 'string'
+    ? category.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) || 'CLIENT'
+    : 'CLIENT';
+  // Client-supplied details are intentionally omitted: they can contain tokens,
+  // personal data or arbitrarily large objects.
+  logger.log(safeCategory, safeLevel, `[MOBİL] ${message.slice(0, 500)}`);
   res.json({ success: true });
 });
 
