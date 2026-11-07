@@ -23,6 +23,7 @@ import { FinalMatchSummary, canonicalCategoryId } from '@trivia/shared';
 import authRoutes from './routes/authRoutes';
 import { metricsMiddleware, metricsHandler, setSocketServer } from './utils/metrics';
 import { initErrorMonitor, captureError } from './utils/errorMonitor';
+import { requirePortalAdmin, requireInternalSecret } from './middleware/security';
 import triviaRoutes from './routes/triviaRoutes';
 import socialRoutes from './routes/socialRoutes';
 
@@ -70,7 +71,7 @@ export function createApp() {
         {
           ip: req.ip,
           query: Object.keys(req.query).length ? req.query : undefined,
-          body: req.method !== 'GET' && Object.keys(req.body || {}).length ? req.body : undefined,
+          bodyKeys: req.method !== 'GET' ? Object.keys(req.body || {}) : undefined,
         }
       );
     });
@@ -241,18 +242,17 @@ export function createApp() {
   });
 
   // Telegram bot status endpoint
-  app.get('/api/admin/telegram/status', async (req, res) => {
+  app.get('/api/admin/telegram/status', requirePortalAdmin, async (req, res) => {
     const webhookInfo = await telegramBot.getWebhookInfo();
     res.json({
       running: telegramBot.isRunning(),
       tokenConfigured: !!(process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_BOT_TOKEN.includes('placeholder')),
-      activeToken: telegramBot.getActiveToken(),
       webhookInfo,
     });
   });
 
   // Telegram bot live configuration endpoint
-  app.post(['/api/admin/telegram/config', '/admin/telegram/config'], async (req, res) => {
+  app.post(['/api/admin/telegram/config', '/admin/telegram/config'], requirePortalAdmin, async (req, res) => {
     try {
       const { token, adminIds } = req.body;
       if (!token || typeof token !== 'string' || token.trim().length < 15) {
@@ -285,7 +285,7 @@ export function createApp() {
   });
 
   // Telegram test & status check endpoint
-  app.get(['/api/admin/telegram/test', '/admin/telegram/test'], async (req, res) => {
+  app.get(['/api/admin/telegram/test', '/admin/telegram/test'], requirePortalAdmin, async (req, res) => {
     try {
       const info = await telegramBot.getBotInfo();
       return res.json(info);
@@ -2737,12 +2737,7 @@ export function createApp() {
   app.use('/api/social', socialRoutes);
 
   // --- Cloudflare Durable Objects Internal Endpoints ---
-  app.post('/api/internal/room-questions', (req, res) => {
-    const internalSecret = process.env.INTERNAL_API_SECRET || 'tavriko_internal_secret_2026';
-    const providedSecret = req.headers['x-internal-secret'];
-    if (providedSecret && providedSecret !== internalSecret) {
-      return res.status(403).json({ error: 'Yetkisiz erişim' });
-    }
+  app.post('/api/internal/room-questions', requireInternalSecret, (req, res) => {
 
     const { categoryId, difficulty, count = 5 } = req.body || {};
     const safeCount = Math.min(50, Math.max(1, Number(count) || 5));
@@ -2756,12 +2751,7 @@ export function createApp() {
     return res.json({ success: true, questions });
   });
 
-  app.post('/api/internal/match-results', async (req, res) => {
-    const internalSecret = process.env.INTERNAL_API_SECRET || 'tavriko_internal_secret_2026';
-    const providedSecret = req.headers['x-internal-secret'];
-    if (providedSecret && providedSecret !== internalSecret) {
-      return res.status(403).json({ error: 'Yetkisiz erişim' });
-    }
+  app.post('/api/internal/match-results', requireInternalSecret, async (req, res) => {
 
     try {
       const summary = req.body as FinalMatchSummary;
