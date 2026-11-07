@@ -317,6 +317,16 @@ router.post('/delete-account', requireUser, async (req: Request, res: Response):
 });
 
 router.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
+  // The current demo reset flow returns the OTP to the caller instead of
+  // delivering it through a verified email channel. Never expose that code
+  // in production; keep the demo behavior limited to non-production builds.
+  if (process.env.NODE_ENV === 'production') {
+    res.status(503).json({
+      error: 'Şifre sıfırlama e-posta hizmeti henüz yapılandırılmadı. Lütfen destek ekibiyle iletişime geçin.',
+    });
+    return;
+  }
+
   try {
     const { identifier, email } = req.body;
     const target = identifier || email;
@@ -326,8 +336,10 @@ router.post('/forgot-password', async (req: Request, res: Response): Promise<voi
     }
     const result = await db.requestPasswordReset(target);
     res.json({
-      ...result,
+      success: result.success,
+      message: result.message,
       resetCodeDemo: result.demoResetCode,
+      emailMasked: result.emailMasked,
     });
   } catch (err: any) {
     res.status(404).json({ error: err.message });
