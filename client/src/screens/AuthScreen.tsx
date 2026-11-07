@@ -352,7 +352,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     if (!urlStr) return;
     if (lastProcessedAuthUrl.current === urlStr) return;
     lastProcessedAuthUrl.current = urlStr;
-    sendClientLog('INFO', 'Deep link URL yakalandı', { url: urlStr });
+    sendClientLog('INFO', 'Deep link URL yakalandı', { hasAuthCode: /[?&#]code=/.test(urlStr), hasAccessToken: /[?&#]access_token=/.test(urlStr) });
     try {
       setLoading(true);
       let rawParams = '';
@@ -365,7 +365,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       let accessToken = params.get('access_token');
       const code = params.get('code');
       if (!accessToken && code) {
-        sendClientLog('INFO', 'OAuth code yakalandı, Supabase ile oturuma dönüştürülüyor...', { code });
+        sendClientLog('INFO', 'OAuth code yakalandı, Supabase ile oturuma dönüştürülüyor...', { hasCode: Boolean(code) });
         try {
           const { data: exchangeData, error: exchangeError } = await clientSupabase.auth.exchangeCodeForSession(code);
           if (exchangeData?.session?.access_token) {
@@ -400,7 +400,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           sendClientLog('WARN', 'getUser istemcide atlandi, sunucuda cozumlenecek', { err: fetchErr.message });
         }
 
-        sendClientLog('INFO', 'Kullanıcı bilgileri sunucuya gönderiliyor', { email: userEmail, userName });
+        sendClientLog('INFO', 'Kullanıcı bilgileri sunucuya gönderiliyor', { hasEmail: Boolean(userEmail), hasDisplayName: Boolean(userName) });
         await submitGoogleAuth({
           accessToken,
           email: userEmail || undefined,
@@ -429,7 +429,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const currentUrl = window.location.href;
       if (currentUrl.includes('access_token') || currentUrl.includes('code=')) {
-        sendClientLog('INFO', 'Web baslangic URL oturum parametresi algilandi', { currentUrl });
+        sendClientLog('INFO', 'Web baslangic URL oturum parametresi algilandi', { hasAccessToken: currentUrl.includes('access_token='), hasAuthCode: currentUrl.includes('code=') });
         handleAuthRedirectUrl(currentUrl);
         try {
           window.history.replaceState(null, '', window.location.pathname);
@@ -438,7 +438,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
       const onWindowMessage = (event: MessageEvent) => {
         if (event.data?.type === 'TAVRIKO_GOOGLE_AUTH') {
-          sendClientLog('INFO', 'window.postMessage uzerinden Google yetkisi alindi', event.data);
+          sendClientLog('INFO', 'window.postMessage uzerinden Google yetkisi alindi', { hasUser: Boolean(event.data?.user), hasToken: Boolean(event.data?.token), hasPayload: Boolean(event.data?.payload) });
           if (event.data.user && event.data.token) {
             sound.playSound('victory');
             sound.triggerHaptic('success');
