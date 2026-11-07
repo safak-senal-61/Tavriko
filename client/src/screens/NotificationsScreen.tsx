@@ -25,6 +25,7 @@ import {
 
 interface NotificationsScreenProps {
   user?: UserProfile;
+  token?: string;
   apiBaseUrl?: string;
   onBack: () => void;
   onAcceptDuel?: (roomCode?: string) => void;
@@ -33,6 +34,7 @@ interface NotificationsScreenProps {
 
 export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   user,
+  token,
   apiBaseUrl,
   onBack,
   onAcceptDuel,
@@ -47,7 +49,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
 
   const fetchNotifications = () => {
     setLoading(true);
-    fetch(`${base}/social/notifications/${userId}`)
+    fetch(`${base}/social/notifications/${userId}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data && Array.isArray(data.notifications)) {
@@ -143,7 +145,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/notifications/respond`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           userId,
           notificationId: notification.id,
