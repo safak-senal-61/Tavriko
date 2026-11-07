@@ -4,20 +4,25 @@ import { logger } from '../utils/logger';
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
 import { getPendingGoogleSessions } from './authRoutes';
+import { requirePortalAdmin } from '../middleware/security';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'trivia-super-secret-jwt-key-2026';
-const PORTAL_ADMIN_EMAIL = 'jewelkaan01@gmail.com';
-const PORTAL_ADMIN_PASSWORD = 'Patr10.senal61@@';
+const JWT_SECRET = process.env.JWT_SECRET;
+const PORTAL_ADMIN_EMAIL = process.env.PORTAL_ADMIN_EMAIL;
+const PORTAL_ADMIN_PASSWORD = process.env.PORTAL_ADMIN_PASSWORD;
 
 export const logRouter = Router();
 
 logRouter.post('/portal/login', (req: Request, res: Response) => {
   const { email, password } = req.body;
+  if (!JWT_SECRET || !PORTAL_ADMIN_EMAIL || !PORTAL_ADMIN_PASSWORD) {
+    res.status(503).json({ success: false, error: 'Yönetici girişi sunucu ortamında yapılandırılmamış.' });
+    return;
+  }
   if (email === PORTAL_ADMIN_EMAIL && password === PORTAL_ADMIN_PASSWORD) {
     const token = jwt.sign(
       { email: PORTAL_ADMIN_EMAIL, role: 'portal_super_admin' },
       JWT_SECRET,
-      { expiresIn: '30d' }
+      { expiresIn: '15m', algorithm: 'HS256' }
     );
     logger.success('AUTH', `Portal Yöneticisi Giriş Yaptı: ${email}`);
     res.json({ success: true, token, email: PORTAL_ADMIN_EMAIL });
@@ -44,12 +49,12 @@ logRouter.get('/portal/verify', (req: Request, res: Response) => {
   res.status(401).json({ success: false, error: 'Geçersiz veya süresi dolmuş oturum' });
 });
 
-logRouter.get('/logs', (req: Request, res: Response) => {
+logRouter.get('/logs', requirePortalAdmin, (req: Request, res: Response) => {
   const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 200;
   res.json({ logs: logger.getRecentLogs(limit) });
 });
 
-logRouter.get('/logs/stream', (req: Request, res: Response) => {
+logRouter.get('/logs/stream', requirePortalAdmin, (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -69,12 +74,12 @@ logRouter.post('/logs/ingest', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
-logRouter.post('/logs/clear', (req: Request, res: Response) => {
+logRouter.post('/logs/clear', requirePortalAdmin, (req: Request, res: Response) => {
   logger.clear();
   res.json({ success: true });
 });
 
-logRouter.get('/logs/stats', async (req: Request, res: Response) => {
+logRouter.get('/logs/stats', requirePortalAdmin, async (req: Request, res: Response) => {
   try {
     let pgUsers = 0;
     let recentUsers: any[] = [];
@@ -113,7 +118,7 @@ logRouter.get('/logs/stats', async (req: Request, res: Response) => {
   }
 });
 
-logRouter.post('/logs/simulate-google', async (req: Request, res: Response) => {
+logRouter.post('/logs/simulate-google', requirePortalAdmin, async (req: Request, res: Response) => {
   try {
     const { email, displayName } = req.body;
     if (!email) {
