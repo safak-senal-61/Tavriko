@@ -1830,6 +1830,7 @@ export const RootNavigator: React.FC = () => {
         {currentScreen === 'friends' && (
           <FriendsScreen
             user={user || undefined}
+            token={token || undefined}
             isGuest={isGuest}
             apiBaseUrl={API_BASE}
             onBack={() => navigateTo('home')}
@@ -1910,6 +1911,7 @@ export const RootNavigator: React.FC = () => {
         {currentScreen === 'notifications' && (
           <NotificationsScreen
             user={user || undefined}
+            token={token || undefined}
             apiBaseUrl={API_BASE}
             onBack={() => navigateTo('home')}
             onAcceptDuel={(roomCode) => {
@@ -2004,6 +2006,7 @@ export const RootNavigator: React.FC = () => {
         {currentScreen === 'season' && (
           <SeasonScreen
             user={user || undefined}
+            token={token || undefined}
             apiBaseUrl={API_BASE}
             onUpdateUser={(u) => setUser(u)}
             onBack={() => navigateTo('home')}
@@ -2013,6 +2016,7 @@ export const RootNavigator: React.FC = () => {
         {currentScreen === 'shop' && (
           <ShopScreen
             user={user || undefined}
+            token={token || undefined}
             apiBaseUrl={API_BASE}
             onUpdateUser={(u) => setUser(u)}
             onBack={() => navigateTo('home')}
@@ -2033,6 +2037,7 @@ export const RootNavigator: React.FC = () => {
         {currentScreen === 'payment' && selectedPaymentItem && (
           <PaymentScreen
             user={user || undefined}
+            token={token || undefined}
             item={selectedPaymentItem}
             apiBaseUrl={API_BASE}
             onBack={() => {
@@ -2049,6 +2054,7 @@ export const RootNavigator: React.FC = () => {
         {currentScreen === 'events' && (
           <EventsScreen
             user={user || undefined}
+            token={token || undefined}
             onBack={() => navigateTo('home')}
             onNotifications={() => navigateTo('notifications')}
             onProfile={() => navigateTo('profile')}
@@ -2064,6 +2070,7 @@ export const RootNavigator: React.FC = () => {
         {currentScreen === 'inventory' && (
           <InventoryScreen
             user={user || undefined}
+            token={token || undefined}
             apiBaseUrl={API_BASE}
             onUpdateUser={(u) => setUser(u)}
             onBack={() => navigateTo('home')}
