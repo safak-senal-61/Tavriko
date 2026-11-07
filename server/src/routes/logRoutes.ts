@@ -1133,9 +1133,9 @@ export function renderDashboardHtml(): string {
               const tr = document.createElement('tr');
               tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
               tr.innerHTML = \`
-                <td style="padding:10px 16px; font-weight:700; color:#FFFFFF;">\${u.displayName || u.username}</td>
-                <td style="padding:10px 16px; color:#A78BFA;">\${u.email || '-'}</td>
-                <td style="padding:10px 16px; font-weight:800; color:var(--gold);">\${u.friendCode || '-'}</td>
+                <td style="padding:10px 16px; font-weight:700; color:#FFFFFF;">\${escapeHtml(u.displayName || u.username)}</td>
+                <td style="padding:10px 16px; color:#A78BFA;">\${escapeHtml(u.email || '-')}</td>
+                <td style="padding:10px 16px; font-weight:800; color:var(--gold);">\${escapeHtml(u.friendCode || '-')}</td>
                 <td style="padding:10px 16px;">Seviye \${u.level || 1}</td>
                 <td style="padding:10px 16px;">🪙 \${u.coins ?? 0} · 💎 \${u.gems ?? 0}</td>
                 <td style="padding:10px 16px; color:var(--text-muted); font-size:12px;">\${u.createdAt ? new Date(u.createdAt).toLocaleDateString('tr-TR') : '-'}</td>
