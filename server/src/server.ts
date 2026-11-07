@@ -23,7 +23,7 @@ import { FinalMatchSummary, canonicalCategoryId } from '@trivia/shared';
 import authRoutes from './routes/authRoutes';
 import { metricsMiddleware, metricsHandler, setSocketServer } from './utils/metrics';
 import { initErrorMonitor, captureError } from './utils/errorMonitor';
-import { requirePortalAdmin, requireInternalSecret } from './middleware/security';
+import { requirePortalAdmin, requireInternalSecret, rateLimit } from './middleware/security';
 import triviaRoutes from './routes/triviaRoutes';
 import socialRoutes from './routes/socialRoutes';
 
@@ -281,7 +281,7 @@ export function createApp() {
   });
 
   // Dynamic QR Code endpoint (Default to Cloud Web URL for 24/7 direct play)
-  app.get('/qr', async (req, res) => {
+  app.get('/qr', rateLimit({ keyPrefix: 'qr-generate', windowMs: 60 * 1000, max: 30 }), async (req, res) => {
     try {
       const host = req.get('host') || 'tavriko-app.vercel.app';
       const proto = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
