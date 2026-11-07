@@ -2283,7 +2283,20 @@ export class PrismaService {
 
   public verifyToken(token: string): { userId: string; username: string } | null {
     try {
-      return jwt.verify(token, JWT_SECRET) as any;
+      const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as jwt.JwtPayload;
+      // Reject signed-but-incomplete tokens and tokens without a bounded lifetime.
+      if (
+        typeof decoded.userId !== 'string' ||
+        decoded.userId.length < 1 ||
+        decoded.userId.length > 128 ||
+        typeof decoded.username !== 'string' ||
+        decoded.username.length < 1 ||
+        typeof decoded.exp !== 'number' ||
+        decoded.exp <= Math.floor(Date.now() / 1000)
+      ) {
+        return null;
+      }
+      return { userId: decoded.userId, username: decoded.username };
     } catch {
       return null;
     }
