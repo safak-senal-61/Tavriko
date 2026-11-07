@@ -265,6 +265,9 @@ export class MatchmakerDO extends DurableObject<Env> {
       try {
         const body: any = await request.json();
         const { targetUserId, event, data } = body || {};
+        if (!this.env.INTERNAL_API_SECRET || request.headers.get('x-internal-secret') !== this.env.INTERNAL_API_SECRET) {
+          return new Response(JSON.stringify({ error: 'Yetkisiz erişim' }), { status: 403 });
+        }
         if (targetUserId && event) {
           const delivered = this.sendToUser(targetUserId, event, data);
           return new Response(
@@ -349,8 +352,7 @@ export class MatchmakerDO extends DurableObject<Env> {
         isGuest: true,
       };
     } else if (rawPlayerId && authUser.id !== rawPlayerId) {
-      // Ensure client-side playerId is also tagged if different
-      authUser.id = rawPlayerId;
+      return new Response(JSON.stringify({ error: 'Kimlik uyuşmazlığı' }), { status: 403 });
     }
 
     // Accept WebSocket into hibernation
