@@ -6,9 +6,28 @@ import { SHOP_CATALOG, SEASON_1_TIERS, EVENT_DEFINITIONS } from '@trivia/shared'
 
 const router = Router();
 
-router.get('/leaderboard', async (req: Request, res: Response): Promise<void> => {
+router.get('/leaderboard', async (_req: Request, res: Response): Promise<void> => {
   try {
-    const topPlayers = await db.getLeaderboardAsync(30);
+    const profiles = await db.getLeaderboardAsync(30);
+    // Leaderboards are public, but full UserProfile objects contain private
+    // contact, account, inventory, notification and settings fields.
+    const topPlayers = profiles.map((profile) => ({
+      id: profile.id,
+      username: profile.username,
+      displayName: profile.displayName,
+      avatarUrl: profile.avatarUrl,
+      level: profile.level,
+      xp: profile.xp,
+      rankTitle: profile.rankTitle,
+      rankPoints: profile.rankPoints,
+      stats: {
+        totalMatches: profile.stats?.totalMatches ?? 0,
+        wins: profile.stats?.wins ?? 0,
+        correctAnswers: profile.stats?.correctAnswers ?? 0,
+        totalAnswers: profile.stats?.totalAnswers ?? 0,
+        bestStreak: profile.stats?.bestStreak ?? 0,
+      },
+    }));
     res.json({
       season: 'Sezon 1: Bilgi Çağı',
       endsInDays: 45,
@@ -121,11 +140,25 @@ router.post('/notifications/respond', requireUser, async (req: Request, res: Res
 });
 
 // --- Real-Time Presence API ---
-router.get('/presence', (req: Request, res: Response): void => {
-  res.json({
-    success: true,
-    presences: presenceManager.getAllPresences(),
-  });
+router.get('/presence', requireUser, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authUserId = (req as any).authUserId as string;
+    const friendData = await db.getFriendsForUserAsync(authUserId);
+    const friendIds = new Set((friendData?.friends || []).map((friend: any) => friend.id));
+    const presences = presenceManager.getAllPresences()
+      .filter((presence: any) => friendIds.has(presence.userId))
+      .map((presence: any) => ({
+        userId: presence.userId,
+        username: presence.username,
+        displayName: presence.displayName,
+        avatarUrl: presence.avatarUrl,
+        online: Boolean(presence.online),
+        inRoom: Boolean(presence.inRoom),
+      }));
+    res.json({ success: true, presences });
+  } catch {
+    res.status(500).json({ error: 'Çevrimiçi durum bilgisi alınamadı.' });
+  }
 });
 
 router.post('/presence/heartbeat', requireUser, (req: Request, res: Response): void => {
