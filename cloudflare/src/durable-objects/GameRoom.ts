@@ -87,6 +87,9 @@ export class GameRoomDO extends DurableObject<Env> {
     }
 
     if (request.method === 'POST' && (url.pathname === '/create-match' || url.pathname.endsWith('/create-match'))) {
+      if (!this.env.INTERNAL_API_SECRET || request.headers.get('x-internal-secret') !== this.env.INTERNAL_API_SECRET) {
+        return new Response(JSON.stringify({ error: 'Yetkisiz iç servis isteği.' }), { status: 403 });
+      }
       const data = (await request.json()) as any;
       const roomCode = sanitizeRoomCode(data.roomCode || url.searchParams.get('roomCode') || '');
       this.room = {
