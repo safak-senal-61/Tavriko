@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { requireUser } from '../middleware/security';
 import { db } from '../db/prismaClient';
 import { presenceManager } from '../services/presenceManager';
 import { SHOP_CATALOG, SEASON_1_TIERS, EVENT_DEFINITIONS } from '@trivia/shared';
@@ -207,7 +208,7 @@ router.get('/shop/catalog', (req: Request, res: Response): void => {
   });
 });
 
-router.post('/shop/purchase', async (req: Request, res: Response): Promise<void> => {
+router.post('/shop/purchase', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, productId, packId, paymentMethod = 'coins' } = req.body;
     if (!userId) {
@@ -264,7 +265,7 @@ router.post('/inventory/use', async (req: Request, res: Response): Promise<void>
   }
 });
 
-router.post('/inventory/open-chest', async (req: Request, res: Response): Promise<void> => {
+router.post('/inventory/open-chest', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, chestId, keyId } = req.body;
     if (!userId || !chestId) {
@@ -289,7 +290,7 @@ router.get('/season/info', (req: Request, res: Response): void => {
   });
 });
 
-router.post('/season/claim', async (req: Request, res: Response): Promise<void> => {
+router.post('/season/claim', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, tier, track = 'free' } = req.body;
     if (!userId || !tier) {
@@ -303,7 +304,7 @@ router.post('/season/claim', async (req: Request, res: Response): Promise<void> 
   }
 });
 
-router.post('/season/premium-pass', async (req: Request, res: Response): Promise<void> => {
+router.post('/season/premium-pass', requireUser, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId } = req.body;
     if (!userId) {
