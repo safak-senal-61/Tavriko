@@ -116,9 +116,9 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   const [addSuccessMsg, setAddSuccessMsg] = useState<string | null>(null);
   const [addErrorMsg, setAddErrorMsg] = useState<string | null>(null);
   const base = apiBaseUrl || DEFAULT_API_BASE;
-  const fetchFriends = () => {
+  const fetchFriends = (silent = false) => {
     const uid = user?.id || 'default';
-    setLoading(true);
+    if (!silent) setLoading(true);
     socketService.requestPresenceSnapshot();
     fetch(`${base}/social/friends/${uid}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
       .then((res) => res.json())
@@ -189,12 +189,13 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       })
       .catch(() => {})
       .finally(() => {
-        setLoading(false);
+        if (!silent) setLoading(false);
       });
   };
 
   useEffect(() => {
     fetchFriends();
+    const refreshInterval = setInterval(() => fetchFriends(true), 20000);
 
     const unsubPresenceSnapshot = socketService.on('presence:snapshot', (data: any) => {
       if (!data || !Array.isArray(data.presences)) return;
@@ -293,6 +294,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       unsubUserOffline();
       unsubFriendsUpdate();
       unsubNewNotif();
+      clearInterval(refreshInterval);
     };
   }, [apiBaseUrl, user?.id]);
   const currentCode = user?.friendCode || friendCode;
@@ -352,9 +354,6 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       }
       sound.playSound('reward');
       sound.triggerHaptic('success');
-      socketService.notifyUserRealtime(targetPlayer.id, 'friends:update', {
-        removedBy: user.id,
-      });
       setFriendsList((prev) => prev.filter((item) => item.id !== targetPlayer.id));
       setConfirmRemoveId(null);
       setInspectPlayer(null);
