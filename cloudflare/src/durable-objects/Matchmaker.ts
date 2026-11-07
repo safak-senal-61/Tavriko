@@ -647,9 +647,12 @@ export class MatchmakerDO extends DurableObject<Env> {
     try {
       const roomId = this.env.GAME_ROOMS.idFromName(roomCode);
       const roomStub = this.env.GAME_ROOMS.get(roomId);
+      if (!this.env.INTERNAL_API_SECRET || this.env.INTERNAL_API_SECRET.length < 32) {
+        throw new Error('INTERNAL_API_SECRET is not configured');
+      }
       await roomStub.fetch('http://internal/create-match', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-internal-secret': this.env.INTERNAL_API_SECRET },
         body: JSON.stringify({
           roomCode,
           mode: mode || 'duel',
