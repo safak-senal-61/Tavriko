@@ -33,6 +33,7 @@ export interface PaymentItem {
 }
 interface PaymentScreenProps {
   user?: UserProfile;
+  token?: string;
   item: PaymentItem;
   apiBaseUrl?: string;
   onBack: () => void;
@@ -41,6 +42,7 @@ interface PaymentScreenProps {
 const PAYMENT_TABS = ['Kart', 'Apple Pay', 'Google Pay'] as const;
 export const PaymentScreen: React.FC<PaymentScreenProps> = ({
   user,
+  token,
   item,
   apiBaseUrl,
   onBack,
@@ -120,7 +122,7 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/shop/purchase`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           userId: user.id,
           packId: item.id,
