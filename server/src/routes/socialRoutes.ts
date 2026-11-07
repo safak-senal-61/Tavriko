@@ -320,10 +320,15 @@ router.post('/season/premium-pass', requireUser, async (req: Request, res: Respo
 });
 
 // --- Live Events ---
-router.get('/events', (req: Request, res: Response): void => {
+router.get('/events', requireUser, (req: Request, res: Response): void => {
   try {
-    const userId = (req.query.userId as string) || '';
-    const result = db.getUserEvents(userId);
+    const authUserId = (req as any).authUserId as string;
+    const requestedUserId = (req.query.userId as string) || authUserId;
+    if (requestedUserId !== authUserId) {
+      res.status(403).json({ error: 'Bu kaynağa erişim yetkiniz yok.' });
+      return;
+    }
+    const result = db.getUserEvents(authUserId);
     res.json({
       success: true,
       events: result.events,
@@ -347,7 +352,7 @@ router.post('/events/claim', requireUser, async (req: Request, res: Response): P
   }
 });
 
-router.post('/events/start', (req: Request, res: Response): void => {
+router.post('/events/start', requireUser, (req: Request, res: Response): void => {
   try {
     const { userId, eventId } = req.body;
     if (!userId || !eventId) {
@@ -360,7 +365,6 @@ router.post('/events/start', (req: Request, res: Response): void => {
     res.status(400).json({ error: err.message });
   }
 });
-*/
 
 // --- Public User Profile (allowlisted fields only) ---
 router.get('/profile/:userId', async (req: Request, res: Response): Promise<void> => {
