@@ -39,10 +39,8 @@ import { RICH_SEED_BANK } from '../ai/evrenLlmGenerator';
 import { supabaseService } from './supabaseClient';
 import { presenceManager } from '../services/presenceManager';
 
-const JWT_SECRET =
-  process.env.JWT_SECRET ||
-  process.env.SUPABASE_JWT_SECRET ||
-  'tavriko-runtime-jwt-key';
+const JWT_SECRET = process.env.JWT_SECRET || process.env.SUPABASE_JWT_SECRET;
+if (!JWT_SECRET) throw new Error('JWT_SECRET must be configured before the server starts.');
 const PRISMA_DATA_DIR = path.join(__dirname, '..', '..', 'data', 'prisma');
 const USERS_DB_FILE = path.join(__dirname, '..', '..', 'supabase_users_store.json');
 const QUESTIONS_DB_FILE = path.join(__dirname, '..', '..', 'supabase_questions_store.json');
