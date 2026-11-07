@@ -60,8 +60,8 @@ export function createApp() {
     },
     credentials: true,
   }));
-  app.use(express.json({ limit: '15mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+  app.use(express.json({ limit: '5mb' }));
+  app.use(express.urlencoded({ extended: false, limit: '100kb', parameterLimit: 100 }));
 
   // Prometheus metrik aracisi (tavriko_http_* metrikleri)
   app.use(metricsMiddleware);
