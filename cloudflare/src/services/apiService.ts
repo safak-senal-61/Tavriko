@@ -15,6 +15,8 @@ export class ApiService {
     const cleanUrl = (this.backendUrl || 'https://tavriko-app.vercel.app').replace(/\/+$/, '');
     const endpoint = `${cleanUrl}/api/internal/room-questions`;
 
+    if (!this.internalSecret || this.internalSecret.length < 32) return getFallbackQuestions(categoryId, difficulty, count);
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3500);
@@ -52,6 +54,8 @@ export class ApiService {
   public async submitMatchResults(summary: FinalMatchSummary): Promise<boolean> {
     const cleanUrl = (this.backendUrl || 'https://tavriko-app.vercel.app').replace(/\/+$/, '');
     const endpoint = `${cleanUrl}/api/internal/match-results`;
+
+    if (!this.internalSecret || this.internalSecret.length < 32) return false;
 
     try {
       const controller = new AbortController();
