@@ -364,7 +364,7 @@ export const RootNavigator: React.FC = () => {
       if (!user?.id) return;
       fetch(`${API_BASE}/social/presence/heartbeat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           userId: user.id,
           inRoom: Boolean(activeRoomRef.current?.code),
@@ -391,7 +391,7 @@ export const RootNavigator: React.FC = () => {
         const hostPlayer = room.players?.[room.hostId] || Object.values(room.players || {})[0];
         fetch(`${API_BASE}/social/rooms/active`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify({
             userId: user.id,
             roomCode: room.code,
@@ -1953,7 +1953,7 @@ export const RootNavigator: React.FC = () => {
                 try {
                   const res = await fetch(`${API_BASE}/auth/sync-wallet`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
                     body: JSON.stringify({
                       userId: user.id,
                       coins: user.coins,
