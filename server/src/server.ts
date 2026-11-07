@@ -44,7 +44,15 @@ export function createApp() {
   const app = express();
   // Vercel is the trusted reverse proxy; rate limiting must see the client IP.
   app.set('trust proxy', 1);
-  const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map((origin) => origin.trim()).filter(Boolean);
+  const defaultAllowedOrigins = [
+    'https://gmae-taupe.vercel.app',
+    'https://tavriko-app.vercel.app',
+    'https://tavriko-game.vercel.app',
+    'https://tavriko-tavriko.vercel.app',
+    'https://tavriko-git-main-tavriko.vercel.app',
+  ];
+  const configuredOrigins = (process.env.CORS_ORIGINS || '').split(',').map((origin) => origin.trim()).filter(Boolean);
+  const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...configuredOrigins]));
   app.use(cors({
     origin: (origin, callback) => {
       if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
@@ -133,6 +141,11 @@ export function createApp() {
   });
 
   wss.on('connection', (ws: WsWebSocket, request: http.IncomingMessage) => {
+    const requestOrigin = request.headers.origin;
+    if (requestOrigin && !allowedOrigins.includes(requestOrigin)) {
+      ws.close(1008, 'Origin not allowed');
+      return;
+    }
     const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
     const suppliedToken = url.searchParams.get('token') || '';
     const suppliedPlayerId = url.searchParams.get('playerId') || '';
