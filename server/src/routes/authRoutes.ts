@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { randomBytes } from 'crypto';
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
-import { UserProfile } from '@trivia/shared';
+import { UserProfile, UserSettings } from '@trivia/shared';
 import { logger } from '../utils/logger';
 import { requireUser, rateLimit } from '../middleware/security';
 
@@ -540,7 +540,7 @@ router.post('/settings', rateLimit({ keyPrefix: 'user-settings', windowMs: 60 * 
       }
     }
 
-    const updated = await db.updateUserSettings(userId, validated);
+    const updated = await db.updateUserSettings(userId, validated as Partial<UserSettings>);
     res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, user: updated });
   } catch (err: any) {
