@@ -257,7 +257,7 @@ router.get('/google/callback', (req: Request, res: Response): void => {
     function navigateToApp(user, token) {
       if (window.opener && window.opener !== window) {
         try {
-          window.opener.postMessage({ type: 'TAVRIKO_GOOGLE_AUTH', user: user, token: token, payload: payload }, '*');
+          window.opener.postMessage({ type: 'TAVRIKO_GOOGLE_AUTH', user: user, token: token, payload: window.location.href }, window.location.origin);
         } catch (e) {}
         setTimeout(function() { window.close(); }, 500);
         return;
