@@ -40,6 +40,7 @@ import { PaymentItem } from './PaymentScreen';
 
 interface ShopScreenProps {
   user?: UserProfile;
+  token?: string;
   apiBaseUrl?: string;
   onUpdateUser?: (updatedUser: UserProfile) => void;
   onBack?: () => void;
@@ -216,6 +217,7 @@ const ShopItemVisual: React.FC<{ product: ShopProduct }> = ({ product }) => {
 
 export const ShopScreen: React.FC<ShopScreenProps> = ({
   user,
+  token,
   apiBaseUrl,
   onUpdateUser,
   onBack,
@@ -337,7 +339,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/shop/purchase`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           userId: user.id,
           productId: product.id,
