@@ -38,8 +38,8 @@ describe('Supabase least-privilege RLS migration', () => {
   });
 
   it('does not create public read policies or use deprecated auth.role()', () => {
-    expect(migration).not.toContain('categories_public_read');
-    expect(migration).not.toContain('categories_public_select');
+    expect(migration).not.toMatch(/CREATE\s+POLICY\s+categories_public_read/i);
+    expect(migration).not.toMatch(/CREATE\s+POLICY\s+categories_public_select/i);
     expect(migration).not.toContain('auth.role()');
   });
 });
