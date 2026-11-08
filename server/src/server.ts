@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { createHash } from 'crypto';
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
@@ -86,7 +87,7 @@ export function createApp() {
         lvl,
         `${req.method} ${req.path} -> ${res.statusCode} (${duration}ms)`,
         {
-          ip: req.ip,
+          ip: cat === 'AUTH' ? createHash('sha256').update(String(req.ip || 'unknown')).digest('hex').slice(0, 12) : req.ip,
           queryKeys: Object.keys(req.query).length ? Object.keys(req.query) : undefined,
           bodyKeys: req.method !== 'GET' ? Object.keys(req.body || {}) : undefined,
         }
