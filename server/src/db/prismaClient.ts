@@ -1402,7 +1402,7 @@ export class PrismaService {
     };
 
     this.users.set(id, record);
-    const token = jwt.sign({ userId: id, username: record.username }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: id, username: record.username, isGuest: true }, JWT_SECRET, { expiresIn: '24h' });
     return { token, user: this.toProfile(record) };
   }
 
