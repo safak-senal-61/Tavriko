@@ -130,6 +130,40 @@ describe('Trivia REST API', () => {
     expect(restored.status).toBe(200);
   });
 
+  it('rejects /me and password changes without a verified bearer token', async () => {
+    const me = await request(app).get('/api/auth/me');
+    expect(me.status).toBe(401);
+
+    const changePassword = await request(app)
+      .post('/api/auth/change-password')
+      .send({ userId: 'someone-else', currentPassword: 'old', newPassword: 'new-password' });
+    expect(changePassword.status).toBe(401);
+  });
+
+  it('rejects malformed and expired bearer tokens on protected endpoints', async () => {
+    const me = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', 'Bearer not-a-jwt');
+    expect(me.status).toBe(401);
+
+    const friends = await request(app)
+      .get('/api/social/friends/some-user')
+      .set('Authorization', 'Bearer not-a-jwt');
+    expect(friends.status).toBe(401);
+  });
+
+  it('prevents cross-user reads of friends and notifications', async () => {
+    const friends = await request(app)
+      .get('/api/social/friends/another-user-id')
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(friends.status).toBe(403);
+
+    const notifications = await request(app)
+      .get('/api/social/notifications/another-user-id')
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(notifications.status).toBe(403);
+  });
+
   it('requires authentication for user-specific event data', async () => {
     const res = await request(app).get('/api/social/events');
     expect(res.status).toBe(401);
