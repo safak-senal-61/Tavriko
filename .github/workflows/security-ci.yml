@@ -31,15 +31,29 @@ jobs:
         run: npm install --package-lock-only --ignore-scripts
       - name: Install dependencies
         run: npm ci
+      - name: Capture dependency diagnostics
+        if: always()
+        run: |
+          node --version
+          npm --version
+          npm ls --all --depth=0 > npm-dependency-tree.txt 2>&1 || true
       - name: Dependency vulnerability audit
-        run: npm audit --audit-level=high
-      - name: Upload generated lockfile
+        id: audit
+        run: |
+          npm audit --audit-level=high --json > npm-audit.json
+          audit_status=$?
+          echo "npm audit exit code: $audit_status"
+          exit "$audit_status"
+      - name: Upload dependency diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: generated-lockfile-audit
-          path: package-lock.json
-          if-no-files-found: error
+          name: dependency-audit-diagnostics
+          path: |
+            package-lock.json
+            npm-audit.json
+            npm-dependency-tree.txt
+          if-no-files-found: warn
 
   build-and-test:
     runs-on: ubuntu-latest
@@ -67,19 +81,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Build all workspaces
+        if: always()
         run: npm run build
       - name: Test shared workspace
+        if: always()
         run: npm run test:shared
       - name: Test server workspace
+        if: always()
         run: npm run test:server
       - name: Test client workspace
+        if: always()
         run: npm run test:client
       - name: Test Cloudflare workspace
+        if: always()
         run: npm run test:cloudflare
-      - name: Upload generated lockfile
+      - name: Upload build and test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: generated-lockfile-build
+          name: build-test-diagnostics
           path: package-lock.json
-          if-no-files-found: error
+          if-no-files-found: warn
