@@ -27,6 +27,9 @@ import {
   HeartIcon,
   CrownIcon,
 } from '../components/TavrikoIcons';
+import Reanimated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
+import { Image } from 'react-native';
+import { KitHeader, KitChips, KitEmpty, STORE_IMG, storeImageFor, KIT } from '../components/StoreKit';
 
 interface InventoryScreenProps {
   user?: UserProfile;
@@ -212,6 +215,11 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   };
 
   const renderItemVisual = (item: InventoryItem, size = 48) => {
+    const img = storeImageFor(item.id, item.category);
+    if (img) {
+      const s2 = Math.round(size * 1.6);
+      return <Image source={img} style={{ width: s2, height: s2 }} resizeMode="contain" />;
+    }
     if (item.category === 'chest' || item.id.includes('chest')) return <ChestIcon size={size} />;
     if (item.category === 'key' || item.id.includes('key')) return <KeyIcon size={size} />;
     if (item.id.includes('bolt')) return <SpeedBoltIcon size={size} />;
@@ -236,42 +244,20 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Hero */}
-        <View style={styles.heroWrap}>
-          <Text style={styles.title}>ENVANTER</Text>
-          <Text style={styles.subtitle}>
-            {userInventory.length === 0
+        <KitHeader
+          title="Envanter"
+          subtitle={
+            userInventory.length === 0
               ? 'Henüz eşyan yok'
-              : `Toplam ${totalQty} eşya · Sunucu Kayıtlı`}
-          </Text>
-        </View>
-
-        {/* 7 Tabs Horizontal Scroll */}
-        <ScrollView
-          ref={invTabScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          decelerationRate="fast"
-          style={styles.tabsScrollWrap}
-          contentContainerStyle={styles.tabsRow}
-        >
-          {INV_TABS.map((tab, idx) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <TouchableOpacity
-                key={tab.id}
-                activeOpacity={0.85}
-                style={[styles.tabPill, isActive && styles.tabPillActive]}
-                onPress={() => handleSelectInvTab(tab.id, idx)}
-              >
-                <Text style={styles.tabIcon}>{tab.icon}</Text>
-                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+              : `${totalQty} eşya · ${userInventory.length} çeşit`
+          }
+        />
+        <KitChips
+          tabs={INV_TABS.map((t) => ({ id: t.id, label: t.label }))}
+          active={activeTab}
+          onChange={(id, idx) => handleSelectInvTab(id, idx)}
+          scrollRef={invTabScrollRef}
+        />
 
         {/* Status Message */}
         {statusMessage && (
@@ -284,45 +270,40 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 
         {/* Empty State vs Item Grid */}
         {userInventory.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>📦</Text>
-            <Text style={styles.emptyTitle}>Envanterin Boş</Text>
-            <Text style={styles.emptyDesc}>
-              Mağazadan sandıklar ve güçlendiriciler satın alabilir veya Sezon Pass'ten seviye atlayarak harika ödüller kazanabilirsin!
-            </Text>
-            {onNavigateSecondary && (
-              <TouchableOpacity
-                style={styles.emptyBtn}
-                onPress={() => {
-                  sound.playSound('tap');
-                  onNavigateSecondary('shop');
-                }}
-              >
-                <Text style={styles.emptyBtnText}>Mağazaya Git</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <KitEmpty
+            source={STORE_IMG.inventoryEmpty}
+            title="Envanterin boş"
+            desc="Mağazadan sandık ve güçlendirici alabilir, Sezon Pass'te seviye atlayarak ödül kazanabilirsin."
+            actionLabel={onNavigateSecondary ? 'Mağazaya git' : undefined}
+            onAction={() => {
+              sound.playSound('tap');
+              onNavigateSecondary && onNavigateSecondary('shop');
+            }}
+          />
         ) : filteredItems.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>🔍</Text>
-            <Text style={styles.emptyTitle}>Bu Kategoride Eşya Yok</Text>
-            <Text style={styles.emptyDesc}>
-              Seçtiğin kategoriye ait eşya bulunamadı. Diğer sekmelere göz atabilirsin.
-            </Text>
-          </View>
+          <KitEmpty
+            source={STORE_IMG.inventoryEmpty}
+            title="Bu kategoride eşya yok"
+            desc="Diğer sekmelere göz atabilirsin."
+          />
         ) : (
           <View style={styles.grid}>
-            {filteredItems.map((item) => {
+            {filteredItems.map((item, index) => {
               const rarityColor = RARITY_COLORS[item.rarity || 'common'];
               const isChest = item.category === 'chest' || item.id.includes('chest');
 
               return (
+                <Reanimated.View
+                  key={`${activeTab}-${item.id}`}
+                  entering={FadeInDown.delay(Math.min(index, 8) * 50).duration(340)}
+                  style={styles.itemCardWrap}
+                >
                 <TouchableOpacity
-                  key={item.id}
-                  style={[styles.itemCard, { borderColor: rarityColor }]}
+                  style={styles.itemCard}
                   activeOpacity={0.8}
                   onPress={() => isChest && handleOpenChestClick(item)}
                 >
+                  <View style={[styles.rarityBar, { backgroundColor: rarityColor }]} />
                   <View style={styles.qtyBadge}>
                     <Text style={styles.qtyText}>x{item.qty}</Text>
                   </View>
@@ -333,10 +314,11 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                   <Text style={styles.itemDesc} numberOfLines={2}>{item.desc}</Text>
                   {isChest && (
                     <View style={styles.openPill}>
-                      <Text style={styles.openPillText}>SANDIĞI AÇ</Text>
+                      <Text style={styles.openPillText}>Sandığı aç</Text>
                     </View>
                   )}
                 </TouchableOpacity>
+                </Reanimated.View>
               );
             })}
           </View>
@@ -357,7 +339,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
             {selectedChest && (
               <>
                 <Text style={styles.modalTitle}>
-                  {chestRewards ? '🎉 TEBRİKLER! ÖDÜLLERİN' : selectedChest.name.toUpperCase()}
+                  {chestRewards ? 'Ödüllerin' : selectedChest.name}
                 </Text>
 
                 {/* Chest Visual / Shake / Glow */}
@@ -373,19 +355,31 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                       },
                     ]}
                   >
-                    <ChestIcon size={96} />
+                    <Image
+                      source={storeImageFor(selectedChest.id, 'chest') || STORE_IMG.chestWood}
+                      style={{ width: 150, height: 150 }}
+                      resizeMode="contain"
+                    />
                   </Animated.View>
                 ) : (
                   <View style={styles.rewardsList}>
                     {chestRewards.map((rew, index) => (
-                      <View key={index} style={styles.rewardCard}>
-                        <Text style={styles.rewardIcon}>
-                          {rew.type === 'coins' ? '🪙' : rew.type === 'gems' ? '💎' : '⚡'}
-                        </Text>
+                      <Reanimated.View
+                        key={index}
+                        entering={ZoomIn.delay(index * 120).springify()}
+                        style={styles.rewardCard}
+                      >
+                        {rew.type === 'coins' ? (
+                          <CoinIcon size={22} />
+                        ) : rew.type === 'gems' ? (
+                          <GemIcon size={22} />
+                        ) : (
+                          <SpeedBoltIcon size={22} />
+                        )}
                         <Text style={styles.rewardText}>
                           +{rew.amount} {rew.type === 'coins' ? 'Altın' : rew.type === 'gems' ? 'Elmas' : 'XP'}
                         </Text>
-                      </View>
+                      </Reanimated.View>
                     ))}
                   </View>
                 )}
@@ -575,14 +569,29 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    justifyContent: 'space-between',
+    rowGap: 10,
     marginTop: 8,
   },
-  itemCard: {
+  itemCardWrap: {
     width: '48.5%',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    alignSelf: 'stretch',
+  },
+  rarityBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+  },
+  itemCard: {
+    width: '100%',
+    flex: 1,
+    backgroundColor: KIT.card,
     borderRadius: 18,
-    borderWidth: 1.5,
+    borderWidth: 1,
+    borderColor: KIT.border,
+    overflow: 'hidden',
     padding: 12,
     alignItems: 'center',
     position: 'relative',
@@ -602,14 +611,14 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.extraBold,
   },
   iconWrap: {
-    height: 60,
+    height: 78,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
     marginBottom: 6,
   },
   itemName: {
-    fontFamily: THEME.fonts.display,
+    fontFamily: THEME.fonts.extraBold,
     fontSize: 14,
     color: '#FFFFFF',
     textAlign: 'center',
@@ -644,9 +653,9 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalSheet: {
-    backgroundColor: '#1E0E3E',
-    borderWidth: 1.5,
-    borderColor: '#FFC43D',
+    backgroundColor: '#1A0B3B',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 24,
     padding: 24,
     width: '100%',
@@ -654,9 +663,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalTitle: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 18,
-    color: '#FFC43D',
+    fontFamily: THEME.fonts.black,
+    fontSize: 20,
+    color: '#FFFFFF',
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -739,7 +748,7 @@ const styles = StyleSheet.create({
   rewardText: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontFamily: THEME.fonts.display,
+    fontFamily: THEME.fonts.extraBold,
   },
   doneBtn: {
     backgroundColor: '#6FE3C1',

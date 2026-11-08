@@ -17,7 +17,10 @@ import {
   SecondaryNavTab,
   TrophyIcon,
   CharacterAvatar,
+  CrownIcon,
 } from '../components/TavrikoIcons';
+import Reanimated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { KitHero, STORE_IMG, KIT } from '../components/StoreKit';
 import { UserProfileModal } from '../components/UserProfileModal';
 import { sound } from '../services/soundService';
 
@@ -100,28 +103,25 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Hero */}
-        <View style={styles.heroWrap}>
-          <View style={styles.trophyGlowWrap}>
-            <TrophyIcon size={84} />
+        <KitHero
+          art={STORE_IMG.trophy}
+          artSize={128}
+          eyebrow="SEZON SIRALAMASI"
+          title="Pro Lig"
+          subtitle={`${user?.rankTitle || 'Acemi Kaşif'} · Canlı lig tablosu`}
+          height={160}
+          delay={0}
+        >
+          <View style={styles.pillsRow}>
+            <View style={[styles.pill, styles.rankPill]}>
+              <Text style={styles.pillTextWhite}>{myRank}. sıra</Text>
+            </View>
+            <View style={styles.pill}>
+              <TrophyIcon size={16} />
+              <Text style={styles.pillTextGold}>{user?.rankPoints ?? 1000} LP</Text>
+            </View>
           </View>
-          <Text style={styles.proText}>PRO LİG</Text>
-          <Text style={styles.leagueText}>SEZON SIRALAMASI</Text>
-          <Text style={styles.endsText}>
-            {user?.rankTitle || 'Acemi Kaşif'} · Canlı Lig Tablosu
-          </Text>
-        </View>
-
-        {/* User Rank Indicator */}
-        <View style={styles.pillsRow}>
-          <View style={[styles.pill, styles.rankPill]}>
-            <Text style={styles.pillTextWhite}>{myRank}. Sıra</Text>
-          </View>
-          <View style={styles.pill}>
-            <TrophyIcon size={18} />
-            <Text style={styles.pillTextGold}>{user?.rankPoints ?? 1000} LP</Text>
-          </View>
-        </View>
+        </KitHero>
 
         {loading ? (
           <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 32 }} />
@@ -129,7 +129,7 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
           <>
             {/* Top 3 Podium */}
             {players.length >= 3 && (
-              <View style={styles.podiumContainer}>
+              <Reanimated.View entering={FadeInUp.delay(120).duration(480)} style={styles.podiumContainer}>
                 {/* 2nd Place (Silver) */}
                 {top2 && (
                   <TouchableOpacity
@@ -148,7 +148,7 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
                     <Text style={styles.podiumName} numberOfLines={1}>{top2.displayName}</Text>
                     <Text style={styles.podiumScore}>{top2.rankPoints} LP</Text>
                     <View style={[styles.pedestal, styles.pedestal2]}>
-                      <Text style={styles.pedestalText}>2. SIRA</Text>
+                      <Text style={styles.pedestalText}>2</Text>
                     </View>
                   </TouchableOpacity>
                 )}
@@ -160,7 +160,9 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
                     activeOpacity={0.8}
                     onPress={() => handleOpenProfile(top1.userId)}
                   >
-                    <Text style={styles.crownText}>👑</Text>
+                    <View style={styles.crownWrap}>
+                      <CrownIcon size={26} />
+                    </View>
                     <View style={styles.podiumAvatarWrap}>
                       <View style={[styles.podiumRing, styles.goldRing]}>
                         <CharacterAvatar seed={top1.avatarUrl || top1.displayName} size={64} />
@@ -172,7 +174,7 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
                     <Text style={[styles.podiumName, styles.goldName]} numberOfLines={1}>{top1.displayName}</Text>
                     <Text style={[styles.podiumScore, styles.goldScore]}>{top1.rankPoints} LP</Text>
                     <View style={[styles.pedestal, styles.pedestal1]}>
-                      <Text style={[styles.pedestalText, { color: '#FFEAA7' }]}>ŞAMPİYON</Text>
+                      <Text style={[styles.pedestalText, { color: '#FFEAA7' }]}>1</Text>
                     </View>
                   </TouchableOpacity>
                 )}
@@ -195,15 +197,15 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
                     <Text style={styles.podiumName} numberOfLines={1}>{top3.displayName}</Text>
                     <Text style={styles.podiumScore}>{top3.rankPoints} LP</Text>
                     <View style={[styles.pedestal, styles.pedestal3]}>
-                      <Text style={styles.pedestalText}>3. SIRA</Text>
+                      <Text style={styles.pedestalText}>3</Text>
                     </View>
                   </TouchableOpacity>
                 )}
-              </View>
+              </Reanimated.View>
             )}
 
             {/* Zone Legend */}
-            <View style={styles.zoneLegend}>
+            <Reanimated.View entering={FadeInDown.delay(220).duration(380)} style={styles.zoneLegend}>
               <View style={styles.zoneItem}>
                 <View style={[styles.zoneDot, { backgroundColor: '#6FE3C1' }]} />
                 <Text style={styles.zoneLabel}>İlk 5: Yükselme</Text>
@@ -216,7 +218,7 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
                 <View style={[styles.zoneDot, { backgroundColor: '#FF5C77' }]} />
                 <Text style={styles.zoneLabel}>Son 5: Düşme</Text>
               </View>
-            </View>
+            </Reanimated.View>
 
             {/* Leaderboard Table */}
             <View style={styles.listCard}>
@@ -227,8 +229,11 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
                 const isRelegation = actualRank >= Math.max(6, players.length - 4);
 
                 return (
-                  <TouchableOpacity
+                  <Reanimated.View
                     key={item.userId}
+                    entering={FadeInDown.delay(260 + Math.min(index, 10) * 45).duration(340)}
+                  >
+                  <TouchableOpacity
                     style={[
                       styles.playerRow,
                       isMe && styles.playerRowActive,
@@ -254,6 +259,7 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
                     <TrophyIcon size={16} />
                     <Text style={styles.playerScore}>{item.rankPoints}</Text>
                   </TouchableOpacity>
+                  </Reanimated.View>
                 );
               })}
             </View>
@@ -281,7 +287,8 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
 const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 140,
-    paddingHorizontal: 12,
+    paddingHorizontal: 4,
+    paddingTop: 4,
   },
   heroWrap: {
     alignItems: 'center',
@@ -310,9 +317,11 @@ const styles = StyleSheet.create({
   },
   pillsRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
     gap: 8,
-    marginVertical: 14,
+    marginTop: 12,
+  },
+  crownWrap: {
+    marginBottom: 2,
   },
   pill: {
     flexDirection: 'row',
@@ -321,9 +330,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10, 4, 24, 0.72)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    height: 30,
+    borderRadius: 15,
   },
   rankPill: {
     backgroundColor: '#6B3CFF',
@@ -461,10 +470,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(205, 127, 50, 0.4)',
   },
   pedestalText: {
-    color: '#D9CDF5',
-    fontSize: 10,
-    fontFamily: THEME.fonts.display,
-    letterSpacing: 1,
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 22,
+    fontFamily: THEME.fonts.black,
   },
   zoneLegend: {
     flexDirection: 'row',
@@ -493,10 +501,10 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.medium,
   },
   listCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: KIT.card,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 20,
+    borderColor: KIT.border,
+    borderRadius: 18,
     padding: 6,
     gap: 4,
   },
@@ -510,9 +518,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.03)',
   },
   playerRowActive: {
-    backgroundColor: 'rgba(107, 60, 255, 0.35)',
-    borderWidth: 1.5,
-    borderColor: '#FFC43D',
+    backgroundColor: 'rgba(107, 60, 255, 0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 200, 55, 0.6)',
   },
   promotionRow: {
     borderLeftWidth: 3.5,

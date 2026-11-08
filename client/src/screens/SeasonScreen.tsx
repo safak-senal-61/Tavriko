@@ -26,6 +26,10 @@ import {
   BadgeShieldIcon,
   SpeedBoltIcon,
 } from '../components/TavrikoIcons';
+import Reanimated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
+import { Image } from 'react-native';
+import { KitHero, STORE_IMG, KIT } from '../components/StoreKit';
+import { GradientFill } from '../components/TavrikoGradient';
 
 interface SeasonScreenProps {
   user?: UserProfile;
@@ -192,6 +196,12 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
   };
 
   const renderRewardIcon = (type: string, size: number = 32) => {
+    const img3d =
+      type === 'chest' ? STORE_IMG.chestGold : type === 'key' ? STORE_IMG.key : type === 'booster' ? STORE_IMG.booster : null;
+    if (img3d) {
+      const s2 = Math.round(size * 1.45);
+      return <Image source={img3d} style={{ width: s2, height: s2 }} resizeMode="contain" />;
+    }
     switch (type) {
       case 'coin':
         return <CoinIcon size={size} />;
@@ -231,43 +241,47 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Season 1 Hero Banner */}
-        <View style={styles.heroBanner}>
-          <View style={styles.seasonBadge}>
-            <Text style={styles.seasonBadgeText}>SEZON 1 · 45 GÜN KALDI</Text>
-          </View>
-          <Text style={styles.heroTitle}>BİLGİ ÇAĞI</Text>
-          <Text style={styles.heroSub}>
-            50 Kademelik Sezon Pass Yolculuğu
-          </Text>
-
-          {/* User Season XP & Tier Progress */}
-          <View style={styles.tierStatusRow}>
-            <View style={styles.tierPill}>
-              <Text style={styles.tierPillLabel}>KADEME</Text>
-              <Text style={styles.tierPillVal}>{currentTier}</Text>
-            </View>
-            <View style={styles.xpProgressWrap}>
-              <View style={styles.xpTextRow}>
-                <Text style={styles.xpLabelText}>Sezon İlerlemesi</Text>
-                <Text style={styles.xpValText}>
-                  {seasonXp} / {currentTier < 50 ? currentTier * 400 : 20000} XP
-                </Text>
-              </View>
-              <TavrikoProgressBar progress={progressPct} height={8} />
-            </View>
-          </View>
+        <View style={styles.sidePad}>
+          <KitHero
+            source={STORE_IMG.seasonHero}
+            eyebrow="SEZON 1 · 45 GÜN KALDI"
+            title="Bilgi Çağı"
+            subtitle="50 kademelik Sezon Pass yolculuğu"
+            height={164}
+            delay={0}
+          />
         </View>
+
+        <Reanimated.View entering={FadeInDown.delay(90).duration(400)} style={styles.progressCard}>
+          <View style={styles.tierPill}>
+            <Text style={styles.tierPillLabel}>KADEME</Text>
+            <Text style={styles.tierPillVal}>{currentTier}</Text>
+          </View>
+          <View style={styles.xpProgressWrap}>
+            <View style={styles.xpTextRow}>
+              <Text style={styles.xpLabelText}>Sezon ilerlemesi</Text>
+              <Text style={styles.xpValText}>
+                {seasonXp} / {currentTier < 50 ? currentTier * 400 : 20000} XP
+              </Text>
+            </View>
+            <View style={styles.barTrack}>
+              <View style={[styles.barFill, { width: `${progressPct}%` }]}>
+                <GradientFill direction="horizontal" colors={['#5ADBB5', '#FFC837']} />
+              </View>
+            </View>
+            <Text style={styles.xpHint}>
+              {currentTier < 50 ? `Sonraki kademe için ${400 - xpInCurrentTier} XP` : 'Son kademeye ulaştın'}
+            </Text>
+          </View>
+        </Reanimated.View>
 
         {/* Premium Pass Purchase Banner */}
         {!hasPremium ? (
-          <View style={styles.passPromoCard}>
+          <Reanimated.View entering={FadeInDown.delay(160).duration(400)} style={styles.passPromoCard}>
             <View style={styles.passPromoLeft}>
-              <View style={styles.crownCircle}>
-                <CrownIcon size={34} />
-              </View>
+              <Image source={STORE_IMG.trophy} style={styles.passTrophy} resizeMode="contain" />
               <View style={{ flex: 1 }}>
-                <Text style={styles.passPromoTitle}>PREMIUM PASS'İ AÇ</Text>
+                <Text style={styles.passPromoTitle}>Premium Pass</Text>
                 <Text style={styles.passPromoSub}>
                   50 kademede 15.000 Altın, 1.200 Elmas, Alev Çerçevesi ve Efsanevi Sandıklar!
                 </Text>
@@ -281,14 +295,14 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
             >
               <GemIcon size={18} />
               <Text style={styles.passBuyBtnText}>
-                {isPurchasingPass ? 'AÇILIYOR...' : '250 ELMAS'}
+                {isPurchasingPass ? 'Açılıyor...' : '250'}
               </Text>
             </TouchableOpacity>
-          </View>
+          </Reanimated.View>
         ) : (
           <View style={styles.passActiveBanner}>
             <CrownIcon size={22} />
-            <Text style={styles.passActiveText}>★ SEZON 1 PREMIUM PASS AKTİF ★</Text>
+            <Text style={styles.passActiveText}>Sezon 1 Premium Pass aktif</Text>
           </View>
         )}
 
@@ -302,28 +316,30 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
         {/* Track Column Headers */}
         <View style={styles.trackHeaderRow}>
           <View style={styles.trackHeaderLeft}>
-            <Text style={styles.trackHeaderTitle}>ÜCRETSİZ YOL</Text>
+            <Text style={styles.trackHeaderTitle}>Ücretsiz</Text>
           </View>
           <View style={styles.trackHeaderCenter}>
-            <Text style={styles.trackHeaderCenterText}>KADEME</Text>
+            <Text style={styles.trackHeaderCenterText}>Kademe</Text>
           </View>
           <View style={styles.trackHeaderRight}>
             <CrownIcon size={16} />
-            <Text style={styles.trackHeaderPremiumTitle}>PREMIUM YOL</Text>
+            <Text style={styles.trackHeaderPremiumTitle}>Premium</Text>
           </View>
         </View>
 
         {/* 50 Tiers List */}
         <View style={styles.tiersContainer}>
-          {SEASON_1_TIERS.map((tierItem) => {
+          <View style={styles.tierSpine} pointerEvents="none" />
+          {SEASON_1_TIERS.map((tierItem, tierIdx) => {
             const isUnlocked = seasonXp >= tierItem.requiredSeasonXp;
             const isFreeClaimed = claimedFree.includes(tierItem.tier);
             const isPremiumClaimed = claimedPremium.includes(tierItem.tier);
             const isCurrent = tierItem.tier === currentTier;
 
             return (
-              <View
+              <Reanimated.View
                 key={tierItem.tier}
+                entering={tierIdx < 10 ? FadeInDown.delay(200 + tierIdx * 45).duration(360) : undefined}
                 style={[
                   styles.tierRow,
                   isCurrent && styles.tierRowCurrent,
@@ -346,7 +362,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
                   </Text>
                   {isFreeClaimed ? (
                     <View style={styles.claimedPill}>
-                      <Text style={styles.claimedPillText}>✓ ALINDI</Text>
+                      <Text style={styles.claimedPillText}>Alındı</Text>
                     </View>
                   ) : isUnlocked ? (
                     <TouchableOpacity
@@ -356,12 +372,12 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
                       disabled={loadingTier === tierItem.tier}
                     >
                       <Text style={styles.claimBtnText}>
-                        {loadingTier === tierItem.tier ? '...' : 'AL'}
+                        {loadingTier === tierItem.tier ? '...' : 'Al'}
                       </Text>
                     </TouchableOpacity>
                   ) : (
                     <View style={styles.lockedPill}>
-                      <Text style={styles.lockedPillText}>🔒</Text>
+                      <Text style={styles.lockedPillText}>Kilitli</Text>
                     </View>
                   )}
                 </View>
@@ -406,7 +422,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
                   </Text>
                   {isPremiumClaimed ? (
                     <View style={styles.claimedPill}>
-                      <Text style={styles.claimedPillText}>✓ ALINDI</Text>
+                      <Text style={styles.claimedPillText}>Alındı</Text>
                     </View>
                   ) : isUnlocked && hasPremium ? (
                     <TouchableOpacity
@@ -416,18 +432,20 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
                       disabled={loadingTier === tierItem.tier}
                     >
                       <Text style={styles.claimBtnTextGold}>
-                        {loadingTier === tierItem.tier ? '...' : 'AL'}
+                        {loadingTier === tierItem.tier ? '...' : 'Al'}
                       </Text>
                     </TouchableOpacity>
                   ) : (
                     <View style={styles.lockedPillGold}>
-                      <Text style={styles.lockedPillText}>
-                        {!hasPremium ? '👑' : '🔒'}
-                      </Text>
+                      {!hasPremium ? (
+                        <CrownIcon size={14} />
+                      ) : (
+                        <Text style={styles.lockedPillText}>Kilitli</Text>
+                      )}
                     </View>
                   )}
                 </View>
-              </View>
+              </Reanimated.View>
             );
           })}
         </View>
@@ -443,10 +461,10 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <View style={styles.modalRewardGlow}>
+              <Reanimated.View entering={ZoomIn.springify()} style={styles.modalRewardGlow}>
                 {renderRewardIcon(claimedRewardModal.type, 64)}
-              </View>
-              <Text style={styles.modalTitle}>TEBRİKLER!</Text>
+              </Reanimated.View>
+              <Text style={styles.modalTitle}>Ödül alındı</Text>
               <Text style={styles.modalRewardName}>
                 {claimedRewardModal.title}
               </Text>
@@ -454,7 +472,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
                 Ödülünüz hesabınıza ve envanterinize başarıyla tanımlandı!
               </Text>
               <Button3D
-                title="HARİKA!"
+                title="Harika"
                 onPress={() => setClaimedRewardModal(null)}
                 style={{ width: 180, marginTop: 16 }}
               />
@@ -469,6 +487,54 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
 const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 48,
+  },
+  sidePad: {
+    marginHorizontal: 14,
+    marginTop: 4,
+  },
+  progressCard: {
+    marginHorizontal: 14,
+    marginTop: -4,
+    marginBottom: 12,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: KIT.card,
+    borderWidth: 1,
+    borderColor: KIT.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  barTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 4,
+    overflow: 'hidden',
+    minWidth: 6,
+  },
+  xpHint: {
+    color: KIT.muted,
+    fontSize: 11,
+    fontFamily: THEME.fonts.medium,
+    marginTop: 6,
+  },
+  passTrophy: {
+    width: 56,
+    height: 56,
+  },
+  tierSpine: {
+    position: 'absolute',
+    top: 10,
+    bottom: 10,
+    left: '50%',
+    width: 2,
+    marginLeft: -1,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
   },
   heroBanner: {
     marginHorizontal: 14,
@@ -514,13 +580,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   tierPill: {
-    backgroundColor: '#351B6A',
+    width: 58,
+    height: 58,
     borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#6FE3C1',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(90, 219, 181, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(90, 219, 181, 0.4)',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   tierPillLabel: {
     color: '#6FE3C1',
@@ -530,7 +597,7 @@ const styles = StyleSheet.create({
   tierPillVal: {
     color: '#FFFFFF',
     fontSize: 22,
-    fontFamily: THEME.fonts.display,
+    fontFamily: THEME.fonts.black,
   },
   xpProgressWrap: {
     flex: 1,
@@ -552,12 +619,12 @@ const styles = StyleSheet.create({
   },
   passPromoCard: {
     marginHorizontal: 14,
-    marginBottom: 12,
-    padding: 14,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 196, 61, 0.12)',
-    borderWidth: 1.5,
-    borderColor: '#FFC43D',
+    marginBottom: 14,
+    padding: 12,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 200, 55, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 200, 55, 0.35)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -578,9 +645,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   passPromoTitle: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 15,
-    color: '#FFC43D',
+    fontFamily: THEME.fonts.black,
+    fontSize: 16,
+    color: '#FFFFFF',
   },
   passPromoSub: {
     color: '#D9CDF5',
@@ -592,17 +659,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FFB21E',
+    backgroundColor: KIT.gold,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 14,
-    borderBottomWidth: 3,
-    borderBottomColor: '#B8560A',
+    borderRadius: 12,
   },
   passBuyBtnText: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 13,
-    color: '#3B1500',
+    fontFamily: THEME.fonts.extraBold,
+    fontSize: 14,
+    color: '#2A1200',
   },
   passActiveBanner: {
     marginHorizontal: 14,
@@ -687,26 +752,27 @@ const styles = StyleSheet.create({
     marginVertical: 6,
   },
   tierRowCurrent: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: 'rgba(107, 60, 255, 0.16)',
     borderRadius: 20,
-    paddingVertical: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
   rewardCard: {
     flex: 1,
-    height: 94,
-    borderRadius: 18,
+    height: 100,
+    borderRadius: 16,
     padding: 8,
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1.5,
+    borderWidth: 1,
   },
   freeRewardCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: KIT.card,
+    borderColor: KIT.border,
   },
   premiumRewardCard: {
-    backgroundColor: 'rgba(255, 196, 61, 0.09)',
-    borderColor: 'rgba(255, 196, 61, 0.35)',
+    backgroundColor: 'rgba(60, 30, 10, 0.45)',
+    borderColor: 'rgba(255, 200, 55, 0.22)',
   },
   cardLocked: {
     opacity: 0.55,
@@ -716,7 +782,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(124, 252, 138, 0.06)',
   },
   rewardIconWrap: {
-    height: 32,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -771,7 +837,9 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   lockedPillText: {
-    fontSize: 13,
+    fontSize: 10,
+    color: 'rgba(217, 205, 245, 0.6)',
+    fontFamily: THEME.fonts.bold,
   },
   centerTierBadgeWrap: {
     width: 64,
@@ -789,8 +857,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tierCircleUnlocked: {
-    borderColor: '#6FE3C1',
-    backgroundColor: '#1E3D3A',
+    borderColor: '#5ADBB5',
+    backgroundColor: '#163A3A',
   },
   tierCircleCurrent: {
     borderColor: '#FFC43D',
@@ -798,7 +866,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.15 }],
   },
   tierNumberText: {
-    fontFamily: THEME.fonts.display,
+    fontFamily: THEME.fonts.black,
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.6)',
   },

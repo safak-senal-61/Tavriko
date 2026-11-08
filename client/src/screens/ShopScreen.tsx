@@ -37,6 +37,9 @@ import {
   CrownIcon,
 } from '../components/TavrikoIcons';
 import { PaymentItem } from './PaymentScreen';
+import Reanimated, { FadeInDown } from 'react-native-reanimated';
+import { Image } from 'react-native';
+import { KitHeader, KitHero, KitChips, STORE_IMG, storeImageFor, KIT } from '../components/StoreKit';
 
 interface ShopScreenProps {
   user?: UserProfile;
@@ -69,6 +72,8 @@ const CATEGORY_TABS: CategoryTabItem[] = [
   { id: 'gold', name: 'Altın', icon: '🪙' },
 ];
 
+const FEATURED_CHEST = SHOP_CATALOG.find((p) => p.id === 'chest_legendary');
+
 const RARITY_COLORS: Record<string, string> = {
   common: '#8A7BAF',
   rare: '#3B82F6',
@@ -80,6 +85,21 @@ const RARITY_COLORS: Record<string, string> = {
 // UI Kit Birebir Vektörel Ürün Görseli
 const ShopItemVisual: React.FC<{ product: ShopProduct }> = ({ product }) => {
   const pId = product.id;
+  const featuredImg: Record<string, any> = {
+    pack_season_premium_pass: STORE_IMG.trophy,
+    pack_starter: STORE_IMG.chestGold,
+    pack_mega_bundle: STORE_IMG.chestLegendary,
+  };
+  const img = featuredImg[pId] || storeImageFor(pId, product.category);
+  if (img) {
+    const tint = RARITY_COLORS[product.rarity || 'common'];
+    return (
+      <View style={styles.visualBox}>
+        <View style={[styles.visualGlow, { backgroundColor: tint }]} />
+        <Image source={img} style={styles.visualImg} resizeMode="contain" />
+      </View>
+    );
+  }
 
   // 1. Sandıklar
   if (product.category === 'chests' || pId.includes('chest')) {
@@ -388,36 +408,30 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         showsVerticalScrollIndicator={false}
       >
         {/* Başlık */}
-        <View style={styles.heroWrap}>
-          <Text style={styles.shopTitle}>MAĞAZA</Text>
-        </View>
-
-        {/* Tavriko UI Kit Mağaza Sekmeleri (Yumuşak Kaydırma & Tam Kenar Geçişi) */}
-        <ScrollView
-          ref={tabScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          decelerationRate="fast"
-          style={styles.categoryScrollWrap}
-          contentContainerStyle={styles.categoryScroll}
+        <KitHeader title="Mağaza" subtitle="Sandık, anahtar ve kozmetikler" />
+        <KitHero
+          art={STORE_IMG.chestLegendary}
+          artSize={124}
+          eyebrow="ÖNE ÇIKAN"
+          title={FEATURED_CHEST?.name || 'Efsanevi Sandık'}
+          subtitle={FEATURED_CHEST?.desc}
+          height={150}
         >
-          {CATEGORY_TABS.map((cat, idx) => {
-            const isActive = activeTab === cat.id;
-            return (
-              <TouchableOpacity
-                key={cat.id}
-                activeOpacity={0.85}
-                style={[styles.categoryTab, isActive && styles.categoryTabActive]}
-                onPress={() => handleSelectCategoryTab(cat.id, idx)}
-              >
-                <Text style={styles.categoryIcon}>{cat.icon}</Text>
-                <Text style={[styles.categoryName, isActive && styles.categoryNameActive]}>
-                  {cat.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+          <TouchableOpacity
+            style={styles.heroCta}
+            activeOpacity={0.85}
+            onPress={() => handleSelectCategoryTab('chests', 1)}
+          >
+            <Text style={styles.heroCtaText}>Sandıklara bak</Text>
+          </TouchableOpacity>
+        </KitHero>
+
+        <KitChips
+          tabs={CATEGORY_TABS.map((c) => ({ id: c.id, label: c.name }))}
+          active={activeTab}
+          onChange={(id, idx) => handleSelectCategoryTab(id, idx)}
+          scrollRef={tabScrollRef}
+        />
 
         {/* Durum Bildirimi */}
         {statusMessage && (
@@ -438,20 +452,18 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             },
           ]}
         >
-          {filteredProducts.map((item) => {
+          {filteredProducts.map((item, index) => {
             const owned = isProductOwned(item);
             const rarityColor = RARITY_COLORS[item.rarity || 'common'];
             const isBuying = purchasingId === item.id;
 
             return (
-              <View
-                key={item.id}
-                style={[
-                  styles.productCard,
-                  { borderColor: rarityColor },
-                  owned && styles.productCardOwned,
-                ]}
+              <Reanimated.View
+                key={`${activeTab}-${item.id}`}
+                entering={FadeInDown.delay(Math.min(index, 8) * 55).duration(360)}
+                style={[styles.productCard, owned && styles.productCardOwned]}
               >
+                <View style={[styles.rarityBar, { backgroundColor: rarityColor }]} />
                 {/* Rozetler */}
                 <View style={styles.badgeRow}>
                   {item.badge && (
@@ -497,7 +509,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                     </View>
                   )}
                 </TouchableOpacity>
-              </View>
+              </Reanimated.View>
             );
           })}
         </Animated.View>
@@ -647,14 +659,17 @@ const styles = StyleSheet.create({
   },
   productCard: {
     width: '48%',
-    backgroundColor: '#1E0E3D',
-    borderRadius: 20,
-    borderWidth: 1.5,
-    paddingVertical: 14,
+    backgroundColor: KIT.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: KIT.border,
+    paddingTop: 16,
+    paddingBottom: 12,
     paddingHorizontal: 10,
     alignItems: 'center',
     marginBottom: 4,
     position: 'relative',
+    overflow: 'hidden',
     ...Platform.select({
       ios: {
         shadowColor: '#000000',
@@ -705,16 +720,47 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.extraBold,
   },
   visualBox: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    backgroundColor: 'rgba(23, 11, 51, 0.8)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(154, 107, 255, 0.35)',
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 8,
+    marginVertical: 4,
     position: 'relative',
+  },
+  visualGlow: {
+    position: 'absolute',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    opacity: 0.22,
+  },
+  visualImg: {
+    width: 92,
+    height: 92,
+  },
+  rarityBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    opacity: 0.9,
+  },
+  heroCta: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    backgroundColor: KIT.gold,
+    paddingHorizontal: 14,
+    height: 34,
+    borderRadius: 11,
+    justifyContent: 'center',
+  },
+  heroCtaText: {
+    color: '#1A0B3B',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
   },
   frameEmojiInside: {
     position: 'absolute',
@@ -754,14 +800,14 @@ const styles = StyleSheet.create({
   },
   productName: {
     color: '#FFFFFF',
-    fontSize: 13,
-    fontFamily: THEME.fonts.bold,
+    fontSize: 14,
+    fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
     marginTop: 4,
   },
   productDesc: {
-    color: '#9A8BC2',
-    fontSize: 10,
+    color: KIT.muted,
+    fontSize: 11,
     fontFamily: THEME.fonts.medium,
     textAlign: 'center',
     marginTop: 2,

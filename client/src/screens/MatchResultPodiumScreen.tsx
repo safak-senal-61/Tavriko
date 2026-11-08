@@ -29,7 +29,7 @@ import {
   CheckMarkSvg,
   CrossMarkSvg,
 } from '../components/TavrikoIcons';
-import { formatNumberTR } from '../components/TavrikoGradient';
+import { formatNumberTR, GradientFill } from '../components/TavrikoGradient';
 
 interface MatchResultPodiumScreenProps {
   summary: FinalMatchSummary;
@@ -353,6 +353,10 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
 
         {/* Sabit Alt Aksiyon Çubuğu */}
         <Animated.View entering={FadeInUp.delay(400).duration(360)} style={styles.stickyBottomDock}>
+          <GradientFill
+            colors={['rgba(34, 14, 82, 0)', 'rgba(34, 14, 82, 0.78)', 'rgba(30, 12, 74, 0.94)']}
+            stops={[0, 0.45, 1]}
+          />
           <Button3D title="TEKRAR OYNA" onPress={onPlayAgain} style={{ flex: 1 }} textStyle={{ fontSize: 14 }} />
           <Button3D title="ANA SAYFA" variant="mint" onPress={onHome} style={{ flex: 1 }} textStyle={{ fontSize: 14 }} />
         </Animated.View>
@@ -636,10 +640,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     paddingHorizontal: 6,
-    paddingTop: 10,
+    paddingTop: 26,
     paddingBottom: 12,
-    backgroundColor: 'rgba(12, 5, 32, 0.92)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.06)',
   },
 });

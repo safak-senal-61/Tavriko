@@ -21,7 +21,14 @@ import {
   KeyIcon,
   GemIcon,
   CoinIcon,
+  TrophyIcon,
+  StreakFlameIcon,
+  SpeedBoltIcon,
+  XpStarIcon,
 } from '../components/TavrikoIcons';
+import Reanimated, { FadeInDown } from 'react-native-reanimated';
+import { Image } from 'react-native';
+import { KitHero, KitSegment, KitEmpty, STORE_IMG, storeImageFor, KIT } from '../components/StoreKit';
 
 interface EventsScreenProps {
   user?: UserProfile;
@@ -172,11 +179,10 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
   };
 
   const getMetricIcon = (metric: string, type: string) => {
-    if (type === 'special') return '🏆';
-    if (metric === 'wins') return '🏆';
-    if (metric === 'streak') return '🔥';
-    if (metric === 'correct_answers') return '⚡';
-    return '🏅';
+    if (type === 'special' || metric === 'wins') return <TrophyIcon size={26} />;
+    if (metric === 'streak') return <StreakFlameIcon size={26} />;
+    if (metric === 'correct_answers') return <SpeedBoltIcon size={26} />;
+    return <XpStarIcon size={26} />;
   };
 
   const getIconCircleStyle = (metric: string, type: string) => {
@@ -218,44 +224,24 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Hero framed box (matching Image 3) */}
-        <View style={styles.heroBox}>
-          <Text style={styles.title}>ETKİNLİKLER</Text>
-          <Text style={styles.subtitle}>Canlı görevler ve özel turnuva ödülleri</Text>
-        </View>
+        <KitHero
+          source={STORE_IMG.eventsHero}
+          eyebrow="GÖREV VE TURNUVA"
+          title="Etkinlikler"
+          subtitle="Canlı görevler ve özel turnuva ödülleri"
+          height={150}
+          delay={0}
+        />
 
-        {/* 3 Pill Tabs Container */}
-        <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'daily' && styles.tabBtnActive]}
-            activeOpacity={0.8}
-            onPress={() => switchTab('daily')}
-          >
-            <Text style={[styles.tabText, activeTab === 'daily' && styles.tabTextActive]} numberOfLines={1}>
-              📅 Günlük Görevler
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'weekly' && styles.tabBtnActive]}
-            activeOpacity={0.8}
-            onPress={() => switchTab('weekly')}
-          >
-            <Text style={[styles.tabText, activeTab === 'weekly' && styles.tabTextActive]} numberOfLines={1}>
-              🏆 Haftalık Hedefler
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'special' && styles.tabBtnActive]}
-            activeOpacity={0.8}
-            onPress={() => switchTab('special')}
-          >
-            <Text style={[styles.tabText, activeTab === 'special' && styles.tabTextActive]} numberOfLines={1}>
-              ⭐ Özel Turnuva
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <KitSegment<EventTab>
+          tabs={[
+            { id: 'daily', label: 'Günlük' },
+            { id: 'weekly', label: 'Haftalık' },
+            { id: 'special', label: 'Özel Turnuva' },
+          ]}
+          active={activeTab}
+          onChange={(t) => t !== activeTab && switchTab(t)}
+        />
 
         {/* Status Toast / Banner */}
         {statusMessage && (
@@ -270,14 +256,14 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
         {loading ? (
           <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 36 }} />
         ) : filteredEvents.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyIcon}>⏳</Text>
-            <Text style={styles.emptyTitle}>Aktif Görev Bulunmuyor</Text>
-            <Text style={styles.emptyDesc}>Bu kategoride henüz yeni görev başlamadı. Yakında tekrar kontrol et!</Text>
-          </View>
+          <KitEmpty
+            source={STORE_IMG.eventsEmpty}
+            title="Aktif görev yok"
+            desc="Bu kategoride henüz yeni görev başlamadı. Yakında tekrar kontrol et."
+          />
         ) : (
           <Animated.View style={[styles.eventsList, { opacity: fadeAnim }]}>
-            {filteredEvents.map((item) => {
+            {filteredEvents.map((item, index) => {
               const current = item.currentCount ?? (item as any).currentProgress ?? 0;
               const target = item.targetCount ?? (item as any).target ?? 1;
               const isCompleted = current >= target;
@@ -294,8 +280,9 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
               const itemReward = item.rewardItem;
 
               return (
-                <View
-                  key={item.id}
+                <Reanimated.View
+                  key={`${activeTab}-${item.id}`}
+                  entering={FadeInDown.delay(Math.min(index, 8) * 60).duration(360)}
                   style={[
                     styles.eventCard,
                     isCompleted && !isClaimed && styles.eventCardCompleted,
@@ -304,7 +291,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                   {/* Card Header Row: Icon + Title/Desc + Action Button */}
                   <View style={styles.cardHeaderRow}>
                     <View style={[styles.iconCircle, getIconCircleStyle(item.metric, item.type)]}>
-                      <Text style={styles.metricEmoji}>{getMetricIcon(item.metric, item.type)}</Text>
+                      {getMetricIcon(item.metric, item.type)}
                     </View>
 
                     <View style={styles.headerInfo}>
@@ -316,7 +303,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                     <View style={styles.actionBtnWrap}>
                       {isClaimed ? (
                         <View style={styles.claimedBadge}>
-                          <Text style={styles.claimedText}>ALINDI ✓</Text>
+                          <Text style={styles.claimedText}>Alındı</Text>
                         </View>
                       ) : isCompleted ? (
                         <TouchableOpacity
@@ -328,7 +315,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                           {isBusy ? (
                             <ActivityIndicator color="#0A2920" size="small" />
                           ) : (
-                            <Text style={styles.collectBtnText}>TOPLA</Text>
+                            <Text style={styles.collectBtnText}>Topla</Text>
                           )}
                         </TouchableOpacity>
                       ) : (
@@ -341,7 +328,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                           {isBusy ? (
                             <ActivityIndicator color="#1A0E00" size="small" />
                           ) : (
-                            <Text style={styles.playBtnText}>OYNA</Text>
+                            <Text style={styles.playBtnText}>Oyna</Text>
                           )}
                         </TouchableOpacity>
                       )}
@@ -401,11 +388,21 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                     )}
                     {itemReward && (
                       <View style={styles.rewardChip}>
-                        {itemReward.category === 'chest' ? <ChestIcon size={14} /> : <KeyIcon size={14} />}
+                        {storeImageFor(itemReward.id || '', itemReward.category) ? (
+                          <Image
+                            source={storeImageFor(itemReward.id || '', itemReward.category) as any}
+                            style={{ width: 20, height: 20 }}
+                            resizeMode="contain"
+                          />
+                        ) : itemReward.category === 'chest' ? (
+                          <ChestIcon size={14} />
+                        ) : (
+                          <KeyIcon size={14} />
+                        )}
                       </View>
                     )}
                   </View>
-                </View>
+                </Reanimated.View>
               );
             })}
           </Animated.View>
@@ -535,19 +532,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   eventCard: {
-    backgroundColor: '#1E163B',
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    padding: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+    backgroundColor: KIT.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: KIT.border,
+    padding: 14,
   },
   eventCardCompleted: {
-    borderColor: 'rgba(90, 219, 181, 0.5)',
-    backgroundColor: '#1E1A3F',
+    borderColor: 'rgba(90, 219, 181, 0.45)',
+    backgroundColor: 'rgba(20, 40, 52, 0.7)',
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -557,8 +550,8 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 46,
     height: 46,
-    borderRadius: 23,
-    borderWidth: 1.5,
+    borderRadius: 14,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -570,10 +563,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   eventTitle: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 16,
+    fontFamily: THEME.fonts.extraBold,
+    fontSize: 15,
     color: '#FFFFFF',
-    letterSpacing: 0.3,
     marginBottom: 2,
   },
   eventDesc: {
@@ -587,42 +579,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   playBtn: {
-    backgroundColor: '#FFB800',
-    borderBottomWidth: 3,
-    borderBottomColor: '#B8560A',
-    paddingHorizontal: 22,
-    paddingVertical: 10,
-    borderRadius: 16,
-    minWidth: 88,
+    backgroundColor: KIT.gold,
+    paddingHorizontal: 18,
+    height: 38,
+    borderRadius: 12,
+    minWidth: 78,
     alignItems: 'center',
     justifyContent: 'center',
   },
   playBtnText: {
-    color: '#1A0E00',
+    color: '#1A0B3B',
     fontSize: 14,
-    fontFamily: THEME.fonts.display,
-    letterSpacing: 0.5,
+    fontFamily: THEME.fonts.extraBold,
   },
   collectBtn: {
     backgroundColor: '#5ADBB5',
-    borderBottomWidth: 3,
-    borderBottomColor: '#1D7A6B',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 16,
-    minWidth: 88,
+    paddingHorizontal: 18,
+    height: 38,
+    borderRadius: 12,
+    minWidth: 78,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#5ADBB5',
-    shadowOpacity: 0.45,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
   },
   collectBtnText: {
     color: '#072E22',
     fontSize: 14,
-    fontFamily: THEME.fonts.display,
-    letterSpacing: 0.5,
+    fontFamily: THEME.fonts.extraBold,
   },
   claimedBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -659,7 +641,7 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     height: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 4,
     overflow: 'hidden',
   },
