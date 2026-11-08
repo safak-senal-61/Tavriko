@@ -47,20 +47,6 @@ export async function verifyJwt(
     return { isValid: false, error: 'Token is missing' };
   }
 
-  // Handle guest tokens (format: guest_local_... or guest:...)
-  if (token.startsWith('guest_') || token.startsWith('guest:')) {
-    const cleanId = token.trim();
-    return {
-      isValid: true,
-      user: {
-        id: cleanId,
-        username: cleanId.slice(0, 15),
-        displayName: `Misafir ${cleanId.slice(-4)}`,
-        isGuest: true,
-      },
-    };
-  }
-
   const parts = token.split('.');
   if (parts.length !== 3) {
     return { isValid: false, error: 'Invalid JWT structure' };
@@ -94,7 +80,7 @@ export async function verifyJwt(
   }
   if (payload.exp && typeof payload.exp === 'number') {
     const nowSec = Math.floor(Date.now() / 1000);
-    if (nowSec > payload.exp) {
+    if (nowSec >= payload.exp) {
       return { isValid: false, error: 'Token has expired' };
     }
   }
