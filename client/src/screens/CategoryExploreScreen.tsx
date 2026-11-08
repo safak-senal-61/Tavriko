@@ -155,26 +155,33 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
     }));
   }, [liveCounts]);
 
-  // Filtered categories by search and group tabs
+  // Flatten main categories and every subcategory into one browsable catalogue.
+  // Subcategory cards keep their parent category ID for the existing game API.
+  const allCategoryItems = useMemo(() => {
+    return categoriesWithRealCounts.flatMap((cat) => [
+      { key: cat.id, category: cat, subCategory: null as string | null, label: cat.name, emoji: null as string | null },
+      ...(cat.subCategories || []).map((sc) => ({
+        key: `${cat.id}__${sc.id}`,
+        category: cat,
+        subCategory: sc.name,
+        label: sc.name,
+        emoji: sc.emoji,
+      })),
+    ]);
+  }, [categoriesWithRealCounts]);
+
   const filteredCategories = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = searchQuery.trim().toLocaleLowerCase('tr-TR');
     const groupAllowed = new Set(GROUP_MEMBERS[activeGroup]);
-
-    return categoriesWithRealCounts.filter((cat) => {
-      if (!groupAllowed.has(cat.id)) return false;
+    return allCategoryItems.filter((item) => {
+      if (!groupAllowed.has(item.category.id)) return false;
       if (!q) return true;
-
-      // Match main name or description
-      if (cat.name.toLowerCase().includes(q)) return true;
-      if (cat.description.toLowerCase().includes(q)) return true;
-
-      // Match subcategories!
-      if (cat.subCategories && cat.subCategories.some((sc) => sc.name.toLowerCase().includes(q))) {
-        return true;
-      }
-      return false;
+      return (
+        item.label.toLocaleLowerCase('tr-TR').includes(q) ||
+        item.category.description.toLocaleLowerCase('tr-TR').includes(q)
+      );
     });
-  }, [categoriesWithRealCounts, activeGroup, searchQuery]);
+  }, [allCategoryItems, activeGroup, searchQuery]);
 
   const totalQuestionCount = useMemo(() => {
     return categoriesWithRealCounts.reduce((sum, item) => sum + item.totalQuestions, 0);
@@ -307,8 +314,8 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                     ]}
                   >
                     {tab.id === 'all'
-                      ? `${tab.label} (${categoriesWithRealCounts.length})`
-                      : `${tab.label} (${GROUP_MEMBERS[tab.id].length})`}
+                      ? `${tab.label} (${allCategoryItems.length})`
+                      : `${tab.label} (${allCategoryItems.filter((item) => GROUP_MEMBERS[tab.id].includes(item.category.id)).length})`}
                   </Text>
                 </TouchableOpacity>
               );
@@ -317,22 +324,34 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
 
           {/* Responsive category grid: 2 columns on small phones, 3 on larger phones, 4 on wide screens */}
           <View style={styles.grid}>
-            {filteredCategories.map((cat) => (
+            {filteredCategories.map((item) => (
               <TouchableOpacity
-                key={cat.id}
-                style={[styles.catTile, { width: categoryTileWidth, borderColor: `${cat.primaryColor}88` }]}
+                key={item.key}
+                style={[styles.catTile, { width: categoryTileWidth, borderColor: `${item.category.primaryColor}88` }]}
                 onPress={() => {
                   sound.playSound('tap');
                   sound.triggerHaptic('light');
-                  setSelectedCatModal(cat);
+                  if (item.subCategory) {
+                    onSelectCategory(item.category.id, item.subCategory);
+                  } else {
+                    setSelectedCatModal(item.category);
+                  }
                 }}
                 activeOpacity={0.85}
               >
-                <CategorySquircleIcon category={cat.id} size={50} />
+                {item.emoji ? (
+                  <View style={{ width: 50, height: 50, borderRadius: 16, borderWidth: 1, borderColor: `${item.category.primaryColor}88`, backgroundColor: `${item.category.primaryColor}24`, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 27 }}>{item.emoji}</Text>
+                  </View>
+                ) : (
+                  <CategorySquircleIcon category={item.category.id} size={50} />
+                )}
                 <Text style={styles.catName} numberOfLines={2}>
-                  {cat.name}
+                  {item.label}
                 </Text>
-                <Text style={styles.catCount}>{cat.totalQuestions} soru</Text>
+                <Text style={styles.catCount}>
+                  {item.subCategory ? 'Alt kategori' : `${item.category.totalQuestions} soru`}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
