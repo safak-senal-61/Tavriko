@@ -357,7 +357,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
                   <View style={styles.rewardIconWrap}>
                     {renderRewardIcon(tierItem.freeReward.type, 26)}
                   </View>
-                  <Text style={styles.rewardAmount} numberOfLines={1}>
+                  <Text style={styles.rewardAmount} numberOfLines={2}>
                     {tierItem.freeReward.title}
                   </Text>
                   {isFreeClaimed ? (
@@ -417,7 +417,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
                   <View style={styles.rewardIconWrap}>
                     {renderRewardIcon(tierItem.premiumReward.type, 26)}
                   </View>
-                  <Text style={styles.premiumRewardAmount} numberOfLines={1}>
+                  <Text style={styles.premiumRewardAmount} numberOfLines={2}>
                     {tierItem.premiumReward.title}
                   </Text>
                   {isPremiumClaimed ? (
@@ -789,12 +789,14 @@ const styles = StyleSheet.create({
   rewardAmount: {
     color: '#FFFFFF',
     fontSize: 11,
+    lineHeight: 13,
     fontFamily: THEME.fonts.bold,
     textAlign: 'center',
   },
   premiumRewardAmount: {
     color: '#FFC43D',
     fontSize: 11,
+    lineHeight: 13,
     fontFamily: THEME.fonts.bold,
     textAlign: 'center',
   },

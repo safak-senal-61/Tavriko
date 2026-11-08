@@ -414,7 +414,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           artSize={124}
           eyebrow="ÖNE ÇIKAN"
           title={FEATURED_CHEST?.name || 'Efsanevi Sandık'}
-          subtitle={FEATURED_CHEST?.desc}
+          subtitle={FEATURED_CHEST?.desc?.split('.')[0]}
           height={150}
         >
           <TouchableOpacity
