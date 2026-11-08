@@ -29,7 +29,7 @@ jobs:
         id: install
         run: |
           set -o pipefail
-          npm install --ignore-scripts --no-audit --no-fund 2>&1 | tee dependency-install.log
+          npm install --no-audit --no-fund 2>&1 | tee dependency-install.log
       - name: Capture dependency diagnostics
         if: always()
         run: |
@@ -96,7 +96,7 @@ jobs:
         id: install
         run: |
           set -o pipefail
-          npm install --ignore-scripts --no-audit --no-fund 2>&1 | tee dependency-install.log
+          npm install --no-audit --no-fund 2>&1 | tee dependency-install.log
       - name: Prepare PostgreSQL test schema
         if: steps.install.outcome == 'success'
         run: |
