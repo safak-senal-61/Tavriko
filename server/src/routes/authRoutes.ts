@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
 import { UserProfile, UserSettings } from '@trivia/shared';
 import { logger } from '../utils/logger';
 import { requireUser, rateLimit } from '../middleware/security';
+import { validateStrongPassword } from '../utils/passwordPolicy';
 
 const router = Router();
 
@@ -145,6 +146,8 @@ router.post('/register', rateLimit({ keyPrefix: 'register', windowMs: 60 * 60 * 
       res.status(400).json({ error: 'Kullanıcı adı, e-posta ve şifre zorunludur.' });
       return;
     }
+    const passwordError = validateStrongPassword(password);
+    if (passwordError) { res.status(400).json({ error: passwordError }); return; }
 
     const result = await db.register({
       username: resolvedUsername,
@@ -176,10 +179,12 @@ router.post('/login', rateLimit({ keyPrefix: 'login', windowMs: 15 * 60 * 1000, 
       return;
     }
     const result = await db.login(loginId, password);
+    logger.info('AUTH', 'Başarılı parola girişi', { identifierHash: createHash('sha256').update(String(loginId).toLowerCase()).digest('hex').slice(0, 12), ipHash: createHash('sha256').update(String(req.ip || 'unknown')).digest('hex').slice(0, 12) });
     res.setHeader('Cache-Control', 'no-store');
     res.json(result);
   } catch {
-    // Avoid disclosing whether an account exists.
+    // Never log raw identifiers, passwords, tokens or request bodies.
+    logger.warn('AUTH', 'Başarısız parola girişi', { identifierHash: createHash('sha256').update(String((req.body || {}).identifier || (req.body || {}).username || (req.body || {}).email || 'unknown').toLowerCase()).digest('hex').slice(0, 12), ipHash: createHash('sha256').update(String(req.ip || 'unknown')).digest('hex').slice(0, 12) });
     res.status(401).json({ error: 'Kullanıcı adı/e-posta veya şifre hatalı.' });
   }
 });
@@ -404,7 +409,10 @@ router.post('/reset-password', rateLimit({ keyPrefix: 'reset-password', windowMs
       res.status(400).json({ error: 'Tüm alanların doldurulması zorunludur.' });
       return;
     }
+    const passwordError = validateStrongPassword(newPassword);
+    if (passwordError) { res.status(400).json({ error: passwordError }); return; }
     const result = await db.confirmPasswordReset(target, finalCode, newPassword);
+    logger.warn('AUTH', 'Parola sıfırlama işlemi tamamlandı', { ipHash: createHash('sha256').update(String(req.ip || 'unknown')).digest('hex').slice(0, 12) });
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -571,6 +579,8 @@ router.post('/change-password', async (req: Request, res: Response): Promise<voi
       res.status(400).json({ error: 'Yeni şifre alanı zorunludur.' });
       return;
     }
+    const passwordError = validateStrongPassword(newPassword);
+    if (passwordError) { res.status(400).json({ error: passwordError }); return; }
 
     const result = await db.changeUserPassword(userId, currentPassword || '', newPassword);
     res.json(result);
