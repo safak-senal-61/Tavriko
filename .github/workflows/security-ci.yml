@@ -49,6 +49,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dependency-audit-diagnostics
+          retention-days: 14
           path: |
             package-lock.json
             npm-audit.json
@@ -100,5 +101,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-test-diagnostics
+          retention-days: 14
           path: package-lock.json
           if-no-files-found: warn
