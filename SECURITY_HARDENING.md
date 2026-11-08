@@ -54,3 +54,18 @@ The migration `server/prisma/migrations/20261106000000_enable_rls_prisma_tables/
 4. Run the server and Worker build/test suites, then perform authenticated integration tests for login, profile, purchases, matchmaking, room creation, and final match settlement.
 5. The live RLS migration is already applied. Re-verify all seven tables and grants after any schema change with the Supabase Security Advisor.
 6. Configure `INTERNAL_API_SECRET` in both Vercel and Cloudflare, `TELEGRAM_WEBHOOK_SECRET` in Vercel and Cloudflare, and portal admin credentials in Vercel. Missing values intentionally disable the corresponding internal, webhook, or admin features.
+
+
+## Supabase Auth: leaked-password protection
+
+Supabase Security Advisor currently reports that leaked-password protection is disabled. This is a project-level Auth setting and is not exposed by the connected database SQL interface.
+
+To enable it:
+1. Open the [Supabase Auth password settings](https://supabase.com/dashboard/project/rjvbgofzsfescnfohzgu/auth/providers?provider=Email).
+2. Find the password security / leaked password protection controls.
+3. Enable prevention of passwords found in known data breaches (HaveIBeenPwned / Pwned Passwords).
+4. Save the setting, then rerun the Supabase Security Advisor.
+
+Supabase documents this feature as available on the Pro plan and above. If the project is on a lower plan or the toggle is unavailable, the owner must upgrade or confirm plan eligibility before this item can be closed:
+https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
+
