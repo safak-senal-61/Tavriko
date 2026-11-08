@@ -1383,9 +1383,13 @@ export const TavrikoBottomNav: React.FC<{
             activeOpacity={0.8}
           >
             <NavIcon tab={item.key} active={isActive} size={24} />
-            <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
+            <Text
+              style={[styles.navLabel, isActive && styles.navLabelActive]}
+              numberOfLines={1}
+            >
               {item.label}
             </Text>
+            {isActive && <View style={styles.navActiveBar} />}
           </TouchableOpacity>
         );
       })}
@@ -1419,9 +1423,13 @@ export const TavrikoSecondaryBottomNav: React.FC<{
             activeOpacity={0.8}
           >
             <NavIcon tab={item.key} active={isActive} size={24} />
-            <Text style={[styles.navLabel, isActive && styles.navLabelActive]}>
+            <Text
+              style={[styles.navLabel, isActive && styles.navLabelActive]}
+              numberOfLines={1}
+            >
               {item.label}
             </Text>
+            {isActive && <View style={styles.navActiveBar} />}
           </TouchableOpacity>
         );
       })}
@@ -1653,18 +1661,33 @@ const styles = StyleSheet.create({
     bottom: 14,
     height: 72,
     borderRadius: 26,
-    backgroundColor: 'rgba(14, 6, 32, 0.94)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: 'rgba(14, 6, 32, 0.96)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(154, 107, 255, 0.45)',
+    overflow: 'hidden',
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
   },
   navItem: {
+    flex: 1,
+    alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
-    paddingHorizontal: 8,
+    paddingHorizontal: 2,
+  },
+  navActiveBar: {
+    position: 'absolute',
+    bottom: 6,
+    width: 34,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#FFC43D',
+    shadowColor: '#FFC43D',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 6,
   },
   navItemActive: {
     // Fixed in place, only yellow highlight

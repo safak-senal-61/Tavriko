@@ -6,9 +6,11 @@ import {
   StyleSheet,
   ScrollView,
   Image,
+  ImageSourcePropType,
   Animated,
   Easing,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { UserProfile, calculateLevelFromXp } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -17,18 +19,27 @@ import {
   TavrikoScreen,
   TavrikoTopBar,
   TavrikoBottomNav,
-  TavrikoProgressBar,
-  Button3D,
   CharacterAvatar,
-  ModeSquircleIcon,
-  StreakFlameIcon,
-  SpeedBoltIcon,
+  CoinIcon,
+  GemIcon,
+  BellLineIcon,
   CrownIcon,
+  StreakFlameIcon,
   ChestIcon,
   TrophyIcon,
   InventoryCubeIcon,
-  TavrikoHeroLogo,
 } from '../components/TavrikoIcons';
+import { GradientFill, formatNumberTR } from '../components/TavrikoGradient';
+
+const LOGO_MARK = require('../../assets/images/logo_mark.png');
+const DUEL_BANNER = require('../../assets/images/duel_arena_banner.jpg');
+const MODE_IMAGES = {
+  customRoom: require('../../assets/images/modes/custom_room.png'),
+  singlePlayer: require('../../assets/images/modes/single_player.png'),
+  daily: require('../../assets/images/modes/daily.png'),
+  friends: require('../../assets/images/modes/friends.png'),
+};
+
 interface HomeScreenProps {
   user: UserProfile;
   isGuest?: boolean;
@@ -49,6 +60,41 @@ interface HomeScreenProps {
   onProLeague?: () => void;
   onLoginPrompt?: () => void;
 }
+
+const useNative = Platform.OS !== 'web';
+
+/** 2x2 ızgaradaki tek bir mod kartı (sol: 3D görsel, sağ: başlık + ok) */
+const ModeTile: React.FC<{
+  label: string;
+  image: ImageSourcePropType;
+  colors: string[];
+  borderColor: string;
+  glowColor: string;
+  onPress: () => void;
+}> = ({ label, image, colors, borderColor, glowColor, onPress }) => (
+  <TouchableOpacity
+    style={[styles.modeTile, { borderColor, shadowColor: glowColor }]}
+    onPress={() => {
+      sound.playSound('tap');
+      sound.triggerHaptic('light');
+      onPress();
+    }}
+    activeOpacity={0.85}
+    accessibilityRole="button"
+    accessibilityLabel={label}
+  >
+    <GradientFill colors={colors} direction="diagonal" />
+    <View style={styles.modeTileShine} pointerEvents="none" />
+    <Image source={image} style={styles.modeTileImg} resizeMode="contain" />
+    <View style={styles.modeTileLabelRow}>
+      <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+        {label}
+      </Text>
+      <Text style={styles.modeTileChevron}>›</Text>
+    </View>
+  </TouchableOpacity>
+);
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   user,
   isGuest = false,
@@ -68,61 +114,121 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onProLeague,
   onLoginPrompt,
 }) => {
-  // Entrance & Floating Bolt Animation
-  const boltFloat = useRef(new Animated.Value(0)).current;
+  // Giriş animasyonu + OYNA butonu nabız efekti
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(18)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 400,
-        useNativeDriver: Platform.OS !== 'web',
+        useNativeDriver: useNative,
       }),
       Animated.spring(slideAnim, {
         toValue: 0,
         friction: 7,
-        useNativeDriver: Platform.OS !== 'web',
+        useNativeDriver: useNative,
       }),
     ]).start();
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(boltFloat, {
-          toValue: -8,
-          duration: 1300,
+        Animated.timing(pulseAnim, {
+          toValue: 1.035,
+          duration: 900,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: Platform.OS !== 'web',
+          useNativeDriver: useNative,
         }),
-        Animated.timing(boltFloat, {
-          toValue: 0,
-          duration: 1300,
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 900,
           easing: Easing.inOut(Easing.ease),
-          useNativeDriver: Platform.OS !== 'web',
+          useNativeDriver: useNative,
         }),
       ])
     );
     loop.start();
     return () => loop.stop();
-  }, [boltFloat, fadeAnim, slideAnim]);
+  }, [fadeAnim, slideAnim, pulseAnim]);
+
+  const { width: windowWidth } = useWindowDimensions();
+  const narrow = windowWidth < 390;
+  const prog = calculateLevelFromXp(user.xp ?? 0);
+  const completedToday = Boolean(user.dailyChallenge?.completedToday);
+  const streakDays = Math.max(1, user.dailyStreak ?? 1);
+  const hasPendingNotifications = (user.notifications ?? []).some(
+    (n) => (n.type === 'friend_request' || n.type === 'match_invite') && !n.handled
+  );
+
   return (
     <TavrikoScreen>
-      {/* Top HUD Bar */}
-      <TavrikoTopBar
-        leftType="bell"
-        onLeftPress={onNotifications}
-        coins={user.coins ?? 0}
-        gems={user.gems ?? 0}
-        avatarSeed={user.avatarUrl || user.displayName}
-        onAvatarPress={onProfile}
-        onCurrencyPress={onShop}
-        isGuest={isGuest}
-        onGuestLoginPress={onLoginPrompt}
-      />
+      {/* Üst Bar: Logo + Altın + Elmas + Bildirim */}
+      {isGuest ? (
+        <TavrikoTopBar
+          leftType="bell"
+          onLeftPress={onNotifications}
+          isGuest
+          onGuestLoginPress={onLoginPrompt}
+          onAvatarPress={onProfile}
+        />
+      ) : (
+        <View style={styles.headerRow}>
+          <View style={styles.brandGroup}>
+            <Image source={LOGO_MARK} style={[styles.brandMark, narrow && styles.brandMarkNarrow]} resizeMode="contain" />
+            <Text style={[styles.brandText, narrow && styles.brandTextNarrow]} numberOfLines={1}>
+              Tavriko
+            </Text>
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={[styles.currencyPill, narrow && styles.currencyPillNarrow]}
+              onPress={() => {
+                if (onShop) {
+                  sound.playSound('reward');
+                  sound.triggerHaptic('light');
+                  onShop();
+                }
+              }}
+              activeOpacity={onShop ? 0.8 : 1}
+              accessibilityLabel={`Altın: ${user.coins ?? 0}`}
+            >
+              <CoinIcon size={22} />
+              <Text style={[styles.currencyText, narrow && styles.currencyTextNarrow]}>{formatNumberTR(user.coins)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.currencyPill, narrow && styles.currencyPillNarrow]}
+              onPress={() => {
+                if (onShop) {
+                  sound.playSound('reward');
+                  sound.triggerHaptic('light');
+                  onShop();
+                }
+              }}
+              activeOpacity={onShop ? 0.8 : 1}
+              accessibilityLabel={`Elmas: ${user.gems ?? 0}`}
+            >
+              <GemIcon size={20} />
+              <Text style={[styles.currencyText, narrow && styles.currencyTextNarrow]}>{formatNumberTR(user.gems)}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.bellButton}
+              onPress={() => {
+                sound.playSound('tap');
+                sound.triggerHaptic('light');
+                onNotifications();
+              }}
+              activeOpacity={0.8}
+              accessibilityLabel="Bildirimler"
+            >
+              <BellLineIcon size={20} />
+              {hasPendingNotifications && <View style={styles.bellDot} />}
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          isGuest && { paddingBottom: 36 },
-        ]}
+        contentContainerStyle={[styles.scrollContent, isGuest && { paddingBottom: 36 }]}
         showsVerticalScrollIndicator={false}
       >
         <Animated.View
@@ -131,11 +237,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             transform: [{ translateY: slideAnim }],
           }}
         >
-          {/* Center Seamless Vector Tavriko Logo (No Square Box!) */}
-          <View style={styles.bannerWrap}>
-            <TavrikoHeroLogo width={165} height={92} />
-          </View>
-          {/* Guest Mode Notice Pill */}
+          {/* Misafir modu bilgilendirmesi */}
           {isGuest && (
             <TouchableOpacity
               style={styles.guestNoticeBanner}
@@ -150,9 +252,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </Text>
             </TouchableOpacity>
           )}
-          {/* User Level & XP Card */}
+
+          {/* Profil Kartı: Avatar + İsim + Seviye + XP */}
           <TouchableOpacity
-            style={styles.userXpCard}
+            style={styles.profileCard}
             onPress={() => {
               sound.playSound('tap');
               if (onSeason) onSeason();
@@ -160,167 +263,159 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }}
             activeOpacity={0.85}
           >
-            <CharacterAvatar
-              seed={user.avatarUrl || user.displayName}
-              size={48}
+            <GradientFill
+              colors={['rgba(107, 60, 255, 0.38)', 'rgba(36, 16, 80, 0.55)', 'rgba(56, 189, 248, 0.16)']}
+              direction="diagonal"
             />
-            {(() => {
-              const prog = calculateLevelFromXp(user.xp ?? 0);
-              return (
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.userName}>{user.displayName}</Text>
-                  <Text style={styles.userXpSub}>
-                    Seviye {prog.level} · {prog.currentLevelXp} / {prog.nextLevelXpRequired} XP · {prog.rankTitle}
-                  </Text>
-                  <TavrikoProgressBar
-                    progress={prog.progressPct}
-                    height={10}
-                    style={{ marginTop: 6 }}
-                  />
-                </View>
-              );
-            })()}
-          </TouchableOpacity>
-          {/* Hero Quick Match (1v1 Duel) Card - Full bleed 3D duel banner */}
-          <View style={styles.heroMatchCard}>
-            <Image
-              source={require('../../assets/images/duel_arena_banner.jpg')}
-              style={StyleSheet.absoluteFillObject}
-              resizeMode="cover"
-            />
-            <View style={styles.heroMatchScrim} pointerEvents="none" />
-            <View style={styles.heroMatchContent}>
-              <View style={styles.heroMatchBadge}>
-                <Text style={styles.heroMatchBadgeText}>⚔️ 1v1 DÜELLO</Text>
+            <View style={styles.profileAvatarWrap}>
+              <View style={styles.profileAvatarRing}>
+                <CharacterAvatar seed={user.avatarUrl || user.displayName} size={62} />
               </View>
+              <View style={styles.profileCrown} pointerEvents="none">
+                <CrownIcon size={26} />
+              </View>
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={styles.userName} numberOfLines={1}>
+                {user.displayName}
+              </Text>
+              <View style={styles.levelRow}>
+                <Text style={styles.levelText}>Seviye {prog.level}</Text>
+                <Text style={styles.levelDot}>·</Text>
+                <CrownIcon size={15} />
+                <Text style={styles.levelText} numberOfLines={1}>
+                  {prog.rankTitle}
+                </Text>
+              </View>
+              <View style={styles.xpRow}>
+                <View style={styles.xpTrack}>
+                  <View style={[styles.xpFill, { width: `${Math.max(4, prog.progressPct)}%` }]}>
+                    <GradientFill colors={['#9A6BFF', '#38BDF8', '#5ADBB5']} direction="horizontal" />
+                  </View>
+                </View>
+                <Text style={styles.xpText} numberOfLines={1}>
+                  {formatNumberTR(prog.currentLevelXp)} / {formatNumberTR(prog.nextLevelXpRequired)} XP
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          {/* Hızlı Eşleşme (1v1 Düello) Hero Kartı */}
+          <View style={styles.heroCard}>
+            <Image source={DUEL_BANNER} style={styles.heroImage} resizeMode="cover" />
+            <GradientFill
+              colors={['rgba(15, 6, 36, 0)', 'rgba(15, 6, 36, 0)', 'rgba(15, 6, 36, 0.7)', 'rgba(15, 6, 36, 0.96)']}
+              stops={[0, 0.45, 0.72, 0.85]}
+            />
+            <View style={styles.heroBadge}>
+              <Text style={styles.heroBadgeText}>⚔️ 1v1 DÜELLO</Text>
+            </View>
+            <View style={styles.heroBottom}>
               <Text
-                style={styles.heroMatchTitle}
+                style={[styles.heroTitle, narrow && styles.heroTitleNarrow]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.8}
+                minimumFontScale={0.7}
               >
                 HIZLI EŞLEŞME
               </Text>
-              <Text style={styles.onlineSub}>
-                {user.rankPoints ?? 1000} Lig Puanı · {user.stats?.totalMatches ?? 0} Düello Maçı
-              </Text>
-              <Button3D
-                title="OYNA"
-                variant="mint"
-                onPress={onQuickMatch}
-                style={styles.heroPlayButton}
-                textStyle={{ fontSize: 20 }}
+              <View style={styles.heroSubRow}>
+                <CrownIcon size={16} />
+                <Text style={styles.heroSub} numberOfLines={1}>
+                  {formatNumberTR(user.rankPoints ?? 1000)} Lig Puanı · {formatNumberTR(user.stats?.totalMatches ?? 0)} Düello Maçı
+                </Text>
+              </View>
+              <Animated.View style={{ transform: [{ scale: pulseAnim }], alignSelf: 'stretch' }}>
+                <TouchableOpacity
+                  style={styles.playButton}
+                  onPress={() => {
+                    sound.playSound('tap');
+                    sound.triggerHaptic('medium');
+                    onQuickMatch();
+                  }}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="Hızlı eşleşme oyna"
+                >
+                  <GradientFill colors={['#8FF0CF', '#5ADBB5', '#2FBF95']} stops={[0, 0.5, 1]} />
+                  <View style={styles.playButtonShine} pointerEvents="none" />
+                  <Text style={styles.playButtonText}>OYNA</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
+          </View>
+
+          {/* 2x2 Mod Kartları */}
+          <View style={styles.modesGrid}>
+            <View style={styles.modesRow}>
+              <ModeTile
+                label="Özel Oda"
+                image={MODE_IMAGES.customRoom}
+                colors={['#5B2CC4', '#3A1690', '#24105A']}
+                borderColor="rgba(186, 150, 255, 0.55)"
+                glowColor="#6B3CFF"
+                onPress={onCustomRoom}
+              />
+              <ModeTile
+                label="Tek Kişilik"
+                image={MODE_IMAGES.singlePlayer}
+                colors={['#1F5FE0', '#16388F', '#0F1E5A']}
+                borderColor="rgba(96, 196, 255, 0.6)"
+                glowColor="#38BDF8"
+                onPress={onPractice}
+              />
+            </View>
+            <View style={styles.modesRow}>
+              <ModeTile
+                label="Günlük"
+                image={MODE_IMAGES.daily}
+                colors={['#7A4A0E', '#4A2A10', '#2A1636']}
+                borderColor="rgba(255, 196, 61, 0.65)"
+                glowColor="#FFC43D"
+                onPress={onDailyChallenge}
+              />
+              <ModeTile
+                label="Arkadaşlar"
+                image={MODE_IMAGES.friends}
+                colors={['#8A1F55', '#5A1440', '#2C0E36']}
+                borderColor="rgba(255, 122, 160, 0.6)"
+                glowColor="#FF5A8A"
+                onPress={onFriends}
               />
             </View>
           </View>
-          {/* 4 Mode Tiles Row with Enriched 3D Visuals and Embedded Inside Labels */}
-          <View style={styles.modesRow}>
-            <TouchableOpacity
-              style={styles.modeTile}
-              onPress={() => {
-                sound.playSound('tap');
-                sound.triggerHaptic('light');
-                onCustomRoom();
-              }}
-              activeOpacity={0.85}
-            >
-              <Image
-                source={require('../../assets/images/custom_room_3d.jpg')}
-                style={styles.modeTileImg}
-                resizeMode="cover"
-              />
-              <View style={styles.modeTileLabelWrap}>
-                <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
-                  Özel Oda
-                </Text>
-              </View>
-            </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.modeTile}
-              onPress={() => {
-                sound.playSound('tap');
-                sound.triggerHaptic('light');
-                onPractice();
-              }}
-              activeOpacity={0.85}
-            >
-              <Image
-                source={require('../../assets/images/single_player_3d.jpg')}
-                style={styles.modeTileImg}
-                resizeMode="cover"
-              />
-              <View style={styles.modeTileLabelWrap}>
-                <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
-                  Tek Kişilik
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.modeTile}
-              onPress={() => {
-                sound.playSound('tap');
-                sound.triggerHaptic('light');
-                onDailyChallenge();
-              }}
-              activeOpacity={0.85}
-            >
-              <Image
-                source={require('../../assets/images/daily_challenge_3d.jpg')}
-                style={styles.modeTileImg}
-                resizeMode="cover"
-              />
-              <View style={styles.modeTileLabelWrap}>
-                <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
-                  Günlük
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.modeTile}
-              onPress={() => {
-                sound.playSound('tap');
-                sound.triggerHaptic('light');
-                onFriends();
-              }}
-              activeOpacity={0.85}
-            >
-              <Image
-                source={require('../../assets/images/friends_3d.jpg')}
-                style={styles.modeTileImg}
-                resizeMode="cover"
-              />
-              <View style={styles.modeTileLabelWrap}>
-                <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit>
-                  Arkadaşlar
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-          {/* Daily Streak Card */}
-          <View style={styles.streakCard}>
-            <StreakFlameIcon size={38} active={Boolean(user.dailyChallenge?.completedToday)} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.streakTitle}>
-                {user.dailyStreak ?? 1} günlük seri {user.dailyChallenge?.completedToday ? '🔥' : ''}
-              </Text>
-              <Text style={styles.streakSub}>
-                {user.dailyChallenge?.completedToday
-                  ? '✓ Bugünkü görev tamamlandı! Seri korundu.'
-                  : `En iyi seri: ${user.stats?.bestStreak ?? 0} · Bugünkü meydan okuma 2x XP`}
-              </Text>
-            </View>
-            <Button3D
-              title={user.dailyChallenge?.completedToday ? 'GÖR' : 'BAŞLA'}
-              variant={user.dailyChallenge?.completedToday ? 'gold' : 'mint'}
-              onPress={onDailyChallenge}
-              style={{ minHeight: 40, paddingHorizontal: 18 }}
-              textStyle={{ fontSize: 14 }}
+          {/* Günlük Seri Bandı */}
+          <TouchableOpacity
+            style={styles.streakCard}
+            onPress={() => {
+              sound.playSound('tap');
+              onDailyChallenge();
+            }}
+            activeOpacity={0.9}
+          >
+            <GradientFill
+              colors={['rgba(107, 60, 255, 0.45)', 'rgba(36, 16, 80, 0.6)', 'rgba(107, 60, 255, 0.3)']}
+              direction="horizontal"
             />
-          </View>
-          {/* Extra UI Kit Features Row (Season 1, Pro League, Shop, Events, Inventory) */}
+            <StreakFlameIcon size={46} active />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.streakTitle} numberOfLines={1}>
+                {streakDays} Günlük Seri!
+              </Text>
+              <Text style={styles.streakSub} numberOfLines={2}>
+                {completedToday
+                  ? '✓ Bugünkü görev tamamlandı! Seri korundu.'
+                  : 'Günün Meydan Okuması seni bekliyor'}
+              </Text>
+            </View>
+            <View style={styles.streakButton}>
+              <GradientFill colors={['#FFE27A', '#FFC43D', '#FF9B2F']} stops={[0, 0.45, 1]} />
+              <Text style={styles.streakButtonText}>{completedToday ? 'GÖR ›' : 'BAŞLA ›'}</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Ek Özellikler (Sezon, Pro Lig, Mağaza, Etkinlik, Envanter) */}
           <View style={styles.extraFeaturesRow}>
             {onSeason && (
               <TouchableOpacity
@@ -385,7 +480,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </Animated.View>
       </ScrollView>
-      {/* Floating Bottom Navigation */}
+
+      {/* Alt Navigasyon */}
       {!isGuest && (
         <TavrikoBottomNav
           activeTab="play"
@@ -400,21 +496,118 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     </TavrikoScreen>
   );
 };
+
+const glow = (color: string, radius = 14, opacity = 0.45) =>
+  Platform.select({
+    ios: {
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: opacity,
+      shadowRadius: radius,
+    },
+    android: { elevation: 6 },
+    default: {
+      shadowColor: color,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: opacity,
+      shadowRadius: radius,
+    },
+  });
+
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 110,
+    paddingBottom: 104,
   },
-  bannerWrap: {
+  // ---- Üst Bar ----
+  headerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    gap: 8,
   },
-  bannerImage: {
-    width: 150,
-    height: 46,
-    borderRadius: 14,
+  brandGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
+    minWidth: 0,
   },
+  brandMark: {
+    width: 44,
+    height: 44,
+  },
+  brandMarkNarrow: {
+    width: 36,
+    height: 36,
+  },
+  brandTextNarrow: {
+    fontSize: 20,
+  },
+  brandText: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 24,
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+    flexShrink: 1,
+    textShadowColor: 'rgba(107, 60, 255, 0.9)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  currencyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    height: 36,
+    paddingLeft: 5,
+    paddingRight: 12,
+    borderRadius: 18,
+    backgroundColor: 'rgba(20, 8, 46, 0.9)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(154, 107, 255, 0.55)',
+  },
+  currencyPillNarrow: {
+    height: 32,
+    paddingRight: 9,
+    gap: 3,
+  },
+  currencyTextNarrow: {
+    fontSize: 12.5,
+  },
+  currencyText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: THEME.fonts.black,
+  },
+  bellButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(20, 8, 46, 0.9)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(154, 107, 255, 0.55)',
+  },
+  bellDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FF3B5C',
+    borderWidth: 1.5,
+    borderColor: '#14082E',
+  },
+  // ---- Misafir ----
   guestNoticeBanner: {
-    marginTop: 10,
+    marginBottom: 10,
     backgroundColor: 'rgba(255, 196, 61, 0.18)',
     borderWidth: 1,
     borderColor: '#FFC43D',
@@ -428,150 +621,273 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
   },
-  userXpCard: {
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.09)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
+  // ---- Profil Kartı ----
+  profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 22,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(36, 16, 80, 0.7)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(120, 140, 255, 0.55)',
+  },
+  profileAvatarWrap: {
+    width: 76,
+    height: 76,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileAvatarRing: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 4,
+    borderColor: '#FFC43D',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#241050',
+    overflow: 'hidden',
+    ...glow('#FFC43D', 10, 0.6),
+  },
+  profileCrown: {
+    position: 'absolute',
+    top: -12,
+    left: 4,
+    transform: [{ rotate: '-18deg' }],
+  },
+  profileInfo: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
   },
   userName: {
     fontFamily: THEME.fonts.display,
-    fontSize: 19,
+    fontSize: 22,
     color: '#FFFFFF',
   },
-  userXpSub: {
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  levelText: {
     color: '#D9CDF5',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+    flexShrink: 1,
+  },
+  levelDot: {
+    color: '#D9CDF5',
+    fontSize: 13,
+    fontFamily: THEME.fonts.black,
+  },
+  xpRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+  xpTrack: {
+    flex: 1,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: 'rgba(8, 3, 22, 0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(154, 107, 255, 0.45)',
+    overflow: 'hidden',
+  },
+  xpFill: {
+    height: '100%',
+    borderRadius: 7,
+    overflow: 'hidden',
+  },
+  xpText: {
+    color: '#FFFFFF',
     fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
   },
-  heroMatchCard: {
-    marginTop: 16,
+  // ---- Hero Kartı ----
+  heroCard: {
+    marginTop: 14,
+    height: 330,
     borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 196, 61, 0.45)',
-    position: 'relative',
     overflow: 'hidden',
-    height: 170,
     backgroundColor: '#0F0624',
-    shadowColor: '#6B3CFF',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(130, 120, 255, 0.75)',
+    ...glow('#6B3CFF', 18, 0.55),
   },
-  heroMatchScrim: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(10, 4, 24, 0.65)',
+  heroImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: 250,
   },
-  heroMatchContent: {
-    flex: 1,
-    padding: 16,
-    justifyContent: 'space-between',
-    zIndex: 2,
-    maxWidth: '75%',
+  heroBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(60, 26, 150, 0.88)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(186, 150, 255, 0.8)',
   },
-  heroMatchBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255, 196, 61, 0.22)',
-    borderWidth: 1,
-    borderColor: '#FFC43D',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  heroMatchBadgeText: {
-    color: '#FFC43D',
-    fontSize: 10,
-    fontFamily: THEME.fonts.extraBold,
-    letterSpacing: 0.5,
-  },
-  onlineSub: {
-    color: '#E2D9F3',
-    fontSize: 11.5,
-    fontFamily: THEME.fonts.bold,
-    marginTop: 2,
-    marginBottom: 6,
-  },
-  heroMatchTitle: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 22,
+  heroBadgeText: {
     color: '#FFFFFF',
-    marginTop: 2,
-    letterSpacing: 0.3,
+    fontSize: 13,
+    fontFamily: THEME.fonts.black,
+    letterSpacing: 0.4,
   },
-  heroPlayButton: {
-    alignSelf: 'flex-start',
-    height: 48,
-    paddingHorizontal: 32,
+  heroBottom: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 16,
+    alignItems: 'center',
+  },
+  heroTitle: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 38,
+    color: '#FFFFFF',
+    letterSpacing: 0.6,
+    textAlign: 'center',
+    textShadowColor: 'rgba(107, 60, 255, 0.95)',
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 12,
+  },
+  heroTitleNarrow: {
+    fontSize: 31,
+  },
+  heroSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+    marginBottom: 12,
+  },
+  heroSub: {
+    color: '#E9E1FF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+    flexShrink: 1,
+  },
+  playButton: {
+    height: 64,
+    borderRadius: 32,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#B6FFE6',
+    borderBottomWidth: 5,
+    borderBottomColor: '#1D7A6B',
+    marginHorizontal: 10,
+    ...glow('#5ADBB5', 16, 0.75),
+  },
+  playButtonShine: {
+    position: 'absolute',
+    top: 4,
+    left: 24,
+    right: 24,
+    height: 16,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+  },
+  playButtonText: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 30,
+    color: '#FFFFFF',
+    letterSpacing: 1.5,
+    textShadowColor: 'rgba(12, 58, 51, 0.85)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 3,
+  },
+  // ---- Mod Kartları ----
+  modesGrid: {
+    marginTop: 14,
+    gap: 10,
   },
   modesRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 16,
+    gap: 10,
   },
   modeTile: {
     flex: 1,
     minWidth: 0,
-    height: 112,
-    borderRadius: 18,
-    backgroundColor: '#1E0E3D',
-    borderWidth: 1.5,
-    borderColor: 'rgba(154, 107, 255, 0.32)',
-    position: 'relative',
+    height: 104,
+    borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: '#000',
+    borderWidth: 1.5,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
     elevation: 5,
   },
-  modeTileImg: {
-    width: '100%',
-    height: '100%',
+  modeTileShine: {
     position: 'absolute',
     top: 0,
     left: 0,
-  },
-  modeTileLabelWrap: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
     right: 0,
-    paddingVertical: 5,
-    paddingHorizontal: 2,
-    backgroundColor: 'rgba(12, 5, 28, 0.82)',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.12)',
+    height: '45%',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  modeTileImg: {
+    position: 'absolute',
+    left: 2,
+    top: 8,
+    width: 88,
+    height: 88,
+  },
+  modeTileLabelRow: {
+    position: 'absolute',
+    left: 56,
+    right: 10,
+    bottom: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
+    gap: 3,
   },
   modeTileText: {
     color: '#FFFFFF',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-    textAlign: 'center',
-    letterSpacing: 0.2,
+    fontSize: 15,
+    fontFamily: THEME.fonts.black,
+    textAlign: 'right',
+    flexShrink: 1,
+    textShadowColor: 'rgba(0, 0, 0, 0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
+  modeTileChevron: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontFamily: THEME.fonts.black,
+    marginTop: -3,
+  },
+  // ---- Seri Bandı ----
   streakCard: {
-    marginTop: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.09)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
+    marginTop: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+    paddingVertical: 12,
+    paddingLeft: 12,
+    paddingRight: 12,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(36, 16, 80, 0.75)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(154, 107, 255, 0.6)',
   },
   streakTitle: {
     fontFamily: THEME.fonts.display,
-    fontSize: 16,
+    fontSize: 19,
     color: '#FFFFFF',
   },
   streakSub: {
@@ -579,6 +895,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
   },
+  streakButton: {
+    height: 44,
+    paddingHorizontal: 18,
+    borderRadius: 22,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFF1A8',
+    borderBottomWidth: 4,
+    borderBottomColor: '#B8560A',
+  },
+  streakButtonText: {
+    fontFamily: THEME.fonts.black,
+    fontSize: 16,
+    color: '#3B1500',
+    letterSpacing: 0.5,
+  },
+  // ---- Ek Özellikler ----
   extraFeaturesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

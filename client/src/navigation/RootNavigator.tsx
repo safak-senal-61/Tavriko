@@ -1689,6 +1689,7 @@ export const RootNavigator: React.FC = () => {
                   activeRoom.mode === 'quick_match')
               }
               myDisplayName={user?.displayName || 'Sen'}
+              myAvatarUrl={user?.avatarUrl || user?.displayName}
               dailyChallengeInfo={
                 activeDailyConfig
                   ? {

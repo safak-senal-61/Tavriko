@@ -21,6 +21,23 @@ export interface AvatarPreset {
   badgeFg: string;
 }
 
+/**
+ * Profil fotoğrafı olmayan kullanıcılar için 3D karakter illüstrasyonları.
+ * Sıra AVATAR_PRESETS ile birebir aynıdır (av_0 … av_9).
+ */
+export const AVATAR_ILLUSTRATIONS = [
+  require('../../assets/images/avatars/av_0.jpg'),
+  require('../../assets/images/avatars/av_1.jpg'),
+  require('../../assets/images/avatars/av_2.jpg'),
+  require('../../assets/images/avatars/av_3.jpg'),
+  require('../../assets/images/avatars/av_4.jpg'),
+  require('../../assets/images/avatars/av_5.jpg'),
+  require('../../assets/images/avatars/av_6.jpg'),
+  require('../../assets/images/avatars/av_7.jpg'),
+  require('../../assets/images/avatars/av_8.jpg'),
+  require('../../assets/images/avatars/av_9.jpg'),
+];
+
 export const AVATAR_PRESETS: AvatarPreset[] = [
   {
     id: 'av_0',
@@ -263,17 +280,17 @@ export const CharacterAvatar: React.FC<{
   const normalizedIndex = Math.abs(resolvedIndex) % AVATAR_PRESETS.length;
 
   return (
-    <Svg width={size} height={size} viewBox="0 0 120 120" style={{ flexShrink: 0 }}>
-      {normalizedIndex === 0 && <AvatarGraphic_0 />}
-      {normalizedIndex === 1 && <AvatarGraphic_1 />}
-      {normalizedIndex === 2 && <AvatarGraphic_2 />}
-      {normalizedIndex === 3 && <AvatarGraphic_3 />}
-      {normalizedIndex === 4 && <AvatarGraphic_4 />}
-      {normalizedIndex === 5 && <AvatarGraphic_5 />}
-      {normalizedIndex === 6 && <AvatarGraphic_6 />}
-      {normalizedIndex === 7 && <AvatarGraphic_7 />}
-      {normalizedIndex === 8 && <AvatarGraphic_8 />}
-      {normalizedIndex === 9 && <AvatarGraphic_9 />}
-    </Svg>
+    <Image
+      source={AVATAR_ILLUSTRATIONS[normalizedIndex]}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        backgroundColor: '#241050',
+        flexShrink: 0,
+      }}
+      resizeMode="cover"
+      accessibilityLabel={AVATAR_PRESETS[normalizedIndex]?.name}
+    />
   );
 };
