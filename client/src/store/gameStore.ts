@@ -222,7 +222,7 @@ export const useGameStore = create<GameState>((set) => ({
       }
 
       // Odada daha önce bilinen oyuncuları koru
-      for (const [pid, prevPlayer] of Object.entries(state.activeRoom.players || {})) {
+      for (const [pid, prevPlayer] of Object.entries(activeRoom.players || {})) {
         if (!mergedPlayers[pid]) {
           const authCorrect = getCompletedCorrectCount(completedMap, pid);
           const authScore = getCompletedScore(completedMap, pid);
@@ -283,7 +283,7 @@ export const useGameStore = create<GameState>((set) => ({
         if (!nextPlayers[entry.playerId]) {
           nextPlayers[entry.playerId] = {
             id: entry.playerId,
-            username: entry.username || entry.displayName,
+            username: entry.displayName,
             displayName: entry.displayName,
             avatarUrl: entry.avatarUrl || 'av1',
             score: 0,
