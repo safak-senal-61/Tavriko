@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { createApp } from '../src/server';
 import { Server } from 'http';
+import { validateStrongPassword } from '../src/utils/passwordPolicy';
 
 describe('Trivia REST API', () => {
   let app: any;
