@@ -153,7 +153,7 @@ router.get('/presence', rateLimit({ keyPrefix: 'presence-read', windowMs: 60 * 1
         .filter((friend: any) => friend.settings?.onlineStatusVisible !== false)
         .map((friend: any) => friend.id)
     );
-    const presences = presenceManager.getAllPresences()
+    const presences = Object.values(presenceManager.getAllPresences())
       .filter((presence: any) => visibleFriendIds.has(presence.userId))
       .map((presence: any) => ({
         userId: presence.userId,
@@ -296,8 +296,9 @@ router.post('/inventory/use', rateLimit({ keyPrefix: 'inventory-use', windowMs: 
       res.status(400).json({ error: 'userId ve itemId gerekli' });
       return;
     }
-    const result = await db.useInventoryItem(userId, itemId);
-    res.json({ success: true, ...result });
+    // Item-use rewards are disabled until the inventory mutation is backed by
+    // an atomic, ownership-checked transaction.
+    res.status(501).json({ error: 'Envanter kullanımı güvenli işlem altyapısı tamamlanana kadar kapalı.' });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
@@ -335,8 +336,9 @@ router.post('/season/claim', rateLimit({ keyPrefix: 'season-claim', windowMs: 60
       res.status(400).json({ error: 'userId ve tier gereklidir' });
       return;
     }
-    const result = await db.claimSeasonTier(userId, Number(tier), track);
-    res.json({ success: true, user: result.user, reward: result.reward });
+    // Season reward grants remain disabled until they use an atomic,
+    // ownership-checked transaction with duplicate-claim protection.
+    res.status(501).json({ error: 'Sezon ödülü talebi güvenli işlem altyapısı tamamlanana kadar kapalı.' });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
