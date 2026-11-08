@@ -234,6 +234,14 @@ describe('Trivia REST API', () => {
     expect(reset.status).toBe(400);
   });
 
+  it('rejects weak passwords during authenticated password changes', async () => {
+    const res = await request(app)
+      .post('/api/auth/change-password')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ currentPassword: '', newPassword: 'abc123' });
+    expect(res.status).toBe(400);
+  });
+
   it('rate limits repeated login attempts', async () => {
     let last: any;
     for (let i = 0; i < 11; i++) {
