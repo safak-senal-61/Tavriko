@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { logger } from '../utils/logger';
+import { logger, LogEntry } from '../utils/logger';
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
 import { getPendingGoogleSessions } from './authRoutes';
@@ -75,10 +75,11 @@ logRouter.post('/logs/ingest', rateLimit({ keyPrefix: 'client-log-ingest', windo
     return;
   }
   const allowedLevels = new Set(['INFO', 'WARN', 'ERROR', 'SUCCESS', 'DEBUG']);
-  const safeLevel = allowedLevels.has(String(level).toUpperCase()) ? String(level).toUpperCase() : 'INFO';
-  const safeCategory = typeof category === 'string'
-    ? category.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) || 'CLIENT'
-    : 'CLIENT';
+  const safeLevel = (allowedLevels.has(String(level).toUpperCase()) ? String(level).toUpperCase() : 'INFO') as LogEntry['level'];
+  const normalizedCategory = typeof category === 'string' ? category.toUpperCase() : 'CLIENT';
+  const safeCategory = (['HTTP', 'AUTH', 'GOOGLE', 'DB', 'PRISMA', 'SOCKET', 'CLIENT', 'SYSTEM', 'TELEGRAM'].includes(normalizedCategory)
+    ? normalizedCategory
+    : 'CLIENT') as LogEntry['category'];
   // Client-supplied details are intentionally omitted: they can contain tokens,
   // personal data or arbitrarily large objects.
   logger.log(safeCategory, safeLevel, `[MOBİL] ${message.slice(0, 500)}`);
