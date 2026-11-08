@@ -40,8 +40,8 @@ jobs:
       - name: Dependency vulnerability audit
         id: audit
         run: |
-          npm audit --audit-level=high --json > npm-audit.json
-          audit_status=$?
+          audit_status=0
+          npm audit --audit-level=high --json > npm-audit.json || audit_status=$?
           echo "npm audit exit code: $audit_status"
           exit "$audit_status"
       - name: Upload dependency diagnostics
