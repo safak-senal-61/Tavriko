@@ -151,7 +151,7 @@ describe('Telegram Bot Management & Admin Approval Workflow', () => {
   it('returns Pro League leaderboard via /lig', async () => {
     const res = await botService.handleCommand(ADMIN_ID, '/lig');
     expect(res.authorized).toBe(true);
-    expect(res.message).toContain('LİDER TABLOSU');
+    expect(res.message).toContain('Henüz lider tablosunda kayıtlı oyuncu yok.');
   });
 
   it('creates custom room via /oda_kur', async () => {
