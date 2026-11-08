@@ -86,8 +86,16 @@ router.get('/google/session-status', rateLimit({ keyPrefix: 'google-status', win
 
 router.post('/google/complete-session', rateLimit({ keyPrefix: 'google-complete', windowMs: 15 * 60 * 1000, max: 10 }), async (req: Request, res: Response): Promise<void> => {
   try {
-    const { sessionId, accessToken } = req.body;
-    if (!accessToken || typeof accessToken !== 'string') { res.status(401).json({ error: 'Doğrulanmış erişim tokenı gerekli.' }); return; }
+    const { sessionId, accessToken } = req.body || {};
+    if (typeof sessionId !== 'string' || !sessionId || typeof accessToken !== 'string' || !accessToken) {
+      res.status(401).json({ error: 'Geçerli Google oturumu gerekli.' });
+      return;
+    }
+    const pending = pendingSessions.get(sessionId);
+    if (!pending || pending.status !== 'pending' || pending.expiresAt <= Date.now()) {
+      res.status(401).json({ error: 'Google oturumu geçersiz veya süresi dolmuş.' });
+      return;
+    }
     const client = supabaseService.getClient();
     if (!client) { res.status(503).json({ error: 'Kimlik sağlayıcısı yapılandırılmamış.' }); return; }
     const { data, error } = await client.auth.getUser(accessToken);
@@ -96,17 +104,14 @@ router.post('/google/complete-session', rateLimit({ keyPrefix: 'google-complete'
     const meta = data.user.user_metadata || {};
     const name = meta.full_name || meta.name || email.split('@')[0];
     const result = await db.loginOrRegisterGoogle({ email, displayName: name, fullName: name, avatarUrl: meta.avatar_url || meta.picture || 'av1', googleId: data.user.id });
-    if (typeof sessionId === 'string') {
-      const pending = pendingSessions.get(sessionId);
-      if (pending && pending.status === 'pending' && pending.expiresAt > Date.now()) {
-        pendingSessions.set(sessionId, {
-          ...pending,
-          status: 'ready',
-          user: result.user,
-          token: result.token,
-        });
-      }
-    }
+    // Mark the pending browser session ready exactly once; later attempts
+    // fail the pending-status check above and cannot replay this session.
+    pendingSessions.set(sessionId, {
+      ...pending,
+      status: 'ready',
+      user: result.user,
+      token: result.token,
+    });
     res.setHeader('Cache-Control', 'no-store');
     res.json(result);
   } catch { res.status(401).json({ error: 'Google oturumu tamamlanamadı.' }); }
