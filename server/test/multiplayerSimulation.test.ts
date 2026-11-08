@@ -1,3 +1,4 @@
+import request from 'supertest';
 import { createApp } from '../src/server';
 import { io as ClientSocket, Socket as ClientSocketType } from 'socket.io-client';
 import { SOCKET_EVENTS, ClientQuestion, RoundResult } from '@trivia/shared';
@@ -9,20 +10,36 @@ describe('Real-Time Multi-Client Multiplayer Simulation', () => {
   let server: Server;
   let serverPort: number;
   let teardown: () => void;
+  let playerAId: string;
+  let playerBId: string;
+  let playerCId: string;
+  let playerAToken: string;
+  let playerBToken: string;
+  let playerCToken: string;
 
   let clientA: ClientSocketType;
   let clientB: ClientSocketType;
   let clientC: ClientSocketType;
 
-  beforeAll((done) => {
+  beforeAll(async () => {
     const created = createApp();
     teardown = created.close;
-    server = created.httpServer.listen(0, () => {
-      const addr = server.address();
-      if (addr && typeof addr === 'object') {
-        serverPort = addr.port;
-      }
-      done();
+    const guests = await Promise.all([
+      request(created.app).post('/api/auth/guest').send({ displayName: 'Ahmet (Fast)' }),
+      request(created.app).post('/api/auth/guest').send({ displayName: 'Barış (Medium)' }),
+      request(created.app).post('/api/auth/guest').send({ displayName: 'Can (Wrong)' }),
+    ]);
+    for (const guest of guests) expect(guest.status).toBe(200);
+    [playerAId, playerBId, playerCId] = guests.map((guest) => guest.body.user.id);
+    [playerAToken, playerBToken, playerCToken] = guests.map((guest) => guest.body.token);
+
+    server = created.httpServer;
+    await new Promise<void>((resolve) => {
+      server.listen(0, () => {
+        const addr = server.address();
+        if (addr && typeof addr === 'object') serverPort = addr.port;
+        resolve();
+      });
     });
   });
 
@@ -34,48 +51,42 @@ describe('Real-Time Multi-Client Multiplayer Simulation', () => {
     server.close(done);
   });
 
-  it('orchestrates 3 live players through room creation, synchronization, authoritative answer submission, and score ranking', (done) => {
+  it('orchestrates 3 authenticated guest players through room creation, synchronization, authoritative answers and score ranking', (done) => {
     const url = `http://localhost:${serverPort}`;
-    clientA = ClientSocket(url);
-    clientB = ClientSocket(url);
-    clientC = ClientSocket(url);
+    clientA = ClientSocket(url, { auth: { token: playerAToken } });
+    clientB = ClientSocket(url, { auth: { token: playerBToken } });
+    clientC = ClientSocket(url, { auth: { token: playerCToken } });
 
     const roomCode = 'MATCH1';
 
-    // Step 1: Client A joins as host
     clientA.emit(SOCKET_EVENTS.JOIN_ROOM, {
       roomCode,
-      playerId: 'player_a',
+      playerId: playerAId,
       displayName: 'Ahmet (Fast)',
     });
 
-    // Step 2: Client B and C join
     setTimeout(() => {
       clientB.emit(SOCKET_EVENTS.JOIN_ROOM, {
         roomCode,
-        playerId: 'player_b',
+        playerId: playerBId,
         displayName: 'Barış (Medium)',
       });
-
       clientC.emit(SOCKET_EVENTS.JOIN_ROOM, {
         roomCode,
-        playerId: 'player_c',
+        playerId: playerCId,
         displayName: 'Can (Wrong)',
       });
     }, 50);
 
-    // Step 3: Wait for state sync and toggle ready
     setTimeout(() => {
-      clientB.emit(SOCKET_EVENTS.TOGGLE_READY, { roomCode, playerId: 'player_b' });
-      clientC.emit(SOCKET_EVENTS.TOGGLE_READY, { roomCode, playerId: 'player_c' });
+      clientB.emit(SOCKET_EVENTS.TOGGLE_READY, { roomCode, playerId: playerBId });
+      clientC.emit(SOCKET_EVENTS.TOGGLE_READY, { roomCode, playerId: playerCId });
     }, 120);
 
-    // Step 4: Host starts game
     setTimeout(() => {
-      clientA.emit(SOCKET_EVENTS.START_GAME, { roomCode, playerId: 'player_a' });
+      clientA.emit(SOCKET_EVENTS.START_GAME, { roomCode, playerId: playerAId });
     }, 200);
 
-    // Listen for question delivery on Client A
     clientA.on(SOCKET_EVENTS.QUESTION_START, (question: ClientQuestion) => {
       expect(question.text).toBeDefined();
       expect(question.options).toHaveLength(4);
@@ -85,66 +96,53 @@ describe('Real-Time Multi-Client Multiplayer Simulation', () => {
       const correctId = bankQ ? bankQ.correctOptionId : 'opt_b';
       const wrongId = question.options.find((o) => o.id !== correctId)?.id || 'opt_d';
 
-      // Client A answers immediately with correct option
       clientA.emit(SOCKET_EVENTS.SUBMIT_ANSWER, {
         roomCode,
-        playerId: 'player_a',
+        playerId: playerAId,
         selectedOptionId: correctId,
         clientTimestamp: Date.now(),
       });
 
-      // Client B answers after small delay with correct option
       setTimeout(() => {
         clientB.emit(SOCKET_EVENTS.SUBMIT_ANSWER, {
           roomCode,
-          playerId: 'player_b',
+          playerId: playerBId,
           selectedOptionId: correctId,
           clientTimestamp: Date.now(),
         });
       }, 50);
 
-      // Client C answers with wrong option
       setTimeout(() => {
         clientC.emit(SOCKET_EVENTS.SUBMIT_ANSWER, {
           roomCode,
-          playerId: 'player_c',
+          playerId: playerCId,
           selectedOptionId: wrongId,
           clientTimestamp: Date.now(),
         });
       }, 80);
     });
 
-    // Listen for round result broadcast
     clientA.on(SOCKET_EVENTS.ROUND_RESULT, (result: RoundResult) => {
       expect(result.correctOptionId).toBeDefined();
       expect(result.leaderboard).toBeDefined();
       expect(result.leaderboard.length).toBe(3);
 
       const [rank1, rank2, rank3] = result.leaderboard;
-
-      // Player A answered faster than Player B -> Rank 1
-      expect(rank1.playerId).toBe('player_a');
+      expect(rank1.playerId).toBe(playerAId);
       expect(rank1.score).toBeGreaterThan(0);
-
-      // Player B answered correct but later -> Rank 2
-      expect(rank2.playerId).toBe('player_b');
+      expect(rank2.playerId).toBe(playerBId);
       expect(rank1.score).toBeGreaterThanOrEqual(rank2.score);
-
-      // Player C answered wrong -> Rank 3 with 0 points
-      expect(rank3.playerId).toBe('player_c');
+      expect(rank3.playerId).toBe(playerCId);
       expect(rank3.score).toBe(0);
-
       done();
     });
   }, 10000);
 
   it('handles client disconnection and continues match without crashing the room', (done) => {
     clientA.on(SOCKET_EVENTS.PLAYER_DISCONNECTED, (data: { playerId: string }) => {
-      expect(data.playerId).toBe('player_c');
+      expect(data.playerId).toBe(playerCId);
       done();
     });
-
-    // Client C disconnects
     clientC.disconnect();
   });
 });
