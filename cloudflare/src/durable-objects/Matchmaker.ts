@@ -65,6 +65,7 @@ export class MatchmakerDO extends DurableObject<Env> {
   private presences: Map<string, PresenceEntry> = new Map();
   private publicRooms: Map<string, PublicRoomEntry> = new Map();
   private rateLimiters = new WeakMap<WebSocket, RateLimiter>();
+  private connectionAttemptsByIp = new Map<string, number[]>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -185,6 +186,24 @@ export class MatchmakerDO extends DurableObject<Env> {
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+      const clientIp = (request.headers.get('CF-Connecting-IP') || '').trim() || 'unknown';
+      const now = Date.now();
+      const recent = (this.connectionAttemptsByIp.get(clientIp) || []).filter((time) => now - time < 60_000);
+      if (recent.length >= 20) {
+        return new Response(JSON.stringify({ error: 'Çok fazla bağlantı denemesi. Lütfen bekleyin.' }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json', 'Retry-After': '60' },
+        });
+      }
+      recent.push(now);
+      this.connectionAttemptsByIp.set(clientIp, recent);
+      if (this.connectionAttemptsByIp.size > 2000) {
+        for (const [ip, attempts] of this.connectionAttemptsByIp) {
+          if (!attempts.some((time) => now - time < 60_000)) this.connectionAttemptsByIp.delete(ip);
+        }
+      }
+    }
 
     // HTTP GET/POST /rooms/public or /api/rooms/public -> Live Public Rooms Directory
     if (
@@ -365,19 +384,9 @@ export class MatchmakerDO extends DurableObject<Env> {
     }
 
     if (!authUser) {
-      const pid = rawPlayerId || `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-      if (!pid.startsWith('guest_') && !pid.startsWith('guest:')) {
-        return new Response(JSON.stringify({ error: 'Misafir kimliği geçersiz' }), { status: 401 });
-      }
-      const name = sanitizeString(rawDisplayName || `Oyuncu ${pid.slice(-4)}`, 30);
-      authUser = {
-        id: pid,
-        username: name.toLowerCase().replace(/\s+/g, '_'),
-        displayName: name,
-        avatarUrl: rawAvatarUrl || 'av1',
-        isGuest: true,
-      };
-    } else if (rawPlayerId && authUser.id !== rawPlayerId) {
+      return new Response(JSON.stringify({ error: 'Geçerli oturum gerekli' }), { status: 401 });
+    }
+    if (rawPlayerId && authUser.id !== rawPlayerId) {
       return new Response(JSON.stringify({ error: 'Kimlik uyuşmazlığı' }), { status: 403 });
     }
 
