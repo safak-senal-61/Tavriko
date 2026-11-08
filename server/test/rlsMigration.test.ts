@@ -7,7 +7,8 @@ describe('Supabase least-privilege RLS migration', () => {
     'utf8'
   );
 
-  const privateTables = [
+  const applicationTables = [
+    'categories',
     'questions',
     'users',
     'user_inventory_items',
@@ -16,26 +17,29 @@ describe('Supabase least-privilege RLS migration', () => {
     'password_reset_tokens',
   ];
 
-  it('enables RLS on every exposed application table', () => {
-    for (const table of ['categories', ...privateTables]) {
+  it('enables RLS on every application table', () => {
+    for (const table of applicationTables) {
       expect(migration).toContain(`ALTER TABLE public.${table} ENABLE ROW LEVEL SECURITY;`);
     }
   });
 
-  it('revokes broad browser-role grants and grants public read access only to categories', () => {
+  it('revokes all direct browser-role and PUBLIC privileges', () => {
     expect(migration).toContain('REVOKE ALL PRIVILEGES ON TABLE');
-    expect(migration).toContain('FROM anon, authenticated;');
-    expect(migration).toContain('CREATE POLICY categories_public_read');
-    expect(migration).toContain('FOR SELECT');
-    expect(migration).toContain('TO anon, authenticated');
-    expect(migration).toContain('USING (true)');
-    for (const table of privateTables) {
+    expect(migration).toContain('FROM PUBLIC, anon, authenticated;');
+    expect(migration).not.toContain('TO anon, authenticated');
+  });
+
+  it('grants server-side access and creates service-role-only policies for every table', () => {
+    expect(migration).toContain('TO service_role;');
+    for (const table of applicationTables) {
       expect(migration).toContain(`CREATE POLICY ${table}_service_role_all`);
-      expect(migration).not.toContain(`CREATE POLICY ${table}_public`);
+      expect(migration).toContain(`ON public.${table} FOR ALL TO service_role`);
     }
   });
 
-  it('does not use the deprecated auth.role() policy expression', () => {
+  it('does not create public read policies or use deprecated auth.role()', () => {
+    expect(migration).not.toContain('categories_public_read');
+    expect(migration).not.toContain('categories_public_select');
     expect(migration).not.toContain('auth.role()');
   });
 });
