@@ -1817,6 +1817,7 @@ export const RootNavigator: React.FC = () => {
             summary={finalSummary}
             currentUserId={user.id}
             questionReviews={finalSummary.questionReviews || matchQuestionsReview}
+            userXp={user.xp}
             onPlayAgain={() => {
               resetGame();
               handleStartQuickMatch();

@@ -1,30 +1,42 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  ZoomIn,
+  useSharedValue,
+  useAnimatedStyle,
+  withDelay,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Animated,
-  Platform,
-  TouchableOpacity,
-} from 'react-native';
-import { FinalMatchSummary, MatchQuestionReviewItem } from '@trivia/shared';
+  FinalMatchSummary,
+  MatchQuestionReviewItem,
+  PlayerScoreSummary,
+  calculateLevelFromXp,
+} from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { loadStoredPreferences } from '../store/appPrefs';
 import {
   TavrikoScreen,
-  TavrikoProgressBar,
   Button3D,
   CharacterAvatar,
   CrownIcon,
   CoinIcon,
+  CheckMarkSvg,
+  CrossMarkSvg,
 } from '../components/TavrikoIcons';
+import { formatNumberTR } from '../components/TavrikoGradient';
 
 interface MatchResultPodiumScreenProps {
   summary: FinalMatchSummary;
   currentUserId: string;
   questionReviews?: MatchQuestionReviewItem[];
+  /** Kullanıcının güncel toplam XP'si; verilirse gerçek seviye ilerlemesi gösterilir */
+  userXp?: number;
   onPlayAgain: () => void;
   onHome: () => void;
 }
@@ -36,10 +48,95 @@ const normalizeDisplayScore = (rawScore: number, totalRounds: number = 5): numbe
   return s > threshold ? Math.round(s / 10) : s;
 };
 
+const PLACE_TONES: Record<1 | 2 | 3, { ring: string; text: string; base: string; height: number; avatar: number }> = {
+  1: { ring: '#FFC43D', text: '#FFD66B', base: 'rgba(255, 196, 61, 0.16)', height: 96, avatar: 70 },
+  2: { ring: '#C9D3E6', text: '#E3E9F5', base: 'rgba(201, 211, 230, 0.12)', height: 70, avatar: 56 },
+  3: { ring: '#E39A5C', text: '#F2B988', base: 'rgba(227, 154, 92, 0.13)', height: 54, avatar: 52 },
+};
+
+const STATUS_COLORS = {
+  correct: '#3FD08A',
+  wrong: '#FF6B6B',
+  timeout: '#FFC43D',
+};
+
+/** 0'dan hedefe yumuşakça sayan sayı (istatistik kutuları için) */
+const useCountUp = (target: number, durationMs = 700, delayMs = 0) => {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    let raf: ReturnType<typeof setTimeout> | null = null;
+    const start = Date.now() + delayMs;
+    const tick = () => {
+      const t = Math.min(1, Math.max(0, (Date.now() - start) / durationMs));
+      const eased = 1 - Math.pow(1 - t, 3);
+      setValue(Math.round(target * eased));
+      if (t < 1) raf = setTimeout(tick, 16);
+    };
+    raf = setTimeout(tick, delayMs);
+    return () => {
+      if (raf) clearTimeout(raf);
+    };
+  }, [target, durationMs, delayMs]);
+  return value;
+};
+
+const PodiumColumn: React.FC<{
+  entry: PlayerScoreSummary;
+  place: 1 | 2 | 3;
+  totalRounds: number;
+  isMe: boolean;
+  delay: number;
+}> = ({ entry, place, totalRounds, isMe, delay }) => {
+  const tone = PLACE_TONES[place];
+  const ring = tone.avatar + 8;
+  return (
+    <Animated.View entering={FadeInUp.delay(delay).springify().damping(14)} style={styles.podiumCol}>
+      {place === 1 ? (
+        <Animated.View entering={ZoomIn.delay(delay + 260).springify()}>
+          <CrownIcon size={28} />
+        </Animated.View>
+      ) : (
+        <View style={{ height: 28 }} />
+      )}
+      <View style={[styles.podiumRing, { width: ring, height: ring, borderRadius: ring / 2, borderColor: tone.ring }]}>
+        <CharacterAvatar seed={entry.avatarUrl || entry.displayName} size={tone.avatar} />
+      </View>
+      <Text style={[styles.podiumName, isMe && { color: '#FFC43D' }]} numberOfLines={1}>
+        {isMe ? 'Sen' : entry.displayName}
+      </Text>
+      <Text style={[styles.podiumScore, { color: tone.text }]}>
+        {formatNumberTR(normalizeDisplayScore(entry.score, totalRounds))}
+        <Text style={styles.podiumUnit}> puan</Text>
+      </Text>
+      <View style={[styles.podiumBase, { height: tone.height, backgroundColor: tone.base, borderColor: tone.ring }]}>
+        <Text style={[styles.podiumPlace, { color: tone.ring }]}>{place}</Text>
+        {typeof entry.correctAnswersCount === 'number' && (
+          <Text style={styles.podiumCorrect}>
+            {entry.correctAnswersCount}/{totalRounds} doğru
+          </Text>
+        )}
+      </View>
+    </Animated.View>
+  );
+};
+
+const StatTile: React.FC<{ label: string; value: string; accent?: string; delay: number }> = ({
+  label,
+  value,
+  accent = '#FFFFFF',
+  delay,
+}) => (
+  <Animated.View entering={FadeInDown.delay(delay).duration(360)} style={styles.statTile}>
+    <Text style={[styles.statValue, { color: accent }]}>{value}</Text>
+    <Text style={styles.statLabel}>{label}</Text>
+  </Animated.View>
+);
+
 export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = ({
   summary,
   currentUserId,
   questionReviews,
+  userXp,
   onPlayAgain,
   onHome,
 }) => {
@@ -53,12 +150,15 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
   const myRanking = summary.rankings?.find((r) => r.playerId === currentUserId);
   const isWinner =
     (myRanking && myRanking.rank === 1) || first?.playerId === currentUserId;
+  const myRank = myRanking?.rank ?? (isWinner ? 1 : undefined);
+  const playerCount = Math.max(summary.rankings?.length || 0, [first, second, third].filter(Boolean).length);
 
   const correctCount =
     typeof myRanking?.correctAnswersCount === 'number'
       ? myRanking.correctAnswersCount
       : reviews.filter((r) => r.isCorrect).length;
   const accuracyPct = Math.round((correctCount / totalRounds) * 100);
+  const myScore = normalizeDisplayScore(myRanking?.score || 0, totalRounds);
 
   // KURAL: 0 doğru cevap veya erken çıkışta para/XP ödülü sıfırlanır!
   const isZeroPerformance = correctCount === 0 || (myRanking?.score || 0) <= 0;
@@ -73,414 +173,189 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
     ? Math.min(15, correctCount * 2 + 5)
     : Math.min(6, correctCount * 1);
 
-  // Açılabilir Soru Cevapları Menüsü (Varsayılan olarak kapalı; tek dokunuşla açılır/kapanır)
-  const [isQuestionsMenuOpen, setIsQuestionsMenuOpen] = useState<boolean>(false);
-  const [expandedQuestionIdx, setExpandedQuestionIdx] = useState<number | null>(0);
+  const levelInfo = typeof userXp === 'number' ? calculateLevelFromXp(userXp) : null;
 
-  // Podium rising animations
-  const col1Anim = useRef(new Animated.Value(60)).current;
-  const col2Anim = useRef(new Animated.Value(60)).current;
-  const col3Anim = useRef(new Animated.Value(60)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
+  const animCorrect = useCountUp(correctCount, 600, 350);
+  const animAccuracy = useCountUp(accuracyPct, 700, 420);
+  const animScore = useCountUp(myScore, 800, 490);
+
+  const levelFill = useSharedValue(0);
   useEffect(() => {
     if (loadStoredPreferences().victoryMelody !== false) {
       sound.playSound('victory');
     }
     sound.triggerHaptic('success');
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 320,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      Animated.stagger(120, [
-        Animated.spring(col3Anim, {
-          toValue: 0,
-          friction: 6,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-        Animated.spring(col2Anim, {
-          toValue: 0,
-          friction: 6,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-        Animated.spring(col1Anim, {
-          toValue: 0,
-          friction: 5,
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-      ]),
-    ]).start();
-  }, [col1Anim, col2Anim, col3Anim, fadeAnim]);
+  }, []);
+  useEffect(() => {
+    if (levelInfo) {
+      levelFill.value = withDelay(650, withTiming(levelInfo.progressPct / 100, { duration: 900, easing: Easing.out(Easing.cubic) }));
+    }
+  }, [levelInfo?.progressPct]);
+  const levelFillStyle = useAnimatedStyle(() => ({ width: `${levelFill.value * 100}%` }));
 
+  const headline = isWinner ? 'Kazandın' : myRank === 2 && playerCount === 2 ? 'Az kaldı' : 'Maç bitti';
+  const subline = [
+    myRank ? `${myRank}. sıra` : null,
+    `${totalRounds} soru`,
+    playerCount > 1 ? `${playerCount} oyuncu` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
-
-  const toggleQuestionsMenu = () => {
+  const toggleReview = (idx: number) => {
     sound.playSound('tap');
     sound.triggerHaptic('light');
-    setIsQuestionsMenuOpen((prev) => !prev);
-  };
-
-  const handleSelectQuestionPill = (idx: number) => {
-    sound.playSound('tap');
-    sound.triggerHaptic('light');
-    setIsQuestionsMenuOpen(true);
-    setExpandedQuestionIdx((prev) => (prev === idx && isQuestionsMenuOpen ? null : idx));
+    setExpandedIdx((prev) => (prev === idx ? null : idx));
   };
 
   return (
     <TavrikoScreen>
       <View style={styles.screenWrapper}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Üst Zafer / Maç Sonucu Rozeti */}
-          <View style={styles.headerWrap}>
-            <View
-              style={[
-                styles.resultBadgePill,
-                isWinner ? styles.resultBadgeWinner : styles.resultBadgeComplete,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.resultBadgeText,
-                  isWinner ? styles.resultBadgeTextWinner : styles.resultBadgeTextComplete,
-                ]}
-              >
-                {isWinner ? '🏆 ZAFER SENİN!' : '⚔️ KARŞILAŞMA TAMAMLANDI'}
-              </Text>
-            </View>
-            <Text style={styles.title}>MAÇ SONUCU</Text>
-            <Text style={styles.subtitle}>
-              {totalRounds} Soruluk Arena · %{accuracyPct} İsabet Oranı
-            </Text>
-          </View>
-
-          {/* Şık Modern Podyum Kartı (2 - 1 - 3) */}
-          <Animated.View style={[styles.podiumShowcaseCard, { opacity: fadeAnim }]}>
-            <View style={styles.podiumRow}>
-              {/* 2nd Place */}
-              {second && (
-                <Animated.View
-                  style={[
-                    styles.podiumCol,
-                    { transform: [{ translateY: col2Anim }] },
-                  ]}
-                >
-                  <View style={styles.avatarMedalSilver}>
-                    <CharacterAvatar
-                      seed={second.avatarUrl || second.displayName}
-                      index={2}
-                      size={46}
-                    />
-                  </View>
-                  <Text style={styles.podiumName} numberOfLines={1}>
-                    {second.displayName}
-                  </Text>
-                  <View style={styles.podiumScorePill}>
-                    <Text style={styles.podiumScore}>
-                      {normalizeDisplayScore(second.score, totalRounds)}p
-                    </Text>
-                  </View>
-                  <View style={[styles.pillar, styles.pillar2]}>
-                    <Text style={styles.pillarNumber}>2</Text>
-                    {typeof second.correctAnswersCount === 'number' && (
-                      <Text style={styles.pillarSubText}>
-                        {second.correctAnswersCount}/{totalRounds} Doğru
-                      </Text>
-                    )}
-                  </View>
-                </Animated.View>
-              )}
-
-              {/* 1st Place */}
-              {first && (
-                <Animated.View
-                  style={[
-                    styles.podiumCol,
-                    styles.podiumColFirst,
-                    { transform: [{ translateY: col1Anim }] },
-                  ]}
-                >
-                  <View style={styles.crownFloater}>
-                    <CrownIcon size={28} />
-                  </View>
-                  <View style={styles.avatarMedalGold}>
-                    <CharacterAvatar
-                      seed={first.avatarUrl || first.displayName}
-                      index={1}
-                      size={56}
-                    />
-                  </View>
-                  <Text style={[styles.podiumName, styles.podiumNameFirst]} numberOfLines={1}>
-                    {first.displayName}
-                  </Text>
-                  <View style={[styles.podiumScorePill, styles.podiumScorePillFirst]}>
-                    <Text style={[styles.podiumScore, styles.podiumScoreFirst]}>
-                      {normalizeDisplayScore(first.score, totalRounds)}p
-                    </Text>
-                  </View>
-                  <View style={[styles.pillar, styles.pillar1]}>
-                    <Text style={styles.pillarNumber}>1</Text>
-                    {typeof first.correctAnswersCount === 'number' && (
-                      <Text style={styles.pillarSubText}>
-                        {first.correctAnswersCount}/{totalRounds} Doğru
-                      </Text>
-                    )}
-                  </View>
-                </Animated.View>
-              )}
-
-              {/* 3rd Place */}
-              {third && (
-                <Animated.View
-                  style={[
-                    styles.podiumCol,
-                    { transform: [{ translateY: col3Anim }] },
-                  ]}
-                >
-                  <View style={styles.avatarMedalBronze}>
-                    <CharacterAvatar
-                      seed={third.avatarUrl || third.displayName}
-                      index={3}
-                      size={42}
-                    />
-                  </View>
-                  <Text style={styles.podiumName} numberOfLines={1}>
-                    {third.displayName}
-                  </Text>
-                  <View style={styles.podiumScorePill}>
-                    <Text style={styles.podiumScore}>
-                      {normalizeDisplayScore(third.score, totalRounds)}p
-                    </Text>
-                  </View>
-                  <View style={[styles.pillar, styles.pillar3]}>
-                    <Text style={styles.pillarNumber}>3</Text>
-                    {typeof third.correctAnswersCount === 'number' && (
-                      <Text style={styles.pillarSubText}>
-                        {third.correctAnswersCount}/{totalRounds} Doğru
-                      </Text>
-                    )}
-                  </View>
-                </Animated.View>
-              )}
-            </View>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Başlık */}
+          <Animated.View entering={FadeIn.duration(360)} style={styles.headerWrap}>
+            <Text style={styles.kicker}>MAÇ SONUCU</Text>
+            <Text style={[styles.headline, isWinner && { color: '#FFD66B' }]}>{headline}</Text>
+            <Text style={styles.subline}>{subline}</Text>
           </Animated.View>
 
-          {/* Ödül & İstatistik Kartı */}
-          <View style={styles.rewardCard}>
-            <View style={styles.rewardTopRow}>
-              <View style={styles.xpBadgeGroup}>
-                <Text style={styles.xpAwardText}>+{xpEarned} XP</Text>
-                <Text style={styles.levelSubText}>Seviye İlerlemesi</Text>
-              </View>
-              <View style={styles.rewardRightGroup}>
-                <View style={styles.accuracyPill}>
-                  <Text style={styles.accuracyPillText}>
-                    🎯 {correctCount}/{totalRounds} Doğru
-                  </Text>
-                </View>
-                <View style={styles.coinPill}>
-                  <CoinIcon size={18} />
-                  <Text style={styles.coinPillText}>+{coinsEarned}</Text>
-                </View>
-              </View>
-            </View>
-            <TavrikoProgressBar progress={isWinner ? 92 : 68} height={10} />
+          {/* Podyum (2 - 1 - 3) */}
+          <View style={[styles.podiumRow, !third && styles.podiumRowDuel]}>
+            {second ? (
+              <PodiumColumn entry={second} place={2} totalRounds={totalRounds} isMe={second.playerId === currentUserId} delay={180} />
+            ) : null}
+            {first ? (
+              <PodiumColumn entry={first} place={1} totalRounds={totalRounds} isMe={first.playerId === currentUserId} delay={60} />
+            ) : (
+              <View style={styles.podiumCol} />
+            )}
+            {third ? (
+              <PodiumColumn entry={third} place={3} totalRounds={totalRounds} isMe={third.playerId === currentUserId} delay={280} />
+            ) : null}
           </View>
 
-          {/* Açılabilir Soru Cevapları & Analiz Menüsü (Accordion) */}
-          {reviews.length > 0 && (
-            <View style={styles.accordionContainer}>
-              {/* Tıklanabilir Açılır/Kapanır Menü Başlığı */}
-              <TouchableOpacity
-                style={[
-                  styles.accordionHeader,
-                  isQuestionsMenuOpen && styles.accordionHeaderActive,
-                ]}
-                activeOpacity={0.85}
-                onPress={toggleQuestionsMenu}
-              >
-                <View style={styles.accordionHeaderTop}>
-                  <View style={styles.accordionTitleGroup}>
-                    <View style={styles.accordionIconCircle}>
-                      <Text style={styles.accordionIconText}>📋</Text>
-                    </View>
-                    <View style={styles.accordionTextWrap}>
-                      <Text style={styles.accordionTitle} numberOfLines={1}>
-                        SORU CEVAPLARI & ANALİZ
-                      </Text>
-                      <Text style={styles.accordionSubtitle} numberOfLines={2}>
-                        {isQuestionsMenuOpen
-                          ? 'Menüyü gizlemek için dokun'
-                          : 'Soruları ve doğru çözümleri görmek için dokun'}
-                      </Text>
-                    </View>
-                  </View>
+          {/* İstatistikler */}
+          <View style={styles.statsRow}>
+            <StatTile label="Doğru" value={`${animCorrect}/${totalRounds}`} accent="#5ADBB5" delay={320} />
+            <StatTile label="İsabet" value={`%${animAccuracy}`} delay={390} />
+            <StatTile label="Puan" value={formatNumberTR(animScore)} accent="#FFD66B" delay={460} />
+          </View>
 
-                  <View style={styles.accordionRightGroup}>
-                    <View style={styles.reviewScorePill}>
-                      <Text style={styles.reviewScoreText} numberOfLines={1}>
-                        {correctCount}/{reviews.length} DOĞRU
-                      </Text>
-                    </View>
-                    <View style={styles.chevronBadge}>
-                      <Text style={styles.chevronText} numberOfLines={1}>
-                        {isQuestionsMenuOpen ? '▴ GİZLE' : '▾ AÇ'}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Hızlı Soru Adım Rozetleri (Her birine tıklanabilir) */}
-                <View style={styles.quickPillsRow}>
-                  {reviews.map((item, idx) => {
-                    const isSelected = isQuestionsMenuOpen && expandedQuestionIdx === idx;
-                    const pillBg = item.isCorrect
-                      ? 'rgba(63, 208, 138, 0.2)'
-                      : item.isTimeout
-                      ? 'rgba(255, 196, 61, 0.2)'
-                      : 'rgba(255, 107, 107, 0.2)';
-                    const pillBorder = item.isCorrect
-                      ? '#3FD08A'
-                      : item.isTimeout
-                      ? '#FFC43D'
-                      : '#FF6B6B';
-                    const pillIcon = item.isCorrect ? '✓' : item.isTimeout ? '⏱' : '✕';
-
-                    return (
-                      <TouchableOpacity
-                        key={`qpill_${idx}`}
-                        style={[
-                          styles.quickQuestionPill,
-                          { backgroundColor: pillBg, borderColor: pillBorder },
-                          isSelected && styles.quickQuestionPillSelected,
-                        ]}
-                        activeOpacity={0.8}
-                        onPress={() => handleSelectQuestionPill(idx)}
-                      >
-                        <Text style={[styles.quickQuestionPillText, { color: pillBorder }]}>
-                          S{item.roundNumber || idx + 1} {pillIcon}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </TouchableOpacity>
-
-              {/* Açılır Soru Listesi */}
-              {isQuestionsMenuOpen && (
-                <View style={styles.reviewList}>
-                  {reviews.map((item, idx) => {
-                    const isItemOpen = expandedQuestionIdx === null || expandedQuestionIdx === idx;
-                    const statusColor = item.isCorrect
-                      ? '#3FD08A'
-                      : item.isTimeout
-                      ? '#FFC43D'
-                      : '#FF6B6B';
-                    const cleanPts = normalizeDisplayScore(item.pointsEarned || 0, 1);
-                    const statusBadge = item.isCorrect
-                      ? `✓ DOĞRU (+${cleanPts}p)`
-                      : item.isTimeout
-                      ? '⏱️ SÜRE DOLDU'
-                      : '✕ YANLIŞ';
-
-                    return (
-                      <TouchableOpacity
-                        key={`review_${idx}`}
-                        activeOpacity={0.88}
-                        onPress={() =>
-                          setExpandedQuestionIdx((prev) => (prev === idx ? null : idx))
-                        }
-                        style={[
-                          styles.reviewCard,
-                          { borderLeftColor: statusColor },
-                          isItemOpen && styles.reviewCardExpanded,
-                        ]}
-                      >
-                        <View style={styles.reviewCardTop}>
-                          <View style={styles.reviewRoundBadge}>
-                            <Text style={styles.reviewRoundText}>
-                              SORU {item.roundNumber || idx + 1}
-                            </Text>
-                          </View>
-                          <View style={styles.reviewCardRightMeta}>
-                            <View
-                              style={[
-                                styles.reviewStatusBadge,
-                                { backgroundColor: statusColor + '22', borderColor: statusColor },
-                              ]}
-                            >
-                              <Text style={[styles.reviewStatusText, { color: statusColor }]}>
-                                {statusBadge}
-                              </Text>
-                            </View>
-                            <Text style={styles.itemChevron}>
-                              {isItemOpen ? '▴' : '▾'}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <Text
-                          style={styles.reviewQuestionText}
-                          numberOfLines={isItemOpen ? undefined : 2}
-                        >
-                          {item.questionText}
-                        </Text>
-
-                        {isItemOpen && (
-                          <View style={styles.reviewAnswersCol}>
-                            {item.userAnswerText && !item.isCorrect && (
-                              <View style={styles.answerRow}>
-                                <Text style={styles.answerLabel}>Senin cevabın:</Text>
-                                <Text style={styles.wrongAnswerValue}>
-                                  {item.userAnswerText}
-                                </Text>
-                              </View>
-                            )}
-                            <View style={styles.answerRow}>
-                              <Text style={styles.answerLabel}>Doğru cevap:</Text>
-                              <Text style={styles.correctAnswerValue}>
-                                {item.correctAnswerText}
-                              </Text>
-                            </View>
-                            {item.explanation ? (
-                              <View style={styles.explanationBox}>
-                                <Text style={styles.reviewExplanation}>
-                                  💡 {item.explanation}
-                                </Text>
-                              </View>
-                            ) : null}
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
+          {/* Ödüller */}
+          <Animated.View entering={FadeInDown.delay(520).duration(380)} style={styles.rewardCard}>
+            <View style={styles.rewardRow}>
+              <Text style={styles.sectionTitle}>Kazandıkların</Text>
+              <View style={styles.rewardChips}>
+                <Animated.View entering={ZoomIn.delay(700).springify()} style={styles.rewardChip}>
+                  <Text style={styles.xpChipText}>+{xpEarned} XP</Text>
+                </Animated.View>
+                <Animated.View entering={ZoomIn.delay(800).springify()} style={styles.rewardChip}>
+                  <CoinIcon size={16} />
+                  <Text style={styles.coinChipText}>+{coinsEarned}</Text>
+                </Animated.View>
+              </View>
             </View>
+            {levelInfo ? (
+              <View style={styles.levelWrap}>
+                <View style={styles.levelLabels}>
+                  <Text style={styles.levelText}>Seviye {levelInfo.level}</Text>
+                  <Text style={styles.levelXpText}>
+                    {formatNumberTR(levelInfo.currentLevelXp)} / {formatNumberTR(levelInfo.nextLevelXpRequired)} XP
+                  </Text>
+                </View>
+                <View style={styles.levelTrack}>
+                  <Animated.View style={[styles.levelFill, levelFillStyle]} />
+                </View>
+              </View>
+            ) : isZeroPerformance ? (
+              <Text style={styles.rewardHint}>Ödül kazanmak için en az bir soruyu doğru bilmelisin.</Text>
+            ) : null}
+          </Animated.View>
+
+          {/* Soru Özeti */}
+          {reviews.length > 0 && (
+            <Animated.View entering={FadeInDown.delay(600).duration(380)} style={styles.reviewCard}>
+              <View style={styles.reviewHeader}>
+                <Text style={styles.sectionTitle}>Soru özeti</Text>
+                <View style={styles.dotStrip}>
+                  {reviews.map((item, idx) => (
+                    <View
+                      key={`dot_${idx}`}
+                      style={[
+                        styles.dot,
+                        {
+                          backgroundColor: item.isCorrect
+                            ? STATUS_COLORS.correct
+                            : item.isTimeout
+                            ? STATUS_COLORS.timeout
+                            : STATUS_COLORS.wrong,
+                        },
+                      ]}
+                    />
+                  ))}
+                </View>
+              </View>
+
+              {reviews.map((item, idx) => {
+                const color = item.isCorrect
+                  ? STATUS_COLORS.correct
+                  : item.isTimeout
+                  ? STATUS_COLORS.timeout
+                  : STATUS_COLORS.wrong;
+                const isOpen = expandedIdx === idx;
+                const pts = normalizeDisplayScore(item.pointsEarned || 0, 1);
+                return (
+                  <TouchableOpacity
+                    key={`review_${idx}`}
+                    activeOpacity={0.85}
+                    onPress={() => toggleReview(idx)}
+                    style={[styles.reviewRow, idx > 0 && styles.reviewRowDivider]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Soru ${item.roundNumber || idx + 1}, ${item.isCorrect ? 'doğru' : item.isTimeout ? 'süre doldu' : 'yanlış'}`}
+                  >
+                    <View style={[styles.reviewNum, { borderColor: color, backgroundColor: color + '1F' }]}>
+                      {item.isCorrect ? (
+                        <CheckMarkSvg size={14} color={color} />
+                      ) : item.isTimeout ? (
+                        <Text style={[styles.reviewNumText, { color }]}>{item.roundNumber || idx + 1}</Text>
+                      ) : (
+                        <CrossMarkSvg size={13} color={color} />
+                      )}
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.reviewQuestion} numberOfLines={isOpen ? undefined : 2}>
+                        {item.questionText}
+                      </Text>
+                      <Text style={styles.reviewMeta} numberOfLines={isOpen ? undefined : 1}>
+                        {item.isCorrect
+                          ? item.correctAnswerText
+                          : item.isTimeout
+                          ? `Süre doldu · Doğrusu: ${item.correctAnswerText}`
+                          : `${item.userAnswerText ? `${item.userAnswerText} · ` : ''}Doğrusu: ${item.correctAnswerText}`}
+                      </Text>
+                      {isOpen && item.explanation ? (
+                        <Animated.View entering={FadeIn.duration(220)} style={styles.explanationBox}>
+                          <Text style={styles.explanationText}>{item.explanation}</Text>
+                        </Animated.View>
+                      ) : null}
+                    </View>
+                    <Text style={[styles.reviewPts, { color: item.isCorrect ? '#FFD66B' : 'rgba(217, 205, 245, 0.45)' }]}>
+                      {item.isCorrect ? `+${pts}` : '0'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </Animated.View>
           )}
         </ScrollView>
 
-        {/* Sabit Alt Aksiyon Çubuğu (Kaydırmaya Gerek Kalmadan Her Zaman Görünür!) */}
-        <View style={styles.stickyBottomDock}>
-          <Button3D
-            title="TEKRAR OYNA"
-            onPress={onPlayAgain}
-            style={{ flex: 1 }}
-            textStyle={{ fontSize: 14 }}
-          />
-          <Button3D
-            title="ANA SAYFA"
-            variant="mint"
-            onPress={onHome}
-            style={{ flex: 1 }}
-            textStyle={{ fontSize: 14 }}
-          />
-        </View>
+        {/* Sabit Alt Aksiyon Çubuğu */}
+        <Animated.View entering={FadeInUp.delay(400).duration(360)} style={styles.stickyBottomDock}>
+          <Button3D title="TEKRAR OYNA" onPress={onPlayAgain} style={{ flex: 1 }} textStyle={{ fontSize: 14 }} />
+          <Button3D title="ANA SAYFA" variant="mint" onPress={onHome} style={{ flex: 1 }} textStyle={{ fontSize: 14 }} />
+        </Animated.View>
       </View>
     </TavrikoScreen>
   );
@@ -491,448 +366,268 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 105,
-    paddingHorizontal: 10,
+    paddingBottom: 110,
+    paddingHorizontal: 6,
   },
   headerWrap: {
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 10,
-  },
-  resultBadgePill: {
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
+    marginTop: 10,
     marginBottom: 6,
   },
-  resultBadgeWinner: {
-    backgroundColor: 'rgba(255, 196, 61, 0.18)',
-    borderColor: '#FFC43D',
-  },
-  resultBadgeComplete: {
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
-    borderColor: '#A78BFA',
-  },
-  resultBadgeText: {
+  kicker: {
+    color: 'rgba(217, 205, 245, 0.6)',
     fontSize: 11,
+    letterSpacing: 1.6,
     fontFamily: THEME.fonts.extraBold,
-    letterSpacing: 1,
   },
-  resultBadgeTextWinner: {
-    color: '#FFC43D',
-  },
-  resultBadgeTextComplete: {
-    color: '#DDD6FE',
-  },
-  title: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 30,
+  headline: {
     color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  subtitle: {
-    color: '#D9CDF5',
-    fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
-    textAlign: 'center',
+    fontSize: 34,
+    letterSpacing: -0.6,
+    fontFamily: THEME.fonts.black,
     marginTop: 2,
   },
-  podiumShowcaseCard: {
-    backgroundColor: 'rgba(24, 10, 52, 0.85)',
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: 'rgba(167, 139, 250, 0.28)',
-    paddingTop: 18,
-    paddingHorizontal: 12,
-    paddingBottom: 0,
-    overflow: 'hidden',
+  subline: {
+    color: 'rgba(217, 205, 245, 0.75)',
+    fontSize: 13,
+    fontFamily: THEME.fonts.bold,
+    marginTop: 2,
   },
   podiumRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    justifyContent: 'center',
-    gap: 10,
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 14,
+  },
+  podiumRowDuel: {
+    paddingHorizontal: 36,
   },
   podiumCol: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 4,
   },
-  podiumColFirst: {
-    zIndex: 5,
-  },
-  crownFloater: {
-    marginBottom: -2,
-  },
-  avatarMedalGold: {
-    padding: 3,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255, 196, 61, 0.25)',
-    borderWidth: 2,
-    borderColor: '#FFC43D',
-  },
-  avatarMedalSilver: {
-    padding: 2.5,
-    borderRadius: 999,
-    backgroundColor: 'rgba(148, 163, 184, 0.2)',
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-  },
-  avatarMedalBronze: {
-    padding: 2.5,
-    borderRadius: 999,
-    backgroundColor: 'rgba(217, 119, 6, 0.2)',
-    borderWidth: 1.5,
-    borderColor: '#F59E0B',
+  podiumRing: {
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1B0C38',
+    marginBottom: 6,
   },
   podiumName: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: THEME.fonts.extraBold,
-    marginTop: 2,
-  },
-  podiumNameFirst: {
-    color: '#FFFBEB',
-    fontSize: 13,
-  },
-  podiumScorePill: {
-    backgroundColor: 'rgba(15, 7, 34, 0.8)',
-    paddingHorizontal: 9,
-    paddingVertical: 2,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    marginBottom: 4,
-  },
-  podiumScorePillFirst: {
-    borderColor: '#FFC43D',
-    backgroundColor: 'rgba(255, 196, 61, 0.16)',
+    maxWidth: '100%',
   },
   podiumScore: {
-    color: '#D9CDF5',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
+    fontSize: 14,
+    fontFamily: THEME.fonts.black,
+    marginTop: 1,
+    marginBottom: 8,
   },
-  podiumScoreFirst: {
-    color: '#FFC43D',
-  },
-  pillar: {
-    width: '100%',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-  },
-  pillar1: {
-    height: 98,
-    backgroundColor: '#D4982A',
-    borderTopWidth: 2,
-    borderColor: '#FFE082',
-  },
-  pillar2: {
-    height: 76,
-    backgroundColor: '#64748B',
-    borderTopWidth: 1.5,
-    borderColor: '#CBD5E1',
-  },
-  pillar3: {
-    height: 62,
-    backgroundColor: '#985E3E',
-    borderTopWidth: 1.5,
-    borderColor: '#FBBF24',
-  },
-  pillarNumber: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 28,
-    color: '#FFFFFF',
-  },
-  pillarSubText: {
-    color: 'rgba(255, 255, 255, 0.9)',
+  podiumUnit: {
     fontSize: 10,
-    fontFamily: THEME.fonts.extraBold,
-    marginTop: 2,
+    fontFamily: THEME.fonts.bold,
+    color: 'rgba(217, 205, 245, 0.7)',
   },
-  rewardCard: {
-    marginTop: 12,
-    padding: 14,
-    borderRadius: 20,
-    backgroundColor: 'rgba(28, 12, 62, 0.88)',
+  podiumBase: {
+    alignSelf: 'stretch',
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-  },
-  rewardTopRow: {
-    flexDirection: 'row',
+    borderBottomWidth: 0,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingTop: 8,
+  },
+  podiumPlace: {
+    fontSize: 26,
+    lineHeight: 30,
+    fontFamily: THEME.fonts.black,
+  },
+  podiumCorrect: {
+    color: 'rgba(217, 205, 245, 0.75)',
+    fontSize: 11,
+    fontFamily: THEME.fonts.bold,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
     marginBottom: 10,
   },
-  xpBadgeGroup: {
-    gap: 2,
-  },
-  xpAwardText: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 22,
-    color: '#7CFC8A',
-  },
-  levelSubText: {
-    color: '#D9CDF5',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  rewardRightGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  accuracyPill: {
-    backgroundColor: 'rgba(56, 189, 248, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.45)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-  },
-  accuracyPillText: {
-    color: '#38BDF8',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  coinPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(10, 4, 24, 0.78)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 196, 61, 0.35)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 16,
-  },
-  coinPillText: {
-    color: '#FFC43D',
-    fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
-  },
-
-  // Açılabilir Soru Analizi Menüsü (Accordion)
-  accordionContainer: {
-    marginTop: 12,
-    width: '100%',
-  },
-  accordionHeader: {
-    backgroundColor: 'rgba(30, 14, 61, 0.92)',
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: 'rgba(167, 139, 250, 0.32)',
-    padding: 14,
-  },
-  accordionHeaderActive: {
-    borderColor: '#FFC43D',
-    backgroundColor: 'rgba(38, 18, 76, 0.96)',
-  },
-  accordionHeaderTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  accordionTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  statTile: {
     flex: 1,
-    minWidth: 0,
-  },
-  accordionTextWrap: {
-    flex: 1,
-    minWidth: 0,
-    paddingRight: 4,
-  },
-  accordionIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255, 196, 61, 0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 196, 61, 0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  accordionIconText: {
-    fontSize: 16,
-  },
-  accordionTitle: {
-    color: '#FFC43D',
-    fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
-    letterSpacing: 0.4,
-  },
-  accordionSubtitle: {
-    color: '#C4B5FD',
-    fontSize: 10.5,
-    fontFamily: THEME.fonts.bold,
-    marginTop: 2,
-    lineHeight: 14,
-  },
-  accordionRightGroup: {
-    alignItems: 'flex-end',
-    gap: 4,
-    flexShrink: 0,
-  },
-  reviewScorePill: {
-    backgroundColor: 'rgba(63, 208, 138, 0.16)',
-    borderWidth: 1,
-    borderColor: '#3FD08A',
-    paddingHorizontal: 9,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  reviewScoreText: {
-    color: '#3FD08A',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  chevronBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  chevronText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  quickPillsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  quickQuestionPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  quickQuestionPillSelected: {
-    transform: [{ scale: 1.05 }],
-    borderWidth: 2,
-  },
-  quickQuestionPillText: {
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  reviewList: {
-    marginTop: 10,
-    gap: 10,
-  },
-  reviewCard: {
-    backgroundColor: 'rgba(30, 14, 61, 0.9)',
+    paddingVertical: 12,
     borderRadius: 16,
-    borderLeftWidth: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(154, 107, 255, 0.25)',
-    padding: 13,
-  },
-  reviewCardExpanded: {
-    borderColor: 'rgba(255, 196, 61, 0.4)',
-    backgroundColor: 'rgba(36, 17, 72, 0.96)',
-  },
-  reviewCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  reviewRoundBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 7,
-  },
-  reviewRoundText: {
-    color: '#D9CDF5',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  reviewCardRightMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  reviewStatusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  reviewStatusText: {
-    fontSize: 10,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  itemChevron: {
-    color: '#D9CDF5',
-    fontSize: 13,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  reviewQuestionText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontFamily: THEME.fonts.bold,
-    lineHeight: 19,
-  },
-  reviewAnswersCol: {
-    marginTop: 8,
-    gap: 5,
-    backgroundColor: 'rgba(8, 3, 20, 0.55)',
-    padding: 10,
-    borderRadius: 12,
+    backgroundColor: 'rgba(20, 8, 52, 0.7)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
   },
-  answerRow: {
+  statValue: {
+    fontSize: 22,
+    fontFamily: THEME.fonts.black,
+  },
+  statLabel: {
+    color: 'rgba(217, 205, 245, 0.65)',
+    fontSize: 11,
+    fontFamily: THEME.fonts.bold,
+    marginTop: 1,
+  },
+  rewardCard: {
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: 'rgba(20, 8, 52, 0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 10,
+    gap: 12,
+  },
+  rewardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  sectionTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  rewardChips: {
+    flexDirection: 'row',
     gap: 6,
   },
-  answerLabel: {
-    color: '#BDB3DC',
+  rewardChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 30,
+    paddingHorizontal: 10,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+  },
+  xpChipText: {
+    color: '#7CF0C6',
+    fontSize: 13,
+    fontFamily: THEME.fonts.black,
+  },
+  coinChipText: {
+    color: '#FFD66B',
+    fontSize: 13,
+    fontFamily: THEME.fonts.black,
+  },
+  rewardHint: {
+    color: 'rgba(217, 205, 245, 0.7)',
     fontSize: 12,
     fontFamily: THEME.fonts.bold,
   },
-  wrongAnswerValue: {
-    color: '#FF7A8A',
+  levelWrap: {
+    gap: 6,
+  },
+  levelLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  levelText: {
+    color: '#FFFFFF',
     fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
   },
-  correctAnswerValue: {
-    color: '#3FD08A',
+  levelXpText: {
+    color: 'rgba(217, 205, 245, 0.7)',
     fontSize: 12,
+    fontFamily: THEME.fonts.bold,
+  },
+  levelTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(154, 107, 255, 0.18)',
+    overflow: 'hidden',
+  },
+  levelFill: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#5ADBB5',
+  },
+  reviewCard: {
+    borderRadius: 18,
+    backgroundColor: 'rgba(20, 8, 52, 0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingTop: 14,
+    paddingBottom: 4,
+    overflow: 'hidden',
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    marginBottom: 6,
+  },
+  dotStrip: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  reviewRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  reviewRowDivider: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  reviewNum: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  reviewNumText: {
+    fontSize: 12,
+    fontFamily: THEME.fonts.black,
+  },
+  reviewQuestion: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    lineHeight: 19,
     fontFamily: THEME.fonts.extraBold,
+  },
+  reviewMeta: {
+    color: 'rgba(217, 205, 245, 0.7)',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
+    marginTop: 3,
   },
   explanationBox: {
+    marginTop: 8,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  explanationText: {
+    color: 'rgba(235, 228, 252, 0.9)',
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: THEME.fonts.bold,
+  },
+  reviewPts: {
+    fontSize: 13,
+    fontFamily: THEME.fonts.black,
+    minWidth: 34,
+    textAlign: 'right',
     marginTop: 4,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
   },
-  reviewExplanation: {
-    color: '#DDD6FE',
-    fontSize: 11,
-    fontFamily: THEME.fonts.medium,
-    lineHeight: 16,
-  },
-
-  // Sabit Alt Buton Barı
   stickyBottomDock: {
     position: 'absolute',
     left: 0,
@@ -940,11 +635,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: 'row',
     gap: 10,
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
     paddingTop: 10,
     paddingBottom: 12,
-    backgroundColor: 'rgba(18, 7, 41, 0.95)',
+    backgroundColor: 'rgba(12, 5, 32, 0.92)',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.14)',
+    borderTopColor: 'rgba(255, 255, 255, 0.06)',
   },
 });
