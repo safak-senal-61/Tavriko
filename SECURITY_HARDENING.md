@@ -56,6 +56,14 @@ The migration `server/prisma/migrations/20261106000000_enable_rls_prisma_tables/
 6. Configure `INTERNAL_API_SECRET` in both Vercel and Cloudflare, `TELEGRAM_WEBHOOK_SECRET` in Vercel and Cloudflare, and portal admin credentials in Vercel. Missing values intentionally disable the corresponding internal, webhook, or admin features.
 
 
+## Local account password and authentication monitoring
+
+- Registration, password reset, and authenticated password changes require at least 12 characters, uppercase and lowercase letters, a number, and a symbol; passwords over 128 characters are rejected.
+- A small denylist of common passwords and simple sequential/repeated patterns is rejected. This is a heuristic and is not a substitute for checking a comprehensive breached-password corpus.
+- Login is limited to 10 attempts per IP per 15 minutes; password-reset requests to 3 per hour; reset-code submissions to 5 per 15 minutes; registration to 6 per hour. These limits use Upstash Redis in production and fail closed if Redis is unavailable.
+- Rate-limit violations and failed/successful password logins are recorded in the server auth log. Identifiers and IP addresses are represented by truncated SHA-256 hashes; passwords, bearer tokens, and raw request bodies are never logged.
+- Monitor repeated failed-login and rate-limit events in the protected server log stream. Production must have Upstash Redis configured so limits are shared across server instances.
+
 ## Supabase Auth: leaked-password protection
 
 Supabase Security Advisor currently reports that leaked-password protection is disabled. This is a project-level Auth setting and is not exposed by the connected database SQL interface.
