@@ -16,7 +16,7 @@ concurrency:
 jobs:
   dependency-audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,24 +25,24 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      # Temporary lockfile repair step: the committed workspace lock was missing
-      # server dependencies. The generated lockfile is uploaded for review/commit.
-      - name: Regenerate workspace lockfile
-        run: npm install --package-lock-only --ignore-scripts
-      - name: Install dependencies
-        run: npm ci
+      - name: Install workspace dependencies
+        id: install
+        run: |
+          set -o pipefail
+          npm install --ignore-scripts --no-audit --no-fund 2>&1 | tee dependency-install.log
       - name: Capture dependency diagnostics
         if: always()
         run: |
-          node --version
-          npm --version
-          npm ls --all --depth=0 > npm-dependency-tree.txt 2>&1 || true
+          node --version > runtime-diagnostics.txt 2>&1
+          npm --version >> runtime-diagnostics.txt 2>&1
+          npm ls --all --depth=0 >> runtime-diagnostics.txt 2>&1 || true
       - name: Dependency vulnerability audit
-        id: audit
+        if: steps.install.outcome == 'success'
         run: |
-          audit_status=0
-          npm audit --audit-level=high --json > npm-audit.json || audit_status=$?
-          echo "npm audit exit code: $audit_status"
+          set +e
+          npm audit --audit-level=high --json > npm-audit.json
+          audit_status=$?
+          echo "npm audit exit code: $audit_status" | tee npm-audit-status.txt
           exit "$audit_status"
       - name: Upload dependency diagnostics
         if: always()
@@ -50,15 +50,16 @@ jobs:
         with:
           name: dependency-audit-diagnostics
           retention-days: 14
-          path: |
-            package-lock.json
-            npm-audit.json
-            npm-dependency-tree.txt
           if-no-files-found: warn
+          path: |
+            dependency-install.log
+            runtime-diagnostics.txt
+            npm-audit.json
+            npm-audit-status.txt
 
   build-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 50
     services:
       postgres:
         image: postgres:16
@@ -91,32 +92,55 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Regenerate workspace lockfile
-        run: npm install --package-lock-only --ignore-scripts
-      - name: Install dependencies
-        run: npm ci
+      - name: Install workspace dependencies
+        id: install
+        run: |
+          set -o pipefail
+          npm install --ignore-scripts --no-audit --no-fund 2>&1 | tee dependency-install.log
       - name: Prepare PostgreSQL test schema
-        run: npx prisma db push --schema=server/prisma/schema.prisma
+        if: steps.install.outcome == 'success'
+        run: |
+          set -o pipefail
+          npx prisma generate --schema=server/prisma/schema.prisma 2>&1 | tee prisma-generate.log
+          npx prisma db push --schema=server/prisma/schema.prisma 2>&1 | tee prisma-db-push.log
       - name: Build all workspaces
-        if: always()
-        run: npm run build
+        if: ${{ always() && steps.install.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          npm run build 2>&1 | tee build.log
       - name: Test shared workspace
-        if: always()
-        run: npm run test:shared
+        if: ${{ always() && steps.install.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          npm run test:shared 2>&1 | tee test-shared.log
       - name: Test server workspace
-        if: always()
-        run: npm run test:server
+        if: ${{ always() && steps.install.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          npm run test:server 2>&1 | tee test-server.log
       - name: Test client workspace
-        if: always()
-        run: npm run test:client
+        if: ${{ always() && steps.install.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          npm run test:client 2>&1 | tee test-client.log
       - name: Test Cloudflare workspace
-        if: always()
-        run: npm run test:cloudflare
+        if: ${{ always() && steps.install.outcome == 'success' }}
+        run: |
+          set -o pipefail
+          npm run test:cloudflare 2>&1 | tee test-cloudflare.log
       - name: Upload build and test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-test-diagnostics
           retention-days: 14
-          path: package-lock.json
           if-no-files-found: warn
+          path: |
+            dependency-install.log
+            prisma-generate.log
+            prisma-db-push.log
+            build.log
+            test-shared.log
+            test-server.log
+            test-client.log
+            test-cloudflare.log
