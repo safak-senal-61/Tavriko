@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
+import { createHash } from 'crypto';
 import jwt from 'jsonwebtoken';
 import { Redis } from '@upstash/redis';
 import { db } from '../db/prismaClient';
+import { logger } from '../utils/logger';
 
 export interface AuthenticatedRequest extends Request {
   authUserId?: string;
@@ -108,6 +110,7 @@ export function rateLimit(options: RateLimitOptions) {
           ttl = windowSeconds;
         }
         if (count > options.max) {
+          logger.warn('AUTH', 'Hız sınırı aşıldı', { route: options.keyPrefix, ipHash: createHash('sha256').update(String(ip)).digest('hex').slice(0, 12), windowSeconds, limit: options.max });
           res.setHeader('Retry-After', String(Math.max(1, ttl)));
           res.status(429).json({ error: 'Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.' });
           return;
@@ -139,6 +142,7 @@ export function rateLimit(options: RateLimitOptions) {
     }
     bucket.count += 1;
     if (bucket.count > options.max) {
+      logger.warn('AUTH', 'Hız sınırı aşıldı', { route: options.keyPrefix, ipHash: createHash('sha256').update(String(ip)).digest('hex').slice(0, 12), windowSeconds, limit: options.max });
       const retryAfter = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
       res.setHeader('Retry-After', String(retryAfter));
       res.status(429).json({ error: 'Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin.' });
