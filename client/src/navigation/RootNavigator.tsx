@@ -643,7 +643,6 @@ export const RootNavigator: React.FC = () => {
   // Auth & Profile Actions
   // -------------------------------------------------------------
   const handleGuestPlay = async () => {
-    setIsGuest(true);
     setAuthRedirectNotice(null);
     try {
       const res = await fetch(`${API_BASE}/auth/guest`, {
@@ -651,45 +650,23 @@ export const RootNavigator: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ displayName: 'Misafir Oyuncu' }),
       });
+      if (!res.ok) throw new Error('guest-session-failed');
       const data = await res.json();
-      if (data.user) {
-        setUser(
-          {
-            ...data.user,
-            displayName: 'Misafir Oyuncu',
-            avatarUrl: 'av0',
-          },
-          data.token
-        );
-        // Guests go straight to Keşfet (CategoryExploreScreen)!
-        navigateTo('categories');
-        return;
-      }
+      if (!data.user || !data.token) throw new Error('guest-session-invalid');
+      setIsGuest(true);
+      setUser(
+        {
+          ...data.user,
+          displayName: 'Misafir Oyuncu',
+          avatarUrl: 'av0',
+        },
+        data.token
+      );
+      navigateTo('categories');
     } catch {
-      // Fallback local guest
+      setIsGuest(false);
+      setAuthRedirectNotice('Misafir oturumu oluşturulamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.');
     }
-    const fallbackUser: UserProfile = {
-      id: 'guest_local_' + Math.random().toString(36).substring(2, 7),
-      username: 'misafir_oyuncu',
-      displayName: 'Misafir Oyuncu',
-      avatarUrl: 'av0',
-      level: 1,
-      xp: 0,
-      coins: 200,
-      rankTitle: 'Misafir Kaşif',
-      rankPoints: 1000,
-      stats: {
-        totalMatches: 0,
-        wins: 0,
-        correctAnswers: 0,
-        totalAnswers: 0,
-        bestStreak: 0,
-        avgResponseTimeMs: 0,
-      },
-      categoryMastery: {},
-    };
-    setUser(fallbackUser, 'mock_token');
-    navigateTo('categories');
   };
   const handleAuthSuccess = (loggedInUser: UserProfile, token: string) => {
     setIsGuest(false);
