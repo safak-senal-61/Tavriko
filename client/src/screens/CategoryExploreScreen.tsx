@@ -9,6 +9,7 @@ import {
   Platform,
   TextInput,
   Modal,
+  useWindowDimensions,
 } from 'react-native';
 import { CategoryId, CategoryInfo, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -41,7 +42,7 @@ interface CategoryExploreScreenProps {
 type GroupTab = 'all' | 'gaming_pop' | 'history_culture' | 'science_nature' | 'lifestyle';
 
 const GROUP_TABS: { id: GroupTab; label: string }[] = [
-  { id: 'all', label: 'Tümü (28)' },
+  { id: 'all', label: 'Tümü' },
   { id: 'gaming_pop', label: '🎮 Oyun & Pop' },
   { id: 'history_culture', label: '🏛️ Tarih & Kültür' },
   { id: 'science_nature', label: '🔬 Bilim & Doğa' },
@@ -100,6 +101,8 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   onLoginPrompt,
   apiBaseUrl,
 }) => {
+  const { width: windowWidth } = useWindowDimensions();
+  const categoryTileWidth = windowWidth < 390 ? '48%' : windowWidth < 768 ? '31.5%' : '23.5%';
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
   const [liveCounts, setLiveCounts] = useState<Record<string, number>>({});
@@ -303,19 +306,21 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                       isActive && styles.tabFilterTextActive,
                     ]}
                   >
-                    {tab.label}
+                    {tab.id === 'all'
+                      ? `${tab.label} (${categoriesWithRealCounts.length})`
+                      : `${tab.label} (${GROUP_MEMBERS[tab.id].length})`}
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
 
-          {/* 4x4 Grid of Categories */}
+          {/* Responsive category grid: 2 columns on small phones, 3 on larger phones, 4 on wide screens */}
           <View style={styles.grid}>
             {filteredCategories.map((cat) => (
               <TouchableOpacity
                 key={cat.id}
-                style={styles.catTile}
+                style={[styles.catTile, { width: categoryTileWidth, borderColor: `${cat.primaryColor}88` }]}
                 onPress={() => {
                   sound.playSound('tap');
                   sound.triggerHaptic('light');
@@ -323,8 +328,8 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                 }}
                 activeOpacity={0.85}
               >
-                <CategorySquircleIcon category={cat.id} size={42} />
-                <Text style={styles.catName} numberOfLines={1}>
+                <CategorySquircleIcon category={cat.id} size={50} />
+                <Text style={styles.catName} numberOfLines={2}>
                   {cat.name}
                 </Text>
                 <Text style={styles.catCount}>{cat.totalQuestions} soru</Text>
@@ -449,7 +454,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
 const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 120,
-    paddingHorizontal: 2,
+    paddingHorizontal: 8,
   },
   guestShowcaseCard: {
     marginTop: 6,
@@ -577,32 +582,42 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 8,
-    paddingHorizontal: 4,
+    justifyContent: 'flex-start',
+    columnGap: 10,
+    rowGap: 10,
+    paddingHorizontal: 2,
   },
   catTile: {
-    width: '23.5%',
-    height: 104,
-    borderRadius: 18,
-    backgroundColor: '#0F172A',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    minHeight: 132,
+    borderRadius: 20,
+    backgroundColor: 'rgba(39, 22, 76, 0.92)',
+    borderWidth: 1.2,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    paddingVertical: 12,
+    paddingHorizontal: 7,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 3,
+    gap: 6,
+    paddingHorizontal: 5,
+    ...Platform.select({
+      web: { boxShadow: '0 8px 18px rgba(5, 2, 18, 0.22)' },
+      android: { elevation: 3 },
+      default: {},
+    }),
   },
   catName: {
     color: '#FFFFFF',
-    fontSize: 10.5,
+    fontSize: 11.5,
+    lineHeight: 15,
+    minHeight: 30,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
   },
   catCount: {
     color: '#94A3B8',
-    fontSize: 9.5,
+    fontSize: 10,
     fontFamily: THEME.fonts.extraBold,
+    color: '#CBBFE8',
   },
   emptyState: {
     alignItems: 'center',
@@ -631,6 +646,7 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '100%',
     maxWidth: 480,
+    maxHeight: '88%',
     backgroundColor: '#0F172A',
     borderRadius: 24,
     borderWidth: 1.5,
