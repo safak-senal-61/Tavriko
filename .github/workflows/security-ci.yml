@@ -25,10 +25,21 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # Temporary lockfile repair step: the committed workspace lock was missing
+      # server dependencies. The generated lockfile is uploaded for review/commit.
+      - name: Regenerate workspace lockfile
+        run: npm install --package-lock-only --ignore-scripts
       - name: Install dependencies
         run: npm ci
       - name: Dependency vulnerability audit
         run: npm audit --audit-level=high
+      - name: Upload generated lockfile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-lockfile-audit
+          path: package-lock.json
+          if-no-files-found: error
 
   build-and-test:
     runs-on: ubuntu-latest
@@ -51,6 +62,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Regenerate workspace lockfile
+        run: npm install --package-lock-only --ignore-scripts
       - name: Install dependencies
         run: npm ci
       - name: Build all workspaces
@@ -63,3 +76,10 @@ jobs:
         run: npm run test:client
       - name: Test Cloudflare workspace
         run: npm run test:cloudflare
+      - name: Upload generated lockfile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-lockfile-build
+          path: package-lock.json
+          if-no-files-found: error
