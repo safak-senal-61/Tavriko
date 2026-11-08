@@ -122,8 +122,9 @@ router.post('/guest', rateLimit({ keyPrefix: 'guest', windowMs: 15 * 60 * 1000, 
     const result = await db.createGuest(displayName);
     res.setHeader('Cache-Control', 'no-store');
     res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    logger.error('AUTH', 'Misafir oturumu oluşturulamadı', { error: err instanceof Error ? err.name : 'unknown' });
+    res.status(500).json({ error: 'Misafir oturumu oluşturulamadı.' });
   }
 });
 
@@ -366,8 +367,9 @@ router.post('/delete-account', requireUser, async (req: Request, res: Response):
     }
     const result = await db.deleteAccount(userId);
     res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    logger.error('AUTH', 'Hesap silme işlemi başarısız', { error: err instanceof Error ? err.name : 'unknown' });
+    res.status(500).json({ error: 'Hesap silme işlemi tamamlanamadı.' });
   }
 });
 
