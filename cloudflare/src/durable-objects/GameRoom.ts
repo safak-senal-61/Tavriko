@@ -59,6 +59,7 @@ export class GameRoomDO extends DurableObject<Env> {
   private isPrivateRoom: boolean = false;
   private apiService: ApiService;
   private rateLimiters = new WeakMap<WebSocket, RateLimiter>();
+  private connectionAttemptsByIp = new Map<string, number[]>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -84,6 +85,24 @@ export class GameRoomDO extends DurableObject<Env> {
   // --- WebSocket Upgrade & Request Handling ---
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    if (request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+      const clientIp = (request.headers.get('CF-Connecting-IP') || '').trim() || 'unknown';
+      const now = Date.now();
+      const recent = (this.connectionAttemptsByIp.get(clientIp) || []).filter((time) => now - time < 60_000);
+      if (recent.length >= 20) {
+        return new Response(JSON.stringify({ error: 'Çok fazla bağlantı denemesi. Lütfen bekleyin.' }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json', 'Retry-After': '60' },
+        });
+      }
+      recent.push(now);
+      this.connectionAttemptsByIp.set(clientIp, recent);
+      if (this.connectionAttemptsByIp.size > 2000) {
+        for (const [ip, attempts] of this.connectionAttemptsByIp) {
+          if (!attempts.some((time) => now - time < 60_000)) this.connectionAttemptsByIp.delete(ip);
+        }
+      }
+    }
 
     // Health / Inspection endpoint
     if (url.pathname === '/info' || request.method === 'GET' && !request.headers.get('Upgrade')) {
@@ -232,20 +251,9 @@ export class GameRoomDO extends DurableObject<Env> {
       return new Response(JSON.stringify({ error: 'Geçersiz oturum' }), { status: 401 });
     }
 
-    // Support guest identities only when no bearer token was supplied.
+    // Every participant, including guests, must present a server-signed JWT.
     if (!authUser) {
-      const pid = rawPlayerId || `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-      if (!pid.startsWith('guest_') && !pid.startsWith('guest:')) {
-        return new Response(JSON.stringify({ error: 'Misafir kimliği geçersiz' }), { status: 401 });
-      }
-      const name = sanitizeString(rawDisplayName || `Misafir ${pid.slice(-4)}`, 30);
-      authUser = {
-        id: pid,
-        username: name.toLowerCase().replace(/\s+/g, '_'),
-        displayName: name,
-        avatarUrl: rawAvatarUrl || 'av1',
-        isGuest: true,
-      };
+      return new Response(JSON.stringify({ error: 'Geçerli oturum gerekli' }), { status: 401 });
     }
 
     // Initialize room if not already created
