@@ -39,7 +39,19 @@ import {
 import { PaymentItem } from './PaymentScreen';
 import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { Image } from 'react-native';
-import { KitHeader, KitHero, KitChips, STORE_IMG, storeImageFor, KIT } from '../components/StoreKit';
+import {
+  KitHeader,
+  KitHero,
+  KitChips,
+  STORE_IMG,
+  storeImageFor,
+  KIT,
+  FramedAvatar,
+  BackgroundThumb,
+  CosmeticPreviewModal,
+  frameFor,
+  backgroundFor,
+} from '../components/StoreKit';
 
 interface ShopScreenProps {
   user?: UserProfile;
@@ -83,8 +95,41 @@ const RARITY_COLORS: Record<string, string> = {
 };
 
 // UI Kit Birebir Vektörel Ürün Görseli
-const ShopItemVisual: React.FC<{ product: ShopProduct }> = ({ product }) => {
+const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: string }> = ({
+  product,
+  seed,
+  name,
+}) => {
   const pId = product.id;
+  if ((product.category === 'frames' || pId.includes('frame')) && frameFor(pId)) {
+    return (
+      <View style={styles.visualTall}>
+        <FramedAvatar frameId={pId} seed={seed} size={100} />
+      </View>
+    );
+  }
+  if ((product.category === 'backgrounds' || pId.startsWith('bg_')) && backgroundFor(pId)) {
+    return (
+      <View style={styles.visualTall}>
+        <BackgroundThumb bgId={pId} seed={seed} name={name} width={64} />
+      </View>
+    );
+  }
+  if ((product.category as string) === 'name_effects' || pId.includes('name_') || pId.includes('effect')) {
+    const isFire = pId.includes('fire');
+    return (
+      <View style={styles.visualTall}>
+        <View style={styles.namePlate}>
+          <Text
+            style={[styles.namePlateText, isFire ? styles.nameEffectFire : styles.nameEffectGold]}
+            numberOfLines={1}
+          >
+            {name || 'Tavriko'}
+          </Text>
+        </View>
+      </View>
+    );
+  }
   const featuredImg: Record<string, any> = {
     pack_season_premium_pass: STORE_IMG.trophy,
     pack_starter: STORE_IMG.chestGold,
@@ -249,6 +294,14 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const [isError, setIsError] = useState<boolean>(false);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const [confirmProduct, setConfirmProduct] = useState<ShopProduct | null>(null);
+  const [previewProduct, setPreviewProduct] = useState<ShopProduct | null>(null);
+  const previewKind = (p: ShopProduct | null): 'frame' | 'background' | null => {
+    if (!p) return null;
+    if ((p.category === 'frames' || p.id.includes('frame')) && frameFor(p.id)) return 'frame';
+    if ((p.category === 'backgrounds' || p.id.startsWith('bg_')) && backgroundFor(p.id)) return 'background';
+    return null;
+  };
+  const userSeed = user?.avatarUrl || user?.displayName;
   const tabScrollRef = useRef<any>(null);
   const contentOpacity = useRef(new Animated.Value(1)).current;
   const contentTranslateX = useRef(new Animated.Value(0)).current;
@@ -479,7 +532,22 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                 </View>
 
                 {/* Vektörel Görsel */}
-                <ShopItemVisual product={item} />
+                {previewKind(item) ? (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      sound.playSound('tap');
+                      setPreviewProduct(item);
+                    }}
+                  >
+                    <ShopItemVisual product={item} seed={userSeed} name={user?.displayName} />
+                    <View style={styles.zoomHint}>
+                      <Text style={styles.zoomHintText}>Büyüt</Text>
+                    </View>
+                  </TouchableOpacity>
+                ) : (
+                  <ShopItemVisual product={item} seed={userSeed} name={user?.displayName} />
+                )}
 
                 {/* İsim & Açıklama */}
                 <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
@@ -514,6 +582,32 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           })}
         </Animated.View>
       </ScrollView>
+
+      <CosmeticPreviewModal
+        visible={!!previewProduct}
+        kind={previewKind(previewProduct)}
+        itemId={previewProduct?.id || ''}
+        title={previewProduct?.name || ''}
+        seed={userSeed}
+        name={user?.displayName}
+        level={user?.level}
+        stats={
+          user
+            ? [
+                { label: 'Maç', value: String(user.stats?.totalMatches ?? 0) },
+                { label: 'Galibiyet', value: String(user.stats?.wins ?? 0) },
+                { label: 'Doğru', value: String(user.stats?.correctAnswers ?? 0) },
+              ]
+            : undefined
+        }
+        onClose={() => setPreviewProduct(null)}
+        actionLabel={previewProduct && !isProductOwned(previewProduct) ? 'Satın al' : undefined}
+        onAction={() => {
+          const p = previewProduct;
+          setPreviewProduct(null);
+          if (p) handleInitiatePurchase(p);
+        }}
+      />
 
       {/* Satın Alma Onay Modalı */}
       <Modal
@@ -729,6 +823,43 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     position: 'relative',
   },
+  visualTall: {
+    height: 108,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 2,
+  },
+  zoomHint: {
+    position: 'absolute',
+    right: -6,
+    bottom: 4,
+    paddingHorizontal: 7,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(10, 4, 30, 0.8)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  zoomHintText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  namePlate: {
+    paddingHorizontal: 12,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(10, 4, 30, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    maxWidth: 150,
+  },
+  namePlateText: {
+    fontSize: 17,
+    fontFamily: THEME.fonts.black,
+  },
   visualGlow: {
     position: 'absolute',
     width: 70,
@@ -776,10 +907,16 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.display,
   },
   nameEffectGold: {
-    color: '#FFC837',
+    color: '#FFD970',
+    textShadowColor: 'rgba(255, 200, 55, 0.85)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
   },
   nameEffectFire: {
-    color: '#FF6B2B',
+    color: '#FF8A3D',
+    textShadowColor: 'rgba(255, 65, 30, 0.9)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
   },
   boosterTag: {
     position: 'absolute',

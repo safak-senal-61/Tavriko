@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { GradientFill } from './TavrikoGradient';
 import {
   View,
   Text,
@@ -1356,86 +1358,109 @@ export const TavrikoProgressBar: React.FC<{
 };
 export type MainNavTab = 'play' | 'explore' | 'leaders' | 'friends' | 'profile';
 export type SecondaryNavTab = 'shop' | 'leagues' | 'play' | 'events' | 'inventory';
+type NavItemDef<K extends string> = { key: K; label: string };
+
+/** Ortak alt menü: kayan aktif kapsül + isteğe bağlı yükseltilmiş orta "Oyna" butonu */
+const NavBarBase = <K extends string>({
+  items,
+  activeKey,
+  onSelect,
+  raisedKey,
+}: {
+  items: NavItemDef<K>[];
+  activeKey: K;
+  onSelect: (k: K) => void;
+  raisedKey?: K;
+}) => {
+  const [w, setW] = useState(0);
+  const slot = w > 0 ? (w - 12) / items.length : 0;
+  const idx = items.findIndex((i) => i.key === activeKey);
+  const showPill = idx >= 0 && items[idx].key !== raisedKey;
+  const x = useSharedValue(0);
+  useEffect(() => {
+    if (idx >= 0) x.value = withSpring(idx * slot, { damping: 18, stiffness: 190 });
+  }, [idx, slot]);
+  const pillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
+  return (
+    <View style={styles.bottomNav} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+      <View style={styles.navSheen} pointerEvents="none" />
+      {w > 0 && showPill && (
+        <Animated.View style={[styles.navPill, { width: slot - 8 }, pillStyle]} pointerEvents="none">
+          <GradientFill direction="vertical" colors={['#7C4DFF', '#5A2BD8']} />
+          <View style={styles.navPillDot} />
+        </Animated.View>
+      )}
+      {items.map((item) => {
+        const isActive = activeKey === item.key;
+        const press = () => {
+          sound.playSound('nav');
+          sound.triggerHaptic('light');
+          onSelect(item.key);
+        };
+        if (item.key === raisedKey) {
+          return (
+            <TouchableOpacity key={item.key} style={styles.navItem} onPress={press} activeOpacity={0.85}>
+              <View style={styles.navRaised}>
+                <GradientFill direction="vertical" colors={['#FFD970', '#FFB21E']} />
+                <View style={styles.navRaisedIcon}>
+                  <Svg width={22} height={22} viewBox="0 0 64 64">
+                    <Path d="M22 12l30 20-30 20z" fill="#2A1200" stroke="#2A1200" strokeWidth="6" strokeLinejoin="round" />
+                  </Svg>
+                </View>
+              </View>
+              <Text style={[styles.navLabel, styles.navLabelRaised]} numberOfLines={1}>
+                {item.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        }
+        return (
+          <TouchableOpacity key={item.key} style={styles.navItem} onPress={press} activeOpacity={0.8}>
+            <NavIcon tab={item.key as any} active={isActive} size={22} />
+            <Text style={[styles.navLabel, isActive && styles.navLabelActive]} numberOfLines={1}>
+              {item.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+};
+
 export const TavrikoBottomNav: React.FC<{
   activeTab: MainNavTab;
   onSelectTab: (tab: MainNavTab) => void;
-}> = ({ activeTab, onSelectTab }) => {
-  const items: { key: MainNavTab; label: string }[] = [
-    { key: 'play', label: 'Oyna' },
-    { key: 'explore', label: 'Keşfet' },
-    { key: 'leaders', label: 'Liderler' },
-    { key: 'friends', label: 'Arkadaşlar' },
-    { key: 'profile', label: 'Profil' },
-  ];
-  return (
-    <View style={styles.bottomNav}>
-      {items.map((item) => {
-        const isActive = activeTab === item.key;
-        return (
-          <TouchableOpacity
-            key={item.key}
-            style={[styles.navItem, isActive && styles.navItemActive]}
-            onPress={() => {
-              sound.playSound('nav');
-              sound.triggerHaptic('light');
-              onSelectTab(item.key);
-            }}
-            activeOpacity={0.8}
-          >
-            <NavIcon tab={item.key} active={isActive} size={24} />
-            <Text
-              style={[styles.navLabel, isActive && styles.navLabelActive]}
-              numberOfLines={1}
-            >
-              {item.label}
-            </Text>
-            {isActive && <View style={styles.navActiveBar} />}
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-};
+}> = ({ activeTab, onSelectTab }) => (
+  <NavBarBase<MainNavTab>
+    items={[
+      { key: 'play', label: 'Oyna' },
+      { key: 'explore', label: 'Keşfet' },
+      { key: 'leaders', label: 'Liderler' },
+      { key: 'friends', label: 'Arkadaşlar' },
+      { key: 'profile', label: 'Profil' },
+    ]}
+    activeKey={activeTab}
+    onSelect={onSelectTab}
+  />
+);
+
 export const TavrikoSecondaryBottomNav: React.FC<{
   activeTab: SecondaryNavTab;
   onSelectTab: (tab: SecondaryNavTab) => void;
-}> = ({ activeTab, onSelectTab }) => {
-  const items: { key: SecondaryNavTab; label: string }[] = [
-    { key: 'shop', label: 'Mağaza' },
-    { key: 'leagues', label: 'Ligler' },
-    { key: 'play', label: 'Oyna' },
-    { key: 'events', label: 'Etkinlik' },
-    { key: 'inventory', label: 'Envanter' },
-  ];
-  return (
-    <View style={styles.bottomNav}>
-      {items.map((item) => {
-        const isActive = activeTab === item.key;
-        return (
-          <TouchableOpacity
-            key={item.key}
-            style={[styles.navItem, isActive && styles.navItemActive]}
-            onPress={() => {
-              sound.playSound('nav');
-              sound.triggerHaptic('light');
-              onSelectTab(item.key);
-            }}
-            activeOpacity={0.8}
-          >
-            <NavIcon tab={item.key} active={isActive} size={24} />
-            <Text
-              style={[styles.navLabel, isActive && styles.navLabelActive]}
-              numberOfLines={1}
-            >
-              {item.label}
-            </Text>
-            {isActive && <View style={styles.navActiveBar} />}
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-};
+}> = ({ activeTab, onSelectTab }) => (
+  <NavBarBase<SecondaryNavTab>
+    items={[
+      { key: 'shop', label: 'Mağaza' },
+      { key: 'leagues', label: 'Ligler' },
+      { key: 'play', label: 'Oyna' },
+      { key: 'events', label: 'Etkinlik' },
+      { key: 'inventory', label: 'Envanter' },
+    ]}
+    activeKey={activeTab}
+    onSelect={onSelectTab}
+    raisedKey="play"
+  />
+);
 const styles = StyleSheet.create({
   screenRoot: {
     flex: 1,
@@ -1656,48 +1681,86 @@ const styles = StyleSheet.create({
   },
   bottomNav: {
     position: 'absolute',
-    left: 12,
-    right: 12,
+    left: 14,
+    right: 14,
     bottom: 14,
-    height: 72,
-    borderRadius: 26,
-    backgroundColor: 'rgba(14, 6, 32, 0.96)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(154, 107, 255, 0.45)',
-    overflow: 'hidden',
+    height: 66,
+    borderRadius: 24,
+    paddingHorizontal: 6,
+    backgroundColor: '#130933',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     flexDirection: 'row',
-    justifyContent: 'space-around',
     alignItems: 'center',
+    ...Platform.select({
+      web: { boxShadow: '0 10px 30px rgba(0,0,0,0.45)' } as any,
+      default: {
+        shadowColor: '#000',
+        shadowOpacity: 0.45,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 12,
+      },
+    }),
+  },
+  navSheen: {
+    position: 'absolute',
+    top: 0,
+    left: 24,
+    right: 24,
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+  },
+  navPill: {
+    position: 'absolute',
+    left: 10,
+    top: 7,
+    bottom: 7,
+    borderRadius: 17,
+    overflow: 'hidden',
+    alignItems: 'center',
+  },
+  navPillDot: {
+    position: 'absolute',
+    bottom: 4,
+    width: 14,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: '#FFC837',
   },
   navItem: {
     flex: 1,
     alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
+    gap: 3,
     paddingHorizontal: 2,
   },
-  navActiveBar: {
-    position: 'absolute',
-    bottom: 6,
-    width: 34,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#FFC43D',
-    shadowColor: '#FFC43D',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 6,
+  navRaised: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginTop: -30,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#1A0B3B',
   },
-  navItemActive: {
-    // Fixed in place, only yellow highlight
+  navRaisedIcon: {
+    position: 'relative',
+    zIndex: 2,
+    paddingLeft: 3,
   },
   navLabel: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: THEME.fonts.extraBold,
-    color: '#D9CDF5',
+    color: 'rgba(217, 205, 245, 0.7)',
   },
   navLabelActive: {
-    color: '#FFC43D',
+    color: '#FFFFFF',
+  },
+  navLabelRaised: {
+    color: '#FFC837',
   },
 });

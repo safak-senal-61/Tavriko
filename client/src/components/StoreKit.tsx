@@ -6,11 +6,13 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
+  Modal,
   ImageSourcePropType,
   ViewStyle,
 } from 'react-native';
 import Animated, {
   FadeInDown,
+  ZoomIn,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -21,6 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { THEME } from '../theme/tokens';
 import { GradientFill } from './TavrikoGradient';
+import { CharacterAvatar } from './TavrikoAvatars';
 
 /* Mağaza / Envanter / Etkinlik / Sezon / Pro Lig ortak görsel kiti */
 
@@ -33,6 +36,19 @@ export const STORE_IMG = {
   chestGold: require('../../assets/images/store/chest_gold.png'),
   chestLegendary: require('../../assets/images/store/chest_legendary.png'),
   key: require('../../assets/images/store/key_gold.png'),
+  keySilver: require('../../assets/images/store/key_silver.png'),
+  keyDiamond: require('../../assets/images/store/key_diamond.png'),
+  booster24h: require('../../assets/images/store/booster_24h.png'),
+  badgeTrivia: require('../../assets/images/store/badge_trivia_master.png'),
+  badgeSpeed: require('../../assets/images/store/badge_speed_demon.png'),
+  gemsS: require('../../assets/images/store/gems_s.png'),
+  gemsM: require('../../assets/images/store/gems_m.png'),
+  gemsL: require('../../assets/images/store/gems_l.png'),
+  gemsXL: require('../../assets/images/store/gems_xl.png'),
+  coinsS: require('../../assets/images/store/coins_s.png'),
+  coinsM: require('../../assets/images/store/coins_m.png'),
+  coinsL: require('../../assets/images/store/coins_l.png'),
+  coinsXL: require('../../assets/images/store/coins_xl.png'),
   booster: require('../../assets/images/store/booster_bolt.png'),
   inventoryEmpty: require('../../assets/images/store/inventory_empty.png'),
   eventsEmpty: require('../../assets/images/store/events_empty.png'),
@@ -48,9 +64,177 @@ export const storeImageFor = (id: string, category?: string): ImageSourcePropTyp
     if (k.includes('silver')) return STORE_IMG.chestSilver;
     return STORE_IMG.chestWood;
   }
-  if (c.startsWith('key') || k.includes('key')) return STORE_IMG.key;
-  if (c.startsWith('booster') || k.includes('booster') || k.includes('bolt')) return STORE_IMG.booster;
+  if (c.startsWith('key') || k.includes('key')) {
+    if (k.includes('diamond')) return STORE_IMG.keyDiamond;
+    if (k.includes('silver')) return STORE_IMG.keySilver;
+    return STORE_IMG.key;
+  }
+  if (c.startsWith('booster') || k.includes('booster') || k.includes('bolt')) {
+    return k.includes('24h') ? STORE_IMG.booster24h : STORE_IMG.booster;
+  }
+  if (c.startsWith('badge') || k.includes('badge')) {
+    return k.includes('speed') ? STORE_IMG.badgeSpeed : STORE_IMG.badgeTrivia;
+  }
+  if (k.startsWith('gems_')) {
+    const n = parseInt(k.slice(5), 10) || 0;
+    return n >= 1500 ? STORE_IMG.gemsXL : n >= 600 ? STORE_IMG.gemsL : n >= 300 ? STORE_IMG.gemsM : STORE_IMG.gemsS;
+  }
+  if (k.startsWith('coins_')) {
+    const n = parseInt(k.slice(6), 10) || 0;
+    return n >= 30000 ? STORE_IMG.coinsXL : n >= 10000 ? STORE_IMG.coinsL : n >= 3000 ? STORE_IMG.coinsM : STORE_IMG.coinsS;
+  }
   return null;
+};
+
+/* Çerçeveler: görsel + iç boşluk oranı (avatarın çerçeve içinde kaplayacağı çap) */
+export const FRAME_IMG: Record<string, { src: ImageSourcePropType; inner: number }> = {
+  frame_neon: { src: require('../../assets/images/store/frame_neon.png'), inner: 0.64 },
+  frame_gold: { src: require('../../assets/images/store/frame_gold.png'), inner: 0.57 },
+  frame_flame: { src: require('../../assets/images/store/frame_flame.png'), inner: 0.63 },
+};
+
+export const frameFor = (id: string) => {
+  const k = (id || '').toLowerCase();
+  if (FRAME_IMG[k]) return FRAME_IMG[k];
+  if (k.includes('flame') || k.includes('fire')) return FRAME_IMG.frame_flame;
+  if (k.includes('gold') || k.includes('royal')) return FRAME_IMG.frame_gold;
+  if (k.includes('neon')) return FRAME_IMG.frame_neon;
+  return null;
+};
+
+/* Profil arka planları */
+export const BG_IMG: Record<string, ImageSourcePropType> = {
+  bg_nebula: require('../../assets/images/store/bg_nebula.jpg'),
+  bg_royal_purple: require('../../assets/images/store/bg_royal_purple.jpg'),
+};
+
+export const backgroundFor = (id: string): ImageSourcePropType | null => {
+  const k = (id || '').toLowerCase();
+  if (BG_IMG[k]) return BG_IMG[k];
+  if (k.includes('nebula')) return BG_IMG.bg_nebula;
+  if (k.includes('royal') || k.includes('purple')) return BG_IMG.bg_royal_purple;
+  return null;
+};
+
+/* Avatar + çerçeve: kullanıcının fotoğrafı/avatarı çerçevenin içinde görünür */
+export const FramedAvatar: React.FC<{ frameId: string; seed?: string; size: number }> = ({
+  frameId,
+  seed,
+  size,
+}) => {
+  const fr = frameFor(frameId);
+  const inner = Math.round(size * (fr?.inner ?? 0.78));
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: inner, height: inner, borderRadius: inner / 2, overflow: 'hidden' }}>
+        <CharacterAvatar seed={seed} size={inner} />
+      </View>
+      {fr && (
+        <Image
+          source={fr.src}
+          style={{ position: 'absolute', width: size, height: size }}
+          resizeMode="contain"
+        />
+      )}
+    </View>
+  );
+};
+
+/* Küçük telefon önizlemesi: arka planın uygulamada nasıl duracağı */
+export const BackgroundThumb: React.FC<{
+  bgId: string;
+  seed?: string;
+  name?: string;
+  width: number;
+}> = ({ bgId, seed, name, width }) => {
+  const src = backgroundFor(bgId);
+  const h = Math.round(width * 1.62);
+  const av = Math.round(width * 0.34);
+  return (
+    <View style={[kit.phone, { width, height: h, borderRadius: width * 0.16 }]}>
+      {src && <Image source={src} style={kit.heroImg} resizeMode="cover" />}
+      <View style={[kit.phoneNotch, { width: width * 0.3 }]} />
+      <View style={{ alignItems: 'center', marginTop: h * 0.14 }}>
+        <View style={{ width: av, height: av, borderRadius: av / 2, overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.7)' }}>
+          <CharacterAvatar seed={seed} size={av} />
+        </View>
+        <Text style={[kit.phoneName, { fontSize: Math.max(8, width * 0.09) }]} numberOfLines={1}>
+          {name || 'Oyuncu'}
+        </Text>
+      </View>
+      <View style={[kit.phoneCard, { top: h * 0.56, height: h * 0.13 }]} />
+      <View style={[kit.phoneCard, { top: h * 0.72, height: h * 0.13 }]} />
+    </View>
+  );
+};
+
+/* Büyütülmüş önizleme (çerçeve veya arka plan) */
+export const CosmeticPreviewModal: React.FC<{
+  visible: boolean;
+  kind: 'frame' | 'background' | null;
+  itemId: string;
+  title: string;
+  seed?: string;
+  name?: string;
+  level?: number;
+  stats?: { label: string; value: string }[];
+  onClose: () => void;
+  actionLabel?: string;
+  onAction?: () => void;
+}> = ({ visible, kind, itemId, title, seed, name, level, stats, onClose, actionLabel, onAction }) => {
+  const bg = kind === 'background' ? backgroundFor(itemId) : null;
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={kit.pvBackdrop}>
+        <Animated.View entering={ZoomIn.duration(260)} style={kit.pvPhone}>
+          {bg ? (
+            <Image source={bg} style={kit.heroImg} resizeMode="cover" />
+          ) : (
+            <GradientFill colors={['#2A0F63', '#170733']} />
+          )}
+          <View style={kit.pvTopBar}>
+            <TouchableOpacity onPress={onClose} style={kit.pvClose} activeOpacity={0.8}>
+              <Text style={kit.pvCloseText}>Kapat</Text>
+            </TouchableOpacity>
+            <Text style={kit.pvLabel}>Önizleme</Text>
+          </View>
+          <View style={{ alignItems: 'center', marginTop: 36 }}>
+            {kind === 'frame' ? (
+              <FramedAvatar frameId={itemId} seed={seed} size={200} />
+            ) : (
+              <View style={kit.pvAvatar}>
+                <CharacterAvatar seed={seed} size={110} />
+              </View>
+            )}
+            <Text style={kit.pvName} numberOfLines={1}>
+              {name || 'Oyuncu'}
+            </Text>
+            {typeof level === 'number' && <Text style={kit.pvLevel}>Seviye {level}</Text>}
+          </View>
+          {!!stats?.length && (
+            <View style={kit.pvStats}>
+              {stats.map((st) => (
+                <View key={st.label} style={kit.pvStat}>
+                  <Text style={kit.pvStatValue}>{st.value}</Text>
+                  <Text style={kit.pvStatLabel}>{st.label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <View style={kit.pvFooter}>
+            <Text style={kit.pvTitle} numberOfLines={1}>
+              {title}
+            </Text>
+            {!!actionLabel && !!onAction && (
+              <TouchableOpacity style={kit.pvAction} onPress={onAction} activeOpacity={0.85}>
+                <Text style={kit.pvActionText}>{actionLabel}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
 };
 
 export const KIT = {
@@ -269,6 +453,158 @@ export const KitSection: React.FC<{ title: string; meta?: string }> = ({ title, 
 );
 
 export const kit = StyleSheet.create({
+  phone: {
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: '#14062F',
+  },
+  phoneNotch: {
+    position: 'absolute',
+    top: 4,
+    alignSelf: 'center',
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  phoneName: {
+    color: '#FFFFFF',
+    fontFamily: THEME.fonts.extraBold,
+    marginTop: 3,
+    maxWidth: '90%',
+  },
+  phoneCard: {
+    position: 'absolute',
+    left: '10%',
+    right: '10%',
+    borderRadius: 5,
+    backgroundColor: 'rgba(10, 4, 30, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  pvBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(6, 2, 16, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 18,
+  },
+  pvPhone: {
+    width: '100%',
+    maxWidth: 360,
+    aspectRatio: 9 / 17,
+    maxHeight: '96%',
+    borderRadius: 32,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: '#14062F',
+  },
+  pvTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  pvClose: {
+    height: 34,
+    paddingHorizontal: 14,
+    borderRadius: 17,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(10, 4, 30, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  pvCloseText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  pvLabel: {
+    color: 'rgba(255, 255, 255, 0.75)',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
+  },
+  pvAvatar: {
+    width: 124,
+    height: 124,
+    borderRadius: 62,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.8)',
+    marginVertical: 38,
+  },
+  pvName: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontFamily: THEME.fonts.black,
+    marginTop: 6,
+  },
+  pvLevel: {
+    color: 'rgba(235, 228, 255, 0.85)',
+    fontSize: 13,
+    fontFamily: THEME.fonts.bold,
+    marginTop: 2,
+  },
+  pvStats: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginTop: 22,
+  },
+  pvStat: {
+    flex: 1,
+    height: 62,
+    borderRadius: 14,
+    backgroundColor: 'rgba(10, 4, 30, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  pvStatValue: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontFamily: THEME.fonts.black,
+  },
+  pvStatLabel: {
+    color: 'rgba(235, 228, 255, 0.8)',
+    fontSize: 11,
+    fontFamily: THEME.fonts.bold,
+  },
+  pvFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 16,
+    backgroundColor: 'rgba(10, 4, 30, 0.72)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  pvTitle: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  pvAction: {
+    height: 40,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#FFC837',
+    justifyContent: 'center',
+  },
+  pvActionText: {
+    color: '#1A0B3B',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',

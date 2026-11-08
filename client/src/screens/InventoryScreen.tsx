@@ -29,7 +29,19 @@ import {
 } from '../components/TavrikoIcons';
 import Reanimated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { Image } from 'react-native';
-import { KitHeader, KitChips, KitEmpty, STORE_IMG, storeImageFor, KIT } from '../components/StoreKit';
+import {
+  KitHeader,
+  KitChips,
+  KitEmpty,
+  STORE_IMG,
+  storeImageFor,
+  KIT,
+  FramedAvatar,
+  BackgroundThumb,
+  CosmeticPreviewModal,
+  frameFor,
+  backgroundFor,
+} from '../components/StoreKit';
 
 interface InventoryScreenProps {
   user?: UserProfile;
@@ -214,7 +226,21 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     }
   };
 
+  const userSeed = user?.avatarUrl || user?.displayName;
+  const previewKindOf = (item: InventoryItem | null): 'frame' | 'background' | null => {
+    if (!item) return null;
+    if ((item.category === 'frame' || item.id.includes('frame')) && frameFor(item.id)) return 'frame';
+    if ((item.category === 'background' || item.id.startsWith('bg_')) && backgroundFor(item.id)) return 'background';
+    return null;
+  };
+  const [previewItem, setPreviewItem] = useState<InventoryItem | null>(null);
+
   const renderItemVisual = (item: InventoryItem, size = 48) => {
+    const pk = previewKindOf(item);
+    if (pk === 'frame') return <FramedAvatar frameId={item.id} seed={userSeed} size={Math.round(size * 1.8)} />;
+    if (pk === 'background') {
+      return <BackgroundThumb bgId={item.id} seed={userSeed} name={user?.displayName} width={Math.round(size * 1.05)} />;
+    }
     const img = storeImageFor(item.id, item.category);
     if (img) {
       const s2 = Math.round(size * 1.6);
@@ -301,7 +327,13 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                 <TouchableOpacity
                   style={styles.itemCard}
                   activeOpacity={0.8}
-                  onPress={() => isChest && handleOpenChestClick(item)}
+                  onPress={() => {
+                    if (isChest) handleOpenChestClick(item);
+                    else if (previewKindOf(item)) {
+                      sound.playSound('tap');
+                      setPreviewItem(item);
+                    }
+                  }}
                 >
                   <View style={[styles.rarityBar, { backgroundColor: rarityColor }]} />
                   <View style={styles.qtyBadge}>
@@ -324,6 +356,26 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
           </View>
         )}
       </ScrollView>
+
+      <CosmeticPreviewModal
+        visible={!!previewItem}
+        kind={previewKindOf(previewItem)}
+        itemId={previewItem?.id || ''}
+        title={previewItem?.name || ''}
+        seed={userSeed}
+        name={user?.displayName}
+        level={user?.level}
+        stats={
+          user
+            ? [
+                { label: 'Maç', value: String(user.stats?.totalMatches ?? 0) },
+                { label: 'Galibiyet', value: String(user.stats?.wins ?? 0) },
+                { label: 'Doğru', value: String(user.stats?.correctAnswers ?? 0) },
+              ]
+            : undefined
+        }
+        onClose={() => setPreviewItem(null)}
+      />
 
       {/* Chest Opening Modal */}
       <Modal
@@ -611,7 +663,7 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.extraBold,
   },
   iconWrap: {
-    height: 78,
+    height: 92,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 8,
