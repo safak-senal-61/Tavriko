@@ -12,6 +12,7 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
+import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { UserProfile, calculateLevelFromXp } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -253,6 +254,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </TouchableOpacity>
           )}
 
+          <Reanimated.View entering={FadeInDown.delay(60).duration(380)}>
           {/* Profil Kartı: Avatar + İsim + Seviye + XP */}
           <TouchableOpacity
             style={styles.profileCard}
@@ -300,6 +302,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           </TouchableOpacity>
 
+          </Reanimated.View>
+
+          <Reanimated.View entering={FadeInDown.delay(130).duration(380)}>
           {/* Hızlı Eşleşme (1v1 Düello) Hero Kartı */}
           <View style={styles.heroCard}>
             <Image source={DUEL_BANNER} style={styles.heroImage} resizeMode="cover" />
@@ -345,6 +350,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           </View>
 
+          </Reanimated.View>
+
+          <Reanimated.View entering={FadeInDown.delay(200).duration(380)}>
           {/* 2x2 Mod Kartları */}
           <View style={styles.modesGrid}>
             <View style={styles.modesRow}>
@@ -385,6 +393,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           </View>
 
+          </Reanimated.View>
+
+          <Reanimated.View entering={FadeInDown.delay(270).duration(380)}>
           {/* Günlük Seri Bandı */}
           <TouchableOpacity
             style={styles.streakCard}
@@ -415,6 +426,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
           </TouchableOpacity>
 
+          </Reanimated.View>
+
+          <Reanimated.View entering={FadeInDown.delay(340).duration(380)}>
           {/* Ek Özellikler (Sezon, Pro Lig, Mağaza, Etkinlik, Envanter) */}
           <View style={styles.extraFeaturesRow}>
             {onSeason && (
@@ -478,6 +492,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </TouchableOpacity>
             )}
           </View>
+          </Reanimated.View>
         </Animated.View>
       </ScrollView>
 

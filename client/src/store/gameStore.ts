@@ -126,6 +126,53 @@ const getCompletedCorrectCount = (
 };
 
 /**
+ * Son tamamlanan turun liderlik tablosundaki (sunucunun kümülatif, yetkili sayımı)
+ * doğru sayısını döndürür. Bağlantı kopması / arka plana alma nedeniyle istemcinin
+ * kaçırdığı ROUND_RESULT'lar olsa bile ilerleme bu değerle telafi edilir.
+ */
+const getLeaderboardCorrectCount = (
+  roundResultsByRound: Record<number, RoundResult>,
+  playerId: string
+): number => {
+  const roundNums = Object.keys(roundResultsByRound)
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .sort((a, b) => b - a);
+  for (const rNum of roundNums) {
+    const entry = roundResultsByRound[rNum]?.leaderboard?.find((e) => e.playerId === playerId);
+    if (entry && typeof entry.correctAnswersCount === 'number') {
+      return Math.max(0, Math.floor(entry.correctAnswersCount));
+    }
+  }
+  return 0;
+};
+
+/**
+ * Oyuncunun kesin doğru sayısı: tamamlanmış turlardan sayılan değer, son turun
+ * liderlik tablosu ve (varsa) sunucu oda durumundan gelen sayı birleştirilir.
+ * Tur devam ederken cevap vermiş oyuncunun o turdaki olası doğrusu sayılmaz;
+ * böylece kimse rakibinden önce pistte ilerlemez.
+ */
+export const resolveCorrectCount = (
+  roundResultsByRound: Record<number, RoundResult>,
+  playerId: string,
+  serverPlayer?: { correctAnswersCount?: number; hasAnsweredCurrentRound?: boolean } | null,
+  roomStatus?: GameRoom['status']
+): number => {
+  let best = Math.max(
+    getCompletedCorrectCount(roundResultsByRound, playerId),
+    getLeaderboardCorrectCount(roundResultsByRound, playerId)
+  );
+  const serverCount = Number(serverPlayer?.correctAnswersCount);
+  if (serverPlayer && Number.isFinite(serverCount) && serverCount > 0) {
+    const roundOpen = roomStatus === 'question_active';
+    const pendingThisRound = roundOpen && serverPlayer.hasAnsweredCurrentRound ? 1 : 0;
+    best = Math.max(best, Math.floor(serverCount) - pendingThisRound);
+  }
+  return best;
+};
+
+/**
  * Yalnızca tamamlanmış turların (ROUND_RESULT) sonuçlarından oyuncunun kesin
  * puanını hesaplar. Tur devam ederken (diğer oyuncular beklenirken) puan değişmez.
  */
@@ -211,7 +258,7 @@ export const useGameStore = create<GameState>((set) => ({
       const mergedScores = { ...activeRoom.scores };
 
       for (const [pid, pObj] of Object.entries(mergedPlayers)) {
-        const authCorrect = getCompletedCorrectCount(completedMap, pid);
+        const authCorrect = resolveCorrectCount(completedMap, pid, pObj, activeRoom.status);
         const authScore = getCompletedScore(completedMap, pid);
         mergedPlayers[pid] = {
           ...pObj,
@@ -222,9 +269,9 @@ export const useGameStore = create<GameState>((set) => ({
       }
 
       // Odada daha önce bilinen oyuncuları koru
-      for (const [pid, prevPlayer] of Object.entries(state.activeRoom.players || {})) {
+      for (const [pid, prevPlayer] of Object.entries(state.activeRoom?.players || {})) {
         if (!mergedPlayers[pid]) {
-          const authCorrect = getCompletedCorrectCount(completedMap, pid);
+          const authCorrect = resolveCorrectCount(completedMap, pid);
           const authScore = getCompletedScore(completedMap, pid);
           mergedPlayers[pid] = {
             ...prevPlayer,
@@ -283,7 +330,7 @@ export const useGameStore = create<GameState>((set) => ({
         if (!nextPlayers[entry.playerId]) {
           nextPlayers[entry.playerId] = {
             id: entry.playerId,
-            username: entry.username || entry.displayName,
+            username: (entry as { username?: string }).username || entry.displayName,
             displayName: entry.displayName,
             avatarUrl: entry.avatarUrl || 'av1',
             score: 0,
@@ -310,7 +357,7 @@ export const useGameStore = create<GameState>((set) => ({
       ]);
 
       for (const pid of allPlayerIds) {
-        const authCorrect = getCompletedCorrectCount(nextRoundResults, pid);
+        const authCorrect = resolveCorrectCount(nextRoundResults, pid);
         const authScore = getCompletedScore(nextRoundResults, pid);
         nextScores[pid] = authScore;
         if (nextPlayers[pid]) {

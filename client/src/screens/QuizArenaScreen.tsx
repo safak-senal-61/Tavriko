@@ -9,6 +9,17 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withSequence,
+  withDelay,
+  Easing,
+  FadeInDown,
+  FadeIn,
+} from 'react-native-reanimated';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { loadStoredPreferences } from '../store/appPrefs';
@@ -246,6 +257,75 @@ const RACE_LANE_COLORS = ['#38BDF8', '#B26BFF', '#FF6BC4', '#5ADBB5', '#FF9B2F',
 const RACE_MAX_LANES = 4;
 const RACE_MARKER = 24;
 
+/** Tek şerit: doğru sayısı arttığında avatar yay animasyonuyla ileri kayar ve "+1" belirir */
+const RaceLane: React.FC<{
+  racer: RacerInfo;
+  color: string;
+  marker: number;
+  laneWidth: number;
+  x: number;
+  correct: number;
+}> = ({ racer, color, marker, laneWidth, x, correct }) => {
+  const pos = useSharedValue(x);
+  const pop = useSharedValue(1);
+  const bubble = useSharedValue(0);
+  const prevCorrect = useRef(correct);
+  const firstLayout = useRef(true);
+
+  useEffect(() => {
+    if (laneWidth <= 0) return;
+    if (firstLayout.current) {
+      // İlk ölçümde zıplama olmadan doğrudan konumla
+      firstLayout.current = false;
+      pos.value = x;
+    } else {
+      pos.value = withSpring(x, { damping: 16, stiffness: 120, mass: 0.9 });
+    }
+    if (correct > prevCorrect.current) {
+      pop.value = withSequence(withTiming(1.28, { duration: 160 }), withSpring(1, { damping: 7 }));
+      bubble.value = 0;
+      bubble.value = withSequence(
+        withTiming(1, { duration: 260, easing: Easing.out(Easing.cubic) }),
+        withDelay(520, withTiming(0, { duration: 260 }))
+      );
+    }
+    prevCorrect.current = correct;
+  }, [x, correct, laneWidth]);
+
+  const fillStyle = useAnimatedStyle(() => ({ width: pos.value + marker / 2 }));
+  const markerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: pos.value }, { scale: pop.value }],
+  }));
+  const bubbleStyle = useAnimatedStyle(() => ({
+    opacity: bubble.value,
+    transform: [{ translateX: pos.value + marker + 4 + bubble.value * 6 }, { scale: 0.7 + bubble.value * 0.3 }],
+  }));
+
+  return (
+    <View style={[styles.raceLane, { height: marker }]}>
+      <View style={styles.raceLaneTrack} />
+      <Animated.View style={[styles.raceLaneFill, { backgroundColor: color, shadowColor: color }, fillStyle]} />
+      {laneWidth > 0 && (
+        <>
+          <Animated.View
+            style={[
+              styles.raceMarker,
+              { left: 0, width: marker, height: marker, borderRadius: marker / 2, borderColor: color, shadowColor: color },
+              racer.lastAnswer?.isCorrect === false && { borderColor: '#FF5A6A' },
+              markerStyle,
+            ]}
+          >
+            <CharacterAvatar seed={racer.avatarUrl || racer.displayName} size={marker - 4} />
+          </Animated.View>
+          <Animated.View pointerEvents="none" style={[styles.raceBubble, bubbleStyle]}>
+            <Text style={styles.raceBubbleText}>+1</Text>
+          </Animated.View>
+        </>
+      )}
+    </View>
+  );
+};
+
 /** Yatay şerit tabanlı Zirve Yarışı: her oyuncu kendi şeridinde bayrağa ilerler */
 const SummitRaceTrack: React.FC<{
   racers: RacerInfo[];
@@ -285,9 +365,7 @@ const SummitRaceTrack: React.FC<{
   return (
     <View style={[styles.raceCard, compact && { paddingTop: 4, paddingBottom: 6 }]}>
       <View style={styles.raceTitleRow}>
-        <Text style={styles.raceLaurel}>🏆</Text>
         <Text style={styles.raceTitle}>ZİRVE YARIŞI</Text>
-        <Text style={styles.raceLaurel}>🏆</Text>
         <View style={styles.raceStepChip}>
           <Text style={styles.raceStepChipText}>
             {myCorrect}/{total} Doğru
@@ -308,26 +386,15 @@ const SummitRaceTrack: React.FC<{
             const usable = Math.max(0, laneWidth - marker);
             const x = usable * pct;
             return (
-              <View key={racer.id} style={[styles.raceLane, { height: marker }]}>
-                <View style={styles.raceLaneTrack} />
-                <View
-                  style={[
-                    styles.raceLaneFill,
-                    { width: x + marker / 2, backgroundColor: color, shadowColor: color },
-                  ]}
-                />
-                {laneWidth > 0 && (
-                  <View
-                    style={[
-                      styles.raceMarker,
-                      { left: x, width: marker, height: marker, borderRadius: marker / 2, borderColor: color, shadowColor: color },
-                      racer.lastAnswer?.isCorrect === false && { borderColor: '#FF5A6A' },
-                    ]}
-                  >
-                    <CharacterAvatar seed={racer.avatarUrl || racer.displayName} size={marker - 4} />
-                  </View>
-                )}
-              </View>
+              <RaceLane
+                key={racer.id}
+                racer={racer}
+                color={color}
+                marker={marker}
+                laneWidth={laneWidth}
+                x={x}
+                correct={clampCorrect(racer.correctAnswers, total)}
+              />
             );
           })}
         </View>
@@ -721,7 +788,11 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       )}
 
       {/* 4. Soru Kartı */}
-      <View style={[styles.questionCard, compact && styles.questionCardCompact, tiny && styles.questionCardTiny]}>
+      <Animated.View
+        key={`q-${question.id}-${question.roundNumber}`}
+        entering={FadeIn.duration(320)}
+        style={[styles.questionCard, compact && styles.questionCardCompact, tiny && styles.questionCardTiny]}
+      >
         <GradientFill
           colors={['rgba(107, 60, 255, 0.55)', 'rgba(52, 22, 128, 0.75)', 'rgba(30, 12, 74, 0.85)']}
           direction="diagonal"
@@ -740,7 +811,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         >
           {question.text}
         </Text>
-      </View>
+      </Animated.View>
 
       {/* 5. Şıklar */}
       <View style={[styles.optionsContainer, compact && { gap: 7 }]}>
@@ -752,7 +823,11 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           const showPoints = !!feedback && feedback.isCorrect && isMyChoice && isCorrectChoice && feedback.pointsAwarded > 0;
 
           return (
-            <View key={opt.id} style={styles.optWrap}>
+            <Animated.View
+              key={`${question.id}-${question.roundNumber}-${opt.id}`}
+              entering={FadeInDown.delay(90 + index * 70).duration(360).springify().damping(16)}
+              style={styles.optWrap}
+            >
               <TouchableOpacity
                 style={[
                   styles.optCard,
@@ -826,17 +901,17 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   ) : null
                 ) : isMyChoice ? (
                   <View style={styles.choiceTagPending}>
-                    <Text style={styles.choiceTagPendingText}>Seçildi 🔒</Text>
+                    <Text style={styles.choiceTagPendingText}>Seçildi</Text>
                   </View>
                 ) : null}
               </TouchableOpacity>
               {showPoints && (
-                <View style={styles.pointsPopup} pointerEvents="none">
+                <Animated.View entering={FadeInDown.springify().damping(12)} style={styles.pointsPopup} pointerEvents="none">
                   <CoinIcon size={18} />
                   <Text style={styles.pointsPopupText}>+{feedback!.pointsAwarded}</Text>
-                </View>
+                </Animated.View>
               )}
-            </View>
+            </Animated.View>
           );
         })}
       </View>
@@ -844,7 +919,8 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       {/* 6. Sabit Alt Durum Alanı (yerleşim kaymasız) */}
       <View style={[styles.fixedBottomStatus, compact && { minHeight: 44 }]}>
         {feedback ? (
-          <View
+          <Animated.View
+            entering={FadeInDown.duration(280)}
             style={[
               styles.inlineFeedbackCard,
               {
@@ -879,7 +955,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                 {feedback.explanation}
               </Text>
             ) : null}
-          </View>
+          </Animated.View>
         ) : answerState === 'submitting' ? (
           <Text style={styles.bottomHintText}>Cevabın kilitlendi, rakipler bekleniyor...</Text>
         ) : answerState === 'timed_out' ? (
@@ -1141,6 +1217,21 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: 'rgba(154, 107, 255, 0.18)',
+  },
+  raceBubble: {
+    position: 'absolute',
+    left: 0,
+    width: 24,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#5ADBB5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  raceBubbleText: {
+    color: '#0B2A20',
+    fontSize: 10,
+    fontFamily: THEME.fonts.black,
   },
   raceLaneFill: {
     position: 'absolute',

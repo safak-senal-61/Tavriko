@@ -10,6 +10,7 @@ import {
   TextInput,
   Modal,
 } from 'react-native';
+import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { CategoryId, CategoryInfo, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -310,11 +311,15 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
             })}
           </ScrollView>
 
-          {/* 4x4 Grid of Categories */}
+          {/* 3 sütunlu kategori ızgarası */}
           <View style={styles.grid}>
-            {filteredCategories.map((cat) => (
+            {filteredCategories.map((cat, idx) => (
+              <Reanimated.View
+                key={`${activeGroup}-${cat.id}`}
+                entering={FadeInDown.delay(Math.min(idx, 14) * 28).duration(300)}
+                style={styles.catCell}
+              >
               <TouchableOpacity
-                key={cat.id}
                 style={styles.catTile}
                 onPress={() => {
                   sound.playSound('tap');
@@ -323,12 +328,13 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                 }}
                 activeOpacity={0.85}
               >
-                <CategorySquircleIcon category={cat.id} size={42} />
-                <Text style={styles.catName} numberOfLines={1}>
+                <CategorySquircleIcon category={cat.id} size={44} />
+                <Text style={styles.catName} numberOfLines={2}>
                   {cat.name}
                 </Text>
                 <Text style={styles.catCount}>{cat.totalQuestions} soru</Text>
               </TouchableOpacity>
+              </Reanimated.View>
             ))}
           </View>
 
@@ -578,31 +584,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    rowGap: 8,
-    paddingHorizontal: 4,
+    rowGap: 10,
+    paddingHorizontal: 2,
+  },
+  catCell: {
+    width: '31.8%',
   },
   catTile: {
-    width: '23.5%',
-    height: 104,
+    height: 124,
     borderRadius: 18,
-    backgroundColor: '#0F172A',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(20, 8, 52, 0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 3,
+    gap: 5,
+    paddingHorizontal: 8,
   },
   catName: {
     color: '#FFFFFF',
-    fontSize: 10.5,
+    fontSize: 12,
+    lineHeight: 15,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
+    minHeight: 30,
+    textAlignVertical: 'center',
   },
   catCount: {
-    color: '#94A3B8',
-    fontSize: 9.5,
-    fontFamily: THEME.fonts.extraBold,
+    color: 'rgba(217, 205, 245, 0.6)',
+    fontSize: 10.5,
+    fontFamily: THEME.fonts.bold,
   },
   emptyState: {
     alignItems: 'center',
