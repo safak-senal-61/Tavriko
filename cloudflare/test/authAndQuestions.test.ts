@@ -10,7 +10,7 @@ describe('Auth & Default Questions', () => {
   it('accepts a valid server-signed guest JWT', async () => {
     const secret = 'test-secret-that-is-at-least-32-characters';
     const encode = (value: unknown) => btoa(unescape(encodeURIComponent(JSON.stringify(value))))
-      .replace(/=/g, '').replace(/\\+/g, '-').replace(/\\//g, '_');
+      .replace(/=/g, '').split('+').join('-').split('/').join('_');
     const header = encode({ alg: 'HS256', typ: 'JWT' });
     const payload = encode({
       userId: 'guest_abc123',
@@ -26,7 +26,7 @@ describe('Auth & Default Questions', () => {
     ));
     let binary = '';
     signatureBytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-    const signature = btoa(binary).replace(/=/g, '').replace(/\\+/g, '-').replace(/\\//g, '_');
+    const signature = btoa(binary).replace(/=/g, '').split('+').join('-').split('/').join('_');
     const res = await verifyJwt(header + '.' + payload + '.' + signature, secret);
     expect(res.isValid).toBe(true);
     expect(res.user?.id).toBe('guest_abc123');
@@ -36,7 +36,7 @@ describe('Auth & Default Questions', () => {
   it('rejects expired guest JWTs', async () => {
     const secret = 'test-secret-that-is-at-least-32-characters';
     const encode = (value: unknown) => btoa(unescape(encodeURIComponent(JSON.stringify(value))))
-      .replace(/=/g, '').replace(/\\+/g, '-').replace(/\\//g, '_');
+      .replace(/=/g, '').split('+').join('-').split('/').join('_');
     const header = encode({ alg: 'HS256', typ: 'JWT' });
     const payload = encode({
       userId: 'guest_abc123',
@@ -52,7 +52,7 @@ describe('Auth & Default Questions', () => {
     ));
     let binary = '';
     signatureBytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-    const signature = btoa(binary).replace(/=/g, '').replace(/\\+/g, '-').replace(/\\//g, '_');
+    const signature = btoa(binary).replace(/=/g, '').split('+').join('-').split('/').join('_');
     const res = await verifyJwt(header + '.' + payload + '.' + signature, secret);
     expect(res.isValid).toBe(false);
   });
