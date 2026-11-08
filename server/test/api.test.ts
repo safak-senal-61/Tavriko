@@ -214,4 +214,34 @@ describe('Trivia REST API', () => {
       expect(player).not.toHaveProperty('settings');
     }
   });
+
+  it('enforces strong passwords and rejects common or predictable passwords', () => {
+    expect(validateStrongPassword('shortA1!')).toContain('12 karakter');
+    expect(validateStrongPassword('password123!')).toContain('yaygın');
+    expect(validateStrongPassword('Abcdef123456!')).toContain('ardışık');
+    expect(validateStrongPassword('TavRiko!Güvenli2026')).toBeNull();
+  });
+
+  it('rejects weak passwords at registration and password reset', async () => {
+    const register = await request(app)
+      .post('/api/auth/register')
+      .send({ username: 'weakpass-user', email: 'weakpass@example.invalid', password: 'abc123' });
+    expect(register.status).toBe(400);
+
+    const reset = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ identifier: 'weakpass-user', otpCode: '000000', newPassword: 'abc123' });
+    expect(reset.status).toBe(400);
+  });
+
+  it('rate limits repeated login attempts', async () => {
+    let last: any;
+    for (let i = 0; i < 11; i++) {
+      last = await request(app)
+        .post('/api/auth/login')
+        .send({ identifier: 'unknown-user@example.invalid', password: 'WrongPassword123!' });
+    }
+    expect(last.status).toBe(429);
+  });
+
 });
