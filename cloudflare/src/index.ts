@@ -5,6 +5,53 @@ import { sanitizeRoomCode } from './websocket/validation';
 import { verifyJwt } from './auth/authenticate';
 
 export { GameRoomDO, MatchmakerDO };
+const avatarUploadWindows = new Map<string, number[]>();
+const AVATAR_UPLOAD_LIMIT = 10;
+const AVATAR_UPLOAD_WINDOW_MS = 60_000;
+const MAX_AVATAR_REQUEST_BYTES = 5 * 1024 * 1024;
+
+async function readJsonLimited(request: Request, maxBytes: number): Promise<any | null> {
+  if (!request.body) return null;
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder().decode(merged));
+  } catch {
+    return null;
+  }
+}
+
+function allowAvatarUpload(userId: string): boolean {
+  const now = Date.now();
+  const recent = (avatarUploadWindows.get(userId) || []).filter((time) => now - time < AVATAR_UPLOAD_WINDOW_MS);
+  if (recent.length >= AVATAR_UPLOAD_LIMIT) return false;
+  recent.push(now);
+  avatarUploadWindows.set(userId, recent);
+  if (avatarUploadWindows.size > 5000) {
+    for (const [id, times] of avatarUploadWindows) {
+      if (!times.some((time) => now - time < AVATAR_UPLOAD_WINDOW_MS)) avatarUploadWindows.delete(id);
+    }
+  }
+  return true;
+}
+
 
 function generateSecureRoomCode(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -89,7 +136,17 @@ export default {
           if (!auth.isValid || !auth.user || auth.user.isGuest) {
             return new Response(JSON.stringify({ error: 'Oturum doğrulaması gerekli.' }), { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } });
           }
-          const bodyJson: any = await request.json().catch(() => ({}));
+          const contentLength = Number(request.headers.get('Content-Length') || 0);
+          if (contentLength > MAX_AVATAR_REQUEST_BYTES) {
+            return new Response(JSON.stringify({ error: 'Görsel isteği çok büyük.' }), { status: 413, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } });
+          }
+          if (!allowAvatarUpload(auth.user.id)) {
+            return new Response(JSON.stringify({ error: 'Çok sık görsel yükleniyor. Lütfen daha sonra tekrar deneyin.' }), { status: 429, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } });
+          }
+          const bodyJson: any = await readJsonLimited(request, MAX_AVATAR_REQUEST_BYTES);
+          if (!bodyJson) {
+            return new Response(JSON.stringify({ error: 'Geçersiz veya çok büyük görsel isteği.' }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } });
+          }
           let rawData = bodyJson?.image || bodyJson?.avatar;
           if (bodyJson?.userId && bodyJson.userId !== auth.user.id) {
             return new Response(JSON.stringify({ error: 'Kullanıcı kimliği uyuşmuyor.' }), { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders(request) } });
