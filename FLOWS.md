@@ -18,6 +18,7 @@
 - Visually inspected the title artwork beside the name and the text-only title pill. Daily day 1 opens the real five-question challenge; completed day 7 shows Mega Sandık and the explicitly unrewarded practice callback. Checked narrow 320px, 375px and desktop 1280px/reduced-motion layouts; no horizontal page/link overflow or uncaught browser errors in exercised flows.
 - Applied the exact additive migration to the existing Tavriko Supabase project. Before/after: 13 users and 13 existing notifications, unchanged; both new tables empty and RLS enabled. No production accounts, friendships, coins or notifications were modified by QA.
 - Native iOS/Android runtime, real Google OAuth and real cross-device notification delivery were not exercised. Web persistence is verified; native process-restart persistence is not claimed.
+- Deployment verification caught that the legacy Node function deployment continued serving tracked old `client/dist`/`server/dist` despite a successful Git status. Add the documented Node `vercel-build` hook and refresh the intentionally tracked build artifacts. Never treat a successful deployment status alone as proof of updated production code.
 
 ## Seen notifications, plain profile title and private rooms
 - Updated behavior: opening the inbox marks all currently loaded notifications seen immediately. New HTTP or WebSocket arrivals are also marked seen while the inbox is open. Invitation acceptance/decline remains a separate explicit action.
