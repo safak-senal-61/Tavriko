@@ -23,12 +23,13 @@ import {
   CharacterAvatar,
   CoinIcon,
   GemIcon,
-  BellLineIcon,
   CrownIcon,
   StreakFlameIcon,
 } from '../components/TavrikoIcons';
 import { GradientFill, formatNumberTR } from '../components/TavrikoGradient';
 import { UI_IMG } from '../components/StoreKit';
+import { NotificationBell } from '../components/NotificationUI';
+import { useUnreadCount } from '../store/notificationStore';
 
 const LOGO_MARK = require('../../assets/images/logo_mark.png');
 const DUEL_BANNER = require('../../assets/images/duel_arena_banner.jpg');
@@ -184,9 +185,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const prog = calculateLevelFromXp(user.xp ?? 0);
   const completedToday = Boolean(user.dailyChallenge?.completedToday);
   const streakDays = Math.max(1, user.dailyStreak ?? 1);
-  const hasPendingNotifications = (user.notifications ?? []).some(
-    (n) => (n.type === 'friend_request' || n.type === 'match_invite') && !n.handled
-  );
+  const unread = useUnreadCount();
 
   return (
     <TavrikoScreen>
@@ -246,10 +245,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onNotifications();
               }}
               activeOpacity={0.8}
-              accessibilityLabel="Bildirimler"
+              accessibilityRole="button"
+              accessibilityLabel={`Bildirimler, ${unread} okunmamış`}
             >
-              <BellLineIcon size={20} />
-              {hasPendingNotifications && <View style={styles.bellDot} />}
+              <NotificationBell />
             </TouchableOpacity>
           </View>
         </View>

@@ -9,7 +9,6 @@ import {
   Share,
   ActivityIndicator,
   Platform,
-  Switch,
   Image,
   ImageSourcePropType,
 } from 'react-native';
@@ -41,6 +40,7 @@ import {
 import { UI_IMG, FloatingImage, ShimmerView, CATEGORY_IMG } from '../components/StoreKit';
 import { DISCOVERY_IMG, DiscoveryArtwork, AchievementState } from '../components/DiscoveryArtwork';
 import { Settings, UserRound } from 'lucide-react-native';
+import { PreferenceSwitch } from '../components/PreferenceSwitch';
 
 let ImagePickerModule: any = null;
 try {
@@ -251,9 +251,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const settings: UserSettings & { soundEnabled?: boolean; allowDuelChallenges?: boolean } =
     (user.settings as any) || {};
   const [onlineStatusVisible, setOnlineStatusVisible] = useState(settings.onlineStatusVisible !== false);
-  const [soundEnabled, setSoundEnabled] = useState(settings.soundEnabled !== false);
+  const [soundEnabled, setSoundEnabled] = useState((settings.sfxEnabled ?? settings.soundEnabled) !== false);
   const [hapticsEnabled, setHapticsEnabled] = useState(settings.hapticsEnabled !== false);
-  const [allowDuelChallenges, setAllowDuelChallenges] = useState(settings.allowDuelChallenges !== false);
+  const [allowDuelChallenges, setAllowDuelChallenges] = useState((settings.duelInvitesAllowed ?? settings.allowDuelChallenges) !== false);
 
   const prog = calculateLevelFromXp(user.xp ?? 0);
   const equippedTitle = settings.equippedTitle || prog.rankTitle;
@@ -392,11 +392,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         },
         body: JSON.stringify({
           userId: user.id,
-          settings: { ...settings, soundEnabled: val },
+          settings: { ...settings, sfxEnabled: val, soundEnabled: val },
         }),
       });
       if (onUpdateUser) {
-        onUpdateUser({ ...user, settings: { ...settings, soundEnabled: val } as any });
+        onUpdateUser({ ...user, settings: { ...settings, sfxEnabled: val, soundEnabled: val } as any });
       }
     } catch {}
   };
@@ -435,11 +435,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         },
         body: JSON.stringify({
           userId: user.id,
-          settings: { ...settings, allowDuelChallenges: val },
+          settings: { ...settings, duelInvitesAllowed: val, allowDuelChallenges: val },
         }),
       });
       if (onUpdateUser) {
-        onUpdateUser({ ...user, settings: { ...settings, allowDuelChallenges: val } as any });
+        onUpdateUser({ ...user, settings: { ...settings, duelInvitesAllowed: val, allowDuelChallenges: val } as any });
       }
     } catch {}
   };
@@ -1205,10 +1205,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         {/* TAB 4: Quick Settings & Live Cloud Sync */}
         {activeTab === 'settings' && (
           <View style={styles.detailsCard}>
-            <Text style={styles.sectionTitle}>Hızlı Ayarlar & Canlı Bağlantı</Text>
-            <Text style={styles.cardSub}>
-              Tüm tercihler anında PostgreSQL veritabanına ve Cloudflare Worker WebSocket katmanına aktarılır.
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.sectionTitle}>Oyun, senin ritmin.</Text>
+                <Text style={styles.cardSub}>En çok kullandığın tercihler elinin altında.</Text>
+              </View>
+              <DiscoveryArtwork source={DISCOVERY_IMG.settings} size={76} />
+            </View>
 
             {/* Cloudflare WS Live Banner */}
             <View style={styles.gatewayBanner}>
@@ -1216,10 +1219,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <RadioSignalIcon size={18} color={wsConnected ? '#3FD08A' : '#FFC43D'} />
                 <View>
                   <Text style={styles.gatewayTitle}>
-                    {wsConnected ? 'Cloudflare Realtime Gateway' : 'Gateway Bağlanıyor'}
+                    {wsConnected ? 'Canlı bağlantı açık' : 'Bağlantı kuruluyor'}
                   </Text>
                   <Text style={styles.gatewaySub}>
-                    {wsConnected ? 'WebSocket senkronizasyonu aktif' : 'Sunucu ile el sıkışılıyor...'}
+                    {wsConnected ? 'Davetler ve durumun güncel' : 'Birazdan yeniden bağlanacak'}
                   </Text>
                 </View>
               </View>
@@ -1238,11 +1241,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   Arkadaşların seni lobide ve oyun içi listelerde çevrimiçi görsün
                 </Text>
               </View>
-              <Switch
+              <PreferenceSwitch label="Çevrimiçi Görünürlük"
                 value={onlineStatusVisible}
                 onValueChange={handleToggleOnlineVisibility}
-                trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#6B3CFF' }}
-                thumbColor={onlineStatusVisible ? '#FFC43D' : '#888'}
               />
             </View>
 
@@ -1252,11 +1253,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.settingLabel}>Ses Efektleri</Text>
                 <Text style={styles.settingSub}>Oyun içi sesler, ödül ve zil efektleri</Text>
               </View>
-              <Switch
+              <PreferenceSwitch label="Ses Efektleri"
                 value={soundEnabled}
                 onValueChange={handleToggleSound}
-                trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#6B3CFF' }}
-                thumbColor={soundEnabled ? '#FFC43D' : '#888'}
               />
             </View>
 
@@ -1266,11 +1265,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.settingLabel}>Titreşim & Dokunsal Geri Bildirim</Text>
                 <Text style={styles.settingSub}>Tuş vuruşları ve kritik anlarda haptic titreşim</Text>
               </View>
-              <Switch
+              <PreferenceSwitch label="Titreşim ve Dokunsal Geri Bildirim"
                 value={hapticsEnabled}
                 onValueChange={handleToggleHaptics}
-                trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#6B3CFF' }}
-                thumbColor={hapticsEnabled ? '#FFC43D' : '#888'}
               />
             </View>
 
@@ -1280,11 +1277,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.settingLabel}>1v1 Düello Meydan Okumaları</Text>
                 <Text style={styles.settingSub}>Diğer oyunculardan gelen yarış davetlerini kabul et</Text>
               </View>
-              <Switch
+              <PreferenceSwitch label="1v1 Düello Meydan Okumaları"
                 value={allowDuelChallenges}
                 onValueChange={handleToggleDuels}
-                trackColor={{ false: 'rgba(255,255,255,0.15)', true: '#6B3CFF' }}
-                thumbColor={allowDuelChallenges ? '#FFC43D' : '#888'}
               />
             </View>
 
@@ -2257,6 +2252,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
+    minWidth: 0,
   },
   gatewayTitle: {
     color: '#FFFFFF',
@@ -2265,7 +2262,7 @@ const styles = StyleSheet.create({
   },
   gatewaySub: {
     color: '#D9CDF5',
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: THEME.fonts.body,
     marginTop: 1,
   },
@@ -2290,12 +2287,12 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: THEME.fonts.extraBold,
   },
   settingSub: {
     color: '#D9CDF5',
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: THEME.fonts.body,
     marginTop: 2,
   },

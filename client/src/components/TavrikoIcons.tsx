@@ -25,6 +25,8 @@ import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { CharacterAvatar, AVATAR_PRESETS, AvatarPreset } from './TavrikoAvatars';
 import { useGameStore } from '../store/gameStore';
+import { NotificationBell } from './NotificationUI';
+import { useUnreadCount } from '../store/notificationStore';
 // Brand Assets
 export const BRAND_LOGO_MAIN = require('../../assets/images/logo_main.jpg');
 export const BRAND_LOGO_BANNER = require('../../assets/images/logo_banner.jpg');
@@ -1182,6 +1184,7 @@ export const TavrikoTopBar: React.FC<{
   onGuestLoginPress,
 }) => {
   const storeUser = useGameStore((s) => s.user);
+  const unread = useUnreadCount();
   const displayCoins = coins !== undefined && coins !== null ? coins : storeUser?.coins ?? 0;
   const displayGems = gems !== undefined && gems !== null ? gems : storeUser?.gems ?? 0;
   const displayAvatar = avatarSeed || storeUser?.avatarUrl || storeUser?.displayName || 'av1';
@@ -1230,6 +1233,8 @@ export const TavrikoTopBar: React.FC<{
       {leftType !== 'none' ? (
         <TouchableOpacity
           style={styles.iconButton}
+          accessibilityRole="button"
+          accessibilityLabel={leftType === 'bell' ? `Bildirimler, ${unread} okunmamış` : leftType === 'back' ? 'Geri' : 'Kapat'}
           onPress={() => {
             sound.playSound('tap');
             sound.triggerHaptic('light');
@@ -1237,7 +1242,7 @@ export const TavrikoTopBar: React.FC<{
           }}
           activeOpacity={0.8}
         >
-          {leftType === 'bell' && <BellLineIcon size={20} />}
+          {leftType === 'bell' && <NotificationBell />}
           {leftType === 'back' && <BackChevronIcon size={22} color="#FFFFFF" />}
           {leftType === 'close' && <CloseXIcon size={18} color="#FFFFFF" />}
         </TouchableOpacity>

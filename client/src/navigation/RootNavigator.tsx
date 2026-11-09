@@ -26,6 +26,7 @@ import {
   DailyChallengeConfig,
   CustomRoomSettings,
   MatchQuestionReviewItem,
+  ALL_CATEGORIES,
 } from '@trivia/shared';
 // Screens
 import { SplashScreen } from '../screens/SplashScreen';
@@ -61,6 +62,8 @@ import { InventoryScreen } from '../screens/InventoryScreen';
 import { ProLeagueScreen } from '../screens/ProLeagueScreen';
 import { sanitizeAvatarForUrl, compressAvatarImageAsync } from '../utils/avatarImage';
 import { applyStoredPreferencesOnBoot } from '../store/appPrefs';
+import { useNotificationStore } from '../store/notificationStore';
+import { NotificationToast } from '../components/NotificationUI';
 import { PaymentScreen, PaymentItem } from '../screens/PaymentScreen';
 import { DeveloperScreen } from '../screens/DeveloperScreen';
 export type ScreenName =
@@ -139,6 +142,7 @@ export const RootNavigator: React.FC = () => {
     if (nextScreen === currentScreenRef.current) {
       return;
     }
+    if (nextScreen === 'notifications') useNotificationStore.getState().dismissToast();
     // Prevent screen darkening/blinking during questions or same-mode transitions
     if (nextScreen === 'quiz_arena' && currentScreenRef.current === 'quiz_arena') {
       return;
@@ -234,6 +238,42 @@ export const RootNavigator: React.FC = () => {
     },
     [setUser]
   );
+
+  const refreshUserProfile = useCallback(async () => {
+    const current = useGameStore.getState();
+    if (!current.user || current.user.isGuest) return;
+    const owner = current.user.id;
+    try {
+      const response = await fetch(`${API_BASE}/social/profile/${encodeURIComponent(owner)}`, {
+        headers: current.token ? { Authorization: `Bearer ${current.token}` } : {},
+      });
+      const fresh = response.ok ? await response.json() : null;
+      if (fresh?.id === owner && useGameStore.getState().user?.id === owner) syncWithFreshUser(fresh);
+    } catch {}
+  }, [syncWithFreshUser]);
+
+  // One inbox for every screen: HTTP reconnect snapshots and socket arrivals
+  // share the same IDs, read receipts and exact badge count.
+  useEffect(() => {
+    const owner = user && !user.isGuest && !isGuest ? user.id : null;
+    const inbox = useNotificationStore.getState();
+    inbox.activate(owner, user?.notifications);
+    if (!owner) return;
+    const refresh = () => {
+      if (Platform.OS !== 'web' || typeof document === 'undefined' || !document.hidden) {
+        void useNotificationStore.getState().refresh(API_BASE);
+      }
+    };
+    refresh();
+    const interval = setInterval(refresh, 60000);
+    const subscription = AppState.addEventListener('change', state => { if (state === 'active') refresh(); });
+    if (Platform.OS === 'web' && typeof window !== 'undefined') window.addEventListener('focus', refresh);
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+      if (Platform.OS === 'web' && typeof window !== 'undefined') window.removeEventListener('focus', refresh);
+    };
+  }, [user?.id, isGuest]);
 
   const currentQuestionRef = useRef<ClientQuestion | null>(currentQuestion);
   currentQuestionRef.current = currentQuestion;
@@ -607,14 +647,17 @@ export const RootNavigator: React.FC = () => {
     );
 
     const unsubNotif = socketService.on('notification:new', (notif: any) => {
+      const inbox = useNotificationStore.getState();
+      if (inbox.userId !== user.id || !inbox.receive(notif)) return;
       sound.playSound('reward');
       sound.triggerHaptic('success');
-      if (notif.type === 'match_invite' || notif.type === 'duel') {
-        setAuthRedirectNotice(`⚔️ ${notif.title}\n${notif.sub}`);
-      } else if (notif.type === 'friend_request') {
-        setAuthRedirectNotice(`👥 ${notif.title}\nBildirimler sayfasından isteği kabul edebilirsin.`);
+      if (currentScreenRef.current === 'notifications') inbox.dismissToast();
+      void refreshUserProfile();
+    });
+    const unsubNotifUpdate = socketService.on('notification:update', (data: { id: string; handled: 'accepted' | 'declined' }) => {
+      if (data?.id && (data.handled === 'accepted' || data.handled === 'declined')) {
+        useNotificationStore.getState().patch(data.id, { handled: data.handled });
       }
-      refreshUserProfile();
     });
 
     const unsubFriendsSync = socketService.on('friends:update', () => {
@@ -641,6 +684,7 @@ export const RootNavigator: React.FC = () => {
       unsubMatchFound();
       unsubPlayerAnswered();
       unsubNotif();
+      unsubNotifUpdate();
       unsubFriendsSync();
       clearInterval(heartbeatInterval);
     };
@@ -1634,7 +1678,7 @@ export const RootNavigator: React.FC = () => {
               rankTitle: duelOpponent?.isBot ? 'Yapay Zeka' : 'Düellocu',
               isBot: duelOpponent?.isBot,
             }}
-            categoryName={selectedCategory.replace('_', ' ').toUpperCase()}
+            categoryName={ALL_CATEGORIES.find(category => category.id === selectedCategory)?.name || 'Genel Kültür'}
             onCancel={handleCancelMatchmaking}
           />
         )}
@@ -1927,16 +1971,7 @@ export const RootNavigator: React.FC = () => {
                 handleStartQuickMatch();
               }
             }}
-            onRefreshUser={() => {
-              if (user && !isGuest) {
-                fetch(`${API_BASE}/social/profile/${user.id}`)
-                  .then((r) => (r.ok ? r.json() : null))
-                  .then((fresh) => {
-                    if (fresh) syncWithFreshUser(fresh);
-                  })
-                  .catch(() => {});
-              }
-            }}
+            onRefreshUser={() => { void refreshUserProfile(); }}
           />
         )}
         {currentScreen === 'settings' && (
@@ -2120,6 +2155,9 @@ export const RootNavigator: React.FC = () => {
           />
         )}
         </Animated.View>
+        {currentScreen !== 'notifications' && user && !isGuest && (
+          <NotificationToast onOpen={() => navigateTo('notifications')} />
+        )}
       </View>
 
       {/* Desktop Right Sidebar (Wide Displays >= 1180px) */}

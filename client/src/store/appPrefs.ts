@@ -14,7 +14,7 @@ export const PREFS_STORAGE_KEY = 'tavriko_user_settings_v1';
 export const loadStoredPreferences = (): UserSettings => {
   try {
     if (typeof localStorage !== 'undefined') {
-      const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+      const raw = localStorage.getItem('tavriko_user_settings_v2') || localStorage.getItem(PREFS_STORAGE_KEY);
       if (raw) return JSON.parse(raw) as UserSettings;
     }
   } catch {}
@@ -30,7 +30,7 @@ const pctToFloat = (pct: any, fallback: number): number => {
 /** Kayıtlı bir ayarı motorlara uygula (ses efektleri, müzik, haptik). */
 export const applyAudioPreferences = (p: UserSettings) => {
   try {
-    sound.setSoundEnabled(p.sfxEnabled !== false);
+    sound.setSoundEnabled((p.sfxEnabled ?? (p as any).soundEnabled) !== false);
     sound.setSoundVolume(pctToFloat(p.sfxVolume, 1));
     sound.setHapticsEnabled(p.hapticsEnabled !== false);
     if (p.hapticIntensity === 'light' || p.hapticIntensity === 'medium' || p.hapticIntensity === 'strong') {
