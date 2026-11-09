@@ -943,13 +943,13 @@ export function renderDashboardHtml(): string {
 
     <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
       <div class="nav-tabs">
-        <button class="nav-btn active" onclick="switchTab('tab-game')">🎮 Canlı Web Oyunu & Simülatör</button>
-        <button class="nav-btn" onclick="switchTab('tab-expo')">📱 Mobil & Bulut QR Kod</button>
-        <button class="nav-btn" onclick="switchTab('tab-cos')">✨ Kozmetikler & Animasyonlar</button>
-        <button class="nav-btn" onclick="switchTab('tab-api')">📖 API Dökümanı & Test</button>
-        <button class="nav-btn" onclick="switchTab('tab-logs')">📜 Canlı Loglar & Hatalar</button>
-        <button class="nav-btn" onclick="switchTab('tab-db')">👥 Kullanıcılar & Veritabanı</button>
-        <button class="nav-btn" onclick="switchTab('tab-mod')">🚫 Moderasyon & Engelleme</button>
+        <button class="nav-btn active" onclick="switchTab('tab-game', this)">🎮 Canlı Web Oyunu & Simülatör</button>
+        <button class="nav-btn" onclick="switchTab('tab-expo', this)">📱 Mobil & Bulut QR Kod</button>
+        <button class="nav-btn" onclick="switchTab('tab-cos', this)">✨ Kozmetikler & Animasyonlar</button>
+        <button class="nav-btn" onclick="switchTab('tab-api', this)">📖 API Dökümanı & Test</button>
+        <button class="nav-btn" onclick="switchTab('tab-logs', this)">📜 Canlı Loglar & Hatalar</button>
+        <button class="nav-btn" onclick="switchTab('tab-db', this)">👥 Kullanıcılar & Veritabanı</button>
+        <button class="nav-btn" onclick="switchTab('tab-mod', this)">🚫 Moderasyon & Engelleme</button>
       </div>
       <div style="display: flex; align-items: center; gap: 8px;">
         <a href="/app" target="_blank" class="btn btn-gold" style="text-decoration:none; padding: 7px 14px; font-size: 12px; font-weight:800;">
@@ -1563,11 +1563,12 @@ export function renderDashboardHtml(): string {
     let activeCatFilter = 'ALL';
     let errorCounter = 0;
 
-    function switchTab(tabId) {
+    function switchTab(tabId, btn) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
-      event.target.classList.add('active');
+      const target = btn || (window.event && window.event.target);
+      if (target && target.classList) target.classList.add('active');
     }
 
     function renderSingleLog(entry, prepend = false) {
