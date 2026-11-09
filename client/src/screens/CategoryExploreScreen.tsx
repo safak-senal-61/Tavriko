@@ -22,11 +22,9 @@ import {
   TavrikoBottomNav,
   Button3D,
   CategorySquircleIcon,
-  SpeedBoltIcon,
-  TrophyIcon,
-  CoinIcon,
 } from '../components/TavrikoIcons';
 import { CATEGORY_IMG } from '../components/StoreKit';
+import { GuestDiscoveryCard } from '../components/DiscoveryArtwork';
 
 interface CategoryExploreScreenProps {
   onBack: () => void;
@@ -248,47 +246,11 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
         >
           {/* Guest Mode Feature Showcase */}
           {isGuest && (
-            <View style={styles.guestShowcaseCard}>
-              <View style={styles.guestShowcaseHeader}>
-                <Text style={styles.guestShowcaseTitle}>
-                  ARKADAŞINLA OYNA & TÜM ÖZELLİKLERİ AÇ!
-                </Text>
-              </View>
-              <Text style={styles.guestShowcaseDesc}>
-                Ücretsiz hesap oluşturarak veya Google ile tek tıkla bağlanarak rekabete katıl:
-              </Text>
-              <View style={styles.perksGrid}>
-                <View style={styles.perkChip}>
-                  <SpeedBoltIcon size={14} />
-                  <Text style={styles.perkChipText}>Canlı 1v1 Düello</Text>
-                </View>
-                <View style={styles.perkChip}>
-                  <TrophyIcon size={14} />
-                  <Text style={styles.perkChipText}>Arkadaşınla Özel Oda</Text>
-                </View>
-                <View style={styles.perkChip}>
-                  <TrophyIcon size={14} />
-                  <Text style={styles.perkChipText}>Pro Lig & Liderlik</Text>
-                </View>
-                <View style={styles.perkChip}>
-                  <CoinIcon size={14} />
-                  <Text style={styles.perkChipText}>+800 Altın Başlangıç</Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.guestCtaActionBtn}
-                onPress={() => {
-                  sound.playSound('reward');
-                  sound.triggerHaptic('medium');
-                  if (onLoginPrompt) onLoginPrompt();
-                }}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.guestCtaActionText}>
-                  HEMEN GİRİŞ YAP / ÜCRETSİZ KAYIT OL →
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <GuestDiscoveryCard onPress={() => {
+              sound.playSound('reward');
+              sound.triggerHaptic('medium');
+              onLoginPrompt?.();
+            }} />
           )}
 
           {/* Screen Title */}
@@ -505,69 +467,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 120,
     paddingHorizontal: 2,
-  },
-  guestShowcaseCard: {
-    marginTop: 6,
-    marginBottom: 10,
-    backgroundColor: '#0F172A',
-    borderWidth: 1.5,
-    borderColor: 'rgba(245, 158, 11, 0.45)',
-    borderRadius: 22,
-    padding: 14,
-    gap: 8,
-  },
-  guestShowcaseHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  guestShowcaseTitle: {
-    flex: 1,
-    color: '#FFC43D',
-    fontSize: 13,
-    fontFamily: THEME.fonts.display,
-  },
-  guestShowcaseDesc: {
-    color: '#E6DCFF',
-    fontSize: 11,
-    fontFamily: THEME.fonts.medium,
-  },
-  perksGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  perkChip: {
-    width: '48%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  perkChipText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  guestCtaActionBtn: {
-    marginTop: 4,
-    backgroundColor: '#10B981',
-    borderBottomWidth: 3,
-    borderBottomColor: '#065F46',
-    borderRadius: 14,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  guestCtaActionText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: THEME.fonts.display,
-    fontWeight: '900',
   },
   title: {
     fontFamily: THEME.fonts.display,

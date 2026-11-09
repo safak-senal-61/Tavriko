@@ -44,6 +44,7 @@ import {
   EyeOffIcon,
 } from '../components/TavrikoIcons';
 import { FloatingImage } from '../components/StoreKit';
+import { GuestDiscoveryCard } from '../components/DiscoveryArtwork';
 import Reanimated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { sound } from '../services/soundService';
 
@@ -1333,23 +1334,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         </Reanimated.View>
         {/* Guest Mode Entry */}
         <Reanimated.View entering={FadeInUp.delay(320).duration(450)}>
-          <TouchableOpacity
-            style={styles.guestButton}
+          <GuestDiscoveryCard
+            compact
             onPress={() => {
               sound.playSound('nav');
               sound.triggerHaptic('light');
               onGuestContinue();
             }}
-            activeOpacity={0.8}
-          >
-            <Image source={AUTH_CROWN} style={styles.guestIcon} resizeMode="contain" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.guestButtonTitle}>Misafir Olarak Göz At →</Text>
-              <Text style={styles.guestButtonSub}>
-                Sadece Keşfet kategorilerinde tek kişilik pratik mod açıktır
-              </Text>
-            </View>
-          </TouchableOpacity>
+          />
         </Reanimated.View>
       </ScrollView>
       {/* Country Picker Modal */}
@@ -1917,38 +1909,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: THEME.fonts.extraBold,
     color: '#1E293B',
-  },
-  guestButton: {
-    marginTop: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 196, 61, 0.28)',
-    width: '100%',
-    maxWidth: 480,
-    alignSelf: 'center',
-  },
-  guestIcon: {
-    width: 38,
-    height: 38,
-  },
-  guestButtonTitle: {
-    color: '#FFC43D',
-    fontSize: 14,
-    fontFamily: THEME.fonts.extraBold,
-    textAlign: 'left',
-  },
-  guestButtonSub: {
-    color: THEME.colors.textSecondary,
-    fontSize: 11,
-    fontFamily: THEME.fonts.medium,
-    marginTop: 2,
-    textAlign: 'left',
   },
   modalBackdrop: {
     flex: 1,

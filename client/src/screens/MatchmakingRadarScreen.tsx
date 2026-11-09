@@ -1,8 +1,11 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, Platform } from 'react-native';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, Animated, Easing, Platform, Image, ScrollView } from 'react-native';
+import { Radio, ShieldCheck, Swords } from 'lucide-react-native';
 import { CategoryId, DifficultyLevel, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
+import { DISCOVERY_IMG, useReducedMotion } from '../components/DiscoveryArtwork';
+import { GradientFill } from '../components/TavrikoGradient';
 import {
   TavrikoScreen,
   Button3D,
@@ -164,6 +167,8 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
   onCancel,
 }) => {
   const [elapsedSec, setElapsedSec] = useState(0);
+  const reducedMotion = useReducedMotion();
+  const pingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Ekranda SADECE tek bir aktif ışık tutulur: biri sönünce diğeri farklı noktada yanar!
   const [activeCoord, setActiveCoord] = useState<{ coord: SonarCoordinate; key: number } | null>(null);
@@ -180,17 +185,17 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
   // Merkez çekirdeğin nefes alma animasyonu
   const centerScale = useRef(new Animated.Value(1)).current;
   // Rakip aranıyor puls
-  const opponentPulseAnim = useRef(new Animated.Value(0)).current;
+  const opponentPulseAnim = useRef(new Animated.Value(1)).current;
 
   // Sıradaki rastgele tek ışığı tetikleyen mekanizma:
-  const triggerNextPing = () => {
+  const triggerNextPing = useCallback(() => {
     let nextIdx = Math.floor(Math.random() * SONAR_POOL.length);
     if (nextIdx === lastIndexRef.current) {
       nextIdx = (nextIdx + 1) % SONAR_POOL.length;
     }
     lastIndexRef.current = nextIdx;
     setActiveCoord({ coord: SONAR_POOL[nextIdx], key: Date.now() });
-  };
+  }, []);
 
   useEffect(() => {
     sound.playSound('radar_ping');
@@ -204,7 +209,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
         useNativeDriver: Platform.OS !== 'web',
       })
     );
-    sweepLoop.start();
+    if (!reducedMotion) sweepLoop.start();
 
     // Genişleyen sonar dalgası
     const sonarLoop = Animated.loop(
@@ -215,7 +220,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
         useNativeDriver: Platform.OS !== 'web',
       })
     );
-    sonarLoop.start();
+    if (!reducedMotion) sonarLoop.start();
 
     // Merkez 1v1 çekirdek nabzı
     const centerLoop = Animated.loop(
@@ -234,7 +239,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
         }),
       ])
     );
-    centerLoop.start();
+    if (!reducedMotion) centerLoop.start();
 
     // Rakip kutusu puls
     const oppLoop = Animated.loop(
@@ -253,7 +258,12 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
         }),
       ])
     );
-    oppLoop.start();
+    if (!reducedMotion) oppLoop.start();
+    else {
+      opponentPulseAnim.setValue(1);
+      centerScale.setValue(1);
+      sonarPulse.setValue(0);
+    }
 
     // Süre sayacı
     const timer = setInterval(() => {
@@ -267,7 +277,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
     }, 1000);
 
     // İlk ışığı başlat
-    const firstTimeout = setTimeout(triggerNextPing, 400);
+    const firstTimeout = !reducedMotion ? setTimeout(triggerNextPing, 400) : undefined;
 
     return () => {
       sweepLoop.stop();
@@ -276,15 +286,16 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
       oppLoop.stop();
       clearInterval(timer);
       clearTimeout(firstTimeout);
+      if (pingTimeout.current) clearTimeout(pingTimeout.current);
     };
-  }, [rotateAnim, sonarPulse, centerScale, opponentPulseAnim]);
+  }, [rotateAnim, sonarPulse, centerScale, opponentPulseAnim, reducedMotion, triggerNextPing]);
 
   // Işık tamamen söndüğünde çağrılır: kısa bir karanlık bekleme sonrası farklı noktada yeni ışığı yakar
-  const handlePingFinished = () => {
+  const handlePingFinished = useCallback(() => {
     setActiveCoord(null);
     const delay = 250 + Math.random() * 350; // 250-600ms aralık
-    setTimeout(triggerNextPing, delay);
-  };
+    pingTimeout.current = setTimeout(triggerNextPing, delay);
+  }, [triggerNextPing]);
 
   const spinInterpolation = rotateAnim.interpolate({
     inputRange: [0, 1],
@@ -317,7 +328,9 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
 
   return (
     <TavrikoScreen>
-      <Text style={styles.title}>1v1 HIZLI EŞLEŞME</Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <View style={styles.liveLabel}><Radio size={14} color="#B7F5E1" /><Text style={styles.liveLabelText}>DÜELLO ARENASI</Text></View>
+      <Text style={styles.title}>Rakibin arenaya geliyor.</Text>
       <Text style={styles.subtitle}>
         {catObj?.name || 'Genel Kültür'} · Canlı Düello
       </Text>
@@ -356,7 +369,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
           </Animated.View>
           <View style={styles.playerInfo}>
             <Text style={styles.playerName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>
-              {elapsedSec >= 7 ? 'Bilgisayar' : 'Rakip Aranıyor'}
+              {elapsedSec >= 7 ? 'Bilgisayar' : 'Rakip aranıyor'}
             </Text>
             <View
               style={[
@@ -365,7 +378,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
               ]}
             >
               <Text style={styles.searchingBadgeText} numberOfLines={1}>
-                {elapsedSec >= 7 ? '🤖 BOT' : '🔍 TARANIYOR'}
+                {elapsedSec >= 7 ? 'BOT RAKİP' : 'TARANIYOR'}
               </Text>
             </View>
           </View>
@@ -374,6 +387,8 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
 
       {/* Dairesel Radar Ekranı */}
       <View style={styles.radarContainer}>
+        <Image source={DISCOVERY_IMG.arena} style={styles.arenaImage} resizeMode="cover" />
+        <GradientFill colors={['rgba(22,12,48,0)', 'rgba(22,12,48,0.55)']} style={{ borderRadius: 135 }} />
         {/* Genişleyen Sonar Dalgası */}
         <Animated.View
           style={[
@@ -458,17 +473,27 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
             { transform: [{ scale: centerScale }] },
           ]}
         >
+          <Swords size={16} color="#FFC43D" />
           <Text style={styles.center1v1Text}>1v1</Text>
         </Animated.View>
 
         {/* SADECE TEK VE AKTİF OLAN IŞIK: Biri söndüğünde diğeri farklı koordinatta yanar! */}
-        {activeCoord && (
+        {!reducedMotion && activeCoord && (
           <SingleActiveSonarPing
             key={activeCoord.key}
             coord={activeCoord.coord}
             onFinished={handlePingFinished}
           />
         )}
+      </View>
+
+      <View style={styles.searchSteps}>
+        {['Hazırsın', 'Canlı rakip', 'Bot alternatifi'].map((label, index) => (
+          <View key={label} style={styles.searchStep}>
+            <View style={[styles.stepDot, index <= (elapsedSec >= 7 ? 2 : 1) && styles.stepDotActive]} />
+            <Text style={styles.stepLabel}>{label}</Text>
+          </View>
+        ))}
       </View>
 
       {/* 7 Saniyelik Arama Sayacı ve İlerleme Çubuğu */}
@@ -488,24 +513,37 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
 
       {/* Dinamik Durum Metni */}
       <Text style={styles.statusMessage}>{getStatusText()}</Text>
+      <View style={styles.fairPlay}><ShieldCheck size={16} color="#B7F5E1" /><Text style={styles.fairPlayText}>Aynı sorular. Eşit şans. Bilgini konuştur.</Text></View>
 
       {/* İptal Butonu */}
       <View style={styles.cancelWrap}>
         <Button3D
-          title="İPTAL"
-          variant="red"
+          title="ARAMAYI İPTAL ET"
+          variant="glass"
           onPress={onCancel}
-          style={{ width: 220 }}
+          style={{ width: '100%', maxWidth: 280 }}
         />
       </View>
+      </ScrollView>
     </TavrikoScreen>
   );
 };
 
 const styles = StyleSheet.create({
+  scrollContent: { paddingTop: 8, paddingBottom: 24, width: '100%', maxWidth: 580, alignSelf: 'center' },
+  liveLabel: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: 6, marginBottom: 8, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20, backgroundColor: 'rgba(111,227,193,0.1)' },
+  liveLabelText: { color: '#B7F5E1', fontSize: 12, fontFamily: THEME.fonts.extraBold, letterSpacing: 1 },
+  arenaImage: { position: 'absolute', top: 0, left: 0, width: 270, height: 270, borderRadius: 135, opacity: 0.85 },
+  searchSteps: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginTop: 8, marginBottom: 12 },
+  searchStep: { alignItems: 'center', gap: 6, flex: 1 },
+  stepDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#6C5C83' },
+  stepDotActive: { backgroundColor: '#B7F5E1' },
+  stepLabel: { color: '#E2D7F5', fontFamily: THEME.fonts.bold, fontSize: 12, textAlign: 'center' },
+  fairPlay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 12 },
+  fairPlayText: { color: '#D9CDF5', fontFamily: THEME.fonts.body, fontSize: 12, flexShrink: 1 },
   title: {
     fontFamily: THEME.fonts.display,
-    fontSize: 28,
+    fontSize: 26,
     color: '#FFFFFF',
     textAlign: 'center',
     marginTop: 6,
@@ -516,7 +554,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 16,
   },
   matchupRow: {
     flexDirection: 'row',
@@ -529,16 +567,16 @@ const styles = StyleSheet.create({
   playerCard: {
     flex: 1,
     minWidth: 0,
-    flexDirection: 'row',
+    flexDirection: 'column',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#2B1A46',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 16,
-    paddingVertical: 7,
+    paddingVertical: 12,
     paddingHorizontal: 7,
     gap: 6,
-    minHeight: 54,
+    minHeight: 96,
   },
   opponentSearchingCard: {
     backgroundColor: 'rgba(111, 227, 193, 0.06)',
@@ -571,15 +609,16 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   playerName: {
     fontFamily: THEME.fonts.display,
-    fontSize: 11.5,
+    fontSize: 13,
     color: '#FFFFFF',
     marginBottom: 3,
   },
   readyBadge: {
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     backgroundColor: 'rgba(124, 252, 138, 0.2)',
     paddingHorizontal: 5,
     paddingVertical: 1.5,
@@ -589,11 +628,11 @@ const styles = StyleSheet.create({
   },
   readyBadgeText: {
     color: '#7CFC8A',
-    fontSize: 9,
+    fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
   },
   searchingBadge: {
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     backgroundColor: 'rgba(111, 227, 193, 0.2)',
     paddingHorizontal: 5,
     paddingVertical: 1.5,
@@ -608,7 +647,7 @@ const styles = StyleSheet.create({
   },
   searchingBadgeText: {
     color: '#6FE3C1',
-    fontSize: 9,
+    fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
   },
   vsBadgeSmall: {
@@ -659,7 +698,7 @@ const styles = StyleSheet.create({
     width: 135,
     height: 135,
     borderTopRightRadius: 135,
-    backgroundColor: 'rgba(111, 227, 193, 0.26)',
+    backgroundColor: 'rgba(111, 227, 193, 0.10)',
   },
   radarBeamLine: {
     position: 'absolute',
@@ -688,12 +727,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(111, 227, 193, 0.15)',
   },
   centerCoreWrap: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#2A1558',
-    borderWidth: 2.5,
-    borderColor: '#6FE3C1',
+    position: 'absolute',
+    bottom: 20,
+    width: 76,
+    height: 36,
+    borderRadius: 18,
+    flexDirection: 'row',
+    gap: 6,
+    backgroundColor: '#26183C',
+    borderWidth: 1,
+    borderColor: '#FFC43D',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 5,
@@ -701,7 +744,7 @@ const styles = StyleSheet.create({
   center1v1Text: {
     fontFamily: THEME.fonts.display,
     fontSize: 17,
-    color: '#6FE3C1',
+    color: '#FFC43D',
   },
 
   // Tekil Parlayan Sonar Işığı
@@ -745,11 +788,11 @@ const styles = StyleSheet.create({
   },
   timerMaxText: {
     fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: '#D9CDF5',
   },
   remainingHint: {
-    color: 'rgba(217, 205, 245, 0.8)',
-    fontSize: 11.5,
+    color: '#E2D7F5',
+    fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
     marginTop: 2,
