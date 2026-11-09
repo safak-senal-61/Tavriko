@@ -253,11 +253,21 @@ function renderDashboardHtml() {
       box-shadow: 0 4px 12px rgba(122, 63, 224, 0.35);
     }
     /* Header eylem satırı: mobilde sarar ve taşmaz */
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      min-width: 0;
+      max-width: 100%;
+    }
     .header-actions {
       display: flex;
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
+      min-width: 0;
+      max-width: 100%;
     }
     .header-user-chip {
       background: rgba(255,196,61,0.12);
@@ -329,6 +339,8 @@ function renderDashboardHtml() {
       }
       .nav-tabs {
         width: 100%;
+        min-width: 0;
+        max-width: 100%;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         white-space: nowrap;
@@ -993,7 +1005,7 @@ function renderDashboardHtml() {
       <div class="env-tag"><div class="pulse-dot"></div> CANLI AKIŞ AKTİF</div>
     </div>
 
-    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+    <div class="header-nav">
       <div class="nav-tabs">
         <button class="nav-btn active" onclick="switchTab('tab-game', this)">🎮 Canlı Web Oyunu & Simülatör</button>
         <button class="nav-btn" onclick="switchTab('tab-expo', this)">📱 Mobil & Bulut QR Kod</button>
