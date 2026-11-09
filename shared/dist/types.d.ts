@@ -296,6 +296,13 @@ export interface UserProfile {
     equippedBadge?: string;
     equippedNameEffect?: string;
     equippedBackground?: string;
+    /** Süreli (rental) profil kozmetikleri — süre dolunca otomatik düşer */
+    equippedFrameExpiresAt?: number;
+    equippedBadgeExpiresAt?: number;
+    equippedNameEffectExpiresAt?: number;
+    equippedBackgroundExpiresAt?: number;
+    /** Kullanıcının engellediği oyuncular */
+    blockedUserIds?: string[];
     activeBoosterExpiresAt?: number;
     friendIds?: string[];
     notifications?: NotificationItem[];

@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Platform,
   Linking,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -53,6 +55,31 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
   const [tgTesting, setTgTesting] = useState<boolean>(false);
   const [tgStatus, setTgStatus] = useState<string | null>(null);
 
+  // --- Block user ---
+  const [blockModal, setBlockModal] = useState<boolean>(false);
+  const [blockInput, setBlockInput] = useState<string>('');
+  const [blockedUsers, setBlockedUsers] = useState<Array<{ id: string; username?: string; displayName?: string }>>([]);
+  const [blockLoading, setBlockLoading] = useState<boolean>(false);
+
+  // --- Send notification ---
+  const [notifModal, setNotifModal] = useState<boolean>(false);
+  const [notifTarget, setNotifTarget] = useState<string>('');
+  const [notifTitle, setNotifTitle] = useState<string>('');
+  const [notifSub, setNotifSub] = useState<string>('');
+  const [notifSending, setNotifSending] = useState<boolean>(false);
+  const [notifStatus, setNotifStatus] = useState<string | null>(null);
+
+  // --- New product ---
+  const [productModal, setProductModal] = useState<boolean>(false);
+  const [productName, setProductName] = useState<string>('');
+  const [productDesc, setProductDesc] = useState<string>('');
+  const [productPrice, setProductPrice] = useState<string>('');
+  const [productCurrency, setProductCurrency] = useState<'coins' | 'gems' | 'try'>('gems');
+  const [productRarity, setProductRarity] = useState<'common' | 'rare' | 'epic' | 'legendary' | 'mythic'>('epic');
+  const [productCategory, setProductCategory] = useState<'featured' | 'diamonds' | 'gold' | 'chests' | 'keys' | 'avatars' | 'frames' | 'badges' | 'name_effects' | 'boosters' | 'backgrounds'>('frames');
+  const [productAdding, setProductAdding] = useState<boolean>(false);
+  const [productStatus, setProductStatus] = useState<string | null>(null);
+
   const base = apiBaseUrl || DEFAULT_API_BASE;
 
   useEffect(() => {
@@ -66,6 +93,12 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
     }, 2000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (user?.id && !user?.isGuest) {
+      loadBlockedUsers();
+    }
+  }, [user?.id]);
 
   const checkApiLatency = async () => {
     setIsPinging(true);
@@ -206,6 +239,127 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
     }
   };
 
+  // --- Block system ---
+  const loadBlockedUsers = async () => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`${base}/social/blocked/${user.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) setBlockedUsers(data.blockedUsers || []);
+      }
+    } catch {}
+  };
+
+  const handleBlockUser = async () => {
+    if (!user?.id || !blockInput.trim()) return;
+    setBlockLoading(true);
+    try {
+      const res = await fetch(`${base}/social/block`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, targetUserId: blockInput.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        notify(`Kullanıcı engellendi!`);
+        setBlockInput('');
+        setBlockModal(false);
+        loadBlockedUsers();
+      } else {
+        notify(`Hata: ${data.error}`);
+      }
+    } catch (e: any) {
+      notify(`Hata: ${e.message}`);
+    } finally {
+      setBlockLoading(false);
+    }
+  };
+
+  const handleUnblockUser = async (targetId: string) => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`${base}/social/unblock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, targetUserId: targetId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        notify('Engel kaldırıldı!');
+        loadBlockedUsers();
+      }
+    } catch (e: any) {
+      notify(`Hata: ${e.message}`);
+    }
+  };
+
+  // --- Send notification ---
+  const handleSendNotification = async () => {
+    if (!user?.id || !notifTarget.trim() || !notifTitle.trim()) return;
+    setNotifSending(true);
+    try {
+      const res = await fetch(`${base}/social/notifications/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          targetUserId: notifTarget.trim(),
+          title: notifTitle.trim(),
+          sub: notifSub.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNotifStatus(`✅ ${data.message}`);
+        setNotifTarget('');
+        setNotifTitle('');
+        setNotifSub('');
+        sound.playSound('reward');
+      } else {
+        setNotifStatus(`⚠️ ${data.error}`);
+        sound.playSound('wrong');
+      }
+    } catch (e: any) {
+      setNotifStatus(`❌ ${e.message}`);
+      sound.playSound('wrong');
+    } finally {
+      setNotifSending(false);
+    }
+  };
+
+  // --- Add new product ---
+  const handleAddProduct = async () => {
+    if (!productName.trim() || !productPrice.trim()) {
+      setProductStatus('⚠️ Ürün adı ve fiyat zorunludur.');
+      return;
+    }
+    setProductAdding(true);
+    try {
+      // Local-only for now — the shop catalog is defined in shared.
+      // We just show a notification that the product would be added.
+      const productId = `dev_${Date.now()}`;
+      setProductStatus(`✅ Ürün "${productName}" hazırlandı! ID: ${productId}\nKategori: ${productCategory}\nFiyat: ${productPrice} ${productCurrency}\nNadirlik: ${productRarity}`);
+      setProductName('');
+      setProductDesc('');
+      setProductPrice('');
+      sound.playSound('reward');
+      sound.triggerHaptic('success');
+    } catch (e: any) {
+      setProductStatus(`❌ ${e.message}`);
+      sound.playSound('wrong');
+    } finally {
+      setProductAdding(false);
+    }
+  };
+
+  const renderSection = (title: string, children: React.ReactNode) => (
+    <View style={styles.card}>
+      <Text style={styles.cardHeader}>{title}</Text>
+      {children}
+    </View>
+  );
+
   return (
     <TavrikoScreen>
       <TavrikoTopBar
@@ -235,170 +389,211 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
         )}
 
         {/* Section 1: System & Network Health */}
-        <View style={styles.card}>
-          <Text style={styles.cardHeader}>🌐 SİSTEM & AĞ DURUMU</Text>
+        {renderSection('🌐 SİSTEM & AĞ DURUMU', (
+          <>
+            <View style={styles.healthRow}>
+              <View style={styles.healthInfo}>
+                <Text style={styles.healthLabel}>Cloudflare Realtime WebSocket</Text>
+                <Text style={styles.healthSub} numberOfLines={1}>{REALTIME_WS_BASE}</Text>
+              </View>
+              <View style={[styles.statusBadge, wsConnected ? styles.badgeSuccess : styles.badgeWarn]}>
+                <Text style={styles.statusBadgeText}>{wsConnected ? 'BAĞLI ✓' : 'KOPUK ⚠️'}</Text>
+              </View>
+            </View>
 
-          {/* WebSocket Row */}
-          <View style={styles.healthRow}>
-            <View style={styles.healthInfo}>
-              <Text style={styles.healthLabel}>Cloudflare Realtime WebSocket</Text>
-              <Text style={styles.healthSub} numberOfLines={1}>{REALTIME_WS_BASE}</Text>
+            <View style={styles.healthRow}>
+              <View style={styles.healthInfo}>
+                <Text style={styles.healthLabel}>Vercel Serverless REST API</Text>
+                <Text style={styles.healthSub} numberOfLines={1}>{base}</Text>
+              </View>
+              <TouchableOpacity style={styles.pingBtn} onPress={checkApiLatency} disabled={isPinging}>
+                {isPinging ? (
+                  <ActivityIndicator size="small" color="#FFC43D" />
+                ) : (
+                  <Text style={styles.pingText}>{apiPing !== null ? `${apiPing} ms` : 'Ping'}</Text>
+                )}
+              </TouchableOpacity>
             </View>
-            <View style={[styles.statusBadge, wsConnected ? styles.badgeSuccess : styles.badgeWarn]}>
-              <Text style={styles.statusBadgeText}>{wsConnected ? 'BAĞLI ✓' : 'KOPUK ⚠️'}</Text>
-            </View>
-          </View>
 
-          {/* REST API Row */}
-          <View style={styles.healthRow}>
-            <View style={styles.healthInfo}>
-              <Text style={styles.healthLabel}>Vercel Serverless REST API</Text>
-              <Text style={styles.healthSub} numberOfLines={1}>{base}</Text>
+            <View style={[styles.healthRow, { borderBottomWidth: 0 }]}>
+              <View style={styles.healthInfo}>
+                <Text style={styles.healthLabel}>Veritabanı Katmanı</Text>
+                <Text style={styles.healthSub}>Supabase PostgreSQL + Prisma ORM + Upstash Redis</Text>
+              </View>
+              <View style={[styles.statusBadge, styles.badgeSuccess]}>
+                <Text style={styles.statusBadgeText}>AKTİF ✓</Text>
+              </View>
             </View>
-            <TouchableOpacity style={styles.pingBtn} onPress={checkApiLatency} disabled={isPinging}>
-              {isPinging ? (
-                <ActivityIndicator size="small" color="#FFC43D" />
-              ) : (
-                <Text style={styles.pingText}>{apiPing !== null ? `${apiPing} ms` : 'Ping'}</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* Database Row */}
-          <View style={[styles.healthRow, { borderBottomWidth: 0 }]}>
-            <View style={styles.healthInfo}>
-              <Text style={styles.healthLabel}>Veritabanı Katmanı</Text>
-              <Text style={styles.healthSub}>Supabase PostgreSQL + Prisma ORM + Upstash Redis</Text>
-            </View>
-            <View style={[styles.statusBadge, styles.badgeSuccess]}>
-              <Text style={styles.statusBadgeText}>AKTİF ✓</Text>
-            </View>
-          </View>
-        </View>
+          </>
+        ))}
 
         {/* Section 2: Sandbox & Cheat Tools */}
-        <View style={styles.card}>
-          <Text style={styles.cardHeader}>⚡ KULLANICI & EKONOMİ SANDBOX</Text>
-          <Text style={styles.cardDesc}>
-            Yerel testler için aktif oturumunuza anında altın, elmas, seviye veya envanter tanımlayın.
-          </Text>
+        {renderSection('⚡ KULLANICI & EKONOMİ SANDBOX', (
+          <>
+            <Text style={styles.cardDesc}>
+              Yerel testler için aktif oturumunuza anında altın, elmas, seviye veya envanter tanımlayın.
+            </Text>
 
-          <View style={styles.actionGrid}>
-            <TouchableOpacity style={styles.actionBtn} onPress={handleAddCoins} activeOpacity={0.8}>
-              <CoinIcon size={20} />
-              <Text style={styles.actionBtnText}>+1.000 Altın</Text>
-            </TouchableOpacity>
+            <View style={styles.actionGrid}>
+              <TouchableOpacity style={styles.actionBtn} onPress={handleAddCoins} activeOpacity={0.8}>
+                <CoinIcon size={20} />
+                <Text style={styles.actionBtnText}>+1.000 Altın</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtn} onPress={handleAddGems} activeOpacity={0.8}>
-              <GemIcon size={20} />
-              <Text style={styles.actionBtnText}>+100 Elmas</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.actionBtn} onPress={handleAddGems} activeOpacity={0.8}>
+                <GemIcon size={20} />
+                <Text style={styles.actionBtnText}>+100 Elmas</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtn} onPress={handleAddXp} activeOpacity={0.8}>
-              <Text style={styles.actionIcon}>⭐</Text>
-              <Text style={styles.actionBtnText}>+500 XP (Seviye)</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.actionBtn} onPress={handleAddXp} activeOpacity={0.8}>
+                <Text style={styles.actionIcon}>⭐</Text>
+                <Text style={styles.actionBtnText}>+500 XP (Seviye)</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtn} onPress={handleAddLp} activeOpacity={0.8}>
-              <Text style={styles.actionIcon}>🏆</Text>
-              <Text style={styles.actionBtnText}>+150 LP (Lig)</Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.actionBtn} onPress={handleAddLp} activeOpacity={0.8}>
+                <Text style={styles.actionIcon}>🏆</Text>
+                <Text style={styles.actionBtnText}>+150 LP (Lig)</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtn} onPress={handleTogglePass} activeOpacity={0.8}>
-              <Text style={styles.actionIcon}>🎟️</Text>
-              <Text style={styles.actionBtnText}>
-                {user?.hasPremiumPass ? 'Pass Kapat' : 'Premium Pass Aç'}
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.actionBtn} onPress={handleTogglePass} activeOpacity={0.8}>
+                <Text style={styles.actionIcon}>🎟️</Text>
+                <Text style={styles.actionBtnText}>
+                  {user?.hasPremiumPass ? 'Pass Kapat' : 'Premium Pass Aç'}
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtn} onPress={handleAddChests} activeOpacity={0.8}>
-              <ChestIcon size={20} />
-              <Text style={styles.actionBtnText}>Test Sandıkları</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Section 3: Web Portals & Admin Bridges */}
-        <View style={styles.card}>
-          <Text style={styles.cardHeader}>🛡️ YÖNETİM & LOG PORTALLARI</Text>
-
-          <TouchableOpacity style={styles.portalRowBtn} onPress={() => openUrl('/developer')}>
-            <View style={styles.portalIconBox}>
-              <Text style={{ fontSize: 20 }}>🛡️</Text>
+              <TouchableOpacity style={styles.actionBtn} onPress={handleAddChests} activeOpacity={0.8}>
+                <ChestIcon size={20} />
+                <Text style={styles.actionBtnText}>Test Sandıkları</Text>
+              </TouchableOpacity>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.portalTitle}>Developer & Ops Portalı (/developer)</Text>
-              <Text style={styles.portalSub}>Canlı oyun simülatörü, gerçek zamanlı log akışı ve API explorer</Text>
-            </View>
-            <Text style={styles.portalArrow}>›</Text>
-          </TouchableOpacity>
+          </>
+        ))}
 
-          <TouchableOpacity style={styles.portalRowBtn} onPress={() => openUrl('/telegram-admin')}>
-            <View style={styles.portalIconBox}>
-              <Text style={{ fontSize: 20 }}>🤖</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.portalTitle}>Telegram Bot Yönetimi (/telegram-admin)</Text>
-              <Text style={styles.portalSub}>Bot Father token yapılandırma ve onay sistemi göstergesi</Text>
-            </View>
-            <Text style={styles.portalArrow}>›</Text>
-          </TouchableOpacity>
+        {/* Section 3: Moderation - Block & Notify */}
+        {renderSection('🛡️ MODERASYON & ARKADAŞ YÖNETİMİ', (
+          <>
+            <Text style={styles.cardDesc}>
+              Kullanıcıları engelleyin, bildirim gönderin ve arkadaş yönetimi yapın.
+            </Text>
 
-          {/* Telegram Test Button & Live Feedback */}
-          <View style={{ marginTop: 8, marginBottom: 10, paddingHorizontal: 2 }}>
             <TouchableOpacity
-              style={{
-                backgroundColor: 'rgba(0, 136, 204, 0.18)',
-                borderWidth: 1,
-                borderColor: '#0088cc',
-                paddingVertical: 10,
-                paddingHorizontal: 14,
-                borderRadius: 12,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-              }}
-              onPress={testTelegram}
-              disabled={tgTesting}
+              style={styles.moderationBtn}
+              onPress={() => { sound.playSound('tap'); setBlockModal(true); loadBlockedUsers(); }}
               activeOpacity={0.8}
             >
-              {tgTesting ? (
-                <ActivityIndicator size="small" color="#38BDF8" />
-              ) : (
-                <>
-                  <Text style={{ fontSize: 15 }}>⚡</Text>
-                  <Text style={{ color: '#38BDF8', fontSize: 12, fontFamily: THEME.fonts.bold }}>
-                    Telegram Bot Durumunu Canlı Test Et
-                  </Text>
-                </>
-              )}
+              <Text style={{ fontSize: 18 }}>🚫</Text>
+              <Text style={styles.moderationBtnText}>Kullanıcı Engelle</Text>
             </TouchableOpacity>
 
-            {tgStatus && (
-              <View style={{ marginTop: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 10, padding: 8 }}>
-                <Text style={{ color: tgStatus.startsWith('✅') ? '#5ADBB5' : '#FF8598', fontSize: 11, fontFamily: THEME.fonts.bold, textAlign: 'center' }}>
-                  {tgStatus}
-                </Text>
+            <TouchableOpacity
+              style={styles.moderationBtn}
+              onPress={() => { sound.playSound('tap'); setNotifModal(true); }}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 18 }}>🔔</Text>
+              <Text style={styles.moderationBtnText}>Bildirim Gönder</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.moderationBtn}
+              onPress={() => { sound.playSound('tap'); setProductModal(true); }}
+              activeOpacity={0.8}
+            >
+              <Text style={{ fontSize: 18 }}>➕</Text>
+              <Text style={styles.moderationBtnText}>Yeni Ürün Ekle</Text>
+            </TouchableOpacity>
+
+            {/* Blocked users list */}
+            {blockedUsers.length > 0 && (
+              <View style={styles.blockedList}>
+                <Text style={styles.blockedListHeader}>ENGELLİ KULLANICILAR ({blockedUsers.length})</Text>
+                {blockedUsers.map((b) => (
+                  <View key={b.id} style={styles.blockedRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.blockedName}>{b.displayName || b.username || b.id}</Text>
+                      {b.username && <Text style={styles.blockedSub}>@{b.username}</Text>}
+                    </View>
+                    <TouchableOpacity
+                      style={styles.unblockBtn}
+                      onPress={() => handleUnblockUser(b.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.unblockBtnText}>Engeli Kaldır</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
               </View>
             )}
-          </View>
+          </>
+        ))}
 
-          <TouchableOpacity style={[styles.portalRowBtn, { borderBottomWidth: 0 }]} onPress={() => openUrl('/api/logs')}>
-            <View style={styles.portalIconBox}>
-              <Text style={{ fontSize: 20 }}>📊</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.portalTitle}>Ham Telemetri & Loglar (/api/logs)</Text>
-              <Text style={styles.portalSub}>Sunucu hata kayıtları ve sistem telemetrisi JSON akışı</Text>
-            </View>
-            <Text style={styles.portalArrow}>›</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Section 4: Web Portals & Admin Bridges */}
+        {renderSection('🛡️ YÖNETİM & LOG PORTALLARI', (
+          <>
+            <TouchableOpacity style={styles.portalRowBtn} onPress={() => openUrl('/developer')}>
+              <View style={styles.portalIconBox}>
+                <Text style={{ fontSize: 20 }}>🛡️</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.portalTitle}>Developer & Ops Portalı (/developer)</Text>
+                <Text style={styles.portalSub}>Canlı oyun simülatörü, gerçek zamanlı log akışı ve API explorer</Text>
+              </View>
+              <Text style={styles.portalArrow}>›</Text>
+            </TouchableOpacity>
 
-        {/* Section 4: Quick Screen Jump */}
-        <View style={styles.card}>
-          <Text style={styles.cardHeader}>🚀 HIZLI EKRAN ATLAMA</Text>
+            <TouchableOpacity style={styles.portalRowBtn} onPress={() => openUrl('/telegram-admin')}>
+              <View style={styles.portalIconBox}>
+                <Text style={{ fontSize: 20 }}>🤖</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.portalTitle}>Telegram Bot Yönetimi (/telegram-admin)</Text>
+                <Text style={styles.portalSub}>Bot Father token yapılandırma ve onay sistemi göstergesi</Text>
+              </View>
+              <Text style={styles.portalArrow}>›</Text>
+            </TouchableOpacity>
+
+            <View style={{ marginTop: 8, marginBottom: 10, paddingHorizontal: 2 }}>
+              <TouchableOpacity
+                style={styles.tgTestBtn}
+                onPress={testTelegram}
+                disabled={tgTesting}
+                activeOpacity={0.8}
+              >
+                {tgTesting ? (
+                  <ActivityIndicator size="small" color="#38BDF8" />
+                ) : (
+                  <>
+                    <Text style={{ fontSize: 15 }}>⚡</Text>
+                    <Text style={styles.tgTestBtnText}>
+                      Telegram Bot Durumunu Canlı Test Et
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {tgStatus && (
+                <View style={styles.tgStatusBox}>
+                  <Text style={styles.tgStatusText}>{tgStatus}</Text>
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity style={[styles.portalRowBtn, { borderBottomWidth: 0 }]} onPress={() => openUrl('/api/logs')}>
+              <View style={styles.portalIconBox}>
+                <Text style={{ fontSize: 20 }}>📊</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.portalTitle}>Ham Telemetri & Loglar (/api/logs)</Text>
+                <Text style={styles.portalSub}>Sunucu hata kayıtları ve sistem telemetrisi JSON akışı</Text>
+              </View>
+              <Text style={styles.portalArrow}>›</Text>
+            </TouchableOpacity>
+          </>
+        ))}
+
+        {/* Section 5: Quick Screen Jump */}
+        {renderSection('🚀 HIZLI EKRAN ATLAMA', (
           <View style={styles.jumpRow}>
             {(
               [
@@ -424,30 +619,237 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        ))}
 
-        {/* Section 5: Raw User State */}
-        <View style={styles.card}>
-          <TouchableOpacity style={styles.jsonHeaderRow} onPress={() => setShowJson((v) => !v)}>
-            <Text style={styles.cardHeader}>📄 AKTİF OYUNCU DURUMU (JSON)</Text>
-            <Text style={styles.jsonToggleText}>{showJson ? 'Gizle ▲' : 'Göster ▼'}</Text>
-          </TouchableOpacity>
+        {/* Section 6: Raw User State */}
+        {renderSection('📄 AKTİF OYUNCU DURUMU (JSON)', (
+          <>
+            <TouchableOpacity style={styles.jsonHeaderRow} onPress={() => setShowJson((v) => !v)}>
+              <Text style={styles.jsonToggleText}>{showJson ? 'Gizle ▲' : 'Göster ▼'}</Text>
+            </TouchableOpacity>
 
-          {showJson && (
-            <View style={styles.jsonBox}>
-              <Text style={styles.jsonText}>{JSON.stringify(user || {}, null, 2)}</Text>
-            </View>
-          )}
-        </View>
+            {showJson && (
+              <View style={styles.jsonBox}>
+                <Text style={styles.jsonText}>{JSON.stringify(user || {}, null, 2)}</Text>
+              </View>
+            )}
+          </>
+        ))}
       </ScrollView>
+
+      {/* Block User Modal */}
+      <Modal visible={blockModal} transparent animationType="fade" onRequestClose={() => setBlockModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>KULLANICI ENGELLE</Text>
+            <Text style={styles.modalDesc}>
+              Engellenecek kullanıcının ID veya kullanıcı adını girin.
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={blockInput}
+              onChangeText={setBlockInput}
+              placeholder="Kullanıcı ID veya kullanıcı adı"
+              placeholderTextColor="#736B92"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: 'rgba(255, 92, 119, 0.2)', borderColor: '#FF5C77' }]}
+                onPress={handleBlockUser}
+                disabled={blockLoading}
+                activeOpacity={0.8}
+              >
+                {blockLoading ? (
+                  <ActivityIndicator size="small" color="#FF8598" />
+                ) : (
+                  <Text style={[styles.modalBtnText, { color: '#FF8598' }]}>ENGELLE</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255, 255, 255, 0.25)' }]}
+                onPress={() => setBlockModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalBtnText}>VAZGEÇ</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Send Notification Modal */}
+      <Modal visible={notifModal} transparent animationType="fade" onRequestClose={() => setNotifModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>BİLDİRİM GÖNDER</Text>
+            <Text style={styles.modalDesc}>
+              Seçilen kullanıcıya özel bir bildirim gönderin.
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={notifTarget}
+              onChangeText={setNotifTarget}
+              placeholder="Hedef kullanıcı ID veya kullanıcı adı"
+              placeholderTextColor="#736B92"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TextInput
+              style={[styles.textInput, { minHeight: 44 }]}
+              value={notifTitle}
+              onChangeText={setNotifTitle}
+              placeholder="Bildirim başlığı"
+              placeholderTextColor="#736B92"
+            />
+            <TextInput
+              style={[styles.textInput, { minHeight: 60 }]}
+              value={notifSub}
+              onChangeText={setNotifSub}
+              placeholder="Bildirim alt metni (isteğe bağlı)"
+              placeholderTextColor="#736B92"
+              multiline
+            />
+            {notifStatus && (
+              <Text style={styles.modalStatus}>{notifStatus}</Text>
+            )}
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: 'rgba(90, 219, 181, 0.2)', borderColor: '#5ADBB5' }]}
+                onPress={handleSendNotification}
+                disabled={notifSending}
+                activeOpacity={0.8}
+              >
+                {notifSending ? (
+                  <ActivityIndicator size="small" color="#5ADBB5" />
+                ) : (
+                  <Text style={[styles.modalBtnText, { color: '#5ADBB5' }]}>GÖNDER</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255, 255, 255, 0.25)' }]}
+                onPress={() => setNotifModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalBtnText}>KAPAT</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Product Modal */}
+      <Modal visible={productModal} transparent animationType="fade" onRequestClose={() => setProductModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>YENİ ÜRÜN EKLE</Text>
+            <Text style={styles.modalDesc}>
+              Mağaza kataloğuna yeni bir ürün tanımı ekleyin.
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={productName}
+              onChangeText={setProductName}
+              placeholder="Ürün adı"
+              placeholderTextColor="#736B92"
+            />
+            <TextInput
+              style={[styles.textInput, { minHeight: 60 }]}
+              value={productDesc}
+              onChangeText={setProductDesc}
+              placeholder="Ürün açıklaması"
+              placeholderTextColor="#736B92"
+              multiline
+            />
+            <TextInput
+              style={styles.textInput}
+              value={productPrice}
+              onChangeText={setProductPrice}
+              placeholder="Fiyat (sayı)"
+              placeholderTextColor="#736B92"
+              keyboardType="numeric"
+            />
+            {/* Currency selector */}
+            <View style={styles.selectorRow}>
+              {(['coins', 'gems', 'try'] as const).map((c) => (
+                <TouchableOpacity
+                  key={c}
+                  style={[styles.selectorPill, productCurrency === c ? styles.selectorPillActive : null]}
+                  onPress={() => setProductCurrency(c)}
+                >
+                  <Text style={[styles.selectorPillText, productCurrency === c ? { color: '#1E0E45' } : null]}>
+                    {c === 'coins' ? '🪙 Altın' : c === 'gems' ? '💎 Elmas' : '₺ TRY'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {/* Rarity selector */}
+            <Text style={styles.selectorLabel}>NADİRLİK</Text>
+            <View style={styles.selectorRow}>
+              {(['common', 'rare', 'epic', 'legendary', 'mythic'] as const).map((r) => (
+                <TouchableOpacity
+                  key={r}
+                  style={[styles.selectorPill, productRarity === r ? styles.selectorPillActive : null]}
+                  onPress={() => setProductRarity(r)}
+                >
+                  <Text style={[styles.selectorPillText, productRarity === r ? { color: '#1E0E45' } : null]}>
+                    {r === 'common' ? 'Genel' : r === 'rare' ? 'Nadir' : r === 'epic' ? 'Destansı' : r === 'legendary' ? 'Efsanevi' : 'Mitolojik'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {/* Category selector */}
+            <Text style={styles.selectorLabel}>KATEGORİ</Text>
+            <View style={styles.selectorRow}>
+              {(['featured', 'diamonds', 'gold', 'chests', 'keys', 'avatars', 'frames', 'badges', 'name_effects', 'boosters', 'backgrounds'] as const).map((c) => (
+                <TouchableOpacity
+                  key={c}
+                  style={[styles.selectorPill, productCategory === c ? styles.selectorPillActive : null]}
+                  onPress={() => setProductCategory(c)}
+                >
+                  <Text style={[styles.selectorPillText, productCategory === c ? { color: '#1E0E45' } : null]}>
+                    {c === 'featured' ? 'Öne Çıkan' : c === 'diamonds' ? 'Elmaslar' : c === 'gold' ? 'Altınlar' : c === 'chests' ? 'Sandıklar' : c === 'keys' ? 'Anahtarlar' : c === 'avatars' ? 'Avatarlar' : c === 'frames' ? 'Çerçeveler' : c === 'badges' ? 'Rozetler' : c === 'name_effects' ? 'İsim Efek.' : c === 'boosters' ? 'Güçl.' : 'Arka Plan.'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {productStatus && (
+              <Text style={styles.modalStatus}>{productStatus}</Text>
+            )}
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: 'rgba(255, 196, 61, 0.2)', borderColor: '#FFC43D' }]}
+                onPress={handleAddProduct}
+                disabled={productAdding}
+                activeOpacity={0.8}
+              >
+                {productAdding ? (
+                  <ActivityIndicator size="small" color="#FFC43D" />
+                ) : (
+                  <Text style={[styles.modalBtnText, { color: '#FFC43D' }]}>ÜRÜNÜ EKLE</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: 'rgba(255, 255, 255, 0.1)', borderColor: 'rgba(255, 255, 255, 0.25)' }]}
+                onPress={() => setProductModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalBtnText}>KAPAT</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </TavrikoScreen>
   );
 };
 
 const styles = StyleSheet.create({
+  // --- Layout (responsive: mobile-first) ---
   scrollContent: {
-    paddingBottom: 80,
-    paddingHorizontal: 14,
+    paddingBottom: 120,
+    paddingHorizontal: 12,
   },
   heroWrap: {
     alignItems: 'center',
@@ -482,16 +884,19 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: THEME.fonts.display,
-    fontSize: 28,
+    fontSize: 24,
     color: '#FFC43D',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
+    textAlign: 'center',
   },
   subtitle: {
     fontFamily: THEME.fonts.medium,
-    fontSize: 12,
+    fontSize: 11,
     color: '#D9CDF5',
-    marginTop: 2,
+    marginTop: 4,
     textAlign: 'center',
+    lineHeight: 16,
+    maxWidth: 320,
   },
   statusToast: {
     backgroundColor: 'rgba(255, 196, 61, 0.2)',
@@ -509,15 +914,15 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    padding: 16,
-    marginBottom: 14,
+    padding: 14,
+    marginBottom: 12,
   },
   cardHeader: {
     fontFamily: THEME.fonts.extraBold,
-    fontSize: 13,
+    fontSize: 12,
     color: '#FFC43D',
     letterSpacing: 0.8,
     marginBottom: 10,
@@ -529,6 +934,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     lineHeight: 16,
   },
+
+  // --- Health rows ---
   healthRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -539,11 +946,11 @@ const styles = StyleSheet.create({
   },
   healthInfo: {
     flex: 1,
-    marginRight: 10,
+    marginRight: 8,
   },
   healthLabel: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: THEME.fonts.bold,
   },
   healthSub: {
@@ -579,7 +986,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 10,
-    minWidth: 64,
+    minWidth: 60,
     alignItems: 'center',
   },
   pingText: {
@@ -587,6 +994,8 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
   },
+
+  // --- Action grid ---
   actionGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -603,15 +1012,87 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 14,
     width: '48.5%',
+    flexShrink: 0,
   },
   actionIcon: {
     fontSize: 18,
   },
   actionBtnText: {
     color: '#FFFFFF',
-    fontSize: 11.5,
+    fontSize: 11,
+    fontFamily: THEME.fonts.bold,
+    flexShrink: 1,
+  },
+
+  // --- Moderation buttons ---
+  moderationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: 'rgba(10, 4, 24, 0.65)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 196, 61, 0.3)',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 14,
+    marginBottom: 8,
+  },
+  moderationBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
     fontFamily: THEME.fonts.bold,
   },
+
+  // --- Blocked users list ---
+  blockedList: {
+    marginTop: 10,
+    backgroundColor: 'rgba(8, 3, 20, 0.5)',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  blockedListHeader: {
+    color: '#FF8598',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  blockedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  blockedName: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
+  },
+  blockedSub: {
+    color: '#A093C2',
+    fontSize: 10,
+    fontFamily: THEME.fonts.medium,
+    marginTop: 2,
+  },
+  unblockBtn: {
+    backgroundColor: 'rgba(90, 219, 181, 0.2)',
+    borderWidth: 1,
+    borderColor: '#5ADBB5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  unblockBtnText: {
+    color: '#5ADBB5',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
+
+  // --- Portal rows ---
   portalRowBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -621,8 +1102,8 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
   portalIconBox: {
-    width: 38,
-    height: 38,
+    width: 36,
+    height: 36,
     borderRadius: 12,
     backgroundColor: 'rgba(107, 60, 255, 0.35)',
     borderWidth: 1,
@@ -632,20 +1113,55 @@ const styles = StyleSheet.create({
   },
   portalTitle: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: THEME.fonts.bold,
+    flexShrink: 1,
   },
   portalSub: {
     color: '#A093C2',
     fontSize: 10,
     fontFamily: THEME.fonts.medium,
     marginTop: 2,
+    flexShrink: 1,
   },
   portalArrow: {
     color: '#FFC43D',
     fontSize: 18,
     fontFamily: THEME.fonts.display,
   },
+
+  // --- Telegram test ---
+  tgTestBtn: {
+    backgroundColor: 'rgba(0, 136, 204, 0.18)',
+    borderWidth: 1,
+    borderColor: '#0088cc',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  tgTestBtnText: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
+  },
+  tgStatusBox: {
+    marginTop: 6,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 10,
+    padding: 8,
+  },
+  tgStatusText: {
+    color: '#FF8598',
+    fontSize: 11,
+    fontFamily: THEME.fonts.bold,
+    textAlign: 'center',
+  },
+
+  // --- Jump pills ---
   jumpRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -664,10 +1180,13 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: THEME.fonts.bold,
   },
+
+  // --- JSON ---
   jsonHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
+    marginBottom: 4,
   },
   jsonToggleText: {
     color: '#FFC43D',
@@ -675,17 +1194,122 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.bold,
   },
   jsonBox: {
-    marginTop: 10,
+    marginTop: 8,
     backgroundColor: '#070312',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 10,
-    maxHeight: 250,
+    maxHeight: 220,
   },
   jsonText: {
     color: '#6EE7B7',
     fontFamily: Platform.OS === 'web' ? 'monospace' : 'Courier',
     fontSize: 10,
+  },
+
+  // --- Modal ---
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(8, 3, 20, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#1E0E45',
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 196, 61, 0.55)',
+    padding: 18,
+  },
+  modalTitle: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 16,
+    color: '#FFC43D',
+    textAlign: 'center',
+    marginBottom: 8,
+    letterSpacing: 1,
+  },
+  modalDesc: {
+    fontFamily: THEME.fonts.medium,
+    fontSize: 11,
+    color: '#D9CDF5',
+    marginBottom: 12,
+    lineHeight: 16,
+    textAlign: 'center',
+  },
+  textInput: {
+    backgroundColor: 'rgba(8, 3, 20, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: THEME.fonts.medium,
+    marginBottom: 10,
+    minHeight: 42,
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  modalBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  modalBtnText: {
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 0.5,
+  },
+  modalStatus: {
+    color: '#5ADBB5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.bold,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 4,
+    lineHeight: 16,
+  },
+  selectorRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  selectorLabel: {
+    color: '#A093C2',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  selectorPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  selectorPillActive: {
+    backgroundColor: '#FFC43D',
+    borderColor: '#FFC43D',
+  },
+  selectorPillText: {
+    color: '#D9CDF5',
+    fontSize: 10,
+    fontFamily: THEME.fonts.bold,
   },
 });

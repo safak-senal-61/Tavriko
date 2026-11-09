@@ -567,7 +567,7 @@ function createApp() {
             <h2>🔗 Hızlı Erişim ve Servisler</h2>
             <div class="links-row">
               <a class="chip" href="/health" target="_blank">🩺 /health (Servis Sağlığı)</a>
-              <a class="chip" href="/api/categories" target="_blank">📚 16 Oyun Kategorisi</a>
+              <a class="chip" href="/api/categories" target="_blank">📚 Tüm Oyun Kategorileri</a>
               <a class="chip" href="/api/admin/questions/stats" target="_blank">📊 Soru Havuzu İstatistikleri</a>
               <a class="chip" href="/api/admin/questions/review" target="_blank">⏳ Onay Bekleyen Sorular</a>
               <a class="chip" href="/telegram-webapp" target="_blank" style="background: rgba(98, 54, 255, 0.25); border-color: #6236FF; color: #E0E7FF; font-weight: 700;">🎮 /telegram-webapp (Telegram Web App)</a>
@@ -1158,13 +1158,14 @@ function createApp() {
           }
           .category-squircle-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
             gap: 8px;
             margin-top: 8px;
+            min-width: 0;
           }
           @media (max-width: 480px) {
             .category-squircle-grid {
-              grid-template-columns: repeat(4, 1fr);
+              grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
               gap: 6px;
             }
           }
@@ -1200,11 +1201,14 @@ function createApp() {
             font-weight: 800;
             color: var(--text-primary);
             line-height: 1.1;
+            overflow-wrap: anywhere;
           }
           .cat-card-id {
             font-size: 9px;
             color: var(--text-secondary);
             font-family: monospace;
+            word-break: break-all;
+            overflow-wrap: anywhere;
           }
           .loader {
             display: inline-block;
@@ -1246,19 +1250,33 @@ function createApp() {
               <div class="form-group">
                 <label class="form-label">Yarışma Kategorisi</label>
                 <select id="ai-cat">
-                  <option value="geography">🌍 Coğrafya & Ülkeler</option>
-                  <option value="history">🏛️ Tarih & Medeniyetler</option>
+                  <option value="geography">🌍 Coğrafya</option>
+                  <option value="history">🏛️ Tarih</option>
                   <option value="science_tech">🔬 Bilim & Teknoloji</option>
-                  <option value="sports">⚽ Spor & Rekorlar</option>
-                  <option value="music">🎵 Müzik & Enstrümanlar</option>
+                  <option value="sports">⚽ Spor</option>
+                  <option value="music">🎵 Müzik</option>
                   <option value="cinema_tv">🎬 Sinema & Dizi</option>
                   <option value="art_culture">🎨 Sanat & Kültür</option>
-                  <option value="literature">📚 Edebiyat & Romanlar</option>
-                  <option value="food_drink">🍕 Mutfak & Gastronomi</option>
-                  <option value="nature_animals">🌿 Doğa & Canlılar</option>
-                  <option value="mythology">⚡ Mitoloji & Efsaneler</option>
-                  <option value="gaming">🎮 Video Oyunları</option>
+                  <option value="literature">📚 Edebiyat</option>
+                  <option value="physics_chemistry">🧪 Fizik & Kimya</option>
+                  <option value="biology">🧬 Biyoloji</option>
+                  <option value="mathematics">🔢 Matematik</option>
                   <option value="logic_puzzles">🧩 Mantık & Zeka</option>
+                  <option value="language_vocab">📝 Dil & Kelime</option>
+                  <option value="space_astronomy">🚀 Uzay & Astronomi</option>
+                  <option value="nature_ecology">🌿 Doğa & Ekoloji</option>
+                  <option value="food_gastronomy">🍲 Yemek & Gastronomi</option>
+                  <option value="animals_wildlife">🐾 Hayvanlar</option>
+                  <option value="gaming_videogames">🎮 Video Oyunları</option>
+                  <option value="anime_manga">🍥 Anime & Manga</option>
+                  <option value="cartoons_animation">🎠 Çizgi Film</option>
+                  <option value="comics_superheroes">🦸 Çizgi Roman</option>
+                  <option value="fantasy_fiction">🐉 Fantastik</option>
+                  <option value="social_internet">📱 Sosyal Medya</option>
+                  <option value="mythology_ancient">⚡ Mitoloji</option>
+                  <option value="hobbies_leisure">🎣 Hobiler</option>
+                  <option value="daily_life">👨‍👩‍👧 Günlük Hayat</option>
+                  <option value="turkey_special">🇹🇷 Türkiye</option>
                   <option value="general_culture" selected>🌟 Genel Kültür</option>
                   <option value="mixed">🔀 Karışık Tüm Kategoriler</option>
                 </select>
@@ -1307,7 +1325,7 @@ function createApp() {
           <div id="pane-json" class="tab-pane">
             <div class="card">
               <h2 class="card-title">📥 Soru Yükleme & Kategori Merkezi</h2>
-              <p class="card-desc">Sorularınızı ister Keşfet ekranındaki 16 tek kişilik kategoriye, ister arkadaşınızla yarışacağınız Özel Oda moduna yükleyin. Aşağıdan oyun modunu ve kategoriyi seçtiğinizde şablon otomatik doldurulur.</p>
+              <p class="card-desc">Sorularınızı ister Keşfet ekranındaki tüm tek kişilik kategorilere, ister arkadaşınızla yarışacağınız Özel Oda moduna yükleyin. Aşağıdan oyun modunu ve kategoriyi seçtiğinizde şablon otomatik doldurulur.</p>
 
               <!-- 1. HEDEF OYUN MODU & HAVUZ SEÇİCİ -->
               <div class="form-group">
@@ -1320,7 +1338,7 @@ function createApp() {
                       <span class="tag-pill gold">standard</span>
                     </div>
                     <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.3;">
-                      Uygulama Keşfet ekranındaki <b>16 ana kategoriye</b> gider. Tek başına antrenman & yarış.
+                      Uygulama Keşfet ekranındaki <b>tüm ana kategorilere</b> gider. Tek başına antrenman & yarış.
                     </div>
                   </div>
 
@@ -1351,14 +1369,14 @@ function createApp() {
               <!-- 2. GÖRSEL KATEGORİ REHBERİ VE TEK TIKLA ŞABLON -->
               <div class="form-group" style="margin-top: 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                  <label class="form-label" style="margin-bottom: 0;">🏷️ 2. Adım: Kategori Seç (16 Oyun Kategorisi)</label>
+                  <label class="form-label" style="margin-bottom: 0;">🏷️ 2. Adım: Kategori Seç (Tüm Oyun Kategorileri)</label>
                   <span style="font-size: 11px; color: var(--accent-gold); font-weight: 700;">👆 Dokunarak Şablonu Al</span>
                 </div>
                 <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">
-                  Aşağıdaki 16 kategoriden birine dokunduğunuzda, o kategoriye ait hazır ve eksiksiz JSON taslağı otomatik oluşturulur.
+                  Aşağıdaki kategorilerden birine dokunduğunuzda, o kategoriye ait hazır ve eksiksiz JSON taslağı otomatik oluşturulur.
                 </div>
 
-                <!-- 16 KATEGORİ SQUIRCLE GRID -->
+                <!-- TÜM KATEGORİ SQUIRCLE GRID -->
                 <div class="category-squircle-grid" id="main-16-cat-grid"></div>
 
                 <!-- ÖZEL ODA TEMATİK PAKETLERİ -->
@@ -1519,8 +1537,10 @@ function createApp() {
                     <option value="literature">📚 Edebiyat</option>
                     <option value="space_astronomy">🚀 Uzay & Astronomi</option>
                     <option value="animals_wildlife">🐾 Hayvanlar Alemi</option>
+                    <option value="biology">🧬 Biyoloji</option>
                     <option value="mathematics">➗ Matematik</option>
                     <option value="logic_puzzles">🎮 Mantık & Zeka</option>
+                    <option value="language_vocab">📝 Dil & Kelime</option>
                     <option value="general_culture">💡 Genel Kültür</option>
                     <option value="physics_chemistry">⚛️ Fizik & Kimya</option>
                     <option value="gaming_videogames">🎮 Video Oyunları</option>
@@ -1837,7 +1857,9 @@ function createApp() {
             { id: 'literature', name: 'Edebiyat', icon: '📚', trKeys: ['edebiyat', 'literature'] },
             { id: 'space_astronomy', name: 'Uzay', icon: '🚀', trKeys: ['uzay', 'space', 'space_astronomy'] },
             { id: 'animals_wildlife', name: 'Hayvanlar', icon: '🐾', trKeys: ['hayvanlar', 'animals', 'animals_wildlife'] },
+            { id: 'biology', name: 'Biyoloji', icon: '🧬', trKeys: ['biyoloji', 'biology'] },
             { id: 'mathematics', name: 'Matematik', icon: '🔢', trKeys: ['matematik', 'mathematics', 'math'] },
+            { id: 'language_vocab', name: 'Dil & Kelime', icon: '📝', trKeys: ['dil', 'kelime', 'language_vocab'] },
             { id: 'logic_puzzles', name: 'Oyun & Zeka', icon: '🎮', trKeys: ['oyun', 'gaming', 'logic_puzzles', 'zeka'] },
             { id: 'general_culture', name: 'Genel Kültür', icon: '💡', trKeys: ['genel', 'genel_kultur', 'general_culture'] },
             { id: 'gaming_videogames', name: 'Video Oyunları', icon: '🎮', trKeys: ['gaming', 'video_oyunlari', 'oyunlar', 'video_games'] },
@@ -1933,7 +1955,7 @@ function createApp() {
             if (!statusEl || !tagsEl) return;
 
             if (!content) {
-              statusEl.innerHTML = '<span>ℹ️</span> <span>Henüz soru girilmedi. Yukarıdaki 16 kategoriden birine dokunarak şablon alabilirsiniz.</span>';
+              statusEl.innerHTML = '<span>ℹ️</span> <span>Henüz soru girilmedi. Yukarıdaki kategorilerden birine dokunarak şablon alabilirsiniz.</span>';
               tagsEl.innerHTML = '';
               return;
             }
@@ -2695,12 +2717,14 @@ function createApp() {
     app.use('/api/social', socialRoutes_1.default);
     app.use('/api/referrals', referralRoutes_1.default);
     // --- Cloudflare Durable Objects Internal Endpoints ---
-    app.post('/api/internal/room-questions', (req, res) => {
+    app.post('/api/internal/room-questions', async (req, res) => {
         const internalSecret = process.env.INTERNAL_API_SECRET || 'tavriko_internal_secret_2026';
         const providedSecret = req.headers['x-internal-secret'];
         if (providedSecret && providedSecret !== internalSecret) {
             return res.status(403).json({ error: 'Yetkisiz erişim' });
         }
+        // Sunucusuz ortamda kalıcı soru havuzunun (Telegram soruları dahil) hazır olmasını bekle
+        await prismaClient_1.db.ensureQuestionsRestored();
         const { categoryId, difficulty, count = 5 } = req.body || {};
         const safeCount = Math.min(50, Math.max(1, Number(count) || 5));
         const resolvedCat = (0, shared_1.canonicalCategoryId)(categoryId || 'general_culture');

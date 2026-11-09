@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import Reanimated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import * as Clipboard from 'expo-clipboard';
-import { UserProfile, calculateLevelFromXp } from '@trivia/shared';
+import { UserProfile, calculateLevelFromXp, extractProfileCosmetics } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
@@ -850,7 +850,20 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         onRequestClose={() => setInspectPlayer(null)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.profileModalCard}>
+          <View
+            style={[
+              styles.profileModalCard,
+              (() => {
+                const bgCosmetic = extractProfileCosmetics(inspectDetails || {}).background;
+                return bgCosmetic
+                  ? {
+                      backgroundColor: bgCosmetic.visual.bgColor,
+                      borderColor: bgCosmetic.visual.bgColor2 || 'rgba(255, 196, 61, 0.55)',
+                    }
+                  : null;
+              })(),
+            ]}
+          >
             {/* Close button */}
             <TouchableOpacity
               style={styles.modalCloseBtn}
@@ -867,27 +880,63 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ alignItems: 'center', paddingBottom: 10 }}
               >
-                {/* Avatar & Online status */}
-                <Reanimated.View entering={ZoomIn.springify().damping(16)} style={styles.inspectAvatarWrap}>
-                  <CharacterAvatar
-                    seed={inspectDetails?.avatarUrl || inspectPlayer.avatarUrl || inspectPlayer.name}
-                    size={76}
-                  />
-                  <View
-                    style={[
-                      styles.inspectStatusBadge,
-                      { backgroundColor: inspectPlayer.online ? '#123927' : '#2C234B', borderColor: inspectPlayer.online ? '#3FD08A' : '#736B92' },
-                    ]}
-                  >
-                    <Text style={[styles.inspectStatusText, { color: inspectPlayer.online ? '#3FD08A' : '#D9CDF5' }]}>
-                      {inspectPlayer.online ? '● ÇEVRİMİÇİ' : '○ ÇEVRİMDIŞI'}
-                    </Text>
-                  </View>
-                </Reanimated.View>
-                {/* Player Names */}
-                <Reanimated.Text entering={FadeInDown.delay(60)} style={styles.inspectDisplayName} numberOfLines={1}>
-                  {inspectDetails?.displayName || inspectPlayer.displayName || inspectPlayer.name}
-                </Reanimated.Text>
+                {(() => {
+                  const cosmetics = extractProfileCosmetics(inspectDetails || {});
+                  const frameDef = cosmetics.frame;
+                  const bgDef = cosmetics.background;
+                  const nameDef = cosmetics.nameEffect;
+                  return (
+                    <>
+                      <Reanimated.View entering={ZoomIn.springify().damping(16)} style={styles.inspectAvatarWrap}>
+                        <View
+                          style={[
+                            styles.inspectAvatarRing,
+                            frameDef
+                              ? {
+                                  borderColor: frameDef.visual.ringColor,
+                                  borderWidth: 3,
+                                  shadowColor: frameDef.visual.ringColor2,
+                                  shadowOpacity: 0.7,
+                                  shadowRadius: 10,
+                                  elevation: 6,
+                                }
+                              : { borderWidth: 0 },
+                          ]}
+                        >
+                          <CharacterAvatar
+                            seed={inspectDetails?.avatarUrl || inspectPlayer.avatarUrl || inspectPlayer.name}
+                            size={76}
+                          />
+                        </View>
+                        <View
+                          style={[
+                            styles.inspectStatusBadge,
+                            { backgroundColor: inspectPlayer.online ? '#123927' : '#2C234B', borderColor: inspectPlayer.online ? '#3FD08A' : '#736B92' },
+                          ]}
+                        >
+                          <Text style={[styles.inspectStatusText, { color: inspectPlayer.online ? '#3FD08A' : '#D9CDF5' }]}>
+                            {inspectPlayer.online ? '● ÇEVRİMİÇİ' : '○ ÇEVRİMDIŞI'}
+                          </Text>
+                        </View>
+                      </Reanimated.View>
+                      {/* Player Names — name effect support */}
+                      <Reanimated.Text
+                        entering={FadeInDown.delay(60)}
+                        style={[
+                          styles.inspectDisplayName,
+                          nameDef
+                            ? {
+                                color: nameDef.visual.nameColor,
+                                textShadowColor: nameDef.visual.nameColor2 || nameDef.visual.nameColor,
+                                textShadowRadius: 6,
+                                textShadowOffset: { width: 0, height: 0 },
+                              }
+                            : null,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {inspectDetails?.displayName || inspectPlayer.displayName || inspectPlayer.name}
+                      </Reanimated.Text>
                 <Reanimated.Text entering={FadeInDown.delay(90)} style={styles.inspectUsername}>
                   @{inspectDetails?.username || inspectPlayer.username || 'oyuncu'}
                   {inspectDetails?.countryName ? ` · ${inspectDetails.countryName}` : ' · Türkiye'}
@@ -1038,6 +1087,9 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     </TouchableOpacity>
                   )}
                 </View>
+                    </>
+                  );
+                })()}
               </ScrollView>
             )}
           </View>
@@ -1353,6 +1405,12 @@ const styles = StyleSheet.create({
   inspectAvatarWrap: {
     position: 'relative',
     marginBottom: 8,
+  },
+  inspectAvatarRing: {
+    borderRadius: 40,
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   inspectStatusBadge: {
     position: 'absolute',

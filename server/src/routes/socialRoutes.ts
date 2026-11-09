@@ -374,6 +374,80 @@ router.get('/profile/:userId', async (req: Request, res: Response): Promise<void
   res.json(profile);
 });
 
+// --- Block / Unblock (kullanıcı engelleme sistemi) ---
+router.post('/block', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, targetUserId } = req.body;
+    if (!userId || !targetUserId) {
+      res.status(400).json({ error: 'userId ve targetUserId zorunludur.' });
+      return;
+    }
+    if (userId === targetUserId) {
+      res.status(400).json({ error: 'Kendinizi engelleyemezsiniz.' });
+      return;
+    }
+    const result = await db.blockUser(userId, targetUserId);
+    if (!result.success) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/unblock', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, targetUserId } = req.body;
+    if (!userId || !targetUserId) {
+      res.status(400).json({ error: 'userId ve targetUserId zorunludur.' });
+      return;
+    }
+    const result = await db.unblockUser(userId, targetUserId);
+    if (!result.success) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/blocked/:userId', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    const blocked = await db.getBlockedUsers(userId || 'anon');
+    res.json({ success: true, blockedUsers: blocked });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- Admin: bildirim gönder (developer paneli) ---
+router.post('/notifications/send', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, targetUserId, title, sub, type = 'system' } = req.body;
+    if (!userId || !targetUserId || !title) {
+      res.status(400).json({ error: 'userId, targetUserId ve title zorunludur.' });
+      return;
+    }
+    const result = await db.sendCustomNotification(userId, targetUserId, {
+      title,
+      sub: sub || '',
+      type,
+    });
+    if (!result.success) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Public profile by friend code (profile share links) ---
 router.get('/users/by-code/:friendCode', async (req: Request, res: Response): Promise<void> => {
   try {

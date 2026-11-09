@@ -33,6 +33,7 @@ import {
   ItemCategory,
   UserSettings,
   canonicalCategoryId,
+  COSMETIC_RENTAL_MS,
 } from '@trivia/shared';
 import { ALL_CATEGORIES, QUESTION_BANK } from './questionsData';
 import { RICH_SEED_BANK } from '../ai/evrenLlmGenerator';
@@ -92,6 +93,12 @@ export interface UserRecord {
   equippedBadge?: string;
   equippedNameEffect?: string;
   equippedBackground?: string;
+  // Süreli (rental) profil kozmetikleri — süre dolunca otomatik düşer
+  equippedFrameExpiresAt?: number;
+  equippedBackgroundExpiresAt?: number;
+  equippedNameEffectExpiresAt?: number;
+  equippedBadgeExpiresAt?: number;
+  blockedUserIds?: string[];
   eventProgress?: Record<string, { started?: boolean; startedAt?: number; progress: number; completed: boolean; claimed: boolean }>;
   friendIds?: string[];
   notifications?: NotificationItem[];
@@ -571,6 +578,11 @@ export class PrismaService {
       equippedBadge: (u as any).equippedBadge ?? undefined,
       equippedNameEffect: (u as any).equippedNameEffect ?? undefined,
       equippedBackground: (u as any).equippedBackground ?? undefined,
+      equippedFrameExpiresAt: (u as any).equippedFrameExpiresAt ?? undefined,
+      equippedBadgeExpiresAt: (u as any).equippedBadgeExpiresAt ?? undefined,
+      equippedNameEffectExpiresAt: (u as any).equippedNameEffectExpiresAt ?? undefined,
+      equippedBackgroundExpiresAt: (u as any).equippedBackgroundExpiresAt ?? undefined,
+      blockedUserIds: Array.isArray((u as any).blockedUserIds) ? ((u as any).blockedUserIds as string[]) : [],
       eventProgress: (u as any).eventProgress || {},
       friendIds: Array.isArray(u.friendIds) ? (u.friendIds as string[]) : [],
       categoryMastery: (u.categoryMastery as any) || {},
@@ -706,6 +718,11 @@ export class PrismaService {
               equippedBadge: (args.create as any).equippedBadge ?? null,
               equippedNameEffect: (args.create as any).equippedNameEffect ?? null,
               equippedBackground: (args.create as any).equippedBackground ?? null,
+              equippedFrameExpiresAt: (args.create as any).equippedFrameExpiresAt ?? null,
+              equippedBadgeExpiresAt: (args.create as any).equippedBadgeExpiresAt ?? null,
+              equippedNameEffectExpiresAt: (args.create as any).equippedNameEffectExpiresAt ?? null,
+              equippedBackgroundExpiresAt: (args.create as any).equippedBackgroundExpiresAt ?? null,
+              blockedUserIds: ((args.create as any).blockedUserIds ?? []) as any,
               eventProgress: ((args.create as any).eventProgress ?? {}) as any,
               friendIds: (args.create.friendIds ?? []) as any,
               settings: (args.create.settings ?? {}) as any,
@@ -1573,6 +1590,11 @@ export class PrismaService {
         equippedBadge: null,
         equippedNameEffect: null,
         equippedBackground: null,
+        equippedFrameExpiresAt: null,
+        equippedBadgeExpiresAt: null,
+        equippedNameEffectExpiresAt: null,
+        equippedBackgroundExpiresAt: null,
+        blockedUserIds: [] as any,
         eventProgress: {},
         friendIds: [],
         createdAt: now,
@@ -1758,6 +1780,11 @@ export class PrismaService {
             equippedBadge: null,
             equippedNameEffect: null,
             equippedBackground: null,
+            equippedFrameExpiresAt: null,
+            equippedBadgeExpiresAt: null,
+            equippedNameEffectExpiresAt: null,
+            equippedBackgroundExpiresAt: null,
+            blockedUserIds: [] as any,
             eventProgress: {},
             friendIds: [],
             createdAt: now,
@@ -1808,6 +1835,11 @@ export class PrismaService {
           equippedBadge: null,
           equippedNameEffect: null,
           equippedBackground: null,
+          equippedFrameExpiresAt: null,
+          equippedBadgeExpiresAt: null,
+          equippedNameEffectExpiresAt: null,
+          equippedBackgroundExpiresAt: null,
+          blockedUserIds: [] as any,
           eventProgress: {},
           friendIds: [],
           createdAt: now,
@@ -1954,6 +1986,10 @@ export class PrismaService {
       equippedBadge: string;
       equippedNameEffect: string;
       equippedBackground: string;
+      equippedFrameExpiresAt: number;
+      equippedBadgeExpiresAt: number;
+      equippedNameEffectExpiresAt: number;
+      equippedBackgroundExpiresAt: number;
       settings: Partial<UserSettings>;
     }>
   ): Promise<UserProfile> {
@@ -1997,6 +2033,10 @@ export class PrismaService {
     if (updates.equippedBadge !== undefined) record.equippedBadge = updates.equippedBadge;
     if (updates.equippedNameEffect !== undefined) record.equippedNameEffect = updates.equippedNameEffect;
     if (updates.equippedBackground !== undefined) record.equippedBackground = updates.equippedBackground;
+    if (updates.equippedFrameExpiresAt !== undefined) record.equippedFrameExpiresAt = updates.equippedFrameExpiresAt;
+    if (updates.equippedBadgeExpiresAt !== undefined) record.equippedBadgeExpiresAt = updates.equippedBadgeExpiresAt;
+    if (updates.equippedNameEffectExpiresAt !== undefined) record.equippedNameEffectExpiresAt = updates.equippedNameEffectExpiresAt;
+    if (updates.equippedBackgroundExpiresAt !== undefined) record.equippedBackgroundExpiresAt = updates.equippedBackgroundExpiresAt;
     if (updates.settings !== undefined) {
       record.settings = { ...(record.settings || {}), ...updates.settings };
     }
@@ -2030,6 +2070,11 @@ export class PrismaService {
             equippedBadge: record.equippedBadge,
             equippedNameEffect: record.equippedNameEffect,
             equippedBackground: record.equippedBackground,
+            equippedFrameExpiresAt: record.equippedFrameExpiresAt ?? null,
+            equippedBadgeExpiresAt: record.equippedBadgeExpiresAt ?? null,
+            equippedNameEffectExpiresAt: record.equippedNameEffectExpiresAt ?? null,
+            equippedBackgroundExpiresAt: record.equippedBackgroundExpiresAt ?? null,
+            blockedUserIds: (record.blockedUserIds || []) as any,
             settings: (record.settings || {}) as any,
             updatedAt: new Date(),
           },
@@ -3538,6 +3583,181 @@ export class PrismaService {
     return { friendCode, friends: friendsResult, sentRequests, incomingRequests };
   }
 
+  // -----------------------------------------------------------------
+  // KULLANICI ENGELLEME SİSTEMİ
+  // -----------------------------------------------------------------
+  public async blockUser(
+    userId: string,
+    targetUserId: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    let me = this.users.get(userId);
+    try {
+      const u = await this.rawClient.user.findFirst({
+        where: { OR: [{ id: userId }, { username: userId }] },
+      });
+      if (u) {
+        me = this.prismaUserToRecord(u as any);
+        this.users.set(me.id, me);
+      }
+    } catch {}
+    if (!me) return { success: false, error: 'Kullanıcı bulunamadı.' };
+
+    if (!me.blockedUserIds) me.blockedUserIds = [];
+    if (me.blockedUserIds.includes(targetUserId)) {
+      return { success: true, message: 'Bu kullanıcı zaten engelli.' };
+    }
+    me.blockedUserIds.push(targetUserId);
+    this.users.set(me.id, me);
+    this.savePersistedUsers();
+    try {
+      await this.rawClient.user.update({
+        where: { id: me.id },
+        data: { blockedUserIds: (me.blockedUserIds || []) as any },
+      });
+    } catch (err: any) {
+      console.warn('[blockUser] DB update error:', err.message);
+    }
+    return { success: true, message: 'Kullanıcı başarıyla engellendi.' };
+  }
+
+  public async unblockUser(
+    userId: string,
+    targetUserId: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    let me = this.users.get(userId);
+    try {
+      const u = await this.rawClient.user.findFirst({
+        where: { OR: [{ id: userId }, { username: userId }] },
+      });
+      if (u) {
+        me = this.prismaUserToRecord(u as any);
+        this.users.set(me.id, me);
+      }
+    } catch {}
+    if (!me) return { success: false, error: 'Kullanıcı bulunamadı.' };
+
+    if (!me.blockedUserIds) me.blockedUserIds = [];
+    if (!me.blockedUserIds.includes(targetUserId)) {
+      return { success: true, message: 'Bu kullanıcı engelli değil.' };
+    }
+    me.blockedUserIds = me.blockedUserIds.filter((id) => id !== targetUserId);
+    this.users.set(me.id, me);
+    this.savePersistedUsers();
+    try {
+      await this.rawClient.user.update({
+        where: { id: me.id },
+        data: { blockedUserIds: (me.blockedUserIds || []) as any },
+      });
+    } catch (err: any) {
+      console.warn('[unblockUser] DB update error:', err.message);
+    }
+    return { success: true, message: 'Kullanıcının engeli kaldırıldı.' };
+  }
+
+  public async getBlockedUsers(userId: string): Promise<Array<{ id: string; username?: string; displayName?: string }>> {
+    let me = this.users.get(userId);
+    try {
+      const u = await this.rawClient.user.findFirst({
+        where: { OR: [{ id: userId }, { username: userId }] },
+      });
+      if (u) {
+        me = this.prismaUserToRecord(u as any);
+        this.users.set(me.id, me);
+      }
+    } catch {}
+    if (!me || !me.blockedUserIds || me.blockedUserIds.length === 0) {
+      return [];
+    }
+    const blocked: Array<{ id: string; username?: string; displayName?: string }> = [];
+    for (const targetId of me.blockedUserIds) {
+      try {
+        const u = await this.rawClient.user.findUnique({ where: { id: targetId } });
+        if (u) {
+          blocked.push({ id: u.id, username: u.username, displayName: u.displayName });
+        } else {
+          const rec = this.users.get(targetId);
+          if (rec) blocked.push({ id: rec.id, username: rec.username, displayName: rec.displayName });
+        }
+      } catch {}
+    }
+    return blocked;
+  }
+
+  /** Custom notification gönderir (developer paneli için) */
+  public async sendCustomNotification(
+    senderUserId: string,
+    targetUserId: string,
+    payload: { title: string; sub?: string; type?: string }
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    let sender = this.users.get(senderUserId);
+    try {
+      const u = await this.rawClient.user.findFirst({
+        where: { OR: [{ id: senderUserId }, { username: senderUserId }] },
+      });
+      if (u) {
+        sender = this.prismaUserToRecord(u as any);
+        this.users.set(sender.id, sender);
+      }
+    } catch {}
+    if (!sender) return { success: false, error: 'Gönderen kullanıcı bulunamadı.' };
+
+    let target = this.users.get(targetUserId);
+    try {
+      const u = await this.rawClient.user.findFirst({
+        where: { OR: [{ id: targetUserId }, { username: targetUserId }] },
+      });
+      if (u) {
+        target = this.prismaUserToRecord(u as any);
+        this.users.set(target.id, target);
+      }
+    } catch {}
+    if (!target) return { success: false, error: 'Hedef kullanıcı bulunamadı.' };
+
+    if (target.blockedUserIds?.includes(senderUserId)) {
+      return { success: false, error: 'Bu kullanıcı sizi engellemiş, bildirim gönderilemez.' };
+    }
+
+    const notifItem: NotificationItem = {
+      id: 'notif_sys_' + Date.now(),
+      type: (payload.type as any) || 'system',
+      title: payload.title,
+      sub: payload.sub || '',
+      timeText: 'Az önce',
+      senderId: sender.id,
+      senderName: sender.displayName,
+      senderAvatar: sender.avatarUrl || 'av1',
+      handled: null,
+    };
+
+    try {
+      await this.rawClient.userNotification.create({
+        data: {
+          id: notifItem.id,
+          userId: target.id,
+          type: notifItem.type,
+          title: notifItem.title,
+          sub: notifItem.sub,
+          timeText: notifItem.timeText,
+          handled: null,
+          senderId: notifItem.senderId,
+          senderName: notifItem.senderName,
+          senderAvatar: notifItem.senderAvatar,
+        },
+      });
+    } catch (e: any) {
+      console.warn('[sendCustomNotification] DB notification error:', e.message);
+    }
+
+    if (!target.notifications) target.notifications = [];
+    target.notifications.unshift(notifItem);
+    this.users.set(target.id, target);
+    this.savePersistedUsers();
+
+    presenceManager.notifyUser(target.id, 'notification:new', notifItem);
+
+    return { success: true, message: `Bildirim ${target.displayName} adlı kullanıcıya gönderildi.` };
+  }
+
   public async addFriend(
     userId: string,
     targetCodeOrUsername: string
@@ -3602,6 +3822,13 @@ export class PrismaService {
 
     if (target.id === me.id) {
       return { success: false, error: 'Kendi kodunuzu arkadaş olarak ekleyemezsiniz!' };
+    }
+
+    if (me.blockedUserIds?.includes(target.id)) {
+      return { success: false, error: 'Bu kullanıcıyı engellediniz. Önce engeli kaldırın.' };
+    }
+    if (target.blockedUserIds?.includes(me.id)) {
+      return { success: false, error: 'Bu kullanıcı sizi engellemiş. Arkadaşlık isteği gönderemezsiniz.' };
     }
 
     if (!me.friendIds) me.friendIds = [];
@@ -4069,6 +4296,13 @@ export class PrismaService {
     }
     if (!target) return { success: false, error: 'Hedef oyuncu bulunamadı.', message: '' };
 
+    if (me.blockedUserIds?.includes(target.id)) {
+      return { success: false, error: 'Bu kullanıcıyı engellediniz. Önce engeli kaldırın.', message: '' };
+    }
+    if (target.blockedUserIds?.includes(me.id)) {
+      return { success: false, error: 'Bu kullanıcı sizi engellemiş. Düello daveti gönderilemez.', message: '' };
+    }
+
     const roomCode = 'DUEL-' + Math.random().toString(36).substring(2, 6).toUpperCase();
     this.setUserActiveRoom(userId, roomCode);
     presenceManager.setUserRoom(userId, roomCode);
@@ -4497,6 +4731,25 @@ export class PrismaService {
             category: item.category || this.getItemCategory(item.id),
             rarity: item.rarity || this.getItemRarity(item.id),
           });
+        }
+
+        // Süreli (rental) profil kozmetikleri ise expiresAt ata — 30 gün
+        const expiresAt = Date.now() + COSMETIC_RENTAL_MS;
+        if (item.category === 'frame' && item.id.startsWith('frame_')) {
+          record.equippedFrame = item.id;
+          record.equippedFrameExpiresAt = expiresAt;
+        }
+        if (item.category === 'background' && item.id.startsWith('bg_')) {
+          record.equippedBackground = item.id;
+          record.equippedBackgroundExpiresAt = expiresAt;
+        }
+        if (item.category === 'name_effect' && item.id.startsWith('name_')) {
+          record.equippedNameEffect = item.id;
+          record.equippedNameEffectExpiresAt = expiresAt;
+        }
+        if (item.category === 'badge' && item.id.startsWith('badge_')) {
+          record.equippedBadge = item.id;
+          record.equippedBadgeExpiresAt = expiresAt;
         }
 
         if (!record.isGuest) {
@@ -4949,6 +5202,33 @@ export class PrismaService {
     const dcState = (record.categoryMastery as any)?.dailyChallenge;
     const completedToday = dcState?.lastCompletedDate === todayStr;
 
+    // Süreli profil kozmetiklerini kontrol et ve süresi dolanları düşür.
+    const now = Date.now();
+    if (record.equippedFrame && record.equippedFrameExpiresAt && now >= record.equippedFrameExpiresAt) {
+      record.equippedFrame = undefined;
+      record.equippedFrameExpiresAt = undefined;
+      this.savePersistedUsers();
+      this.rawClient.user.update({ where: { id: record.id }, data: { equippedFrame: null, equippedFrameExpiresAt: null } }).catch(() => {});
+    }
+    if (record.equippedBackground && record.equippedBackgroundExpiresAt && now >= record.equippedBackgroundExpiresAt) {
+      record.equippedBackground = undefined;
+      record.equippedBackgroundExpiresAt = undefined;
+      this.savePersistedUsers();
+      this.rawClient.user.update({ where: { id: record.id }, data: { equippedBackground: null, equippedBackgroundExpiresAt: null } }).catch(() => {});
+    }
+    if (record.equippedNameEffect && record.equippedNameEffectExpiresAt && now >= record.equippedNameEffectExpiresAt) {
+      record.equippedNameEffect = undefined;
+      record.equippedNameEffectExpiresAt = undefined;
+      this.savePersistedUsers();
+      this.rawClient.user.update({ where: { id: record.id }, data: { equippedNameEffect: null, equippedNameEffectExpiresAt: null } }).catch(() => {});
+    }
+    if (record.equippedBadge && record.equippedBadgeExpiresAt && now >= record.equippedBadgeExpiresAt) {
+      record.equippedBadge = undefined;
+      record.equippedBadgeExpiresAt = undefined;
+      this.savePersistedUsers();
+      this.rawClient.user.update({ where: { id: record.id }, data: { equippedBadge: null, equippedBadgeExpiresAt: null } }).catch(() => {});
+    }
+
     return {
       id: record.id,
       username: record.username,
@@ -4986,6 +5266,11 @@ export class PrismaService {
       equippedBadge: record.equippedBadge,
       equippedNameEffect: record.equippedNameEffect,
       equippedBackground: record.equippedBackground,
+      equippedFrameExpiresAt: record.equippedFrameExpiresAt,
+      equippedBadgeExpiresAt: record.equippedBadgeExpiresAt,
+      equippedNameEffectExpiresAt: record.equippedNameEffectExpiresAt,
+      equippedBackgroundExpiresAt: record.equippedBackgroundExpiresAt,
+      blockedUserIds: record.blockedUserIds || [],
       eventProgress: record.eventProgress || {},
       friendIds: record.friendIds || [],
       notifications: record.notifications,

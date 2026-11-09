@@ -89,6 +89,13 @@ model User {
   equippedBadge             String?
   equippedFrame             String?
   equippedNameEffect        String?
+  // Süreli (rental) profil kozmetikleri
+  equippedBackgroundExpiresAt Int?
+  equippedBadgeExpiresAt    Int?
+  equippedFrameExpiresAt    Int?
+  equippedNameEffectExpiresAt Int?
+  // Kullanıcının engellediği oyuncular
+  blockedUserIds            Json                @default("[]")
   eventProgress             Json                @default("{}")
   hasPremiumPass            Boolean             @default(false)
   seasonXp                  Int                 @default(0)

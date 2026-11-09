@@ -31,6 +31,9 @@ exports.CATEGORIES_CONFIG = [
     { id: 'social_internet', name: 'Sosyal Medya', emoji: '📱' },
     { id: 'mythology_ancient', name: 'Mitoloji', emoji: '⚡' },
     { id: 'hobbies_leisure', name: 'Hobiler', emoji: '🎣' },
+    { id: 'animals_wildlife', name: 'Hayvanlar', emoji: '🐾' },
+    { id: 'food_gastronomy', name: 'Yemek & Gastronomi', emoji: '🍲' },
+    { id: 'nature_ecology', name: 'Doğa & Ekoloji', emoji: '🌿' },
     { id: 'daily_life', name: 'Günlük Hayat', emoji: '👨‍👩‍👧' },
     { id: 'turkey_special', name: 'Türkiye', emoji: '🇹🇷' },
     { id: 'mixed', name: 'Karma Sorular', emoji: '🎲' },
@@ -111,6 +114,19 @@ const CATEGORY_MAP = {
     mitoloji: 'mythology_ancient',
     hobbies: 'hobbies_leisure',
     hobiler: 'hobbies_leisure',
+    hayvanlar: 'animals_wildlife',
+    hayvan: 'animals_wildlife',
+    animals: 'animals_wildlife',
+    animals_wildlife: 'animals_wildlife',
+    yemek: 'food_gastronomy',
+    gastra: 'food_gastronomy',
+    food: 'food_gastronomy',
+    food_gastronomy: 'food_gastronomy',
+    doga: 'nature_ecology',
+    doğa: 'nature_ecology',
+    ekoloji: 'nature_ecology',
+    nature: 'nature_ecology',
+    nature_ecology: 'nature_ecology',
     daily_life: 'daily_life',
     gunluk: 'daily_life',
     toplum: 'daily_life',
@@ -425,15 +441,31 @@ class TelegramBotService {
             [telegraf_1.Markup.button.webApp('🎮 Tavriko WebApp Aç', webAppUrl), '❓ Yardım & Komutlar'],
         ]).resize();
     }
-    getCategoryWizardKeyboard() {
+    // Sihirbaz kategori klavyesi sayfalama: sayfa başına 12 kategori (6 satır x 2)
+    getCategoryWizardKeyboard(page = 0) {
+        const PER_PAGE = 12;
+        const totalPages = Math.max(1, Math.ceil(exports.CATEGORIES_CONFIG.length / PER_PAGE));
+        const safePage = Math.min(Math.max(0, page), totalPages - 1);
+        const start = safePage * PER_PAGE;
+        const slice = exports.CATEGORIES_CONFIG.slice(start, start + PER_PAGE);
         const buttons = [];
-        for (let i = 0; i < exports.CATEGORIES_CONFIG.length; i += 2) {
+        for (let i = 0; i < slice.length; i += 2) {
             const row = [];
-            row.push(telegraf_1.Markup.button.callback(`${exports.CATEGORIES_CONFIG[i].emoji} ${exports.CATEGORIES_CONFIG[i].name}`, `wiz_cat:${exports.CATEGORIES_CONFIG[i].id}`));
-            if (i + 1 < exports.CATEGORIES_CONFIG.length) {
-                row.push(telegraf_1.Markup.button.callback(`${exports.CATEGORIES_CONFIG[i + 1].emoji} ${exports.CATEGORIES_CONFIG[i + 1].name}`, `wiz_cat:${exports.CATEGORIES_CONFIG[i + 1].id}`));
+            row.push(telegraf_1.Markup.button.callback(`${slice[i].emoji} ${slice[i].name}`, `wiz_cat:${slice[i].id}`));
+            if (i + 1 < slice.length) {
+                row.push(telegraf_1.Markup.button.callback(`${slice[i + 1].emoji} ${slice[i + 1].name}`, `wiz_cat:${slice[i + 1].id}`));
             }
             buttons.push(row);
+        }
+        // Sayfa gezinme satırı
+        if (totalPages > 1) {
+            const navRow = [];
+            if (safePage > 0)
+                navRow.push(telegraf_1.Markup.button.callback('◀️ Önceki', `wiz_cat_page:${safePage - 1}`));
+            navRow.push(telegraf_1.Markup.button.callback(`📄 ${safePage + 1}/${totalPages}`, 'wiz_page_info'));
+            if (safePage < totalPages - 1)
+                navRow.push(telegraf_1.Markup.button.callback('Sonraki ▶️', `wiz_cat_page:${safePage + 1}`));
+            buttons.push(navRow);
         }
         return telegraf_1.Markup.inlineKeyboard(buttons);
     }
@@ -544,7 +576,7 @@ class TelegramBotService {
                         `• \`/json_ornek\` — Örnek JSON soru formatı şablonunu gösterir\n` +
                         `• \`/bekleyenler\` — Onay kuyruğundaki soruları inceler\n` +
                         `• \`/istatistik\` — Soru havuzu metrikleri ve kategori dağılımı\n` +
-                        `• \`/kategori\` — 18 yarışma kategorisini listeler\n` +
+                        `• \`/kategori\` — ${exports.CATEGORIES_CONFIG.length} yarışma kategorisinin tamamını listeler\n` +
                         `• \`/ara_soru <kelime>\` — Soru havuzunda arama yapar\n\n` +
                         `*🎮 Oyuncu & Topluluk Komutları:*\n` +
                         `• \`/profil <kullanıcı_adı>\` — Seviye, LP, galibiyet oranı ve unvanı gösterir\n` +
@@ -1134,6 +1166,27 @@ class TelegramBotService {
             if (!this.isAdmin(ctx.from.id)) {
                 try {
                     await ctx.answerCbQuery('⛔ Yetkiniz bulunmamaktadır.', { show_alert: true });
+                }
+                catch { }
+                return;
+            }
+            // Sayfa bilgisi butonu (yalnızca spinner'ı kapatır)
+            if (data === 'wiz_page_info') {
+                try {
+                    await ctx.answerCbQuery();
+                }
+                catch { }
+                return;
+            }
+            // Kategori sayfası değiştirme (sihirbaz)
+            if (data.startsWith('wiz_cat_page:')) {
+                const page = parseInt(data.replace('wiz_cat_page:', ''), 10) || 0;
+                try {
+                    await ctx.answerCbQuery();
+                    await ctx.editMessageText(`📚 *Adım 1/3: Soru Kategorisi Seçin* (Sayfa ${page + 1})\n\nHangi kategoride soru üretmek istersiniz? Aşağıdaki butonlardan birine dokunun:`, {
+                        parse_mode: 'Markdown',
+                        ...this.getCategoryWizardKeyboard(page),
+                    });
                 }
                 catch { }
                 return;

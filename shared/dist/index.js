@@ -18,3 +18,4 @@ __exportStar(require("./types"), exports);
 __exportStar(require("./events"), exports);
 __exportStar(require("./scoring"), exports);
 __exportStar(require("./categories"), exports);
+__exportStar(require("./cosmetics"), exports);

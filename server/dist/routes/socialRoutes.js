@@ -354,6 +354,105 @@ router.get('/profile/:userId', async (req, res) => {
     }
     res.json(profile);
 });
+// --- Block / Unblock (kullanıcı engelleme sistemi) ---
+router.post('/block', async (req, res) => {
+    try {
+        const { userId, targetUserId } = req.body;
+        if (!userId || !targetUserId) {
+            res.status(400).json({ error: 'userId ve targetUserId zorunludur.' });
+            return;
+        }
+        if (userId === targetUserId) {
+            res.status(400).json({ error: 'Kendinizi engelleyemezsiniz.' });
+            return;
+        }
+        const result = await prismaClient_1.db.blockUser(userId, targetUserId);
+        if (!result.success) {
+            res.status(400).json({ error: result.error });
+            return;
+        }
+        res.json(result);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/unblock', async (req, res) => {
+    try {
+        const { userId, targetUserId } = req.body;
+        if (!userId || !targetUserId) {
+            res.status(400).json({ error: 'userId ve targetUserId zorunludur.' });
+            return;
+        }
+        const result = await prismaClient_1.db.unblockUser(userId, targetUserId);
+        if (!result.success) {
+            res.status(400).json({ error: result.error });
+            return;
+        }
+        res.json(result);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.get('/blocked/:userId', async (req, res) => {
+    try {
+        const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+        const blocked = await prismaClient_1.db.getBlockedUsers(userId || 'anon');
+        res.json({ success: true, blockedUsers: blocked });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// --- Admin: bildirim gönder (developer paneli) ---
+router.post('/notifications/send', async (req, res) => {
+    try {
+        const { userId, targetUserId, title, sub, type = 'system' } = req.body;
+        if (!userId || !targetUserId || !title) {
+            res.status(400).json({ error: 'userId, targetUserId ve title zorunludur.' });
+            return;
+        }
+        const result = await prismaClient_1.db.sendCustomNotification(userId, targetUserId, {
+            title,
+            sub: sub || '',
+            type,
+        });
+        if (!result.success) {
+            res.status(400).json({ error: result.error });
+            return;
+        }
+        res.json(result);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// --- Public profile by friend code (profile share links) ---
+router.get('/users/by-code/:friendCode', async (req, res) => {
+    try {
+        const friendCode = Array.isArray(req.params.friendCode) ? req.params.friendCode[0] : req.params.friendCode;
+        const profile = await prismaClient_1.db.getUserProfileByFriendCodeAsync(friendCode || '');
+        if (!profile) {
+            res.status(404).json({ error: 'Bu arkadaşlık koduna ait profil bulunamadı.' });
+            return;
+        }
+        // Sadece herkese açık alanlar
+        res.json({
+            id: profile.id,
+            displayName: profile.displayName,
+            username: profile.username,
+            avatarUrl: profile.avatarUrl,
+            friendCode: profile.friendCode,
+            xp: profile.xp,
+            stats: profile.stats,
+            settings: { equippedTitle: profile.settings?.equippedTitle },
+        });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 router.post('/daily-challenge/complete', async (req, res) => {
     try {
         const { userId, correctAnswers, totalQuestions } = req.body;

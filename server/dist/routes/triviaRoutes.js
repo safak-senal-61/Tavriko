@@ -21,6 +21,8 @@ router.get('/questions/practice', async (req, res) => {
     const seenIdsRaw = req.query.seenIds;
     const seenIds = seenIdsRaw ? seenIdsRaw.split(',') : [];
     const sessionId = req.query.sessionId || 'practice';
+    // Sunucusuz ortamda kalıcı soru havuzunun (Telegram soruları dahil) hazır olmasını bekle
+    await prismaClient_1.db.ensureQuestionsRestored();
     const rawQuestions = prismaClient_1.db.getQuestions(category, difficulty, count, seenIds);
     // Strip correctOptionId for client-safe delivery
     const questions = rawQuestions.map((q, idx) => ({
@@ -86,7 +88,8 @@ router.post('/questions/submit', async (req, res) => {
     });
 });
 // Daily challenge set
-router.get('/questions/daily', (req, res) => {
+router.get('/questions/daily', async (req, res) => {
+    await prismaClient_1.db.ensureQuestionsRestored();
     const daily = prismaClient_1.db.getDailyChallenge();
     res.json(daily);
 });
