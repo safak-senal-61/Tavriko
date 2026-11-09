@@ -137,8 +137,11 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 
   const totalQty = userInventory.reduce((acc, it) => acc + (it.qty || 0), 0);
 
-  // Determine key needed for a chest
-  const getRequiredKey = (chestId: string) => {
+  // Determine key needed for a chest (hediye kutusu anahtar gerektirmez)
+  const getRequiredKey = (chestId: string): { id: string; name: string } | null => {
+    if (chestId.includes('gift')) {
+      return null;
+    }
     if (chestId.includes('legendary') || chestId.includes('mythic')) {
       return { id: 'key_diamond', name: 'Elmas Anahtar' };
     }
@@ -157,10 +160,10 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   const triggerChestOpeningAnimation = async () => {
     if (!selectedChest || !user) return;
     const reqKey = getRequiredKey(selectedChest.id);
-    const keyInInv = userInventory.find((i) => i.id === reqKey.id);
-    const hasKey = (keyInInv?.qty || 0) > 0;
+    const keyInInv = reqKey ? userInventory.find((i) => i.id === reqKey.id) : undefined;
+    const hasKey = !reqKey || (keyInInv?.qty || 0) > 0;
 
-    if (!hasKey) {
+    if (!hasKey && reqKey) {
       sound.playSound('wrong');
       sound.triggerHaptic('error');
       setIsError(true);
@@ -191,7 +194,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
         body: JSON.stringify({
           userId: user.id,
           chestId: selectedChest.id,
-          keyId: reqKey.id,
+          keyId: reqKey ? reqKey.id : undefined,
         }),
       });
 
@@ -444,7 +447,9 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                       <View style={styles.keyReqRow}>
                         <KeyIcon size={18} />
                         <Text style={styles.keyReqText}>
-                          1x {getRequiredKey(selectedChest.id).name}
+                          {getRequiredKey(selectedChest.id)
+                            ? `1x ${getRequiredKey(selectedChest.id)!.name}`
+                            : 'Anahtar gerekmez — hediye kutusu'}
                         </Text>
                       </View>
                     </View>

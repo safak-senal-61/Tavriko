@@ -21,13 +21,9 @@ import {
   KeyIcon,
   GemIcon,
   CoinIcon,
-  TrophyIcon,
-  StreakFlameIcon,
-  SpeedBoltIcon,
-  XpStarIcon,
 } from '../components/TavrikoIcons';
-import Reanimated, { FadeInDown } from 'react-native-reanimated';
-import { Image } from 'react-native';
+import Reanimated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
+import { Image, ImageSourcePropType } from 'react-native';
 import { KitHero, KitSegment, KitEmpty, STORE_IMG, storeImageFor, KIT, FloatingElement, PulseElement, ShimmerView, UI_IMG } from '../components/StoreKit';
 
 interface EventsScreenProps {
@@ -42,6 +38,19 @@ interface EventsScreenProps {
 }
 
 type EventTab = 'daily' | 'weekly' | 'special';
+
+// Etkinlik kartlarına özel üretilmiş görseller
+const EVENT_TYPE_IMG: Record<EventTab, ImageSourcePropType> = {
+  daily: require('../../assets/images/ui/event_daily.png'),
+  weekly: require('../../assets/images/ui/event_weekly.png'),
+  special: require('../../assets/images/ui/event_special.png'),
+};
+
+const EVENT_METRIC_IMG: Record<string, ImageSourcePropType> = {
+  wins: require('../../assets/images/ui/event_wins.png'),
+  streak: require('../../assets/images/ui/event_streak.png'),
+  correct_answers: require('../../assets/images/ui/event_correct.png'),
+};
 
 export const EventsScreen: React.FC<EventsScreenProps> = ({
   user,
@@ -178,37 +187,8 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
     }
   };
 
-  const getMetricIcon = (metric: string, type: string) => {
-    if (type === 'special' || metric === 'wins') return <TrophyIcon size={26} />;
-    if (metric === 'streak') return <StreakFlameIcon size={26} />;
-    if (metric === 'correct_answers') return <SpeedBoltIcon size={26} />;
-    return <XpStarIcon size={26} />;
-  };
-
-  const getIconCircleStyle = (metric: string, type: string) => {
-    if (metric === 'streak') {
-      return {
-        backgroundColor: 'rgba(249, 115, 22, 0.2)',
-        borderColor: 'rgba(249, 115, 22, 0.45)',
-      };
-    }
-    if (metric === 'correct_answers') {
-      return {
-        backgroundColor: 'rgba(56, 189, 248, 0.2)',
-        borderColor: 'rgba(56, 189, 248, 0.45)',
-      };
-    }
-    if (metric === 'wins' || type === 'special') {
-      return {
-        backgroundColor: 'rgba(168, 85, 247, 0.2)',
-        borderColor: 'rgba(168, 85, 247, 0.45)',
-      };
-    }
-    return {
-      backgroundColor: 'rgba(255, 196, 61, 0.2)',
-      borderColor: 'rgba(255, 196, 61, 0.45)',
-    };
-  };
+  const getEventArtwork = (metric: string, type: string): ImageSourcePropType =>
+    EVENT_METRIC_IMG[metric] || EVENT_TYPE_IMG[(type as EventTab)] || EVENT_TYPE_IMG.daily;
 
   return (
     <TavrikoScreen>
@@ -288,12 +268,30 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                     isCompleted && !isClaimed && styles.eventCardCompleted,
                   ]}
                 >
-                  {/* Card Header Row: Icon + Title/Desc + Action Button */}
+                  {/* Card Header Row: Custom Artwork + Title/Desc + Action Button */}
                   <View style={styles.cardHeaderRow}>
-                    <FloatingElement amplitude={3} duration={1400}>
-                      <View style={[styles.iconCircle, getIconCircleStyle(item.metric, item.type)]}>
-                        {getMetricIcon(item.metric, item.type)}
-                      </View>
+                    <FloatingElement amplitude={4} duration={1600}>
+                      <Reanimated.View
+                        entering={ZoomIn.delay(Math.min(index, 8) * 60 + 80).springify().damping(12)}
+                      >
+                        {isCompleted && !isClaimed ? (
+                          <PulseElement min={1} max={1.08} duration={900}>
+                            <Image
+                              source={getEventArtwork(item.metric, item.type)}
+                              style={[styles.eventArt, isCompleted && { borderColor: 'rgba(90, 219, 181, 0.7)' }]}
+                              resizeMode="cover"
+                              accessibilityLabel={item.title}
+                            />
+                          </PulseElement>
+                        ) : (
+                          <Image
+                            source={getEventArtwork(item.metric, item.type)}
+                            style={styles.eventArt}
+                            resizeMode="cover"
+                            accessibilityLabel={item.title}
+                          />
+                        )}
+                      </Reanimated.View>
                     </FloatingElement>
 
                     <View style={styles.headerInfo}>
@@ -553,13 +551,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  iconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-    borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  eventArt: {
+    width: 54,
+    height: 54,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: '#241637',
   },
   metricEmoji: {
     fontSize: 22,

@@ -673,7 +673,8 @@ function getDailyChallengeConfig(streakDay = 1) {
     const rewardXp = 50 + dayNumber * 25;
     const rewardCoins = 40 + dayNumber * 20;
     const rewardGems = 5 + dayNumber * 5;
-    const rewardChest = dayNumber === 7 ? 'mega_chest' : dayNumber >= 5 ? 'bronze_chest' : undefined;
+    // Hediye kutusu yalnızca 7 günlük serinin tamamlanmasında verilir (boş yere görünmez)
+    const rewardChest = dayNumber === 7 ? 'gift_box' : undefined;
     return {
         dayNumber,
         totalQuestions,

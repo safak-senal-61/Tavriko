@@ -36,7 +36,12 @@ describe('Daily Challenge Progression', () => {
     expect(day7.dayNumber).toBe(7);
     expect(day7.totalQuestions).toBe(10);
     expect(day7.requiredCorrect).toBe(9);
-    expect(day7.rewardChest).toBe('mega_chest');
+    expect(day7.rewardChest).toBe('gift_box');
+
+    // Hediye kutusu yalnızca 7. günde verilir, ara günlerde görünmez
+    expect(day1.rewardChest).toBeUndefined();
+    expect(day5.rewardChest).toBeUndefined();
+    expect(day6.rewardChest).toBeUndefined();
   });
 
   it('cycles back to 1-7 for streaks beyond 7 days', () => {
@@ -45,5 +50,6 @@ describe('Daily Challenge Progression', () => {
 
     const day14 = getDailyChallengeConfig(14);
     expect(day14.dayNumber).toBe(7);
+    expect(day14.rewardChest).toBe('gift_box');
   });
 });

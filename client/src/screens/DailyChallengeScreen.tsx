@@ -61,7 +61,7 @@ export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({ user
           <View style={s.reward}><CoinIcon size={32} /><Text style={s.rewardValue}>+{cfg.rewardCoins}</Text><Text style={s.small}>Altın</Text></View>
           <View style={s.reward}><GemIcon size={32} /><Text style={s.rewardValue}>+{cfg.rewardGems}</Text><Text style={s.small}>Elmas</Text></View>
         </View>
-        {cfg.rewardChest && <View style={s.chest}><ChestIcon size={32} /><View style={{ flex: 1 }}><Text style={s.gold}>{cfg.rewardChest === 'mega_chest' ? 'Mega Sandık' : 'Bonus Sandık'}</Text><Text style={s.body}>Günlük ödüllerine ek olarak</Text></View></View>}
+        {cfg.rewardChest && <View style={s.chest}><ChestIcon size={32} /><View style={{ flex: 1 }}><Text style={s.gold}>🎁 Hediye Kutusu</Text><Text style={s.body}>7 günlük serinin özel final ödülü — anahtarsız açılır</Text></View></View>}
         <Button3D title={completed ? 'TEKRAR PRATİK YAP (ÖDÜLSÜZ)' : 'MEYDAN OKUMAYA BAŞLA'} variant={completed ? 'mint' : 'gold'} onPress={() => onStartDaily(cfg)} textStyle={{ fontSize: 13 }} />
       </View>
       <View style={s.tomorrow}><View style={s.tomorrowArt}><DiscoveryArtwork source={completed ? DISCOVERY_IMG.victory : DISCOVERY_IMG.collector} size={60} /></View>

@@ -23,6 +23,9 @@ router.get('/questions/practice', async (req: Request, res: Response): Promise<v
   const seenIds = seenIdsRaw ? seenIdsRaw.split(',') : [];
   const sessionId = (req.query.sessionId as string) || 'practice';
 
+  // Sunucusuz ortamda kalıcı soru havuzunun (Telegram soruları dahil) hazır olmasını bekle
+  await db.ensureQuestionsRestored();
+
   const rawQuestions = db.getQuestions(category, difficulty, count, seenIds);
   // Strip correctOptionId for client-safe delivery
   const questions: ClientQuestion[] = rawQuestions.map((q, idx) => ({
@@ -101,7 +104,8 @@ router.post('/questions/submit', async (req: Request, res: Response): Promise<vo
 });
 
 // Daily challenge set
-router.get('/questions/daily', (req: Request, res: Response): void => {
+router.get('/questions/daily', async (req: Request, res: Response): Promise<void> => {
+  await db.ensureQuestionsRestored();
   const daily = db.getDailyChallenge();
   res.json(daily);
 });

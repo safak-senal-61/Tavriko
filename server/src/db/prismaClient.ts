@@ -916,6 +916,81 @@ export class PrismaService {
   // ==========================================================================
   // HIGH-LEVEL DOMAIN METHODS (Previously in DatabaseAdapter)
   // ==========================================================================
+  private questionsRestorePromise: Promise<void> | null = null;
+
+  /**
+   * Kalıcı soru deposundan (PostgreSQL + Supabase Cloud Storage) soruları geri yükler.
+   * Sunucusuz (Vercel Lambda) ortamda bellek ömrü kısadır; Telegram üzerinden eklenen
+   * sorular yalnızca bulut deposunda kaldığı için burada geri yüklenmezse oyunda görünmezdi.
+   */
+  public ensureQuestionsRestored(): Promise<void> {
+    if (!this.questionsRestorePromise) {
+      this.questionsRestorePromise = this.restoreQuestionsFromPersistentStores()
+        .then(() => undefined)
+        .catch(() => undefined);
+    }
+    return this.questionsRestorePromise;
+  }
+
+  private async restoreQuestionsFromPersistentStores(): Promise<number> {
+    if (this.isJest) return 0;
+    let restored = 0;
+    const seenHashes = new Set<string>();
+    for (const q of this.questions) {
+      if (q.contentHash) seenHashes.add(q.contentHash);
+    }
+    const seenIds = new Set<string>(this.questions.map((q) => q.id));
+
+    const mergeQuestionList = (list: unknown, source: string): void => {
+      if (!Array.isArray(list)) return;
+      for (const raw of list) {
+        const pq = raw as Partial<Question> & { category_id?: string; review_status?: string };
+        if (!pq || !pq.text || !Array.isArray(pq.options)) continue;
+        const hash = pq.contentHash || computeQuestionHash(pq.text, pq.options as any);
+        if (seenHashes.has(hash)) continue;
+        seenHashes.add(hash);
+        // Prisma satırı (yılan_notu biçimi) veya JSON deposu biçimi olabilir
+        const normalized: Question = {
+          ...pq,
+          categoryId: (pq.categoryId || pq.category_id || 'general_culture') as CategoryId,
+          reviewStatus: (pq.reviewStatus || pq.review_status || 'published') as ReviewStatus,
+          options: pq.options as any,
+          contentHash: hash,
+          createdAt: pq.createdAt || new Date().toISOString(),
+          language: pq.language || 'tr',
+        } as Question;
+        if (seenIds.has(normalized.id)) {
+          normalized.id = 'q_' + Math.random().toString(36).substring(2, 9);
+        }
+        seenIds.add(normalized.id);
+        this.questions.push(normalized);
+        restored++;
+      }
+      if (restored > 0) {
+        console.log(`[PrismaService] ${source} üzerinden ${restored} kalıcı soru geri yüklendi.`);
+      }
+    };
+
+    // 1) Supabase Cloud Storage questions_store.json — tam Question nesnesi
+    //    (targetPool, isDailyChallenge gibi havuz alanları burada saklanır)
+    try {
+      const cloudQuestions = await supabaseService.loadCloudStore<Question[]>('questions_store.json');
+      mergeQuestionList(cloudQuestions, 'Supabase Cloud Storage');
+    } catch {
+      // Ignore
+    }
+
+    // 2) PostgreSQL questions tablosu (yedek kalıcı kaynak)
+    try {
+      const dbQuestions = await this.rawClient.question.findMany().catch(() => [] as any[]);
+      mergeQuestionList(dbQuestions, 'PostgreSQL');
+    } catch {
+      // Ignore
+    }
+
+    return restored;
+  }
+
   private async syncInitialCloudState() {
     if (this.isJest) return;
     try {
@@ -931,6 +1006,10 @@ export class PrismaService {
         }
         console.log(`[PrismaService] PostgreSQL'den ${dbUsers.length} gerçek kullanıcı senkronize edildi.`);
       }
+
+      // Önce kalıcı depolardan soruları geri yükle (Telegram'dan eklenenler dahil),
+      // sonra birleşik havuzu buluta gönder ki mevcut sorular ezilmesin.
+      await this.ensureQuestionsRestored();
 
       await supabaseService.syncCloudStore('questions_store.json', this.questions);
       await supabaseService.syncCloudStore('categories_store.json', this.getCategories());
@@ -2401,7 +2480,15 @@ export class PrismaService {
         if (!record.inventory) record.inventory = [];
         const chestItem = record.inventory.find((i) => i.id === 'chest' || i.id === cfg.rewardChest);
         if (chestItem) chestItem.qty += 1;
-        else record.inventory.push({ id: cfg.rewardChest, name: 'Günün Sandığı', desc: 'Meydan okuma ödülü', qty: 1 });
+        else
+          record.inventory.push({
+            id: cfg.rewardChest,
+            name: cfg.rewardChest === 'gift_box' ? '7 Günlük Hediye Kutusu' : 'Günün Sandığı',
+            desc: 'Meydan okuma ödülü — Envanterden anahtarsız açılır',
+            qty: 1,
+            category: 'chest',
+            rarity: cfg.rewardChest === 'gift_box' ? 'epic' : 'rare',
+          });
       }
     }
 
@@ -4483,9 +4570,13 @@ export class PrismaService {
       throw new Error('Açılacak sandık envanterinizde bulunamadı.');
     }
 
+    // Hediye kutusu (7 günlük meydan okuma ödülü) anahtar gerektirmez
+    const isGiftBox = chestId.includes('gift');
     let requiredKeyId = 'key_silver';
     let chestRarity: ItemRarity = 'common';
-    if (chestId.includes('silver')) {
+    if (isGiftBox) {
+      chestRarity = 'epic';
+    } else if (chestId.includes('silver')) {
       requiredKeyId = 'key_silver';
       chestRarity = 'rare';
     } else if (chestId.includes('gold')) {
@@ -4497,14 +4588,16 @@ export class PrismaService {
     }
 
     const actualKeyId = keyId || requiredKeyId;
-    const keyItem = record.inventory.find((i) => i.id === actualKeyId || i.id === 'key_master');
-    if (!keyItem || keyItem.qty <= 0) {
+    const keyItem = isGiftBox
+      ? undefined
+      : record.inventory.find((i) => i.id === actualKeyId || i.id === 'key_master');
+    if (!isGiftBox && (!keyItem || keyItem.qty <= 0)) {
       throw new Error(`Bu sandığı açmak için ${requiredKeyId.replace('key_', '').toUpperCase()} Anahtar gereklidir!`);
     }
 
     // Atomically consume key & chest
     chestItem.qty -= 1;
-    keyItem.qty -= 1;
+    if (keyItem) keyItem.qty -= 1;
     record.inventory = record.inventory.filter((i) => i.qty > 0);
 
     let coins = 0;
@@ -4512,7 +4605,31 @@ export class PrismaService {
     let xp = 0;
     let bonusItem: InventoryItem | undefined;
 
-    if (chestId.includes('legendary')) {
+    if (isGiftBox) {
+      // 7 günlük meydan okuma hediye kutusu: cömert epik ödüller
+      coins = Math.floor(2000 + Math.random() * 2500);
+      gems = Math.floor(60 + Math.random() * 60);
+      xp = Math.floor(400 + Math.random() * 400);
+      const giftBonusPool: InventoryItem[] = [
+        {
+          id: 'booster_xp_2x_1h',
+          name: '2x XP (1 Saat)',
+          desc: '1 saat boyunca iki kat XP',
+          qty: 1,
+          category: 'booster',
+          rarity: 'rare',
+        },
+        {
+          id: 'badge_7day_legend',
+          name: '7 Gün Efsanesi Rozeti',
+          desc: '7 günlük seriyi tamamlama rozeti',
+          qty: 1,
+          category: 'badge',
+          rarity: 'epic',
+        },
+      ];
+      bonusItem = giftBonusPool[Math.floor(Math.random() * giftBonusPool.length)];
+    } else if (chestId.includes('legendary')) {
       coins = Math.floor(4000 + Math.random() * 6000);
       gems = Math.floor(100 + Math.random() * 200);
       xp = Math.floor(800 + Math.random() * 800);
@@ -4583,12 +4700,12 @@ export class PrismaService {
           }).catch(() => {});
         }
 
-        // Consumed key in PostgreSQL
-        if (keyItem.qty <= 0) {
+        // Consumed key in PostgreSQL (hediye kutusunda anahtar harcanmaz)
+        if (keyItem && keyItem.qty <= 0) {
           await this.rawClient.userInventoryItem.deleteMany({
             where: { userId: record.id, itemId: actualKeyId },
           }).catch(() => {});
-        } else {
+        } else if (keyItem) {
           await this.rawClient.userInventoryItem.update({
             where: { userId_itemId: { userId: record.id, itemId: actualKeyId } },
             data: { qty: keyItem.qty, updatedAt: new Date() },

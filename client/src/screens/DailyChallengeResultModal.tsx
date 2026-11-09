@@ -83,7 +83,7 @@ export const DailyChallengeResultModal: React.FC<DailyChallengeResultModalProps>
                   <View style={styles.rewardItem}>
                     <ChestIcon size={18} />
                     <Text style={styles.rewardItemVal}>
-                      {rewards.chest === 'mega_chest' ? ' Mega Sandık' : ' Sandık'}
+                      {rewards.chest === 'gift_box' ? ' Hediye Kutusu' : rewards.chest === 'mega_chest' ? ' Mega Sandık' : ' Sandık'}
                     </Text>
                   </View>
                 )}

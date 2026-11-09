@@ -1393,7 +1393,8 @@ const card = {
 
 const styles = StyleSheet.create({
   profileScreenRoot: {
-    paddingHorizontal: 4,
+    // Diğer sayfalarla aynı 16px kenar boşluğu (TavrikoScreen screenRoot değerini ezmez)
+    paddingHorizontal: 0,
     width: '100%',
     maxWidth: 620,
     alignSelf: 'center',
@@ -1401,7 +1402,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 150,
     alignItems: 'center',
-    paddingHorizontal: 2,
     width: '100%',
   },
   heroCard: {

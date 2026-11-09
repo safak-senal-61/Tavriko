@@ -2739,12 +2739,15 @@ export function createApp() {
   app.use('/api/referrals', referralRoutes);
 
   // --- Cloudflare Durable Objects Internal Endpoints ---
-  app.post('/api/internal/room-questions', (req, res) => {
+  app.post('/api/internal/room-questions', async (req, res) => {
     const internalSecret = process.env.INTERNAL_API_SECRET || 'tavriko_internal_secret_2026';
     const providedSecret = req.headers['x-internal-secret'];
     if (providedSecret && providedSecret !== internalSecret) {
       return res.status(403).json({ error: 'Yetkisiz erişim' });
     }
+
+    // Sunucusuz ortamda kalıcı soru havuzunun (Telegram soruları dahil) hazır olmasını bekle
+    await db.ensureQuestionsRestored();
 
     const { categoryId, difficulty, count = 5 } = req.body || {};
     const safeCount = Math.min(50, Math.max(1, Number(count) || 5));
