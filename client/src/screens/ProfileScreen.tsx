@@ -39,7 +39,7 @@ import {
   AVATAR_PRESETS,
   AvatarPreset,
 } from '../components/TavrikoIcons';
-import { UI_IMG, FloatingImage, ShimmerView } from '../components/StoreKit';
+import { UI_IMG, FloatingImage, ShimmerView, CATEGORY_IMG } from '../components/StoreKit';
 
 let ImagePickerModule: any = null;
 try {
@@ -142,15 +142,15 @@ const TITLE_CATALOG: Array<{
   rarity: string;
   icon: ImageSourcePropType;
 }> = [
-  { title: 'Acemi Kaşif', minLevel: 1, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: UI_IMG.titleNadir },
-  { title: 'Yükselen Yıldız', minLevel: 3, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: UI_IMG.titleNadir },
-  { title: 'Usta Kaşif', minLevel: 6, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: UI_IMG.titleNadir },
-  { title: 'Bilgi Şövalyesi', minLevel: 10, badgeColor: '#B388FF', rarity: 'Epik', icon: UI_IMG.titleEpik },
-  { title: 'Stratejist', minLevel: 15, badgeColor: '#B388FF', rarity: 'Epik', icon: UI_IMG.titleEpik },
-  { title: 'Usta Bilgin', minLevel: 20, badgeColor: '#B388FF', rarity: 'Epik', icon: UI_IMG.titleEpik },
-  { title: 'Büyük Üstat', minLevel: 30, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: UI_IMG.titleEfsanevi },
-  { title: 'Efsanevi Deha', minLevel: 40, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: UI_IMG.titleEfsanevi },
-  { title: 'Evrenin Hakimi', minLevel: 50, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: UI_IMG.titleEfsanevi },
+  { title: 'Acemi Kaşif', minLevel: 1, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: require('../../assets/images/ui/title_acemi.png') },
+  { title: 'Yükselen Yıldız', minLevel: 3, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: require('../../assets/images/ui/title_yildiz.png') },
+  { title: 'Usta Kaşif', minLevel: 6, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: require('../../assets/images/ui/title_usta_kasif.png') },
+  { title: 'Bilgi Şövalyesi', minLevel: 10, badgeColor: '#B388FF', rarity: 'Epik', icon: require('../../assets/images/ui/title_sovalye.png') },
+  { title: 'Stratejist', minLevel: 15, badgeColor: '#B388FF', rarity: 'Epik', icon: require('../../assets/images/ui/title_stratejist.png') },
+  { title: 'Usta Bilgin', minLevel: 20, badgeColor: '#B388FF', rarity: 'Epik', icon: require('../../assets/images/ui/title_bilgin.png') },
+  { title: 'Büyük Üstat', minLevel: 30, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: require('../../assets/images/ui/title_ustat.png') },
+  { title: 'Efsanevi Deha', minLevel: 40, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: require('../../assets/images/ui/title_deha.png') },
+  { title: 'Evrenin Hakimi', minLevel: 50, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: require('../../assets/images/ui/title_evren.png') },
 ];
 
 const TitleLockIcon: React.FC<{ size?: number; color?: string }> = ({ size = 18, color = '#8F84B5' }) => (
@@ -1033,34 +1033,72 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         {/* TAB 2: Category Mastery */}
         {activeTab === 'mastery' && (
-          <View style={styles.detailsCard}>
+          <View style={styles.masteryTabWrap}>
+            {/* En güçlü kategori spotlight */}
+            {bestCategory && (
+              <Animated.View entering={FadeInDown.delay(40).duration(400).springify().damping(16)} style={styles.masterySpotlight}>
+                <View style={[styles.masterySpotGlow, { backgroundColor: `${bestCategory.color}33` }]} />
+                <View style={styles.masterySpotIconWrap}>
+                  <Image
+                    source={CATEGORY_IMG[bestCategory.id]}
+                    style={styles.masterySpotIcon}
+                    resizeMode="contain"
+                  />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.masterySpotEyebrow}>EN GÜÇLÜ KATEGORİN</Text>
+                  <Text style={styles.masterySpotName} numberOfLines={1}>{bestCategory.name}</Text>
+                  <Text style={styles.masterySpotMeta}>
+                    Sv. {bestCategory.level} · {bestCategory.correctCount} doğru cevap
+                  </Text>
+                </View>
+                <View style={styles.masterySpotCrownWrap}>
+                  <CrownIcon size={26} />
+                </View>
+              </Animated.View>
+            )}
+
             <Text style={styles.sectionTitle}>Kategori Ustalığı</Text>
             <Text style={styles.cardSub}>
               Her kategoride verdiğin doğru cevaplar veritabanından canlı okunur.
             </Text>
-            {masteryList.map((m) => (
-              <View key={m.id} style={styles.masteryRow}>
-                <View style={[styles.masteryTagBadge, { backgroundColor: m.color }]}>
-                  <Text style={styles.masteryTagText}>{m.tag}</Text>
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <View style={styles.masteryHeader}>
-                    <Text style={styles.masteryName} numberOfLines={1}>{m.name}</Text>
-                    <Text style={styles.masteryMeta}>
-                      Sv. {m.level} · {m.correctCount} doğru
-                    </Text>
+            {masteryList.map((m, idx) => {
+              const progress =
+                m.correctCount > 0 ? Math.min(100, Math.round((m.correctCount / maxCorrect) * 100)) : 0;
+              const isTop = bestCategory?.id === m.id;
+              return (
+                <Animated.View
+                  key={m.id}
+                  entering={FadeInRight.delay(60 + Math.min(idx, 12) * 35).duration(340).springify().damping(18)}
+                  style={styles.masteryCard}
+                >
+                  <View style={styles.masteryRow}>
+                    <View style={[styles.masteryIconWrap, { borderColor: `${m.color}55`, backgroundColor: `${m.color}18` }]}>
+                      <Image
+                        source={CATEGORY_IMG[m.id]}
+                        style={[styles.masteryIcon, m.correctCount === 0 && styles.masteryIconIdle]}
+                        resizeMode="contain"
+                      />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <View style={styles.masteryHeader}>
+                        <Text style={styles.masteryName} numberOfLines={1}>{m.name}</Text>
+                        <View style={[styles.masteryLevelChip, { backgroundColor: `${m.color}22`, borderColor: `${m.color}77` }]}>
+                          <Text style={[styles.masteryLevelText, { color: m.color }]}>Sv. {m.level}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.masteryMeta}>{m.correctCount} doğru cevap</Text>
+                    </View>
                   </View>
-                  <TavrikoProgressBar
-                    progress={
-                      m.correctCount > 0
-                        ? Math.min(100, Math.round((m.correctCount / maxCorrect) * 100))
-                        : 0
-                    }
-                    height={6}
-                  />
-                </View>
-              </View>
-            ))}
+                  <View style={styles.masteryBarWrap}>
+                    <View style={styles.masteryBarTrack}>
+                      <View style={[styles.masteryBarFill, { width: `${progress}%`, backgroundColor: m.color }]} />
+                    </View>
+                    {isTop && <ShimmerView color="#FFFFFF" duration={1700} />}
+                  </View>
+                </Animated.View>
+              );
+            })}
           </View>
         )}
 
@@ -1854,22 +1892,96 @@ const styles = StyleSheet.create({
   badgeName: { color: '#FFFFFF', fontSize: 11, fontFamily: THEME.fonts.extraBold, textAlign: 'center' },
   badgeDesc: { color: '#D9CDF5', fontSize: 9, fontFamily: THEME.fonts.body, textAlign: 'center' },
 
-  masteryRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-  masteryTagBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+  // Ustalık sekmesi (yeni kart tasarımı)
+  masteryTabWrap: { gap: 4 },
+  masterySpotlight: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 196, 61, 0.5)',
+    backgroundColor: 'rgba(255, 196, 61, 0.08)',
+    padding: 12,
+    marginBottom: 14,
+    overflow: 'hidden',
+  },
+  masterySpotGlow: {
+    position: 'absolute',
+    top: -30,
+    right: -30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    opacity: 0.5,
+  },
+  masterySpotIconWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 196, 61, 0.55)',
+    backgroundColor: 'rgba(255, 196, 61, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  masteryTagText: {
-    color: '#0A0418',
-    fontSize: 10,
-    fontWeight: '900',
+  masterySpotIcon: { width: 46, height: 46 },
+  masterySpotEyebrow: {
+    color: '#FFC43D',
+    fontSize: 9,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 1.2,
   },
-  masteryHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  masteryName: { color: '#FFFFFF', fontSize: 13, fontFamily: THEME.fonts.extraBold },
-  masteryMeta: { color: '#D9CDF5', fontSize: 11, fontFamily: THEME.fonts.extraBold },
+  masterySpotName: { color: '#FFFFFF', fontSize: 16, fontFamily: THEME.fonts.display, marginTop: 2 },
+  masterySpotMeta: { color: '#D9CDF5', fontSize: 10.5, fontFamily: THEME.fonts.bold, marginTop: 2 },
+  masterySpotCrownWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 196, 61, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.45)',
+  },
+  masteryCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.045)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.09)',
+    borderRadius: 15,
+    padding: 10,
+    marginBottom: 8,
+  },
+  masteryRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  masteryIconWrap: {
+    width: 46,
+    height: 46,
+    borderRadius: 13,
+    borderWidth: 1.2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  masteryIcon: { width: 36, height: 36 },
+  masteryIconIdle: { opacity: 0.4 },
+  masteryHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 2 },
+  masteryName: { color: '#FFFFFF', fontSize: 13, fontFamily: THEME.fonts.extraBold, flexShrink: 1 },
+  masteryLevelChip: {
+    paddingHorizontal: 7,
+    paddingVertical: 1.5,
+    borderRadius: 7,
+    borderWidth: 1,
+  },
+  masteryLevelText: { fontSize: 9.5, fontFamily: THEME.fonts.extraBold },
+  masteryMeta: { color: '#D9CDF5', fontSize: 10.5, fontFamily: THEME.fonts.bold, marginBottom: 6 },
+  masteryBarWrap: { position: 'relative' },
+  masteryBarTrack: {
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    overflow: 'hidden',
+  },
+  masteryBarFill: { height: '100%', borderRadius: 4 },
 
   masterySpotlightCard: {
     flexDirection: 'row',

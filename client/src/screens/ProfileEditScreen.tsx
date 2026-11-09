@@ -560,7 +560,7 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
     paddingTop: 8,
     paddingBottom: 60,
   },
@@ -745,8 +745,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: 'rgba(107, 60, 255, 0.45)',
-    padding: 14,
-    gap: 12,
+    padding: 12,
+    gap: 11,
   },
   fieldGroup: {
     gap: 6,
@@ -769,7 +769,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.14)',
     borderRadius: 14,
     paddingHorizontal: 12,
-    minHeight: 46,
+    minHeight: 48,
   },
   inputWrapperFocused: {
     borderColor: '#FFC43D',

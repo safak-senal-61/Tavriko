@@ -72,6 +72,38 @@ export const UI_IMG = {
   titlesHero: require('../../assets/images/store/titles_hero.jpg'),
 };
 
+/** Kategori kimliğine göre 3B oyun ikonu */
+export const CATEGORY_IMG: Record<string, ImageSourcePropType> = {
+  gaming_videogames: require('../../assets/images/categories/cat_gaming.png'),
+  anime_manga: require('../../assets/images/categories/cat_anime.png'),
+  cartoons_animation: require('../../assets/images/categories/cat_cartoons.png'),
+  cinema_tv: require('../../assets/images/categories/cat_cinema.png'),
+  comics_superheroes: require('../../assets/images/categories/cat_comics.png'),
+  fantasy_fiction: require('../../assets/images/categories/cat_fantasy.png'),
+  literature: require('../../assets/images/categories/cat_literature.png'),
+  music: require('../../assets/images/categories/cat_music.png'),
+  social_internet: require('../../assets/images/categories/cat_social.png'),
+  animals_wildlife: require('../../assets/images/categories/cat_animals.png'),
+  mythology_ancient: require('../../assets/images/categories/cat_mythology.png'),
+  hobbies_leisure: require('../../assets/images/categories/cat_hobbies.png'),
+  history: require('../../assets/images/categories/cat_history.png'),
+  geography: require('../../assets/images/categories/cat_geography.png'),
+  art_culture: require('../../assets/images/categories/cat_art.png'),
+  sports: require('../../assets/images/categories/cat_sports.png'),
+  science_tech: require('../../assets/images/categories/cat_science.png'),
+  logic_puzzles: require('../../assets/images/categories/cat_logic.png'),
+  mathematics: require('../../assets/images/categories/cat_math.png'),
+  food_gastronomy: require('../../assets/images/categories/cat_food.png'),
+  daily_life: require('../../assets/images/categories/cat_daily.png'),
+  turkey_special: require('../../assets/images/categories/cat_turkey.png'),
+  space_astronomy: require('../../assets/images/categories/cat_space.png'),
+  biology: require('../../assets/images/categories/cat_biology.png'),
+  physics_chemistry: require('../../assets/images/categories/cat_physics.png'),
+  language_vocab: require('../../assets/images/categories/cat_language.png'),
+  nature_ecology: require('../../assets/images/categories/cat_nature.png'),
+  general_culture: require('../../assets/images/categories/cat_general.png'),
+};
+
 /** Ürün/eşya kimliğine göre 3B görsel (yoksa null) */
 export const storeImageFor = (id: string, category?: string): ImageSourcePropType | null => {
   const k = (id || '').toLowerCase();

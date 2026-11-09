@@ -9,6 +9,7 @@ import {
   Platform,
   TextInput,
   Modal,
+  Image,
 } from 'react-native';
 import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { CategoryId, CategoryInfo, ALL_CATEGORIES } from '@trivia/shared';
@@ -25,6 +26,7 @@ import {
   TrophyIcon,
   CoinIcon,
 } from '../components/TavrikoIcons';
+import { CATEGORY_IMG } from '../components/StoreKit';
 
 interface CategoryExploreScreenProps {
   onBack: () => void;
@@ -40,6 +42,39 @@ interface CategoryExploreScreenProps {
 }
 
 type GroupTab = 'all' | 'gaming_pop' | 'history_culture' | 'science_nature' | 'lifestyle';
+
+const catFallback = require('../../assets/images/categories/cat_general.png');
+
+const CAT_COLORS: Record<string, string> = {
+  gaming_videogames: '#8B5CF6',
+  anime_manga: '#EC4899',
+  cartoons_animation: '#F59E0B',
+  cinema_tv: '#BA68C8',
+  comics_superheroes: '#0284C7',
+  fantasy_fiction: '#7C3AED',
+  literature: '#A1887F',
+  music: '#F06292',
+  social_internet: '#06B6D4',
+  animals_wildlife: '#DCE775',
+  mythology_ancient: '#F59E0B',
+  hobbies_leisure: '#10B981',
+  history: '#FFB74D',
+  geography: '#81C784',
+  art_culture: '#4DB6AC',
+  sports: '#FF8A65',
+  science_tech: '#4FC3F7',
+  logic_puzzles: '#FF8A80',
+  mathematics: '#4FC3F7',
+  food_gastronomy: '#FFD54F',
+  daily_life: '#6366F1',
+  turkey_special: '#DC2626',
+  space_astronomy: '#9575CD',
+  biology: '#4DD0E1',
+  physics_chemistry: '#64B5F6',
+  language_vocab: '#80CBC4',
+  nature_ecology: '#AED581',
+  general_culture: '#FFD180',
+};
 
 const GROUP_TABS: { id: GroupTab; label: string }[] = [
   { id: 'all', label: 'Tümü (28)' },
@@ -320,7 +355,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                 style={styles.catCell}
               >
               <TouchableOpacity
-                style={styles.catTile}
+                style={[styles.catTile, { borderColor: `${CAT_COLORS[cat.id] || '#8B5CF6'}44` }]}
                 onPress={() => {
                   sound.playSound('tap');
                   sound.triggerHaptic('light');
@@ -328,11 +363,19 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                 }}
                 activeOpacity={0.85}
               >
-                <CategorySquircleIcon category={cat.id} size={44} />
+                <View style={styles.catIconGlowWrap}>
+                  <Image
+                    source={CATEGORY_IMG[cat.id] || catFallback}
+                    style={styles.catIcon}
+                    resizeMode="contain"
+                  />
+                </View>
                 <Text style={styles.catName} numberOfLines={2}>
                   {cat.name}
                 </Text>
-                <Text style={styles.catCount}>{cat.totalQuestions} soru</Text>
+                <View style={styles.catCountPill}>
+                  <Text style={styles.catCount}>{cat.totalQuestions} soru</Text>
+                </View>
               </TouchableOpacity>
               </Reanimated.View>
             ))}
@@ -370,7 +413,13 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeaderRow}>
-                <CategorySquircleIcon category={selectedCatModal.id} size={50} />
+                <View style={styles.modalIconWrap}>
+                  <Image
+                    source={CATEGORY_IMG[selectedCatModal.id] || catFallback}
+                    style={styles.modalIcon}
+                    resizeMode="contain"
+                  />
+                </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <Text style={styles.modalTitle}>{selectedCatModal.name}</Text>
                   <Text style={styles.modalSub}>{selectedCatModal.description}</Text>
@@ -591,15 +640,47 @@ const styles = StyleSheet.create({
     width: '31.8%',
   },
   catTile: {
-    height: 124,
+    height: 138,
     borderRadius: 18,
     backgroundColor: 'rgba(20, 8, 52, 0.72)',
-    borderWidth: 1,
+    borderWidth: 1.2,
     borderColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 6,
+    paddingHorizontal: 6,
+  },
+  catIconGlowWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  catIcon: {
+    width: 46,
+    height: 46,
+  },
+  catCountPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderRadius: 8,
     paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  modalIconWrap: {
+    width: 62,
+    height: 62,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.35)',
+  },
+  modalIcon: {
+    width: 52,
+    height: 52,
   },
   catName: {
     color: '#FFFFFF',
