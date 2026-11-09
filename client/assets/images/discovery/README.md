@@ -13,3 +13,6 @@ collection. Artwork does not determine whether an achievement has been earned.
 
 The components use the operating system's reduced-motion preference. Infinite
 animations are stopped on unmount; text and static artwork remain visible.
+## Follow-up illustrations
+
+`settings.webp`, `bell.webp`, `robot.webp` and `social.webp` were generated specifically for Tavriko as a transparent four-cell illustration sheet, with the existing guest explorer used only as a visual-style reference. Each cell was cropped and optimized to at most 384 px with transparent WebP compression. Notification counts, settings switches, text and countdowns are rendered by application code, not baked into artwork.

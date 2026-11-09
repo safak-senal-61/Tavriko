@@ -6,6 +6,7 @@ import {
 import { ArrowRight, Check, LockKeyhole } from 'lucide-react-native';
 import { GradientFill } from './TavrikoGradient';
 import { THEME } from '../theme/tokens';
+import { useGameStore } from '../store/gameStore';
 
 export const DISCOVERY_IMG = {
   explorer: require('../../assets/images/discovery/guest_explorer.png'),
@@ -16,10 +17,16 @@ export const DISCOVERY_IMG = {
   accuracy: require('../../assets/images/discovery/badge_accuracy.png'),
   expert: require('../../assets/images/discovery/badge_expert.png'),
   collector: require('../../assets/images/discovery/badge_collector.png'),
+  settings: require('../../assets/images/discovery/settings.webp'),
+  bell: require('../../assets/images/discovery/bell.webp'),
+  robot: require('../../assets/images/discovery/robot.webp'),
+  social: require('../../assets/images/discovery/social.webp'),
 };
 
 /** Follow the OS preference on native and web, including changes while mounted. */
 export function useReducedMotion() {
+  const preferStill = useGameStore(state =>
+    state.user?.settings?.smoothAnimations === false || state.user?.settings?.batterySaver === true);
   const [reduced, setReduced] = useState(true);
   useEffect(() => {
     let mounted = true;
@@ -36,7 +43,7 @@ export function useReducedMotion() {
       subscription.remove();
     };
   }, []);
-  return reduced;
+  return reduced || preferStill;
 }
 
 export const DiscoveryArtwork: React.FC<{

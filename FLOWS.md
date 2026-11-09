@@ -1,5 +1,31 @@
 # Visual refresh acceptance and regression checks
 
+## Settings, notification and versus follow-up
+- Baseline: inspected the real exported settings screen with a synthetic local profile. All audio, game, privacy, sync, password and delete controls exist and must remain accessible.
+- Settings: modern illustrated header, compact account summary, sound/game/privacy/account tabs, animated accessible switches. Exercise off/on, volume/difficulty segments, save feedback, sync, password validation/cancel and delete dialog cancel only. Do not mutate production accounts.
+- Profile quick settings must use the same switches and artwork and remain linked to advanced settings.
+- The requested post-seven-second screen is `DuelVersusScreen`, not the radar. Inspect both bot and real-player variants, player names, countdown, sound toggle and cancellation. Retain the server-owned transition into the quiz.
+- All notification bells (home and shared top bar across screens) must show exact unread counts: 0 hides badge, then 1, 2; duplicate IDs must not inflate counts. Cap display at 99+ with an exact accessible label.
+- Notification list: illustrated empty/populated/error states, all/unread/invitation filters, explicit read and mark-all-read, accepted/declined statuses, working friend/duel actions with failure rollback.
+- New notification events update the shared store immediately and show a dismissible in-app banner. Socket and HTTP duplicates must not create duplicate cards, sounds or banners.
+- Read receipts are account-specific on this web device; no database schema migration or cross-device read-sync is included. Test reload, account switching and blocked browser storage.
+- Check 320px, 375px, desktop, reduced motion, long notification copy, failed responses, and late HTTP snapshots arriving after a socket event.
+- Regression: auth login/register/reset views, guest browsing, category search/filter/modal, all profile tabs and drawer, radar cancel/re-entry.
+- Production publication is separate from local verification and requires approval for this new update.
+
+## Follow-up verification record
+- Expo web export succeeds under Node 22. All 4 Jest suites and 19 tests pass, including 11 new inbox tests covering duplicate arrivals, stale snapshots, read persistence, account isolation, blocked storage and failed requests.
+- TypeScript still reports 11 pre-existing diagnostics elsewhere in the application. This follow-up introduces no new diagnostics; it also resolves the two missing profile-refresh references and invalid haptic preview argument from the previously recorded baseline of 14.
+- Browser checks use the real exported app with an isolated synthetic account and intercepted HTTP/WebSocket traffic. No production account, password, friendships or wallet was changed.
+- Verified home badge 0 → 1 → 2, duplicate delivery remaining at 2, one-item read, mark-all-read, reload retaining zero unread, and 101 unread displaying `99+` while exposing the exact accessible count. The shared friends-screen bell uses the same count.
+- Verified illustrated inbox and toast, all/unread/invitation filters, accepted and declined invitation state changes, failed invitation responses retaining the action instead of reporting success, and refresh failure preserving the existing cards with a working retry.
+- Verified all four settings tabs, switch state exposed to web assistive technology, sound off/on, saved 50% sound volume, sync request, profile quick-settings entry, password validation/cancel and delete-dialog cancel. No password-change or delete request was made.
+- Verified bot and real-player versus variants through mocked matchmaking events, Turkish category name, 3-to-0 countdown and honest server-waiting state, sound off/on, cancellation/re-entry, long opponent name, 320px mobile and 1280px desktop layouts, and reduced-motion rendering.
+- Screenshots were captured from the application at 375px. Referenced artwork loaded successfully, and no uncaught page errors appeared in these exercised flows.
+- Rechecked login/register switching, password-reset view/back, guest browsing and category search against the final exported bundle. Guest mode showed no unread notification badge.
+- Native iOS/Android behavior, actual two-player delivery, real credentials and cross-device read synchronization remain untested. The seven-second server matchmaking contract is unchanged; no local fake opponent or question transition was added.
+- These follow-up changes are not production-published until the user approves this update.
+
 ## Baseline
 - Production login opens with login/register tabs, password reset, Google entry and guest browsing.
 - Guest browsing opens category exploration, with sign-in promotion, search, group filters and category/subcategory picker.
@@ -21,7 +47,7 @@
 - Viewports: 375px, 320px and desktop; verify no horizontal clipping. Reduced-motion mode keeps artwork and content visible.
 - Check console errors and image loading. Authentication/network multiplayer with real accounts requires credentials and is excluded from local fixture testing.
 
-## Verification record
+## Initial visual refresh verification record
 - Expo web export completed using Node 22. The repository's existing client test suites passed: 3 suites, 8 tests.
 - TypeScript baseline was checked in an untouched worktree at `3276973`: 14 diagnostics. The edited version has the same 14 pre-existing diagnostics, with no new diagnostics.
 - Browser checks used the real exported application, not recreated screen mockups. Profile and duel used a synthetic local QA user and intercepted API/WebSocket traffic; no production account or data was modified.

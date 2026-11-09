@@ -15,6 +15,11 @@ import { UserProfile, UserSettings } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
+import { DISCOVERY_IMG, DiscoveryArtwork } from '../components/DiscoveryArtwork';
+import { PreferenceSwitch } from '../components/PreferenceSwitch';
+import { GradientFill } from '../components/TavrikoGradient';
+import { applyAudioPreferences, loadStoredPreferences } from '../store/appPrefs';
+import { Volume2, Gamepad2, ShieldCheck, UserRound, Sparkles } from 'lucide-react-native';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -98,7 +103,7 @@ const loadLocalSettings = (): UserSettings => {
       if (raw) return JSON.parse(raw) as UserSettings;
     }
   } catch {}
-  return {};
+  return loadStoredPreferences();
 };
 
 const saveLocalSettings = (settings: UserSettings) => {
@@ -127,9 +132,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  const [settingsTab, setSettingsTab] = useState<'sound' | 'game' | 'privacy' | 'account'>('sound');
 
   // Audio & Haptics
-  const [sfxEnabled, setSfxEnabled] = useState<boolean>(pick('sfxEnabled', sound.isSoundEnabled()));
+  const [sfxEnabled, setSfxEnabled] = useState<boolean>(pick('sfxEnabled', (saved as any).soundEnabled ?? sound.isSoundEnabled()));
   const [sfxVolume, setSfxVolume] = useState<'25' | '50' | '75' | '100'>(pick('sfxVolume', '100'));
   const [musicEnabled, setMusicEnabled] = useState<boolean>(pick('musicEnabled', false));
   const [musicVolume, setMusicVolume] = useState<'25' | '50' | '75' | '100'>(pick('musicVolume', '50'));
@@ -149,7 +155,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   // Social & Privacy (Websocket + Postgres)
   const [onlineStatusVisible, setOnlineStatusVisible] = useState<boolean>(pick('onlineStatusVisible', true));
-  const [duelInvitesAllowed, setDuelInvitesAllowed] = useState<boolean>(pick('duelInvitesAllowed', true));
+  const [duelInvitesAllowed, setDuelInvitesAllowed] = useState<boolean>(pick('duelInvitesAllowed', (saved as any).allowDuelChallenges ?? true));
   const [friendRequestsAllowed, setFriendRequestsAllowed] = useState<boolean>(pick('friendRequestsAllowed', true));
   const [profilePublic, setProfilePublic] = useState<boolean>(pick('profilePublic', true));
 
@@ -170,14 +176,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Apply engine sound/haptic state
-  useEffect(() => {
-    sound.setSoundEnabled(sfxEnabled);
-    sound.setHapticsEnabled(hapticsEnabled);
-  }, [sfxEnabled, hapticsEnabled]);
-
   // Aggregate current settings
   const currentSettings: UserSettings = {
+    ...saved,
     sfxEnabled,
     sfxVolume,
     musicEnabled,
@@ -197,6 +198,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     profilePublic,
   };
   const settingsSig = JSON.stringify(currentSettings);
+  useEffect(() => { applyAudioPreferences(currentSettings); }, [settingsSig]);
 
   // Auto-save debounced to PostgreSQL via API + WebSocket Presence update
   useEffect(() => {
@@ -317,26 +319,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   };
 
   // Modern Sleek Toggle Switch
-  const renderToggle = (value: boolean, onToggle: () => void) => (
-    <TouchableOpacity
-      style={[
-        styles.switchTrack,
-        value ? styles.switchTrackOn : styles.switchTrackOff,
-      ]}
-      onPress={() => {
-        sound.playSound('tap');
-        sound.triggerHaptic('light');
-        onToggle();
-      }}
-      activeOpacity={0.85}
-    >
-      <View
-        style={[
-          styles.switchThumb,
-          value ? styles.switchThumbOn : styles.switchThumbOff,
-        ]}
-      />
-    </TouchableOpacity>
+  const renderToggle = (value: boolean, onToggle: () => void, label: string) => (
+    <PreferenceSwitch value={value} label={label} onValueChange={() => {
+      sound.playSound('tap');
+      sound.triggerHaptic('light');
+      onToggle();
+    }} />
   );
 
   return (
@@ -353,7 +341,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerRow}>
-          <Text style={styles.title}>Ayarlar</Text>
+          <Text accessibilityRole="header" style={styles.title}>Ayarlar</Text>
           {saveStatus !== 'idle' && (
             <View
               style={[
@@ -380,6 +368,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           )}
         </View>
 
+        <View style={styles.preferenceHero}>
+          <GradientFill colors={['#3F275D', '#25183D']} direction="diagonal" />
+          <View style={{ flex: 1, minWidth: 0, gap: 8 }}>
+            <Text style={styles.heroEyebrow}>KONTROL SENDE</Text>
+            <Text style={styles.heroTitle}>Kendi ritminde oyna.</Text>
+            <Text style={styles.heroSub}>Sesini, oyununu ve gizliliğini sana göre ayarla.</Text>
+          </View>
+          <DiscoveryArtwork source={DISCOVERY_IMG.settings} size={104} />
+        </View>
+
         {/* 1. Account & Database Sync Card */}
         {user && (
           <View style={styles.accountCard}>
@@ -389,17 +387,16 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <Text style={styles.accountName} numberOfLines={1}>
                   {user.displayName}
                 </Text>
-                <Text style={styles.accountHandle}>
-                  @{user.username} {user.email ? `· ${user.email}` : ''}
-                </Text>
+                <Text style={styles.accountHandle}>@{user.username}</Text>
                 <View style={styles.accountBadgeRow}>
                   <View style={styles.levelBadge}>
                     <Text style={styles.levelBadgeText}>
-                      Seviye {user.level} · {user.rankTitle || 'Acemi Kaşif'}
+                      Seviye {user.level}
                     </Text>
                   </View>
                   <View style={styles.verifiedBadge}>
-                    <Text style={styles.verifiedBadgeText}>PostgreSQL Bulut</Text>
+                    <ShieldCheck size={12} color="#ADF0D8" />
+                    <Text style={styles.verifiedBadgeText}>Hesabın güvende</Text>
                   </View>
                 </View>
               </View>
@@ -429,7 +426,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             >
               <CloudSyncIcon size={18} color="#FFC43D" />
               <Text style={styles.syncBtnText}>
-                {isSyncing ? 'Veritabanı ile Senkronize Ediliyor...' : 'Bulut Veritabanı ile Eşitle'}
+                {isSyncing ? 'İlerlemen eşitleniyor...' : 'İlerlememi eşitle'}
               </Text>
             </TouchableOpacity>
 
@@ -437,6 +434,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </View>
         )}
 
+        <View accessibilityRole="tablist" style={styles.preferenceTabs}>
+          {([
+            ['sound', 'Ses', Volume2], ['game', 'Oyun', Gamepad2],
+            ['privacy', 'Gizlilik', ShieldCheck], ['account', 'Hesap', UserRound],
+          ] as const).map(([key, label, Icon]) => (
+            <TouchableOpacity key={key} accessibilityRole="tab" accessibilityState={{ selected: settingsTab === key }} aria-selected={settingsTab === key}
+              onPress={() => { sound.playSound('tap'); setSettingsTab(key); }}
+              style={[styles.preferenceTab, settingsTab === key && styles.preferenceTabActive]}>
+              <Icon size={18} color={settingsTab === key ? '#2D1C40' : '#D7CBF1'} />
+              <Text style={[styles.preferenceTabText, settingsTab === key && styles.preferenceTabTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {settingsTab === 'sound' && <>
         {/* 2. Audio & Feedback Section */}
         <View style={styles.sectionHeader}>
           <SpeakerIcon size={18} color="#FFC43D" />
@@ -454,7 +466,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               const next = !sfxEnabled;
               setSfxEnabled(next);
               sound.setSoundEnabled(next);
-            })}
+            }, 'Ses Efektleri')}
           </View>
 
           {/* SFX Volume Segmented Control */}
@@ -488,7 +500,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <Text style={styles.itemLabel}>Arka Plan Müziği</Text>
               <Text style={styles.itemSub}>Lobi ve menü tema melodisi</Text>
             </View>
-            {renderToggle(musicEnabled, () => setMusicEnabled((v) => !v))}
+            {renderToggle(musicEnabled, () => setMusicEnabled((v) => !v), 'Arka Plan Müziği')}
           </View>
 
           {/* Music Volume Segmented Control */}
@@ -526,7 +538,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               const next = !hapticsEnabled;
               setHapticsEnabled(next);
               sound.setHapticsEnabled(next);
-            })}
+            }, 'Titreşimli Geri Bildirim')}
           </View>
 
           {/* Haptic Intensity */}
@@ -546,7 +558,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                     style={[styles.miniSegPill, hapticIntensity === key && styles.miniSegPillActive]}
                     onPress={() => {
                       sound.playSound('tap');
-                      sound.triggerHaptic(key);
+                      sound.setHapticIntensity(key);
+                      sound.triggerHaptic(key === 'strong' ? 'medium' : key);
                       setHapticIntensity(key);
                     }}
                   >
@@ -570,10 +583,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <Text style={styles.itemLabel}>Süre Uyarı Sesi</Text>
               <Text style={styles.itemSub}>Son 5 saniyede geri sayım uyarısı</Text>
             </View>
-            {renderToggle(timerAlertSound, () => setTimerAlertSound((v) => !v))}
+            {renderToggle(timerAlertSound, () => setTimerAlertSound((v) => !v), 'Süre Uyarı Sesi')}
           </View>
         </View>
+        </>}
 
+        {settingsTab === 'game' && <>
         {/* 3. Gameplay & Competition Section */}
         <View style={styles.sectionHeader}>
           <GamepadIcon size={18} color="#FFC43D" />
@@ -619,7 +634,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <Text style={styles.itemLabel}>Yanlış Cevap Puan Kesintisi</Text>
               <Text style={styles.itemSub}>Rekabetçi maçlarda hatalı cevaplarda -10 RP</Text>
             </View>
-            {renderToggle(penaltyForWrong, () => setPenaltyForWrong((v) => !v))}
+            {renderToggle(penaltyForWrong, () => setPenaltyForWrong((v) => !v), 'Yanlış Cevap Puan Kesintisi')}
           </View>
 
           {/* Auto next question */}
@@ -628,10 +643,26 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <Text style={styles.itemLabel}>Otomatik Sonraki Soru</Text>
               <Text style={styles.itemSub}>Cevaplandıktan 1.5 sn sonra devam et</Text>
             </View>
-            {renderToggle(autoNextQuestion, () => setAutoNextQuestion((v) => !v))}
+            {renderToggle(autoNextQuestion, () => setAutoNextQuestion((v) => !v), 'Otomatik Sonraki Soru')}
+          </View>
+          <View style={styles.itemRow}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.itemLabel}>Akıcı Animasyonlar</Text>
+              <Text style={styles.itemSub}>Yeni kartlar ve arena görselleri hareket etsin</Text>
+            </View>
+            {renderToggle(smoothAnimations, () => setSmoothAnimations(v => !v), 'Akıcı Animasyonlar')}
+          </View>
+          <View style={[styles.itemRow, { borderBottomWidth: 0 }]}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.itemLabel}>Pil Tasarrufu</Text>
+              <Text style={styles.itemSub}>Yeni ekranlarda dekoratif hareketleri azalt</Text>
+            </View>
+            {renderToggle(batterySaver, () => setBatterySaver(v => !v), 'Pil Tasarrufu')}
           </View>
         </View>
+        </>}
 
+        {settingsTab === 'privacy' && <>
         {/* 4. Privacy & WebSocket Presence Section */}
         <View style={styles.sectionHeader}>
           <ShieldIcon size={18} color="#FFC43D" />
@@ -668,7 +699,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               const next = !onlineStatusVisible;
               setOnlineStatusVisible(next);
               if (user?.id) socketService.updatePresence(user.id, next);
-            })}
+            }, 'Çevrim İçi Durumu')}
           </View>
 
           {/* Duel Invites */}
@@ -677,7 +708,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <Text style={styles.itemLabel}>1v1 Düello Davetleri</Text>
               <Text style={styles.itemSub}>Arkadaşlarınızdan gelen anlık maç bildirimleri</Text>
             </View>
-            {renderToggle(duelInvitesAllowed, () => setDuelInvitesAllowed((v) => !v))}
+            {renderToggle(duelInvitesAllowed, () => setDuelInvitesAllowed((v) => !v), '1v1 Düello Davetleri')}
           </View>
 
           {/* Friend Requests */}
@@ -686,7 +717,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <Text style={styles.itemLabel}>Arkadaşlık İstekleri</Text>
               <Text style={styles.itemSub}>Kullanıcı koduyla gelen arkadaşlık talepleri</Text>
             </View>
-            {renderToggle(friendRequestsAllowed, () => setFriendRequestsAllowed((v) => !v))}
+            {renderToggle(friendRequestsAllowed, () => setFriendRequestsAllowed((v) => !v), 'Arkadaşlık İstekleri')}
           </View>
 
           {/* Public Profile */}
@@ -695,10 +726,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <Text style={styles.itemLabel}>Herkese Açık Profil</Text>
               <Text style={styles.itemSub}>İstatistiklerinizin liderler tablosunda incelenebilmesi</Text>
             </View>
-            {renderToggle(profilePublic, () => setProfilePublic((v) => !v))}
+            {renderToggle(profilePublic, () => setProfilePublic((v) => !v), 'Herkese Açık Profil')}
           </View>
         </View>
+        </>}
 
+        {settingsTab === 'account' && <>
         {/* 5. Account Security & Session Section */}
         <View style={styles.sectionHeader}>
           <KeyIcon size={18} color="#FFC43D" />
@@ -734,7 +767,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           />
 
           <Text style={styles.logoutDisclaimer}>
-            Oturumu kapattığınızda altınlarınız, elmaslarınız ve seviyeniz PostgreSQL veritabanında güvenle saklanır; tekrar giriş yaptığınızda kaldığınız yerden devam edersiniz.
+            Çıkış yaptığında kayıtlı ilerlemen hesabında kalır. Yeniden giriş yaparak kaldığın yerden devam edebilirsin.
           </Text>
 
           {/* Delete Account */}
@@ -750,13 +783,12 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <Text style={styles.deleteAccountBtnText}>Hesabımı Kalıcı Olarak Sil</Text>
           </TouchableOpacity>
         </View>
+        </>}
 
         {/* System & Build Footer */}
         <View style={styles.footerWrap}>
-          <Text style={styles.footerVersion}>Tavriko Arena · Sürüm 2.4.0</Text>
-          <Text style={styles.footerArchitecture}>
-            PostgreSQL (Prisma) · Cloudflare Realtime WebSocket DO
-          </Text>
+          <Sparkles size={14} color="#CDB9E4" />
+          <Text style={styles.footerVersion}>Tavriko · Sana göre ayarlandı</Text>
         </View>
       </ScrollView>
 
@@ -883,12 +915,23 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     paddingTop: 8,
   },
+  preferenceHero: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 24, borderWidth: 1, borderColor: '#74558F', backgroundColor: '#302045', overflow: 'hidden', marginBottom: 16 },
+  heroEyebrow: { color: '#ADF0D8', fontFamily: THEME.fonts.extraBold, fontSize: 12, letterSpacing: 1 },
+  heroTitle: { color: '#FFFFFF', fontFamily: THEME.fonts.display, fontSize: 25, lineHeight: 31 },
+  heroSub: { color: '#DDD0EE', fontFamily: THEME.fonts.body, fontSize: 13, lineHeight: 19 },
+  preferenceTabs: { flexDirection: 'row', backgroundColor: '#1C1030', borderRadius: 18, padding: 4, marginBottom: 24, gap: 4 },
+  preferenceTab: { flex: 1, minWidth: 0, minHeight: 64, alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 14 },
+  preferenceTabActive: { backgroundColor: '#FFC43D' },
+  preferenceTabText: { color: '#D7CBF1', fontFamily: THEME.fonts.extraBold, fontSize: 12 },
+  preferenceTabTextActive: { color: '#2D1C40' },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 14,
     paddingHorizontal: 4,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   title: {
     fontFamily: THEME.fonts.display,
@@ -921,7 +964,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(26, 14, 56, 0.92)',
     borderRadius: 22,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: '#59446D',
     padding: 16,
     marginBottom: 20,
     ...Platform.select({
@@ -949,6 +992,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginTop: 6,
+    flexWrap: 'wrap',
   },
   levelBadge: {
     backgroundColor: 'rgba(107, 60, 255, 0.3)',
@@ -960,10 +1004,13 @@ const styles = StyleSheet.create({
   },
   levelBadgeText: {
     color: '#D9CDF5',
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
   },
   verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: 'rgba(63, 208, 138, 0.15)',
     borderWidth: 1,
     borderColor: '#3FD08A',
@@ -972,8 +1019,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   verifiedBadgeText: {
-    color: '#3FD08A',
-    fontSize: 10,
+    color: '#ADF0D8',
+    fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
   },
   walletRow: {
@@ -1009,6 +1056,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 196, 61, 0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255, 196, 61, 0.4)',
+    minHeight: 44,
   },
   syncBtnText: {
     color: '#FFC43D',
@@ -1033,17 +1081,17 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: THEME.fonts.display,
     letterSpacing: 0.3,
   },
   groupCard: {
-    backgroundColor: 'rgba(26, 14, 56, 0.85)',
+    backgroundColor: '#251838',
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 14,
-    paddingVertical: 4,
+    borderColor: '#59446D',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     marginBottom: 20,
   },
   itemRow: {
@@ -1056,15 +1104,15 @@ const styles = StyleSheet.create({
   },
   itemLabel: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: THEME.fonts.extraBold,
   },
   itemSub: {
     color: '#D9CDF5',
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: THEME.fonts.body,
     marginTop: 2,
-    lineHeight: 15,
+    lineHeight: 18,
   },
 
   // Segmented Controls
@@ -1091,6 +1139,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
   },
   miniSegPillActive: {
     backgroundColor: 'rgba(255, 196, 61, 0.2)',
