@@ -1393,11 +1393,7 @@ const card = {
 
 const styles = StyleSheet.create({
   profileScreenRoot: {
-    // Diğer sayfalarla aynı 16px kenar boşluğu (TavrikoScreen screenRoot değerini ezmez)
-    paddingHorizontal: 0,
-    width: '100%',
-    maxWidth: 620,
-    alignSelf: 'center',
+    // TavrikoScreen screenRoot (16px) aynen geçerli — kenar boşluğu ezilmez.
   },
   scrollContent: {
     paddingBottom: 150,
