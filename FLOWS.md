@@ -1,5 +1,24 @@
 # Visual refresh acceptance and regression checks
 
+## Referral links, daily challenge and equipped-title artwork
+- Preserve the purple/gold Tavriko design and existing artwork/fonts. Restore only the selected unlocked title's artwork beside the profile name; the title pill stays text-only.
+- Redesign daily challenge without changing configuration, rewards, completion or practice callbacks. Inspect pending/completed states and seven-day tracker at 320px, 375px and desktop/reduced motion.
+- Invite-and-earn lives in Friends. Generate a durable opaque personal link with authenticated API access. Capture incoming link before auth/OAuth, persist it safely for up to seven days, then open Friends with a separate inviter preview card, NOT an accepted friend.
+- Only explicit "Daveti gönder" confirms mutual friendship. Dismiss clears the pending link; errors preserve it for retry. Self-links and invalid links cannot mutate data.
+- Award the inviter 100 in-game coins once per newly registered invited account (created after the link). Existing accounts may connect but earn no referral reward. Database transaction, row locks and unique invitee ledger prevent duplicate/concurrent rewards.
+- Read live schema before additive migration. Enable RLS on the new tables with no anonymous policies; do not change existing rows or schemas. Compare existing user/notification row counts before and after migration.
+- Verify authenticated ownership, public-preview privacy, invalid/self/deleted links, existing friendship, repeated confirmation, concurrent confirmation and rollback with backend tests; local PostgreSQL integration if available. No real production friendships or wallets may be changed during QA.
+- Regression: login/register/reset/guest/category exploration; profile tabs/equip title/settings; notifications seen count; private create/join, matchmaking cancel; friends/code/request actions. Test export and server/client suites, then merge/publish to the existing Vercel project under the user's standing authorization.
+
+### Referral release verification
+- Client: 6 suites / 33 tests pass. New referral service/routes: 2 suites / 11 tests pass, including serialization retry and authenticated ownership. Server build and Node 22 Expo web export pass. Client typecheck retains the 11 pre-existing diagnostics, with no new diagnostics.
+- Real isolated PostgreSQL: 7 integration tests pass against the checked-in migration, including durable two-way friendship, concurrent repeat confirmations, competing inviters, one reward per new invitee, older accounts, rollback, and anonymous access denial.
+- Full server suite: 13 suites pass (73 tests); 3 tests fail in the existing Telegram leaderboard, multiplayer simulation and Prisma fixture suites. All three failures reproduce on untouched main commit `630297d` under the same isolated environment. The PostgreSQL suite is opt-in and skipped without its isolated test URL.
+- Browser uses the real exported app with intercepted APIs/WebSockets and synthetic accounts. Verified link capture before login, persistence across reload and login, post-login separate inviter preview, no automatic confirmation, failed confirmation preserving the token, successful confirmation clearing it and refreshing Friends, preview/link error retry, dismissal, personal-link copy and share payload.
+- Visually inspected the title artwork beside the name and the text-only title pill. Daily day 1 opens the real five-question challenge; completed day 7 shows Mega Sandık and the explicitly unrewarded practice callback. Checked narrow 320px, 375px and desktop 1280px/reduced-motion layouts; no horizontal page/link overflow or uncaught browser errors in exercised flows.
+- Applied the exact additive migration to the existing Tavriko Supabase project. Before/after: 13 users and 13 existing notifications, unchanged; both new tables empty and RLS enabled. No production accounts, friendships, coins or notifications were modified by QA.
+- Native iOS/Android runtime, real Google OAuth and real cross-device notification delivery were not exercised. Web persistence is verified; native process-restart persistence is not claimed.
+
 ## Seen notifications, plain profile title and private rooms
 - Updated behavior: opening the inbox marks all currently loaded notifications seen immediately. New HTTP or WebSocket arrivals are also marked seen while the inbox is open. Invitation acceptance/decline remains a separate explicit action.
 - Outside the inbox, a new notification increases the shared badge as before. Check 5 → inbox → 0, new arrivals while open, dismissal of the banner, and persistence after reload.

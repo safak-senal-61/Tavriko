@@ -18,6 +18,7 @@ import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
 import { socketService } from '../services/socketService';
+import { ReferralCards } from '../components/ReferralCards';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -26,6 +27,10 @@ import {
   CharacterAvatar,
 } from '../components/TavrikoIcons';
 interface FriendsScreenProps {
+  token?: string | null;
+  pendingReferral?: string | null;
+  onClearReferral?: () => void;
+  onReferralConnected?: () => void;
   user?: UserProfile;
   isGuest?: boolean;
   apiBaseUrl?: string;
@@ -58,6 +63,10 @@ interface FriendRowItem {
   currentRoomCode?: string;
 }
 export const FriendsScreen: React.FC<FriendsScreenProps> = ({
+  token,
+  pendingReferral,
+  onClearReferral,
+  onReferralConnected,
   user,
   isGuest = false,
   apiBaseUrl,
@@ -175,8 +184,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
               .toLowerCase()
               .replace(/[^a-z0-9ğüşıöç]/gi, '')
               .trim();
-            if (uName && seenUsernames.has(uName)) return false;
-            if (normName && seenNames.has(normName)) return false;
+            // Display names are not unique. Two friends named Ahmet are two people.
             seenIds.add(f.id);
             if (uName) seenUsernames.add(uName);
             if (normName) seenNames.add(normName);
@@ -508,6 +516,9 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>ARKADAŞLAR</Text>
+        {!isGuest && user && <ReferralCards key={user.id} base={base} token={token} userId={user.id}
+          pendingToken={pendingReferral} onClear={() => onClearReferral?.()}
+          onConnected={() => { fetchFriends(); onReferralConnected?.(); }} />}
         {/* Compact Friend Code Card */}
         <View style={styles.codeCard}>
           <View style={styles.codeTopRow}>

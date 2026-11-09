@@ -3286,7 +3286,7 @@ export class PrismaService {
         for (const dbu of dbFriends) {
           const uName = (dbu.username || '').toLowerCase().trim();
           const dName = normalizeName(dbu.displayName || dbu.username);
-          if (!seenUserIds.has(dbu.id) && (!uName || !seenUsernames.has(uName)) && (!dName || !seenNormalizedNames.has(dName))) {
+          if (!seenUserIds.has(dbu.id)) {
             seenUserIds.add(dbu.id);
             if (uName) seenUsernames.add(uName);
             if (dName) seenNormalizedNames.add(dName);
@@ -3305,7 +3305,7 @@ export class PrismaService {
       if (!u || !u.id || !explicitFriendIds.has(u.id)) continue;
       const uName = (u?.username || '').toLowerCase().trim();
       const dName = normalizeName(u?.displayName || u?.username);
-      if (!seenUserIds.has(u.id) && (!uName || !seenUsernames.has(uName)) && (!dName || !seenNormalizedNames.has(dName)) && !u.isGuest) {
+      if (!seenUserIds.has(u.id) && !u.isGuest) {
         seenUserIds.add(u.id);
         if (uName) seenUsernames.add(uName);
         if (dName) seenNormalizedNames.add(dName);

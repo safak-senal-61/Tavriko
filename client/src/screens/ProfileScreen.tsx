@@ -688,6 +688,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.displayName} numberOfLines={1}>
                   {user.fullName || user.displayName}
                 </Text>
+                <Image
+                  source={TITLE_CATALOG.find(t => t.title === equippedTitle)?.icon}
+                  accessibilityLabel={`${equippedTitle} ünvanı`}
+                  style={{ width: 32, height: 32, flexShrink: 0 }}
+                  resizeMode="contain"
+                />
               </View>
 
               <Text style={styles.levelSub} numberOfLines={1}>
@@ -1440,6 +1446,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   displayName: {
+    flexShrink: 1,
     fontFamily: THEME.fonts.display,
     fontSize: 21,
     color: '#FFFFFF',
