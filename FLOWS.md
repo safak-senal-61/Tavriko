@@ -11,6 +11,7 @@
 - Verified a lower selected unlocked title instead of the level-derived default, switching to another unlocked title, shared home/profile text, zero image beside the profile name and zero icon inside its title pill.
 - Verified empty join validation, protected public-room password validation/cancel, normalized join code `AB12CD` reaching the local socket, category selection, room-password validation, and created-room parameters (6 players, 14 questions, 40 seconds, hard difficulty).
 - Captured create/join/profile screenshots from the exported app. Both room tabs fit at 320px, and desktop/reduced-motion rendering remained visible without horizontal overflow or uncaught page errors. All traffic used synthetic account/API/WebSocket fixtures; no production account mutations or real multiplayer test.
+- Public-room cards now separate readable title/category content from capacity/join controls. Rechecked the complete room title at 320px and protected-room selection after the layout fix; recaptured screenshots with all referenced images loaded.
 - Current deployment is included in the user's instruction to publish Tavriko updates directly without repeating approval for this scope.
 
 ## Settings, notification and versus follow-up

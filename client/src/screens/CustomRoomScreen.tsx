@@ -758,12 +758,13 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               ) : (
                 publicRooms.map((room) => (
                   <View key={room.id} style={styles.publicRoomCard}>
+                    <View style={styles.publicRoomHeader}>
                     <View style={styles.publicRoomIconWrap}>
                       <CategorySquircleIcon category={room.categoryKey} size={42} />
                     </View>
                     <View style={styles.publicRoomInfo}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.publicRoomTitle} numberOfLines={1}>
+                        <Text style={styles.publicRoomTitle}>
                           {room.title}
                         </Text>
                         {room.hasPassword && (
@@ -772,16 +773,19 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                           </Text>
                         )}
                       </View>
-                      <Text style={styles.publicRoomSub} numberOfLines={1}>
+                      <Text style={styles.publicRoomSub}>
                         {room.categoryName} · {room.totalRounds} soru · {room.timeSec}sn
                       </Text>
                     </View>
+                    </View>
+                    <View style={styles.publicRoomFooter}>
                     <View style={styles.publicRoomPill}>
                       <Text style={styles.publicRoomPillText}>
                         {room.players}/{room.maxPlayers} Kişi
                       </Text>
                     </View>
                     <TouchableOpacity
+                      accessibilityRole="button" accessibilityLabel={`Odaya katıl: ${room.title}`}
                       style={styles.publicRoomJoinBtn}
                       activeOpacity={0.85}
                       onPress={() => {
@@ -799,6 +803,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                     >
                       <Text style={styles.publicRoomJoinBtnText}>KATIL</Text>
                     </TouchableOpacity>
+                    </View>
                   </View>
                 ))
               )}
@@ -1349,8 +1354,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   publicRoomCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'stretch',
     gap: 12,
     padding: 10,
     paddingHorizontal: 12,
@@ -1369,8 +1374,13 @@ const styles = StyleSheet.create({
   },
   publicRoomInfo: {
     flex: 1,
+    minWidth: 0,
   },
+  publicRoomHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  publicRoomFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   publicRoomTitle: {
+    flex: 1,
+    lineHeight: 21,
     color: '#FFFFFF',
     fontSize: 15,
     fontFamily: THEME.fonts.display,
@@ -1378,7 +1388,8 @@ const styles = StyleSheet.create({
   },
   publicRoomSub: {
     color: '#A79BC4',
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 18,
     fontFamily: THEME.fonts.medium,
     marginTop: 2,
   },
@@ -1396,6 +1407,7 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.bold,
   },
   publicRoomJoinBtn: {
+    minHeight: 44,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 14,
