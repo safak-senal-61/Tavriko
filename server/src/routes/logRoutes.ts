@@ -146,7 +146,7 @@ export function renderDashboardHtml(): string {
 <html lang="tr">
 <head>
   <meta charset="utf-8">
-  <title>Tavriko & TriviaVerse - Geliştirici & Canlı Operasyon Portalı</title>
+  <title>Tavriko & TriviaVerse - Yönetim & Canlı Operasyon Paneli</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
   <style>
@@ -258,6 +258,54 @@ export function renderDashboardHtml(): string {
       background: var(--purple);
       color: #FFFFFF;
       box-shadow: 0 4px 12px rgba(122, 63, 224, 0.35);
+    }
+    /* Header eylem satırı: mobilde sarar ve taşmaz */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .header-user-chip {
+      background: rgba(255,196,61,0.12);
+      border: 1px solid rgba(255,196,61,0.3);
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: var(--gold);
+      font-weight: 700;
+      max-width: 220px;
+      overflow: hidden;
+    }
+    .header-user-name {
+      display: inline-block;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: bottom;
+    }
+    /* Telefon simülatörü: her ekran genişliğine akıcı uyar */
+    .sim-phone {
+      position: relative;
+      width: 380px;
+      max-width: 100%;
+      height: 740px;
+      background: #0B0818;
+      border: 12px solid #231942;
+      border-radius: 44px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.85), 0 0 40px rgba(108,92,231,0.3);
+      overflow: hidden;
+    }
+    .sim-phone-actions {
+      display: flex;
+      gap: 8px;
+      width: 380px;
+      max-width: 100%;
+    }
+    @media (max-width: 430px) {
+      .sim-phone { border-width: 8px; border-radius: 32px; height: 600px; }
+      .sim-phone-actions { flex-direction: column; }
     }
     main {
       flex: 1;
@@ -388,11 +436,8 @@ export function renderDashboardHtml(): string {
       .game-sim-grid > div:first-child { display: flex; flex-direction: column; align-items: center; }
     }
     @media (max-width: 480px) {
-      .game-sim-grid > div:first-child > div:first-child {
-        width: 100% !important;
-        max-width: 320px;
-        height: 560px !important;
-      }
+      .sim-phone { width: 100%; }
+      .sim-phone-actions { width: 100%; }
     }
 
     /* ===== COSMETICS / MODERATION STYLES ===== */
@@ -905,7 +950,7 @@ export function renderDashboardHtml(): string {
     <div style="background: #150F2C; border: 1.5px solid #2D2254; box-shadow: 0 25px 60px rgba(0,0,0,0.7); border-radius: 22px; max-width: 440px; width: 100%; padding: 36px 30px; text-align: center;">
       <div style="font-size: 46px; margin-bottom: 10px;">🛡️</div>
       <div style="font-size: 20px; font-weight: 900; background: linear-gradient(135deg, #FFC43D 0%, #FF9F0A 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 6px;">
-        TAVRİKO DEVELOPER & OPS PORTAL
+        TAVRİKO ADMİN & OPS PORTAL
       </div>
       <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px;">
         Express · Prisma PostgreSQL · Supabase Cloud · Redis · Vercel
@@ -935,7 +980,7 @@ export function renderDashboardHtml(): string {
     <div class="brand-wrap">
       <div style="font-size:26px;">🎮</div>
       <div>
-        <div class="brand-title">TAVRİKO DEVELOPER & OPS PORTAL</div>
+        <div class="brand-title">TAVRİKO ADMİN & OPS PORTAL</div>
         <div style="font-size:11.5px; color:var(--text-muted);">Express · Prisma PostgreSQL · Supabase Cloud · Redis · Vercel</div>
       </div>
       <div class="env-tag"><div class="pulse-dot"></div> CANLI AKIŞ AKTİF</div>
@@ -951,14 +996,14 @@ export function renderDashboardHtml(): string {
         <button class="nav-btn" onclick="switchTab('tab-db', this)">👥 Kullanıcılar & Veritabanı</button>
         <button class="nav-btn" onclick="switchTab('tab-mod', this)">🚫 Moderasyon & Engelleme</button>
       </div>
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <a href="/app" target="_blank" class="btn btn-gold" style="text-decoration:none; padding: 7px 14px; font-size: 12px; font-weight:800;">
-          🚀 Tam Ekran Oyna (/app)
+      <div class="header-actions">
+        <a href="/app" target="_blank" class="btn btn-gold header-play-btn" style="text-decoration:none;">
+          🚀 Tam Ekran Oyna
         </a>
-        <div style="background: rgba(255,196,61,0.12); border: 1px solid rgba(255,196,61,0.3); border-radius: 999px; padding: 4px 12px; font-size: 12px; color: var(--gold); font-weight: 700;">
-          👤 jewelkaan01@gmail.com
+        <div class="header-user-chip" title="jewelkaan01@gmail.com">
+          <span class="header-user-name">👤 jewelkaan01@gmail.com</span>
         </div>
-        <button class="btn btn-red" onclick="handlePortalLogout()" style="padding: 6px 12px; font-size: 12px;">🔒 Çıkış</button>
+        <button class="btn btn-red" onclick="handlePortalLogout()">🔒 Çıkış</button>
       </div>
     </div>
   </header>
@@ -989,8 +1034,8 @@ export function renderDashboardHtml(): string {
       <div class="game-sim-grid">
         
         <!-- Mobile Phone Device Frame -->
-        <div style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
-          <div style="position: relative; width: 380px; height: 740px; background: #0B0818; border: 12px solid #231942; border-radius: 44px; box-shadow: 0 25px 60px rgba(0,0,0,0.85), 0 0 40px rgba(108,92,231,0.3); overflow: hidden;">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%;">
+          <div class="sim-phone">
             <!-- Notch / Speaker bar -->
             <div style="position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 110px; height: 22px; background: #150F2C; border-radius: 20px; z-index: 20; display: flex; align-items: center; justify-content: center; gap: 8px;">
               <div style="width: 8px; height: 8px; background: #2A1F4E; border-radius: 50%;"></div>
@@ -1000,7 +1045,7 @@ export function renderDashboardHtml(): string {
             <iframe id="gameSimulatorIframe" src="/app" style="width: 100%; height: 100%; border: none; background: #12052C;"></iframe>
           </div>
 
-          <div style="display: flex; gap: 8px; width: 380px;">
+          <div class="sim-phone-actions">
             <button class="btn btn-gold" style="flex: 1; justify-content: center;" onclick="refreshSimulator()">
               🔄 Simülatörü Yenile
             </button>

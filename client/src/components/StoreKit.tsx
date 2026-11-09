@@ -15,6 +15,7 @@ import Animated, {
   ZoomIn,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
   withSpring,
@@ -167,84 +168,247 @@ export const backgroundFor = (id: string): ImageSourcePropType | null => {
 };
 
 /* ============================================================
-   ANİMASYONLU KOZMETİKLER (Reanimated ile renkli geçişler)
-   Süreli (30 gün) kozmetikler için canlı, nefes alan görseller
+   ANİMASYONLU KOZMETİKLER (Reanimated ile benzersiz stiller)
+   Her kozmetiğin kendi görsel dili var:
+   - Buz: yörüngede dönen kar tanecikleri + buz halkası
+   - Zümrüt: dönen yapraklar + nefes alan yeşil halka
+   - Menekşe: çift yönlü dönen yıldız/parçacık yörüngesi
+   - Alev: yükselen kor parçacıkları + titreyen ateş halkası
    ============================================================ */
 
-/** Animasyonlu çerçevelerin renk paletleri (3 renkli geçiş döngüsü) */
-export const ANIMATED_FRAME_COLORS: Record<string, string[]> = {
-  frame_ice: ['#A5F3FC', '#38BDF8', '#0EA5E9'],
-  frame_emerald: ['#6EE7B7', '#34D399', '#059669'],
-  frame_violet: ['#C4B5FD', '#A78BFA', '#7C3AED'],
-  frame_flame: ['#FFD08A', '#FF6B35', '#E11D48'],
+/** Animasyonlu çerçeve tanımları: her biri kendine özgü stil */
+export const ANIMATED_FRAME_STYLES: Record<string, {
+  colors: string[];
+  particle: 'snowflake' | 'leaf' | 'star' | 'ember';
+  duration: number;
+  reverse?: boolean;
+  doubleOrbit?: boolean;
+}> = {
+  frame_ice: { colors: ['#A5F3FC', '#38BDF8', '#0EA5E9'], particle: 'snowflake', duration: 9000, reverse: true },
+  frame_emerald: { colors: ['#6EE7B7', '#34D399', '#059669'], particle: 'leaf', duration: 7000 },
+  frame_violet: { colors: ['#C4B5FD', '#A78BFA', '#7C3AED'], particle: 'star', duration: 8000, doubleOrbit: true },
+  frame_flame: { colors: ['#FFD08A', '#FF6B35', '#E11D48'], particle: 'ember', duration: 5000 },
 };
 
-/** Animasyonlu arka planların renk katmanları */
-export const ANIMATED_BG_LAYERS: Record<string, string[]> = {
-  bg_sunset: ['#7C2D12', '#C2410C', '#F59E0B'],
-  bg_forest: ['#14532D', '#166534', '#4D7C0F'],
-  bg_night_city: ['#0F172A', '#1E293B', '#334155'],
+/** Arka planlar: her birinin farklı sahne öğeleri */
+export const ANIMATED_BG_STYLES: Record<string, {
+  layers: string[];
+  scene: 'sun' | 'leaves' | 'stars';
+}> = {
+  bg_sunset: { layers: ['#7C2D12', '#C2410C', '#F59E0B'], scene: 'sun' },
+  bg_forest: { layers: ['#14532D', '#166534', '#4D7C0F'], scene: 'leaves' },
+  bg_night_city: { layers: ['#0F172A', '#1E293B', '#334155'], scene: 'stars' },
 };
 
-/** Animasyonlu isim efekti renk döngüleri */
-export const ANIMATED_NAME_COLORS: Record<string, string[]> = {
-  name_gradient_ice: ['#A5F3FC', '#38BDF8', '#E0F2FE', '#38BDF8'],
-  name_gradient_rainbow: ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF'],
-  name_gradient_fire: ['#FFE27A', '#FF9B2F', '#E11D48', '#FF9B2F'],
+/** İsim efektleri: renk döngü hızı ve stili farklı */
+export const ANIMATED_NAME_STYLES: Record<string, {
+  colors: string[];
+  duration: number;
+  glow: number;
+}> = {
+  name_gradient_ice: { colors: ['#A5F3FC', '#38BDF8', '#E0F2FE', '#38BDF8'], duration: 5000, glow: 6 },
+  name_gradient_rainbow: { colors: ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#B197FC', '#FF6B6B'], duration: 3500, glow: 10 },
+  name_gradient_fire: { colors: ['#FFE27A', '#FF9B2F', '#E11D48', '#FF9B2F'], duration: 2800, glow: 12 },
 };
 
-/** Tek bir nefes alan halka katmanı: renk geçişli pulse animasyonu */
-const PulseRing: React.FC<{ color: string; period: number; size: number; ringWidth: number }> = ({
-  color,
-  period,
-  size,
-  ringWidth,
-}) => {
+const PARTICLE_EMOJI: Record<string, string> = {
+  snowflake: '❄',
+  leaf: '🍃',
+  star: '✦',
+  ember: '🔥',
+};
+
+/** Yörüngede dönen parçacıklar: avatarın etrafında süzülen öğeler */
+const OrbitingParticles: React.FC<{
+  radius: number;
+  particleSize: number;
+  count: number;
+  colors: string[];
+  particle: string;
+  duration: number;
+  reverse?: boolean;
+}> = ({ radius, particleSize, count, colors, particle, duration, reverse }) => {
+  const rot = useSharedValue(0);
+  useEffect(() => {
+    rot.value = withRepeat(
+      withTiming(reverse ? -360 : 360, { duration, easing: Easing.linear }),
+      -1,
+      false,
+    );
+  }, [duration, reverse]);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rot.value}deg` }],
+  }));
+  const emoji = PARTICLE_EMOJI[particle] || '✦';
+  const parts: React.ReactNode[] = [];
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    const c = colors[i % colors.length];
+    parts.push(
+      <View
+        key={i}
+        style={{
+          position: 'absolute',
+          left: x - particleSize / 2,
+          top: y - particleSize / 2,
+          width: particleSize,
+          height: particleSize,
+          borderRadius: particleSize / 2,
+          backgroundColor: `${c}33`,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={{ fontSize: particleSize * 0.62, color: c }}>{emoji}</Text>
+      </View>,
+    );
+  }
+  return (
+    <Animated.View
+      style={[{ position: 'absolute', width: 0, height: 0, left: '50%', top: '50%' }, style]}
+      pointerEvents="none"
+    >
+      {parts}
+    </Animated.View>
+  );
+};
+
+/** Nefes alan halka: kenar rengi döngüde yumuşakça değişir */
+const BreathingRing: React.FC<{
+  colors: string[];
+  size: number;
+  ringWidth: number;
+  duration: number;
+}> = ({ colors, size, ringWidth, duration }) => {
   const progress = useSharedValue(0);
   useEffect(() => {
-    progress.value = withRepeat(withTiming(1, { duration: period, easing: Easing.inOut(Easing.quad) }), -1, true);
-  }, [period]);
+    progress.value = withRepeat(withTiming(1, { duration, easing: Easing.inOut(Easing.quad) }), -1, true);
+  }, [duration]);
   const style = useAnimatedStyle(() => {
-    const p = progress.value;
+    const t = progress.value;
+    const idx = Math.min(colors.length - 1, Math.floor(t * colors.length));
+    const nextIdx = (idx + 1) % colors.length;
+    const local = t * colors.length - idx;
     return {
       position: 'absolute',
       width: size,
       height: size,
       borderRadius: size / 2,
       borderWidth: ringWidth,
-      borderColor: color,
-      opacity: 0.15 + 0.75 * Math.sin(p * Math.PI),
-      transform: [{ scale: 0.92 + 0.1 * Math.sin(p * Math.PI) }],
+      borderColor: mixHex(colors[idx], colors[nextIdx], local),
+      shadowColor: mixHex(colors[idx], colors[nextIdx], local),
+      shadowOpacity: 0.6,
+      shadowRadius: 8,
+      transform: [{ scale: 0.96 + 0.05 * Math.sin(t * Math.PI * 2) }],
     };
   });
   return <Animated.View style={style} pointerEvents="none" />;
 };
 
-/** Animasyonlu çerçeve: avatarı saran 3 katmanlı renk geçişli pulse halkaları */
+/** Yükselen kor parçacığı: alev çerçevesi için dikey süzülen kıvılcım */
+const RisingEmber: React.FC<{
+  x: number;
+  delay: number;
+  color: string;
+  size: number;
+  travel: number;
+}> = ({ x, delay, color, size, travel }) => {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withRepeat(
+      withSequence(
+        withDelay(delay, withTiming(0, { duration: 0 })),
+        withTiming(1, { duration: 2200 + delay % 800, easing: Easing.out(Easing.quad) }),
+      ),
+      -1,
+      false,
+    );
+  }, [delay]);
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute',
+    left: x,
+    bottom: 0,
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    backgroundColor: color,
+    opacity: 0.85 * (1 - p.value),
+    transform: [{ translateY: -p.value * travel }, { scale: 0.6 + p.value * 0.8 }],
+  }));
+  return <Animated.View style={style} pointerEvents="none" />;
+};
+
+/** Animasyonlu çerçeve: her çerçeve kendi animasyon diliyle avatarı sarar */
 export const AnimatedFrame: React.FC<{
   frameId: string;
   seed?: string;
   size: number;
   glow?: boolean;
-}> = ({ frameId, seed, size, glow = true }) => {
-  const colors = ANIMATED_FRAME_COLORS[(frameId || '').toLowerCase()] || ANIMATED_FRAME_COLORS.frame_ice;
-  const inner = Math.round(size * 0.62);
+}> = ({ frameId, seed, size }) => {
+  const def = ANIMATED_FRAME_STYLES[(frameId || '').toLowerCase()] || ANIMATED_FRAME_STYLES.frame_ice;
+  const inner = Math.round(size * 0.58);
+  const orbitRadius = Math.round(size * 0.44);
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <PulseRing color={colors[0]} period={1500} size={size} ringWidth={Math.max(2, size * 0.035)} />
-      <PulseRing color={colors[1]} period={2100} size={Math.round(size * 0.94)} ringWidth={Math.max(2, size * 0.045)} />
-      <PulseRing color={colors[2]} period={2600} size={Math.round(size * 0.86)} ringWidth={Math.max(2, size * 0.05)} />
-      {glow && (
-        <View
-          style={{
-            position: 'absolute',
-            width: size * 0.75,
-            height: size * 0.75,
-            borderRadius: (size * 0.75) / 2,
-            backgroundColor: colors[1],
-            opacity: 0.18,
-          }}
-        />
+      <View
+        style={{
+          position: 'absolute',
+          width: size * 0.8,
+          height: size * 0.8,
+          borderRadius: (size * 0.8) / 2,
+          backgroundColor: `${def.colors[1]}22`,
+        }}
+      />
+      {def.particle === 'ember' ? (
+        <>
+          <BreathingRing colors={def.colors} size={Math.round(size * 0.96)} ringWidth={Math.max(3, size * 0.05)} duration={1400} />
+          {[0.2, 0.35, 0.5, 0.65, 0.8].map((fx, i) => (
+            <RisingEmber
+              key={i}
+              x={size * (0.15 + fx * 0.7)}
+              delay={i * 380}
+              color={def.colors[i % def.colors.length]}
+              size={Math.max(4, size * 0.07)}
+              travel={size * 0.9}
+            />
+          ))}
+        </>
+      ) : def.doubleOrbit ? (
+        <>
+          <BreathingRing colors={def.colors} size={Math.round(size * 0.92)} ringWidth={Math.max(2, size * 0.035)} duration={2600} />
+          <OrbitingParticles
+            radius={orbitRadius}
+            particleSize={Math.max(10, size * 0.13)}
+            count={4}
+            colors={def.colors}
+            particle={def.particle}
+            duration={def.duration}
+          />
+          <OrbitingParticles
+            radius={Math.round(orbitRadius * 0.78)}
+            particleSize={Math.max(8, size * 0.1)}
+            count={3}
+            colors={[def.colors[2], def.colors[0]]}
+            particle={def.particle}
+            duration={def.duration * 0.7}
+            reverse
+          />
+        </>
+      ) : (
+        <>
+          <BreathingRing colors={def.colors} size={Math.round(size * 0.94)} ringWidth={Math.max(2, size * 0.04)} duration={2200} />
+          <OrbitingParticles
+            radius={orbitRadius}
+            particleSize={Math.max(10, size * 0.14)}
+            count={def.particle === 'snowflake' ? 5 : 4}
+            colors={def.colors}
+            particle={def.particle}
+            duration={def.duration}
+            reverse={def.reverse}
+          />
+        </>
       )}
       <View
         style={{
@@ -253,7 +417,7 @@ export const AnimatedFrame: React.FC<{
           borderRadius: inner / 2,
           overflow: 'hidden',
           borderWidth: 1.5,
-          borderColor: colors[0],
+          borderColor: def.colors[0],
           backgroundColor: '#170733',
         }}
       >
@@ -263,21 +427,105 @@ export const AnimatedFrame: React.FC<{
   );
 };
 
-/** Animasyonlu arka plan önizlemesi: renk katmanları yumuşak geçişle nefes alır */
+/** Gökyüzü öğeleri: güneş (batım), yıldızlar (gece şehri) */
+const TwinkleStar: React.FC<{ x: number; y: number; delay: number; size: number }> = ({ x, y, delay, size }) => {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withRepeat(
+      withSequence(
+        withDelay(delay, withTiming(0, { duration: 0 })),
+        withTiming(1, { duration: 1600 + (delay % 900), easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
+      true,
+    );
+  }, [delay]);
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute',
+    left: x,
+    top: y,
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    backgroundColor: '#E0F2FE',
+    opacity: 0.15 + 0.85 * Math.abs(Math.sin(p.value * Math.PI)),
+  }));
+  return <Animated.View style={style} pointerEvents="none" />;
+};
+
+const PulsingSun: React.FC<{ size: number }> = ({ size }) => {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withRepeat(withTiming(1, { duration: 4000, easing: Easing.inOut(Easing.sin) }), -1, true);
+  }, []);
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute',
+    right: -size * 0.3,
+    top: size * 0.35,
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    backgroundColor: '#F59E0B',
+    opacity: 0.35 + 0.3 * Math.sin(p.value * Math.PI),
+    transform: [{ scale: 0.92 + 0.12 * Math.sin(p.value * Math.PI) }],
+  }));
+  return <Animated.View style={style} pointerEvents="none" />;
+};
+
+/** Süzülen yaprak: orman arka planı için */
+const DriftingLeaf: React.FC<{ x: number; delay: number; size: number; drift: number }> = ({ x, delay, size, drift }) => {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withRepeat(
+      withSequence(
+        withDelay(delay, withTiming(0, { duration: 0 })),
+        withTiming(1, { duration: 5000 + (delay % 3000), easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
+      true,
+    );
+  }, [delay]);
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute',
+    left: x,
+    top: 10 + p.value * drift,
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    backgroundColor: '#6EE7B7',
+    opacity: 0.25 + 0.35 * Math.sin(p.value * Math.PI),
+    transform: [{ translateY: Math.sin(p.value * Math.PI * 2) * 6 }, { rotate: `${p.value * 360}deg` }],
+  }));
+  return <Animated.View style={style} pointerEvents="none" />;
+};
+
+/** Animasyonlu arka plan önizlemesi: her sahnenin kendine özgü canlı öğeleri */
 export const AnimatedBackgroundThumb: React.FC<{
   bgId: string;
   seed?: string;
   name?: string;
   width: number;
 }> = ({ bgId, seed, name, width }) => {
-  const layers = ANIMATED_BG_LAYERS[(bgId || '').toLowerCase()] || ANIMATED_BG_LAYERS.bg_sunset;
+  const def = ANIMATED_BG_STYLES[(bgId || '').toLowerCase()] || ANIMATED_BG_STYLES.bg_sunset;
   const h = Math.round(width * 1.62);
   const av = Math.round(width * 0.34);
   return (
     <View style={[kit.phone, { width, height: h, borderRadius: width * 0.16, overflow: 'hidden' }]}>
-      {layers.map((c, i) => (
-        <PulseBgLayer key={i} color={c} period={3200 + i * 1400} />
+      {def.layers.map((c, i) => (
+        <PulseBgLayer key={i} color={c} period={3600 + i * 1600} />
       ))}
+      {def.scene === 'sun' && <PulsingSun size={width * 0.5} />}
+      {def.scene === 'stars' &&
+        [
+          [0.08, 0.1], [0.3, 0.06], [0.55, 0.12], [0.75, 0.08], [0.18, 0.22],
+          [0.62, 0.26], [0.85, 0.2], [0.4, 0.34], [0.05, 0.4], [0.9, 0.36],
+        ].map(([fx, fy], i) => (
+          <TwinkleStar key={i} x={width * fx} y={h * fy} delay={i * 700} size={Math.max(3, width * 0.045)} />
+        ))}
+      {def.scene === 'leaves' &&
+        [0.1, 0.3, 0.5, 0.7, 0.85].map((fx, i) => (
+          <DriftingLeaf key={i} x={width * fx} delay={i * 900} size={Math.max(4, width * 0.06)} drift={h * 0.6} />
+        ))}
       <View style={kit.phoneNotch as ViewStyle} />
       <View style={{ alignItems: 'center', marginTop: h * 0.14 }}>
         <View
@@ -315,33 +563,33 @@ const PulseBgLayer: React.FC<{ color: string; period: number }> = ({ color, peri
     right: 0,
     bottom: 0,
     backgroundColor: color,
-    opacity: 0.25 + 0.5 * Math.sin(progress.value * Math.PI),
+    opacity: 0.22 + 0.5 * Math.sin(progress.value * Math.PI),
   }));
   return <Animated.View style={style} pointerEvents="none" />;
 };
 
-/** Animasyonlu isim efekti: renk döngüsü içinde süzülen yazı */
+/** Animasyonlu isim efekti: her efektin kendine özgü hız ve parlaklığı */
 export const AnimatedNameText: React.FC<{
   effectId: string;
   children?: string;
   style?: any;
   numberOfLines?: number;
 }> = ({ effectId, children, style, numberOfLines }) => {
-  const colors = ANIMATED_NAME_COLORS[(effectId || '').toLowerCase()] || ANIMATED_NAME_COLORS.name_gradient_ice;
+  const def = ANIMATED_NAME_STYLES[(effectId || '').toLowerCase()] || ANIMATED_NAME_STYLES.name_gradient_ice;
+  const colors = def.colors;
   const progress = useSharedValue(0);
   useEffect(() => {
-    progress.value = withRepeat(withTiming(1, { duration: 3600, easing: Easing.linear }), -1, false);
-  }, []);
+    progress.value = withRepeat(withTiming(1, { duration: def.duration, easing: Easing.linear }), -1, false);
+  }, [def.duration]);
   const animStyle = useAnimatedStyle(() => {
     const t = progress.value;
     const idx = Math.min(colors.length - 1, Math.floor(t * colors.length));
     const nextIdx = (idx + 1) % colors.length;
     const local = t * colors.length - idx;
-    // Basit lineer renk karışımı (hex)
     return {
       color: mixHex(colors[idx], colors[nextIdx], local),
       textShadowColor: mixHex(colors[idx], colors[nextIdx], local),
-      textShadowRadius: 8,
+      textShadowRadius: def.glow,
       textShadowOffset: { width: 0, height: 0 },
     };
   });
@@ -365,6 +613,17 @@ const mixHex = (a: string, b: string, t: number): string => {
   const hex = (v: number) => v.toString(16).padStart(2, '0');
   return `#${hex(r)}${hex(g)}${hex(bl)}`;
 };
+
+/** Animasyonlu kozmetik kimlikleri (ShopScreen ve profil modalı için) */
+export const ANIMATED_FRAME_COLORS: Record<string, string[]> = Object.fromEntries(
+  Object.entries(ANIMATED_FRAME_STYLES).map(([k, v]) => [k, v.colors]),
+);
+export const ANIMATED_BG_LAYERS: Record<string, string[]> = Object.fromEntries(
+  Object.entries(ANIMATED_BG_STYLES).map(([k, v]) => [k, v.layers]),
+);
+export const ANIMATED_NAME_COLORS: Record<string, string[]> = Object.fromEntries(
+  Object.entries(ANIMATED_NAME_STYLES).map(([k, v]) => [k, v.colors]),
+);
 
 /* Avatar + çerçeve: kullanıcının fotoğrafı/avatarı çerçevenin içinde görünür */
 export const FramedAvatar: React.FC<{ frameId: string; seed?: string; size: number }> = ({
@@ -418,10 +677,10 @@ export const BackgroundThumb: React.FC<{
   );
 };
 
-/* Büyütülmüş önizleme (çerçeve veya arka plan) */
+/* Büyütülmüş önizleme (çerçeve, arka plan veya isim efekti) */
 export const CosmeticPreviewModal: React.FC<{
   visible: boolean;
-  kind: 'frame' | 'background' | null;
+  kind: 'frame' | 'background' | 'name' | null;
   itemId: string;
   title: string;
   seed?: string;
@@ -433,6 +692,12 @@ export const CosmeticPreviewModal: React.FC<{
   onAction?: () => void;
 }> = ({ visible, kind, itemId, title, seed, name, level, stats, onClose, actionLabel, onAction }) => {
   const bg = kind === 'background' ? backgroundFor(itemId) : null;
+  const isAnimFrame = kind === 'frame' && !!ANIMATED_FRAME_STYLES[(itemId || '').toLowerCase()];
+  const isAnimBg = kind === 'background' && !!ANIMATED_BG_STYLES[(itemId || '').toLowerCase()];
+  const isNameEffect = kind === 'name';
+  const animNameDef = isNameEffect
+    ? ANIMATED_NAME_STYLES[(itemId || '').toLowerCase()]
+    : null;
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={kit.pvBackdrop}>
@@ -450,16 +715,31 @@ export const CosmeticPreviewModal: React.FC<{
           </View>
           <View style={{ alignItems: 'center', marginTop: 36 }}>
             {kind === 'frame' ? (
-              <FramedAvatar frameId={itemId} seed={seed} size={200} />
+              isAnimFrame ? (
+                <AnimatedFrame frameId={itemId} seed={seed} size={200} />
+              ) : (
+                <FramedAvatar frameId={itemId} seed={seed} size={200} />
+              )
             ) : (
               <View style={kit.pvAvatar}>
                 <CharacterAvatar seed={seed} size={110} />
               </View>
             )}
-            <Text style={kit.pvName} numberOfLines={1}>
-              {name || 'Oyuncu'}
-            </Text>
+            {isNameEffect ? (
+              <AnimatedNameText effectId={itemId} style={kit.pvName} numberOfLines={1}>
+                {name || 'Oyuncu'}
+              </AnimatedNameText>
+            ) : (
+              <Text style={kit.pvName} numberOfLines={1}>
+                {name || 'Oyuncu'}
+              </Text>
+            )}
             {typeof level === 'number' && <Text style={kit.pvLevel}>Seviye {level}</Text>}
+            {isNameEffect && (
+              <Text style={[kit.pvLevel, { marginTop: 6, fontSize: 11, color: 'rgba(217,205,245,0.6)' }]}>
+                İsim efektiniz profilinizde ve arkadaş listesinde böyle görünecek
+              </Text>
+            )}
           </View>
           {!!stats?.length && (
             <View style={kit.pvStats}>

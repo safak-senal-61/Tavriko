@@ -342,10 +342,14 @@ function createApp() {
             res.send((0, logRoutes_1.renderDashboardHtml)());
         });
     }
-    // Developer & Operations Portal (Password protected via jewelkaan01@gmail.com)
-    app.get(['/portal', '/dashboard', '/admin', '/ops', '/developer', '/dev', '/developer-portal', '/gelistirici'], (req, res) => {
+    // Admin & Operations Portal (Password protected via jewelkaan01@gmail.com) — birincil adres /admin
+    app.get(['/admin', '/portal', '/dashboard', '/ops', '/dev', '/developer-portal', '/gelistirici'], (req, res) => {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.send((0, logRoutes_1.renderDashboardHtml)());
+    });
+    // Eski /developer adresi artık /admin'e yönlendirir
+    app.get(['/developer', '/developer/'], (req, res) => {
+        res.redirect(301, '/admin');
     });
     // Telegram Admin dashboard
     app.get('/telegram-admin', (req, res) => {

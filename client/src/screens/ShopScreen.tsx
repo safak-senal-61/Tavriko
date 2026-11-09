@@ -329,10 +329,11 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const [confirmProduct, setConfirmProduct] = useState<ShopProduct | null>(null);
   const [previewProduct, setPreviewProduct] = useState<ShopProduct | null>(null);
-  const previewKind = (p: ShopProduct | null): 'frame' | 'background' | null => {
+  const previewKind = (p: ShopProduct | null): 'frame' | 'background' | 'name' | null => {
     if (!p) return null;
-    if ((p.category === 'frames' || p.id.includes('frame')) && frameFor(p.id)) return 'frame';
-    if ((p.category === 'backgrounds' || p.id.startsWith('bg_')) && backgroundFor(p.id)) return 'background';
+    if ((p.category === 'frames' || p.id.includes('frame')) && (frameFor(p.id) || ANIMATED_FRAME_COLORS[p.id])) return 'frame';
+    if ((p.category === 'backgrounds' || p.id.startsWith('bg_')) && (backgroundFor(p.id) || ANIMATED_BG_LAYERS[p.id])) return 'background';
+    if (p.category === 'name_effects' || p.id.includes('name_')) return 'name';
     return null;
   };
   const userSeed = user?.avatarUrl || user?.displayName;
