@@ -43,7 +43,11 @@ import {
   EyeOpenIcon,
   EyeOffIcon,
 } from '../components/TavrikoIcons';
+import { FloatingImage } from '../components/StoreKit';
+import Reanimated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { sound } from '../services/soundService';
+
+const AUTH_CROWN = require('../../assets/images/ui/auth_crown.png');
 const GOOGLE_CLIENT_ID =
   '411578437442-gs1rck2124rgr516fe9dn9tuu15ge9ig.apps.googleusercontent.com';
 interface AuthScreenProps {
@@ -749,17 +753,24 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Clean Modern Brand Header (No Crown, Clean Title) */}
+        {/* Clean Modern Brand Header (3D Crown + Floating) */}
         <Animated.View
           style={[
             styles.heroWrap,
             { transform: [{ translateY }] },
           ]}
         >
-          <Text style={styles.cleanBrandTitle}>Tavriko</Text>
+          <Reanimated.View entering={FadeInDown.delay(60).duration(500).springify().damping(14)} style={styles.heroCrownWrap}>
+            <View style={styles.heroCrownGlow} />
+            <FloatingImage source={AUTH_CROWN} size={92} />
+          </Reanimated.View>
+          <Reanimated.View entering={FadeInUp.delay(140).duration(500)}>
+            <Text style={styles.cleanBrandTitle}>Tavriko</Text>
+            <Text style={styles.brandSubtitle}>CANLI BİLGİ & DÜELLO</Text>
+          </Reanimated.View>
         </Animated.View>
         {/* Main Glass Auth Card */}
-        <View style={styles.card}>
+        <Reanimated.View entering={FadeInDown.delay(220).duration(500).springify().damping(16)} style={styles.card}>
           {redirectNotice ? (
             <View style={styles.redirectNoticeBanner}>
               <Text style={styles.errorText}>🔒 {redirectNotice}</Text>
@@ -796,13 +807,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </View>
           )}
           {resetSuccessMsg && mode === 'login' && (
-            <View style={styles.successBanner}>
+            <Reanimated.View entering={ZoomIn.duration(220)} style={styles.successBanner}>
               <Text style={styles.successText}>✓ {resetSuccessMsg}</Text>
-            </View>
+            </Reanimated.View>
           )}
           {/* ==================== LOGIN FORM ==================== */}
           {mode === 'login' && (
-            <>
+            <Reanimated.View key="login-form" entering={FadeInDown.delay(80).duration(420).springify().damping(16)}>
               <Text style={styles.label}>E-POSTA VEYA KULLANICI ADI</Text>
               <TextInput
                 style={styles.input}
@@ -844,9 +855,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <Text style={styles.forgotLinkText}>Şifremi Unuttum?</Text>
               </TouchableOpacity>
               {errorMsg && (
-                <View style={styles.errorBanner}>
+                <Reanimated.View entering={ZoomIn.duration(220)} style={styles.errorBanner}>
                   <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
-                </View>
+                </Reanimated.View>
               )}
               {loading ? (
                 <ActivityIndicator
@@ -862,11 +873,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   style={{ marginTop: 12 }}
                 />
               )}
-            </>
+            </Reanimated.View>
           )}
           {/* ==================== STEP-BY-STEP REGISTER WIZARD ==================== */}
           {mode === 'register' && (
-            <>
+            <Reanimated.View key={'register-form-' + regStep} entering={FadeInDown.delay(80).duration(420).springify().damping(16)}>
               {/* Step Progress Header */}
               <View style={styles.stepWizardBox}>
                 <View style={styles.stepWizardHeader}>
@@ -1184,11 +1195,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   )}
                 </View>
               )}
-            </>
+            </Reanimated.View>
           )}
           {/* ==================== FORGOT / RESET PASSWORD VIEW ==================== */}
           {mode === 'forgot' && (
-            <>
+            <Reanimated.View key={'forgot-' + resetStep} entering={FadeInDown.delay(80).duration(420).springify().damping(16)}>
               <View style={styles.forgotHeaderBox}>
                 <Text style={styles.forgotTitle}>ŞİFREMİ UNUTTUM</Text>
                 <Text style={styles.forgotSub}>
@@ -1256,9 +1267,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </>
               )}
               {errorMsg && (
-                <View style={styles.errorBanner}>
+                <Reanimated.View entering={ZoomIn.duration(220)} style={styles.errorBanner}>
                   <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
-                </View>
+                </Reanimated.View>
               )}
               {loading ? (
                 <ActivityIndicator
@@ -1292,7 +1303,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               >
                 <Text style={styles.backToLoginText}>← Giriş Ekranına Dön</Text>
               </TouchableOpacity>
-            </>
+            </Reanimated.View>
           )}
           {/* Google Sign-In & Divider (Only shown on Login tab, not on Register) */}
           {mode === 'login' && (
@@ -1319,22 +1330,27 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </TouchableOpacity>
             </>
           )}
-        </View>
+        </Reanimated.View>
         {/* Guest Mode Entry */}
-        <TouchableOpacity
-          style={styles.guestButton}
-          onPress={() => {
-            sound.playSound('nav');
-            sound.triggerHaptic('light');
-            onGuestContinue();
-          }}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.guestButtonTitle}>Misafir Olarak Göz At →</Text>
-          <Text style={styles.guestButtonSub}>
-            Sadece Keşfet kategorilerinde tek kişilik pratik mod açıktır
-          </Text>
-        </TouchableOpacity>
+        <Reanimated.View entering={FadeInUp.delay(320).duration(450)}>
+          <TouchableOpacity
+            style={styles.guestButton}
+            onPress={() => {
+              sound.playSound('nav');
+              sound.triggerHaptic('light');
+              onGuestContinue();
+            }}
+            activeOpacity={0.8}
+          >
+            <Image source={AUTH_CROWN} style={styles.guestIcon} resizeMode="contain" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.guestButtonTitle}>Misafir Olarak Göz At →</Text>
+              <Text style={styles.guestButtonSub}>
+                Sadece Keşfet kategorilerinde tek kişilik pratik mod açıktır
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </Reanimated.View>
       </ScrollView>
       {/* Country Picker Modal */}
       <Modal
@@ -1408,6 +1424,29 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     alignSelf: 'center',
   },
+  heroCrownWrap: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 110,
+    height: 110,
+    marginBottom: 4,
+  },
+  heroCrownGlow: {
+    position: 'absolute',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(255, 196, 61, 0.22)',
+  },
+  brandSubtitle: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 3,
+    textAlign: 'center',
+    opacity: 0.85,
+  },
   cleanBrandTitle: {
     fontFamily: THEME.fonts.display,
     fontSize: 44,
@@ -1444,6 +1483,13 @@ const styles = StyleSheet.create({
   },
   tabBtnActive: {
     backgroundColor: '#7636DF',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.55)',
+    shadowColor: '#7636DF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.55,
+    shadowRadius: 12,
+    elevation: 6,
   },
   tabText: {
     fontSize: 14,
@@ -1874,27 +1920,35 @@ const styles = StyleSheet.create({
   },
   guestButton: {
     marginTop: 14,
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 196, 61, 0.28)',
     width: '100%',
     maxWidth: 480,
     alignSelf: 'center',
+  },
+  guestIcon: {
+    width: 38,
+    height: 38,
   },
   guestButtonTitle: {
     color: '#FFC43D',
     fontSize: 14,
     fontFamily: THEME.fonts.extraBold,
+    textAlign: 'left',
   },
   guestButtonSub: {
     color: THEME.colors.textSecondary,
     fontSize: 11,
     fontFamily: THEME.fonts.medium,
     marginTop: 2,
+    textAlign: 'left',
   },
   modalBackdrop: {
     flex: 1,

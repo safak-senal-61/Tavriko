@@ -522,6 +522,12 @@ export const RootNavigator: React.FC = () => {
     });
     const unsubMatchFound = socketService.onMatchFound(
       (data: { roomCode: string; opponent?: any }) => {
+        // Kullanıcı eşleşmeyi zaten iptal ettiyse / oyundan çıktıysa
+        // geç gelen eşleşme bildirimini yok say (çıkıştan sonra tekrar oyuna atma)
+        if (!isGameActiveRef.current) {
+          socketService.cancelMatch(user?.id || '');
+          return;
+        }
         if (user) {
           isGameActiveRef.current = true;
           setMatchQuestionsReview([]);
