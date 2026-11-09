@@ -96,6 +96,35 @@ const ModeTile: React.FC<{
   </TouchableOpacity>
 );
 
+/** Alt menü üstündeki premium özellik butonu: gradyan + parlama + ikon kapsülü */
+const FeatureChip: React.FC<{
+  label: string;
+  icon: React.ReactNode;
+  colors: string[];
+  borderColor: string;
+  glowColor: string;
+  onPress: () => void;
+}> = ({ label, icon, colors, borderColor, glowColor, onPress }) => (
+  <TouchableOpacity
+    style={[styles.featureChip, { borderColor, shadowColor: glowColor }]}
+    onPress={() => {
+      sound.playSound('tap');
+      sound.triggerHaptic('light');
+      onPress();
+    }}
+    activeOpacity={0.85}
+    accessibilityRole="button"
+    accessibilityLabel={label}
+  >
+    <GradientFill colors={colors} direction="diagonal" />
+    <View style={styles.featureChipShine} pointerEvents="none" />
+    <View style={styles.featureChipIcon}>{icon}</View>
+    <Text style={styles.featureChipText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+      {label}
+    </Text>
+  </TouchableOpacity>
+);
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   user,
   isGuest = false,
@@ -432,64 +461,54 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {/* Ek Özellikler (Sezon, Pro Lig, Mağaza, Etkinlik, Envanter) */}
           <View style={styles.extraFeaturesRow}>
             {onSeason && (
-              <TouchableOpacity
-                style={styles.extraChip}
-                onPress={() => {
-                  sound.playSound('tap');
-                  onSeason();
-                }}
-              >
-                <CrownIcon size={18} />
-                <Text style={styles.extraChipText}>Sezon 1</Text>
-              </TouchableOpacity>
+              <FeatureChip
+                label="Sezon 1"
+                icon={<CrownIcon size={17} />}
+                colors={['#7C4DFF', '#3A1690', '#24105A']}
+                borderColor="rgba(186, 150, 255, 0.6)"
+                glowColor="#9A6BFF"
+                onPress={onSeason}
+              />
             )}
             {onProLeague && (
-              <TouchableOpacity
-                style={styles.extraChip}
-                onPress={() => {
-                  sound.playSound('tap');
-                  onProLeague();
-                }}
-              >
-                <TrophyIcon size={18} />
-                <Text style={styles.extraChipText}>Pro Lig</Text>
-              </TouchableOpacity>
+              <FeatureChip
+                label="Pro Lig"
+                icon={<TrophyIcon size={17} />}
+                colors={['#2F7BE8', '#16388F', '#0F1E5A']}
+                borderColor="rgba(96, 196, 255, 0.6)"
+                glowColor="#38BDF8"
+                onPress={onProLeague}
+              />
             )}
             {onShop && (
-              <TouchableOpacity
-                style={styles.extraChip}
-                onPress={() => {
-                  sound.playSound('tap');
-                  onShop();
-                }}
-              >
-                <ChestIcon size={18} />
-                <Text style={styles.extraChipText}>Mağaza</Text>
-              </TouchableOpacity>
+              <FeatureChip
+                label="Mağaza"
+                icon={<ChestIcon size={17} />}
+                colors={['#D98A1F', '#8A4A12', '#4A2A10']}
+                borderColor="rgba(255, 196, 61, 0.6)"
+                glowColor="#FFC43D"
+                onPress={onShop}
+              />
             )}
             {onEvents && (
-              <TouchableOpacity
-                style={styles.extraChip}
-                onPress={() => {
-                  sound.playSound('tap');
-                  onEvents();
-                }}
-              >
-                <StreakFlameIcon size={18} />
-                <Text style={styles.extraChipText}>Etkinlik</Text>
-              </TouchableOpacity>
+              <FeatureChip
+                label="Etkinlik"
+                icon={<StreakFlameIcon size={17} active />}
+                colors={['#FF6A2F', '#B02E10', '#5A1408']}
+                borderColor="rgba(255, 150, 90, 0.65)"
+                glowColor="#FF7A3D"
+                onPress={onEvents}
+              />
             )}
             {onInventory && (
-              <TouchableOpacity
-                style={styles.extraChip}
-                onPress={() => {
-                  sound.playSound('tap');
-                  onInventory();
-                }}
-              >
-                <InventoryCubeIcon size={18} />
-                <Text style={styles.extraChipText}>Envanter</Text>
-              </TouchableOpacity>
+              <FeatureChip
+                label="Envanter"
+                icon={<InventoryCubeIcon size={17} />}
+                colors={['#8A2E9E', '#5A1D6E', '#2C0E36']}
+                borderColor="rgba(200, 140, 255, 0.55)"
+                glowColor="#A855F7"
+                onPress={onInventory}
+              />
             )}
           </View>
           </Reanimated.View>
@@ -936,20 +955,45 @@ const styles = StyleSheet.create({
     marginTop: 14,
     justifyContent: 'center',
   },
-  extraChip: {
+  featureChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(10, 4, 24, 0.65)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 16,
+    gap: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 9,
+    elevation: 4,
   },
-  extraChipText: {
-    color: '#D9CDF5',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
+  featureChipShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+  },
+  featureChipIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(10, 4, 24, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  featureChipText: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontFamily: THEME.fonts.black,
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0, 0, 0, 0.45)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
 });

@@ -28,7 +28,7 @@ import {
 } from '../components/TavrikoIcons';
 import Reanimated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { Image } from 'react-native';
-import { KitHero, STORE_IMG, KIT } from '../components/StoreKit';
+import { KitHero, STORE_IMG, KIT, FloatingElement, FloatingImage } from '../components/StoreKit';
 import { GradientFill } from '../components/TavrikoGradient';
 
 interface SeasonScreenProps {
@@ -279,7 +279,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
         {!hasPremium ? (
           <Reanimated.View entering={FadeInDown.delay(160).duration(400)} style={styles.passPromoCard}>
             <View style={styles.passPromoLeft}>
-              <Image source={STORE_IMG.trophy} style={styles.passTrophy} resizeMode="contain" />
+              <FloatingImage source={STORE_IMG.trophy} size={56} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.passPromoTitle}>Premium Pass</Text>
                 <Text style={styles.passPromoSub}>
@@ -354,8 +354,14 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
                     !isUnlocked && styles.cardLocked,
                   ]}
                 >
-                  <View style={styles.rewardIconWrap}>
-                    {renderRewardIcon(tierItem.freeReward.type, 26)}
+                  <View style={[styles.rewardIconWrap, isCurrent && styles.rewardIconWrapCurrent]}>
+                    {isCurrent ? (
+                      <FloatingElement amplitude={3} duration={1300}>
+                        {renderRewardIcon(tierItem.freeReward.type, 26)}
+                      </FloatingElement>
+                    ) : (
+                      renderRewardIcon(tierItem.freeReward.type, 26)
+                    )}
                   </View>
                   <Text style={styles.rewardAmount} numberOfLines={2}>
                     {tierItem.freeReward.title}
@@ -414,8 +420,14 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
                     (!isUnlocked || !hasPremium) && styles.cardLocked,
                   ]}
                 >
-                  <View style={styles.rewardIconWrap}>
-                    {renderRewardIcon(tierItem.premiumReward.type, 26)}
+                  <View style={[styles.rewardIconWrap, isCurrent && styles.rewardIconWrapCurrent]}>
+                    {isCurrent ? (
+                      <FloatingElement amplitude={3} duration={1300}>
+                        {renderRewardIcon(tierItem.premiumReward.type, 26)}
+                      </FloatingElement>
+                    ) : (
+                      renderRewardIcon(tierItem.premiumReward.type, 26)
+                    )}
                   </View>
                   <Text style={styles.premiumRewardAmount} numberOfLines={2}>
                     {tierItem.premiumReward.title}
@@ -522,10 +534,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: THEME.fonts.medium,
     marginTop: 6,
-  },
-  passTrophy: {
-    width: 56,
-    height: 56,
   },
   tierSpine: {
     position: 'absolute',
@@ -785,6 +793,11 @@ const styles = StyleSheet.create({
     height: 38,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  rewardIconWrapCurrent: {
+    backgroundColor: 'rgba(255, 196, 61, 0.12)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
   },
   rewardAmount: {
     color: '#FFFFFF',

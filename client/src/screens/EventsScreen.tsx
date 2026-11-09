@@ -28,7 +28,7 @@ import {
 } from '../components/TavrikoIcons';
 import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { Image } from 'react-native';
-import { KitHero, KitSegment, KitEmpty, STORE_IMG, storeImageFor, KIT } from '../components/StoreKit';
+import { KitHero, KitSegment, KitEmpty, STORE_IMG, storeImageFor, KIT, FloatingElement, PulseElement } from '../components/StoreKit';
 
 interface EventsScreenProps {
   user?: UserProfile;
@@ -290,9 +290,11 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                 >
                   {/* Card Header Row: Icon + Title/Desc + Action Button */}
                   <View style={styles.cardHeaderRow}>
-                    <View style={[styles.iconCircle, getIconCircleStyle(item.metric, item.type)]}>
-                      {getMetricIcon(item.metric, item.type)}
-                    </View>
+                    <FloatingElement amplitude={3} duration={1400}>
+                      <View style={[styles.iconCircle, getIconCircleStyle(item.metric, item.type)]}>
+                        {getMetricIcon(item.metric, item.type)}
+                      </View>
+                    </FloatingElement>
 
                     <View style={styles.headerInfo}>
                       <Text style={styles.eventTitle} numberOfLines={1}>{item.title}</Text>
@@ -306,18 +308,20 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                           <Text style={styles.claimedText}>Alındı</Text>
                         </View>
                       ) : isCompleted ? (
-                        <TouchableOpacity
-                          style={styles.collectBtn}
-                          disabled={isBusy}
-                          activeOpacity={0.85}
-                          onPress={() => handleAction(item)}
-                        >
-                          {isBusy ? (
-                            <ActivityIndicator color="#0A2920" size="small" />
-                          ) : (
-                            <Text style={styles.collectBtnText}>Topla</Text>
-                          )}
-                        </TouchableOpacity>
+                        <PulseElement min={1} max={1.05} duration={700}>
+                          <TouchableOpacity
+                            style={styles.collectBtn}
+                            disabled={isBusy}
+                            activeOpacity={0.85}
+                            onPress={() => handleAction(item)}
+                          >
+                            {isBusy ? (
+                              <ActivityIndicator color="#0A2920" size="small" />
+                            ) : (
+                              <Text style={styles.collectBtnText}>Topla</Text>
+                            )}
+                          </TouchableOpacity>
+                        </PulseElement>
                       ) : (
                         <TouchableOpacity
                           style={styles.playBtn}

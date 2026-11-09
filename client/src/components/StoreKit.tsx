@@ -398,6 +398,55 @@ export const KitChips = <T extends string>({
   </ScrollView>
 );
 
+/* Hafifçe süzülen herhangi bir içerik (ikon, görsel, buton vb.) */
+export const FloatingElement: React.FC<{
+  children: React.ReactNode;
+  amplitude?: number;
+  duration?: number;
+  style?: ViewStyle;
+}> = ({ children, amplitude = 4, duration = 1500, style }) => {
+  const y = useSharedValue(0);
+  useEffect(() => {
+    y.value = withRepeat(
+      withSequence(
+        withTiming(-amplitude, { duration, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0, { duration, easing: Easing.inOut(Easing.quad) })
+      ),
+      -1,
+      false
+    );
+  }, []);
+  const st = useAnimatedStyle(() => ({ transform: [{ translateY: y.value }] }));
+  return (
+    <Animated.View style={[st, style]}>{children}</Animated.View>
+  );
+};
+
+/* Nabız gibi atan içerik (dikkat çekici buton/ikon) */
+export const PulseElement: React.FC<{
+  children: React.ReactNode;
+  min?: number;
+  max?: number;
+  duration?: number;
+  style?: ViewStyle;
+}> = ({ children, min = 1, max = 1.06, duration = 750, style }) => {
+  const s = useSharedValue(min);
+  useEffect(() => {
+    s.value = withRepeat(
+      withSequence(
+        withTiming(max, { duration, easing: Easing.inOut(Easing.quad) }),
+        withTiming(min, { duration, easing: Easing.inOut(Easing.quad) })
+      ),
+      -1,
+      false
+    );
+  }, []);
+  const st = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
+  return (
+    <Animated.View style={[st, style]}>{children}</Animated.View>
+  );
+};
+
 /* Hafifçe süzülen görsel */
 export const FloatingImage: React.FC<{
   source: ImageSourcePropType;

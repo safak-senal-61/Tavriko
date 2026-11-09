@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import React, { useState } from 'react';
 import { GradientFill } from './TavrikoGradient';
 import {
   View,
@@ -133,33 +132,16 @@ export const GoogleGIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
 // ============================================================================
 // 2. ECONOMY & REWARD ICONS (13 Icons from page28)
 // ============================================================================
+/* Mağazadaki 3B para/elmas görselleri — oyun genelinde aynı görsel kullanılır */
+const COIN_3D_IMG = require('../../assets/images/store/coins_s.png');
+const GEM_3D_IMG = require('../../assets/images/store/gems_s.png');
 export const CoinIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
-  <Svg width={size} height={size} viewBox="0 0 64 64">
-    <SharedSvgDefs />
-    <Circle cx="32" cy="32" r="27" fill="url(#gold)" />
-    <Circle cx="32" cy="32" r="19" fill="none" stroke="#fff" strokeOpacity="0.55" strokeWidth="3" />
-    <Path
-      d="M32 20l3.5 7.2 7.9 1.1-5.7 5.5 1.4 7.8-7.1-3.7-7.1 3.7 1.4-7.8-5.7-5.5 7.9-1.1z"
-      fill="#fff"
-      opacity="0.9"
-    />
-  </Svg>
+  <Image source={COIN_3D_IMG} style={{ width: size, height: size }} resizeMode="contain" />
 );
 export const CoinSvg = CoinIcon;
 export const CoinTavrikoIcon = CoinIcon;
 export const GemIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
-  <Svg width={size} height={size} viewBox="0 0 64 64">
-    <SharedSvgDefs />
-    <Path d="M20 8h24l14 16-26 32L6 24z" fill="url(#pink)" />
-    <Path
-      d="M6 24h52M20 8l-6 16 18 32 18-32-6-16"
-      fill="none"
-      stroke="#fff"
-      strokeOpacity="0.6"
-      strokeWidth="2.5"
-      strokeLinejoin="round"
-    />
-  </Svg>
+  <Image source={GEM_3D_IMG} style={{ width: size, height: size }} resizeMode="contain" />
 );
 export const GemTavrikoIcon = GemIcon;
 export const TrophyIcon: React.FC<{ size?: number }> = ({ size = 28 }) => (
@@ -1360,7 +1342,7 @@ export type MainNavTab = 'play' | 'explore' | 'leaders' | 'friends' | 'profile';
 export type SecondaryNavTab = 'shop' | 'leagues' | 'play' | 'events' | 'inventory';
 type NavItemDef<K extends string> = { key: K; label: string };
 
-/** Ortak alt menü: kayan aktif kapsül + isteğe bağlı yükseltilmiş orta "Oyna" butonu */
+/** Ortak alt menü: sabit aktif kapsül (animasyonsuz) + isteğe bağlı yükseltilmiş orta "Oyna" butonu */
 const NavBarBase = <K extends string>({
   items,
   activeKey,
@@ -1376,19 +1358,17 @@ const NavBarBase = <K extends string>({
   const slot = w > 0 ? (w - 12) / items.length : 0;
   const idx = items.findIndex((i) => i.key === activeKey);
   const showPill = idx >= 0 && items[idx].key !== raisedKey;
-  const x = useSharedValue(0);
-  useEffect(() => {
-    if (idx >= 0) x.value = withSpring(idx * slot, { damping: 18, stiffness: 190 });
-  }, [idx, slot]);
-  const pillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
   return (
     <View style={styles.bottomNav} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
       <View style={styles.navSheen} pointerEvents="none" />
       {w > 0 && showPill && (
-        <Animated.View style={[styles.navPill, { width: slot - 8 }, pillStyle]} pointerEvents="none">
+        <View
+          style={[styles.navPill, { width: slot - 8, left: 10 + idx * slot }]}
+          pointerEvents="none"
+        >
           <GradientFill direction="vertical" colors={['#7C4DFF', '#5A2BD8']} />
           <View style={styles.navPillDot} />
-        </Animated.View>
+        </View>
       )}
       {items.map((item) => {
         const isActive = activeKey === item.key;
