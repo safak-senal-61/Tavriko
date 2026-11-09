@@ -374,6 +374,31 @@ router.get('/profile/:userId', async (req: Request, res: Response): Promise<void
   res.json(profile);
 });
 
+// --- Public profile by friend code (profile share links) ---
+router.get('/users/by-code/:friendCode', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const friendCode = Array.isArray(req.params.friendCode) ? req.params.friendCode[0] : req.params.friendCode;
+    const profile = await db.getUserProfileByFriendCodeAsync(friendCode || '');
+    if (!profile) {
+      res.status(404).json({ error: 'Bu arkadaşlık koduna ait profil bulunamadı.' });
+      return;
+    }
+    // Sadece herkese açık alanlar
+    res.json({
+      id: profile.id,
+      displayName: profile.displayName,
+      username: profile.username,
+      avatarUrl: profile.avatarUrl,
+      friendCode: profile.friendCode,
+      xp: profile.xp,
+      stats: profile.stats,
+      settings: { equippedTitle: (profile as any).settings?.equippedTitle },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/daily-challenge/complete', async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, correctAnswers, totalQuestions } = req.body;

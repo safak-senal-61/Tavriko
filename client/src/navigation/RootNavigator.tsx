@@ -67,6 +67,8 @@ import { useNotificationStore } from '../store/notificationStore';
 import { NotificationToast } from '../components/NotificationUI';
 import { PaymentScreen, PaymentItem } from '../screens/PaymentScreen';
 import { captureReferralLink, clearPendingReferral, getPendingReferral } from '../utils/referralLink';
+import { captureProfileLink, clearPendingProfileCode, getPendingProfileCode } from '../utils/profileLink';
+import { ProfileInspectModal, PublicProfileCard } from '../components/ProfileInspectModal';
 import { DeveloperScreen } from '../screens/DeveloperScreen';
 export type ScreenName =
   | 'splash'
@@ -330,11 +332,34 @@ export const RootNavigator: React.FC = () => {
         const account = useGameStore.getState().user;
         if (account && !account.isGuest) navigateTo('friends');
       }
+      // Paylaşılan profil bağlantısını yakala
+      const profileCode = captureProfileLink(url);
+      if (profileCode) setSharedProfileCode(profileCode);
     };
     void Linking.getInitialURL().then(capture).catch(() => {});
     const sub = Linking.addEventListener('url', event => capture(event.url));
     return () => sub.remove();
   }, []);
+
+  // --- Paylaşılan profil bağlantısı (?profil=KOD) ---
+  const [sharedProfileCode, setSharedProfileCode] = useState<string | null>(() => captureProfileLink());
+  const [sharedProfile, setSharedProfile] = useState<PublicProfileCard | null>(null);
+  const [sharedProfileLoading, setSharedProfileLoading] = useState(false);
+  const sharedProfileHandledRef = useRef<string | null>(null);
+  useEffect(() => {
+    const code = sharedProfileCode || getPendingProfileCode();
+    if (!code || !user || isGuest || user.isGuest || sharedProfileHandledRef.current === code) return;
+    sharedProfileHandledRef.current = code;
+    setSharedProfileLoading(true);
+    fetch(`${API_BASE}/social/users/by-code/${encodeURIComponent(code)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((p) => {
+        if (p && p.id) setSharedProfile(p);
+        clearPendingProfileCode();
+      })
+      .catch(() => {})
+      .finally(() => setSharedProfileLoading(false));
+  }, [sharedProfileCode, user, isGuest]);
   // Keep system status bar completely hidden in fullscreen mode without triggering re-layouts on screen changes
   useEffect(() => {
     StatusBar.setHidden(true, 'none');
@@ -669,6 +694,8 @@ export const RootNavigator: React.FC = () => {
 
     const unsubNotif = socketService.on('notification:new', (notif: any) => {
       const inbox = useNotificationStore.getState();
+      // Gönderen, kendi gönderdiği isteğin bildirimini asla görmemeli
+      if (notif?.senderId && notif.senderId === user?.id) return;
       if (inbox.userId !== user.id || !inbox.receive(notif)) return;
       sound.playSound('reward');
       sound.triggerHaptic('success');
@@ -2186,6 +2213,27 @@ export const RootNavigator: React.FC = () => {
           <NotificationToast onOpen={() => navigateTo('notifications')} />
         )}
       </View>
+
+      {/* Paylaşılan profil bağlantısından gelen profil modalı */}
+      {(sharedProfile || sharedProfileLoading) && (
+        <ProfileInspectModal
+          visible
+          profile={sharedProfile}
+          loading={sharedProfileLoading}
+          currentUserId={user?.id || null}
+          onClose={() => { setSharedProfile(null); setSharedProfileCode(null); }}
+          onChallenge={() => {
+            setSharedProfile(null);
+            setSharedProfileCode(null);
+            navigateTo('friends');
+          }}
+          onAddFriend={(p) => {
+            setSharedProfile(null);
+            setSharedProfileCode(null);
+            navigateTo('friends');
+          }}
+        />
+      )}
 
       {/* Desktop Right Sidebar (Wide Displays >= 1180px) */}
       {isWide && (

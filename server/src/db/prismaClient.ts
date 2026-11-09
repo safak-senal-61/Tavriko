@@ -2423,6 +2423,29 @@ export class PrismaService {
     return record ? this.toProfile(record) : null;
   }
 
+  /** Arkadaşlık koduna göre herkese açık profil getirir (profil paylaşım bağlantıları için). */
+  public async getUserProfileByFriendCodeAsync(friendCode: string): Promise<UserProfile | null> {
+    const clean = (friendCode || '').trim().toUpperCase();
+    if (!clean) return null;
+    try {
+      const u = await this.rawClient.user.findFirst({
+        where: { friendCode: { equals: clean, mode: 'insensitive' } },
+      });
+      if (u) {
+        const record = this.prismaUserToRecord(u as any);
+        this.users.set(record.id, record);
+        return this.toProfile(record);
+      }
+    } catch (err: any) {
+      console.error('[getUserProfileByFriendCodeAsync] Error:', err.message);
+    }
+    // Bellek fallback
+    const record = Array.from(this.users.values()).find(
+      (u) => u && u.friendCode && u.friendCode.toUpperCase() === clean
+    );
+    return record ? this.toProfile(record) : null;
+  }
+
   public async recordDailyChallengeCompletion(
     userId: string,
     data: {

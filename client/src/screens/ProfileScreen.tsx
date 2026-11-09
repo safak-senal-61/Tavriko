@@ -570,8 +570,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const handleShareProfile = async () => {
     sound.playSound('tap');
     try {
+      // Profil bağlantısı olarak paylaş — karşı taraf bağlantıyı açıp giriş yaptığında profilini görür
+      const origin =
+        typeof window !== 'undefined' && window.location?.origin
+          ? window.location.origin
+          : 'https://tavriko-app.vercel.app';
+      const profileUrl = `${origin}/?profil=${encodeURIComponent(friendCode)}`;
       await Share.share({
-        message: `Tavriko'da bana meydan oku!\n${user.displayName} · Seviye ${prog.level} · ${equippedTitle}\nArkadaşlık Kodum: ${friendCode}\nhttps://tavriko-app.vercel.app`,
+        message: `Tavriko'da bana meydan oku!\n${user.displayName} · Seviye ${prog.level} · ${equippedTitle}\nProfilim: ${profileUrl}`,
+        url: profileUrl,
       });
     } catch {}
   };

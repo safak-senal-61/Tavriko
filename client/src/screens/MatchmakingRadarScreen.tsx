@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, Platform, Image, ScrollView } from 'react-native';
-import { Radio, ShieldCheck, Swords } from 'lucide-react-native';
+import { View, Text, StyleSheet, Animated, Easing, Platform, Image, ScrollView, useWindowDimensions } from 'react-native';
+import { ShieldCheck, Swords } from 'lucide-react-native';
 import { CategoryId, DifficultyLevel, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -169,6 +169,11 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
   const [elapsedSec, setElapsedSec] = useState(0);
   const reducedMotion = useReducedMotion();
   const pingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Ekran yüksekliğine göre radar boyutu — küçük ekranlarda taşma olmasın
+  const { height: windowHeight } = useWindowDimensions();
+  const radarSize = Math.round(Math.min(250, Math.max(150, windowHeight * 0.28)));
+  const radarRadius = radarSize / 2;
+  const radarScale = radarSize / 270; // SONAR_POOL koordinatları 270px tabanlı
 
   // Ekranda SADECE tek bir aktif ışık tutulur: biri sönünce diğeri farklı noktada yanar!
   const [activeCoord, setActiveCoord] = useState<{ coord: SonarCoordinate; key: number } | null>(null);
@@ -329,9 +334,8 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
   return (
     <TavrikoScreen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-      <View style={styles.liveLabel}><Radio size={14} color="#B7F5E1" /><Text style={styles.liveLabelText}>DÜELLO ARENASI</Text></View>
-      <Text style={styles.title}>Rakibin arenaya geliyor.</Text>
-      <Text style={styles.subtitle}>
+      <Text style={[styles.title, { marginTop: 0, fontSize: 22, marginBottom: 2 }]}>Rakibin arenaya geliyor.</Text>
+      <Text style={[styles.subtitle, { marginBottom: 10 }]}>
         {catObj?.name || 'Genel Kültür'} · Canlı Düello
       </Text>
 
@@ -386,14 +390,17 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
       </View>
 
       {/* Dairesel Radar Ekranı */}
-      <View style={styles.radarContainer}>
-        <Image source={DISCOVERY_IMG.arena} style={styles.arenaImage} resizeMode="cover" />
-        <GradientFill colors={['rgba(22,12,48,0)', 'rgba(22,12,48,0.55)']} style={{ borderRadius: 135 }} />
+      <View style={[styles.radarContainer, { width: radarSize, height: radarSize, marginVertical: 4 }]}>
+        <Image source={DISCOVERY_IMG.arena} style={[styles.arenaImage, { width: radarSize, height: radarSize, borderRadius: radarRadius }]} resizeMode="cover" />
+        <GradientFill colors={['rgba(22,12,48,0)', 'rgba(22,12,48,0.55)']} style={{ borderRadius: radarRadius }} />
         {/* Genişleyen Sonar Dalgası */}
         <Animated.View
           style={[
             styles.sonarWaveRing,
             {
+              width: radarSize,
+              height: radarSize,
+              borderRadius: radarRadius,
               opacity: sonarOpacity,
               transform: [{ scale: sonarScale }],
             },
@@ -404,12 +411,17 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
         <Animated.View
           style={[
             styles.rotatingSweepWrap,
-            { transform: [{ rotate: spinInterpolation }] },
+            {
+              width: radarSize,
+              height: radarSize,
+              borderRadius: radarRadius,
+              transform: [{ rotate: spinInterpolation }],
+            },
           ]}
           pointerEvents="none"
         >
-          <View style={styles.radarGlowSector} />
-          <View style={styles.radarBeamLine} />
+          <View style={[styles.radarGlowSector, { width: radarRadius, height: radarRadius, borderTopRightRadius: radarRadius }]} />
+          <View style={[styles.radarBeamLine, { height: radarRadius, left: radarRadius - 1.25 }]} />
         </Animated.View>
 
         {/* Eşmerkezli Kılavuz Çemberler */}
@@ -429,10 +441,10 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
           style={[
             styles.ring,
             {
-              top: 34,
-              left: 34,
-              right: 34,
-              bottom: 34,
+              top: 34 * radarScale,
+              left: 34 * radarScale,
+              right: 34 * radarScale,
+              bottom: 34 * radarScale,
               borderColor: 'rgba(255, 255, 255, 0.16)',
             },
           ]}
@@ -441,10 +453,10 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
           style={[
             styles.ring,
             {
-              top: 68,
-              left: 68,
-              right: 68,
-              bottom: 68,
+              top: 68 * radarScale,
+              left: 68 * radarScale,
+              right: 68 * radarScale,
+              bottom: 68 * radarScale,
               borderColor: 'rgba(255, 255, 255, 0.12)',
             },
           ]}
@@ -453,18 +465,18 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
           style={[
             styles.ring,
             {
-              top: 102,
-              left: 102,
-              right: 102,
-              bottom: 102,
+              top: 102 * radarScale,
+              left: 102 * radarScale,
+              right: 102 * radarScale,
+              bottom: 102 * radarScale,
               borderColor: 'rgba(255, 255, 255, 0.08)',
             },
           ]}
         />
 
         {/* Radar Kılavuz Çizgileri */}
-        <View style={styles.radarCrossHorizontal} />
-        <View style={styles.radarCrossVertical} />
+        <View style={[styles.radarCrossHorizontal, { width: radarSize }]} />
+        <View style={[styles.radarCrossVertical, { height: radarSize }]} />
 
         {/* Merkez 1v1 Çekirdek */}
         <Animated.View
@@ -481,7 +493,12 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
         {!reducedMotion && activeCoord && (
           <SingleActiveSonarPing
             key={activeCoord.key}
-            coord={activeCoord.coord}
+            coord={{
+              ...activeCoord.coord,
+              x: activeCoord.coord.x * radarScale,
+              y: activeCoord.coord.y * radarScale,
+              size: activeCoord.coord.size * radarScale,
+            }}
             onFinished={handlePingFinished}
           />
         )}
@@ -531,15 +548,13 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: { paddingTop: 8, paddingBottom: 24, width: '100%', maxWidth: 580, alignSelf: 'center' },
-  liveLabel: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center', gap: 6, marginBottom: 8, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20, backgroundColor: 'rgba(111,227,193,0.1)' },
-  liveLabelText: { color: '#B7F5E1', fontSize: 12, fontFamily: THEME.fonts.extraBold, letterSpacing: 1 },
   arenaImage: { position: 'absolute', top: 0, left: 0, width: 270, height: 270, borderRadius: 135, opacity: 0.85 },
-  searchSteps: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginTop: 8, marginBottom: 12 },
+  searchSteps: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginTop: 6, marginBottom: 8 },
   searchStep: { alignItems: 'center', gap: 6, flex: 1 },
   stepDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#6C5C83' },
   stepDotActive: { backgroundColor: '#B7F5E1' },
   stepLabel: { color: '#E2D7F5', fontFamily: THEME.fonts.bold, fontSize: 12, textAlign: 'center' },
-  fairPlay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 12 },
+  fairPlay: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 },
   fairPlayText: { color: '#D9CDF5', fontFamily: THEME.fonts.body, fontSize: 12, flexShrink: 1 },
   title: {
     fontFamily: THEME.fonts.display,
@@ -561,7 +576,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginHorizontal: 8,
-    marginBottom: 8,
+    marginBottom: 6,
     gap: 5,
   },
   playerCard: {
@@ -573,10 +588,10 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.16)',
     borderRadius: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 7,
-    gap: 6,
-    minHeight: 96,
+    gap: 5,
+    minHeight: 84,
   },
   opponentSearchingCard: {
     backgroundColor: 'rgba(111, 227, 193, 0.06)',
@@ -777,12 +792,12 @@ const styles = StyleSheet.create({
 
   timerWrap: {
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 0,
     paddingHorizontal: 28,
   },
   timerText: {
     fontFamily: THEME.fonts.display,
-    fontSize: 30,
+    fontSize: 26,
     color: '#FFFFFF',
     textAlign: 'center',
   },
@@ -796,7 +811,7 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
     marginTop: 2,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   progressContainer: {
     width: '100%',
@@ -807,11 +822,11 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 12,
+    marginTop: 4,
+    marginBottom: 8,
   },
   cancelWrap: {
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 8,
   },
 });

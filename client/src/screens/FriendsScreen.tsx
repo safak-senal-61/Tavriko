@@ -11,7 +11,9 @@ import {
   TextInput,
   Modal,
   Platform,
+  Image,
 } from 'react-native';
+import Reanimated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import * as Clipboard from 'expo-clipboard';
 import { UserProfile, calculateLevelFromXp } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -19,6 +21,8 @@ import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
 import { socketService } from '../services/socketService';
 import { ReferralCards } from '../components/ReferralCards';
+import { DISCOVERY_IMG } from '../components/DiscoveryArtwork';
+import { GradientFill } from '../components/TavrikoGradient';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -618,11 +622,14 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
               />
             </View>
           ) : (
-            friendsList.map((f) => {
+            friendsList.map((f, idx) => {
               const playerName = f.displayName || f.username || f.name || 'Oyuncu';
               return (
-                <TouchableOpacity
+                <Reanimated.View
                   key={f.id}
+                  entering={FadeInDown.delay(idx * 45).springify().damping(18)}
+                >
+                <TouchableOpacity
                   style={styles.friendRow}
                   activeOpacity={0.82}
                   onPress={() => handleOpenProfile(f)}
@@ -687,6 +694,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     />
                   </View>
                 </TouchableOpacity>
+                </Reanimated.View>
               );
             })
           )
@@ -694,8 +702,11 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         {/* Tab 2: Add Friend Form */}
         {activeTab === 'add' && (
           <View>
-            <View style={styles.addCard}>
-              <Text style={styles.addCardTitle}>ARKADAŞLIK İSTEĞİ GÖNDER</Text>
+            <Reanimated.View entering={FadeInDown.springify().damping(18)} style={styles.addCard}>
+              {/* Hero görsel */}
+              <Image source={DISCOVERY_IMG.social} style={styles.addHeroImage} resizeMode="cover" />
+              <GradientFill colors={['#1C0C3E00', '#1C0C3ECC', '#1C0C3E']} />
+              <Reanimated.Text entering={ZoomIn.delay(80)} style={styles.addCardTitle}>ARKADAŞLIK İSTEĞİ GÖNDER</Reanimated.Text>
               <Text style={styles.addCardSub}>
                 Arkadaşının 7 haneli kodunu (Örn: TV-UB1AY94) veya kullanıcı adını girerek arkadaşlık isteği gönder. Karşı taraf Bildirimler kısmından kabul ettiğinde arkadaş listene eklenir.
               </Text>
@@ -732,7 +743,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 style={{ marginTop: 14 }}
                 textStyle={{ fontSize: 13 }}
               />
-            </View>
+            </Reanimated.View>
 
             {sentRequests.length > 0 && (
               <View style={{ marginTop: 18 }}>
@@ -768,8 +779,12 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         {activeTab === 'requests' && (
           <View>
             {incomingRequests.length > 0 ? (
-              incomingRequests.map((req) => (
-                <View key={req.id} style={[styles.friendRow, { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
+              incomingRequests.map((req, rIdx) => (
+                <Reanimated.View
+                  key={req.id}
+                  entering={FadeInDown.delay(rIdx * 55).springify().damping(18)}
+                  style={[styles.friendRow, { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}
+                >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                     <CharacterAvatar seed={req.senderAvatar || req.senderName || 'av2'} size={46} />
                     <View style={{ flex: 1 }}>
@@ -795,7 +810,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                       textStyle={{ fontSize: 13 }}
                     />
                   </View>
-                </View>
+                </Reanimated.View>
               ))
             ) : (
               <View style={styles.emptyStateBox}>
@@ -853,7 +868,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 contentContainerStyle={{ alignItems: 'center', paddingBottom: 10 }}
               >
                 {/* Avatar & Online status */}
-                <View style={styles.inspectAvatarWrap}>
+                <Reanimated.View entering={ZoomIn.springify().damping(16)} style={styles.inspectAvatarWrap}>
                   <CharacterAvatar
                     seed={inspectDetails?.avatarUrl || inspectPlayer.avatarUrl || inspectPlayer.name}
                     size={76}
@@ -868,15 +883,15 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                       {inspectPlayer.online ? '● ÇEVRİMİÇİ' : '○ ÇEVRİMDIŞI'}
                     </Text>
                   </View>
-                </View>
+                </Reanimated.View>
                 {/* Player Names */}
-                <Text style={styles.inspectDisplayName} numberOfLines={1}>
+                <Reanimated.Text entering={FadeInDown.delay(60)} style={styles.inspectDisplayName} numberOfLines={1}>
                   {inspectDetails?.displayName || inspectPlayer.displayName || inspectPlayer.name}
-                </Text>
-                <Text style={styles.inspectUsername}>
+                </Reanimated.Text>
+                <Reanimated.Text entering={FadeInDown.delay(90)} style={styles.inspectUsername}>
                   @{inspectDetails?.username || inspectPlayer.username || 'oyuncu'}
                   {inspectDetails?.countryName ? ` · ${inspectDetails.countryName}` : ' · Türkiye'}
-                </Text>
+                </Reanimated.Text>
                 {/* Level & Rank Pill */}
                 <View style={styles.inspectLevelPill}>
                   <Text style={styles.inspectLevelText}>
@@ -1204,6 +1219,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(28, 12, 62, 0.88)',
     borderWidth: 1.5,
     borderColor: 'rgba(107, 60, 255, 0.55)',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  addHeroImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: 110,
+    opacity: 0.4,
   },
   addCardTitle: {
     color: '#FFC43D',
