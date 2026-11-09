@@ -33,9 +33,18 @@ describe('Shared notification inbox and exact unread count', () => {
     inbox().receive(makeNotification('two'));
     inbox().markRead(['one']);
     expect(unreadCount(inbox().items, inbox().readIds)).toBe(1);
+    expect(inbox().toast?.id).toBe('two');
     expect(inbox().items.find(n => n.id === 'one')?.handled).toBeUndefined();
     inbox().markRead(['one', 'two']);
     expect(unreadCount(inbox().items, inbox().readIds)).toBe(0);
+    expect(inbox().toast).toBeNull();
+  });
+
+  it('dismisses a banner without silently marking its notification read', () => {
+    inbox().receive(makeNotification('one'));
+    inbox().dismissToast();
+    expect(inbox().toast).toBeNull();
+    expect(unreadCount(inbox().items, inbox().readIds)).toBe(1);
   });
 
   it('persists read receipts across reloads on the same account', () => {

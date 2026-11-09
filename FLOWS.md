@@ -14,11 +14,12 @@
 - Production publication is separate from local verification and requires approval for this new update.
 
 ## Follow-up verification record
-- Expo web export succeeds under Node 22. All 4 Jest suites and 19 tests pass, including 11 new inbox tests covering duplicate arrivals, stale snapshots, read persistence, account isolation, blocked storage and failed requests.
+- Expo web export succeeds under Node 22. All 4 Jest suites and 20 tests pass, including 12 new inbox tests covering duplicate arrivals, stale snapshots, read persistence, account isolation, blocked storage, banner dismissal and failed requests.
 - TypeScript still reports 11 pre-existing diagnostics elsewhere in the application. This follow-up introduces no new diagnostics; it also resolves the two missing profile-refresh references and invalid haptic preview argument from the previously recorded baseline of 14.
 - Browser checks use the real exported app with an isolated synthetic account and intercepted HTTP/WebSocket traffic. No production account, password, friendships or wallet was changed.
 - Verified home badge 0 → 1 → 2, duplicate delivery remaining at 2, one-item read, mark-all-read, reload retaining zero unread, and 101 unread displaying `99+` while exposing the exact accessible count. The shared friends-screen bell uses the same count.
 - Verified illustrated inbox and toast, all/unread/invitation filters, accepted and declined invitation state changes, failed invitation responses retaining the action instead of reporting success, and refresh failure preserving the existing cards with a working retry.
+- Opening the inbox dismisses the pending banner without implicitly reading the notification; explicit read actions also clear a matching banner. Returning to settings must not replay a stale banner.
 - Verified all four settings tabs, switch state exposed to web assistive technology, sound off/on, saved 50% sound volume, sync request, profile quick-settings entry, password validation/cancel and delete-dialog cancel. No password-change or delete request was made.
 - Verified bot and real-player versus variants through mocked matchmaking events, Turkish category name, 3-to-0 countdown and honest server-waiting state, sound off/on, cancellation/re-entry, long opponent name, 320px mobile and 1280px desktop layouts, and reduced-motion rendering.
 - Screenshots were captured from the application at 375px. Referenced artwork loaded successfully, and no uncaught page errors appeared in these exercised flows.

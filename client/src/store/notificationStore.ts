@@ -93,7 +93,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     const available = new Set(state.items.map(item => item.id));
     const readIds = Array.from(new Set([...state.readIds, ...ids.filter(id => available.has(id))])).slice(-1000);
     saveReceipts(state.userId, readIds);
-    set({ readIds });
+    set({ readIds, toast: state.toast && readIds.includes(state.toast.id) ? null : state.toast });
   },
   dismissToast: () => set({ toast: null }),
   refresh: async base => {

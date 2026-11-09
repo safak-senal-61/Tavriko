@@ -142,6 +142,7 @@ export const RootNavigator: React.FC = () => {
     if (nextScreen === currentScreenRef.current) {
       return;
     }
+    if (nextScreen === 'notifications') useNotificationStore.getState().dismissToast();
     // Prevent screen darkening/blinking during questions or same-mode transitions
     if (nextScreen === 'quiz_arena' && currentScreenRef.current === 'quiz_arena') {
       return;
