@@ -10,6 +10,7 @@ import {
   Text,
   TouchableOpacity,
   Image,
+  Linking,
 } from 'react-native';
 import { useGameStore, clearAllAccountStorage, getStoredAuth } from '../store/gameStore';
 import { socketService } from '../services/socketService';
@@ -65,6 +66,7 @@ import { applyStoredPreferencesOnBoot } from '../store/appPrefs';
 import { useNotificationStore } from '../store/notificationStore';
 import { NotificationToast } from '../components/NotificationUI';
 import { PaymentScreen, PaymentItem } from '../screens/PaymentScreen';
+import { captureReferralLink, clearPendingReferral, getPendingReferral } from '../utils/referralLink';
 import { DeveloperScreen } from '../screens/DeveloperScreen';
 export type ScreenName =
   | 'splash'
@@ -101,6 +103,7 @@ import { DEFAULT_API_BASE, getRealtimeWsUrl } from '../config';
 
 const API_BASE = DEFAULT_API_BASE;
 export const RootNavigator: React.FC = () => {
+  const [pendingReferral, setPendingReferral] = useState(() => captureReferralLink());
   const { width: windowWidth } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
   const isDesktop = isWeb && windowWidth > 540;
@@ -125,7 +128,7 @@ export const RootNavigator: React.FC = () => {
     : isWebDeveloperReturn
     ? 'developer'
     : initialAuthUser
-    ? (initialAuthUser.isGuest ? 'categories' : 'home')
+    ? (initialAuthUser.isGuest ? 'categories' : pendingReferral ? 'friends' : 'home')
     : 'splash';
 
   const [currentScreen, setCurrentScreen] = useState<ScreenName>(initialScreen);
@@ -318,6 +321,20 @@ export const RootNavigator: React.FC = () => {
 
   const currentScreenRef = useRef<ScreenName>(currentScreen);
   currentScreenRef.current = currentScreen;
+
+  useEffect(() => {
+    const capture = (url?: string | null) => {
+      const value = captureReferralLink(url);
+      if (value) {
+        setPendingReferral(value);
+        const account = useGameStore.getState().user;
+        if (account && !account.isGuest) navigateTo('friends');
+      }
+    };
+    void Linking.getInitialURL().then(capture).catch(() => {});
+    const sub = Linking.addEventListener('url', event => capture(event.url));
+    return () => sub.remove();
+  }, []);
   // Keep system status bar completely hidden in fullscreen mode without triggering re-layouts on screen changes
   useEffect(() => {
     StatusBar.setHidden(true, 'none');
@@ -749,7 +766,9 @@ export const RootNavigator: React.FC = () => {
     setIsGuest(false);
     setAuthRedirectNotice(null);
     setUser(loggedInUser, token);
-    navigateTo('home');
+    const referral = getPendingReferral();
+    setPendingReferral(referral);
+    navigateTo(referral ? 'friends' : 'home');
   };
   const handleSaveProfile = async (name: string, rawAvatarSeedOrUri: string) => {
     if (user) {
@@ -1549,7 +1568,7 @@ export const RootNavigator: React.FC = () => {
             onSuccess={handleAuthSuccess}
             onGuestContinue={handleGuestPlay}
             apiBaseUrl={API_BASE}
-            redirectNotice={authRedirectNotice}
+            redirectNotice={authRedirectNotice || (pendingReferral ? 'Davet bağlantın kaydedildi. Girişten sonra arkadaşının profilini göreceksin; onayın olmadan arkadaş eklenmez.' : null)}
           />
         )}
         {currentScreen === 'profile_setup' && (
@@ -1885,6 +1904,10 @@ export const RootNavigator: React.FC = () => {
         )}
         {currentScreen === 'friends' && (
           <FriendsScreen
+            token={token}
+            pendingReferral={pendingReferral}
+            onClearReferral={() => { clearPendingReferral(); setPendingReferral(null); }}
+            onReferralConnected={() => { void refreshUserProfile(); }}
             user={user || undefined}
             isGuest={isGuest}
             apiBaseUrl={API_BASE}

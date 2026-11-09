@@ -1314,6 +1314,9 @@ export const Button3D: React.FC<{
         if (onPress) onPress();
       }}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ disabled: Boolean(disabled) }}
       activeOpacity={0.85}
       style={[
         styles.btn3DBase,

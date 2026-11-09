@@ -25,6 +25,7 @@ import { metricsMiddleware, metricsHandler, setSocketServer } from './utils/metr
 import { initErrorMonitor, captureError } from './utils/errorMonitor';
 import triviaRoutes from './routes/triviaRoutes';
 import socialRoutes from './routes/socialRoutes';
+import referralRoutes from './routes/referralRoutes';
 
 function getLocalIpAddress(): string {
   const interfaces = os.networkInterfaces();
@@ -2735,6 +2736,7 @@ export function createApp() {
   });
   app.use('/api', triviaRoutes);
   app.use('/api/social', socialRoutes);
+  app.use('/api/referrals', referralRoutes);
 
   // --- Cloudflare Durable Objects Internal Endpoints ---
   app.post('/api/internal/room-questions', (req, res) => {
