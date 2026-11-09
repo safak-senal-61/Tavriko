@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { UserProfile, calculateLevelFromXp } from '@trivia/shared';
+import { resolveProfileTitle } from '../utils/profileTitle';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import {
@@ -310,9 +311,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <View style={styles.levelRow}>
                 <Text style={styles.levelText}>Seviye {prog.level}</Text>
                 <Text style={styles.levelDot}>·</Text>
-                <CrownIcon size={15} />
                 <Text style={styles.levelText} numberOfLines={1}>
-                  {prog.rankTitle}
+                  {resolveProfileTitle(user.settings?.equippedTitle, prog.level, prog.rankTitle)}
                 </Text>
               </View>
               <View style={styles.xpRow}>

@@ -142,7 +142,11 @@ export const RootNavigator: React.FC = () => {
     if (nextScreen === currentScreenRef.current) {
       return;
     }
-    if (nextScreen === 'notifications') useNotificationStore.getState().dismissToast();
+    if (nextScreen === 'notifications') {
+      const inbox = useNotificationStore.getState();
+      inbox.dismissToast();
+      inbox.markAllSeen();
+    }
     // Prevent screen darkening/blinking during questions or same-mode transitions
     if (nextScreen === 'quiz_arena' && currentScreenRef.current === 'quiz_arena') {
       return;

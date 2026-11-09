@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
 import type { UserProfile, NotificationItem } from '@trivia/shared';
 import { Check, CheckCheck, Clock3, RefreshCw, X } from 'lucide-react-native';
@@ -29,6 +29,8 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   const [respondingId, setRespondingId] = useState<string | null>(null);
   const [responseError, setResponseError] = useState<{ id: string; text: string } | null>(null);
   const base = apiBaseUrl || DEFAULT_API_BASE;
+  // Includes late HTTP snapshots and WebSocket arrivals while this inbox is open.
+  useEffect(() => { useNotificationStore.getState().markAllSeen(); }, [items]);
   const shown = items.filter(item =>
     filter === 'unread' ? isUnread(item, readIds) : filter === 'invites' ? isInvitation(item) : true);
 

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
+  Image,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -13,6 +14,9 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import { ArrowRight, Clipboard as ClipboardIcon, RefreshCw } from 'lucide-react-native';
+import { DISCOVERY_IMG, DiscoveryArtwork } from '../components/DiscoveryArtwork';
+import { GradientFill } from '../components/TavrikoGradient';
 import * as Clipboard from 'expo-clipboard';
 import { CustomRoomSettings, CategoryId, DifficultyLevel } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -294,9 +298,25 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Tavriko Neon Sekme Seçici (Oda Kur | Odaya Katıl - UI Kit Design) */}
-        <View style={styles.tabToggleRow}>
+        <View style={styles.roomHero}>
+          <Image source={DISCOVERY_IMG.arena} style={styles.heroBackdrop} resizeMode="cover" />
+          <GradientFill colors={['#38204DEB', '#24173EEB']} direction="diagonal" />
+          <View style={styles.heroCopy}>
+            <Text style={styles.heroEyebrow}>ARKADAŞLARLA OYNA</Text>
+            <Text accessibilityRole="header" style={styles.heroTitle}>
+              {activeTab === 'create' ? 'Kendi arenanı kur.' : 'Bir kod, aynı arena.'}
+            </Text>
+            <Text style={styles.heroSubtitle}>{activeTab === 'create'
+              ? 'Kuralları sen belirle. Arkadaşlarını bilgine meydan okumaya çağır.'
+              : 'Davet kodunu gir, arkadaşlarının oyununa hemen dahil ol.'}</Text>
+          </View>
+          <DiscoveryArtwork source={activeTab === 'create'
+            ? require('../../assets/images/modes/custom_room.png') : DISCOVERY_IMG.social} size={96} />
+        </View>
+        <View style={styles.tabToggleRow} accessibilityRole="tablist">
           <TouchableOpacity
+            accessibilityRole="tab" aria-selected={activeTab === 'create'}
+            accessibilityState={{ selected: activeTab === 'create' }}
             style={[styles.tabButton, activeTab === 'create' && styles.tabButtonActiveCreate]}
             activeOpacity={0.85}
             onPress={() => {
@@ -317,6 +337,8 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
           </TouchableOpacity>
 
           <TouchableOpacity
+            accessibilityRole="tab" aria-selected={activeTab === 'join'}
+            accessibilityState={{ selected: activeTab === 'join' }}
             style={[styles.tabButton, activeTab === 'join' && styles.tabButtonActiveJoin]}
             activeOpacity={0.85}
             onPress={() => {
@@ -339,11 +361,20 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
         {activeTab === 'create' ? (
           /* TAVRİKO ÖZGÜN ODA KURMA KARTI */
           <View style={styles.roomSetupCard}>
+            <View style={styles.setupIntro}>
+              <Text style={styles.setupTitle}>Oyun senin, kurallar senin.</Text>
+              <Text style={styles.setupSubtitle}>Kategorini seç, masanı hazırla.</Text>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryPill}>{maxPlayers} oyuncu</Text>
+                <Text style={styles.summaryPill}>{totalRounds} soru</Text>
+                <Text style={styles.summaryPill}>{questionTimeSec} saniye</Text>
+              </View>
+            </View>
             {/* 1. KATEGORİ SEÇİCİ DROPDOWN */}
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionHeader}>KATEGORİ</Text>
               <Text style={styles.sectionBadge}>
-                {selectedCategory === 'mixed' ? '🎲 KARIŞIK MOD' : '🎯 TEK BRANŞ'}
+                {selectedCategory === 'mixed' ? 'KARIŞIK MOD' : 'TEK BRANŞ'}
               </Text>
             </View>
 
@@ -371,7 +402,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                     <CategorySquircleIcon category={selectedCategory.id} size={26} />
                   )}
                 </View>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.categoryDropdownText}>
                     {selectedCategory === 'mixed' ? 'Tüm Kategoriler (Karışık)' : selectedCategory.name}
                   </Text>
@@ -403,7 +434,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               }}
             >
               <Text style={styles.mixedQuickText}>
-                {selectedCategory === 'mixed' ? '🎯 Tek Kategori Seç' : '🎲 Karışık Moduna Dön'}
+                {selectedCategory === 'mixed' ? 'Tek Kategori Seç' : 'Karışık Moduna Dön'}
               </Text>
             </TouchableOpacity>
 
@@ -511,8 +542,8 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
             </View>
 
             {/* 5. GİZLİLİK & CEZA AYARLARI */}
-            <View style={styles.switchRow}>
-              <View>
+          <View style={styles.switchRow}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
                 <Text style={styles.switchLabel}>Oda Gizliliği</Text>
                 <Text style={styles.switchSub}>
                   {privacy === 'public' ? 'Herkese Açık (Lobiye Katılabilir)' : 'Özel (Yalnızca Kod İle)'}
@@ -530,7 +561,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
             </View>
 
             <View style={styles.switchRow}>
-              <View>
+              <View style={{ flex: 1, paddingRight: 8 }}>
                 <Text style={styles.switchLabel}>Yanlış Cevap Cezası</Text>
                 <Text style={styles.switchSub}>Yanlış cevaplarda -50 puan düşer</Text>
               </View>
@@ -547,7 +578,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 
             {/* Oda Şifresi */}
             <View style={styles.switchRow}>
-              <View>
+              <View style={{ flex: 1, paddingRight: 8 }}>
                 <Text style={styles.switchLabel}>Oda Şifresi</Text>
                 <Text style={styles.switchSub}>
                   {hasRoomPassword ? 'Şifreli Giriş (Sadece Şifreyi Bilenler)' : 'Şifresiz (Herkes Katılabilir)'}
@@ -581,6 +612,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
             )}
 
             {/* 6. TAVRİKO 3D ODA OLUŞTUR BUTONU */}
+            {joinError && <Text accessibilityLiveRegion="polite" style={styles.errorText}>{joinError}</Text>}
             <Button3D
               title="ODAYI OLUŞTUR"
               onPress={handleCreateRoomPress}
@@ -590,7 +622,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
           </View>
         ) : (
           /* ODAYA KATIL KARTI (Tavriko UI Kit Screen 08) */
-          <View style={styles.roomSetupCard}>
+            <View style={styles.roomSetupCard}>
             <View style={styles.joinCodeHeaderRow}>
               <ModeSquircleIcon mode="custom_room" size={38} />
               <View style={styles.joinCodeHeaderTextCol}>
@@ -621,6 +653,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 
             <TextInput
               ref={codeInputRef}
+              accessibilityLabel="6 haneli oda kodu"
               style={styles.hiddenInput}
               value={roomCode}
               onChangeText={(text) => {
@@ -637,7 +670,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 
             {/* Oda Şifresi (Şifreli odalar için KATIL butonundan önce girilir) */}
             <View style={{ marginTop: 10, marginBottom: 12 }}>
-              <Text style={styles.passwordSettingLabel}>🔒 Oda Şifresi (Oda şifreli ise):</Text>
+              <Text style={styles.passwordSettingLabel}>Oda şifresi (isteğe bağlı)</Text>
               <TextInput
                 style={styles.passwordSettingInput}
                 value={joinPassword}
@@ -653,25 +686,32 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
             <View style={styles.joinActionRow}>
               <TouchableOpacity
                 style={styles.pasteButton}
+                accessibilityRole="button" accessibilityLabel="Oda kodunu yapıştır"
                 activeOpacity={0.8}
                 onPress={async () => {
                   sound.playSound('tap');
-                  const clip = await Clipboard.getStringAsync();
-                  if (clip) {
-                    const clean = clip.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-                    setRoomCode(clean);
-                  }
+                  try {
+                    const clip = await Clipboard.getStringAsync();
+                    if (clip) {
+                      const clean = clip.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+                      setRoomCode(clean);
+                      setJoinError(null);
+                    }
+                  } catch { setJoinError('Panoya erişilemedi. Oda kodunu elle girebilirsin.'); }
                 }}
               >
-                <Text style={styles.pasteButtonText}>📋 Yapıştır</Text>
+                <ClipboardIcon size={17} color="#DDD0F1" />
+                <Text style={styles.pasteButtonText}>Yapıştır</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.joinPrimaryBtn}
+                accessibilityRole="button" accessibilityLabel="Kodla odaya katıl"
                 activeOpacity={0.88}
                 onPress={handleJoinPress}
               >
                 <Text style={styles.joinPrimaryBtnText}>KATIL</Text>
+                <ArrowRight size={18} color="#103B2E" />
               </TouchableOpacity>
             </View>
 
@@ -680,6 +720,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               <View style={styles.publicRoomsDivider} />
               <Text style={styles.publicRoomsSectionTitle}>HERKESE AÇIK ODALAR</Text>
               <TouchableOpacity
+                accessibilityRole="button" accessibilityLabel="Açık odaları yenile"
                 onPress={fetchPublicRooms}
                 style={styles.refreshIconBtn}
                 activeOpacity={0.7}
@@ -687,7 +728,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 {isLoadingPublicRooms ? (
                   <ActivityIndicator size="small" color="#5ADBB5" />
                 ) : (
-                  <Text style={styles.refreshIconText}>🔄</Text>
+                  <RefreshCw size={18} color="#ADF0D8" />
                 )}
               </TouchableOpacity>
               <View style={styles.publicRoomsDivider} />
@@ -696,7 +737,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
             <View style={styles.publicRoomsList}>
               {publicRooms.length === 0 ? (
                 <View style={styles.emptyPublicRoomsBox}>
-                  <Text style={styles.emptyPublicRoomsEmoji}>🏟️</Text>
+                  <DiscoveryArtwork source={DISCOVERY_IMG.social} size={100} />
                   <Text style={styles.emptyPublicRoomsTitle}>
                     {isLoadingPublicRooms ? 'Aktif Odalar Taranıyor...' : 'Şu An Açık Oda Yok'}
                   </Text>
@@ -717,12 +758,13 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               ) : (
                 publicRooms.map((room) => (
                   <View key={room.id} style={styles.publicRoomCard}>
+                    <View style={styles.publicRoomHeader}>
                     <View style={styles.publicRoomIconWrap}>
                       <CategorySquircleIcon category={room.categoryKey} size={42} />
                     </View>
                     <View style={styles.publicRoomInfo}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.publicRoomTitle} numberOfLines={1}>
+                        <Text style={styles.publicRoomTitle}>
                           {room.title}
                         </Text>
                         {room.hasPassword && (
@@ -731,16 +773,19 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                           </Text>
                         )}
                       </View>
-                      <Text style={styles.publicRoomSub} numberOfLines={1}>
+                      <Text style={styles.publicRoomSub}>
                         {room.categoryName} · {room.totalRounds} soru · {room.timeSec}sn
                       </Text>
                     </View>
+                    </View>
+                    <View style={styles.publicRoomFooter}>
                     <View style={styles.publicRoomPill}>
                       <Text style={styles.publicRoomPillText}>
                         {room.players}/{room.maxPlayers} Kişi
                       </Text>
                     </View>
                     <TouchableOpacity
+                      accessibilityRole="button" accessibilityLabel={`Odaya katıl: ${room.title}`}
                       style={styles.publicRoomJoinBtn}
                       activeOpacity={0.85}
                       onPress={() => {
@@ -758,6 +803,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                     >
                       <Text style={styles.publicRoomJoinBtnText}>KATIL</Text>
                     </TouchableOpacity>
+                    </View>
                   </View>
                 ))
               )}
@@ -847,8 +893,19 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  roomHero: { width: '100%', flexDirection: 'row', alignItems: 'center', borderRadius: 24, borderWidth: 1, borderColor: '#78578F', padding: 16, marginBottom: 18, overflow: 'hidden', backgroundColor: '#302045' },
+  heroBackdrop: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.18 },
+  heroCopy: { flex: 1, minWidth: 0, paddingRight: 4 },
+  heroEyebrow: { color: '#ADF0D8', fontFamily: THEME.fonts.extraBold, fontSize: 11, letterSpacing: 1, marginBottom: 8 },
+  heroTitle: { color: '#FFFFFF', fontFamily: THEME.fonts.display, fontSize: 26, lineHeight: 31 },
+  heroSubtitle: { color: '#DFD2EF', fontFamily: THEME.fonts.body, fontSize: 12, lineHeight: 18, marginTop: 8 },
+  setupIntro: { marginBottom: 22 },
+  setupTitle: { color: '#FFFFFF', fontFamily: THEME.fonts.extraBold, fontSize: 18, lineHeight: 25 },
+  setupSubtitle: { color: '#CCBFDE', fontFamily: THEME.fonts.body, fontSize: 12, marginTop: 4 },
+  summaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 14 },
+  summaryPill: { color: '#FFE2A4', backgroundColor: '#49352E', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, fontFamily: THEME.fonts.bold, fontSize: 12 },
   customScreenRoot: {
-    paddingHorizontal: 2,
+    paddingHorizontal: 16,
     width: '100%',
     maxWidth: 720,
     alignSelf: 'center',
@@ -856,18 +913,18 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 0,
     paddingTop: 6,
-    paddingBottom: 150,
+    paddingBottom: 44,
     alignItems: 'center',
     width: '100%',
   },
   tabToggleRow: {
     flexDirection: 'row',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#1D1034',
     borderRadius: 22,
     padding: 4,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    marginBottom: 10,
+    marginBottom: 18,
     width: '100%',
     maxWidth: 700,
     alignSelf: 'stretch',
@@ -881,10 +938,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   tabButtonActiveCreate: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#77502B',
   },
   tabButtonActiveJoin: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#226653',
   },
   tabButtonText: {
     fontSize: 14,
@@ -900,10 +957,10 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 700,
     alignSelf: 'stretch',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#291A3E',
     borderRadius: 24,
     borderWidth: 1.5,
-    borderColor: 'rgba(245, 158, 11, 0.35)',
+    borderColor: '#654A7D',
     paddingHorizontal: 14,
     paddingVertical: 18,
     ...Platform.select({
@@ -945,7 +1002,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1E293B',
+    backgroundColor: '#36244B',
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.16)',
@@ -954,6 +1011,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   categoryDropdownLeft: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -1084,7 +1142,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   switchSub: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: THEME.fonts.medium,
     fontWeight: '600',
     color: '#CBBFE8',
@@ -1119,19 +1177,22 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   digitsWrapper: {
+    width: '100%',
     alignItems: 'center',
     marginVertical: 12,
   },
   digitsRow: {
+    width: '100%',
     flexDirection: 'row',
-    gap: 8,
+    gap: 5,
     justifyContent: 'center',
   },
   digitBox: {
-    width: 54,
+    flex: 1,
+    minWidth: 0,
     height: 64,
     borderRadius: 16,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#36244B',
     borderWidth: 1.8,
     borderColor: 'rgba(255, 255, 255, 0.18)',
     justifyContent: 'center',
@@ -1168,6 +1229,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   pasteButton: {
+    flexDirection: 'row',
+    gap: 6,
     flex: 1,
     height: 56,
     borderRadius: 16,
@@ -1184,6 +1247,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   joinPrimaryBtn: {
+    flexDirection: 'row',
+    gap: 8,
     flex: 1.5,
     height: 56,
     borderRadius: 16,
@@ -1289,8 +1354,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   publicRoomCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'stretch',
     gap: 12,
     padding: 10,
     paddingHorizontal: 12,
@@ -1309,8 +1374,13 @@ const styles = StyleSheet.create({
   },
   publicRoomInfo: {
     flex: 1,
+    minWidth: 0,
   },
+  publicRoomHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  publicRoomFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   publicRoomTitle: {
+    flex: 1,
+    lineHeight: 21,
     color: '#FFFFFF',
     fontSize: 15,
     fontFamily: THEME.fonts.display,
@@ -1318,7 +1388,8 @@ const styles = StyleSheet.create({
   },
   publicRoomSub: {
     color: '#A79BC4',
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 18,
     fontFamily: THEME.fonts.medium,
     marginTop: 2,
   },
@@ -1336,6 +1407,7 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.bold,
   },
   publicRoomJoinBtn: {
+    minHeight: 44,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 14,
