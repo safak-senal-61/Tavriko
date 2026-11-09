@@ -321,6 +321,15 @@ export function renderDashboardHtml(): string {
         padding: 10px 12px;
         flex-direction: column;
         align-items: flex-start;
+        max-width: 100vw;
+        overflow-x: hidden;
+      }
+      .brand-wrap {
+        flex-wrap: wrap;
+        max-width: 100%;
+      }
+      .env-tag {
+        order: 3;
       }
       .brand-title {
         font-size: 16px;
@@ -419,6 +428,11 @@ export function renderDashboardHtml(): string {
       .btn { font-size: 12px; padding: 7px 12px; }
       .qr-box { width: 180px; height: 180px; }
       .brand-title { font-size: 14px; }
+      /* Marka bloğu: alt yazıyı ve etiketi küçült, sığdır */
+      .brand-sub { font-size: 9.5px; }
+      .env-tag { font-size: 9px; padding: 3px 8px; }
+      .header-user-chip { max-width: 150px; }
+      .header-play-btn { font-size: 11px; padding: 6px 10px; }
     }
     /* ===== END MOBILE RESPONSIVE ===== */
     .tab-content { display: none; }
@@ -981,7 +995,7 @@ export function renderDashboardHtml(): string {
       <div style="font-size:26px;">🎮</div>
       <div>
         <div class="brand-title">TAVRİKO ADMİN & OPS PORTAL</div>
-        <div style="font-size:11.5px; color:var(--text-muted);">Express · Prisma PostgreSQL · Supabase Cloud · Redis · Vercel</div>
+        <div class="brand-sub" style="font-size:11.5px; color:var(--text-muted);">Express · Prisma PostgreSQL · Supabase Cloud · Redis · Vercel</div>
       </div>
       <div class="env-tag"><div class="pulse-dot"></div> CANLI AKIŞ AKTİF</div>
     </div>
