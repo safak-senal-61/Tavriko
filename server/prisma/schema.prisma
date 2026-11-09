@@ -89,11 +89,11 @@ model User {
   equippedBadge             String?
   equippedFrame             String?
   equippedNameEffect        String?
-  // Süreli (rental) profil kozmetikleri
-  equippedBackgroundExpiresAt Int?
-  equippedBadgeExpiresAt    Int?
-  equippedFrameExpiresAt    Int?
-  equippedNameEffectExpiresAt Int?
+  // Süreli (rental) profil kozmetikleri (milisaniye timestamp — BigInt gerekli)
+  equippedBackgroundExpiresAt BigInt?
+  equippedBadgeExpiresAt    BigInt?
+  equippedFrameExpiresAt    BigInt?
+  equippedNameEffectExpiresAt BigInt?
   // Kullanıcının engellediği oyuncular
   blockedUserIds            Json                @default("[]")
   eventProgress             Json                @default("{}")

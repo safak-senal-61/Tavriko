@@ -352,6 +352,33 @@ class PrismaService {
     // ==========================================================================
     // PRISMA MODEL DELEGATE: prisma.user
     // ==========================================================================
+    /** BigInt veya number güvenli biçimde number'a çevirir. */
+    toNumberSafe(v) {
+        if (v === null || v === undefined)
+            return undefined;
+        if (typeof v === 'number')
+            return v;
+        if (typeof v === 'bigint') {
+            try {
+                return Number(v);
+            }
+            catch {
+                return undefined;
+            }
+        }
+        return undefined;
+    }
+    /** number'ı Prisma BigInt alanına güvenli biçimde çevirir. */
+    toBigIntSafe(v) {
+        if (v === null || v === undefined)
+            return null;
+        try {
+            return BigInt(Math.floor(v));
+        }
+        catch {
+            return null;
+        }
+    }
     prismaUserToRecord(u) {
         let inventory = [];
         if (Array.isArray(u.inventoryItems)) {
@@ -424,10 +451,10 @@ class PrismaService {
             equippedBadge: u.equippedBadge ?? undefined,
             equippedNameEffect: u.equippedNameEffect ?? undefined,
             equippedBackground: u.equippedBackground ?? undefined,
-            equippedFrameExpiresAt: u.equippedFrameExpiresAt ?? undefined,
-            equippedBadgeExpiresAt: u.equippedBadgeExpiresAt ?? undefined,
-            equippedNameEffectExpiresAt: u.equippedNameEffectExpiresAt ?? undefined,
-            equippedBackgroundExpiresAt: u.equippedBackgroundExpiresAt ?? undefined,
+            equippedFrameExpiresAt: this.toNumberSafe(u.equippedFrameExpiresAt),
+            equippedBadgeExpiresAt: this.toNumberSafe(u.equippedBadgeExpiresAt),
+            equippedNameEffectExpiresAt: this.toNumberSafe(u.equippedNameEffectExpiresAt),
+            equippedBackgroundExpiresAt: this.toNumberSafe(u.equippedBackgroundExpiresAt),
             blockedUserIds: Array.isArray(u.blockedUserIds) ? u.blockedUserIds : [],
             eventProgress: u.eventProgress || {},
             friendIds: Array.isArray(u.friendIds) ? u.friendIds : [],
@@ -1764,10 +1791,10 @@ class PrismaService {
                         equippedBadge: record.equippedBadge,
                         equippedNameEffect: record.equippedNameEffect,
                         equippedBackground: record.equippedBackground,
-                        equippedFrameExpiresAt: record.equippedFrameExpiresAt ?? null,
-                        equippedBadgeExpiresAt: record.equippedBadgeExpiresAt ?? null,
-                        equippedNameEffectExpiresAt: record.equippedNameEffectExpiresAt ?? null,
-                        equippedBackgroundExpiresAt: record.equippedBackgroundExpiresAt ?? null,
+                        equippedFrameExpiresAt: this.toBigIntSafe(record.equippedFrameExpiresAt),
+                        equippedBadgeExpiresAt: this.toBigIntSafe(record.equippedBadgeExpiresAt),
+                        equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
+                        equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
                         blockedUserIds: (record.blockedUserIds || []),
                         settings: (record.settings || {}),
                         updatedAt: new Date(),
@@ -4163,6 +4190,15 @@ class PrismaService {
                         coins: record.coins,
                         gems: record.gems,
                         hasPremiumPass: record.hasPremiumPass,
+                        equippedFrame: record.equippedFrame ?? null,
+                        equippedBadge: record.equippedBadge ?? null,
+                        equippedNameEffect: record.equippedNameEffect ?? null,
+                        equippedBackground: record.equippedBackground ?? null,
+                        equippedFrameExpiresAt: this.toBigIntSafe(record.equippedFrameExpiresAt),
+                        equippedBadgeExpiresAt: this.toBigIntSafe(record.equippedBadgeExpiresAt),
+                        equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
+                        equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
+                        blockedUserIds: (record.blockedUserIds || []),
                         updatedAt: new Date(),
                     },
                 });

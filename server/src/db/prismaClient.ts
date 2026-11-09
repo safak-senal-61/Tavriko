@@ -501,6 +501,30 @@ export class PrismaService {
   // ==========================================================================
   // PRISMA MODEL DELEGATE: prisma.user
   // ==========================================================================
+  /** BigInt veya number güvenli biçimde number'a çevirir. */
+  private toNumberSafe(v: unknown): number | undefined {
+    if (v === null || v === undefined) return undefined;
+    if (typeof v === 'number') return v;
+    if (typeof v === 'bigint') {
+      try {
+        return Number(v);
+      } catch {
+        return undefined;
+      }
+    }
+    return undefined;
+  }
+
+  /** number'ı Prisma BigInt alanına güvenli biçimde çevirir. */
+  private toBigIntSafe(v: number | undefined | null): bigint | null {
+    if (v === null || v === undefined) return null;
+    try {
+      return BigInt(Math.floor(v));
+    } catch {
+      return null;
+    }
+  }
+
   private prismaUserToRecord(u: PrismaUser & { inventoryItems?: PrismaUserInventoryItem[] }): UserRecord {
     let inventory: InventoryItem[] = [];
     if (Array.isArray((u as any).inventoryItems)) {
@@ -578,10 +602,10 @@ export class PrismaService {
       equippedBadge: (u as any).equippedBadge ?? undefined,
       equippedNameEffect: (u as any).equippedNameEffect ?? undefined,
       equippedBackground: (u as any).equippedBackground ?? undefined,
-      equippedFrameExpiresAt: (u as any).equippedFrameExpiresAt ?? undefined,
-      equippedBadgeExpiresAt: (u as any).equippedBadgeExpiresAt ?? undefined,
-      equippedNameEffectExpiresAt: (u as any).equippedNameEffectExpiresAt ?? undefined,
-      equippedBackgroundExpiresAt: (u as any).equippedBackgroundExpiresAt ?? undefined,
+      equippedFrameExpiresAt: this.toNumberSafe((u as any).equippedFrameExpiresAt),
+      equippedBadgeExpiresAt: this.toNumberSafe((u as any).equippedBadgeExpiresAt),
+      equippedNameEffectExpiresAt: this.toNumberSafe((u as any).equippedNameEffectExpiresAt),
+      equippedBackgroundExpiresAt: this.toNumberSafe((u as any).equippedBackgroundExpiresAt),
       blockedUserIds: Array.isArray((u as any).blockedUserIds) ? ((u as any).blockedUserIds as string[]) : [],
       eventProgress: (u as any).eventProgress || {},
       friendIds: Array.isArray(u.friendIds) ? (u.friendIds as string[]) : [],
@@ -2070,10 +2094,10 @@ export class PrismaService {
             equippedBadge: record.equippedBadge,
             equippedNameEffect: record.equippedNameEffect,
             equippedBackground: record.equippedBackground,
-            equippedFrameExpiresAt: record.equippedFrameExpiresAt ?? null,
-            equippedBadgeExpiresAt: record.equippedBadgeExpiresAt ?? null,
-            equippedNameEffectExpiresAt: record.equippedNameEffectExpiresAt ?? null,
-            equippedBackgroundExpiresAt: record.equippedBackgroundExpiresAt ?? null,
+            equippedFrameExpiresAt: this.toBigIntSafe(record.equippedFrameExpiresAt),
+            equippedBadgeExpiresAt: this.toBigIntSafe(record.equippedBadgeExpiresAt),
+            equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
+            equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
             blockedUserIds: (record.blockedUserIds || []) as any,
             settings: (record.settings || {}) as any,
             updatedAt: new Date(),
@@ -4796,6 +4820,15 @@ export class PrismaService {
             coins: record.coins,
             gems: record.gems,
             hasPremiumPass: record.hasPremiumPass,
+            equippedFrame: record.equippedFrame ?? null,
+            equippedBadge: record.equippedBadge ?? null,
+            equippedNameEffect: record.equippedNameEffect ?? null,
+            equippedBackground: record.equippedBackground ?? null,
+            equippedFrameExpiresAt: this.toBigIntSafe(record.equippedFrameExpiresAt),
+            equippedBadgeExpiresAt: this.toBigIntSafe(record.equippedBadgeExpiresAt),
+            equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
+            equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
+            blockedUserIds: (record.blockedUserIds || []) as any,
             updatedAt: new Date(),
           },
         });
@@ -5228,6 +5261,7 @@ export class PrismaService {
       this.savePersistedUsers();
       this.rawClient.user.update({ where: { id: record.id }, data: { equippedBadge: null, equippedBadgeExpiresAt: null } }).catch(() => {});
     }
+
 
     return {
       id: record.id,
