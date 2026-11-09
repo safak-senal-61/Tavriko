@@ -66,6 +66,10 @@ export const UI_IMG = {
   special: require('../../assets/images/ui/icon_special.png'),
   seasonEmblem: require('../../assets/images/ui/season_emblem.png'),
   levelBadge: require('../../assets/images/ui/level_badge.png'),
+  titleNadir: require('../../assets/images/ui/title_nadir.png'),
+  titleEpik: require('../../assets/images/ui/title_epik.png'),
+  titleEfsanevi: require('../../assets/images/ui/title_efsanevi.png'),
+  titlesHero: require('../../assets/images/store/titles_hero.jpg'),
 };
 
 /** Ürün/eşya kimliğine göre 3B görsel (yoksa null) */

@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Platform,
   Switch,
+  Image,
+  ImageSourcePropType,
 } from 'react-native';
 import Animated, { FadeInRight, FadeInUp, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
@@ -37,7 +39,7 @@ import {
   AVATAR_PRESETS,
   AvatarPreset,
 } from '../components/TavrikoIcons';
-import { UI_IMG, FloatingImage } from '../components/StoreKit';
+import { UI_IMG, FloatingImage, ShimmerView } from '../components/StoreKit';
 
 let ImagePickerModule: any = null;
 try {
@@ -133,17 +135,31 @@ interface ProfileScreenProps {
 type ProfileTab = 'overview' | 'mastery' | 'titles' | 'settings' | 'account';
 
 // Unlockable display titles with vector badge color coding
-const TITLE_CATALOG: Array<{ title: string; minLevel: number; badgeColor: string; rarity: string }> = [
-  { title: 'Acemi Kaşif', minLevel: 1, badgeColor: '#4FC3F7', rarity: 'Nadir' },
-  { title: 'Yükselen Yıldız', minLevel: 3, badgeColor: '#4FC3F7', rarity: 'Nadir' },
-  { title: 'Usta Kaşif', minLevel: 6, badgeColor: '#4FC3F7', rarity: 'Nadir' },
-  { title: 'Bilgi Şövalyesi', minLevel: 10, badgeColor: '#B388FF', rarity: 'Epik' },
-  { title: 'Stratejist', minLevel: 15, badgeColor: '#B388FF', rarity: 'Epik' },
-  { title: 'Usta Bilgin', minLevel: 20, badgeColor: '#B388FF', rarity: 'Epik' },
-  { title: 'Büyük Üstat', minLevel: 30, badgeColor: '#FFC43D', rarity: 'Efsanevi' },
-  { title: 'Efsanevi Deha', minLevel: 40, badgeColor: '#FFC43D', rarity: 'Efsanevi' },
-  { title: 'Evrenin Hakimi', minLevel: 50, badgeColor: '#FFC43D', rarity: 'Efsanevi' },
+const TITLE_CATALOG: Array<{
+  title: string;
+  minLevel: number;
+  badgeColor: string;
+  rarity: string;
+  icon: ImageSourcePropType;
+}> = [
+  { title: 'Acemi Kaşif', minLevel: 1, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: UI_IMG.titleNadir },
+  { title: 'Yükselen Yıldız', minLevel: 3, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: UI_IMG.titleNadir },
+  { title: 'Usta Kaşif', minLevel: 6, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: UI_IMG.titleNadir },
+  { title: 'Bilgi Şövalyesi', minLevel: 10, badgeColor: '#B388FF', rarity: 'Epik', icon: UI_IMG.titleEpik },
+  { title: 'Stratejist', minLevel: 15, badgeColor: '#B388FF', rarity: 'Epik', icon: UI_IMG.titleEpik },
+  { title: 'Usta Bilgin', minLevel: 20, badgeColor: '#B388FF', rarity: 'Epik', icon: UI_IMG.titleEpik },
+  { title: 'Büyük Üstat', minLevel: 30, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: UI_IMG.titleEfsanevi },
+  { title: 'Efsanevi Deha', minLevel: 40, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: UI_IMG.titleEfsanevi },
+  { title: 'Evrenin Hakimi', minLevel: 50, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: UI_IMG.titleEfsanevi },
 ];
+
+const TitleLockIcon: React.FC<{ size?: number; color?: string }> = ({ size = 18, color = '#8F84B5' }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x="4" y="11" width="16" height="10" rx="2.5" stroke={color} strokeWidth={2} />
+    <Path d="M8 11V7a4 4 0 018 0v4" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    <Circle cx="12" cy="16" r="1.6" fill={color} />
+  </Svg>
+);
 
 const CATEGORY_LABELS: Record<string, { name: string; tag: string; color: string }> = {
   gaming_videogames: { name: 'Video Oyunları', tag: 'OYU', color: '#8B5CF6' },
@@ -1050,42 +1066,84 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         {/* TAB 3: Titles */}
         {activeTab === 'titles' && (
-          <View style={styles.detailsCard}>
-            <Text style={styles.sectionTitle}>Unvan Seç & Kuşan</Text>
-            <Text style={styles.cardSub}>
-              Seviye atladıkça yeni unvanlar açılır. Seçtiğin unvan PostgreSQL'e kaydedilir ve arkadaşların tarafından görülür.
-            </Text>
+          <View>
+            {/* Unvan Hero Banner */}
+            <Animated.View entering={FadeInDown.delay(40).duration(420)} style={styles.titlesHeroWrap}>
+              <Image source={UI_IMG.titlesHero} style={styles.titlesHeroImg} resizeMode="cover" />
+              <View style={styles.titlesHeroScrim} />
+              <View style={styles.titlesHeroText}>
+                <Text style={styles.titlesHeroEyebrow}>UNVAN KOLEKSİYONU</Text>
+                <Text style={styles.titlesHeroTitle}>Unvan Seç & Kuşan</Text>
+                <Text style={styles.titlesHeroSub}>
+                  Seviye atladıkça yeni unvanlar açılır. Seçtiğin unvan PostgreSQL'e kaydedilir ve arkadaşların tarafından görülür.
+                </Text>
+              </View>
+              <View style={styles.titlesHeroCount}>
+                <Text style={styles.titlesHeroCountNum}>
+                  {TITLE_CATALOG.filter((t) => prog.level >= t.minLevel).length}/{TITLE_CATALOG.length}
+                </Text>
+                <Text style={styles.titlesHeroCountLabel}>AÇIK</Text>
+              </View>
+            </Animated.View>
+
             {titleNotice && (
               <Text style={[styles.noticeText, { color: titleNotice.ok ? '#3FD08A' : '#FF5A6A' }]}>
                 {titleNotice.text}
               </Text>
             )}
-            {TITLE_CATALOG.map((t) => {
+
+            {TITLE_CATALOG.map((t, idx) => {
               const unlocked = prog.level >= t.minLevel;
               const equipped = t.title === equippedTitle;
               return (
-                <TouchableOpacity
+                <Animated.View
                   key={t.title}
-                  disabled={!unlocked || equipped || !!savingTitle}
-                  onPress={() => handleEquipTitle(t.title)}
-                  style={[styles.titleRow, equipped && styles.titleRowEquipped, !unlocked && { opacity: 0.4 }]}
-                  activeOpacity={0.85}
+                  entering={FadeInRight.delay(70 + idx * 45).duration(380).springify().damping(18)}
                 >
-                  <View style={[styles.titleRarityDot, { backgroundColor: t.badgeColor }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.titleName}>{t.title}</Text>
-                    <Text style={styles.titleReq}>
-                      {unlocked ? `${t.rarity} · Kuşanılabilir` : `Kilitli · Seviye ${t.minLevel} gerekli`}
-                    </Text>
-                  </View>
-                  {savingTitle === t.title ? (
-                    <ActivityIndicator color="#FFC43D" size="small" />
-                  ) : (
-                    <Text style={[styles.titleAction, equipped && { color: '#3FD08A' }]}>
-                      {equipped ? '✓ Kuşanıldı' : unlocked ? 'Kuşan ›' : ''}
-                    </Text>
-                  )}
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    disabled={!unlocked || equipped || !!savingTitle}
+                    onPress={() => handleEquipTitle(t.title)}
+                    style={[
+                      styles.titleRow,
+                      equipped && styles.titleRowEquipped,
+                      !unlocked && styles.titleRowLocked,
+                    ]}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.titleBadgeWrap}>
+                      <Image
+                        source={t.icon}
+                        style={[styles.titleBadgeImg, !unlocked && styles.titleBadgeLocked]}
+                        resizeMode="contain"
+                      />
+                      {equipped && <ShimmerView color="#3FD08A" duration={1800} style={styles.titleBadgeShine} />}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.titleNameRow}>
+                        <Text style={[styles.titleName, !unlocked && { color: '#8F84B5' }]}>{t.title}</Text>
+                        <View style={[styles.titleRarityChip, { backgroundColor: `${t.badgeColor}22`, borderColor: `${t.badgeColor}88` }]}>
+                          <Text style={[styles.titleRarityChipText, { color: t.badgeColor }]}>{t.rarity}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.titleReq}>
+                        {unlocked
+                          ? `Seviye ${t.minLevel} · Kuşanılabilir`
+                          : `Kilitli · Seviye ${t.minLevel} gerekli`}
+                      </Text>
+                    </View>
+                    {savingTitle === t.title ? (
+                      <ActivityIndicator color="#FFC43D" size="small" />
+                    ) : equipped ? (
+                      <View style={styles.titleEquippedPill}>
+                        <Text style={styles.titleEquippedPillText}>✓ KUŞANILDI</Text>
+                      </View>
+                    ) : unlocked ? (
+                      <Text style={styles.titleAction}>Kuşan ›</Text>
+                    ) : (
+                      <TitleLockIcon />
+                    )}
+                  </TouchableOpacity>
+                </Animated.View>
               );
             })}
           </View>
@@ -1955,20 +2013,101 @@ const styles = StyleSheet.create({
   },
 
   noticeText: { fontSize: 12, fontFamily: THEME.fonts.extraBold, marginBottom: 8 },
+  // Unvan Hero Banner
+  titlesHeroWrap: {
+    position: 'relative',
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 196, 61, 0.45)',
+    minHeight: 132,
+    marginBottom: 12,
+    backgroundColor: '#1E0E3E',
+  },
+  titlesHeroImg: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' },
+  titlesHeroScrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(14, 6, 36, 0.55)',
+  },
+  titlesHeroText: { padding: 16, paddingRight: 96, justifyContent: 'center', minHeight: 132 },
+  titlesHeroEyebrow: {
+    color: '#FFC43D',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 1.5,
+    marginBottom: 2,
+  },
+  titlesHeroTitle: { color: '#FFFFFF', fontSize: 19, fontFamily: THEME.fonts.display, marginBottom: 4 },
+  titlesHeroSub: { color: 'rgba(217, 205, 245, 0.85)', fontSize: 11, fontFamily: THEME.fonts.body, lineHeight: 15 },
+  titlesHeroCount: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    alignItems: 'center',
+    backgroundColor: 'rgba(14, 6, 36, 0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 196, 61, 0.55)',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  titlesHeroCountNum: { color: '#FFC43D', fontSize: 15, fontFamily: THEME.fonts.display },
+  titlesHeroCountLabel: { color: '#D9CDF5', fontSize: 8.5, fontFamily: THEME.fonts.extraBold, letterSpacing: 1 },
+
+  // Unvan Satırları (yeni kart tasarımı)
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    padding: 10,
-    borderRadius: 14,
-    borderWidth: 1,
+    gap: 12,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1.2,
     borderColor: 'rgba(255,255,255,0.1)',
     marginBottom: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  titleRowEquipped: { borderColor: '#3FD08A', backgroundColor: 'rgba(63, 208, 138, 0.1)' },
-  titleRarityDot: { width: 10, height: 10, borderRadius: 5 },
-  titleName: { color: '#FFFFFF', fontSize: 14, fontFamily: THEME.fonts.extraBold },
-  titleReq: { color: '#D9CDF5', fontSize: 11, fontFamily: THEME.fonts.body },
+  titleRowEquipped: {
+    borderColor: '#3FD08A',
+    backgroundColor: 'rgba(63, 208, 138, 0.12)',
+    borderWidth: 1.6,
+  },
+  titleRowLocked: { opacity: 0.5 },
+  titleBadgeWrap: {
+    position: 'relative',
+    width: 46,
+    height: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    overflow: 'hidden',
+  },
+  titleBadgeImg: { width: 38, height: 38 },
+  titleBadgeLocked: { opacity: 0.55, tintColor: undefined },
+  titleBadgeShine: { borderRadius: 14 },
+  titleNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  titleName: { color: '#FFFFFF', fontSize: 14.5, fontFamily: THEME.fonts.extraBold },
+  titleRarityChip: {
+    paddingHorizontal: 7,
+    paddingVertical: 1.5,
+    borderRadius: 7,
+    borderWidth: 1,
+  },
+  titleRarityChipText: { fontSize: 9, fontFamily: THEME.fonts.extraBold, letterSpacing: 0.5 },
+  titleEquippedPill: {
+    backgroundColor: 'rgba(63, 208, 138, 0.18)',
+    borderWidth: 1,
+    borderColor: '#3FD08A',
+    borderRadius: 9,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  titleEquippedPillText: { color: '#3FD08A', fontSize: 9.5, fontFamily: THEME.fonts.extraBold },
+  titleReq: { color: '#D9CDF5', fontSize: 11, fontFamily: THEME.fonts.body, marginTop: 2 },
   titleAction: { color: '#FFC43D', fontSize: 12, fontFamily: THEME.fonts.extraBold },
 
   // Settings tab specific styles

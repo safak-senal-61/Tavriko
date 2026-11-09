@@ -113,6 +113,19 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
 
   const fullNameValid = fullName.trim().length >= 2;
 
+  // Profil tamamlanma yüzdesi (6 alan: ad, ülke, telefon, doğum, cinsiyet, bio)
+  const completion = useMemo(() => {
+    const checks = [
+      fullName.trim().length >= 2,
+      true, // ülke her zaman seçili
+      phone.trim().length > 0,
+      /^\d{2}\.\d{2}\.\d{4}$/.test(birthDate.trim()),
+      gender.length > 0,
+      bio.trim().length > 0,
+    ];
+    return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+  }, [fullName, phone, birthDate, gender, bio]);
+
   const handlePickCountry = (c: { code: string; name: string }) => {
     sound.playSound('tap');
     sound.triggerHaptic('light');
@@ -244,6 +257,18 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
                 <Text style={styles.syncStatusText}>PostgreSQL Canlı</Text>
               </View>
             </View>
+            {/* Profil Tamamlanma Çubuğu */}
+            <View style={styles.completionWrap}>
+              <View style={styles.completionBarTrack}>
+                <Animated.View
+                  entering={ZoomIn.delay(220).duration(500)}
+                  style={[styles.completionBarFill, { width: `${completion}%` }]}
+                >
+                  <View style={styles.completionBarShine} />
+                </Animated.View>
+              </View>
+              <Text style={styles.completionLabel}>Profil %{completion} tamamlandı</Text>
+            </View>
           </View>
         </Animated.View>
 
@@ -259,7 +284,7 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
         {/* Form Alanları Kartı */}
         <Animated.View entering={FadeInDown.delay(120).springify().damping(16)} style={styles.formCard}>
           {/* Ad Soyad */}
-          <View style={styles.fieldGroup}>
+          <Animated.View entering={FadeInDown.delay(100).springify().damping(16)} style={styles.fieldGroup}>
             <View style={styles.fieldLabelRow}>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                 <Path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="#FFC43D" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -285,18 +310,18 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
                 onBlur={() => setFocusedField(null)}
               />
               {fullNameValid && (
-                <View style={styles.fieldCheckIcon}>
+                <Animated.View entering={ZoomIn.duration(200)} style={styles.fieldCheckIcon}>
                   <Text style={styles.fieldCheckText}>✓</Text>
-                </View>
+                </Animated.View>
               )}
             </View>
             {!fullNameValid && fullName.length > 0 && (
               <Text style={styles.fieldError}>En az 2 karakter girmelisiniz</Text>
             )}
-          </View>
+          </Animated.View>
 
           {/* Kullanıcı Adı (Salt Okunur) */}
-          <View style={styles.fieldGroup}>
+          <Animated.View entering={FadeInDown.delay(145).springify().damping(16)} style={styles.fieldGroup}>
             <View style={styles.fieldLabelRow}>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                 <Circle cx="12" cy="12" r="4" stroke="#A855F7" strokeWidth={2} />
@@ -311,10 +336,10 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
               </View>
             </View>
             <Text style={styles.fieldHint}>Kullanıcı adı sıralama ve düellolarda değişmez kimliğindir.</Text>
-          </View>
+          </Animated.View>
 
           {/* Ülke Seçimi */}
-          <View style={styles.fieldGroup}>
+          <Animated.View entering={FadeInDown.delay(190).springify().damping(16)} style={styles.fieldGroup}>
             <View style={styles.fieldLabelRow}>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                 <Circle cx="12" cy="12" r="10" stroke="#38BDF8" strokeWidth={2} />
@@ -340,10 +365,10 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
               </View>
               <Text style={styles.selectChevron}>›</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
 
           {/* Telefon Numarası */}
-          <View style={styles.fieldGroup}>
+          <Animated.View entering={FadeInDown.delay(235).springify().damping(16)} style={styles.fieldGroup}>
             <View style={styles.fieldLabelRow}>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                 <Path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" stroke="#5ADBB5" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -372,10 +397,10 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
             {!phoneValid && phone.length > 0 && (
               <Text style={styles.fieldError}>Geçerli bir telefon numarası girin</Text>
             )}
-          </View>
+          </Animated.View>
 
           {/* Doğum Tarihi */}
-          <View style={styles.fieldGroup}>
+          <Animated.View entering={FadeInDown.delay(280).springify().damping(16)} style={styles.fieldGroup}>
             <View style={styles.fieldLabelRow}>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                 <Rect x="3" y="4" width="18" height="18" rx="2" stroke="#FFC43D" strokeWidth={2} />
@@ -405,10 +430,10 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
             {!birthValid && birthDate.length > 0 && (
               <Text style={styles.fieldError}>GG.AA.YYYY biçiminde girin</Text>
             )}
-          </View>
+          </Animated.View>
 
           {/* Cinsiyet */}
-          <View style={styles.fieldGroup}>
+          <Animated.View entering={FadeInDown.delay(325).springify().damping(16)} style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Cinsiyet</Text>
             <View style={styles.genderRow}>
               {GENDERS.map((g) => {
@@ -431,10 +456,10 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
                 );
               })}
             </View>
-          </View>
+          </Animated.View>
 
           {/* Hakkımda (Bio) */}
-          <View style={styles.fieldGroup}>
+          <Animated.View entering={FadeInDown.delay(370).springify().damping(16)} style={styles.fieldGroup}>
             <View style={styles.fieldLabelRow}>
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
                 <Path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="#C084FC" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -462,7 +487,7 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
                 onBlur={() => setFocusedField(null)}
               />
             </View>
-          </View>
+          </Animated.View>
         </Animated.View>
 
         {/* 3D Kaydet Butonu */}
@@ -535,7 +560,7 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 10,
     paddingTop: 8,
     paddingBottom: 60,
   },
@@ -583,10 +608,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderRadius: 20,
-    padding: 14,
-    marginBottom: 14,
-    gap: 14,
+    borderRadius: 18,
+    padding: 12,
+    marginBottom: 12,
+    gap: 12,
   },
   heroAvatarWrap: {
     position: 'relative',
@@ -657,6 +682,40 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.extraBold,
   },
 
+  // Profil Tamamlanma Çubuğu
+  completionWrap: {
+    marginTop: 8,
+    gap: 3,
+  },
+  completionBarTrack: {
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  completionBarFill: {
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: '#FFC43D',
+    overflow: 'hidden',
+  },
+  completionBarShine: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: 26,
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+    transform: [{ skewX: '-18deg' }],
+  },
+  completionLabel: {
+    color: 'rgba(217, 205, 245, 0.75)',
+    fontSize: 9.5,
+    fontFamily: THEME.fonts.extraBold,
+  },
+
   // Bildirim Bandı
   noticeBanner: {
     paddingHorizontal: 12,
@@ -683,11 +742,11 @@ const styles = StyleSheet.create({
   // Form Kartı
   formCard: {
     backgroundColor: 'rgba(20, 8, 48, 0.88)',
-    borderRadius: 22,
+    borderRadius: 20,
     borderWidth: 1.5,
     borderColor: 'rgba(107, 60, 255, 0.45)',
-    padding: 16,
-    gap: 14,
+    padding: 14,
+    gap: 12,
   },
   fieldGroup: {
     gap: 6,
@@ -850,7 +909,7 @@ const styles = StyleSheet.create({
 
   // CTA Butonu
   ctaWrapper: {
-    marginTop: 18,
+    marginTop: 14,
   },
 
   // Modal
