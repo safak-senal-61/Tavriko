@@ -31,6 +31,7 @@ const metrics_1 = require("./utils/metrics");
 const errorMonitor_1 = require("./utils/errorMonitor");
 const triviaRoutes_1 = __importDefault(require("./routes/triviaRoutes"));
 const socialRoutes_1 = __importDefault(require("./routes/socialRoutes"));
+const referralRoutes_1 = __importDefault(require("./routes/referralRoutes"));
 function getLocalIpAddress() {
     const interfaces = os_1.default.networkInterfaces();
     for (const name of Object.keys(interfaces)) {
@@ -2692,6 +2693,7 @@ function createApp() {
     });
     app.use('/api', triviaRoutes_1.default);
     app.use('/api/social', socialRoutes_1.default);
+    app.use('/api/referrals', referralRoutes_1.default);
     // --- Cloudflare Durable Objects Internal Endpoints ---
     app.post('/api/internal/room-questions', (req, res) => {
         const internalSecret = process.env.INTERNAL_API_SECRET || 'tavriko_internal_secret_2026';
