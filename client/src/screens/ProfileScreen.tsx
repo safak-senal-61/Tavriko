@@ -33,13 +33,14 @@ import {
   StreakFlameIcon,
   BadgeShieldIcon,
   CrownIcon,
-  ChestIcon,
   XpStarIcon,
   ModeSquircleIcon,
   AVATAR_PRESETS,
   AvatarPreset,
 } from '../components/TavrikoIcons';
 import { UI_IMG, FloatingImage, ShimmerView, CATEGORY_IMG } from '../components/StoreKit';
+import { DISCOVERY_IMG, DiscoveryArtwork, AchievementState } from '../components/DiscoveryArtwork';
+import { Settings, UserRound } from 'lucide-react-native';
 
 let ImagePickerModule: any = null;
 try {
@@ -541,17 +542,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const bestCategory = masteryList[0]?.correctCount > 0 ? masteryList[0] : null;
 
   const achievements = [
-    { name: 'İlk Zafer', desc: '1 maç kazan', done: wins >= 1, Icon: TrophyIcon },
+    { name: 'İlk Zafer', desc: '1 maç kazan', done: wins >= 1, image: DISCOVERY_IMG.victory },
     {
       name: 'Hız Ustası',
       desc: 'Ort. cevap < 5 sn',
       done: !!user.stats?.avgResponseTimeMs && user.stats.avgResponseTimeMs < 5000,
-      Icon: SpeedBoltIcon,
+      image: DISCOVERY_IMG.speed,
     },
-    { name: 'Seri Kralı', desc: '3+ doğru seri', done: (user.stats?.bestStreak || 0) >= 3, Icon: StreakFlameIcon },
-    { name: '100 Doğru', desc: '100 doğru cevap', done: correctAnswers >= 100, Icon: BadgeShieldIcon },
-    { name: 'Uzman', desc: 'Seviye 5', done: prog.level >= 5, Icon: CrownIcon },
-    { name: 'Koleksiyoncu', desc: '5+ eşya', done: (user.inventory?.length || 0) >= 5, Icon: ChestIcon },
+    { name: 'Seri Kralı', desc: '3+ doğru seri', done: (user.stats?.bestStreak || 0) >= 3, image: DISCOVERY_IMG.streak },
+    { name: '100 Doğru', desc: '100 doğru cevap', done: correctAnswers >= 100, image: DISCOVERY_IMG.accuracy },
+    { name: 'Uzman', desc: 'Seviye 5', done: prog.level >= 5, image: DISCOVERY_IMG.expert },
+    { name: 'Koleksiyoncu', desc: '5+ eşya', done: (user.inventory?.length || 0) >= 5, image: DISCOVERY_IMG.collector },
   ];
   const doneAchievements = achievements.filter((a) => a.done).length;
 
@@ -623,7 +624,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             style={[styles.tabBtn, isActive && styles.tabBtnActive]}
             onPress={() => switchProfileTab(tKey)}
             activeOpacity={0.8}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isActive }}
           >
+            {tKey === 'settings' ? <Settings size={22} color={isActive ? '#281543' : '#D9CDF5'} />
+              : tKey === 'account' ? <UserRound size={22} color={isActive ? '#281543' : '#D9CDF5'} />
+              : <Image source={tKey === 'overview' ? DISCOVERY_IMG.victory : tKey === 'mastery' ? DISCOVERY_IMG.accuracy : DISCOVERY_IMG.expert}
+                  style={styles.profileTabImage} resizeMode="contain" />}
             <Text
               style={[styles.tabText, isActive && styles.tabTextActive]}
               numberOfLines={1}
@@ -914,6 +921,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             {/* Primary 2x2 Key Performance Cards */}
             <View style={styles.primaryStatsGrid}>
               <View style={styles.primaryStatBox}>
+                <Image source={DISCOVERY_IMG.victory} style={styles.statArtwork} resizeMode="contain" />
                 <View
                   style={[
                     styles.statIconChip,
@@ -929,6 +937,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </Text>
               </View>
               <View style={styles.primaryStatBox}>
+                <Image source={DISCOVERY_IMG.expert} style={styles.statArtwork} resizeMode="contain" />
                 <View
                   style={[
                     styles.statIconChip,
@@ -942,6 +951,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.primaryStatSub}>{wins} Galibiyet</Text>
               </View>
               <View style={styles.primaryStatBox}>
+                <Image source={DISCOVERY_IMG.speed} style={styles.statArtwork} resizeMode="contain" />
                 <View
                   style={[
                     styles.statIconChip,
@@ -958,6 +968,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.primaryStatSub}>Toplam {totalAnswers} soru</Text>
               </View>
               <View style={styles.primaryStatBox}>
+                <Image source={DISCOVERY_IMG.accuracy} style={styles.statArtwork} resizeMode="contain" />
                 <View
                   style={[
                     styles.statIconChip,
@@ -1020,12 +1031,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </Text>
             </View>
             <View style={styles.badgeGrid}>
-              {achievements.map(({ name, desc, done, Icon }) => (
-                <View key={name} style={[styles.badgeCard, !done && { opacity: 0.42 }]}>
-                  <Icon size={28} />
-                  <Text style={styles.badgeName} numberOfLines={1}>{name}</Text>
-                  <Text style={styles.badgeDesc} numberOfLines={1}>{done ? 'Tamamlandı' : desc}</Text>
-                </View>
+              {achievements.map(({ name, desc, done, image }, index) => (
+                <Animated.View key={name} entering={FadeInDown.delay(index * 45).duration(280)}
+                  style={[styles.badgeCard, done && styles.badgeCardDone]}>
+                  <View style={!done && { opacity: 0.5 }}>
+                    <DiscoveryArtwork source={image} size={64} animated={done} />
+                  </View>
+                  <Text style={styles.badgeName}>{name}</Text>
+                  <Text style={styles.badgeDesc}>{desc}</Text>
+                  <AchievementState done={done} />
+                </Animated.View>
               ))}
             </View>
           </>
@@ -1709,12 +1724,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
   },
   tabBtnActive: {
     backgroundColor: '#F59E0B',
   },
   tabText: {
-    color: '#94A3B8',
+    color: '#D9CDF5',
     fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
@@ -1736,11 +1752,13 @@ const styles = StyleSheet.create({
     width: '48.5%',
     paddingVertical: 13,
     paddingHorizontal: 14,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#25183E',
     borderRadius: 18,
     borderWidth: 1.2,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
+  statArtwork: { position: 'absolute', right: 8, top: 4, width: 48, height: 48, opacity: 0.9 },
+  profileTabImage: { width: 26, height: 26 },
   statIconChip: {
     width: 26,
     height: 26,
@@ -1751,8 +1769,8 @@ const styles = StyleSheet.create({
     marginBottom: 7,
   },
   primaryStatLabel: {
-    color: '#A992E2',
-    fontSize: 10,
+    color: '#D9CDF5',
+    fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
     letterSpacing: 0.6,
   },
@@ -1768,7 +1786,7 @@ const styles = StyleSheet.create({
   },
   primaryStatSub: {
     color: '#D9CDF5',
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: THEME.fonts.bold,
     marginTop: 2,
   },
@@ -1888,9 +1906,10 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: THEME.fonts.display, fontSize: 18, color: '#FFFFFF' },
 
   badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
-  badgeCard: { ...card, width: '31.5%', height: 104, alignItems: 'center', justifyContent: 'center', gap: 3 },
-  badgeName: { color: '#FFFFFF', fontSize: 11, fontFamily: THEME.fonts.extraBold, textAlign: 'center' },
-  badgeDesc: { color: '#D9CDF5', fontSize: 9, fontFamily: THEME.fonts.body, textAlign: 'center' },
+  badgeCard: { ...card, width: '31.5%', minHeight: 172, padding: 8, backgroundColor: '#211637', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  badgeCardDone: { backgroundColor: '#30213E', borderColor: 'rgba(255,196,61,0.5)' },
+  badgeName: { color: '#FFFFFF', fontSize: 12, fontFamily: THEME.fonts.extraBold, textAlign: 'center' },
+  badgeDesc: { color: '#D9CDF5', fontSize: 12, lineHeight: 16, fontFamily: THEME.fonts.body, textAlign: 'center', minHeight: 32 },
 
   // Ustalık sekmesi (yeni kart tasarımı)
   masteryTabWrap: { gap: 4 },
