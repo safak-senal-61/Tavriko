@@ -46,6 +46,7 @@ interface NotificationState {
   mergeSnapshot: (items: NotificationItem[]) => void;
   patch: (id: string, update: Partial<NotificationItem>) => void;
   markRead: (ids: string[]) => void;
+  markAllSeen: () => void;
   dismissToast: () => void;
   refresh: (base: string) => Promise<void>;
 }
@@ -96,6 +97,11 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     set({ readIds, toast: state.toast && readIds.includes(state.toast.id) ? null : state.toast });
   },
   dismissToast: () => set({ toast: null }),
+  markAllSeen: () => {
+    const state = get();
+    const ids = state.items.filter(item => isUnread(item, state.readIds)).map(item => item.id);
+    if (ids.length) get().markRead(ids);
+  },
   refresh: async base => {
     const owner = get().userId;
     if (!owner) return;

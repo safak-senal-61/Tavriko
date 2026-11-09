@@ -1,5 +1,18 @@
 # Visual refresh acceptance and regression checks
 
+## Seen notifications, plain profile title and private rooms
+- Updated behavior: opening the inbox marks all currently loaded notifications seen immediately. New HTTP or WebSocket arrivals are also marked seen while the inbox is open. Invitation acceptance/decline remains a separate explicit action.
+- Outside the inbox, a new notification increases the shared badge as before. Check 5 → inbox → 0, new arrivals while open, dismissal of the banner, and persistence after reload.
+- Profile identity and home identity must use a known selected unlocked title with plain text only. Remove the decorative image beside the profile name and the icon beside the title; keep collection artwork and unrelated XP/stat icons.
+- Private room create/join screens reuse original Tavriko artwork, animated hero illustration, purple cards, live setup summary and responsive six-character code boxes. Preserve all category, difficulty, privacy, password, player-count and room callbacks.
+- Verify create parameters, password-required error, join validation and normalized code, public room refresh/selection, category modal, tab cycles, 320px/375px/desktop and reduced-motion layout. Use isolated fixtures only.
+- Current automated checks: 5 suites, 27 tests pass. Web export succeeds; the same 11 pre-existing TypeScript diagnostics remain.
+- Browser fixtures verified 5 unread → open inbox → 0, a new WebSocket invitation while open remaining seen with its accept action intact, and zero badge after returning/reloading.
+- Verified a lower selected unlocked title instead of the level-derived default, switching to another unlocked title, shared home/profile text, zero image beside the profile name and zero icon inside its title pill.
+- Verified empty join validation, protected public-room password validation/cancel, normalized join code `AB12CD` reaching the local socket, category selection, room-password validation, and created-room parameters (6 players, 14 questions, 40 seconds, hard difficulty).
+- Captured create/join/profile screenshots from the exported app. Both room tabs fit at 320px, and desktop/reduced-motion rendering remained visible without horizontal overflow or uncaught page errors. All traffic used synthetic account/API/WebSocket fixtures; no production account mutations or real multiplayer test.
+- Current deployment is included in the user's instruction to publish Tavriko updates directly without repeating approval for this scope.
+
 ## Settings, notification and versus follow-up
 - Baseline: inspected the real exported settings screen with a synthetic local profile. All audio, game, privacy, sync, password and delete controls exist and must remain accessible.
 - Settings: modern illustrated header, compact account summary, sound/game/privacy/account tabs, animated accessible switches. Exercise off/on, volume/difficulty segments, save feedback, sync, password validation/cancel and delete dialog cancel only. Do not mutate production accounts.

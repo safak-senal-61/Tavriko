@@ -47,6 +47,19 @@ describe('Shared notification inbox and exact unread count', () => {
     expect(unreadCount(inbox().items, inbox().readIds)).toBe(1);
   });
 
+  it('clears all five seen notifications without accepting invitations, then counts a new socket arrival', () => {
+    for (let i = 0; i < 5; i++) inbox().receive(makeNotification(`seen-${i}`, { type: 'friend_request' }));
+    expect(unreadCount(inbox().items, inbox().readIds)).toBe(5);
+    inbox().markAllSeen();
+    expect(unreadCount(inbox().items, inbox().readIds)).toBe(0);
+    expect(inbox().items.every(item => !item.handled)).toBe(true);
+    expect(inbox().toast).toBeNull();
+    inbox().receive(makeNotification('after-seen'));
+    expect(unreadCount(inbox().items, inbox().readIds)).toBe(1);
+    inbox().markAllSeen();
+    expect(unreadCount(inbox().items, inbox().readIds)).toBe(0);
+  });
+
   it('persists read receipts across reloads on the same account', () => {
     inbox().receive(makeNotification('one'));
     inbox().markRead(['one']);

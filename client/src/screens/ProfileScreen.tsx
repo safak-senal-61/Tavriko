@@ -21,6 +21,7 @@ import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
 import { compressAvatarImageAsync, uploadAvatarToR2Async } from '../utils/avatarImage';
 import { DEFAULT_API_BASE } from '../config';
+import { resolveProfileTitle } from '../utils/profileTitle';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -256,7 +257,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [allowDuelChallenges, setAllowDuelChallenges] = useState((settings.duelInvitesAllowed ?? settings.allowDuelChallenges) !== false);
 
   const prog = calculateLevelFromXp(user.xp ?? 0);
-  const equippedTitle = settings.equippedTitle || prog.rankTitle;
+  const equippedTitle = resolveProfileTitle(settings.equippedTitle, prog.level, prog.rankTitle);
 
   // Live WebSocket connection polling & heartbeat
   useEffect(() => {
@@ -576,7 +577,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   };
 
   const handleEquipTitle = async (title: string) => {
-    if (title === equippedTitle || savingTitle) return;
+    if (title === equippedTitle || savingTitle || resolveProfileTitle(title, prog.level) !== title) return;
     sound.playSound('tap');
     setSavingTitle(title);
     setTitleNotice(null);
@@ -687,7 +688,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.displayName} numberOfLines={1}>
                   {user.fullName || user.displayName}
                 </Text>
-                <FloatingImage source={UI_IMG.levelBadge} size={30} amplitude={2.5} />
               </View>
 
               <Text style={styles.levelSub} numberOfLines={1}>
@@ -696,7 +696,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
               <View style={styles.heroBadgesRow}>
                 <View style={styles.titlePill}>
-                  <XpStarIcon size={12} />
                   <Text style={styles.titlePillText} numberOfLines={1}>
                     {equippedTitle}
                   </Text>
