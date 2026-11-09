@@ -48,6 +48,12 @@ import {
   KIT,
   FramedAvatar,
   BackgroundThumb,
+  AnimatedFrame,
+  AnimatedBackgroundThumb,
+  AnimatedNameText,
+  ANIMATED_FRAME_COLORS,
+  ANIMATED_BG_LAYERS,
+  ANIMATED_NAME_COLORS,
   CosmeticPreviewModal,
   frameFor,
   backgroundFor,
@@ -101,6 +107,14 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
   name,
 }) => {
   const pId = product.id;
+  // Animasyonlu çerçeveler: renkli geçişli pulse halkaları
+  if (ANIMATED_FRAME_COLORS[pId]) {
+    return (
+      <View style={styles.visualTall}>
+        <AnimatedFrame frameId={pId} seed={seed} size={100} />
+      </View>
+    );
+  }
   if ((product.category === 'frames' || pId.includes('frame')) && frameFor(pId)) {
     return (
       <View style={styles.visualTall}>
@@ -108,10 +122,30 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
       </View>
     );
   }
+  // Animasyonlu arka planlar: nefes alan renk katmanları
+  if (ANIMATED_BG_LAYERS[pId]) {
+    return (
+      <View style={styles.visualTall}>
+        <AnimatedBackgroundThumb bgId={pId} seed={seed} name={name} width={64} />
+      </View>
+    );
+  }
   if ((product.category === 'backgrounds' || pId.startsWith('bg_')) && backgroundFor(pId)) {
     return (
       <View style={styles.visualTall}>
         <BackgroundThumb bgId={pId} seed={seed} name={name} width={64} />
+      </View>
+    );
+  }
+  // Animasyonlu isim efektleri: renk döngüsü
+  if (ANIMATED_NAME_COLORS[pId]) {
+    return (
+      <View style={styles.visualTall}>
+        <View style={styles.namePlate}>
+          <AnimatedNameText effectId={pId} style={styles.namePlateText} numberOfLines={1}>
+            {name || 'Tavriko'}
+          </AnimatedNameText>
+        </View>
       </View>
     );
   }

@@ -166,6 +166,206 @@ export const backgroundFor = (id: string): ImageSourcePropType | null => {
   return null;
 };
 
+/* ============================================================
+   ANİMASYONLU KOZMETİKLER (Reanimated ile renkli geçişler)
+   Süreli (30 gün) kozmetikler için canlı, nefes alan görseller
+   ============================================================ */
+
+/** Animasyonlu çerçevelerin renk paletleri (3 renkli geçiş döngüsü) */
+export const ANIMATED_FRAME_COLORS: Record<string, string[]> = {
+  frame_ice: ['#A5F3FC', '#38BDF8', '#0EA5E9'],
+  frame_emerald: ['#6EE7B7', '#34D399', '#059669'],
+  frame_violet: ['#C4B5FD', '#A78BFA', '#7C3AED'],
+  frame_flame: ['#FFD08A', '#FF6B35', '#E11D48'],
+};
+
+/** Animasyonlu arka planların renk katmanları */
+export const ANIMATED_BG_LAYERS: Record<string, string[]> = {
+  bg_sunset: ['#7C2D12', '#C2410C', '#F59E0B'],
+  bg_forest: ['#14532D', '#166534', '#4D7C0F'],
+  bg_night_city: ['#0F172A', '#1E293B', '#334155'],
+};
+
+/** Animasyonlu isim efekti renk döngüleri */
+export const ANIMATED_NAME_COLORS: Record<string, string[]> = {
+  name_gradient_ice: ['#A5F3FC', '#38BDF8', '#E0F2FE', '#38BDF8'],
+  name_gradient_rainbow: ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF'],
+  name_gradient_fire: ['#FFE27A', '#FF9B2F', '#E11D48', '#FF9B2F'],
+};
+
+/** Tek bir nefes alan halka katmanı: renk geçişli pulse animasyonu */
+const PulseRing: React.FC<{ color: string; period: number; size: number; ringWidth: number }> = ({
+  color,
+  period,
+  size,
+  ringWidth,
+}) => {
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    progress.value = withRepeat(withTiming(1, { duration: period, easing: Easing.inOut(Easing.quad) }), -1, true);
+  }, [period]);
+  const style = useAnimatedStyle(() => {
+    const p = progress.value;
+    return {
+      position: 'absolute',
+      width: size,
+      height: size,
+      borderRadius: size / 2,
+      borderWidth: ringWidth,
+      borderColor: color,
+      opacity: 0.15 + 0.75 * Math.sin(p * Math.PI),
+      transform: [{ scale: 0.92 + 0.1 * Math.sin(p * Math.PI) }],
+    };
+  });
+  return <Animated.View style={style} pointerEvents="none" />;
+};
+
+/** Animasyonlu çerçeve: avatarı saran 3 katmanlı renk geçişli pulse halkaları */
+export const AnimatedFrame: React.FC<{
+  frameId: string;
+  seed?: string;
+  size: number;
+  glow?: boolean;
+}> = ({ frameId, seed, size, glow = true }) => {
+  const colors = ANIMATED_FRAME_COLORS[(frameId || '').toLowerCase()] || ANIMATED_FRAME_COLORS.frame_ice;
+  const inner = Math.round(size * 0.62);
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <PulseRing color={colors[0]} period={1500} size={size} ringWidth={Math.max(2, size * 0.035)} />
+      <PulseRing color={colors[1]} period={2100} size={Math.round(size * 0.94)} ringWidth={Math.max(2, size * 0.045)} />
+      <PulseRing color={colors[2]} period={2600} size={Math.round(size * 0.86)} ringWidth={Math.max(2, size * 0.05)} />
+      {glow && (
+        <View
+          style={{
+            position: 'absolute',
+            width: size * 0.75,
+            height: size * 0.75,
+            borderRadius: (size * 0.75) / 2,
+            backgroundColor: colors[1],
+            opacity: 0.18,
+          }}
+        />
+      )}
+      <View
+        style={{
+          width: inner,
+          height: inner,
+          borderRadius: inner / 2,
+          overflow: 'hidden',
+          borderWidth: 1.5,
+          borderColor: colors[0],
+          backgroundColor: '#170733',
+        }}
+      >
+        <CharacterAvatar seed={seed} size={inner} />
+      </View>
+    </View>
+  );
+};
+
+/** Animasyonlu arka plan önizlemesi: renk katmanları yumuşak geçişle nefes alır */
+export const AnimatedBackgroundThumb: React.FC<{
+  bgId: string;
+  seed?: string;
+  name?: string;
+  width: number;
+}> = ({ bgId, seed, name, width }) => {
+  const layers = ANIMATED_BG_LAYERS[(bgId || '').toLowerCase()] || ANIMATED_BG_LAYERS.bg_sunset;
+  const h = Math.round(width * 1.62);
+  const av = Math.round(width * 0.34);
+  return (
+    <View style={[kit.phone, { width, height: h, borderRadius: width * 0.16, overflow: 'hidden' }]}>
+      {layers.map((c, i) => (
+        <PulseBgLayer key={i} color={c} period={3200 + i * 1400} />
+      ))}
+      <View style={kit.phoneNotch as ViewStyle} />
+      <View style={{ alignItems: 'center', marginTop: h * 0.14 }}>
+        <View
+          style={{
+            width: av,
+            height: av,
+            borderRadius: av / 2,
+            overflow: 'hidden',
+            borderWidth: 1.5,
+            borderColor: 'rgba(255,255,255,0.7)',
+          }}
+        >
+          <CharacterAvatar seed={seed} size={av} />
+        </View>
+        <Text style={[kit.phoneName, { fontSize: Math.max(8, width * 0.09) }]} numberOfLines={1}>
+          {name || 'Oyuncu'}
+        </Text>
+      </View>
+      <View style={[kit.phoneCard, { top: h * 0.56, height: h * 0.13 } as ViewStyle]} />
+      <View style={[kit.phoneCard, { top: h * 0.72, height: h * 0.13 } as ViewStyle]} />
+    </View>
+  );
+};
+
+/** Arka plan katmanı: opaklık nefes alarak renkler arası yumuşak geçiş sağlar */
+const PulseBgLayer: React.FC<{ color: string; period: number }> = ({ color, period }) => {
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    progress.value = withRepeat(withTiming(1, { duration: period, easing: Easing.inOut(Easing.sin) }), -1, true);
+  }, [period]);
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: color,
+    opacity: 0.25 + 0.5 * Math.sin(progress.value * Math.PI),
+  }));
+  return <Animated.View style={style} pointerEvents="none" />;
+};
+
+/** Animasyonlu isim efekti: renk döngüsü içinde süzülen yazı */
+export const AnimatedNameText: React.FC<{
+  effectId: string;
+  children?: string;
+  style?: any;
+  numberOfLines?: number;
+}> = ({ effectId, children, style, numberOfLines }) => {
+  const colors = ANIMATED_NAME_COLORS[(effectId || '').toLowerCase()] || ANIMATED_NAME_COLORS.name_gradient_ice;
+  const progress = useSharedValue(0);
+  useEffect(() => {
+    progress.value = withRepeat(withTiming(1, { duration: 3600, easing: Easing.linear }), -1, false);
+  }, []);
+  const animStyle = useAnimatedStyle(() => {
+    const t = progress.value;
+    const idx = Math.min(colors.length - 1, Math.floor(t * colors.length));
+    const nextIdx = (idx + 1) % colors.length;
+    const local = t * colors.length - idx;
+    // Basit lineer renk karışımı (hex)
+    return {
+      color: mixHex(colors[idx], colors[nextIdx], local),
+      textShadowColor: mixHex(colors[idx], colors[nextIdx], local),
+      textShadowRadius: 8,
+      textShadowOffset: { width: 0, height: 0 },
+    };
+  });
+  return (
+    <Animated.Text style={[style, animStyle]} numberOfLines={numberOfLines}>
+      {children}
+    </Animated.Text>
+  );
+};
+
+/** İki hex rengi karıştırır (Reanimated worklet güvenli) */
+const mixHex = (a: string, b: string, t: number): string => {
+  'worklet';
+  const pa = parseInt(a.replace('#', ''), 16);
+  const pb = parseInt(b.replace('#', ''), 16);
+  const ar = (pa >> 16) & 255, ag = (pa >> 8) & 255, ab = pa & 255;
+  const br = (pb >> 16) & 255, bg = (pb >> 8) & 255, bb = pb & 255;
+  const r = Math.round(ar + (br - ar) * t);
+  const g = Math.round(ag + (bg - ag) * t);
+  const bl = Math.round(ab + (bb - ab) * t);
+  const hex = (v: number) => v.toString(16).padStart(2, '0');
+  return `#${hex(r)}${hex(g)}${hex(bl)}`;
+};
+
 /* Avatar + çerçeve: kullanıcının fotoğrafı/avatarı çerçevenin içinde görünür */
 export const FramedAvatar: React.FC<{ frameId: string; seed?: string; size: number }> = ({
   frameId,

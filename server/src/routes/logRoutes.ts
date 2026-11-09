@@ -261,13 +261,342 @@ export function renderDashboardHtml(): string {
     }
     main {
       flex: 1;
-      padding: 24px;
+      padding: 16px;
       max-width: 1400px;
       margin: 0 auto;
       width: 100%;
     }
+
+    /* ===== MOBILE RESPONSIVE OVERRIDES ===== */
+    @media (max-width: 768px) {
+      header {
+        padding: 10px 12px;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .brand-title {
+        font-size: 16px;
+      }
+      .nav-tabs {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        white-space: nowrap;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+      }
+      .nav-tabs::-webkit-scrollbar { display: none; }
+      .nav-btn {
+        font-size: 12px;
+        padding: 7px 12px;
+        flex-shrink: 0;
+      }
+      main {
+        padding: 10px;
+      }
+      .kpi-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+      .kpi-val {
+        font-size: 20px;
+      }
+      .kpi-card {
+        padding: 12px 14px;
+      }
+      .logs-wrapper {
+        height: calc(100vh - 380px);
+        min-height: 320px;
+      }
+      .search-input {
+        width: 100%;
+      }
+      .logs-toolbar {
+        padding: 10px 12px;
+      }
+      .qr-box {
+        width: 220px;
+        height: 220px;
+      }
+      .qr-card {
+        padding: 16px;
+      }
+      .guide-card {
+        padding: 16px;
+      }
+      .api-endpoint-card {
+        padding: 14px;
+      }
+      .api-code-editor {
+        font-size: 11px;
+        min-height: 90px;
+      }
+      .response-view {
+        font-size: 11px;
+      }
+      .log-item {
+        padding: 8px 10px;
+      }
+      .log-text {
+        font-size: 12px;
+      }
+      .tag {
+        font-size: 10px;
+        padding: 2px 6px;
+      }
+      table {
+        font-size: 11px;
+      }
+      th, td {
+        padding: 8px 10px !important;
+      }
+      .expo-container {
+        grid-template-columns: 1fr;
+      }
+      .expo-container > div:first-child { display: flex; flex-direction: column; align-items: center; }
+      .expo-container > div:first-child .qr-card { width: 100%; }
+    }
+    @media (max-width: 480px) {
+      header { padding: 8px 8px; }
+      main { padding: 8px; }
+      .kpi-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .kpi-card { padding: 10px 12px; border-radius: 12px; }
+      .kpi-title { font-size: 10px; }
+      .kpi-val { font-size: 18px; }
+      .logs-wrapper { height: calc(100vh - 420px); min-height: 260px; }
+      .nav-btn { font-size: 11px; padding: 6px 10px; }
+      .search-input { font-size: 12px; }
+      .pill { font-size: 10px; padding: 3px 8px; }
+      .btn { font-size: 12px; padding: 7px 12px; }
+      .qr-box { width: 180px; height: 180px; }
+      .brand-title { font-size: 14px; }
+    }
+    /* ===== END MOBILE RESPONSIVE ===== */
     .tab-content { display: none; }
     .tab-content.active { display: block; }
+
+    /* Game simulator grid: mobile 1 kolon */
+    .game-sim-grid {
+      display: grid;
+      grid-template-columns: 400px 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .game-sim-grid { grid-template-columns: 1fr; }
+      .game-sim-grid > div:first-child { display: flex; flex-direction: column; align-items: center; }
+    }
+    @media (max-width: 480px) {
+      .game-sim-grid > div:first-child > div:first-child {
+        width: 100% !important;
+        max-width: 320px;
+        height: 560px !important;
+      }
+    }
+
+    /* ===== COSMETICS / MODERATION STYLES ===== */
+    .cos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px;
+    }
+    @media (max-width: 600px) {
+      .cos-grid { grid-template-columns: 1fr; }
+    }
+    .cos-card {
+      background: var(--card);
+      border: 1.5px solid var(--card-border);
+      border-radius: 16px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .cos-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 196, 61, 0.5);
+    }
+    .cos-icon-wrap {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      position: relative;
+    }
+    .cos-icon-wrap.animated {
+      animation: cosPulse 2.5s ease-in-out infinite;
+    }
+    .cos-icon-wrap.animated-gradient {
+      background: linear-gradient(135deg, #FFC43D, #FF6B9D, #7A3FE0, #FFC43D);
+      background-size: 400% 400%;
+      animation: cosGradientShift 4s ease-in-out infinite;
+    }
+    .cos-icon-wrap.flame {
+      background: radial-gradient(circle, #FF6B35 30%, #F7931E 70%);
+      animation: cosFlame 1.5s ease-in-out infinite;
+      box-shadow: 0 0 18px rgba(255, 107, 53, 0.6);
+    }
+    .cos-icon-wrap.ice {
+      background: radial-gradient(circle, #A5F3FC 30%, #38BDF8 70%);
+      animation: cosShimmer 2s ease-in-out infinite;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.5);
+    }
+    .cos-icon-wrap.neon {
+      background: linear-gradient(135deg, #38BDF8, #F472B6);
+      animation: cosNeon 2s ease-in-out infinite;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.7);
+    }
+    .cos-icon-wrap.rainbow {
+      background: linear-gradient(135deg, #FF6B6B, #FFD93D, #6BCB77, #4D96FF, #FF6B6B);
+      background-size: 400% 400%;
+      animation: cosGradientShift 3s ease-in-out infinite;
+    }
+    .cos-icon-wrap.emerald {
+      background: radial-gradient(circle, #34D399 30%, #10B981 70%);
+      animation: cosPulse 2.2s ease-in-out infinite;
+    }
+    .cos-icon-wrap.violet {
+      background: radial-gradient(circle, #A78BFA 30%, #8B5CF6 70%);
+      animation: cosShimmer 2.4s ease-in-out infinite;
+    }
+    .cos-icon-wrap.gold-frame {
+      background: radial-gradient(circle, #FFC43D 30%, #F59E0B 70%);
+      animation: cosPulse 1.8s ease-in-out infinite;
+    }
+    @keyframes cosPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+    @keyframes cosGradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    @keyframes cosFlame {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      25% { transform: scale(1.05) rotate(-2deg); }
+      75% { transform: scale(1.05) rotate(2deg); }
+    }
+    @keyframes cosShimmer {
+      0%, 100% { filter: brightness(1); transform: scale(1); }
+      50% { filter: brightness(1.15); transform: scale(1.04); }
+    }
+    @keyframes cosNeon {
+      0%, 100% { filter: hue-rotate(0deg); }
+      50% { filter: hue-rotate(25deg); }
+    }
+    .cos-name {
+      font-size: 14px;
+      font-weight: 800;
+      color: #FFFFFF;
+      text-align: center;
+    }
+    .cos-desc {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.5;
+      flex: 1;
+    }
+    .cos-meta {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .cos-price {
+      font-size: 13px;
+      font-weight: 900;
+      color: var(--gold);
+    }
+    .cos-duration {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(90, 219, 181, 0.15);
+      border: 1px solid rgba(90, 219, 181, 0.4);
+      color: #5ADBB5;
+    }
+    .cos-rarity {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+    .cos-rarity.common { background: rgba(156, 163, 175, 0.2); color: #9CA3AF; }
+    .cos-rarity.rare { background: rgba(59, 130, 246, 0.2); color: #60A5FA; }
+    .cos-rarity.epic { background: rgba(168, 85, 247, 0.2); color: #C084FC; }
+    .cos-rarity.legendary { background: rgba(255, 196, 61, 0.2); color: #FFC43D; }
+    .cos-rarity.mythic { background: rgba(239, 68, 68, 0.2); color: #FCA5A5; }
+
+    /* Moderation form */
+    .mod-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-width: 520px;
+      width: 100%;
+    }
+    .mod-label {
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .mod-input {
+      background: #0D081D;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 11px 14px;
+      color: #FFFFFF;
+      font-size: 14px;
+      outline: none;
+      width: 100%;
+      transition: border-color 0.2s;
+    }
+    .mod-input:focus { border-color: var(--gold); }
+    .mod-select {
+      background: #0D081D;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: #FFFFFF;
+      font-size: 13px;
+      width: 100%;
+      outline: none;
+    }
+    .mod-status {
+      font-size: 12px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-weight: 700;
+      display: none;
+    }
+    .mod-status.success { background: rgba(16,185,129,0.15); color: #34D399; display: block; border: 1px solid rgba(16,185,129,0.3); }
+    .mod-status.error { background: rgba(239,68,68,0.15); color: #FCA5A5; display: block; border: 1px solid rgba(239,68,68,0.3); }
+    .mod-blocked-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      flex-wrap: wrap;
+    }
+    .mod-blocked-name { font-size: 13px; font-weight: 700; color: #FFFFFF; flex: 1; min-width: 140px; }
+    .mod-blocked-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    /* ===== END COSMETICS / MODERATION ===== */
     .btn {
       background: #251B47;
       border: 1px solid var(--card-border);
@@ -616,9 +945,11 @@ export function renderDashboardHtml(): string {
       <div class="nav-tabs">
         <button class="nav-btn active" onclick="switchTab('tab-game')">🎮 Canlı Web Oyunu & Simülatör</button>
         <button class="nav-btn" onclick="switchTab('tab-expo')">📱 Mobil & Bulut QR Kod</button>
+        <button class="nav-btn" onclick="switchTab('tab-cos')">✨ Kozmetikler & Animasyonlar</button>
         <button class="nav-btn" onclick="switchTab('tab-api')">📖 API Dökümanı & Test</button>
         <button class="nav-btn" onclick="switchTab('tab-logs')">📜 Canlı Loglar & Hatalar</button>
         <button class="nav-btn" onclick="switchTab('tab-db')">👥 Kullanıcılar & Veritabanı</button>
+        <button class="nav-btn" onclick="switchTab('tab-mod')">🚫 Moderasyon & Engelleme</button>
       </div>
       <div style="display: flex; align-items: center; gap: 8px;">
         <a href="/app" target="_blank" class="btn btn-gold" style="text-decoration:none; padding: 7px 14px; font-size: 12px; font-weight:800;">
@@ -655,7 +986,7 @@ export function renderDashboardHtml(): string {
 
     <!-- TAB 1: LIVE GAME SIMULATOR -->
     <div id="tab-game" class="tab-content active">
-      <div style="display: grid; grid-template-columns: 400px 1fr; gap: 24px; align-items: start;">
+      <div class="game-sim-grid">
         
         <!-- Mobile Phone Device Frame -->
         <div style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
@@ -794,6 +1125,246 @@ export function renderDashboardHtml(): string {
               <h3 style="font-size:15px; color:var(--gold);">Gerçek Zamanlı Log Takibi</h3>
               <p style="font-size:13px; color:var(--text-muted);">Telefonunuzda yaptığınız her giriş, soru yanıtı ve profil işlemi bu panelin <b>"Canlı Loglar"</b> sekmesinde anlık olarak izlenebilir.</p>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: COSMETICS & ANIMATIONS -->
+    <div id="tab-cos" class="tab-content">
+      <div style="margin-bottom:20px;">
+        <h2 style="font-size:20px; color:#FFFFFF; margin-bottom:6px;">✨ Kozmetikler & Animasyonlar</h2>
+        <p style="font-size:13px; color:var(--text-muted);">Süreli (30 gün) profil kozmetikleri — animasyonlu, renk geçişli, çerçeveler, arka planlar ve isim efektleri</p>
+      </div>
+
+      <!-- AVATAR FRAMES -->
+      <div class="guide-card" style="margin-bottom:18px;">
+        <h3 style="font-size:16px; color:var(--gold); margin-bottom:12px;">🖼️ AVATAR ÇERÇEVELERİ</h3>
+        <div class="cos-grid">
+          <div class="cos-card">
+            <div class="cos-icon-wrap neon">🖼️</div>
+            <div class="cos-name">Siber Neon Çerçeve</div>
+            <div class="cos-desc">Neon mavi ve pembe siber ışık efekti. Pulse animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 60</span>
+              <span class="cos-rarity epic">Destansı</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+          <div class="cos-card">
+            <div class="cos-icon-wrap gold-frame">👑</div>
+            <div class="cos-name">Kraliyet Altın Çerçeve</div>
+            <div class="cos-desc">24 ayar parıldayan altın. Pulse animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 90</span>
+              <span class="cos-rarity legendary">Efsanevi</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+          <div class="cos-card">
+            <div class="cos-icon-wrap flame">🔥</div>
+            <div class="cos-name">Alev Çerçevesi</div>
+            <div class="cos-desc">Mitolojik alev animasyonu. Flame rotate animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 150</span>
+              <span class="cos-rarity mythic">Mitolojik</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+          <div class="cos-card">
+            <div class="cos-icon-wrap ice">❄️</div>
+            <div class="cos-name">Buz Kristal Çerçeve</div>
+            <div class="cos-desc">Kutup soğuğunda parlayan buz mavisi. Shimmer animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 55</span>
+              <span class="cos-rarity epic">Destansı</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+          <div class="cos-card">
+            <div class="cos-icon-wrap emerald">🌿</div>
+            <div class="cos-name">Zümrüt Orman Çerçevesi</div>
+            <div class="cos-desc">Tropik ormandan zümrüt yeşili. Pulse animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 40</span>
+              <span class="cos-rarity rare">Nadir</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+          <div class="cos-card">
+            <div class="cos-icon-wrap violet">🌀</div>
+            <div class="cos-name">Menekşe Astral Çerçeve</div>
+            <div class="cos-desc">Gece gökyüzü mor-menekşe astral ışık. Shimmer animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 60</span>
+              <span class="cos-rarity epic">Destansı</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BACKGROUNDS -->
+      <div class="guide-card" style="margin-bottom:18px;">
+        <h3 style="font-size:16px; color:var(--gold); margin-bottom:12px;">🌌 PROFİL ARKA PLANLARI</h3>
+        <div class="cos-grid">
+          <div class="cos-card">
+            <div class="cos-icon-wrap animated-gradient" style="background:linear-gradient(135deg,#2E1065,#7C3AED,#2E1065);background-size:400% 400%;animation:cosGradientShift 5s ease-in-out infinite;">🌌</div>
+            <div class="cos-name">Nebula Profil Arka Planı</div>
+            <div class="cos-desc">Derin uzay ve mor galaksi teması. Gradient shift animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 75</span>
+              <span class="cos-rarity legendary">Efsanevi</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+          <div class="cos-card">
+            <div class="cos-icon-wrap animated-gradient" style="background:linear-gradient(135deg,#1E0E45,#4C1D95,#1E0E45);background-size:400% 400%;animation:cosGradientShift 5s ease-in-out infinite;">👑</div>
+            <div class="cos-name">Kraliyet Moru Teması</div>
+            <div class="cos-desc">Altın yıldızlı kraliyet kadifesi. Gradient shift animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 110</span>
+              <span class="cos-rarity mythic">Mitolojik</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+          <div class="cos-card">
+            <div class="cos-icon-wrap animated-gradient" style="background:linear-gradient(135deg,#7C2D12,#C2410C,#7C2D12);background-size:400% 400%;animation:cosGradientShift 4s ease-in-out infinite;">🌅</div>
+            <div class="cos-name">Gün Batımı Teması</div>
+            <div class="cos-desc">Sıcak turuncu-mor gün batımı. Gradient shift animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 65</span>
+              <span class="cos-rarity epic">Destansı</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+          <div class="cos-card">
+            <div class="cos-icon-wrap animated-gradient" style="background:linear-gradient(135deg,#14532D,#166534,#14532D);background-size:400% 400%;animation:cosGradientShift 5s ease-in-out infinite;">🌳</div>
+            <div class="cos-name">Orman Sabahı Teması</div>
+            <div class="cos-desc">Yeşil ve amber orman sabahı. Gradient shift animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 50</span>
+              <span class="cos-rarity rare">Nadir</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+          <div class="cos-card">
+            <div class="cos-icon-wrap animated-gradient" style="background:linear-gradient(135deg,#0F172A,#1E293B,#0F172A);background-size:400% 400%;animation:cosGradientShift 5s ease-in-out infinite;">🌃</div>
+            <div class="cos-name">Gece Şehri Teması</div>
+            <div class="cos-desc">Neon panelli gece şehri. Gradient shift animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 70</span>
+              <span class="cos-rarity epic">Destansı</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NAME EFFECTS -->
+      <div class="guide-card">
+        <h3 style="font-size:16px; color:var(--gold); margin-bottom:12px;">✨ İSİM EFEKTLERİ</h3>
+        <div class="cos-grid">
+          <div class="cos-card">
+            <div class="cos-icon-wrap animated" style="background:radial-gradient(circle,#FFD700,#FFA500);box-shadow:0 0 18px rgba(255,215,0,0.6);">✨</div>
+            <div class="cos-name">Altın İsim Parıltısı</div>
+            <div class="cos-desc">İsminiz altın ışıkla parlar. Pulse animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 45</span>
+              <span class="cos-rarity epic">Destansı</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+          <div class="cos-card">
+            <div class="cos-icon-wrap flame" style="font-size:28px;">🔥</div>
+            <div class="cos-name">Ateş Gradyan İsmi</div>
+            <div class="cos-desc">Kızıl lav ve alev gradyanı. Flame animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 75</span>
+              <span class="cos-rarity legendary">Efsanevi</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+          <div class="cos-card">
+            <div class="cos-icon-wrap ice" style="font-size:28px;">❄️</div>
+            <div class="cos-name">Buz Gradyan İsmi</div>
+            <div class="cos-desc">Buz mavisi kristal gradyanı. Shimmer animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 50</span>
+              <span class="cos-rarity epic">Destansı</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+          <div class="cos-card">
+            <div class="cos-icon-wrap rainbow" style="font-size:28px;">🌈</div>
+            <div class="cos-name">Gökkuşağı Gradyan İsmi</div>
+            <div class="cos-desc">Yedi renk gökkuşağı gradyanı. Rainbow shift animasyonlu.</div>
+            <div class="cos-meta">
+              <span class="cos-price">💎 90</span>
+              <span class="cos-rarity mythic">Mitolojik</span>
+              <span class="cos-duration">30 GÜN</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: MODERATION & BLOCKING -->
+    <div id="tab-mod" class="tab-content">
+      <div style="margin-bottom:20px;">
+        <h2 style="font-size:20px; color:#FFFFFF; margin-bottom:6px;">🚫 Moderasyon & Kullanıcı Engelleme</h2>
+        <p style="font-size:13px; color:var(--text-muted);">Kullanıcıları engelleyin, engeli kaldırın ve bildirim gönderin</p>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:18px;">
+        <!-- Block user form -->
+        <div class="guide-card">
+          <h3 style="font-size:15px; color:var(--gold); margin-bottom:12px;">🚫 Kullanıcı Engelle</h3>
+          <div class="mod-form">
+            <div>
+              <label class="mod-label">Kullanıcı ID veya Kullanıcı Adı</label>
+              <input type="text" id="modBlockInput" class="mod-input" placeholder="google_xxx veya kullanıcı_adı" />
+            </div>
+            <button class="btn btn-red" style="justify-content:center; padding:12px; font-size:13px;" onclick="handleBlockUser()">
+              🚫 ENGELLE
+            </button>
+            <div id="modBlockStatus" class="mod-status"></div>
+          </div>
+        </div>
+
+        <!-- Send notification form -->
+        <div class="guide-card">
+          <h3 style="font-size:15px; color:var(--gold); margin-bottom:12px;">🔔 Bildirim Gönder</h3>
+          <div class="mod-form">
+            <div>
+              <label class="mod-label">Hedef Kullanıcı ID</label>
+              <input type="text" id="modNotifTarget" class="mod-input" placeholder="google_xxx veya bot_1" />
+            </div>
+            <div>
+              <label class="mod-label">Bildirim Başlığı</label>
+              <input type="text" id="modNotifTitle" class="mod-input" placeholder="Duyuru başlığı" />
+            </div>
+            <div>
+              <label class="mod-label">Bildirim Alt Metni (İsteğe Bağlı)</label>
+              <input type="text" id="modNotifSub" class="mod-input" placeholder="Detay açıklaması" />
+            </div>
+            <button class="btn btn-gold" style="justify-content:center; padding:12px; font-size:13px;" onclick="handleSendNotif()">
+              🔔 BİLDİRİM GÖNDER
+            </button>
+            <div id="modNotifStatus" class="mod-status"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Blocked users list -->
+      <div class="guide-card" style="margin-top:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
+          <h3 style="font-size:15px; color:var(--gold); margin:0;">👥 Engelli Kullanıcılar (<span id="modBlockedCount">0</span>)</h3>
+          <button class="btn btn-cyan" onclick="loadBlockedUsers()">🔄 Yenile</button>
+        </div>
+        <div style="background:rgba(0,0,0,0.25); border-radius:12px; overflow:hidden;" id="modBlockedContainer">
+          <div style="padding:20px; text-align:center; color:var(--text-muted); font-size:13px;">
+            Henüz engelli kullanıcı yok. Yukarıdaki formu kullanarak bir kullanıcıyı engelleyebilirsiniz.
           </div>
         </div>
       </div>
@@ -1203,6 +1774,125 @@ export function renderDashboardHtml(): string {
       return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    // ===== MODERATION FUNCTIONS =====
+    const ADMIN_USER_ID = 'google_i7h0qx1'; // jewelkaan01@gmail.com admin user
+
+    function showModStatus(elementId, msg, isSuccess) {
+      const el = document.getElementById(elementId);
+      if (el) {
+        el.className = 'mod-status ' + (isSuccess ? 'success' : 'error');
+        el.innerText = msg;
+      }
+    }
+
+    async function handleBlockUser() {
+      const target = document.getElementById('modBlockInput').value.trim();
+      if (!target) {
+        showModStatus('modBlockStatus', 'Kullanıcı ID veya kullanıcı adı girin!', false);
+        return;
+      }
+      showModStatus('modBlockStatus', 'Engelleniyor...', true);
+      try {
+        const res = await fetch('/api/social/block', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: ADMIN_USER_ID, targetUserId: target })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showModStatus('modBlockStatus', '✅ ' + (data.message || 'Kullanıcı engellendi!'), true);
+          document.getElementById('modBlockInput').value = '';
+          loadBlockedUsers();
+        } else {
+          showModStatus('modBlockStatus', '⚠️ ' + (data.error || 'Engelleme başarısız!'), false);
+        }
+      } catch (err) {
+        showModStatus('modBlockStatus', '❌ Bağlantı hatası: ' + err.message, false);
+      }
+    }
+
+    async function loadBlockedUsers() {
+      try {
+        const res = await fetch('/api/social/blocked/' + ADMIN_USER_ID);
+        const data = await res.json();
+        const container = document.getElementById('modBlockedContainer');
+        const countEl = document.getElementById('modBlockedCount');
+        const blocked = data.blockedUsers || [];
+        if (countEl) countEl.innerText = blocked.length;
+        if (blocked.length === 0) {
+          container.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted); font-size:13px;">Henüz engelli kullanıcı yok.</div>';
+          return;
+        }
+        let html = '';
+        blocked.forEach(b => {
+          html += \`
+            <div class="mod-blocked-row">
+              <div>
+                <div class="mod-blocked-name">\${escapeHtml(b.displayName || b.username || b.id)}</div>
+                <div class="mod-blocked-sub">@\${escapeHtml(b.username || 'kullanıcı')} · \${escapeHtml(b.id)}</div>
+              </div>
+              <button class="btn btn-cyan" style="padding:6px 12px; font-size:11px;" onclick="handleUnblockUser('\${escapeHtml(b.id)}')">
+                ✅ Engeli Kaldır
+              </button>
+            </div>
+          \`;
+        });
+        container.innerHTML = html;
+      } catch (err) {
+        console.error('loadBlockedUsers error:', err);
+      }
+    }
+
+    async function handleUnblockUser(targetId) {
+      showModStatus('modBlockStatus', 'Engel kaldırılıyor...', true);
+      try {
+        const res = await fetch('/api/social/unblock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: ADMIN_USER_ID, targetUserId: targetId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showModStatus('modBlockStatus', '✅ ' + (data.message || 'Engel kaldırıldı!'), true);
+          loadBlockedUsers();
+        } else {
+          showModStatus('modBlockStatus', '⚠️ ' + (data.error || 'Engel kaldırma başarısız!'), false);
+        }
+      } catch (err) {
+        showModStatus('modBlockStatus', '❌ Bağlantı hatası: ' + err.message, false);
+      }
+    }
+
+    async function handleSendNotif() {
+      const target = document.getElementById('modNotifTarget').value.trim();
+      const title = document.getElementById('modNotifTitle').value.trim();
+      const sub = document.getElementById('modNotifSub').value.trim();
+      if (!target || !title) {
+        showModStatus('modNotifStatus', 'Hedef kullanıcı ID ve bildirim başlığı zorunludur!', false);
+        return;
+      }
+      showModStatus('modNotifStatus', 'Gönderiliyor...', true);
+      try {
+        const res = await fetch('/api/social/notifications/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: ADMIN_USER_ID, targetUserId: target, title, sub })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showModStatus('modNotifStatus', '✅ ' + (data.message || 'Bildirim gönderildi!'), true);
+          document.getElementById('modNotifTarget').value = '';
+          document.getElementById('modNotifTitle').value = '';
+          document.getElementById('modNotifSub').value = '';
+        } else {
+          showModStatus('modNotifStatus', '⚠️ ' + (data.error || 'Bildirim gönderilemedi!'), false);
+        }
+      } catch (err) {
+        showModStatus('modNotifStatus', '❌ Bağlantı hatası: ' + err.message, false);
+      }
+    }
+    // ===== END MODERATION FUNCTIONS =====
+
     let portalAuthToken = localStorage.getItem('tavriko_portal_token');
 
     async function checkPortalAuth() {
@@ -1297,6 +1987,7 @@ export function renderDashboardHtml(): string {
         loadInitialLogs();
         connectSSE();
         refreshStats();
+        loadBlockedUsers();
         setInterval(refreshStats, 6000);
       }
     });

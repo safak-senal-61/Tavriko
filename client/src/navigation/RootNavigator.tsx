@@ -122,7 +122,8 @@ export const RootNavigator: React.FC = () => {
     isWeb &&
     typeof window !== 'undefined' &&
     (window.location.search.includes('screen=developer') ||
-      window.location.hash.includes('developer'));
+      window.location.hash.includes('developer') ||
+      window.location.pathname.includes('/developer'));
 
   const initialAuthUser = getStoredAuth()?.user || useGameStore.getState().user;
   const initialScreen: ScreenName = isWebOAuthReturn

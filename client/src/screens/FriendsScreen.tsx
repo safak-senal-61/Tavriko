@@ -23,6 +23,7 @@ import { socketService } from '../services/socketService';
 import { ReferralCards } from '../components/ReferralCards';
 import { DISCOVERY_IMG } from '../components/DiscoveryArtwork';
 import { GradientFill } from '../components/TavrikoGradient';
+import { AnimatedFrame, AnimatedNameText, ANIMATED_FRAME_COLORS, ANIMATED_NAME_COLORS } from '../components/StoreKit';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -885,9 +886,20 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                   const frameDef = cosmetics.frame;
                   const bgDef = cosmetics.background;
                   const nameDef = cosmetics.nameEffect;
+                  const frameId = (inspectDetails as any)?.equippedFrame;
+                  const nameEffectId = (inspectDetails as any)?.equippedNameEffect;
+                  const animatedFrame = frameId ? ANIMATED_FRAME_COLORS[frameId] : null;
+                  const animatedName = nameEffectId ? ANIMATED_NAME_COLORS[nameEffectId] : null;
                   return (
                     <>
                       <Reanimated.View entering={ZoomIn.springify().damping(16)} style={styles.inspectAvatarWrap}>
+                        {animatedFrame ? (
+                          <AnimatedFrame
+                            frameId={frameId}
+                            seed={inspectDetails?.avatarUrl || inspectPlayer.avatarUrl || inspectPlayer.name}
+                            size={92}
+                          />
+                        ) : (
                         <View
                           style={[
                             styles.inspectAvatarRing,
@@ -908,6 +920,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                             size={76}
                           />
                         </View>
+                        )}
                         <View
                           style={[
                             styles.inspectStatusBadge,
@@ -920,6 +933,15 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                         </View>
                       </Reanimated.View>
                       {/* Player Names — name effect support */}
+                      {animatedName ? (
+                        <AnimatedNameText
+                          effectId={nameEffectId}
+                          style={[styles.inspectDisplayName]}
+                          numberOfLines={1}
+                        >
+                          {inspectDetails?.displayName || inspectPlayer.displayName || inspectPlayer.name}
+                        </AnimatedNameText>
+                      ) : (
                       <Reanimated.Text
                         entering={FadeInDown.delay(60)}
                         style={[
@@ -937,6 +959,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                       >
                         {inspectDetails?.displayName || inspectPlayer.displayName || inspectPlayer.name}
                       </Reanimated.Text>
+                      )}
                 <Reanimated.Text entering={FadeInDown.delay(90)} style={styles.inspectUsername}>
                   @{inspectDetails?.username || inspectPlayer.username || 'oyuncu'}
                   {inspectDetails?.countryName ? ` · ${inspectDetails.countryName}` : ' · Türkiye'}
