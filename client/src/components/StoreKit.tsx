@@ -54,6 +54,20 @@ export const STORE_IMG = {
   eventsEmpty: require('../../assets/images/store/events_empty.png'),
 };
 
+/** Yeni nesil parlak UI ikon görselleri (buton döşemeleri, sekmeler, amblemler) */
+export const UI_IMG = {
+  season: require('../../assets/images/ui/icon_season.png'),
+  prolig: require('../../assets/images/ui/icon_prolig.png'),
+  shop: require('../../assets/images/ui/icon_shop.png'),
+  events: require('../../assets/images/ui/icon_events.png'),
+  inventory: require('../../assets/images/ui/icon_inventory.png'),
+  daily: require('../../assets/images/ui/icon_daily.png'),
+  weekly: require('../../assets/images/ui/icon_weekly.png'),
+  special: require('../../assets/images/ui/icon_special.png'),
+  seasonEmblem: require('../../assets/images/ui/season_emblem.png'),
+  levelBadge: require('../../assets/images/ui/level_badge.png'),
+};
+
 /** Ürün/eşya kimliğine göre 3B görsel (yoksa null) */
 export const storeImageFor = (id: string, category?: string): ImageSourcePropType | null => {
   const k = (id || '').toLowerCase();
@@ -327,7 +341,7 @@ export const KitSegment = <T extends string>({
   onChange,
   style,
 }: {
-  tabs: { id: T; label: string }[];
+  tabs: { id: T; label: string; icon?: ImageSourcePropType }[];
   active: T;
   onChange: (id: T) => void;
   style?: ViewStyle;
@@ -350,6 +364,13 @@ export const KitSegment = <T extends string>({
           activeOpacity={0.85}
           onPress={() => onChange(t.id)}
         >
+          {t.icon ? (
+            <Image
+              source={t.icon}
+              style={{ width: 18, height: 18, marginRight: 5 }}
+              resizeMode="contain"
+            />
+          ) : null}
           <Text
             style={[kit.segText, t.id === active && kit.segTextActive]}
             numberOfLines={1}
@@ -444,6 +465,45 @@ export const PulseElement: React.FC<{
   const st = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
   return (
     <Animated.View style={[st, style]}>{children}</Animated.View>
+  );
+};
+
+/* İçinden ışık şeridi geçen parlama efekti (ilerleme çubukları, vurgulu kartlar) */
+export const ShimmerView: React.FC<{
+  color?: string;
+  duration?: number;
+  style?: ViewStyle;
+}> = ({ color = '#FFFFFF', duration = 1600, style }) => {
+  const x = useSharedValue(-90);
+  useEffect(() => {
+    x.value = withRepeat(
+      withSequence(
+        withTiming(300, { duration, easing: Easing.inOut(Easing.quad) }),
+        withTiming(-90, { duration: 0 })
+      ),
+      -1,
+      false
+    );
+  }, []);
+  const st = useAnimatedStyle(() => ({
+    transform: [{ translateX: x.value }, { skewX: '-18deg' }],
+  }));
+  return (
+    <View style={[{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, overflow: 'hidden' }, style]} pointerEvents="none">
+      <Animated.View
+        style={[
+          st,
+          {
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            width: 70,
+            backgroundColor: color,
+            opacity: 0.32,
+          },
+        ]}
+      />
+    </View>
   );
 };
 
@@ -747,6 +807,7 @@ export const kit = StyleSheet.create({
   segBtn: {
     flex: 1,
     height: 36,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,

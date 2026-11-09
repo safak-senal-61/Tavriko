@@ -26,11 +26,9 @@ import {
   BellLineIcon,
   CrownIcon,
   StreakFlameIcon,
-  ChestIcon,
-  TrophyIcon,
-  InventoryCubeIcon,
 } from '../components/TavrikoIcons';
 import { GradientFill, formatNumberTR } from '../components/TavrikoGradient';
+import { UI_IMG } from '../components/StoreKit';
 
 const LOGO_MARK = require('../../assets/images/logo_mark.png');
 const DUEL_BANNER = require('../../assets/images/duel_arena_banner.jpg');
@@ -96,17 +94,17 @@ const ModeTile: React.FC<{
   </TouchableOpacity>
 );
 
-/** Alt menü üstündeki premium özellik butonu: gradyan + parlama + ikon kapsülü */
-const FeatureChip: React.FC<{
+/** Alt menü üstündeki premium özellik döşemesi: 3D ikon görseli + eşit ölçü */
+const FeatureTile: React.FC<{
   label: string;
-  icon: React.ReactNode;
+  icon: ImageSourcePropType;
   colors: string[];
   borderColor: string;
   glowColor: string;
   onPress: () => void;
 }> = ({ label, icon, colors, borderColor, glowColor, onPress }) => (
   <TouchableOpacity
-    style={[styles.featureChip, { borderColor, shadowColor: glowColor }]}
+    style={[styles.featureTile, { borderColor, shadowColor: glowColor }]}
     onPress={() => {
       sound.playSound('tap');
       sound.triggerHaptic('light');
@@ -117,9 +115,9 @@ const FeatureChip: React.FC<{
     accessibilityLabel={label}
   >
     <GradientFill colors={colors} direction="diagonal" />
-    <View style={styles.featureChipShine} pointerEvents="none" />
-    <View style={styles.featureChipIcon}>{icon}</View>
-    <Text style={styles.featureChipText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+    <View style={styles.featureTileShine} pointerEvents="none" />
+    <Image source={icon} style={styles.featureTileIcon} resizeMode="contain" />
+    <Text style={styles.featureTileText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
       {label}
     </Text>
   </TouchableOpacity>
@@ -461,9 +459,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {/* Ek Özellikler (Sezon, Pro Lig, Mağaza, Etkinlik, Envanter) */}
           <View style={styles.extraFeaturesRow}>
             {onSeason && (
-              <FeatureChip
+              <FeatureTile
                 label="Sezon 1"
-                icon={<CrownIcon size={17} />}
+                icon={UI_IMG.season}
                 colors={['#7C4DFF', '#3A1690', '#24105A']}
                 borderColor="rgba(186, 150, 255, 0.6)"
                 glowColor="#9A6BFF"
@@ -471,9 +469,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               />
             )}
             {onProLeague && (
-              <FeatureChip
+              <FeatureTile
                 label="Pro Lig"
-                icon={<TrophyIcon size={17} />}
+                icon={UI_IMG.prolig}
                 colors={['#2F7BE8', '#16388F', '#0F1E5A']}
                 borderColor="rgba(96, 196, 255, 0.6)"
                 glowColor="#38BDF8"
@@ -481,9 +479,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               />
             )}
             {onShop && (
-              <FeatureChip
+              <FeatureTile
                 label="Mağaza"
-                icon={<ChestIcon size={17} />}
+                icon={UI_IMG.shop}
                 colors={['#D98A1F', '#8A4A12', '#4A2A10']}
                 borderColor="rgba(255, 196, 61, 0.6)"
                 glowColor="#FFC43D"
@@ -491,9 +489,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               />
             )}
             {onEvents && (
-              <FeatureChip
+              <FeatureTile
                 label="Etkinlik"
-                icon={<StreakFlameIcon size={17} active />}
+                icon={UI_IMG.events}
                 colors={['#FF6A2F', '#B02E10', '#5A1408']}
                 borderColor="rgba(255, 150, 90, 0.65)"
                 glowColor="#FF7A3D"
@@ -501,9 +499,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               />
             )}
             {onInventory && (
-              <FeatureChip
+              <FeatureTile
                 label="Envanter"
-                icon={<InventoryCubeIcon size={17} />}
+                icon={UI_IMG.inventory}
                 colors={['#8A2E9E', '#5A1D6E', '#2C0E36']}
                 borderColor="rgba(200, 140, 255, 0.55)"
                 glowColor="#A855F7"
@@ -950,18 +948,18 @@ const styles = StyleSheet.create({
   // ---- Ek Özellikler ----
   extraFeaturesRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 14,
-    justifyContent: 'center',
-  },
-  featureChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 7,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 18,
+    marginTop: 14,
+  },
+  featureTile: {
+    flex: 1,
+    minWidth: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 10,
+    paddingHorizontal: 3,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1.5,
     shadowOffset: { width: 0, height: 4 },
@@ -969,30 +967,24 @@ const styles = StyleSheet.create({
     shadowRadius: 9,
     elevation: 4,
   },
-  featureChipShine: {
+  featureTileShine: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     height: '50%',
-    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
   },
-  featureChipIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(10, 4, 24, 0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.18)',
+  featureTileIcon: {
+    width: 38,
+    height: 38,
   },
-  featureChipText: {
+  featureTileText: {
     color: '#FFFFFF',
-    fontSize: 12.5,
+    fontSize: 10.5,
     fontFamily: THEME.fonts.black,
-    letterSpacing: 0.3,
-    textShadowColor: 'rgba(0, 0, 0, 0.45)',
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },

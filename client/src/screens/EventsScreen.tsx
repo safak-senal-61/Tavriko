@@ -28,7 +28,7 @@ import {
 } from '../components/TavrikoIcons';
 import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { Image } from 'react-native';
-import { KitHero, KitSegment, KitEmpty, STORE_IMG, storeImageFor, KIT, FloatingElement, PulseElement } from '../components/StoreKit';
+import { KitHero, KitSegment, KitEmpty, STORE_IMG, storeImageFor, KIT, FloatingElement, PulseElement, ShimmerView, UI_IMG } from '../components/StoreKit';
 
 interface EventsScreenProps {
   user?: UserProfile;
@@ -235,9 +235,9 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
 
         <KitSegment<EventTab>
           tabs={[
-            { id: 'daily', label: 'Günlük' },
-            { id: 'weekly', label: 'Haftalık' },
-            { id: 'special', label: 'Özel Turnuva' },
+            { id: 'daily', label: 'Günlük', icon: UI_IMG.daily },
+            { id: 'weekly', label: 'Haftalık', icon: UI_IMG.weekly },
+            { id: 'special', label: 'Özel Turnuva', icon: UI_IMG.special },
           ]}
           active={activeTab}
           onChange={(t) => t !== activeTab && switchTab(t)}
@@ -356,11 +356,13 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                         style={[
                           styles.progressFill,
                           {
-                            width: `${progressPct}%`,
+                            width: `${Math.max(progressPct, 10)}%`,
                             backgroundColor: isCompleted ? '#5ADBB5' : '#FF9B2F',
                           },
                         ]}
-                      />
+                      >
+                        <ShimmerView color="#FFFFFF" duration={2000} />
+                      </View>
                     </View>
                   </View>
 
@@ -652,6 +654,7 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     borderRadius: 4,
+    overflow: 'hidden',
   },
   rewardsRow: {
     flexDirection: 'row',

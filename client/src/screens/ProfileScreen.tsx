@@ -37,6 +37,7 @@ import {
   AVATAR_PRESETS,
   AvatarPreset,
 } from '../components/TavrikoIcons';
+import { UI_IMG, FloatingImage } from '../components/StoreKit';
 
 let ImagePickerModule: any = null;
 try {
@@ -663,6 +664,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.displayName} numberOfLines={1}>
                   {user.fullName || user.displayName}
                 </Text>
+                <FloatingImage source={UI_IMG.levelBadge} size={30} amplitude={2.5} />
               </View>
 
               <Text style={styles.levelSub} numberOfLines={1}>
@@ -896,6 +898,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             {/* Primary 2x2 Key Performance Cards */}
             <View style={styles.primaryStatsGrid}>
               <View style={styles.primaryStatBox}>
+                <View
+                  style={[
+                    styles.statIconChip,
+                    { backgroundColor: 'rgba(255, 196, 61, 0.14)', borderColor: 'rgba(255, 196, 61, 0.4)' },
+                  ]}
+                >
+                  <TrophyIcon size={13} />
+                </View>
                 <Text style={styles.primaryStatLabel}>TOPLAM MAÇ</Text>
                 <Text style={styles.primaryStatValue}>{totalMatches}</Text>
                 <Text style={styles.primaryStatSub}>
@@ -903,11 +913,27 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </Text>
               </View>
               <View style={styles.primaryStatBox}>
+                <View
+                  style={[
+                    styles.statIconChip,
+                    { backgroundColor: 'rgba(63, 208, 138, 0.14)', borderColor: 'rgba(63, 208, 138, 0.4)' },
+                  ]}
+                >
+                  <BadgeShieldIcon size={13} />
+                </View>
                 <Text style={styles.primaryStatLabel}>KAZANMA ORANI</Text>
                 <Text style={[styles.primaryStatValue, { color: '#3FD08A' }]}>%{winRate}</Text>
                 <Text style={styles.primaryStatSub}>{wins} Galibiyet</Text>
               </View>
               <View style={styles.primaryStatBox}>
+                <View
+                  style={[
+                    styles.statIconChip,
+                    { backgroundColor: 'rgba(56, 189, 248, 0.14)', borderColor: 'rgba(56, 189, 248, 0.4)' },
+                  ]}
+                >
+                  <SpeedBoltIcon size={13} />
+                </View>
                 <Text style={styles.primaryStatLabel}>DOĞRU CEVAP</Text>
                 <Text style={[styles.primaryStatValue, { color: '#FFC43D' }]}>
                   {correctAnswers}
@@ -916,6 +942,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.primaryStatSub}>Toplam {totalAnswers} soru</Text>
               </View>
               <View style={styles.primaryStatBox}>
+                <View
+                  style={[
+                    styles.statIconChip,
+                    { backgroundColor: 'rgba(168, 85, 247, 0.16)', borderColor: 'rgba(168, 85, 247, 0.45)' },
+                  ]}
+                >
+                  <XpStarIcon size={13} />
+                </View>
                 <Text style={styles.primaryStatLabel}>İSABET ORANI</Text>
                 <Text style={[styles.primaryStatValue, { color: '#38BDF8' }]}>%{accuracyRate}</Text>
                 <Text style={styles.primaryStatSub}>En iyi seri: {safeBestStreak}x</Text>
@@ -1610,6 +1644,15 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1.2,
     borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  statIconChip: {
+    width: 26,
+    height: 26,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    marginBottom: 7,
   },
   primaryStatLabel: {
     color: '#A992E2',

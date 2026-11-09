@@ -28,7 +28,7 @@ import {
 } from '../components/TavrikoIcons';
 import Reanimated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { Image } from 'react-native';
-import { KitHero, STORE_IMG, KIT, FloatingElement, FloatingImage } from '../components/StoreKit';
+import { KitHero, STORE_IMG, KIT, FloatingElement, FloatingImage, ShimmerView, UI_IMG } from '../components/StoreKit';
 import { GradientFill } from '../components/TavrikoGradient';
 
 interface SeasonScreenProps {
@@ -253,9 +253,12 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
         </View>
 
         <Reanimated.View entering={FadeInDown.delay(90).duration(400)} style={styles.progressCard}>
-          <View style={styles.tierPill}>
-            <Text style={styles.tierPillLabel}>KADEME</Text>
-            <Text style={styles.tierPillVal}>{currentTier}</Text>
+          <View style={styles.tierEmblemWrap}>
+            <FloatingImage source={UI_IMG.seasonEmblem} size={50} />
+            <View style={styles.tierNumBadge}>
+              <Text style={styles.tierNumText}>{currentTier}</Text>
+            </View>
+            <Text style={styles.tierEmblemLbl}>KADEME</Text>
           </View>
           <View style={styles.xpProgressWrap}>
             <View style={styles.xpTextRow}>
@@ -265,8 +268,9 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
               </Text>
             </View>
             <View style={styles.barTrack}>
-              <View style={[styles.barFill, { width: `${progressPct}%` }]}>
+              <View style={[styles.barFill, { width: `${Math.max(progressPct, 12)}%` }]}>
                 <GradientFill direction="horizontal" colors={['#5ADBB5', '#FFC837']} />
+                <ShimmerView color="#FFF3C4" duration={1800} />
               </View>
             </View>
             <Text style={styles.xpHint}>
@@ -355,6 +359,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
                   ]}
                 >
                   <View style={[styles.rewardIconWrap, isCurrent && styles.rewardIconWrapCurrent]}>
+                    {isCurrent && <ShimmerView color="#FFE9A8" duration={2200} />}
                     {isCurrent ? (
                       <FloatingElement amplitude={3} duration={1300}>
                         {renderRewardIcon(tierItem.freeReward.type, 26)}
@@ -421,6 +426,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
                   ]}
                 >
                   <View style={[styles.rewardIconWrap, isCurrent && styles.rewardIconWrapCurrent]}>
+                    {isCurrent && <ShimmerView color="#FFE9A8" duration={2200} />}
                     {isCurrent ? (
                       <FloatingElement amplitude={3} duration={1300}>
                         {renderRewardIcon(tierItem.premiumReward.type, 26)}
@@ -587,25 +593,41 @@ const styles = StyleSheet.create({
     width: '100%',
     gap: 12,
   },
-  tierPill: {
+  tierEmblemWrap: {
     width: 58,
-    height: 58,
-    borderRadius: 16,
-    backgroundColor: 'rgba(90, 219, 181, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(90, 219, 181, 0.4)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tierPillLabel: {
-    color: '#6FE3C1',
-    fontSize: 9,
-    fontFamily: THEME.fonts.extraBold,
+  tierNumBadge: {
+    position: 'absolute',
+    bottom: 14,
+    right: 1,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    backgroundColor: '#FFC43D',
+    borderWidth: 2,
+    borderColor: '#1A0E3C',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FFC43D',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 5,
+    elevation: 3,
   },
-  tierPillVal: {
-    color: '#FFFFFF',
-    fontSize: 22,
+  tierNumText: {
+    color: '#1A0E3C',
+    fontSize: 11,
     fontFamily: THEME.fonts.black,
+  },
+  tierEmblemLbl: {
+    color: '#6FE3C1',
+    fontSize: 8,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 1,
+    marginTop: 1,
   },
   xpProgressWrap: {
     flex: 1,
@@ -798,6 +820,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 196, 61, 0.12)',
     borderRadius: 12,
     paddingHorizontal: 10,
+    overflow: 'hidden',
   },
   rewardAmount: {
     color: '#FFFFFF',
