@@ -1727,6 +1727,18 @@ export function createApp() {
                 </div>
               </div>
 
+                <!-- SEÇİLİ KATEGORİ İÇİN ÖRNEK JSON ÖNİZLEME -->
+                <div id="example-json-section" style="display: none; margin-top: 12px; background: rgba(21, 15, 44, 0.6); border: 1px solid var(--accent-primary, #6236FF); border-radius: var(--radius-lg); padding: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 6px;">
+                    <label class="form-label" style="margin-bottom: 0;">📋 Seçili Kategori İçin Örnek JSON Kodu</label>
+                    <button type="button" class="btn" style="width: auto; padding: 6px 12px; font-size: 12px;" onclick="copyExampleJson()">📄 Kopyala</button>
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; line-height: 1.4;">
+                    Bu örnek kodu kopyalayıp aşağıdaki JSON alanına yapıştırın; kendi sorularınızı yazıp "Soruları Havuza Aktar" ile yükleyin. Alt kategoriye dokunduysanız <b>subCategory</b> satırı seçtiğiniz kartı içerir.
+                  </div>
+                  <pre id="example-json-pre" style="background: rgba(11, 8, 24, 0.9); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; font-size: 11px; line-height: 1.5; overflow-x: auto; margin: 0; white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow-y: auto; color: #C9B8FF;"></pre>
+                </div>
+
               <!-- 3. MANUEL TEK SORU EKLEME FORMU -->
               <div class="form-group" style="margin-top: 16px;">
                 <label class="form-label">✍️ 3. Adım: Hızlı Soru Ekleme Formu (Manuel)</label>
@@ -2568,8 +2580,46 @@ export function createApp() {
             if (selectedSubName) {
               sample[0].subCategory = selectedSubName;
             }
-            document.getElementById('json-textarea').value = JSON.stringify(sample, null, 2);
+            const sampleJson = JSON.stringify(sample, null, 2);
+            document.getElementById('json-textarea').value = sampleJson;
+            // Seçili kategori için örnek JSON önizleme paneli
+            const exSection = document.getElementById('example-json-section');
+            const exPre = document.getElementById('example-json-pre');
+            if (exSection && exPre) {
+              exSection.style.display = 'block';
+              exPre.textContent = sampleJson;
+            }
             updateLiveDetection();
+          }
+
+          function copyExampleJson() {
+            triggerHaptic('light');
+            const exPre = document.getElementById('example-json-pre');
+            if (!exPre) return;
+            const text = exPre.textContent || '';
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(() => {
+                alert('Örnek JSON kopyalandı! Aşağıdaki JSON alanına yapıştırabilirsiniz.');
+              }).catch(() => fallbackCopyExampleJson(text));
+            } else {
+              fallbackCopyExampleJson(text);
+            }
+          }
+
+          function fallbackCopyExampleJson(text) {
+            const tmp = document.createElement('textarea');
+            tmp.value = text;
+            tmp.style.position = 'fixed';
+            tmp.style.opacity = '0';
+            document.body.appendChild(tmp);
+            tmp.select();
+            try {
+              document.execCommand('copy');
+              alert('Örnek JSON kopyalandı! Aşağıdaki JSON alanına yapıştırabilirsiniz.');
+            } catch (e) {
+              alert('Kopyalanamadı — kodu elle seçip kopyalayın.');
+            }
+            document.body.removeChild(tmp);
           }
 
           function selectCategoryTemplate(catId) {
@@ -2746,6 +2796,12 @@ export function createApp() {
             const alertBox = document.getElementById('json-alert');
             if (alertBox) alertBox.style.display = 'none';
             document.querySelectorAll('.category-squircle-card').forEach(c => c.classList.remove('active'));
+            selectedCatId = null;
+            selectedSubName = null;
+            const subSection = document.getElementById('sub-cat-section');
+            if (subSection) subSection.style.display = 'none';
+            const exSection = document.getElementById('example-json-section');
+            if (exSection) exSection.style.display = 'none';
             console.log("🧹 [Telegram WebApp] JSON textarea ve uyarı kutusu temizlendi.");
             updateLiveDetection();
           }
