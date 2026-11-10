@@ -9,7 +9,9 @@ const supabaseClient_1 = require("../db/supabaseClient");
 const questionImporter_1 = require("../utils/questionImporter");
 const router = (0, express_1.Router)();
 // Public trivia categories
-router.get('/categories', (req, res) => {
+router.get('/categories', async (req, res) => {
+    // Sunucusuz ortamda canlı soru havuzunun hazır olmasını bekle (Keşfet sayısındaki güncel değerler için)
+    await prismaClient_1.db.ensureQuestionsRestored();
     const categories = prismaClient_1.db.getCategories();
     res.json(categories);
 });

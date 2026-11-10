@@ -109,6 +109,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
   const [liveCounts, setLiveCounts] = useState<Record<string, number>>({});
+  const [liveSubCounts, setLiveSubCounts] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [activeGroup, setActiveGroup] = useState<GroupTab>('all');
 
@@ -135,12 +136,20 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
       .then((data: CategoryInfo[]) => {
         if (!isMounted || !Array.isArray(data)) return;
         const map: Record<string, number> = {};
+        const subMap: Record<string, number> = {};
         for (const c of data) {
           if (c && c.id) {
             map[c.id] = c.totalQuestions;
+            for (const sc of c.subCategories || []) {
+              if (sc && sc.name) {
+                subMap[c.id + '::' + sc.name.trim().toLowerCase()] =
+                  sc.questionCount ?? 0;
+              }
+            }
           }
         }
         setLiveCounts(map);
+        setLiveSubCounts(subMap);
       })
       .catch(() => {});
     return () => {
@@ -149,13 +158,20 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   }, [apiBaseUrl]);
 
   // Kategoriler canlı soru sayılarıyla
-  const categoriesWithRealCounts = useMemo(() => {
+  const categoriesWithRealCounts = useMemo((): CategoryInfo[] => {
     return ALL_CATEGORIES.filter((c) => c.id !== 'mixed').map((cat) => ({
       ...cat,
       totalQuestions:
         liveCounts[cat.id] !== undefined ? liveCounts[cat.id] : cat.totalQuestions,
+      subCategories: (cat.subCategories || []).map((sc) => ({
+        ...sc,
+        questionCount:
+          liveSubCounts[cat.id + '::' + sc.name.trim().toLowerCase()] ??
+          sc.questionCount ??
+          0,
+      })),
     }));
-  }, [liveCounts]);
+  }, [liveCounts, liveSubCounts]);
 
   // Arama ve grup sekmesine göre filtrelenmiş bölümler
   const visibleSections = useMemo(() => {
@@ -308,6 +324,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                   <View style={styles.sectionHeaderLeft}>
                     <View style={[styles.sectionAccentBar, { backgroundColor: accent }]} />
                     <Text style={styles.sectionTitle}>{cat.name}</Text>
+                    <Text style={styles.sectionCount}>{cat.totalQuestions} soru</Text>
                   </View>
                   <TouchableOpacity
                     style={styles.sectionPlayAll}
@@ -348,6 +365,9 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                         <Text style={styles.catEmoji}>{sc.emoji}</Text>
                         <Text style={styles.catName} numberOfLines={2}>
                           {sc.name}
+                        </Text>
+                        <Text style={styles.catCount}>
+                          {sc.questionCount ?? 0} soru
                         </Text>
                       </TouchableOpacity>
                     </Reanimated.View>
@@ -485,6 +505,17 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.display,
     letterSpacing: 0.5,
   },
+  sectionCount: {
+    color: '#5ADBB5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    backgroundColor: 'rgba(90, 219, 181, 0.12)',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginLeft: 8,
+    overflow: 'hidden',
+  },
   sectionPlayAll: {
     backgroundColor: 'rgba(255, 255, 255, 0.07)',
     borderRadius: 12,
@@ -530,6 +561,17 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
+  },
+  catCount: {
+    color: 'rgba(255, 255, 255, 0.65)',
+    fontSize: 9.5,
+    fontFamily: THEME.fonts.bold,
+    textAlign: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 7,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    overflow: 'hidden',
   },
   emptyState: {
     alignItems: 'center',

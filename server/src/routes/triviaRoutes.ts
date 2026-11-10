@@ -9,7 +9,9 @@ import { importQuestionsFromJson } from '../utils/questionImporter';
 const router = Router();
 
 // Public trivia categories
-router.get('/categories', (req: Request, res: Response): void => {
+router.get('/categories', async (req: Request, res: Response): Promise<void> => {
+  // Sunucusuz ortamda canlı soru havuzunun hazır olmasını bekle (Keşfet sayısındaki güncel değerler için)
+  await db.ensureQuestionsRestored();
   const categories = db.getCategories();
   res.json(categories);
 });

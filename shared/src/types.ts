@@ -48,6 +48,8 @@ export interface SubCategoryInfo {
   id: string;
   name: string;
   emoji: string;
+  /** Bu alt kategorideki yayında olan soru sayısı (canlı hesaplanır) */
+  questionCount?: number;
 }
 
 export interface CategoryInfo {

@@ -1698,10 +1698,73 @@ export function createApp() {
                 </details>
               </div>
 
-              <!-- 3. JSON METİN ALANI VE CANLI ALGILAMA BARI -->
+              <!-- 3. MANUEL TEK SORU EKLEME FORMU -->
+              <div class="form-group" style="margin-top: 16px;">
+                <label class="form-label">✍️ 3. Adım: Hızlı Soru Ekleme Formu (Manuel)</label>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">
+                  JSON yazmadan formu doldurarak tek tek soru ekleyin. Kategori listesi oyunun tüm kategorilerini içerir; hedef havuz yukarıdaki 1. Adım'dan seçilir.
+                </div>
+
+                <div style="background: var(--surface-2); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 16px;">
+                  <div class="form-group">
+                    <label class="form-label">Soru Metni</label>
+                    <textarea id="mq-text" rows="2" placeholder="Örn: Türkiye'nin başkenti neresidir?"></textarea>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Şıklar (A, B, C, D)</label>
+                    <input type="text" id="mq-opt-0" placeholder="A şıkkı" style="margin-bottom: 6px;">
+                    <input type="text" id="mq-opt-1" placeholder="B şıkkı" style="margin-bottom: 6px;">
+                    <input type="text" id="mq-opt-2" placeholder="C şıkkı" style="margin-bottom: 6px;">
+                    <input type="text" id="mq-opt-3" placeholder="D şıkkı">
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Doğru Cevap</label>
+                    <div class="segmented-control" style="grid-template-columns: repeat(4, 1fr);" id="mq-correct-seg">
+                      <div class="seg-btn" data-idx="0" onclick="setMqCorrect(0)">A</div>
+                      <div class="seg-btn" data-idx="1" onclick="setMqCorrect(1)">B</div>
+                      <div class="seg-btn" data-idx="2" onclick="setMqCorrect(2)">C</div>
+                      <div class="seg-btn" data-idx="3" onclick="setMqCorrect(3)">D</div>
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Kategori (Tüm Oyun Kategorileri)</label>
+                    <select id="mq-category"></select>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Zorluk</label>
+                    <div class="segmented-control" style="grid-template-columns: repeat(4, 1fr);" id="mq-diff-seg">
+                      <div class="seg-btn" data-diff="easy" onclick="setMqDiff('easy')">🟢 Kolay</div>
+                      <div class="seg-btn active" data-diff="medium" onclick="setMqDiff('medium')">🔵 Orta</div>
+                      <div class="seg-btn" data-diff="hard" onclick="setMqDiff('hard')">🟡 Zor</div>
+                      <div class="seg-btn" data-diff="expert" onclick="setMqDiff('expert')">🔴 Uzman</div>
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Açıklama (İsteğe Bağlı)</label>
+                    <input type="text" id="mq-explanation" placeholder="Soru çözüldükten sonra gösterilecek bilgi notu">
+                  </div>
+
+                  <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                    <input type="checkbox" id="mq-autopublish" checked style="width: 18px; height: 18px; accent-color: var(--accent-primary);">
+                    <label for="mq-autopublish" style="font-size: 13px; font-weight: 600; cursor: pointer;">Doğrudan yayınla (Onay kuyruğunu atla ve havuza ekle)</label>
+                  </div>
+
+                  <button class="btn-primary" id="btn-mq-add" onclick="addManualQuestion()">
+                    <span>➕ Soruyu Ekle</span>
+                  </button>
+                  <div class="alert-box" id="mq-alert"></div>
+                </div>
+              </div>
+
+              <!-- 4. JSON METİN ALANI VE CANLI ALGILAMA BARI -->
               <div class="form-group" style="margin-top: 16px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                  <label class="form-label" style="margin-bottom: 0;">📝 3. Adım: Soru JSON Verisi</label>
+                  <label class="form-label" style="margin-bottom: 0;">📝 4. Adım: Toplu Soru Yükleme (JSON Verisi)</label>
                   <div>
                     <button class="btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="pasteSampleJson()">📋 Varsayılan Şablon</button>
                     <button class="btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="clearJsonText()">🧹 Temizle</button>
@@ -1812,7 +1875,7 @@ export function createApp() {
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <div>
                   <h2 class="card-title" style="margin: 0;">📊 Kategori & Zorluk Dağılımı</h2>
-                  <p class="card-desc" style="margin: 0;">16 geçerli branşın zorluk (Kolay, Orta, Zor, Uzman) oranları</p>
+                  <p class="card-desc" style="margin: 0;">Tüm kategorilerin zorluk (Kolay, Orta, Zor, Uzman) oranları</p>
                 </div>
                 <button class="btn-secondary" onclick="loadStats()">🔄 Yenile</button>
               </div>
@@ -2215,6 +2278,134 @@ export function createApp() {
                 '</div>';
               }).join('');
             }
+          }
+
+          // Manuel soru ekleme formu (Tüm kategoriler)
+          let mqCorrectIdx = -1;
+          let mqDiff = 'medium';
+
+          function setMqCorrect(idx) {
+            triggerHaptic('light');
+            mqCorrectIdx = idx;
+            document.querySelectorAll('#mq-correct-seg .seg-btn').forEach(b => {
+              b.classList.toggle('active', parseInt(b.getAttribute('data-idx'), 10) === idx);
+            });
+          }
+
+          function setMqDiff(d) {
+            triggerHaptic('light');
+            mqDiff = d;
+            document.querySelectorAll('#mq-diff-seg .seg-btn').forEach(b => {
+              b.classList.toggle('active', b.getAttribute('data-diff') === d);
+            });
+          }
+
+          function renderManualCategoryOptions() {
+            const sel = document.getElementById('mq-category');
+            if (!sel) return;
+            const all = APP_16_CATEGORIES.concat(SPECIAL_ROOM_CATEGORIES);
+            sel.innerHTML = all.map(c => {
+              return '<option value="' + c.id + '">' + c.icon + ' ' + c.name + ' (' + c.id + ')</option>';
+            }).join('');
+          }
+
+          function resetManualForm() {
+            const t = document.getElementById('mq-text');
+            if (t) t.value = '';
+            for (let i = 0; i < 4; i++) {
+              const o = document.getElementById('mq-opt-' + i);
+              if (o) o.value = '';
+            }
+            const e = document.getElementById('mq-explanation');
+            if (e) e.value = '';
+            mqCorrectIdx = -1;
+            document.querySelectorAll('#mq-correct-seg .seg-btn').forEach(b => b.classList.remove('active'));
+            setMqDiff('medium');
+          }
+
+          async function addManualQuestion() {
+            triggerHaptic('medium');
+            const alertBox = document.getElementById('mq-alert');
+            const text = (document.getElementById('mq-text').value || '').trim();
+            const opts = [0, 1, 2, 3].map(i => (document.getElementById('mq-opt-' + i).value || '').trim());
+            const catId = document.getElementById('mq-category').value || 'general_culture';
+            const explanation = (document.getElementById('mq-explanation').value || '').trim();
+            const pool = document.getElementById('json-pool').value || 'standard';
+            const autoPublish = document.getElementById('mq-autopublish').checked;
+
+            const showError = (msg) => {
+              if (alertBox) {
+                alertBox.className = 'alert-box error';
+                alertBox.style.display = 'block';
+                alertBox.innerText = '⚠️ ' + msg;
+              }
+              triggerHaptic('error');
+            };
+
+            if (text.length < 5) {
+              showError('Soru metni en az 5 karakter olmalıdır.');
+              return;
+            }
+            if (opts.some(o => o.length < 1)) {
+              showError('Dört şıkkın hepsi de doldurulmalıdır.');
+              return;
+            }
+            if (mqCorrectIdx < 0) {
+              showError('Doğru cevabın hangi şık olduğunu seçin (A, B, C veya D).');
+              return;
+            }
+
+            const q = {
+              text: text,
+              options: opts,
+              correctAnswerIndex: mqCorrectIdx,
+              categoryId: catId,
+              difficulty: mqDiff,
+              targetPool: pool,
+              explanation: explanation
+            };
+
+            const btn = document.getElementById('btn-mq-add');
+            if (btn) btn.disabled = true;
+            if (alertBox) alertBox.style.display = 'none';
+
+            try {
+              const payload = {
+                input: [q],
+                publishDirectly: autoPublish,
+                defaultTargetPool: pool,
+                addedBy: 'Telegram WebApp'
+              };
+              const res = await fetch('/api/admin/questions/import-json', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              const data = await res.json();
+
+              if (data && data.success && data.importedCount > 0) {
+                triggerHaptic('success');
+                if (alertBox) {
+                  alertBox.className = 'alert-box success';
+                  alertBox.style.display = 'block';
+                  let msg = '🎉 Soru havuza başarıyla eklendi! Kategori: ' + catId + ' · Havuz: ' + pool;
+                  if (data.duplicateCount > 0) msg += ' (' + data.duplicateCount + ' mükerrer atlandı)';
+                  alertBox.innerText = msg;
+                }
+                resetManualForm();
+              } else {
+                let msg = 'Soru eklenemedi.';
+                if (data && data.importedCount === 0 && data.duplicateCount > 0) {
+                  msg = 'Bu soru havuzda zaten mevcut (mükerrer). Farklı bir soru deneyin.';
+                } else if (data && (data.error || data.message)) {
+                  msg = data.error || data.message;
+                }
+                showError(msg);
+              }
+            } catch (err) {
+              showError('Bağlantı hatası: ' + err.message);
+            }
+            if (btn) btn.disabled = false;
           }
 
           function selectPoolMode(pool) {
@@ -2885,6 +3076,7 @@ export function createApp() {
           // Initial load
           window.addEventListener('DOMContentLoaded', () => {
             renderCategoryPickers();
+            renderManualCategoryOptions();
             updateLiveDetection();
             fetch('/api/admin/questions/review?limit=1').then(r => r.json()).then(d => {
               const dot = document.getElementById('pending-dot');

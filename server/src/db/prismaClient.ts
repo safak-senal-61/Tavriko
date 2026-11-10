@@ -2647,8 +2647,13 @@ export class PrismaService {
   public getCategories(): CategoryInfo[] {
     const published = this.questions.filter((q) => (q.reviewStatus || 'published') === 'published');
     const countsByCategory: Record<string, number> = {};
+    const countsBySub: Record<string, number> = {};
     for (const q of published) {
       countsByCategory[q.categoryId] = (countsByCategory[q.categoryId] || 0) + 1;
+      if (q.subCategory) {
+        const key = q.categoryId + '::' + q.subCategory.trim().toLowerCase();
+        countsBySub[key] = (countsBySub[key] || 0) + 1;
+      }
     }
 
     return this.categories.map((cat) => ({
@@ -2657,6 +2662,10 @@ export class PrismaService {
         cat.id === 'mixed'
           ? published.length
           : countsByCategory[cat.id] || 0,
+      subCategories: (cat.subCategories || []).map((sc) => ({
+        ...sc,
+        questionCount: countsBySub[cat.id + '::' + sc.name.trim().toLowerCase()] || 0,
+      })),
     }));
   }
 
