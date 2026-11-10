@@ -1055,6 +1055,9 @@ export function createApp() {
   // Telegram Mini App / Web App Portal
   app.get('/telegram-webapp', (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    // Telegram WebApp tarayıcısı sayfayı agresif önbelleğe alıyor ve eski sürüm
+    // gösteriliyor; her ziyarette güncel HTML'in çekilmesini garanti et.
+    res.setHeader('Cache-Control', 'no-store');
     res.send(`
       <!DOCTYPE html>
       <html lang="tr">

@@ -1090,11 +1090,18 @@ export const RootNavigator: React.FC = () => {
   const handleStartPractice = (
     category: CategoryId,
     difficulty: DifficultyLevel,
-    subCategory?: string
+    subCategory?: string,
+    questionCount: number = 5
   ) => {
     setActiveDailyConfig(null);
     setSelectedSubCategory(subCategory ?? null);
-    handleStartPracticeInternal(category, difficulty, 5, false, subCategory);
+    handleStartPracticeInternal(
+      category,
+      difficulty,
+      questionCount,
+      false,
+      subCategory
+    );
   };
   const handleStartPracticeInternal = async (
     category: CategoryId,
@@ -1725,9 +1732,14 @@ export const RootNavigator: React.FC = () => {
               navigateTo('auth');
             }}
             onBack={() => navigateTo('categories')}
-            onSelectDifficulty={(diff) => {
+            onSelectDifficulty={(diff, questionCount) => {
               setSelectedDifficulty(diff);
-              handleStartPractice(selectedCategory, diff, selectedSubCategory ?? undefined);
+              handleStartPractice(
+                selectedCategory,
+                diff,
+                selectedSubCategory ?? undefined,
+                questionCount
+              );
             }}
           />
         )}

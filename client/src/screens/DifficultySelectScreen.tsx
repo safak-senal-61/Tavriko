@@ -15,11 +15,14 @@ import {
   Button3D,
   XpStarIcon,
 } from '../components/TavrikoIcons';
+
+const QUESTION_COUNT_OPTIONS = [5, 10, 15, 20] as const;
+
 interface DifficultySelectScreenProps {
   categoryId: CategoryId;
   subCategory?: string;
   onBack: () => void;
-  onSelectDifficulty: (difficulty: DifficultyLevel) => void;
+  onSelectDifficulty: (difficulty: DifficultyLevel, questionCount: number) => void;
   avatarSeed?: string;
   coins?: number;
   gems?: number;
@@ -50,6 +53,7 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
   onLoginPrompt,
 }) => {
   const [selected, setSelected] = useState<DifficultyLevel>('hard');
+  const [questionCount, setQuestionCount] = useState<number>(5);
   const category = ALL_CATEGORIES.find((c) => c.id === categoryId);
   return (
     <TavrikoScreen>
@@ -68,8 +72,39 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
       >
         <Text style={styles.title}>ZORLUK SEVİYESİ</Text>
         <Text style={styles.subtitle}>
-          {subCategory ? `${category?.name || 'Kategori'} · ${subCategory}` : `${category?.name || 'Bilim'}`} · 5 soru
+          {subCategory ? `${category?.name || 'Kategori'} · ${subCategory}` : `${category?.name || 'Bilim'}`} · {questionCount} soru
         </Text>
+        {/* Soru sayısı seçimi: 5 / 10 / 15 / 20 */}
+        <Text style={styles.countLabel}>SORU SAYISI</Text>
+        <View style={styles.countRow}>
+          {QUESTION_COUNT_OPTIONS.map((count) => {
+            const isCountSelected = count === questionCount;
+            return (
+              <TouchableOpacity
+                key={count}
+                style={[
+                  styles.countPill,
+                  isCountSelected && styles.countPillSelected,
+                ]}
+                onPress={() => {
+                  sound.playSound('tap');
+                  sound.triggerHaptic('light');
+                  setQuestionCount(count);
+                }}
+                activeOpacity={0.85}
+              >
+                <Text
+                  style={[
+                    styles.countPillText,
+                    isCountSelected && styles.countPillTextSelected,
+                  ]}
+                >
+                  {count}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
         {DIFFICULTIES.map((diff) => {
           const isSelected = selected === diff.id;
           return (
@@ -106,7 +141,7 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
         <View style={{ marginTop: 8 }}>
           <Button3D
             title="DEVAM"
-            onPress={() => onSelectDifficulty(selected)}
+            onPress={() => onSelectDifficulty(selected, questionCount)}
             style={{ height: 56 }}
           />
         </View>
@@ -117,6 +152,41 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
 const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 32,
+  },
+  countLabel: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 14,
+    letterSpacing: 1.5,
+    color: THEME.colors.textMuted,
+    marginTop: 18,
+    marginBottom: 10,
+  },
+  countRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 6,
+  },
+  countPill: {
+    flex: 1,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countPillSelected: {
+    borderColor: '#FFC43D',
+    backgroundColor: 'rgba(98, 54, 255, 0.18)',
+  },
+  countPillText: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 18,
+    color: '#CBBFE8',
+  },
+  countPillTextSelected: {
+    color: '#C9B8FF',
   },
   title: {
     fontFamily: THEME.fonts.display,
