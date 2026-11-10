@@ -2247,11 +2247,11 @@ export function createApp() {
             { id: 'mythology_ancient', name: 'Mitoloji', icon: '⚡', trKeys: ['mythology', 'mitoloji', 'efsaneler'] },
             { id: 'hobbies_leisure', name: 'Hobiler', icon: '🎣', trKeys: ['hobbies', 'hobiler', 'eglence_hobiler'] },
             { id: 'daily_life', name: 'Günlük Hayat', icon: '👨‍👩‍👧', trKeys: ['daily_life', 'gunluk_hayat', 'toplum'] },
+            { id: 'mixed', name: 'Karma Mod', icon: '🎲', trKeys: ['mixed', 'karma', 'karisik'] },
             { id: 'turkey_special', name: 'Türkiye', icon: '🇹🇷', trKeys: ['turkey', 'turkiye', 'turkiyeye_ozel'] }
           ];
 
           const SPECIAL_ROOM_CATEGORIES = [
-            { id: 'mixed', name: 'Karışık Mod', icon: '🎲', desc: 'Tüm kategorilerden karma sorular' },
             { id: 'yesilcam', name: 'Yeşilçam', icon: '⭐', desc: 'Yeşilçam Sineması özel' },
             { id: 'turkish_pop_90s', name: "90'lar Pop", icon: '⭐', desc: 'Nostalji müzik' },
             { id: 'ottoman_history', name: 'Osmanlı', icon: '⭐', desc: 'Tarih tematik oda' },
