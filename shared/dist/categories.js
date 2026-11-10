@@ -277,6 +277,7 @@ exports.ALL_CATEGORIES = [
             { id: 'reptiles', name: 'Sürüngenler', emoji: '🐍' },
             { id: 'frogs_amphibians', name: 'Kurbağalar ve Amfibiler', emoji: '🐸' },
             { id: 'butterflies_insects', name: 'Kelebekler ve Böcekler', emoji: '🦋' },
+            { id: 'microscopic_life', name: 'Mikroskobik Canlılar', emoji: '🦠' },
             { id: 'deep_sea_creatures', name: 'Derin Deniz Canlıları', emoji: '🐙' },
             { id: 'exotic_birds', name: 'Egzotik Kuşlar', emoji: '🦜' },
             { id: 'forest_wildlife', name: 'Ormanlar ve Yaban Hayatı', emoji: '🐻' },
@@ -419,6 +420,7 @@ exports.ALL_CATEGORIES = [
         accentColor: '#FECACA',
         totalQuestions: 280,
         subCategories: [
+            { id: 'basketball', name: 'Basketbol', emoji: '🏀' },
             { id: 'athletics', name: 'Atletizm', emoji: '🏃' },
             { id: 'fitness_bodybuilding', name: 'Fitness ve Vücut Geliştirme', emoji: '🏋️' },
             { id: 'gymnastics', name: 'Jimnastik', emoji: '🤸' },
@@ -434,6 +436,7 @@ exports.ALL_CATEGORIES = [
             { id: 'climbing_outdoors', name: 'Doğa Sporları ve Tırmanış', emoji: '🧗' },
             { id: 'horse_racing', name: 'At Yarışı ve Binicilik', emoji: '🏇' },
             { id: 'world_cup', name: 'Dünya Kupası', emoji: '🏆' },
+            { id: 'olympics', name: 'Olimpiyatlar', emoji: '🏅' },
             { id: 'super_lig_clubs', name: 'Süper Lig ve Kulüpler', emoji: '⚽' },
             { id: 'legendary_athletes', name: 'Efsane Sporcular', emoji: '🥇' },
             { id: 'sports_records', name: 'Spor Rekorları', emoji: '📏' },
@@ -520,6 +523,7 @@ exports.ALL_CATEGORIES = [
         totalQuestions: 210,
         subCategories: [
             { id: 'italian_cuisine', name: 'İtalyan Mutfağı', emoji: '🍝' },
+            { id: 'spanish_cuisine', name: 'İspanyol Mutfağı', emoji: '🥘' },
             { id: 'asian_cuisine', name: 'Uzak Doğu Mutfağı', emoji: '🍣' },
             { id: 'turkish_cuisine', name: 'Türk Mutfağı', emoji: '🥙' },
             { id: 'fast_food', name: 'Fast Food', emoji: '🍔' },
@@ -614,6 +618,7 @@ exports.ALL_CATEGORIES = [
         subCategories: [
             { id: 'human_anatomy', name: 'İnsan Anatomisi', emoji: '🦴' },
             { id: 'genetics', name: 'Genetik ve DNA', emoji: '🧬' },
+            { id: 'cell_biology', name: 'Hücre Biyolojisi', emoji: '🔬' },
             { id: 'botany_plants', name: 'Bitkiler Alemi', emoji: '🌿' },
             { id: 'ecology', name: 'Ekoloji ve Canlılar', emoji: '🌱' },
         ],
@@ -659,6 +664,7 @@ exports.ALL_CATEGORIES = [
         subCategories: [
             { id: 'climate_weather', name: 'İklim ve Hava Olayları', emoji: '⛈️' },
             { id: 'forests_jungles', name: 'Ormanlar ve Korular', emoji: '🌲' },
+            { id: 'bees_honey', name: 'Arılar ve Bal', emoji: '🐝' },
             { id: 'sustainability', name: 'Sürdürülebilirlik ve Çevre', emoji: '♻️' },
             { id: 'natural_disasters', name: 'Doğal Afetler', emoji: '🌋' },
         ],
