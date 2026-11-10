@@ -2509,14 +2509,23 @@ class PrismaService {
         });
         return stats;
     }
-    getQuestions(category = 'mixed', difficulty, count = 10, seenIds = []) {
+    getQuestions(category = 'mixed', difficulty, count = 10, seenIds = [], subCategory) {
         const canonCat = (0, shared_1.canonicalCategoryId)(category);
         const allPublished = this.questions.filter((q) => q.reviewStatus === 'published');
         const pickedMap = new Map();
         const categoryPool = canonCat === 'mixed'
             ? allPublished
             : allPublished.filter((q) => (0, shared_1.canonicalCategoryId)(q.categoryId) === canonCat);
-        let primaryPool = categoryPool.length > 0 ? categoryPool : allPublished;
+        // Alt kategori filtresi: eşleşen soru yoksa tüm kategori havuzuna geri düşer
+        let effectivePool = categoryPool;
+        if (subCategory && categoryPool.length > 0) {
+            const sub = subCategory.trim().toLowerCase();
+            const subPool = categoryPool.filter((q) => q.subCategory && q.subCategory.trim().toLowerCase() === sub);
+            if (subPool.length > 0) {
+                effectivePool = subPool;
+            }
+        }
+        let primaryPool = effectivePool.length > 0 ? effectivePool : allPublished;
         if (difficulty && difficulty !== 'mixed') {
             const withDiff = primaryPool.filter((q) => q.difficulty === difficulty);
             if (withDiff.length > 0) {
@@ -2532,7 +2541,7 @@ class PrismaService {
             }
         }
         if (pickedMap.size < count) {
-            const sameCategoryUnseen = categoryPool
+            const sameCategoryUnseen = effectivePool
                 .filter((q) => !pickedMap.has(q.id) && !seenIds.includes(q.id))
                 .sort(() => 0.5 - Math.random());
             for (const q of sameCategoryUnseen) {
@@ -2551,7 +2560,7 @@ class PrismaService {
             }
         }
         if (pickedMap.size < count) {
-            const sameCategoryAny = [...categoryPool].sort(() => 0.5 - Math.random());
+            const sameCategoryAny = [...effectivePool].sort(() => 0.5 - Math.random());
             for (const q of sameCategoryAny) {
                 if (pickedMap.size >= count)
                     break;
@@ -2560,7 +2569,7 @@ class PrismaService {
                 }
             }
         }
-        if (pickedMap.size < count && (canonCat === 'mixed' || categoryPool.length === 0)) {
+        if (pickedMap.size < count && (canonCat === 'mixed' || effectivePool.length === 0)) {
             const fallbackPool = allPublished
                 .filter((q) => !pickedMap.has(q.id))
                 .sort(() => 0.5 - Math.random());

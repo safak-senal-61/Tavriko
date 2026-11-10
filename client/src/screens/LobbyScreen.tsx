@@ -98,11 +98,15 @@ const CheckSvgIcon = ({ size = 18, color = '#5ADBB5' }: { size?: number; color?:
 // Tavriko UI Kit 8 Lobi Reaksiyonu
 const LOBBY_REACTION_EMOJIS = ['🔥', '👏', '😂', '❤️', '⚡', '🎯', '🚀'];
 
-/* Üretilmiş lobi görselleri: sahne banner'ı ve boş slot kaidesi */
+/* Üretilmiş lobi görselleri: sahne banner'ı ve şeffaf arka plansız soru işareti */
 const LOBBY_IMG = {
   hero: require('../../assets/images/lobby/lobby_hero.png'),
-  emptySlot: require('../../assets/images/lobby/empty_slot.png'),
+  questionMark: require('../../assets/images/lobby/question_mark.png'),
 };
+
+/** Özel oda katılım bağlantısı: ?oda=KOD ile tıklayan doğrudan odaya katılır */
+const ROOM_LINK_BASE = 'https://tavriko-app.vercel.app';
+const buildRoomLink = (code: string) => `${ROOM_LINK_BASE}/?oda=${code}`;
 
 /** Nefes alan altın parıltılı KART KENDİSİ (üst üste katman yok, tek kart) */
 const CodeCardShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -148,23 +152,23 @@ const BouncyReaction: React.FC<{ emoji: string; onPress: () => void }> = ({ emoj
   );
 };
 
-/** Boş slot: üretilmiş kaide görseli + nefes alan parıltı */
+/** Boş slot: sadece şeffaf (arka plansız) soru işareti + bekleniyor yazısı */
 const EmptySlotCard: React.FC = () => {
   const p = useSharedValue(0);
   useEffect(() => {
     p.value = withRepeat(withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }), -1, true);
   }, []);
   const glow = useAnimatedStyle(() => ({
-    opacity: 0.35 + 0.4 * Math.sin(p.value * Math.PI),
+    opacity: 0.45 + 0.4 * Math.sin(p.value * Math.PI),
     transform: [{ scale: 0.97 + 0.04 * Math.sin(p.value * Math.PI) }],
   }));
   return (
     <Reanimated.View
       entering={FadeInDown.delay(140).duration(400)}
-      style={[styles.emptySlotCardMinimal]}
+      style={styles.emptySlotRow}
     >
       <Reanimated.Image
-        source={LOBBY_IMG.emptySlot}
+        source={LOBBY_IMG.questionMark}
         style={[styles.emptySlotArt, glow]}
         resizeMode="contain"
       />
@@ -277,6 +281,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   onKickPlayer,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [chatText, setChatText] = useState('');
   const [floatingItems, setFloatingItems] = useState<FloatingItemData[]>([]);
 
@@ -451,12 +456,31 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const roomLink = buildRoomLink(room.code);
+
+  const handleCopyLink = async () => {
+    sound.playSound('tap');
+    sound.triggerHaptic('light');
+    await Clipboard.setStringAsync(roomLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
   const handleShareCode = async () => {
     sound.playSound('tap');
     sound.triggerHaptic('medium');
     try {
       await Share.share({
-        message: `Tavriko bilgi yarışmasında özel odama katıl! 🎮\nOda Kodum: ${room.code}\nÖzel Oda ekranından bu kodu girerek hemen oyuna katıl!`,
+        message:
+          `🎮 Tavriko bilgi yarışmasında özel odama katıl!\n\n` +
+          `🔗 Oda Bağlantısı: ${roomLink}\n` +
+          `📝 Oda Kodu: ${room.code}\n\n` +
+          `📋 Oda Detayları:\n` +
+          `• 🔒 ${room.privacy === 'public' ? 'Herkese Açık' : 'Özel Oda'}\n` +
+          `• 📝 ${room.totalRounds || 7} Soru\n` +
+          `• ⏱️ Soru Başına ${room.questionTimeSec || 20} Saniye\n` +
+          `• ${room.penaltyForWrong ? '⚠️ Yanlışta -50 Puan Cezası' : '🛡️ Cezasız Mod'}\n\n` +
+          `Bağlantıya dokunarak ya da Özel Oda ekranından kodu girerek hemen katılabilirsin!`,
       });
     } catch {}
   };
@@ -545,6 +569,32 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             </View>
           </TouchableOpacity>
           </CodeCardShell>
+        </Reanimated.View>
+
+        {/* 1.5. DAVET BAĞLANTISI (Linke dokunan doğrudan odaya katılır) */}
+        <Reanimated.View entering={FadeInDown.delay(120).duration(400)} style={styles.inviteLinkWrap}>
+          <TouchableOpacity
+            style={styles.inviteLinkCard}
+            onPress={handleCopyLink}
+            activeOpacity={0.8}
+          >
+            <View style={styles.inviteLinkInfo}>
+              <Text style={styles.inviteLinkLabel}>DAVET BAĞLANTISI</Text>
+              <Text style={styles.inviteLinkText} numberOfLines={1} ellipsizeMode="middle">
+                {roomLink}
+              </Text>
+              <Text style={styles.inviteLinkSub}>
+                {linkCopied ? '✓ Bağlantı kopyalandı!' : 'Linke dokunan arkadaşın doğrudan odaya katılır'}
+              </Text>
+            </View>
+            <View style={[styles.codeIconBtn, linkCopied && styles.codeIconBtnActive]}>
+              {linkCopied ? (
+                <CheckSvgIcon size={18} color="#5ADBB5" />
+              ) : (
+                <CopySvgIcon size={18} color="#FFFFFF" />
+              )}
+            </View>
+          </TouchableOpacity>
         </Reanimated.View>
 
         {/* 2. ODA PARAMETRELERİ (Kademeli girişli çipler) */}
@@ -1022,28 +1072,66 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // Boş Oyuncu Slotu (Sade ve Şık Kesikli Slot)
-  emptySlotCardMinimal: {
+  // Boş Oyuncu Slotu (Arka plansız, sadece şeffaf soru işareti)
+  emptySlotRow: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(154, 107, 255, 0.25)',
-    backgroundColor: 'rgba(23, 11, 51, 0.35)',
-    gap: 12,
+    paddingHorizontal: 14,
+    gap: 14,
+    backgroundColor: 'transparent',
   },
   emptySlotArt: {
-    width: 52,
-    height: 52,
+    width: 46,
+    height: 46,
   },
   emptySlotTextMinimal: {
     color: '#8A7BAF',
     fontSize: 13,
     fontFamily: THEME.fonts.medium,
+  },
+
+  // 1.5. Davet Bağlantısı Kartı
+  inviteLinkWrap: {
+    width: '100%',
+    marginBottom: 12,
+  },
+  inviteLinkCard: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+    backgroundColor: 'rgba(23, 11, 51, 0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(90, 219, 181, 0.35)',
+  },
+  inviteLinkInfo: {
+    flex: 1,
+    marginRight: 10,
+  },
+  inviteLinkLabel: {
+    color: '#5ADBB5',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 2.5,
+    marginBottom: 2,
+  },
+  inviteLinkText: {
+    color: '#E9DFFC',
+    fontSize: 13,
+    fontFamily: THEME.fonts.bold,
+    textDecorationLine: 'underline',
+    textDecorationColor: 'rgba(90, 219, 181, 0.6)',
+  },
+  inviteLinkSub: {
+    color: '#9A8BC2',
+    fontSize: 10.5,
+    fontFamily: THEME.fonts.medium,
+    marginTop: 2,
   },
   emptySlotCard: {
     width: '100%',

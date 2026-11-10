@@ -18,6 +18,7 @@ router.get('/categories', (req: Request, res: Response): void => {
 router.get('/questions/practice', async (req: Request, res: Response): Promise<void> => {
   const category = (req.query.category as CategoryId) || 'mixed';
   const difficulty = req.query.difficulty as DifficultyLevel | undefined;
+  const subCategory = (req.query.subcategory as string) || undefined;
   const count = parseInt(req.query.count as string, 10) || 5;
   const seenIdsRaw = req.query.seenIds as string | undefined;
   const seenIds = seenIdsRaw ? seenIdsRaw.split(',') : [];
@@ -26,7 +27,7 @@ router.get('/questions/practice', async (req: Request, res: Response): Promise<v
   // Sunucusuz ortamda kalıcı soru havuzunun (Telegram soruları dahil) hazır olmasını bekle
   await db.ensureQuestionsRestored();
 
-  const rawQuestions = db.getQuestions(category, difficulty, count, seenIds);
+  const rawQuestions = db.getQuestions(category, difficulty, count, seenIds, subCategory);
   // Strip correctOptionId for client-safe delivery
   const questions: ClientQuestion[] = rawQuestions.map((q, idx) => ({
     id: q.id,

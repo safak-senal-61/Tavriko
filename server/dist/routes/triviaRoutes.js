@@ -17,13 +17,14 @@ router.get('/categories', (req, res) => {
 router.get('/questions/practice', async (req, res) => {
     const category = req.query.category || 'mixed';
     const difficulty = req.query.difficulty;
+    const subCategory = req.query.subcategory || undefined;
     const count = parseInt(req.query.count, 10) || 5;
     const seenIdsRaw = req.query.seenIds;
     const seenIds = seenIdsRaw ? seenIdsRaw.split(',') : [];
     const sessionId = req.query.sessionId || 'practice';
     // Sunucusuz ortamda kalıcı soru havuzunun (Telegram soruları dahil) hazır olmasını bekle
     await prismaClient_1.db.ensureQuestionsRestored();
-    const rawQuestions = prismaClient_1.db.getQuestions(category, difficulty, count, seenIds);
+    const rawQuestions = prismaClient_1.db.getQuestions(category, difficulty, count, seenIds, subCategory);
     // Strip correctOptionId for client-safe delivery
     const questions = rawQuestions.map((q, idx) => ({
         id: q.id,

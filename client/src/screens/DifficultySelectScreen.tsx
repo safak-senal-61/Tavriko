@@ -17,6 +17,7 @@ import {
 } from '../components/TavrikoIcons';
 interface DifficultySelectScreenProps {
   categoryId: CategoryId;
+  subCategory?: string;
   onBack: () => void;
   onSelectDifficulty: (difficulty: DifficultyLevel) => void;
   avatarSeed?: string;
@@ -39,6 +40,7 @@ const DIFFICULTIES: {
 ];
 export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
   categoryId,
+  subCategory,
   onBack,
   onSelectDifficulty,
   avatarSeed,
@@ -66,7 +68,7 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
       >
         <Text style={styles.title}>ZORLUK SEVİYESİ</Text>
         <Text style={styles.subtitle}>
-          {category?.name || 'Bilim'} · 5 soru
+          {subCategory ? `${category?.name || 'Kategori'} · ${subCategory}` : `${category?.name || 'Bilim'}`} · 5 soru
         </Text>
         {DIFFICULTIES.map((diff) => {
           const isSelected = selected === diff.id;

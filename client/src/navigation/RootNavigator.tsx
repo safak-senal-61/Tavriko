@@ -68,6 +68,7 @@ import { NotificationToast } from '../components/NotificationUI';
 import { PaymentScreen, PaymentItem } from '../screens/PaymentScreen';
 import { captureReferralLink, clearPendingReferral, getPendingReferral } from '../utils/referralLink';
 import { captureProfileLink, clearPendingProfileCode, getPendingProfileCode } from '../utils/profileLink';
+import { captureRoomLink, clearPendingRoomCode } from '../utils/roomLink';
 import { ProfileInspectModal, PublicProfileCard } from '../components/ProfileInspectModal';
 import { DeveloperScreen } from '../screens/DeveloperScreen';
 export type ScreenName =
@@ -136,6 +137,7 @@ export const RootNavigator: React.FC = () => {
 
   const [currentScreen, setCurrentScreen] = useState<ScreenName>(initialScreen);
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('general_culture');
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>('medium');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [selectedPaymentItem, setSelectedPaymentItem] = useState<PaymentItem | null>(null);
@@ -336,6 +338,9 @@ export const RootNavigator: React.FC = () => {
       // Paylaşılan profil bağlantısını yakala
       const profileCode = captureProfileLink(url);
       if (profileCode) setSharedProfileCode(profileCode);
+      // Paylaşılan özel oda bağlantısını (?oda=KOD) yakala
+      const roomCode = captureRoomLink(url);
+      if (roomCode) setSharedRoomCode(roomCode);
     };
     void Linking.getInitialURL().then(capture).catch(() => {});
     const sub = Linking.addEventListener('url', event => capture(event.url));
@@ -344,6 +349,9 @@ export const RootNavigator: React.FC = () => {
 
   // --- Paylaşılan profil bağlantısı (?profil=KOD) ---
   const [sharedProfileCode, setSharedProfileCode] = useState<string | null>(() => captureProfileLink());
+  // --- Paylaşılan özel oda bağlantısı (?oda=KOD) ---
+  const [sharedRoomCode, setSharedRoomCode] = useState<string | null>(() => captureRoomLink());
+  const sharedRoomHandledRef = useRef<string | null>(null);
   const [sharedProfile, setSharedProfile] = useState<PublicProfileCard | null>(null);
   const [sharedProfileLoading, setSharedProfileLoading] = useState(false);
   const sharedProfileHandledRef = useRef<string | null>(null);
@@ -1050,6 +1058,17 @@ export const RootNavigator: React.FC = () => {
       navigateTo('lobby');
     }, 'Özel Odaya Katılma');
   };
+  // --- Paylaşılan oda bağlantısından otomatik katılım (?oda=KOD) ---
+  useEffect(() => {
+    if (!sharedRoomCode || !user || isGuest || user.isGuest) return;
+    if (sharedRoomHandledRef.current === sharedRoomCode) return;
+    if (activeRoomRef.current) return; // zaten bir odada
+    sharedRoomHandledRef.current = sharedRoomCode;
+    const code = sharedRoomCode;
+    setSharedRoomCode(null);
+    clearPendingRoomCode();
+    handleJoinCustomRoom(code);
+  }, [sharedRoomCode, user, isGuest]);
   const handleToggleReady = () => {
     if (activeRoom && user) {
       socketService.toggleReady(activeRoom.code, user.id);
@@ -1070,16 +1089,19 @@ export const RootNavigator: React.FC = () => {
   };
   const handleStartPractice = (
     category: CategoryId,
-    difficulty: DifficultyLevel
+    difficulty: DifficultyLevel,
+    subCategory?: string
   ) => {
     setActiveDailyConfig(null);
-    handleStartPracticeInternal(category, difficulty, 5, false);
+    setSelectedSubCategory(subCategory ?? null);
+    handleStartPracticeInternal(category, difficulty, 5, false, subCategory);
   };
   const handleStartPracticeInternal = async (
     category: CategoryId,
     difficulty: DifficultyLevel,
     questionCount: number = 5,
-    isDaily: boolean = false
+    isDaily: boolean = false,
+    subCategory?: string
   ) => {
     if (activeRoomRef.current && user) {
       try {
@@ -1114,7 +1136,7 @@ export const RootNavigator: React.FC = () => {
       'sess_' + Math.random().toString(36).substring(2, 9);
     try {
       const res = await fetch(
-        `${API_BASE}/questions/practice?category=${category}&difficulty=${difficulty}&count=${questionCount}&sessionId=${practiceSessionIdRef.current}`
+        `${API_BASE}/questions/practice?category=${category}${subCategory ? `&subcategory=${encodeURIComponent(subCategory)}` : ''}&difficulty=${difficulty}&count=${questionCount}&sessionId=${practiceSessionIdRef.current}`
       );
       if (res.ok) {
         const data = await res.json();
@@ -1668,8 +1690,9 @@ export const RootNavigator: React.FC = () => {
             onBack={() =>
               requireAuth(() => navigateTo('home'), 'Ana Menü & Düello Modları')
             }
-            onSelectCategory={(cat) => {
+            onSelectCategory={(cat, sub) => {
               setSelectedCategory(cat);
+              setSelectedSubCategory(sub ?? null);
               navigateTo('difficulty');
             }}
             onNotifications={() =>
@@ -1692,6 +1715,7 @@ export const RootNavigator: React.FC = () => {
         {currentScreen === 'difficulty' && (
           <DifficultySelectScreen
             categoryId={selectedCategory}
+            subCategory={selectedSubCategory ?? undefined}
             avatarSeed={user?.avatarUrl || user?.displayName}
             coins={user?.coins}
             gems={user?.gems}
@@ -1703,7 +1727,7 @@ export const RootNavigator: React.FC = () => {
             onBack={() => navigateTo('categories')}
             onSelectDifficulty={(diff) => {
               setSelectedDifficulty(diff);
-              handleStartPractice(selectedCategory, diff);
+              handleStartPractice(selectedCategory, diff, selectedSubCategory ?? undefined);
             }}
           />
         )}

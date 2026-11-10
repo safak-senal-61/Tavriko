@@ -8,10 +8,8 @@ import {
   Animated,
   Platform,
   TextInput,
-  Modal,
-  Image,
 } from 'react-native';
-import Reanimated, { FadeInDown } from 'react-native-reanimated';
+import Reanimated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { CategoryId, CategoryInfo, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -21,9 +19,7 @@ import {
   TavrikoTopBar,
   TavrikoBottomNav,
   Button3D,
-  CategorySquircleIcon,
 } from '../components/TavrikoIcons';
-import { CATEGORY_IMG } from '../components/StoreKit';
 import { GuestDiscoveryCard } from '../components/DiscoveryArtwork';
 
 interface CategoryExploreScreenProps {
@@ -41,41 +37,8 @@ interface CategoryExploreScreenProps {
 
 type GroupTab = 'all' | 'gaming_pop' | 'history_culture' | 'science_nature' | 'lifestyle';
 
-const catFallback = require('../../assets/images/categories/cat_general.png');
-
-const CAT_COLORS: Record<string, string> = {
-  gaming_videogames: '#8B5CF6',
-  anime_manga: '#EC4899',
-  cartoons_animation: '#F59E0B',
-  cinema_tv: '#BA68C8',
-  comics_superheroes: '#0284C7',
-  fantasy_fiction: '#7C3AED',
-  literature: '#A1887F',
-  music: '#F06292',
-  social_internet: '#06B6D4',
-  animals_wildlife: '#DCE775',
-  mythology_ancient: '#F59E0B',
-  hobbies_leisure: '#10B981',
-  history: '#FFB74D',
-  geography: '#81C784',
-  art_culture: '#4DB6AC',
-  sports: '#FF8A65',
-  science_tech: '#4FC3F7',
-  logic_puzzles: '#FF8A80',
-  mathematics: '#4FC3F7',
-  food_gastronomy: '#FFD54F',
-  daily_life: '#6366F1',
-  turkey_special: '#DC2626',
-  space_astronomy: '#9575CD',
-  biology: '#4DD0E1',
-  physics_chemistry: '#64B5F6',
-  language_vocab: '#80CBC4',
-  nature_ecology: '#AED581',
-  general_culture: '#FFD180',
-};
-
 const GROUP_TABS: { id: GroupTab; label: string }[] = [
-  { id: 'all', label: 'Tümü (28)' },
+  { id: 'all', label: 'Tümü' },
   { id: 'gaming_pop', label: '🎮 Oyun & Pop' },
   { id: 'history_culture', label: '🏛️ Tarih & Kültür' },
   { id: 'science_nature', label: '🔬 Bilim & Doğa' },
@@ -122,6 +85,15 @@ const GROUP_MEMBERS: Record<GroupTab, CategoryId[]> = {
   ],
 };
 
+/** Yardımcı: hex rengi alfa ile rgba'ya çevirir */
+const withAlpha = (hex: string, alpha: number): string => {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
 export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   onBack,
   onSelectCategory,
@@ -139,7 +111,6 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   const [liveCounts, setLiveCounts] = useState<Record<string, number>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [activeGroup, setActiveGroup] = useState<GroupTab>('all');
-  const [selectedCatModal, setSelectedCatModal] = useState<CategoryInfo | null>(null);
 
   useEffect(() => {
     Animated.parallel([
@@ -177,7 +148,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
     };
   }, [apiBaseUrl]);
 
-  // Categories list with live counts
+  // Kategoriler canlı soru sayılarıyla
   const categoriesWithRealCounts = useMemo(() => {
     return ALL_CATEGORIES.filter((c) => c.id !== 'mixed').map((cat) => ({
       ...cat,
@@ -186,36 +157,51 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
     }));
   }, [liveCounts]);
 
-  // Filtered categories by search and group tabs
-  const filteredCategories = useMemo(() => {
+  // Arama ve grup sekmesine göre filtrelenmiş bölümler
+  const visibleSections = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const groupAllowed = new Set(GROUP_MEMBERS[activeGroup]);
 
-    return categoriesWithRealCounts.filter((cat) => {
-      if (!groupAllowed.has(cat.id)) return false;
-      if (!q) return true;
-
-      // Match main name or description
-      if (cat.name.toLowerCase().includes(q)) return true;
-      if (cat.description.toLowerCase().includes(q)) return true;
-
-      // Match subcategories!
-      if (cat.subCategories && cat.subCategories.some((sc) => sc.name.toLowerCase().includes(q))) {
-        return true;
-      }
-      return false;
-    });
+    return categoriesWithRealCounts
+      .filter((cat) => groupAllowed.has(cat.id))
+      .map((cat) => {
+        if (!q) return cat;
+        // Arama: ana ad veya alt kategori adı eşleşmeli
+        const nameMatch =
+          cat.name.toLowerCase().includes(q) ||
+          (cat.description && cat.description.toLowerCase().includes(q));
+        const subs = (cat.subCategories || []).filter((sc) =>
+          sc.name.toLowerCase().includes(q)
+        );
+        if (nameMatch) return cat;
+        if (subs.length > 0) return { ...cat, subCategories: subs };
+        return null;
+      })
+      .filter((cat): cat is CategoryInfo & { totalQuestions: number } => cat !== null);
   }, [categoriesWithRealCounts, activeGroup, searchQuery]);
 
-  const totalQuestionCount = useMemo(() => {
-    return categoriesWithRealCounts.reduce((sum, item) => sum + item.totalQuestions, 0);
-  }, [categoriesWithRealCounts]);
+  const totalSubCount = useMemo(
+    () => visibleSections.reduce((sum, s) => sum + (s.subCategories?.length || 0), 0),
+    [visibleSections]
+  );
+
+  const totalQuestionCount = useMemo(
+    () => visibleSections.reduce((sum, item) => sum + item.totalQuestions, 0),
+    [visibleSections]
+  );
 
   const handleRandomCategory = () => {
     sound.playSound('tap');
-    const randomItem =
-      categoriesWithRealCounts[Math.floor(Math.random() * categoriesWithRealCounts.length)];
-    onSelectCategory(randomItem.id);
+    // Rastgele bir bölümün rastgele bir alt kategorisi seçilir
+    const allSubs = visibleSections.flatMap((cat) =>
+      (cat.subCategories || []).map((sc) => ({ catId: cat.id, subName: sc.name }))
+    );
+    if (allSubs.length === 0) {
+      if (visibleSections.length > 0) onSelectCategory(visibleSections[0].id);
+      return;
+    }
+    const pick = allSubs[Math.floor(Math.random() * allSubs.length)];
+    onSelectCategory(pick.catId, pick.subName);
   };
 
   return (
@@ -253,18 +239,18 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
             }} />
           )}
 
-          {/* Screen Title */}
-          <Text style={styles.title}>KATEGORİLER</Text>
+          {/* Sayfa Başlığı */}
+          <Text style={styles.title}>KEŞFET</Text>
           <Text style={styles.subtitle}>
-            {categoriesWithRealCounts.length} ana branş · {totalQuestionCount}+ soru havuzu
+            {visibleSections.length} bölüm · {totalSubCount} kategori · {totalQuestionCount}+ soru
           </Text>
 
-          {/* Search Bar */}
+          {/* Arama */}
           <View style={styles.searchBar}>
             <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
             <TextInput
               style={styles.searchInput}
-              placeholder="Branş veya alt konu ara... (örn: anime, shonen, fps)"
+              placeholder="Kategori ara... (örn: anime, futbol, uzay)"
               placeholderTextColor="#94A3B8"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -277,7 +263,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
             )}
           </View>
 
-          {/* Group Filter Tabs */}
+          {/* Grup Sekmeleri */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -308,42 +294,70 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
             })}
           </ScrollView>
 
-          {/* 3 sütunlu kategori ızgarası */}
-          <View style={styles.grid}>
-            {filteredCategories.map((cat, idx) => (
+          {/* Bölümler: üstte sadece bölüm adı yazısı, altında normal kategori gibi alt kategoriler */}
+          {visibleSections.map((cat, sIdx) => {
+            const accent = cat.primaryColor || '#8B5CF6';
+            return (
               <Reanimated.View
                 key={`${activeGroup}-${cat.id}`}
-                entering={FadeInDown.delay(Math.min(idx, 14) * 28).duration(300)}
-                style={styles.catCell}
+                entering={FadeInDown.delay(Math.min(sIdx, 6) * 60).duration(320)}
+                style={styles.sectionWrap}
               >
-              <TouchableOpacity
-                style={[styles.catTile, { borderColor: `${CAT_COLORS[cat.id] || '#8B5CF6'}44` }]}
-                onPress={() => {
-                  sound.playSound('tap');
-                  sound.triggerHaptic('light');
-                  setSelectedCatModal(cat);
-                }}
-                activeOpacity={0.85}
-              >
-                <View style={styles.catIconGlowWrap}>
-                  <Image
-                    source={CATEGORY_IMG[cat.id] || catFallback}
-                    style={styles.catIcon}
-                    resizeMode="contain"
-                  />
+                {/* Bölüm Başlığı — sadece yazı */}
+                <View style={styles.sectionHeader}>
+                  <View style={styles.sectionHeaderLeft}>
+                    <View style={[styles.sectionAccentBar, { backgroundColor: accent }]} />
+                    <Text style={styles.sectionTitle}>{cat.name}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.sectionPlayAll}
+                    onPress={() => {
+                      sound.playSound('tap');
+                      sound.triggerHaptic('light');
+                      onSelectCategory(cat.id);
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.sectionPlayAllText}>Tümünü Oyna →</Text>
+                  </TouchableOpacity>
                 </View>
-                <Text style={styles.catName} numberOfLines={2}>
-                  {cat.name}
-                </Text>
-                <View style={styles.catCountPill}>
-                  <Text style={styles.catCount}>{cat.totalQuestions} soru</Text>
-                </View>
-              </TouchableOpacity>
-              </Reanimated.View>
-            ))}
-          </View>
 
-          {filteredCategories.length === 0 && (
+                {/* Alt kategoriler: normal kategori kartları */}
+                <View style={styles.grid}>
+                  {(cat.subCategories || []).map((sc, idx) => (
+                    <Reanimated.View
+                      key={`${cat.id}-${sc.id}`}
+                      entering={FadeIn.delay(Math.min(idx, 10) * 25).duration(280)}
+                      style={styles.catCell}
+                    >
+                      <TouchableOpacity
+                        style={[
+                          styles.catTile,
+                          {
+                            backgroundColor: withAlpha(accent, 0.14),
+                            borderColor: withAlpha(accent, 0.45),
+                          },
+                        ]}
+                        onPress={() => {
+                          sound.playSound('tap');
+                          sound.triggerHaptic('light');
+                          onSelectCategory(cat.id, sc.name);
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.catEmoji}>{sc.emoji}</Text>
+                        <Text style={styles.catName} numberOfLines={2}>
+                          {sc.name}
+                        </Text>
+                      </TouchableOpacity>
+                    </Reanimated.View>
+                  ))}
+                </View>
+              </Reanimated.View>
+            );
+          })}
+
+          {visibleSections.length === 0 && (
             <View style={styles.emptyState}>
               <Text style={{ fontSize: 32, marginBottom: 6 }}>🔍</Text>
               <Text style={styles.emptyTitle}>Eşleşen Kategori Bulunamadı</Text>
@@ -353,102 +367,16 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
             </View>
           )}
 
-          {/* Random Category Button */}
+          {/* Rastgele Kategori */}
           <View style={{ marginTop: 20 }}>
             <Button3D
-              title="🎲 RASTGELE BRANŞ SEÇ"
+              title="🎲 RASTGELE KATEGORİ SEÇ"
               variant="mint"
               onPress={handleRandomCategory}
             />
           </View>
         </Animated.View>
       </ScrollView>
-
-      {/* Subcategory Detail Modal */}
-      {selectedCatModal && (
-        <Modal
-          visible={true}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setSelectedCatModal(null)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeaderRow}>
-                <View style={styles.modalIconWrap}>
-                  <Image
-                    source={CATEGORY_IMG[selectedCatModal.id] || catFallback}
-                    style={styles.modalIcon}
-                    resizeMode="contain"
-                  />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.modalTitle}>{selectedCatModal.name}</Text>
-                  <Text style={styles.modalSub}>{selectedCatModal.description}</Text>
-                  <Text style={styles.modalCountBadge}>
-                    🎯 Toplam {selectedCatModal.totalQuestions} soru mevcut
-                  </Text>
-                </View>
-              </View>
-
-              {/* Action 1: Play all category questions */}
-              <TouchableOpacity
-                style={styles.playAllBtn}
-                onPress={() => {
-                  sound.playSound('tap');
-                  const catId = selectedCatModal.id;
-                  setSelectedCatModal(null);
-                  onSelectCategory(catId);
-                }}
-                activeOpacity={0.88}
-              >
-                <Text style={styles.playAllBtnText}>⚡ TÜM BRANŞI OYNA</Text>
-              </TouchableOpacity>
-
-              {/* Subcategories title */}
-              {selectedCatModal.subCategories && selectedCatModal.subCategories.length > 0 && (
-                <>
-                  <Text style={styles.subCatHeader}>
-                    Alt Başlıklar ({selectedCatModal.subCategories.length})
-                  </Text>
-                  <ScrollView style={{ maxHeight: 240 }} showsVerticalScrollIndicator={false}>
-                    <View style={styles.subCatGrid}>
-                      {selectedCatModal.subCategories.map((sc) => (
-                        <TouchableOpacity
-                          key={sc.id}
-                          style={styles.subCatPill}
-                          onPress={() => {
-                            sound.playSound('tap');
-                            const catId = selectedCatModal.id;
-                            const subName = sc.name;
-                            setSelectedCatModal(null);
-                            onSelectCategory(catId, subName);
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={{ fontSize: 16, marginRight: 6 }}>{sc.emoji}</Text>
-                          <Text style={styles.subCatPillText} numberOfLines={1}>
-                            {sc.name}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </ScrollView>
-                </>
-              )}
-
-              {/* Close Button */}
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setSelectedCatModal(null)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.modalCloseBtnText}>KAPAT</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-      )}
 
       {!isGuest && (
         <TavrikoBottomNav
@@ -528,6 +456,51 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     fontWeight: '900',
   },
+
+  // Bölüm yapısı
+  sectionWrap: {
+    marginBottom: 22,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    marginBottom: 10,
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexShrink: 1,
+  },
+  sectionAccentBar: {
+    width: 4,
+    height: 20,
+    borderRadius: 2,
+    marginRight: 8,
+  },
+  sectionTitle: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontFamily: THEME.fonts.display,
+    letterSpacing: 0.5,
+  },
+  sectionPlayAll: {
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    marginLeft: 8,
+  },
+  sectionPlayAllText: {
+    color: '#5ADBB5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+
+  // Kategori ızgarası
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -539,61 +512,24 @@ const styles = StyleSheet.create({
     width: '31.8%',
   },
   catTile: {
-    height: 138,
+    height: 96,
     borderRadius: 18,
-    backgroundColor: 'rgba(20, 8, 52, 0.72)',
     borderWidth: 1.2,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
     paddingHorizontal: 6,
   },
-  catIconGlowWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  catIcon: {
-    width: 46,
-    height: 46,
-  },
-  catCountPill: {
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  modalIconWrap: {
-    width: 62,
-    height: 62,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 196, 61, 0.35)',
-  },
-  modalIcon: {
-    width: 52,
-    height: 52,
+  catEmoji: {
+    fontSize: 30,
+    lineHeight: 34,
   },
   catName: {
     color: '#FFFFFF',
-    fontSize: 12,
-    lineHeight: 15,
+    fontSize: 11,
+    lineHeight: 14,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
-    minHeight: 30,
-    textAlignVertical: 'center',
-  },
-  catCount: {
-    color: 'rgba(217, 205, 245, 0.6)',
-    fontSize: 10.5,
-    fontFamily: THEME.fonts.bold,
   },
   emptyState: {
     alignItems: 'center',
@@ -611,120 +547,5 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.medium,
     textAlign: 'center',
     marginTop: 4,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(5, 2, 18, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  modalContent: {
-    width: '100%',
-    maxWidth: 480,
-    backgroundColor: '#0F172A',
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: 'rgba(245, 158, 11, 0.45)',
-    padding: 20,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#F59E0B',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.35,
-        shadowRadius: 16,
-      },
-      android: { elevation: 10 },
-      web: { boxShadow: '0 8px 30px rgba(245, 158, 11, 0.25)' },
-    }),
-  },
-  modalHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  modalTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontFamily: THEME.fonts.display,
-    fontWeight: '900',
-  },
-  modalSub: {
-    color: '#94A3B8',
-    fontSize: 11,
-    fontFamily: THEME.fonts.medium,
-    marginTop: 2,
-  },
-  modalCountBadge: {
-    color: '#10B981',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-    marginTop: 4,
-  },
-  playAllBtn: {
-    backgroundColor: '#10B981',
-    borderRadius: 14,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginBottom: 14,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#10B981',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-      },
-      android: { elevation: 4 },
-      web: { boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)' },
-    }),
-  },
-  playAllBtnText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: THEME.fonts.display,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  subCatHeader: {
-    color: '#FFC43D',
-    fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
-    marginBottom: 8,
-    letterSpacing: 0.5,
-  },
-  subCatGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    paddingBottom: 8,
-  },
-  subCatPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  subCatPillText: {
-    color: '#E2E8F0',
-    fontSize: 11.5,
-    fontFamily: THEME.fonts.bold,
-  },
-  modalCloseBtn: {
-    marginTop: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 14,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  modalCloseBtnText: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
   },
 });
