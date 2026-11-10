@@ -7,6 +7,7 @@ const evrenLlmGenerator_1 = require("../ai/evrenLlmGenerator");
 const redisClient_1 = require("../cache/redisClient");
 const supabaseClient_1 = require("../db/supabaseClient");
 const questionImporter_1 = require("../utils/questionImporter");
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 // Public trivia categories
 router.get('/categories', async (req, res) => {
@@ -96,6 +97,9 @@ router.get('/questions/daily', async (req, res) => {
     const daily = prismaClient_1.db.getDailyChallenge();
     res.json(daily);
 });
+// SECURITY: all admin & AI question management endpoints require admin
+// authentication (HTTP Basic / portal JWT / x-internal-secret).
+router.use('/admin/questions', auth_1.requireAdminAuth);
 // -------------------------------------------------------------
 // Admin & AI Question Management Endpoints
 // -------------------------------------------------------------

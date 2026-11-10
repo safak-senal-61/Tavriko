@@ -18,6 +18,7 @@ import * as Clipboard from 'expo-clipboard';
 import { UserProfile, calculateLevelFromXp, extractProfileCosmetics } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
+import { authHeaders } from '../utils/apiAuth';
 import { DEFAULT_API_BASE } from '../config';
 import { socketService } from '../services/socketService';
 import { ReferralCards } from '../components/ReferralCards';
@@ -351,7 +352,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/friends/remove`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           userId: user.id,
           friendId: targetPlayer.id,
@@ -398,7 +399,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/friends/add`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           userId: user.id,
           codeOrUsername: clean,
@@ -435,7 +436,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/notifications/respond`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           userId: user.id,
           notificationId: req.id,

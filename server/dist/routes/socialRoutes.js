@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const auth_1 = require("../middleware/auth");
 const prismaClient_1 = require("../db/prismaClient");
 const presenceManager_1 = require("../services/presenceManager");
 const shared_1 = require("@trivia/shared");
@@ -29,9 +30,10 @@ router.get('/friends/:userId', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-router.post('/friends/add', async (req, res) => {
+router.post('/friends/add', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, codeOrUsername } = req.body;
+        const userId = req.authUserId;
+        const { codeOrUsername } = req.body;
         if (!userId || !codeOrUsername) {
             res.status(400).json({ error: 'userId ve codeOrUsername gereklidir.' });
             return;
@@ -47,9 +49,10 @@ router.post('/friends/add', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-router.post('/friends/remove', async (req, res) => {
+router.post('/friends/remove', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, friendId, targetUserId } = req.body;
+        const userId = req.authUserId;
+        const { friendId, targetUserId } = req.body;
         const target = friendId || targetUserId;
         if (!userId || !target) {
             res.status(400).json({ error: 'userId ve friendId zorunludur.' });
@@ -67,9 +70,10 @@ router.post('/friends/remove', async (req, res) => {
     }
 });
 // --- 1v1 Match Challenge (Yarış İsteği) ---
-router.post('/friends/challenge', async (req, res) => {
+router.post('/friends/challenge', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, targetUserId, category } = req.body;
+        const userId = req.authUserId;
+        const { targetUserId, category } = req.body;
         if (!userId || !targetUserId) {
             res.status(400).json({ error: 'userId ve targetUserId zorunludur.' });
             return;
@@ -86,9 +90,10 @@ router.post('/friends/challenge', async (req, res) => {
     }
 });
 // --- Real Notifications API ---
-router.get('/notifications/:userId', async (req, res) => {
+// SECURITY: notifications are private; the identity comes from the verified token.
+router.get('/notifications/:userId', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+        const userId = req.authUserId;
         const notifications = await prismaClient_1.db.getUserNotificationsAsync(userId || 'anon');
         res.json({
             success: true,
@@ -99,9 +104,10 @@ router.get('/notifications/:userId', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-router.post('/notifications/respond', async (req, res) => {
+router.post('/notifications/respond', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, notificationId, action } = req.body;
+        const userId = req.authUserId;
+        const { notificationId, action } = req.body;
         if (!userId || !notificationId || !action) {
             res.status(400).json({ error: 'userId, notificationId ve action zorunludur.' });
             return;
@@ -140,9 +146,10 @@ router.post('/presence/heartbeat', (req, res) => {
     }
 });
 // --- Room Status Sync ---
-router.post('/rooms/active', (req, res) => {
+router.post('/rooms/active', auth_1.requireUserAuth, (req, res) => {
     try {
-        const { userId, roomCode, name, hostName, category, categoryName, players, playerCount, maxPlayers, totalRounds, questionTimeSec, status, privacy, } = req.body;
+        const { roomCode, name, hostName, category, categoryName, players, playerCount, maxPlayers, totalRounds, questionTimeSec, status, privacy, } = req.body;
+        const userId = req.authUserId;
         const resolvedPlayers = typeof players === 'number' ? players : typeof playerCount === 'number' ? playerCount : undefined;
         if (userId) {
             prismaClient_1.db.setUserActiveRoom(userId, roomCode || null, roomCode
@@ -188,9 +195,10 @@ router.get('/shop/catalog', (req, res) => {
         catalog: shared_1.SHOP_CATALOG,
     });
 });
-router.post('/shop/purchase', async (req, res) => {
+router.post('/shop/purchase', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, productId, packId, paymentMethod = 'coins' } = req.body;
+        const userId = req.authUserId;
+        const { productId, packId, paymentMethod = 'coins' } = req.body;
         if (!userId) {
             res.status(400).json({ error: 'userId gerekli' });
             return;
@@ -232,9 +240,10 @@ router.post('/shop/purchase', async (req, res) => {
     }
 });
 // --- Inventory & Chest Opening ---
-router.post('/inventory/use', async (req, res) => {
+router.post('/inventory/use', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, itemId } = req.body;
+        const userId = req.authUserId;
+        const { itemId } = req.body;
         if (!userId || !itemId) {
             res.status(400).json({ error: 'userId ve itemId gerekli' });
             return;
@@ -246,9 +255,10 @@ router.post('/inventory/use', async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
-router.post('/inventory/open-chest', async (req, res) => {
+router.post('/inventory/open-chest', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, chestId, keyId } = req.body;
+        const userId = req.authUserId;
+        const { chestId, keyId } = req.body;
         if (!userId || !chestId) {
             res.status(400).json({ error: 'userId ve chestId gereklidir.' });
             return;
@@ -270,9 +280,10 @@ router.get('/season/info', (req, res) => {
         tiers: shared_1.SEASON_1_TIERS,
     });
 });
-router.post('/season/claim', async (req, res) => {
+router.post('/season/claim', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, tier, track = 'free' } = req.body;
+        const userId = req.authUserId;
+        const { tier, track = 'free' } = req.body;
         if (!userId || !tier) {
             res.status(400).json({ error: 'userId ve tier gereklidir' });
             return;
@@ -284,9 +295,9 @@ router.post('/season/claim', async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
-router.post('/season/premium-pass', async (req, res) => {
+router.post('/season/premium-pass', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId } = req.body;
+        const userId = req.authUserId;
         if (!userId) {
             res.status(400).json({ error: 'userId gereklidir' });
             return;
@@ -316,9 +327,10 @@ router.get('/events', (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-router.post('/events/claim', async (req, res) => {
+router.post('/events/claim', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, eventId } = req.body;
+        const userId = req.authUserId;
+        const { eventId } = req.body;
         if (!userId || !eventId) {
             res.status(400).json({ error: 'userId ve eventId gereklidir' });
             return;
@@ -330,9 +342,10 @@ router.post('/events/claim', async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
-router.post('/events/start', (req, res) => {
+router.post('/events/start', auth_1.requireUserAuth, (req, res) => {
     try {
-        const { userId, eventId } = req.body;
+        const userId = req.authUserId;
+        const { eventId } = req.body;
         if (!userId || !eventId) {
             res.status(400).json({ error: 'userId ve eventId gereklidir' });
             return;
@@ -355,9 +368,10 @@ router.get('/profile/:userId', async (req, res) => {
     res.json(profile);
 });
 // --- Block / Unblock (kullanıcı engelleme sistemi) ---
-router.post('/block', async (req, res) => {
+router.post('/block', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, targetUserId } = req.body;
+        const userId = req.authUserId;
+        const { targetUserId } = req.body;
         if (!userId || !targetUserId) {
             res.status(400).json({ error: 'userId ve targetUserId zorunludur.' });
             return;
@@ -377,9 +391,10 @@ router.post('/block', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-router.post('/unblock', async (req, res) => {
+router.post('/unblock', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, targetUserId } = req.body;
+        const userId = req.authUserId;
+        const { targetUserId } = req.body;
         if (!userId || !targetUserId) {
             res.status(400).json({ error: 'userId ve targetUserId zorunludur.' });
             return;
@@ -395,9 +410,9 @@ router.post('/unblock', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-router.get('/blocked/:userId', async (req, res) => {
+router.get('/blocked/:userId', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+        const userId = req.authUserId;
         const blocked = await prismaClient_1.db.getBlockedUsers(userId || 'anon');
         res.json({ success: true, blockedUsers: blocked });
     }
@@ -406,9 +421,10 @@ router.get('/blocked/:userId', async (req, res) => {
     }
 });
 // --- Admin: bildirim gönder (developer paneli) ---
-router.post('/notifications/send', async (req, res) => {
+router.post('/notifications/send', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, targetUserId, title, sub, type = 'system' } = req.body;
+        const userId = req.authUserId;
+        const { targetUserId, title, sub, type = 'system' } = req.body;
         if (!userId || !targetUserId || !title) {
             res.status(400).json({ error: 'userId, targetUserId ve title zorunludur.' });
             return;
@@ -453,9 +469,10 @@ router.get('/users/by-code/:friendCode', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-router.post('/daily-challenge/complete', async (req, res) => {
+router.post('/daily-challenge/complete', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, correctAnswers, totalQuestions } = req.body;
+        const userId = req.authUserId;
+        const { correctAnswers, totalQuestions } = req.body;
         if (!userId) {
             res.status(400).json({ error: 'userId gereklidir' });
             return;

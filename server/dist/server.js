@@ -24,14 +24,16 @@ const telegramBot_1 = require("./telegram/telegramBot");
 const supabaseClient_1 = require("./db/supabaseClient");
 const redisClient_1 = require("./cache/redisClient");
 const logger_1 = require("./utils/logger");
-const logRoutes_1 = require("./routes/logRoutes");
 const shared_1 = require("@trivia/shared");
+const logRoutes_1 = require("./routes/logRoutes");
+const shared_2 = require("@trivia/shared");
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const metrics_1 = require("./utils/metrics");
 const errorMonitor_1 = require("./utils/errorMonitor");
 const triviaRoutes_1 = __importDefault(require("./routes/triviaRoutes"));
 const socialRoutes_1 = __importDefault(require("./routes/socialRoutes"));
 const referralRoutes_1 = __importDefault(require("./routes/referralRoutes"));
+const auth_1 = require("./middleware/auth");
 function getLocalIpAddress() {
     const interfaces = os_1.default.networkInterfaces();
     for (const name of Object.keys(interfaces)) {
@@ -42,6 +44,47 @@ function getLocalIpAddress() {
         }
     }
     return 'tavriko-app.vercel.app';
+}
+const SENSITIVE_KEYS = /pass|token|secret|authorization|otp|code|cookie/i;
+// SECURITY: redact sensitive fields (passwords, tokens, OTP codes) before writing
+// request payloads to logs. Logs are readable from the admin portal and must never
+// contain credentials in plaintext.
+function redactSensitiveBody(body) {
+    if (!body || typeof body !== 'object')
+        return body;
+    try {
+        const clone = Array.isArray(body) ? [] : {};
+        for (const key of Object.keys(body)) {
+            const value = body[key];
+            if (SENSITIVE_KEYS.test(key)) {
+                clone[key] = '[REDACTED]';
+            }
+            else if (value && typeof value === 'object') {
+                clone[key] = redactSensitiveBody(value);
+            }
+            else {
+                clone[key] = value;
+            }
+        }
+        return clone;
+    }
+    catch {
+        return '[redacted]';
+    }
+}
+function redactSensitiveQuery(query) {
+    if (!query || typeof query !== 'object')
+        return query;
+    try {
+        const clone = {};
+        for (const key of Object.keys(query)) {
+            clone[key] = SENSITIVE_KEYS.test(key) ? '[REDACTED]' : query[key];
+        }
+        return clone;
+    }
+    catch {
+        return '[redacted]';
+    }
 }
 function createApp() {
     (0, errorMonitor_1.initErrorMonitor)();
@@ -66,8 +109,8 @@ function createApp() {
             }
             logger_1.logger.log(cat, lvl, `${req.method} ${req.originalUrl} -> ${res.statusCode} (${duration}ms)`, {
                 ip: req.ip,
-                query: Object.keys(req.query).length ? req.query : undefined,
-                body: req.method !== 'GET' && Object.keys(req.body || {}).length ? req.body : undefined,
+                query: Object.keys(req.query).length ? redactSensitiveQuery(req.query) : undefined,
+                body: req.method !== 'GET' && Object.keys(req.body || {}).length ? redactSensitiveBody(req.body) : undefined,
             });
         });
         next();
@@ -144,6 +187,20 @@ function createApp() {
     // Telegram Webhook endpoint (Essential for Vercel Serverless execution)
     app.post(['/api/telegram/webhook', '/telegram/webhook'], async (req, res) => {
         try {
+            // SECURITY: verify Telegram's webhook secret token. Without this check anyone
+            // could POST forged Telegram updates (impersonating admins in the approval bot).
+            const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+            if (!webhookSecret) {
+                logger_1.logger.error('TELEGRAM', 'Webhook reddedildi: TELEGRAM_WEBHOOK_SECRET tanımlı değil.');
+                return res.status(401).send('Unauthorized');
+            }
+            const providedSecret = req.headers['x-telegram-bot-api-secret-token'];
+            if (typeof providedSecret !== 'string' ||
+                providedSecret.length !== webhookSecret.length ||
+                providedSecret !== webhookSecret) {
+                logger_1.logger.warn('TELEGRAM', 'Webhook reddedildi: gizli token doğrulaması başarısız.');
+                return res.status(401).send('Unauthorized');
+            }
             const update = req.body;
             const sender = update?.message?.from?.username ||
                 update?.callback_query?.from?.username ||
@@ -168,7 +225,7 @@ function createApp() {
         }
     });
     // Telegram set webhook endpoint
-    app.get(['/api/admin/telegram/set-webhook', '/admin/telegram/set-webhook'], async (req, res) => {
+    app.get(['/api/admin/telegram/set-webhook', '/admin/telegram/set-webhook'], auth_1.requireAdminAuth, async (req, res) => {
         try {
             const cfGatewayUrl = 'https://tavriko-realtime.uncertainidentity8.workers.dev/telegram/webhook';
             const vercelUrl = 'https://tavriko-app.vercel.app/api/telegram/webhook';
@@ -187,7 +244,7 @@ function createApp() {
         }
     });
     // Telegram webhook info
-    app.get(['/api/admin/telegram/webhook-info', '/admin/telegram/webhook-info'], async (req, res) => {
+    app.get(['/api/admin/telegram/webhook-info', '/admin/telegram/webhook-info'], auth_1.requireAdminAuth, async (req, res) => {
         try {
             const info = await telegramBot.getWebhookInfo();
             return res.json({ success: true, info });
@@ -219,17 +276,18 @@ function createApp() {
         }
     });
     // Telegram bot status endpoint
-    app.get('/api/admin/telegram/status', async (req, res) => {
+    // SECURITY: the bot token is never returned in API responses (previously leaked
+    // via activeToken).
+    app.get('/api/admin/telegram/status', auth_1.requireAdminAuth, async (req, res) => {
         const webhookInfo = await telegramBot.getWebhookInfo();
         res.json({
             running: telegramBot.isRunning(),
             tokenConfigured: !!(process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_BOT_TOKEN.includes('placeholder')),
-            activeToken: telegramBot.getActiveToken(),
             webhookInfo,
         });
     });
     // Telegram bot live configuration endpoint
-    app.post(['/api/admin/telegram/config', '/admin/telegram/config'], async (req, res) => {
+    app.post(['/api/admin/telegram/config', '/admin/telegram/config'], auth_1.requireAdminAuth, async (req, res) => {
         try {
             const { token, adminIds } = req.body;
             if (!token || typeof token !== 'string' || token.trim().length < 15) {
@@ -261,7 +319,7 @@ function createApp() {
         }
     });
     // Telegram test & status check endpoint
-    app.get(['/api/admin/telegram/test', '/admin/telegram/test'], async (req, res) => {
+    app.get(['/api/admin/telegram/test', '/admin/telegram/test'], auth_1.requireAdminAuth, async (req, res) => {
         try {
             const info = await telegramBot.getBotInfo();
             return res.json(info);
@@ -343,16 +401,16 @@ function createApp() {
         });
     }
     // Admin & Operations Portal (Password protected via jewelkaan01@gmail.com) — birincil adres /admin
-    app.get(['/admin', '/portal', '/dashboard', '/ops', '/dev', '/developer-portal', '/gelistirici'], (req, res) => {
+    app.get(['/admin', '/portal', '/dashboard', '/ops', '/dev', '/developer-portal', '/gelistirici'], auth_1.requireAdminAuth, (req, res) => {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.send((0, logRoutes_1.renderDashboardHtml)());
     });
     // Eski /developer adresi artık /admin'e yönlendirir
-    app.get(['/developer', '/developer/'], (req, res) => {
+    app.get(['/developer', '/developer/'], auth_1.requireAdminAuth, (req, res) => {
         res.redirect(301, '/admin');
     });
     // Telegram Admin dashboard
-    app.get('/telegram-admin', (req, res) => {
+    app.get('/telegram-admin', auth_1.requireAdminAuth, (req, res) => {
         const isBotRunning = telegramBot.isRunning();
         const tokenSet = !!(process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_BOT_TOKEN.includes('placeholder'));
         res.send(`
@@ -1014,9 +1072,24 @@ function createApp() {
       </html>
     `);
     });
+    // Portal alt kategori haritası: oyunun Keşfet ekranındaki kartların aynısı.
+    // Kaynak: shared/src/categories.ts (ALL_CATEGORIES) — tek yerden beslenir.
+    const PORTAL_SUBCATEGORY_MAP = {};
+    for (const cat of shared_1.ALL_CATEGORIES) {
+        if (cat.id !== 'mixed' && cat.subCategories && cat.subCategories.length > 0) {
+            PORTAL_SUBCATEGORY_MAP[cat.id] = cat.subCategories.map((s) => ({
+                n: s.name,
+                e: s.emoji || '🏷️',
+            }));
+        }
+    }
+    const portalSubcategoryMapJson = JSON.stringify(PORTAL_SUBCATEGORY_MAP);
     // Telegram Mini App / Web App Portal
     app.get('/telegram-webapp', (req, res) => {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        // Telegram WebApp tarayıcısı sayfayı agresif önbelleğe alıyor ve eski sürüm
+        // gösteriliyor; her ziyarette güncel HTML'in çekilmesini garanti et.
+        res.setHeader('Cache-Control', 'no-store');
         res.send(`
       <!DOCTYPE html>
       <html lang="tr">
@@ -1645,7 +1718,7 @@ function createApp() {
                   <span style="font-size: 11px; color: var(--accent-gold); font-weight: 700;">👆 Dokunarak Şablonu Al</span>
                 </div>
                 <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">
-                  Aşağıdaki kategorilerden birine dokunduğunuzda, o kategoriye ait hazır ve eksiksiz JSON taslağı otomatik oluşturulur.
+                  Aşağıdaki kategorilerden birine dokunduğunuzda, o kategoriye ait hazır ve eksiksiz JSON taslağı otomatik oluşur ve seçtiğiniz kategorinin oyun Keşfet ekranındaki alt kategori kartları (soru sayılarıyla) altta açılır. Bir alt kategoriye dokunursanız sorular doğrudan o karta yüklenir.
                 </div>
 
                 <!-- TÜM KATEGORİ SQUIRCLE GRID -->
@@ -1654,11 +1727,35 @@ function createApp() {
                 <!-- ÖZEL ODA TEMATİK PAKETLERİ -->
                 <details style="margin-top: 10px; background: rgba(255, 255, 255, 0.03); border-radius: var(--radius-sm); padding: 8px 12px; border: 1px solid rgba(255, 255, 255, 0.08);">
                   <summary style="cursor: pointer; font-size: 12px; font-weight: 700; color: #C084FC; outline: none;">
-                    ⚔️ Arkadaşla Özel Oda Paketleri & Karışık Mod (Tıkla ve Gör)
+                    ⚔️ Arkadaşla Özel Oda Paketleri (Tıkla ve Gör)
                   </summary>
                   <div style="margin-top: 8px;" class="category-squircle-grid" id="special-cat-grid"></div>
                 </details>
+
+                <!-- ALT KATEGORİ KARTLARI (oyun Keşfet ekranıyla birebir) -->
+                <div id="sub-cat-section" style="display: none; margin-top: 12px; background: rgba(21, 15, 44, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label class="form-label" style="margin-bottom: 0;">🎯 Alt Kategori Kartları</label>
+                    <span id="sub-cat-count-label" style="font-size: 11px; color: var(--accent-gold); font-weight: 700;"></span>
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; line-height: 1.4;">
+                    Yukarıdaki kategorinin oyun Keşfet ekranındaki kartlarının aynısı. Bir karta dokunursanız yüklediğiniz sorular o alt kategoriye eklenir; tekrar dokunursanız seçim kalkar ve sorular kategori genelinde tutulur. Kartlarda o alt kategorideki mevcut soru sayısı görünür.
+                  </div>
+                  <div class="category-squircle-grid" id="sub-cat-grid"></div>
+                </div>
               </div>
+
+                <!-- SEÇİLİ KATEGORİ İÇİN ÖRNEK JSON ÖNİZLEME -->
+                <div id="example-json-section" style="display: none; margin-top: 12px; background: rgba(21, 15, 44, 0.6); border: 1px solid var(--accent-primary, #6236FF); border-radius: var(--radius-lg); padding: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 6px;">
+                    <label class="form-label" style="margin-bottom: 0;">📋 Seçili Kategori İçin Örnek JSON Kodu</label>
+                    <button type="button" class="btn" style="width: auto; padding: 6px 12px; font-size: 12px;" onclick="copyExampleJson()">📄 Kopyala</button>
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; line-height: 1.4;">
+                    Bu örnek kodu kopyalayıp aşağıdaki JSON alanına yapıştırın; kendi sorularınızı yazıp "Soruları Havuza Aktar" ile yükleyin. Alt kategoriye dokunduysanız <b>subCategory</b> satırı seçtiğiniz kartı içerir.
+                  </div>
+                  <pre id="example-json-pre" style="background: rgba(11, 8, 24, 0.9); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; font-size: 11px; line-height: 1.5; overflow-x: auto; margin: 0; white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow-y: auto; color: #C9B8FF;"></pre>
+                </div>
 
               <!-- 3. MANUEL TEK SORU EKLEME FORMU -->
               <div class="form-group" style="margin-top: 16px;">
@@ -1693,7 +1790,12 @@ function createApp() {
 
                   <div class="form-group">
                     <label class="form-label">Kategori (Tüm Oyun Kategorileri)</label>
-                    <select id="mq-category"></select>
+                    <select id="mq-category" onchange="renderManualSubOptions()"></select>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Alt Kategori (İsteğe Bağlı — Seçili kategorinin Keşfet kartları)</label>
+                    <select id="mq-subcategory"></select>
                   </div>
 
                   <div class="form-group">
@@ -2206,11 +2308,11 @@ function createApp() {
             { id: 'mythology_ancient', name: 'Mitoloji', icon: '⚡', trKeys: ['mythology', 'mitoloji', 'efsaneler'] },
             { id: 'hobbies_leisure', name: 'Hobiler', icon: '🎣', trKeys: ['hobbies', 'hobiler', 'eglence_hobiler'] },
             { id: 'daily_life', name: 'Günlük Hayat', icon: '👨‍👩‍👧', trKeys: ['daily_life', 'gunluk_hayat', 'toplum'] },
+            { id: 'mixed', name: 'Karma Mod', icon: '🎲', trKeys: ['mixed', 'karma', 'karisik'] },
             { id: 'turkey_special', name: 'Türkiye', icon: '🇹🇷', trKeys: ['turkey', 'turkiye', 'turkiyeye_ozel'] }
           ];
 
           const SPECIAL_ROOM_CATEGORIES = [
-            { id: 'mixed', name: 'Karışık Mod', icon: '🎲', desc: 'Tüm kategorilerden karma sorular' },
             { id: 'yesilcam', name: 'Yeşilçam', icon: '⭐', desc: 'Yeşilçam Sineması özel' },
             { id: 'turkish_pop_90s', name: "90'lar Pop", icon: '⭐', desc: 'Nostalji müzik' },
             { id: 'ottoman_history', name: 'Osmanlı', icon: '⭐', desc: 'Tarih tematik oda' },
@@ -2242,6 +2344,9 @@ function createApp() {
             }
           }
 
+          // Portal alt kategori haritası: oyun Keşfet kartları (server.ts'ten enjekte edilir)
+          const SUBCATEGORY_MAP = ${portalSubcategoryMapJson};
+
           // Manuel soru ekleme formu (Tüm kategoriler)
           let mqCorrectIdx = -1;
           let mqDiff = 'medium';
@@ -2269,6 +2374,20 @@ function createApp() {
             sel.innerHTML = all.map(c => {
               return '<option value="' + c.id + '">' + c.icon + ' ' + c.name + ' (' + c.id + ')</option>';
             }).join('');
+            renderManualSubOptions();
+          }
+
+          function renderManualSubOptions() {
+            const catSel = document.getElementById('mq-category');
+            const subSel = document.getElementById('mq-subcategory');
+            if (!subSel) return;
+            const catId = catSel ? catSel.value : null;
+            const subs = (catId && SUBCATEGORY_MAP[catId]) || [];
+            let html = '<option value="">— Alt kategorisiz (kategori geneli) —</option>';
+            for (const s of subs) {
+              html += '<option value="' + s.n.replace(/"/g, '"') + '">' + s.e + ' ' + s.n + '</option>';
+            }
+            subSel.innerHTML = html;
           }
 
           function resetManualForm() {
@@ -2291,6 +2410,7 @@ function createApp() {
             const text = (document.getElementById('mq-text').value || '').trim();
             const opts = [0, 1, 2, 3].map(i => (document.getElementById('mq-opt-' + i).value || '').trim());
             const catId = document.getElementById('mq-category').value || 'general_culture';
+            const subCategory = (document.getElementById('mq-subcategory') ? document.getElementById('mq-subcategory').value : '') || '';
             const explanation = (document.getElementById('mq-explanation').value || '').trim();
             const pool = document.getElementById('json-pool').value || 'standard';
             const autoPublish = document.getElementById('mq-autopublish').checked;
@@ -2324,7 +2444,8 @@ function createApp() {
               categoryId: catId,
               difficulty: mqDiff,
               targetPool: pool,
-              explanation: explanation
+              explanation: explanation,
+              subCategory: subCategory || undefined
             };
 
             const btn = document.getElementById('btn-mq-add');
@@ -2355,6 +2476,9 @@ function createApp() {
                   alertBox.innerText = msg;
                 }
                 resetManualForm();
+                // Alt kategori sayaçlarını güncelle
+                subCounts = null;
+                renderSubGrid();
               } else {
                 let msg = 'Soru eklenemedi.';
                 if (data && data.importedCount === 0 && data.duplicateCount > 0) {
@@ -2380,14 +2504,81 @@ function createApp() {
             updateLiveDetection();
           }
 
-          function selectCategoryTemplate(catId) {
+          // ---- Alt kategori seçim durumu ve sayaçlar ----
+          let selectedCatId = null;
+          let selectedSubName = null;
+          let subCounts = null; // { "catId||subName": sayi }
+
+          function refreshSubCounts() {
+            // Tüm soruları sayfalar halinde çekip alt kategori bazında sayar
+            const fetchPage = (offset) =>
+              fetch('/api/admin/questions/list?limit=200&offset=' + offset)
+                .then(r => r.json())
+                .catch(() => null);
+            return (async () => {
+              const counts = {};
+              let offset = 0;
+              for (let page = 0; page < 10; page++) {
+                const d = await fetchPage(offset);
+                if (!d || !Array.isArray(d.questions) || d.questions.length === 0) break;
+                for (const q of d.questions) {
+                  const cat = (q.categoryId || '').toString();
+                  const sub = (q.subCategory || '').toString().trim();
+                  if (cat && sub) {
+                    const key = cat.toLowerCase() + '||' + sub.toLowerCase();
+                    counts[key] = (counts[key] || 0) + 1;
+                  }
+                }
+                if (d.questions.length < 200) break;
+                offset += 200;
+              }
+              return counts;
+            })();
+          }
+
+          function renderSubGrid() {
+            const section = document.getElementById('sub-cat-section');
+            const grid = document.getElementById('sub-cat-grid');
+            const countLabel = document.getElementById('sub-cat-count-label');
+            if (!section || !grid) return;
+            const subs = (selectedCatId && SUBCATEGORY_MAP[selectedCatId]) || null;
+            if (!subs || subs.length === 0) {
+              section.style.display = 'none';
+              grid.innerHTML = '';
+              if (countLabel) countLabel.textContent = '';
+              return;
+            }
+            section.style.display = 'block';
+            if (countLabel) countLabel.textContent = selectedCatId + ' · ' + subs.length + ' kart';
+            grid.innerHTML = subs.map(s => {
+              const key = selectedCatId.toLowerCase() + '||' + s.n.toLowerCase();
+              const cnt = (subCounts && subCounts[key]) || 0;
+              const active = selectedSubName === s.n;
+              return '<div class="category-squircle-card' + (active ? ' active' : '') + '" data-sub-name="' + s.n.replace(/"/g, '"') + '" onclick="selectSubTemplate(this.dataset.subName)">' +
+                '<div class="cat-card-icon">' + s.e + '</div>' +
+                '<div class="cat-card-title">' + s.n + '</div>' +
+                '<div class="cat-card-id">' + cnt + ' soru</div>' +
+              '</div>';
+            }).join('');
+            // Sayaçlar henüz yüklenmediyse arka planda çek ve yenile
+            if (!subCounts) {
+              refreshSubCounts().then(c => {
+                subCounts = c;
+                if (selectedCatId) renderSubGrid();
+              });
+            }
+          }
+
+          function selectSubTemplate(name) {
             triggerHaptic('light');
-            document.querySelectorAll('.category-squircle-card').forEach(c => {
-              c.classList.toggle('active', c.getAttribute('data-cat-id') === catId);
-            });
+            selectedSubName = selectedSubName === name ? null : name;
+            renderSubGrid();
+            if (selectedCatId) buildCategoryTemplate(selectedCatId);
+          }
+
+          function buildCategoryTemplate(catId) {
             const currentPool = document.getElementById('json-pool').value || 'standard';
             const catObj = APP_16_CATEGORIES.find(c => c.id === catId) || SPECIAL_ROOM_CATEGORIES.find(c => c.id === catId) || { name: catId, icon: '🏷️' };
-            
             const sample = [
               {
                 "text": catObj.name + " kategorisi için soru metnini buraya yazın...",
@@ -2404,9 +2595,62 @@ function createApp() {
                 "targetPool": currentPool
               }
             ];
-
-            document.getElementById('json-textarea').value = JSON.stringify(sample, null, 2);
+            if (selectedSubName) {
+              sample[0].subCategory = selectedSubName;
+            }
+            const sampleJson = JSON.stringify(sample, null, 2);
+            document.getElementById('json-textarea').value = sampleJson;
+            // Seçili kategori için örnek JSON önizleme paneli
+            const exSection = document.getElementById('example-json-section');
+            const exPre = document.getElementById('example-json-pre');
+            if (exSection && exPre) {
+              exSection.style.display = 'block';
+              exPre.textContent = sampleJson;
+            }
             updateLiveDetection();
+          }
+
+          function copyExampleJson() {
+            triggerHaptic('light');
+            const exPre = document.getElementById('example-json-pre');
+            if (!exPre) return;
+            const text = exPre.textContent || '';
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(() => {
+                alert('Örnek JSON kopyalandı! Aşağıdaki JSON alanına yapıştırabilirsiniz.');
+              }).catch(() => fallbackCopyExampleJson(text));
+            } else {
+              fallbackCopyExampleJson(text);
+            }
+          }
+
+          function fallbackCopyExampleJson(text) {
+            const tmp = document.createElement('textarea');
+            tmp.value = text;
+            tmp.style.position = 'fixed';
+            tmp.style.opacity = '0';
+            document.body.appendChild(tmp);
+            tmp.select();
+            try {
+              document.execCommand('copy');
+              alert('Örnek JSON kopyalandı! Aşağıdaki JSON alanına yapıştırabilirsiniz.');
+            } catch (e) {
+              alert('Kopyalanamadı — kodu elle seçip kopyalayın.');
+            }
+            document.body.removeChild(tmp);
+          }
+
+          function selectCategoryTemplate(catId) {
+            triggerHaptic('light');
+            document.querySelectorAll('.category-squircle-card[data-cat-id]').forEach(c => {
+              c.classList.toggle('active', c.getAttribute('data-cat-id') === catId);
+            });
+            if (selectedCatId !== catId) {
+              selectedSubName = null;
+            }
+            selectedCatId = catId;
+            renderSubGrid();
+            buildCategoryTemplate(catId);
           }
 
           function updateLiveDetection() {
@@ -2570,6 +2814,12 @@ function createApp() {
             const alertBox = document.getElementById('json-alert');
             if (alertBox) alertBox.style.display = 'none';
             document.querySelectorAll('.category-squircle-card').forEach(c => c.classList.remove('active'));
+            selectedCatId = null;
+            selectedSubName = null;
+            const subSection = document.getElementById('sub-cat-section');
+            if (subSection) subSection.style.display = 'none';
+            const exSection = document.getElementById('example-json-section');
+            if (exSection) exSection.style.display = 'none';
             console.log("🧹 [Telegram WebApp] JSON textarea ve uyarı kutusu temizlendi.");
             updateLiveDetection();
           }
@@ -2662,6 +2912,9 @@ function createApp() {
                 alertBox.innerText = msg;
                 textarea.value = '';
                 console.log('🎉 [Telegram WebApp] Sorular başarıyla eklendi:', data.importedCount);
+                // Alt kategori sayaçlarını güncelle
+                subCounts = null;
+                renderSubGrid();
 
                 const detailBox = document.getElementById('json-result-details');
                 if (detailBox) {
@@ -3076,7 +3329,6 @@ function createApp() {
                 telegramBot: {
                     configured: telegramBot.isRunning(),
                     tokenSet: !!(process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_BOT_TOKEN.includes('placeholder')),
-                    activeToken: telegramBot.getActiveToken(),
                 },
             },
         });
@@ -3182,23 +3434,27 @@ function createApp() {
     app.use('/api/referrals', referralRoutes_1.default);
     // --- Cloudflare Durable Objects Internal Endpoints ---
     app.post('/api/internal/room-questions', async (req, res) => {
-        const internalSecret = process.env.INTERNAL_API_SECRET || 'tavriko_internal_secret_2026';
+        // SECURITY: internal endpoints are service-to-service only. The secret header is
+        // REQUIRED; previously a missing header bypassed the check entirely.
+        const internalSecret = process.env.INTERNAL_API_SECRET;
         const providedSecret = req.headers['x-internal-secret'];
-        if (providedSecret && providedSecret !== internalSecret) {
+        if (!internalSecret || typeof providedSecret !== 'string' || providedSecret !== internalSecret) {
             return res.status(403).json({ error: 'Yetkisiz erişim' });
         }
         // Sunucusuz ortamda kalıcı soru havuzunun (Telegram soruları dahil) hazır olmasını bekle
         await prismaClient_1.db.ensureQuestionsRestored();
         const { categoryId, difficulty, count = 5 } = req.body || {};
         const safeCount = Math.min(50, Math.max(1, Number(count) || 5));
-        const resolvedCat = (0, shared_1.canonicalCategoryId)(categoryId || 'general_culture');
+        const resolvedCat = (0, shared_2.canonicalCategoryId)(categoryId || 'general_culture');
         const questions = prismaClient_1.db.getQuestions(resolvedCat, difficulty || 'medium', safeCount);
         return res.json({ success: true, questions });
     });
     app.post('/api/internal/match-results', async (req, res) => {
-        const internalSecret = process.env.INTERNAL_API_SECRET || 'tavriko_internal_secret_2026';
+        // SECURITY: internal endpoints are service-to-service only. The secret header is
+        // REQUIRED; previously a missing header bypassed the check entirely.
+        const internalSecret = process.env.INTERNAL_API_SECRET;
         const providedSecret = req.headers['x-internal-secret'];
-        if (providedSecret && providedSecret !== internalSecret) {
+        if (!internalSecret || typeof providedSecret !== 'string' || providedSecret !== internalSecret) {
             return res.status(403).json({ error: 'Yetkisiz erişim' });
         }
         try {

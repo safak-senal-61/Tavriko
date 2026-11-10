@@ -13,6 +13,7 @@ import {
   Linking,
 } from 'react-native';
 import { useGameStore, clearAllAccountStorage, getStoredAuth } from '../store/gameStore';
+import { authHeaders } from '../utils/apiAuth';
 import { socketService } from '../services/socketService';
 import { sound } from '../services/soundService';
 import { THEME } from '../theme/tokens';
@@ -486,7 +487,7 @@ export const RootNavigator: React.FC = () => {
         const hostPlayer = room.players?.[room.hostId] || Object.values(room.players || {})[0];
         fetch(`${API_BASE}/social/rooms/active`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({
             userId: user.id,
             roomCode: room.code,
@@ -593,7 +594,10 @@ export const RootNavigator: React.FC = () => {
         const coinsEarned = isZero ? 0 : won ? Math.min(15, correctAnswers * 2 + 5) : Math.min(6, correctAnswers * 1);
         fetch(`${API_BASE}/auth/stats`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(useGameStore.getState().token ? { Authorization: `Bearer ${useGameStore.getState().token}` } : {}),
+          },
           body: JSON.stringify({
             userId: user.id,
             won,
@@ -893,7 +897,7 @@ export const RootNavigator: React.FC = () => {
     if (user && !isGuest) {
       fetch(`${API_BASE}/social/rooms/active`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ userId: user.id, roomCode: null }),
       }).catch(() => {});
     }
@@ -987,7 +991,7 @@ export const RootNavigator: React.FC = () => {
       if (!isGuest) {
         fetch(`${API_BASE}/social/rooms/active`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({
             userId: user.id,
             roomCode,
@@ -1050,7 +1054,7 @@ export const RootNavigator: React.FC = () => {
       if (!isGuest) {
         fetch(`${API_BASE}/social/rooms/active`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({ userId: user.id, roomCode: cleanCode }),
         }).catch(() => {});
       }
@@ -1290,7 +1294,7 @@ export const RootNavigator: React.FC = () => {
 
           fetch(`${API_BASE}/social/daily-challenge/complete`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...authHeaders() },
             body: JSON.stringify({
               userId: user.id,
               correctAnswers: correctAns,
@@ -1350,7 +1354,10 @@ export const RootNavigator: React.FC = () => {
         const won = correctAns >= Math.ceil(totalAns / 2);
         fetch(`${API_BASE}/auth/stats`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(useGameStore.getState().token ? { Authorization: `Bearer ${useGameStore.getState().token}` } : {}),
+          },
           body: JSON.stringify({
             userId: user.id,
             won,
@@ -2085,7 +2092,10 @@ export const RootNavigator: React.FC = () => {
                 try {
                   const res = await fetch(`${API_BASE}/auth/sync-wallet`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                      'Content-Type': 'application/json',
+                      ...(useGameStore.getState().token ? { Authorization: `Bearer ${useGameStore.getState().token}` } : {}),
+                    },
                     body: JSON.stringify({
                       userId: user.id,
                       coins: user.coins,
@@ -2110,7 +2120,10 @@ export const RootNavigator: React.FC = () => {
                 try {
                   await fetch(`${API_BASE}/auth/delete-account`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                      'Content-Type': 'application/json',
+                      ...(useGameStore.getState().token ? { Authorization: `Bearer ${useGameStore.getState().token}` } : {}),
+                    },
                     body: JSON.stringify({ userId: user.id }),
                   });
                 } catch (err) {

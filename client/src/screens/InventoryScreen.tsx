@@ -13,6 +13,7 @@ import { UserProfile, InventoryItem, ItemCategory } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
+import { authHeaders } from '../utils/apiAuth';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -190,7 +191,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/inventory/open-chest`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           userId: user.id,
           chestId: selectedChest.id,

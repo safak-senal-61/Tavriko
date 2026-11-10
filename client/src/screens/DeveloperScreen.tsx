@@ -16,6 +16,7 @@ import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
 import { DEFAULT_API_BASE, REALTIME_WS_BASE } from '../config';
+import { authHeaders } from '../utils/apiAuth';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -257,7 +258,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/block`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ userId: user.id, targetUserId: blockInput.trim() }),
       });
       const data = await res.json();
@@ -281,7 +282,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/unblock`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ userId: user.id, targetUserId: targetId }),
       });
       const data = await res.json();
@@ -301,7 +302,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/notifications/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           userId: user.id,
           targetUserId: notifTarget.trim(),

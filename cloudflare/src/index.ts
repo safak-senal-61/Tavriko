@@ -2,6 +2,7 @@ import { Env } from './env';
 import { GameRoomDO } from './durable-objects/GameRoom';
 import { MatchmakerDO } from './durable-objects/Matchmaker';
 import { sanitizeRoomCode } from './websocket/validation';
+import { verifyJwt } from './auth/authenticate';
 
 export { GameRoomDO, MatchmakerDO };
 
@@ -47,9 +48,29 @@ export default {
     if (url.pathname === '/api/upload/avatar' || url.pathname === '/upload/avatar') {
       if (request.method === 'POST') {
         try {
+          // SECURITY: uploads require an authenticated player (JWT). The previous
+          // implementation accepted unauthenticated writes with client-controlled
+          // userId and content type.
+          const authHeader = request.headers.get('Authorization') || '';
+          const bearerToken = authHeader.replace(/^Bearer\s+/i, '');
+          if (!bearerToken || !bearerToken.startsWith('ey')) {
+            return new Response(JSON.stringify({ error: 'Yetkilendirme başlığı eksik' }), {
+              status: 401,
+              headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            });
+          }
+          const auth = await verifyJwt(bearerToken, env.JWT_SECRET);
+          if (!auth.isValid || !auth.user) {
+            return new Response(JSON.stringify({ error: 'Geçersiz oturum tokeni' }), {
+              status: 401,
+              headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            });
+          }
+          // The uploader identity comes from the verified token, never the body.
+          const userId = auth.user.id || 'u';
+
           const bodyJson: any = await request.json().catch(() => ({}));
           let rawData = bodyJson?.image || bodyJson?.avatar;
-          const userId = bodyJson?.userId || 'u';
 
           if (!rawData || typeof rawData !== 'string') {
             return new Response(JSON.stringify({ error: 'Geçersiz resim verisi' }), {
@@ -58,13 +79,29 @@ export default {
             });
           }
 
+          // Content type whitelist: only real images may be stored/served.
+          const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
           let contentType = 'image/jpeg';
           if (rawData.startsWith('data:')) {
             const match = rawData.match(/^data:([^;]+);base64,(.+)$/);
             if (match) {
+              if (!ALLOWED_TYPES.has(match[1].toLowerCase())) {
+                return new Response(JSON.stringify({ error: 'Desteklenmeyen dosya türü' }), {
+                  status: 415,
+                  headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+                });
+              }
               contentType = match[1];
               rawData = match[2];
             }
+          }
+
+          // Size cap: 2 MB decoded.
+          if (rawData.length > 2_800_000) {
+            return new Response(JSON.stringify({ error: 'Dosya çok büyük (maks 2MB)' }), {
+              status: 413,
+              headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            });
           }
 
           const binary = Uint8Array.from(atob(rawData), (c) => c.charCodeAt(0));
@@ -138,14 +175,22 @@ export default {
           } catch {}
 
           // Background asynchronous dispatch to Vercel so Telegram gets an instant 200 OK
+          // SECURITY: forward Telegram's secret token (or the configured gateway secret)
+          // so the backend can authenticate the forwarded update.
+          const forwardHeaders: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'x-forwarded-for': request.headers.get('cf-connecting-ip') || '127.0.0.1',
+            'x-cf-source': 'cloudflare-worker-edge',
+          };
+          const telegramSecret =
+            request.headers.get('x-telegram-bot-api-secret-token') || env.TELEGRAM_WEBHOOK_SECRET;
+          if (telegramSecret) {
+            forwardHeaders['x-telegram-bot-api-secret-token'] = telegramSecret;
+          }
           ctx.waitUntil(
             fetch(targetUrl, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-forwarded-for': request.headers.get('cf-connecting-ip') || '127.0.0.1',
-                'x-cf-source': 'cloudflare-worker-edge',
-              },
+              headers: forwardHeaders,
               body: bodyText,
             })
               .then(async (res) => {
@@ -192,19 +237,36 @@ export default {
       );
     }
 
-    // Direct helper to set webhook to this Cloudflare Worker
+    // Direct helper to set webhook to this Cloudflare Worker.
+    // SECURITY: previously this was an unauthenticated proxy that accepted any bot
+    // token in the query string. It now requires the internal service secret header
+    // and no longer leaks the token into query-string logs.
     if (url.pathname === '/telegram/set-webhook') {
-      const token = url.searchParams.get('token') || '';
+      const internalSecret = env.INTERNAL_API_SECRET;
+      const providedSecret = request.headers.get('x-internal-secret') || '';
+      if (!internalSecret || providedSecret !== internalSecret) {
+        return new Response(JSON.stringify({ error: 'Yetkisiz erişim' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      const bodyJson: any = await request.json().catch(() => ({}));
+      const token = String(bodyJson?.token || '');
       if (!token || token.length < 15) {
         return new Response(
-          JSON.stringify({ success: false, error: 'Lütfen geçerli bir token belirtin (?token=...)' }),
+          JSON.stringify({ success: false, error: 'Geçerli bir token belirtin (body: {"token": "..."})' }),
           { status: 400, headers: { 'Content-Type': 'application/json' } }
         );
       }
       const cfWebhookUrl = `https://${url.host}/telegram/webhook`;
-      const tgRes = await fetch(
-        `https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(cfWebhookUrl)}&drop_pending_updates=true`
-      );
+      const tgParams = new URLSearchParams({
+        url: cfWebhookUrl,
+        drop_pending_updates: 'true',
+      });
+      if (env.TELEGRAM_WEBHOOK_SECRET) {
+        tgParams.set('secret_token', env.TELEGRAM_WEBHOOK_SECRET);
+      }
+      const tgRes = await fetch(`https://api.telegram.org/bot${token}/setWebhook?${tgParams.toString()}`);
       const data = await tgRes.json();
       return new Response(JSON.stringify({ cloudflare_gateway: cfWebhookUrl, telegram_response: data }), {
         status: tgRes.status,

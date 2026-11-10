@@ -12,6 +12,7 @@ import { UserProfile, SEASON_1_TIERS, SeasonTierItem, SeasonReward } from '@triv
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
+import { authHeaders } from '../utils/apiAuth';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -117,7 +118,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
       sound.playSound('tap');
       const res = await fetch(`${base}/social/season/claim`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ userId: user.id, tier, track }),
       });
       const data = await res.json();
@@ -166,7 +167,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
       sound.playSound('tap');
       const res = await fetch(`${base}/social/season/premium-pass`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ userId: user.id }),
       });
       const data = await res.json();
