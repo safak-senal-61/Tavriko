@@ -14,6 +14,31 @@ import {
   GENERAL_CATEGORIES,
   SPECIAL_CATEGORIES,
 } from './CategorySquircleCard';
+
+/**
+ * "Genel" sekmesi: herkesin çözdüğü popüler ana kategoriler.
+ */
+const POPULAR_CATEGORY_IDS = [
+  'general_culture',
+  'science_tech',
+  'history',
+  'geography',
+  'sports',
+  'cinema_tv',
+  'music',
+  'art_culture',
+  'animals_wildlife',
+  'space_astronomy',
+];
+
+const POPULAR_CATEGORIES = GENERAL_CATEGORIES.filter((c) =>
+  POPULAR_CATEGORY_IDS.includes(c.id)
+);
+
+/**
+ * "Özel" sekmesi: oyundaki TÜM kategoriler (ana kategoriler + tematik paketler).
+ */
+const ALL_CATEGORIES: CategoryData[] = [...GENERAL_CATEGORIES, ...SPECIAL_CATEGORIES];
 import { SegmentedFilter } from './SegmentedFilter';
 import { CategoryCarousel } from './CategoryCarousel';
 import { sound } from '../services/soundService';
@@ -36,27 +61,29 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'special'>('general');
 
+  // Genel = popüler kategoriler, Özel = TÜM kategoriler
   const currentCategoryList =
-    activeTab === 'general' ? GENERAL_CATEGORIES : SPECIAL_CATEGORIES;
+    activeTab === 'general' ? POPULAR_CATEGORIES : ALL_CATEGORIES;
 
   const [selectedCategory, setSelectedCategory] = useState<CategoryData>(() => {
     return (
-      GENERAL_CATEGORIES.find((c) => c.id === initialCategoryId) ||
-      SPECIAL_CATEGORIES.find((c) => c.id === initialCategoryId) ||
-      GENERAL_CATEGORIES[0]
+      POPULAR_CATEGORIES.find((c) => c.id === initialCategoryId) ||
+      ALL_CATEGORIES.find((c) => c.id === initialCategoryId) ||
+      POPULAR_CATEGORIES[0]
     );
   });
 
   useEffect(() => {
     if (visible) {
-      const isSpecial = SPECIAL_CATEGORIES.some((c) => c.id === initialCategoryId);
-      if (isSpecial) {
-        setActiveTab('special');
-        const found = SPECIAL_CATEGORIES.find((c) => c.id === initialCategoryId);
+      const isPopular = POPULAR_CATEGORIES.some((c) => c.id === initialCategoryId);
+      if (isPopular) {
+        setActiveTab('general');
+        const found = POPULAR_CATEGORIES.find((c) => c.id === initialCategoryId);
         if (found) setSelectedCategory(found);
       } else {
-        setActiveTab('general');
-        const found = GENERAL_CATEGORIES.find((c) => c.id === initialCategoryId);
+        // Diğer tüm kategoriler "Özel" (Tümü) sekmesinde
+        setActiveTab('special');
+        const found = ALL_CATEGORIES.find((c) => c.id === initialCategoryId);
         if (found) setSelectedCategory(found);
       }
     }
@@ -64,7 +91,7 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
 
   const handleTabChange = (tab: 'general' | 'special') => {
     setActiveTab(tab);
-    const targetList = tab === 'general' ? GENERAL_CATEGORIES : SPECIAL_CATEGORIES;
+    const targetList = tab === 'general' ? POPULAR_CATEGORIES : ALL_CATEGORIES;
     setSelectedCategory(targetList[0]);
   };
 
@@ -106,6 +133,11 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
                 onChange={handleTabChange}
                 width={250}
               />
+              <Text style={styles.tabHint}>
+                {activeTab === 'general'
+                  ? `Herkesin çözdüğü ${POPULAR_CATEGORIES.length} popüler kategori`
+                  : `Oyundaki tüm ${ALL_CATEGORIES.length} kategori`}
+              </Text>
             </View>
 
             {/* 2. 3D Cyber-Squircle Kategori Karuseli */}
@@ -214,6 +246,16 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     marginBottom: 10,
+    alignItems: 'center',
+  },
+  tabHint: {
+    marginTop: 7,
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    fontWeight: '700',
+    color: 'rgba(233, 225, 255, 0.65)',
+    letterSpacing: 0.4,
+    textAlign: 'center',
   },
   confirm3DButton: {
     width: '88%',

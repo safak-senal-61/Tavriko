@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.setupSocketHandlers = setupSocketHandlers;
 const shared_1 = require("@trivia/shared");
+const prismaClient_1 = require("../db/prismaClient");
 const presenceManager_1 = require("../services/presenceManager");
 function setupSocketHandlers(io, roomManager, matchmaker) {
     // Wire up room manager callbacks to broadcast to rooms
@@ -215,6 +216,8 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
             }
         });
         socket.on(shared_1.SOCKET_EVENTS.FIND_MATCH, (data) => {
+            // Eşleşme başlamadan kalıcı soru havuzunu (Supabase/Telegram soruları) geri yükle
+            prismaClient_1.db.ensureQuestionsRestored().catch(() => { });
             matchmaker.enqueue({
                 socketId: socket.id,
                 playerId: data.playerId,

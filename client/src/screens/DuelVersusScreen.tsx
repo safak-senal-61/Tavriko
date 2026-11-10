@@ -121,7 +121,7 @@ export const DuelVersusScreen: React.FC<DuelVersusScreenProps> = ({
               {countdown > 0 ? <Text style={styles.countNumber}>{countdown}</Text> : <ActivityIndicator size="small" color="#FFE2A4" />}
             </View>
             <View style={styles.countCopy}>
-              <Text accessibilityLiveRegion="polite" style={styles.countTitle}>{countdown > 0 ? 'Düello başlıyor' : 'Arena hazırlanıyor'}</Text>
+              <Text accessibilityLiveRegion="polite" style={styles.countTitle}>{countdown > 0 ? '15 soruluk düello başlıyor' : 'Arena hazırlanıyor'}</Text>
               <Text style={styles.countSubtitle}>{countdown > 0 ? 'İlk soruya hazırlan. Sıra sende.' : 'Sorular geldiğinde otomatik başlayacak.'}</Text>
             </View>
           </View>

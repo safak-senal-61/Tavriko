@@ -47,7 +47,7 @@ class Matchmaker {
                     mode,
                     category,
                     difficulty,
-                    totalRounds: 5,
+                    totalRounds: 15,
                     maxPlayers: 2,
                 });
                 this.manager.joinRoom(room.code, {
@@ -89,7 +89,7 @@ class Matchmaker {
                     mode: 'duel',
                     category: req.category || 'mixed',
                     difficulty: req.difficulty || 'medium',
-                    totalRounds: 5,
+                    totalRounds: 15,
                     maxPlayers: 2,
                 });
                 this.manager.joinRoom(room.code, {

@@ -336,7 +336,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
       <Text style={[styles.title, { marginTop: 0, fontSize: 22, marginBottom: 2 }]}>Rakibin arenaya geliyor.</Text>
       <Text style={[styles.subtitle, { marginBottom: 10 }]}>
-        {catObj?.name || 'Genel Kültür'} · Canlı Düello
+        {catObj?.name || 'Genel Kültür'} · Canlı Düello · 15 Soru
       </Text>
 
       {/* 1v1 Önizleme Kartları */}

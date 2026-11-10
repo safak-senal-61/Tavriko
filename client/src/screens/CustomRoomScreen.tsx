@@ -430,7 +430,11 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               activeOpacity={0.8}
               onPress={() => {
                 sound.playSound('tap');
-                setSelectedCategory(selectedCategory === 'mixed' ? GENERAL_CATEGORIES[0] : 'mixed');
+                setSelectedCategory(
+                  selectedCategory === 'mixed'
+                    ? GENERAL_CATEGORIES.find((c) => c.id === 'general_culture') || GENERAL_CATEGORIES[0]
+                    : 'mixed'
+                );
               }}
             >
               <Text style={styles.mixedQuickText}>

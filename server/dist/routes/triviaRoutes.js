@@ -101,6 +101,7 @@ router.get('/questions/daily', async (req, res) => {
 router.post('/admin/questions/generate', async (req, res) => {
     const { categoryId = 'general_culture', subCategory, difficulty = 'medium', count = 1 } = req.body;
     try {
+        await prismaClient_1.db.ensureQuestionsRestored();
         const result = await (0, evrenLlmGenerator_1.generateQuestionsWithEvrenGLM)({
             categoryId: categoryId,
             subCategory,
@@ -115,14 +116,16 @@ router.post('/admin/questions/generate', async (req, res) => {
     }
 });
 // List questions awaiting review
-router.get('/admin/questions/review', (req, res) => {
+router.get('/admin/questions/review', async (req, res) => {
+    await prismaClient_1.db.ensureQuestionsRestored();
     const limit = parseInt(req.query.limit, 10) || 20;
     const offset = parseInt(req.query.offset, 10) || 0;
     const pending = prismaClient_1.db.getQuestionsByStatus('pending_review', limit, offset);
     res.json({ count: pending.length, questions: pending });
 });
 // Approve question to published
-router.post('/admin/questions/:id/approve', (req, res) => {
+router.post('/admin/questions/:id/approve', async (req, res) => {
+    await prismaClient_1.db.ensureQuestionsRestored();
     const id = String(req.params.id);
     const reviewedBy = req.body.reviewedBy || 'admin';
     const pool = req.body.targetPool || req.body.pool || 'standard';
@@ -135,7 +138,8 @@ router.post('/admin/questions/:id/approve', (req, res) => {
     res.json({ success: true, question: approved, pool });
 });
 // Reject question
-router.post('/admin/questions/:id/reject', (req, res) => {
+router.post('/admin/questions/:id/reject', async (req, res) => {
+    await prismaClient_1.db.ensureQuestionsRestored();
     const id = String(req.params.id);
     const { reviewedBy = 'admin', reason = 'Uygun görülmedi' } = req.body;
     const rejected = prismaClient_1.db.rejectQuestion(id, reviewedBy, reason);
@@ -147,12 +151,14 @@ router.post('/admin/questions/:id/reject', (req, res) => {
     res.json({ success: true, question: rejected });
 });
 // Question pool & review statistics (with full category x difficulty matrix)
-router.get('/admin/questions/stats', (req, res) => {
+router.get('/admin/questions/stats', async (req, res) => {
+    await prismaClient_1.db.ensureQuestionsRestored();
     const stats = prismaClient_1.db.getReviewStats();
     res.json(stats);
 });
 // Search and filter questions in pool
-router.get('/admin/questions/list', (req, res) => {
+router.get('/admin/questions/list', async (req, res) => {
+    await prismaClient_1.db.ensureQuestionsRestored();
     const { search, categoryId, difficulty, reviewStatus, targetPool, limit, offset, } = req.query;
     const result = prismaClient_1.db.getQuestionsFiltered({
         search: search,
@@ -166,12 +172,14 @@ router.get('/admin/questions/list', (req, res) => {
     res.json(result);
 });
 // Scan pool for duplicate questions
-router.get('/admin/questions/duplicates', (req, res) => {
+router.get('/admin/questions/duplicates', async (req, res) => {
+    await prismaClient_1.db.ensureQuestionsRestored();
     const result = prismaClient_1.db.findDuplicates();
     res.json(result);
 });
 // Delete a question by ID
-router.delete('/admin/questions/:id', (req, res) => {
+router.delete('/admin/questions/:id', async (req, res) => {
+    await prismaClient_1.db.ensureQuestionsRestored();
     const id = String(req.params.id);
     const deleted = prismaClient_1.db.deleteQuestion(id);
     if (!deleted) {
@@ -184,7 +192,8 @@ router.delete('/admin/questions/:id', (req, res) => {
     res.json({ success: true, id, message: 'Soru başarıyla silindi.' });
 });
 // Update a question by ID
-router.put('/admin/questions/:id', (req, res) => {
+router.put('/admin/questions/:id', async (req, res) => {
+    await prismaClient_1.db.ensureQuestionsRestored();
     const id = String(req.params.id);
     const updated = prismaClient_1.db.updateQuestion(id, req.body);
     if (!updated) {
@@ -194,8 +203,12 @@ router.put('/admin/questions/:id', (req, res) => {
     res.json({ success: true, question: updated });
 });
 // Import questions manually via JSON text or parsed array
-router.post('/admin/questions/import-json', (req, res) => {
+router.post('/admin/questions/import-json', async (req, res) => {
     try {
+        // Önce kalıcı depodaki (Supabase/PostgreSQL) soruları belleğe geri yükle.
+        // Bu, sunucusuz ortamda mükerrer kontrolün doğru çalışmasını ve yeni
+        // yüklenen soruların bulut deposundaki mevcut soruları ezmesini önler.
+        await prismaClient_1.db.ensureQuestionsRestored();
         const body = req.body || {};
         console.log('📥 [/admin/questions/import-json] İstek alındı:', {
             bodyKeys: Object.keys(body),
@@ -203,7 +216,8 @@ router.post('/admin/questions/import-json', (req, res) => {
             ip: req.ip || req.headers['x-forwarded-for'],
         });
         // Extract input from various potential keys
-        let input = body.jsonContent ??
+        let input = body.input ??
+            body.jsonContent ??
             body.json ??
             body.content ??
             body.questions ??

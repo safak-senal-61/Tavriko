@@ -120,6 +120,8 @@ router.post('/admin/questions/generate', async (req: Request, res: Response): Pr
   const { categoryId = 'general_culture', subCategory, difficulty = 'medium', count = 1 } = req.body;
 
   try {
+    await db.ensureQuestionsRestored();
+
     const result = await generateQuestionsWithEvrenGLM({
       categoryId: categoryId as CategoryId,
       subCategory,
@@ -135,7 +137,8 @@ router.post('/admin/questions/generate', async (req: Request, res: Response): Pr
 });
 
 // List questions awaiting review
-router.get('/admin/questions/review', (req: Request, res: Response): void => {
+router.get('/admin/questions/review', async (req: Request, res: Response): Promise<void> => {
+  await db.ensureQuestionsRestored();
   const limit = parseInt(req.query.limit as string, 10) || 20;
   const offset = parseInt(req.query.offset as string, 10) || 0;
   const pending = db.getQuestionsByStatus('pending_review', limit, offset);
@@ -143,7 +146,8 @@ router.get('/admin/questions/review', (req: Request, res: Response): void => {
 });
 
 // Approve question to published
-router.post('/admin/questions/:id/approve', (req: Request, res: Response): void => {
+router.post('/admin/questions/:id/approve', async (req: Request, res: Response): Promise<void> => {
+  await db.ensureQuestionsRestored();
   const id = String(req.params.id);
   const reviewedBy = req.body.reviewedBy || 'admin';
   const pool = req.body.targetPool || req.body.pool || 'standard';
@@ -158,7 +162,8 @@ router.post('/admin/questions/:id/approve', (req: Request, res: Response): void 
 });
 
 // Reject question
-router.post('/admin/questions/:id/reject', (req: Request, res: Response): void => {
+router.post('/admin/questions/:id/reject', async (req: Request, res: Response): Promise<void> => {
+  await db.ensureQuestionsRestored();
   const id = String(req.params.id);
   const { reviewedBy = 'admin', reason = 'Uygun görülmedi' } = req.body;
   const rejected = db.rejectQuestion(id, reviewedBy, reason);
@@ -172,13 +177,15 @@ router.post('/admin/questions/:id/reject', (req: Request, res: Response): void =
 });
 
 // Question pool & review statistics (with full category x difficulty matrix)
-router.get('/admin/questions/stats', (req: Request, res: Response): void => {
+router.get('/admin/questions/stats', async (req: Request, res: Response): Promise<void> => {
+  await db.ensureQuestionsRestored();
   const stats = db.getReviewStats();
   res.json(stats);
 });
 
 // Search and filter questions in pool
-router.get('/admin/questions/list', (req: Request, res: Response): void => {
+router.get('/admin/questions/list', async (req: Request, res: Response): Promise<void> => {
+  await db.ensureQuestionsRestored();
   const {
     search,
     categoryId,
@@ -203,13 +210,15 @@ router.get('/admin/questions/list', (req: Request, res: Response): void => {
 });
 
 // Scan pool for duplicate questions
-router.get('/admin/questions/duplicates', (req: Request, res: Response): void => {
+router.get('/admin/questions/duplicates', async (req: Request, res: Response): Promise<void> => {
+  await db.ensureQuestionsRestored();
   const result = db.findDuplicates();
   res.json(result);
 });
 
 // Delete a question by ID
-router.delete('/admin/questions/:id', (req: Request, res: Response): void => {
+router.delete('/admin/questions/:id', async (req: Request, res: Response): Promise<void> => {
+  await db.ensureQuestionsRestored();
   const id = String(req.params.id);
   const deleted = db.deleteQuestion(id);
   if (!deleted) {
@@ -223,7 +232,8 @@ router.delete('/admin/questions/:id', (req: Request, res: Response): void => {
 });
 
 // Update a question by ID
-router.put('/admin/questions/:id', (req: Request, res: Response): void => {
+router.put('/admin/questions/:id', async (req: Request, res: Response): Promise<void> => {
+  await db.ensureQuestionsRestored();
   const id = String(req.params.id);
   const updated = db.updateQuestion(id, req.body);
   if (!updated) {
@@ -234,8 +244,13 @@ router.put('/admin/questions/:id', (req: Request, res: Response): void => {
 });
 
 // Import questions manually via JSON text or parsed array
-router.post('/admin/questions/import-json', (req: Request, res: Response): void => {
+router.post('/admin/questions/import-json', async (req: Request, res: Response): Promise<void> => {
   try {
+    // Önce kalıcı depodaki (Supabase/PostgreSQL) soruları belleğe geri yükle.
+    // Bu, sunucusuz ortamda mükerrer kontrolün doğru çalışmasını ve yeni
+    // yüklenen soruların bulut deposundaki mevcut soruları ezmesini önler.
+    await db.ensureQuestionsRestored();
+
     const body = req.body || {};
     console.log('📥 [/admin/questions/import-json] İstek alındı:', {
       bodyKeys: Object.keys(body),
@@ -245,6 +260,7 @@ router.post('/admin/questions/import-json', (req: Request, res: Response): void 
 
     // Extract input from various potential keys
     let input =
+      body.input ??
       body.jsonContent ??
       body.json ??
       body.content ??

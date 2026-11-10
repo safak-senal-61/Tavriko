@@ -958,6 +958,10 @@ export class PrismaService {
   // HIGH-LEVEL DOMAIN METHODS (Previously in DatabaseAdapter)
   // ==========================================================================
   private questionsRestorePromise: Promise<void> | null = null;
+  /** Geri yükleme tamamlandı mı? Tamamlanmadan bulut deposu yazılmaz (veri kaybı koruması). */
+  private questionsRestored = false;
+  /** PostgreSQL'e henüz yazılmamış, kuyrukta bekleyen soru değişiklikleri */
+  private pendingPrismaQuestionSync: Question[] = [];
 
   /**
    * Kalıcı soru deposundan (PostgreSQL + Supabase Cloud Storage) soruları geri yükler.
@@ -1029,6 +1033,8 @@ export class PrismaService {
       // Ignore
     }
 
+    // Geri yükleme tamamlandı: artık bulut deposuna güvenle yazılabilir
+    this.questionsRestored = true;
     return restored;
   }
 
@@ -1151,13 +1157,29 @@ export class PrismaService {
   private savePersistedQuestions() {
     try {
       if (!this.isJest) {
-        fs.writeFileSync(QUESTIONS_DB_FILE, JSON.stringify(this.questions, null, 2), 'utf-8');
-        supabaseService.syncCloudStore('questions_store.json', this.questions).catch(() => {});
-        supabaseService.syncCloudStore('categories_store.json', this.getCategories()).catch(() => {});
+        try {
+          fs.writeFileSync(QUESTIONS_DB_FILE, JSON.stringify(this.questions, null, 2), 'utf-8');
+        } catch {
+          // Sunucusuz ortamda dosya sistemi salt-okunur olabilir
+        }
+        // Kalıcı depodan geri yükleme tamamlanmadan bulut deposuna yazılmaz:
+        // taze bir Lambda örneğinde yazılırsa, daha önce yüklenen soruları da
+        // içeren questions_store.json yalnızca çekirdek + yeni sorularla üzerine
+        // yazılır ve kullanıcının yüklediği sorular kaybolurdu.
+        if (this.questionsRestored) {
+          supabaseService.syncCloudStore('questions_store.json', this.questions).catch(() => {});
+          supabaseService.syncCloudStore('categories_store.json', this.getCategories()).catch(() => {});
+        } else {
+          console.warn(
+            '[PrismaService] Soru geri yüklemesi tamamlanmadan bulut deposu yazması atlandı (veri kaybını önlemek için).'
+          );
+        }
       }
-      const latest = this.questions[this.questions.length - 1];
-      if (latest) {
-        this.syncQuestionToPrisma(latest).catch(() => {});
+      // Bekleyen tüm değişiklikleri PostgreSQL'e aktar (yalnızca son soru değil)
+      const pending = this.pendingPrismaQuestionSync;
+      this.pendingPrismaQuestionSync = [];
+      for (const q of pending) {
+        this.syncQuestionToPrisma(q).catch(() => {});
       }
     } catch {
       // Ignore write errors
@@ -2668,6 +2690,7 @@ export class PrismaService {
     };
 
     this.questions.push(newQuestion);
+    this.pendingPrismaQuestionSync.push(newQuestion);
     this.savePersistedQuestions();
     return newQuestion;
   }
@@ -2689,6 +2712,7 @@ export class PrismaService {
     } else if (pool === 'custom_room') {
       q.isCustomRoomOnly = true;
     }
+    this.pendingPrismaQuestionSync.push(q);
     this.savePersistedQuestions();
     return q;
   }
@@ -2701,6 +2725,7 @@ export class PrismaService {
     q.reviewedBy = reviewedBy;
     q.rejectionReason = reason;
     q.reviewedAt = new Date().toISOString();
+    this.pendingPrismaQuestionSync.push(q);
     this.savePersistedQuestions();
     return q;
   }
@@ -2718,6 +2743,7 @@ export class PrismaService {
       updated.contentHash = computeQuestionHash(updated.text, updated.options);
     }
     this.questions[idx] = updated;
+    this.pendingPrismaQuestionSync.push(updated);
     this.savePersistedQuestions();
     return updated;
   }

@@ -767,6 +767,10 @@ class PrismaService {
     // HIGH-LEVEL DOMAIN METHODS (Previously in DatabaseAdapter)
     // ==========================================================================
     questionsRestorePromise = null;
+    /** Geri yükleme tamamlandı mı? Tamamlanmadan bulut deposu yazılmaz (veri kaybı koruması). */
+    questionsRestored = false;
+    /** PostgreSQL'e henüz yazılmamış, kuyrukta bekleyen soru değişiklikleri */
+    pendingPrismaQuestionSync = [];
     /**
      * Kalıcı soru deposundan (PostgreSQL + Supabase Cloud Storage) soruları geri yükler.
      * Sunucusuz (Vercel Lambda) ortamda bellek ömrü kısadır; Telegram üzerinden eklenen
@@ -839,6 +843,8 @@ class PrismaService {
         catch {
             // Ignore
         }
+        // Geri yükleme tamamlandı: artık bulut deposuna güvenle yazılabilir
+        this.questionsRestored = true;
         return restored;
     }
     async syncInitialCloudState() {
@@ -957,13 +963,29 @@ class PrismaService {
     savePersistedQuestions() {
         try {
             if (!this.isJest) {
-                fs.writeFileSync(QUESTIONS_DB_FILE, JSON.stringify(this.questions, null, 2), 'utf-8');
-                supabaseClient_1.supabaseService.syncCloudStore('questions_store.json', this.questions).catch(() => { });
-                supabaseClient_1.supabaseService.syncCloudStore('categories_store.json', this.getCategories()).catch(() => { });
+                try {
+                    fs.writeFileSync(QUESTIONS_DB_FILE, JSON.stringify(this.questions, null, 2), 'utf-8');
+                }
+                catch {
+                    // Sunucusuz ortamda dosya sistemi salt-okunur olabilir
+                }
+                // Kalıcı depodan geri yükleme tamamlanmadan bulut deposuna yazılmaz:
+                // taze bir Lambda örneğinde yazılırsa, daha önce yüklenen soruları da
+                // içeren questions_store.json yalnızca çekirdek + yeni sorularla üzerine
+                // yazılır ve kullanıcının yüklediği sorular kaybolurdu.
+                if (this.questionsRestored) {
+                    supabaseClient_1.supabaseService.syncCloudStore('questions_store.json', this.questions).catch(() => { });
+                    supabaseClient_1.supabaseService.syncCloudStore('categories_store.json', this.getCategories()).catch(() => { });
+                }
+                else {
+                    console.warn('[PrismaService] Soru geri yüklemesi tamamlanmadan bulut deposu yazması atlandı (veri kaybını önlemek için).');
+                }
             }
-            const latest = this.questions[this.questions.length - 1];
-            if (latest) {
-                this.syncQuestionToPrisma(latest).catch(() => { });
+            // Bekleyen tüm değişiklikleri PostgreSQL'e aktar (yalnızca son soru değil)
+            const pending = this.pendingPrismaQuestionSync;
+            this.pendingPrismaQuestionSync = [];
+            for (const q of pending) {
+                this.syncQuestionToPrisma(q).catch(() => { });
             }
         }
         catch {
@@ -2303,6 +2325,7 @@ class PrismaService {
             language: data.language || 'tr',
         };
         this.questions.push(newQuestion);
+        this.pendingPrismaQuestionSync.push(newQuestion);
         this.savePersistedQuestions();
         return newQuestion;
     }
@@ -2320,6 +2343,7 @@ class PrismaService {
         else if (pool === 'custom_room') {
             q.isCustomRoomOnly = true;
         }
+        this.pendingPrismaQuestionSync.push(q);
         this.savePersistedQuestions();
         return q;
     }
@@ -2331,6 +2355,7 @@ class PrismaService {
         q.reviewedBy = reviewedBy;
         q.rejectionReason = reason;
         q.reviewedAt = new Date().toISOString();
+        this.pendingPrismaQuestionSync.push(q);
         this.savePersistedQuestions();
         return q;
     }
@@ -2347,6 +2372,7 @@ class PrismaService {
             updated.contentHash = computeQuestionHash(updated.text, updated.options);
         }
         this.questions[idx] = updated;
+        this.pendingPrismaQuestionSync.push(updated);
         this.savePersistedQuestions();
         return updated;
     }

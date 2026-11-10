@@ -2,6 +2,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { SOCKET_EVENTS, ClientQuestion, RoundResult, FinalMatchSummary, GameRoom } from '@trivia/shared';
 import { GameRoomManager } from '../engine/GameRoomManager';
 import { Matchmaker } from '../engine/Matchmaker';
+import { db } from '../db/prismaClient';
 import { presenceManager } from '../services/presenceManager';
 
 export function setupSocketHandlers(
@@ -259,6 +260,8 @@ export function setupSocketHandlers(
       category?: any;
       difficulty?: any;
     }) => {
+      // Eşleşme başlamadan kalıcı soru havuzunu (Supabase/Telegram soruları) geri yükle
+      db.ensureQuestionsRestored().catch(() => {});
       matchmaker.enqueue({
         socketId: socket.id,
         playerId: data.playerId,

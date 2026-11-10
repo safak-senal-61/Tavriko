@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -35,32 +35,49 @@ export const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<any>(null);
   const lastHapticIndex = useRef<number>(-1);
+  const snapTimerRef = useRef<any>(null);
+  const isSnappingRef = useRef(false);
 
-  // Kartlar arası boşluk ve snapping hesabı
+  // Kartlar arası boşluk ve yapışma (snap) hesabı
   const CARD_SPACING = 24;
   const ITEM_WIDTH = cardSize + CARD_SPACING;
   // Modal içi genişlik yaklaşık 340px
   const CONTAINER_WIDTH = Math.min(SCREEN_WIDTH - 48, 360);
-  const SPACER_WIDTH = (CONTAINER_WIDTH - ITEM_WIDTH) / 2;
+  // Kenar dolgusu: kart i, contentOffset = i * ITEM_WIDTH ile TAM ortalanacak şekilde.
+  // (Önceki değer (CONTAINER - ITEM) / 2 idi ve kartlar 12px kayık duruyordu.)
+  const SPACER_WIDTH = (CONTAINER_WIDTH - cardSize) / 2;
 
-  // Başlangıçta veya kategori değiştiğinde ilgili karta kaydır
-  useEffect(() => {
-    const selectedIndex = categories.findIndex((c) => c.id === selectedCategoryId);
-    if (selectedIndex !== -1 && scrollViewRef.current) {
+  const maxIndex = Math.max(0, categories.length - 1);
+
+  // En yakın karta yumuşakça kaydır (tam yapışma: yarım kalmaz)
+  const snapToNearest = useCallback(
+    (offsetX: number, animated = true) => {
+      const rawIndex = offsetX / ITEM_WIDTH;
+      const nearestIndex = Math.max(0, Math.min(maxIndex, Math.round(rawIndex)));
+      const target = nearestIndex * ITEM_WIDTH;
+      if (Math.abs(target - offsetX) < 1) return; // zaten hizalı
+      isSnappingRef.current = true;
+      scrollViewRef.current?.scrollTo({ x: target, animated });
+      // Seçimi de güncelle
+      const selected = categories[nearestIndex];
+      if (selected && selected.id !== selectedCategoryId) {
+        sound.playSound('tap');
+        sound.triggerHaptic('light');
+        onSelectCategory(selected);
+      }
       setTimeout(() => {
-        scrollViewRef.current?.scrollTo({
-          x: selectedIndex * ITEM_WIDTH,
-          animated: true,
-        });
-      }, 80);
-    }
-  }, [categories]);
+        isSnappingRef.current = false;
+      }, 320);
+    },
+    [categories, maxIndex, ITEM_WIDTH, selectedCategoryId, onSelectCategory]
+  );
 
+  // Web'de mouse tekerleği/serbest sürükleme sonrası da tam karta oturt
   const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-    {
+    [{ nativeEvent: { contentOffset: { x: scrollX } } }], {
       useNativeDriver: Platform.OS !== 'web',
       listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        if (isSnappingRef.current) return;
         const offsetX = event.nativeEvent.contentOffset.x;
         const activeIndex = Math.round(offsetX / ITEM_WIDTH);
         if (
@@ -71,6 +88,13 @@ export const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
           lastHapticIndex.current = activeIndex;
           sound.triggerHaptic('light');
         }
+        if (Platform.OS === 'web') {
+          // Tekerlek/dokunma kaydırması bırakılınca en yakın karta yapış
+          if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
+          snapTimerRef.current = setTimeout(() => {
+            snapToNearest(offsetX);
+          }, 140);
+        }
       },
     }
   );
@@ -78,30 +102,71 @@ export const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
   const handleMomentumScrollEnd = (
     event: NativeSyntheticEvent<NativeScrollEvent>
   ) => {
-    const offsetX = event.nativeEvent.contentOffset.x;
-    const activeIndex = Math.round(offsetX / ITEM_WIDTH);
-    if (activeIndex >= 0 && activeIndex < categories.length) {
-      const selected = categories[activeIndex];
-      if (selected.id !== selectedCategoryId) {
-        sound.playSound('tap');
-        sound.triggerHaptic('light');
-        onSelectCategory(selected);
-      }
-    }
+    if (isSnappingRef.current) return;
+    snapToNearest(event.nativeEvent.contentOffset.x);
   };
 
   const handleItemPress = (index: number, cat: CategoryData) => {
     sound.playSound('tap');
     sound.triggerHaptic('medium');
+    isSnappingRef.current = true;
     scrollViewRef.current?.scrollTo({
       x: index * ITEM_WIDTH,
       animated: true,
     });
+    setTimeout(() => {
+      isSnappingRef.current = false;
+    }, 320);
     onSelectCategory(cat);
   };
 
+  // Başlangıçta veya sekme değiştiğinde seçili kartı ortaya getir
+  useEffect(() => {
+    const selectedIndex = categories.findIndex((c) => c.id === selectedCategoryId);
+    if (selectedIndex !== -1 && scrollViewRef.current) {
+      setTimeout(() => {
+        isSnappingRef.current = true;
+        scrollViewRef.current?.scrollTo({
+          x: selectedIndex * ITEM_WIDTH,
+          animated: true,
+        });
+        setTimeout(() => {
+          isSnappingRef.current = false;
+        }, 320);
+      }, 60);
+    }
+  }, [categories]);
+
   const selectedCategory =
     categories.find((c) => c.id === selectedCategoryId) || categories[0];
+
+  // Dinamik sayfalama noktaları (maks. 7 nokta, pencere kayar)
+  const renderDots = () => {
+    const total = categories.length;
+    if (total === 0) return null;
+    const selectedIndex = categories.findIndex(
+      (c) => c.id === selectedCategory?.id
+    );
+    const maxDots = 7;
+    let start = 0;
+    let end = total;
+    if (total > maxDots) {
+      start = Math.max(0, selectedIndex - 3);
+      end = Math.min(total, start + maxDots);
+      start = Math.max(0, end - maxDots);
+    }
+    const dots = [];
+    for (let i = start; i < end; i++) {
+      const isActive = i === selectedIndex;
+        dots.push(
+        <View
+          key={i}
+          style={[styles.dotInactive, isActive && styles.dotActive]}
+        />
+      );
+    }
+    return dots;
+  };
 
   return (
     <View style={styles.wrapper}>
@@ -112,11 +177,22 @@ export const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
           horizontal
           showsHorizontalScrollIndicator={false}
           snapToInterval={ITEM_WIDTH}
+          snapToAlignment="start"
           decelerationRate="fast"
           bounces={false}
           scrollEventThrottle={16}
           onScroll={handleScroll}
           onMomentumScrollEnd={handleMomentumScrollEnd}
+          onScrollEndDrag={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+            // Sürükleme bırakılınca da tam karta otur (web dahil)
+            if (Platform.OS === 'web') {
+              // Web'de kısa bekle: momentum devam ediyor olabilir
+              if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
+              snapTimerRef.current = setTimeout(() => {
+                snapToNearest(event.nativeEvent.contentOffset.x);
+              }, 60);
+            }
+          }}
           contentContainerStyle={{
             paddingHorizontal: SPACER_WIDTH,
             alignItems: 'center',
@@ -133,13 +209,13 @@ export const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
 
             const scale = scrollX.interpolate({
               inputRange,
-              outputRange: [0.82, 1.18, 0.82],
+              outputRange: [0.8, 1.16, 0.8],
               extrapolate: 'clamp',
             });
 
             const opacity = scrollX.interpolate({
               inputRange,
-              outputRange: [0.55, 1.0, 0.55],
+              outputRange: [0.45, 1.0, 0.45],
               extrapolate: 'clamp',
             });
 
@@ -173,23 +249,19 @@ export const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
         </ScrollView>
       </View>
 
-      {/* Seçili Kategori Başlığı & Alt Bilgi (UI Kit Screen 9) */}
+      {/* Seçili Kategori Başlığı & Alt Bilgi */}
       {selectedCategory && (
         <View style={styles.categoryInfoBox}>
           <Text style={styles.categoryTitle}>{selectedCategory.name}</Text>
-          <Text style={styles.categorySub}>
+          <Text style={styles.categorySub} numberOfLines={1}>
             {selectedCategory.badge ||
               (selectedCategory.type === 'special'
                 ? '⭐ Tematik Özel Soru Paketi'
                 : '🧬 Genel Branş Soruları')}
           </Text>
 
-          {/* Tavriko UI Kit 3'lü Sayfalama Göstergesi */}
-          <View style={styles.paginationDotsRow}>
-            <View style={styles.dotInactive} />
-            <View style={styles.dotActive} />
-            <View style={styles.dotInactive} />
-          </View>
+          {/* Dinamik sayfalama göstergesi */}
+          <View style={styles.paginationDotsRow}>{renderDots()}</View>
         </View>
       )}
     </View>
@@ -236,6 +308,7 @@ const styles = StyleSheet.create({
     marginTop: 3,
     textAlign: 'center',
     letterSpacing: 0.6,
+    maxWidth: 300,
   },
   paginationDotsRow: {
     flexDirection: 'row',

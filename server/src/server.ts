@@ -525,6 +525,9 @@ export function createApp() {
             line-height: 1.5; 
           }
           #msg-box { margin-top: 10px; font-size: 13px; font-weight: 600; display: none; }
+          .stat-box { background: #0E1321; border: 1px solid #2B3754; border-radius: 14px; padding: 14px; text-align: center; }
+          .stat-val { font-size: 26px; font-weight: 800; color: #F8FAFC; }
+          .stat-lbl { font-size: 11px; color: #94A3B8; font-weight: 600; margin-top: 4px; }
         </style>
       </head>
       <body>
@@ -601,6 +604,71 @@ export function createApp() {
                 <a id="bot-link-btn" href="#" target="_blank" style="display: inline-block; margin-top: 8px; background: #0088cc; color: #fff; padding: 8px 16px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 13px;">📲 Telegram'da Botu Aç</a>
               </div>
             </div>
+          </div>
+
+          <!-- SORU YÜKLEME MERKEZİ (Supabase senkron) -->
+          <div class="card" id="upload-center">
+            <h2>📥 Soru Yükleme Merkezi <span class="badge" style="margin:0 0 0 auto; padding:4px 10px; font-size:11px; background:rgba(99,102,241,0.15); color:#818CF8;">SUPABASE SENKRON</span></h2>
+            <p style="color:#94A3B8; font-size:13px; margin:0 0 16px; line-height:1.55;">
+              Buraya yüklediğiniz sorular Supabase kalıcı deposuna yazılır ve oyunda anında görünür.
+              JSON metni yapıştırın veya <b>.json</b> dosyası seçin. Telegram botuna <b>/soru_ekle</b> komutuyla
+              gönderdiğiniz sorular da aynı havuza düşer.
+            </p>
+
+            <div class="form-group">
+              <label>HEDEF HAVUZ</label>
+              <select id="upload-pool" class="form-control">
+                <option value="standard" selected>🏆 Tek Kişilik Mod (Keşfet kategorileri)</option>
+                <option value="custom_room">⚔️ Özel Oda & 1v1 Düellolar</option>
+                <option value="daily_challenge">📅 Günlük Meydan Okuma</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>JSON SORU VERİSİ</label>
+              <textarea id="upload-json" class="form-control" rows="8" placeholder='[{"text":"Soru metni...","options":["A","B","C","D"],"correctAnswerIndex":0,"categoryId":"history","difficulty":"medium","explanation":"Açıklama..."}]' oninput="updateUploadLive()"></textarea>
+              <div id="upload-live" style="margin-top:8px; font-size:12px; color:#94A3B8; font-weight:600;">ℹ️ Henüz soru girilmedi.</div>
+            </div>
+
+            <div class="form-group">
+              <input type="file" id="upload-file" class="form-control" accept=".json,application/json" onchange="handleUploadFile(event)" />
+            </div>
+
+            <div class="form-group" style="display:flex; align-items:center; gap:8px;">
+              <input type="checkbox" id="upload-autopublish" checked style="width:16px; height:16px; accent-color:#6366F1;" />
+              <label for="upload-autopublish" style="margin:0; font-size:13px; color:#CBD5E1; cursor:pointer;">Doğrudan yayınla (onay kuyruğunu atla)</label>
+            </div>
+
+            <button type="button" class="btn" onclick="uploadQuestions()" id="btn-upload-q">🚀 Soruları Havuza Aktar</button>
+            <button type="button" class="btn" style="background:#232B42; border:1px solid #3B4B75; margin-top:8px;" onclick="fillSampleTemplate()">📋 Örnek Şablonu Doldur</button>
+            <div id="upload-result" style="display:none; margin-top:14px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:12px; padding:14px; font-size:13px; line-height:1.6;"></div>
+          </div>
+
+          <!-- HAVUZ İSTATİSTİKLERİ -->
+          <div class="card">
+            <h2>📊 Soru Havuzu Durumu <button type="button" class="btn" style="width:auto; margin-left:auto; padding:6px 14px; font-size:12px;" onclick="loadPoolStats()">🔄 Yenile</button></h2>
+            <div class="stats-grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:14px;">
+              <div class="stat-box"><div class="stat-val" id="stat-total">-</div><div class="stat-lbl">Toplam Soru</div></div>
+              <div class="stat-box"><div class="stat-val" style="color:#10B981;" id="stat-published">-</div><div class="stat-lbl">Yayında</div></div>
+              <div class="stat-box"><div class="stat-val" style="color:#F59E0B;" id="stat-pending">-</div><div class="stat-lbl">Onay Bekleyen</div></div>
+            </div>
+            <div id="stat-categories" style="font-size:12px; color:#CBD5E1; line-height:1.8;">Yükleniyor...</div>
+          </div>
+
+          <!-- SORU GEZGİNİ -->
+          <div class="card">
+            <h2>🔎 Havuzda Ara</h2>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <input type="text" id="search-term" class="form-control" style="flex:1; min-width:160px;" placeholder="Soru metninde ara..." onkeydown="if(event.key==='Enter'){searchQuestions();}" />
+              <button type="button" class="btn" style="width:auto; padding:10px 18px;" onclick="searchQuestions()">Ara</button>
+            </div>
+            <div id="search-results" style="margin-top:14px;"></div>
+          </div>
+
+          <!-- ONAY KUYRUĞU -->
+          <div class="card">
+            <h2>⏳ Onay Bekleyen Sorular <button type="button" class="btn" style="width:auto; margin-left:auto; padding:6px 14px; font-size:12px;" onclick="loadPendingQuestions()">🔄 Yenile</button></h2>
+            <div id="pending-list" style="margin-top:8px; font-size:13px; color:#94A3B8;">Yükleniyor...</div>
           </div>
 
           <!-- Alt Kısım: Servis Durumları ve Hızlı Linkler -->
@@ -777,7 +845,207 @@ export function createApp() {
                 }
               }
             }).catch(() => {});
+
+            // Soru merkezi otomatik yükleme
+            loadPoolStats();
+            loadPendingQuestions();
           });
+
+          // ================= SORU YÜKLEME MERKEZİ =================
+          function parseUploadJson() {
+            const raw = (document.getElementById('upload-json').value || '').trim();
+            if (!raw) return { list: null, error: null };
+            try {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) return { list: parsed, error: null };
+              if (parsed && typeof parsed === 'object') return { list: [parsed], error: null };
+              return { list: null, error: 'JSON bir dizi (list) veya soru objesi olmalı.' };
+            } catch (e) {
+              return { list: null, error: 'Geçersiz JSON: ' + e.message };
+            }
+          }
+
+          function updateUploadLive() {
+            const live = document.getElementById('upload-live');
+            const res = parseUploadJson();
+            if (res.error) {
+              live.style.color = '#EF4444';
+              live.innerText = '❌ ' + res.error;
+            } else if (!res.list) {
+              live.style.color = '#94A3B8';
+              live.innerText = 'ℹ️ Henüz soru girilmedi.';
+            } else {
+              const cats = {};
+              res.list.forEach(function (q) { const c = q.categoryId || q.kategori || 'general_culture'; cats[c] = (cats[c] || 0) + 1; });
+              const catText = Object.keys(cats).map(function (k) { return k + ':' + cats[k]; }).join(' · ');
+              live.style.color = '#10B981';
+              live.innerText = '✅ ' + res.list.length + ' soru algılandı (' + catText + ')';
+            }
+          }
+
+          function handleUploadFile(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function () {
+              document.getElementById('upload-json').value = String(reader.result || '');
+              updateUploadLive();
+            };
+            reader.readAsText(file);
+          }
+
+          function fillSampleTemplate() {
+            document.getElementById('upload-json').value = JSON.stringify([
+              { text: 'Osmanlı Devleti hangi yıl kuruldu?', options: ['1299', '1453', '1071', '1492'], correctAnswerIndex: 0, categoryId: 'history', difficulty: 'medium', targetPool: document.getElementById('upload-pool').value, explanation: 'Osmanlı Devleti 1299 yılında Osman Bey tarafından kuruldu.' },
+              { text: 'Türkiye cumhuriyetinin başkenti neresidir?', options: ['İstanbul', 'Ankara', 'İzmir', 'Bursa'], correctAnswerIndex: 1, categoryId: 'geography', difficulty: 'easy', targetPool: document.getElementById('upload-pool').value, explanation: 'Türkiye Cumhuriyetinin başkenti Ankara dır.' }
+            ], null, 2);
+            updateUploadLive();
+          }
+
+          async function uploadQuestions() {
+            const btn = document.getElementById('btn-upload-q');
+            const resultBox = document.getElementById('upload-result');
+            const res = parseUploadJson();
+            if (res.error || !res.list) {
+              resultBox.style.display = 'block';
+              resultBox.style.background = 'rgba(239,68,68,0.08)';
+              resultBox.style.borderColor = 'rgba(239,68,68,0.3)';
+              resultBox.innerText = '❌ Lütfen geçerli JSON girin.';
+              return;
+            }
+            btn.disabled = true;
+            btn.innerText = 'Yükleniyor...';
+            try {
+              const apiRes = await fetch('/api/admin/questions/import-json', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  input: res.list,
+                  publishDirectly: document.getElementById('upload-autopublish').checked,
+                  defaultTargetPool: document.getElementById('upload-pool').value,
+                  addedBy: 'Telegram Admin Panel'
+                })
+              });
+              const data = await apiRes.json();
+              resultBox.style.display = 'block';
+              if (data.importedCount > 0 || data.success) {
+                resultBox.style.background = 'rgba(16,185,129,0.08)';
+                resultBox.style.borderColor = 'rgba(16,185,129,0.3)';
+                let html = '✅ <b>' + (data.importedCount || 0) + ' soru havuza eklendi.</b> ';
+                if (data.duplicateCount) html += '🔁 ' + data.duplicateCount + ' mükerrer atlandı. ';
+                if (data.errorCount) html += '⚠️ ' + data.errorCount + ' hatalı soru.';
+                if (data.errors && data.errors.length) {
+                  html += '<div style="margin-top:8px; color:#F59E0B; font-size:12px;">' + data.errors.slice(0, 5).join('<br>') + '</div>';
+                }
+                resultBox.innerHTML = html;
+                document.getElementById('upload-json').value = '';
+                updateUploadLive();
+              } else {
+                resultBox.style.background = 'rgba(239,68,68,0.08)';
+                resultBox.style.borderColor = 'rgba(239,68,68,0.3)';
+                resultBox.innerText = '❌ Hiç soru eklenmedi. ' + ((data.errors && data.errors[0]) || '');
+              }
+              loadPoolStats();
+              loadPendingQuestions();
+            } catch (err) {
+              resultBox.style.display = 'block';
+              resultBox.style.background = 'rgba(239,68,68,0.08)';
+              resultBox.style.borderColor = 'rgba(239,68,68,0.3)';
+              resultBox.innerText = '❌ Yükleme hatası: ' + err.message;
+            } finally {
+              btn.disabled = false;
+              btn.innerText = '🚀 Soruları Havuza Aktar';
+            }
+          }
+
+          async function loadPoolStats() {
+            try {
+              const res = await fetch('/api/admin/questions/stats');
+              const data = await res.json();
+              document.getElementById('stat-total').innerText = String(data.total || 0);
+              document.getElementById('stat-published').innerText = String(data.published || 0);
+              document.getElementById('stat-pending').innerText = String(data.pending || 0);
+              const catBox = document.getElementById('stat-categories');
+              if (data.byCategory && Object.keys(data.byCategory).length) {
+                const entries = Object.entries(data.byCategory).sort(function (a, b) { return b[1] - a[1]; });
+                catBox.innerHTML = '<b style="color:#818CF8;">Kategori Dağılımı:</b><br>' +
+                  entries.map(function (e) { return '• ' + e[0] + ': <b>' + e[1] + '</b>'; }).join('<br>');
+              } else {
+                catBox.innerText = 'Kategori verisi bulunamadı.';
+              }
+            } catch (err) {
+              document.getElementById('stat-categories').innerText = 'İstatistikler yüklenemedi: ' + err.message;
+            }
+          }
+
+          function questionCardHtml(q, withActions) {
+            let html = '<div style="background:#0E1321; border:1px solid #2B3754; border-radius:12px; padding:12px; margin-bottom:10px;">';
+            html += '<div style="font-weight:700; font-size:13px; margin-bottom:4px;">' + (q.text || '').slice(0, 140) + '</div>';
+            html += '<div style="font-size:11px; color:#94A3B8;">';
+            html += '📂 ' + (q.categoryId || q.category_id || '-') + ' · ';
+            html += '🎚 ' + (q.difficulty || '-') + ' · ';
+            html += '📌 ' + (q.reviewStatus || q.review_status || '-') + ' · ';
+            html += '🎯 ' + (q.targetPool || 'standard');
+            html += '</div>';
+            if (q.options && q.options.length) {
+              const opts = q.options.map(function (o) { return typeof o === 'string' ? o : (o && o.text) || ''; });
+              html += '<div style="font-size:11px; color:#CBD5E1; margin-top:6px;">A) ' + opts[0] + '  B) ' + opts[1] + '  C) ' + opts[2] + '  D) ' + opts[3] + '</div>';
+            }
+            if (withActions) {
+              html += '<div style="display:flex; gap:8px; margin-top:10px;">';
+              html += '<button type="button" class="btn" style="width:auto; padding:6px 14px; font-size:12px; background:#10B981;" onclick="approveQ(\\'' + q.id + '\\')">✅ Onayla</button>';
+              html += '<button type="button" class="btn" style="width:auto; padding:6px 14px; font-size:12px; background:#EF4444;" onclick="rejectQ(\\'' + q.id + '\\')">❌ Reddet</button>';
+              html += '</div>';
+            }
+            html += '</div>';
+            return html;
+          }
+
+          async function searchQuestions() {
+            const term = (document.getElementById('search-term').value || '').trim();
+            const box = document.getElementById('search-results');
+            box.innerHTML = '<div style="color:#94A3B8;">Aranıyor...</div>';
+            try {
+              const url = '/api/admin/questions/list?limit=20' + (term ? '&search=' + encodeURIComponent(term) : '');
+              const res = await fetch(url);
+              const data = await res.json();
+              if (!data.questions || data.questions.length === 0) {
+                box.innerHTML = '<div style="color:#94A3B8;">Sonuç bulunamadı.</div>';
+                return;
+              }
+              box.innerHTML = '<div style="font-size:12px; color:#818CF8; margin-bottom:8px;">' + (data.filteredCount || data.questions.length) + ' sonuç bulundu (ilk ' + data.questions.length + ' gösteriliyor)</div>' +
+                data.questions.map(function (q) { return questionCardHtml(q, false); }).join('');
+            } catch (err) {
+              box.innerHTML = '<div style="color:#EF4444;">Arama hatası: ' + err.message + '</div>';
+            }
+          }
+
+          async function loadPendingQuestions() {
+            const box = document.getElementById('pending-list');
+            try {
+              const res = await fetch('/api/admin/questions/review?limit=20');
+              const data = await res.json();
+              if (!data.questions || data.questions.length === 0) {
+                box.innerHTML = '<div style="color:#10B981;">✅ Onay bekleyen soru yok. Her şey yayında.</div>';
+                return;
+              }
+              box.innerHTML = data.questions.map(function (q) { return questionCardHtml(q, true); }).join('');
+            } catch (err) {
+              box.innerText = 'Yüklenemedi: ' + err.message;
+            }
+          }
+
+          async function approveQ(id) {
+            await fetch('/api/admin/questions/' + id + '/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetPool: 'standard', reviewedBy: 'Telegram Admin Panel' }) });
+            loadPendingQuestions();
+            loadPoolStats();
+          }
+
+          async function rejectQ(id) {
+            await fetch('/api/admin/questions/' + id + '/reject', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reviewedBy: 'Telegram Admin Panel' }) });
+            loadPendingQuestions();
+            loadPoolStats();
+          }
         </script>
       </body>
       </html>

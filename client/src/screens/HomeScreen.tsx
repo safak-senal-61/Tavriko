@@ -353,7 +353,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <View style={styles.heroSubRow}>
                 <CrownIcon size={16} />
                 <Text style={styles.heroSub} numberOfLines={1}>
-                  {formatNumberTR(user.rankPoints ?? 1000)} Lig Puanı · {formatNumberTR(user.stats?.totalMatches ?? 0)} Düello Maçı
+                  15 Soru · {formatNumberTR(user.rankPoints ?? 1000)} Lig Puanı · {formatNumberTR(user.stats?.totalMatches ?? 0)} Düello Maçı
                 </Text>
               </View>
               <Animated.View style={{ transform: [{ scale: pulseAnim }], alignSelf: 'stretch' }}>
