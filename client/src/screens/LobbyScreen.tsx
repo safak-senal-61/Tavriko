@@ -100,8 +100,8 @@ const LOBBY_REACTION_EMOJIS = ['🔥', '👏', '😂', '❤️', '⚡', '🎯', 
 
 /* Üretilmiş lobi görselleri: sahne banner'ı ve boş slot kaidesi */
 const LOBBY_IMG = {
-  hero: require('../assets/images/lobby/lobby_hero.png'),
-  emptySlot: require('../assets/images/lobby/empty_slot.png'),
+  hero: require('../../assets/images/lobby/lobby_hero.png'),
+  emptySlot: require('../../assets/images/lobby/empty_slot.png'),
 };
 
 /** Nefes alan altın parıltı: oda kodu kartının çerçevesi için */
