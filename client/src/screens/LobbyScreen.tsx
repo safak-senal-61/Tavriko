@@ -9,7 +9,18 @@ import {
   Share,
   Animated,
   Platform,
+  Image,
 } from 'react-native';
+import Reanimated, {
+  FadeInDown,
+  ZoomIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  withSequence,
+  Easing,
+} from 'react-native-reanimated';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
 import { GameRoom, UserProfile } from '@trivia/shared';
@@ -86,6 +97,77 @@ const CheckSvgIcon = ({ size = 18, color = '#5ADBB5' }: { size?: number; color?:
 
 // Tavriko UI Kit 8 Lobi Reaksiyonu
 const LOBBY_REACTION_EMOJIS = ['🔥', '👏', '😂', '❤️', '⚡', '🎯', '🚀'];
+
+/* Üretilmiş lobi görselleri: sahne banner'ı ve boş slot kaidesi */
+const LOBBY_IMG = {
+  hero: require('../assets/images/lobby/lobby_hero.png'),
+  emptySlot: require('../assets/images/lobby/empty_slot.png'),
+};
+
+/** Nefes alan altın parıltı: oda kodu kartının çerçevesi için */
+const GlowingBorder: React.FC<{ color: string; borderRadius: number }> = ({ color, borderRadius }) => {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withRepeat(withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.sin) }), -1, true);
+  }, []);
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute',
+    top: -2,
+    left: -2,
+    right: -2,
+    bottom: -2,
+    borderRadius: borderRadius + 2,
+    borderWidth: 1.5,
+    borderColor: color,
+    opacity: 0.35 + 0.5 * Math.sin(p.value * Math.PI),
+  }));
+  return <Reanimated.View style={style} pointerEvents="none" />;
+};
+
+/** Basınca zıplayan emoji butonu */
+const BouncyReaction: React.FC<{ emoji: string; onPress: () => void }> = ({ emoji, onPress }) => {
+  const s = useSharedValue(1);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
+  return (
+    <TouchableOpacity
+      style={styles.reactionTouch}
+      activeOpacity={0.65}
+      onPress={() => {
+        s.value = withSequence(withTiming(1.45, { duration: 120 }), withTiming(1, { duration: 220 }));
+        onPress();
+      }}
+    >
+      <Reanimated.View style={style}>
+        <Text style={styles.reactionEmojiText}>{emoji}</Text>
+      </Reanimated.View>
+    </TouchableOpacity>
+  );
+};
+
+/** Boş slot: üretilmiş kaide görseli + nefes alan parıltı */
+const EmptySlotCard: React.FC = () => {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withRepeat(withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }), -1, true);
+  }, []);
+  const glow = useAnimatedStyle(() => ({
+    opacity: 0.35 + 0.4 * Math.sin(p.value * Math.PI),
+    transform: [{ scale: 0.97 + 0.04 * Math.sin(p.value * Math.PI) }],
+  }));
+  return (
+    <Reanimated.View
+      entering={FadeInDown.delay(140).duration(400)}
+      style={[styles.emptySlotCardMinimal]}
+    >
+      <Reanimated.Image
+        source={LOBBY_IMG.emptySlot}
+        style={[styles.emptySlotArt, glow]}
+        resizeMode="contain"
+      />
+      <Text style={styles.emptySlotTextMinimal}>Oyuncu bekleniyor...</Text>
+    </Reanimated.View>
+  );
+};
 
 // Hızlı Mesaj Çipleri
 const QUICK_CHAT_CHIPS = [
@@ -400,56 +482,79 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Modern, Şık Tavriko Lobi Başlığı */}
-        <View style={styles.headerTitleWrap}>
-          <Text style={styles.title}>ÖZEL LOBİ</Text>
-        </View>
-
-        {/* 1. ODA KODU KARTI (Tavriko UI Kit Altın Çerçeveli) */}
-        <View style={styles.codeCard}>
-          <View style={styles.codeInfoLeft}>
-            <Text style={styles.codeValueText}>{room.code.split('').join(' ')}</Text>
-            <Text style={styles.codeCardSub}>Dokun kopyala</Text>
+        {/* Modern, Şık Animasyonlu Lobi Sahnesi (Üretilmiş görsel + başlık) */}
+        <Reanimated.View
+          entering={ZoomIn.duration(420)}
+          style={styles.heroBanner}
+        >
+          <Image
+            source={LOBBY_IMG.hero}
+            style={styles.heroImg}
+            resizeMode="cover"
+          />
+          <View style={styles.heroOverlay} />
+          <View style={styles.heroContent}>
+            <Text style={styles.heroEyebrow}>CANLI ARKADAŞ LOBİSİ</Text>
+            <Text style={styles.title}>ÖZEL LOBİ</Text>
+            <View style={styles.heroPillRow}>
+              <View style={styles.heroPill}>
+                <Text style={styles.heroPillText}>🔒 {room.privacy === 'public' ? 'Herkese Açık' : 'Özel Oda'}</Text>
+              </View>
+            </View>
           </View>
+        </Reanimated.View>
 
-          <View style={styles.codeActionsRow}>
-            {/* Kopyala Butonu */}
-            <TouchableOpacity
-              style={[styles.codeIconBtn, copied && styles.codeIconBtnActive]}
-              onPress={handleCopyCode}
-              activeOpacity={0.8}
-            >
-              {copied ? (
-                <CheckSvgIcon size={18} color="#5ADBB5" />
-              ) : (
-                <CopySvgIcon size={18} color="#FFFFFF" />
-              )}
-            </TouchableOpacity>
+        {/* 1. ODA KODU KARTI (Nefes alan altın parıltılı) */}
+        <Reanimated.View entering={FadeInDown.delay(90).duration(400)} style={styles.codeCardWrap}>
+          <GlowingBorder color="#FFC837" borderRadius={20} />
+          <TouchableOpacity
+            style={styles.codeCard}
+            onPress={handleCopyCode}
+            activeOpacity={0.85}
+          >
+            <View style={styles.codeInfoLeft}>
+              <Text style={styles.codeLabel}>ODA KODU</Text>
+              <Text style={styles.codeValueText}>{room.code.split('').join(' ')}</Text>
+              <Text style={styles.codeCardSub}>{copied ? '✓ Kopyalandı!' : 'Dokun kopyala'}</Text>
+            </View>
 
-            {/* Paylaş Butonu */}
-            <TouchableOpacity
-              style={styles.codeIconBtn}
-              onPress={handleShareCode}
-              activeOpacity={0.8}
-            >
-              <ShareSvgIcon size={18} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
+            <View style={styles.codeActionsRow}>
+              {/* Kopyala Butonu */}
+              <View
+                style={[styles.codeIconBtn, copied && styles.codeIconBtnActive]}
+              >
+                {copied ? (
+                  <CheckSvgIcon size={18} color="#5ADBB5" />
+                ) : (
+                  <CopySvgIcon size={18} color="#FFFFFF" />
+                )}
+              </View>
 
-        {/* 2. ODA PARAMETRELERİ (Tavriko UI Kit Çipleri) */}
+              {/* Paylaş Butonu */}
+              <TouchableOpacity
+                style={styles.codeIconBtn}
+                onPress={handleShareCode}
+                activeOpacity={0.8}
+              >
+                <ShareSvgIcon size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Reanimated.View>
+
+        {/* 2. ODA PARAMETRELERİ (Kademeli girişli çipler) */}
         <View style={styles.chipsRow}>
-          <View style={styles.specChip}>
+          <Reanimated.View entering={FadeInDown.delay(140).duration(380)} style={styles.specChip}>
             <Text style={styles.specChipText}>📝 {room.totalRounds || 7} Soru</Text>
-          </View>
-          <View style={styles.specChip}>
+          </Reanimated.View>
+          <Reanimated.View entering={FadeInDown.delay(190).duration(380)} style={styles.specChip}>
             <Text style={styles.specChipText}>⏱️ {room.questionTimeSec || 20}sn</Text>
-          </View>
-          <View style={styles.specChip}>
+          </Reanimated.View>
+          <Reanimated.View entering={FadeInDown.delay(240).duration(380)} style={styles.specChip}>
             <Text style={styles.specChipText}>
               {room.penaltyForWrong ? '⚠️ -50p Ceza' : '🛡️ Cezasız'}
             </Text>
-          </View>
+          </Reanimated.View>
         </View>
 
         {/* 3. OYUNCU LİSTESİ */}
@@ -468,11 +573,19 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             const isMe = p.id === currentUserId;
 
             return (
-              <View
+              <Reanimated.View
                 key={p.id}
+                entering={FadeInDown.delay(index * 80).duration(380)}
                 style={[styles.playerRow, isMe && styles.playerRowMe]}
               >
-                <CharacterAvatar seed={p.avatarUrl || p.displayName} index={index} size={42} />
+                <View style={styles.playerAvatarWrap}>
+                  <CharacterAvatar seed={p.avatarUrl || p.displayName} index={index} size={42} />
+                  {playerIsHost && (
+                    <View style={styles.hostCrown}>
+                      <Text style={styles.hostCrownText}>👑</Text>
+                    </View>
+                  )}
+                </View>
 
                 <View style={styles.playerInfo}>
                   <View style={styles.nameRow}>
@@ -509,15 +622,13 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                     <Text style={styles.kickBtnText}>✕</Text>
                   </TouchableOpacity>
                 )}
-              </View>
+              </Reanimated.View>
             );
           })}
 
-          {/* Boş Slotlar: Sade ve modern minimalist slotlar */}
+          {/* Boş Slotlar: Üretilmiş kaide görseli + nefes alan parıltı */}
           {Array.from({ length: Math.min(4, emptySlotCount) }).map((_, idx) => (
-            <View key={`empty_${idx}`} style={styles.emptySlotCardMinimal}>
-              <Text style={styles.emptySlotTextMinimal}>Oyuncu bekleniyor...</Text>
-            </View>
+            <EmptySlotCard key={`empty_${idx}`} />
           ))}
         </View>
 
@@ -526,14 +637,11 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           <Text style={styles.reactionsHeader}>LOBİ REAKSİYONLARI</Text>
           <View style={styles.reactionsPillBar}>
             {LOBBY_REACTION_EMOJIS.map((emoji) => (
-              <TouchableOpacity
+              <BouncyReaction
                 key={emoji}
-                style={styles.reactionTouch}
-                activeOpacity={0.65}
+                emoji={emoji}
                 onPress={() => handleSendReaction(emoji)}
-              >
-                <Text style={styles.reactionEmojiText}>{emoji}</Text>
-              </TouchableOpacity>
+              />
             ))}
           </View>
         </View>
@@ -654,6 +762,73 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  // 0. Lobi Sahnesi Banner'ı (Üretilmiş görsel + animasyonlu başlık)
+  heroBanner: {
+    width: '100%',
+    height: 170,
+    borderRadius: 22,
+    overflow: 'hidden',
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 200, 55, 0.25)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#7A3FE0',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 16,
+      },
+      android: { elevation: 10 },
+      web: {
+        boxShadow: '0 10px 30px rgba(122, 63, 224, 0.4)',
+      },
+    }),
+  },
+  heroImg: {
+    width: '100%',
+    height: '100%',
+  },
+  heroOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(30, 14, 61, 0.45)',
+  },
+  heroContent: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    paddingLeft: 20,
+  },
+  heroEyebrow: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#5ADBB5',
+    letterSpacing: 3,
+    marginBottom: 4,
+  },
+  heroPillRow: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  heroPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  heroPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#E9DFFC',
+  },
+
+  // Oda kodu kartı sarmalayıcı: nefes alan parıltı için
+  codeCardWrap: {
+    width: '100%',
+    marginBottom: 12,
+  },
+
   // 1. Oda Kodu Kartı (Tavriko UI Kit Altın Çerçeveli)
   codeCard: {
     width: '100%',
@@ -684,6 +859,13 @@ const styles = StyleSheet.create({
   },
   codeInfoLeft: {
     flex: 1,
+  },
+  codeLabel: {
+    color: '#FFC837',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 2.5,
+    marginBottom: 2,
   },
   codeValueText: {
     color: '#FFFFFF',
@@ -774,6 +956,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(154, 107, 255, 0.25)',
   },
+  playerAvatarWrap: {
+    position: 'relative',
+  },
+  hostCrown: {
+    position: 'absolute',
+    top: -10,
+    left: -2,
+    fontSize: 13,
+  },
+  hostCrownText: {
+    fontSize: 13,
+  },
   playerRowMe: {
     borderColor: '#FFC837',
     backgroundColor: 'rgba(255, 200, 55, 0.06)',
@@ -847,14 +1041,18 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 16,
     borderWidth: 1.5,
     borderStyle: 'dashed',
     borderColor: 'rgba(154, 107, 255, 0.25)',
     backgroundColor: 'rgba(23, 11, 51, 0.35)',
+    gap: 12,
+  },
+  emptySlotArt: {
+    width: 52,
+    height: 52,
   },
   emptySlotTextMinimal: {
     color: '#8A7BAF',
