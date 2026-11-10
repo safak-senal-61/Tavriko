@@ -104,24 +104,28 @@ const LOBBY_IMG = {
   emptySlot: require('../../assets/images/lobby/empty_slot.png'),
 };
 
-/** Nefes alan altın parıltı: oda kodu kartının çerçevesi için */
-const GlowingBorder: React.FC<{ color: string; borderRadius: number }> = ({ color, borderRadius }) => {
+/** Nefes alan altın parıltılı KART KENDİSİ (üst üste katman yok, tek kart) */
+const CodeCardShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const p = useSharedValue(0);
   useEffect(() => {
-    p.value = withRepeat(withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.sin) }), -1, true);
+    p.value = withRepeat(withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.sin) }), -1, true);
   }, []);
-  const style = useAnimatedStyle(() => ({
-    position: 'absolute',
-    top: -2,
-    left: -2,
-    right: -2,
-    bottom: -2,
-    borderRadius: borderRadius + 2,
-    borderWidth: 1.5,
-    borderColor: color,
-    opacity: 0.35 + 0.5 * Math.sin(p.value * Math.PI),
-  }));
-  return <Reanimated.View style={style} pointerEvents="none" />;
+  const cardStyle = useAnimatedStyle(() => {
+    const t = 0.5 + 0.5 * Math.sin(p.value * Math.PI); // 0..1 nefes
+    return {
+      width: '100%',
+      backgroundColor: '#1E0E3D',
+      borderRadius: 20,
+      borderWidth: 1.5,
+      borderColor: `rgba(255, 206, 80, ${0.55 + 0.45 * t})`,
+      shadowColor: '#FFC837',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.14 + 0.18 * t,
+      shadowRadius: 10,
+      elevation: 6,
+    };
+  });
+  return <Reanimated.View style={cardStyle}>{children}</Reanimated.View>;
 };
 
 /** Basınca zıplayan emoji butonu */
@@ -504,11 +508,11 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </View>
         </Reanimated.View>
 
-        {/* 1. ODA KODU KARTI (Nefes alan altın parıltılı) */}
+        {/* 1. ODA KODU KARTI (Nefes alan altın parıltılı, tek kart) */}
         <Reanimated.View entering={FadeInDown.delay(90).duration(400)} style={styles.codeCardWrap}>
-          <GlowingBorder color="#FFC837" borderRadius={20} />
+          <CodeCardShell>
           <TouchableOpacity
-            style={styles.codeCard}
+            style={styles.codeCardInner}
             onPress={handleCopyCode}
             activeOpacity={0.85}
           >
@@ -540,6 +544,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
+          </CodeCardShell>
         </Reanimated.View>
 
         {/* 2. ODA PARAMETRELERİ (Kademeli girişli çipler) */}
@@ -746,7 +751,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 40,
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     alignItems: 'center',
   },
   headerTitleWrap: {
@@ -830,32 +835,13 @@ const styles = StyleSheet.create({
   },
 
   // 1. Oda Kodu Kartı (Tavriko UI Kit Altın Çerçeveli)
-  codeCard: {
+  codeCardInner: {
     width: '100%',
-    backgroundColor: '#1E0E3D',
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: '#FFC837',
     paddingVertical: 14,
     paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#FFC837',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 6,
-      },
-      web: {
-        boxShadow: '0 4px 16px rgba(255, 200, 55, 0.25)',
-      },
-    }),
   },
   codeInfoLeft: {
     flex: 1,
