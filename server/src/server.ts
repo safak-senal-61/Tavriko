@@ -18,6 +18,7 @@ import { TelegramBotService } from './telegram/telegramBot';
 import { supabaseService } from './db/supabaseClient';
 import { cacheService } from './cache/redisClient';
 import { logger } from './utils/logger';
+import { ALL_CATEGORIES } from '@trivia/shared';
 import { logRouter, renderDashboardHtml } from './routes/logRoutes';
 import { FinalMatchSummary, canonicalCategoryId } from '@trivia/shared';
 import authRoutes from './routes/authRoutes';
@@ -1052,6 +1053,19 @@ export function createApp() {
     `);
   });
 
+  // Portal alt kategori haritası: oyunun Keşfet ekranındaki kartların aynısı.
+  // Kaynak: shared/src/categories.ts (ALL_CATEGORIES) — tek yerden beslenir.
+  const PORTAL_SUBCATEGORY_MAP: Record<string, Array<{ n: string; e: string }>> = {};
+  for (const cat of ALL_CATEGORIES) {
+    if (cat.id !== 'mixed' && cat.subCategories && cat.subCategories.length > 0) {
+      PORTAL_SUBCATEGORY_MAP[cat.id] = cat.subCategories.map((s) => ({
+        n: s.name,
+        e: s.emoji || '🏷️',
+      }));
+    }
+  }
+  const portalSubcategoryMapJson = JSON.stringify(PORTAL_SUBCATEGORY_MAP);
+
   // Telegram Mini App / Web App Portal
   app.get('/telegram-webapp', (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -1686,7 +1700,7 @@ export function createApp() {
                   <span style="font-size: 11px; color: var(--accent-gold); font-weight: 700;">👆 Dokunarak Şablonu Al</span>
                 </div>
                 <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">
-                  Aşağıdaki kategorilerden birine dokunduğunuzda, o kategoriye ait hazır ve eksiksiz JSON taslağı otomatik oluşturulur.
+                  Aşağıdaki kategorilerden birine dokunduğunuzda, o kategoriye ait hazır ve eksiksiz JSON taslağı otomatik oluşur ve seçtiğiniz kategorinin oyun Keşfet ekranındaki alt kategori kartları (soru sayılarıyla) altta açılır. Bir alt kategoriye dokunursanız sorular doğrudan o karta yüklenir.
                 </div>
 
                 <!-- TÜM KATEGORİ SQUIRCLE GRID -->
@@ -1695,10 +1709,22 @@ export function createApp() {
                 <!-- ÖZEL ODA TEMATİK PAKETLERİ -->
                 <details style="margin-top: 10px; background: rgba(255, 255, 255, 0.03); border-radius: var(--radius-sm); padding: 8px 12px; border: 1px solid rgba(255, 255, 255, 0.08);">
                   <summary style="cursor: pointer; font-size: 12px; font-weight: 700; color: #C084FC; outline: none;">
-                    ⚔️ Arkadaşla Özel Oda Paketleri & Karışık Mod (Tıkla ve Gör)
+                    ⚔️ Arkadaşla Özel Oda Paketleri (Tıkla ve Gör)
                   </summary>
                   <div style="margin-top: 8px;" class="category-squircle-grid" id="special-cat-grid"></div>
                 </details>
+
+                <!-- ALT KATEGORİ KARTLARI (oyun Keşfet ekranıyla birebir) -->
+                <div id="sub-cat-section" style="display: none; margin-top: 12px; background: rgba(21, 15, 44, 0.6); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label class="form-label" style="margin-bottom: 0;">🎯 Alt Kategori Kartları</label>
+                    <span id="sub-cat-count-label" style="font-size: 11px; color: var(--accent-gold); font-weight: 700;"></span>
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; line-height: 1.4;">
+                    Yukarıdaki kategorinin oyun Keşfet ekranındaki kartlarının aynısı. Bir karta dokunursanız yüklediğiniz sorular o alt kategoriye eklenir; tekrar dokunursanız seçim kalkar ve sorular kategori genelinde tutulur. Kartlarda o alt kategorideki mevcut soru sayısı görünür.
+                  </div>
+                  <div class="category-squircle-grid" id="sub-cat-grid"></div>
+                </div>
               </div>
 
               <!-- 3. MANUEL TEK SORU EKLEME FORMU -->
@@ -1734,7 +1760,12 @@ export function createApp() {
 
                   <div class="form-group">
                     <label class="form-label">Kategori (Tüm Oyun Kategorileri)</label>
-                    <select id="mq-category"></select>
+                    <select id="mq-category" onchange="renderManualSubOptions()"></select>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Alt Kategori (İsteğe Bağlı — Seçili kategorinin Keşfet kartları)</label>
+                    <select id="mq-subcategory"></select>
                   </div>
 
                   <div class="form-group">
@@ -2283,6 +2314,9 @@ export function createApp() {
             }
           }
 
+          // Portal alt kategori haritası: oyun Keşfet kartları (server.ts'ten enjekte edilir)
+          const SUBCATEGORY_MAP = ${portalSubcategoryMapJson};
+
           // Manuel soru ekleme formu (Tüm kategoriler)
           let mqCorrectIdx = -1;
           let mqDiff = 'medium';
@@ -2310,6 +2344,20 @@ export function createApp() {
             sel.innerHTML = all.map(c => {
               return '<option value="' + c.id + '">' + c.icon + ' ' + c.name + ' (' + c.id + ')</option>';
             }).join('');
+            renderManualSubOptions();
+          }
+
+          function renderManualSubOptions() {
+            const catSel = document.getElementById('mq-category');
+            const subSel = document.getElementById('mq-subcategory');
+            if (!subSel) return;
+            const catId = catSel ? catSel.value : null;
+            const subs = (catId && SUBCATEGORY_MAP[catId]) || [];
+            let html = '<option value="">— Alt kategorisiz (kategori geneli) —</option>';
+            for (const s of subs) {
+              html += '<option value="' + s.n.replace(/"/g, '"') + '">' + s.e + ' ' + s.n + '</option>';
+            }
+            subSel.innerHTML = html;
           }
 
           function resetManualForm() {
@@ -2332,6 +2380,7 @@ export function createApp() {
             const text = (document.getElementById('mq-text').value || '').trim();
             const opts = [0, 1, 2, 3].map(i => (document.getElementById('mq-opt-' + i).value || '').trim());
             const catId = document.getElementById('mq-category').value || 'general_culture';
+            const subCategory = (document.getElementById('mq-subcategory') ? document.getElementById('mq-subcategory').value : '') || '';
             const explanation = (document.getElementById('mq-explanation').value || '').trim();
             const pool = document.getElementById('json-pool').value || 'standard';
             const autoPublish = document.getElementById('mq-autopublish').checked;
@@ -2365,7 +2414,8 @@ export function createApp() {
               categoryId: catId,
               difficulty: mqDiff,
               targetPool: pool,
-              explanation: explanation
+              explanation: explanation,
+              subCategory: subCategory || undefined
             };
 
             const btn = document.getElementById('btn-mq-add');
@@ -2396,6 +2446,9 @@ export function createApp() {
                   alertBox.innerText = msg;
                 }
                 resetManualForm();
+                // Alt kategori sayaçlarını güncelle
+                subCounts = null;
+                renderSubGrid();
               } else {
                 let msg = 'Soru eklenemedi.';
                 if (data && data.importedCount === 0 && data.duplicateCount > 0) {
@@ -2421,14 +2474,81 @@ export function createApp() {
             updateLiveDetection();
           }
 
-          function selectCategoryTemplate(catId) {
+          // ---- Alt kategori seçim durumu ve sayaçlar ----
+          let selectedCatId = null;
+          let selectedSubName = null;
+          let subCounts = null; // { "catId||subName": sayi }
+
+          function refreshSubCounts() {
+            // Tüm soruları sayfalar halinde çekip alt kategori bazında sayar
+            const fetchPage = (offset) =>
+              fetch('/api/admin/questions/list?limit=200&offset=' + offset)
+                .then(r => r.json())
+                .catch(() => null);
+            return (async () => {
+              const counts = {};
+              let offset = 0;
+              for (let page = 0; page < 10; page++) {
+                const d = await fetchPage(offset);
+                if (!d || !Array.isArray(d.questions) || d.questions.length === 0) break;
+                for (const q of d.questions) {
+                  const cat = (q.categoryId || '').toString();
+                  const sub = (q.subCategory || '').toString().trim();
+                  if (cat && sub) {
+                    const key = cat.toLowerCase() + '||' + sub.toLowerCase();
+                    counts[key] = (counts[key] || 0) + 1;
+                  }
+                }
+                if (d.questions.length < 200) break;
+                offset += 200;
+              }
+              return counts;
+            })();
+          }
+
+          function renderSubGrid() {
+            const section = document.getElementById('sub-cat-section');
+            const grid = document.getElementById('sub-cat-grid');
+            const countLabel = document.getElementById('sub-cat-count-label');
+            if (!section || !grid) return;
+            const subs = (selectedCatId && SUBCATEGORY_MAP[selectedCatId]) || null;
+            if (!subs || subs.length === 0) {
+              section.style.display = 'none';
+              grid.innerHTML = '';
+              if (countLabel) countLabel.textContent = '';
+              return;
+            }
+            section.style.display = 'block';
+            if (countLabel) countLabel.textContent = selectedCatId + ' · ' + subs.length + ' kart';
+            grid.innerHTML = subs.map(s => {
+              const key = selectedCatId.toLowerCase() + '||' + s.n.toLowerCase();
+              const cnt = (subCounts && subCounts[key]) || 0;
+              const active = selectedSubName === s.n;
+              return '<div class="category-squircle-card' + (active ? ' active' : '') + '" data-sub-name="' + s.n.replace(/"/g, '"') + '" onclick="selectSubTemplate(this.dataset.subName)">' +
+                '<div class="cat-card-icon">' + s.e + '</div>' +
+                '<div class="cat-card-title">' + s.n + '</div>' +
+                '<div class="cat-card-id">' + cnt + ' soru</div>' +
+              '</div>';
+            }).join('');
+            // Sayaçlar henüz yüklenmediyse arka planda çek ve yenile
+            if (!subCounts) {
+              refreshSubCounts().then(c => {
+                subCounts = c;
+                if (selectedCatId) renderSubGrid();
+              });
+            }
+          }
+
+          function selectSubTemplate(name) {
             triggerHaptic('light');
-            document.querySelectorAll('.category-squircle-card').forEach(c => {
-              c.classList.toggle('active', c.getAttribute('data-cat-id') === catId);
-            });
+            selectedSubName = selectedSubName === name ? null : name;
+            renderSubGrid();
+            if (selectedCatId) buildCategoryTemplate(selectedCatId);
+          }
+
+          function buildCategoryTemplate(catId) {
             const currentPool = document.getElementById('json-pool').value || 'standard';
             const catObj = APP_16_CATEGORIES.find(c => c.id === catId) || SPECIAL_ROOM_CATEGORIES.find(c => c.id === catId) || { name: catId, icon: '🏷️' };
-            
             const sample = [
               {
                 "text": catObj.name + " kategorisi için soru metnini buraya yazın...",
@@ -2445,9 +2565,24 @@ export function createApp() {
                 "targetPool": currentPool
               }
             ];
-
+            if (selectedSubName) {
+              sample[0].subCategory = selectedSubName;
+            }
             document.getElementById('json-textarea').value = JSON.stringify(sample, null, 2);
             updateLiveDetection();
+          }
+
+          function selectCategoryTemplate(catId) {
+            triggerHaptic('light');
+            document.querySelectorAll('.category-squircle-card[data-cat-id]').forEach(c => {
+              c.classList.toggle('active', c.getAttribute('data-cat-id') === catId);
+            });
+            if (selectedCatId !== catId) {
+              selectedSubName = null;
+            }
+            selectedCatId = catId;
+            renderSubGrid();
+            buildCategoryTemplate(catId);
           }
 
           function updateLiveDetection() {
@@ -2703,6 +2838,9 @@ export function createApp() {
                 alertBox.innerText = msg;
                 textarea.value = '';
                 console.log('🎉 [Telegram WebApp] Sorular başarıyla eklendi:', data.importedCount);
+                // Alt kategori sayaçlarını güncelle
+                subCounts = null;
+                renderSubGrid();
 
                 const detailBox = document.getElementById('json-result-details');
                 if (detailBox) {
