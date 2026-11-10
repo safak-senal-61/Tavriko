@@ -38,6 +38,7 @@ import {
 import { ALL_CATEGORIES, QUESTION_BANK } from './questionsData';
 import { RICH_SEED_BANK } from '../ai/evrenLlmGenerator';
 import { supabaseService } from './supabaseClient';
+import { mergeQuestionStores } from '../utils/questionStoreMerge';
 import { presenceManager } from '../services/presenceManager';
 
 const JWT_SECRET =
@@ -177,6 +178,13 @@ export class PrismaService {
   };
   private users: Map<string, UserRecord> = new Map();
   private questions: Question[] = [];
+  // Bu örneğin yerel olarak değiştirdiği / sildiği soru id'leri. Bulut yazımı
+  // sırasında yalnızca bu sorular yerel sürümle yazılır; diğer sorularda
+  // buluttaki (diğer örneklerin güncellediği) sürüm korunur.
+  private localQuestionEdits = new Set<string>();
+  private localQuestionDeletes = new Set<string>();
+  // Aynı örnek içinden eşzamanlı bulut yazımlarını sıraya sokar (okuma-değiştirme-yazma yarışını önler)
+  private cloudQuestionsWriteChain: Promise<void> = Promise.resolve();
   private categories: CategoryInfo[] = [...ALL_CATEGORIES];
   private isJest = Boolean(process.env.JEST_WORKER_ID);
   public activeUserRooms: Map<string, { roomCode: string; joinedAt: number }> = new Map();
@@ -1058,8 +1066,10 @@ export class PrismaService {
       // sonra birleşik havuzu buluta gönder ki mevcut sorular ezilmesin.
       await this.ensureQuestionsRestored();
 
-      await supabaseService.syncCloudStore('questions_store.json', this.questions);
-      await supabaseService.syncCloudStore('categories_store.json', this.getCategories());
+      // Birleştirmeli güvenli yazım: geri yükleme yapıldıysa bile bu örneğin
+      // görmediği (geri yüklemeden sonra yazılmış) güncellemeleri ezmeyecek.
+      await this.syncQuestionsCloudSafe().catch(() => {});
+      supabaseService.syncCloudStore('categories_store.json', this.getCategories()).catch(() => {});
     } catch {
       // Ignore background cloud sync errors
     }
@@ -1154,6 +1164,33 @@ export class PrismaService {
     }
   }
 
+  /**
+   * Soru havuzunu bulut deposuna BİRLEŞTİRMELİ yazar: buluttaki mevcut liste
+   * yüklenir; yerel değişiklikler (localQuestionEdits / localQuestionDeletes)
+   * uygulanır, diğer sorularda bulut tarafındaki sürüm korunur.
+   */
+  private async syncQuestionsCloudSafe(): Promise<void> {
+    let cloudQuestions: unknown = null;
+    try {
+      cloudQuestions = await supabaseService.loadCloudStore('questions_store.json');
+    } catch {
+      cloudQuestions = null;
+    }
+    const merged = mergeQuestionStores(
+      cloudQuestions,
+      this.questions,
+      this.localQuestionEdits,
+      this.localQuestionDeletes
+    );
+    const ok = await supabaseService.syncCloudStore('questions_store.json', merged);
+    if (ok) {
+      // Yazma başarılı: yerel değişiklikler artık bulutta; bayraklar temizlenir
+      // (sonraki yazımlarda bu sorular için bulut sürümü korunmaya devam eder).
+      this.localQuestionEdits.clear();
+      this.localQuestionDeletes.clear();
+    }
+  }
+
   private savePersistedQuestions() {
     try {
       if (!this.isJest) {
@@ -1167,7 +1204,13 @@ export class PrismaService {
         // içeren questions_store.json yalnızca çekirdek + yeni sorularla üzerine
         // yazılır ve kullanıcının yüklediği sorular kaybolurdu.
         if (this.questionsRestored) {
-          supabaseService.syncCloudStore('questions_store.json', this.questions).catch(() => {});
+          // Birleştirmeli güvenli yazım: buluttaki güncel durum yüklenir ve
+          // yalnızca bu örneğin değiştirdiği sorular yerel sürümle yazılır.
+          // Böylece bayat bir Lambda örneği diğer örneklerin güncellemelerini
+          // tüm havuzu ezerek kaybedemez.
+          this.cloudQuestionsWriteChain = this.cloudQuestionsWriteChain
+            .then(() => this.syncQuestionsCloudSafe())
+            .catch(() => {});
           supabaseService.syncCloudStore('categories_store.json', this.getCategories()).catch(() => {});
         } else {
           console.warn(
@@ -2699,6 +2742,7 @@ export class PrismaService {
     };
 
     this.questions.push(newQuestion);
+    this.localQuestionEdits.add(newQuestion.id);
     this.pendingPrismaQuestionSync.push(newQuestion);
     this.savePersistedQuestions();
     return newQuestion;
@@ -2721,6 +2765,7 @@ export class PrismaService {
     } else if (pool === 'custom_room') {
       q.isCustomRoomOnly = true;
     }
+    this.localQuestionEdits.add(id);
     this.pendingPrismaQuestionSync.push(q);
     this.savePersistedQuestions();
     return q;
@@ -2734,6 +2779,7 @@ export class PrismaService {
     q.reviewedBy = reviewedBy;
     q.rejectionReason = reason;
     q.reviewedAt = new Date().toISOString();
+    this.localQuestionEdits.add(id);
     this.pendingPrismaQuestionSync.push(q);
     this.savePersistedQuestions();
     return q;
@@ -2752,6 +2798,7 @@ export class PrismaService {
       updated.contentHash = computeQuestionHash(updated.text, updated.options);
     }
     this.questions[idx] = updated;
+    this.localQuestionEdits.add(id);
     this.pendingPrismaQuestionSync.push(updated);
     this.savePersistedQuestions();
     return updated;
@@ -2761,6 +2808,8 @@ export class PrismaService {
     const idx = this.questions.findIndex((item) => item.id === id);
     if (idx === -1) return false;
     this.questions.splice(idx, 1);
+    this.localQuestionEdits.delete(id);
+    this.localQuestionDeletes.add(id);
     this.savePersistedQuestions();
     try {
       this.rawClient.question.delete({ where: { id } }).catch(() => {});
