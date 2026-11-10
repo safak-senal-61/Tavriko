@@ -10,14 +10,23 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const logger_1 = require("../utils/logger");
 const prismaClient_1 = require("../db/prismaClient");
 const authRoutes_1 = require("./authRoutes");
-const JWT_SECRET = process.env.JWT_SECRET || 'trivia-super-secret-jwt-key-2026';
-const PORTAL_ADMIN_EMAIL = 'jewelkaan01@gmail.com';
-const PORTAL_ADMIN_PASSWORD = 'Patr10.senal61@@';
+const auth_1 = require("../middleware/auth");
+// SECURITY: portal credentials come exclusively from environment variables.
+// The previously hardcoded values were exposed in the public repository and
+// MUST be rotated by the operator.
+const PORTAL_ADMIN_EMAIL = process.env.PORTAL_ADMIN_EMAIL || '';
+const PORTAL_ADMIN_PASSWORD = process.env.PORTAL_ADMIN_PASSWORD || '';
+const PORTAL_CONFIGURED = Boolean(PORTAL_ADMIN_EMAIL && PORTAL_ADMIN_PASSWORD && (0, auth_1.getJwtSecret)());
 exports.logRouter = (0, express_1.Router)();
 exports.logRouter.post('/portal/login', (req, res) => {
     const { email, password } = req.body;
+    if (!PORTAL_CONFIGURED) {
+        logger_1.logger.warn('AUTH', 'Portal girişi reddedildi: PORTAL_ADMIN_EMAIL/PORTAL_ADMIN_PASSWORD ortam değişkenleri tanımlı değil.');
+        res.status(503).json({ success: false, error: 'Yönetici portalı yapılandırılmamış.' });
+        return;
+    }
     if (email === PORTAL_ADMIN_EMAIL && password === PORTAL_ADMIN_PASSWORD) {
-        const token = jsonwebtoken_1.default.sign({ email: PORTAL_ADMIN_EMAIL, role: 'portal_super_admin' }, JWT_SECRET, { expiresIn: '30d' });
+        const token = jsonwebtoken_1.default.sign({ email: PORTAL_ADMIN_EMAIL, role: 'portal_super_admin' }, (0, auth_1.getJwtSecret)(), { expiresIn: '30d' });
         logger_1.logger.success('AUTH', `Portal Yöneticisi Giriş Yaptı: ${email}`);
         res.json({ success: true, token, email: PORTAL_ADMIN_EMAIL });
     }
@@ -34,7 +43,7 @@ exports.logRouter.get('/portal/verify', (req, res) => {
         return;
     }
     try {
-        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        const decoded = jsonwebtoken_1.default.verify(token, (0, auth_1.getJwtSecret)());
         if (decoded && decoded.email === PORTAL_ADMIN_EMAIL) {
             res.json({ success: true, email: decoded.email });
             return;
@@ -43,11 +52,13 @@ exports.logRouter.get('/portal/verify', (req, res) => {
     catch { }
     res.status(401).json({ success: false, error: 'Geçersiz veya süresi dolmuş oturum' });
 });
-exports.logRouter.get('/logs', (req, res) => {
-    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 200;
+// SECURITY: log access is restricted to authenticated admins. Server logs contain
+// request metadata and must not be publicly readable.
+exports.logRouter.get('/logs', auth_1.requireAdminAuth, (req, res) => {
+    const limit = Math.min(1000, req.query.limit ? parseInt(req.query.limit, 10) || 200 : 200);
     res.json({ logs: logger_1.logger.getRecentLogs(limit) });
 });
-exports.logRouter.get('/logs/stream', (req, res) => {
+exports.logRouter.get('/logs/stream', auth_1.requireAdminAuth, (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -55,20 +66,34 @@ exports.logRouter.get('/logs/stream', (req, res) => {
     logger_1.logger.addSseClient(res);
     logger_1.logger.info('SYSTEM', 'Yeni bir istemci SSE log akışına bağlandı');
 });
+// Public client log ingestion (mobile app). Input is size-capped and sanitized
+// to prevent log flooding / injection.
 exports.logRouter.post('/logs/ingest', (req, res) => {
     const { level = 'INFO', category = 'CLIENT', message, details } = req.body;
-    if (!message) {
+    if (!message || typeof message !== 'string') {
         res.status(400).json({ error: 'message zorunludur' });
         return;
     }
-    logger_1.logger.log(category || 'CLIENT', level || 'INFO', `[MOBİL] ${message}`, details);
+    const safeLevel = ['INFO', 'WARN', 'ERROR'].includes(level) ? level : 'INFO';
+    const safeCategory = typeof category === 'string' ? category.slice(0, 24) : 'CLIENT';
+    const safeMessage = message.slice(0, 1000).replace(/[\r\n\t]/g, ' ');
+    let safeDetails = details;
+    if (details && typeof details === 'object') {
+        try {
+            safeDetails = JSON.parse(JSON.stringify(details).slice(0, 4000));
+        }
+        catch {
+            safeDetails = undefined;
+        }
+    }
+    logger_1.logger.log(safeCategory, safeLevel, `[MOBİL] ${safeMessage}`, safeDetails);
     res.json({ success: true });
 });
-exports.logRouter.post('/logs/clear', (req, res) => {
+exports.logRouter.post('/logs/clear', auth_1.requireAdminAuth, (req, res) => {
     logger_1.logger.clear();
     res.json({ success: true });
 });
-exports.logRouter.get('/logs/stats', async (req, res) => {
+exports.logRouter.get('/logs/stats', auth_1.requireAdminAuth, async (req, res) => {
     try {
         let pgUsers = 0;
         let recentUsers = [];
@@ -106,7 +131,7 @@ exports.logRouter.get('/logs/stats', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-exports.logRouter.post('/logs/simulate-google', async (req, res) => {
+exports.logRouter.post('/logs/simulate-google', auth_1.requireAdminAuth, async (req, res) => {
     try {
         const { email, displayName } = req.body;
         if (!email) {

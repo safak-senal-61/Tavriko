@@ -23,6 +23,7 @@ import { UserProfile, SHOP_CATALOG, ShopProduct, ShopProductCategory } from '@tr
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { getApiBaseUrl } from '../config';
+import { authHeaders } from '../utils/apiAuth';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -445,7 +446,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/shop/purchase`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           userId: user.id,
           productId: product.id,

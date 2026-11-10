@@ -99,29 +99,27 @@ export async function verifyJwt(
     const dataToVerify = encoder.encode(`${headerB64}.${payloadB64}`);
     const signatureBytes = base64UrlDecode(signatureB64);
 
-    // Try provided secret first, then fallback to default if different
-    const secretsToTry = [secret, 'super_secret_trivia_key_2026'];
-
-    let verified = false;
-    for (const sec of secretsToTry) {
-      if (!sec) continue;
-      const key = await crypto.subtle.importKey(
-        'raw',
-        encoder.encode(sec),
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['verify']
-      );
-
-      verified = await crypto.subtle.verify(
-        'HMAC',
-        key,
-        signatureBytes,
-        dataToVerify
-      );
-
-      if (verified) break;
+    // SECURITY: only the configured secret is accepted. The previous hardcoded
+    // fallback secret was committed to a public repository, which allowed anyone
+    // to forge valid identity tokens for the realtime gateway.
+    if (!secret) {
+      return { isValid: false, error: 'Verification secret is not configured' };
     }
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+
+    const verified = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      signatureBytes,
+      dataToVerify
+    );
 
     if (!verified) {
       return { isValid: false, error: 'Invalid token signature' };

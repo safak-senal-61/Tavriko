@@ -27,6 +27,7 @@ import { initErrorMonitor, captureError } from './utils/errorMonitor';
 import triviaRoutes from './routes/triviaRoutes';
 import socialRoutes from './routes/socialRoutes';
 import referralRoutes from './routes/referralRoutes';
+import { requireAdminAuth } from './middleware/auth';
 
 function getLocalIpAddress(): string {
   const interfaces = os.networkInterfaces();
@@ -38,6 +39,44 @@ function getLocalIpAddress(): string {
     }
   }
   return 'tavriko-app.vercel.app';
+}
+
+const SENSITIVE_KEYS = /pass|token|secret|authorization|otp|code|cookie/i;
+
+// SECURITY: redact sensitive fields (passwords, tokens, OTP codes) before writing
+// request payloads to logs. Logs are readable from the admin portal and must never
+// contain credentials in plaintext.
+function redactSensitiveBody(body: any): any {
+  if (!body || typeof body !== 'object') return body;
+  try {
+    const clone: any = Array.isArray(body) ? [] : {};
+    for (const key of Object.keys(body)) {
+      const value = body[key];
+      if (SENSITIVE_KEYS.test(key)) {
+        clone[key] = '[REDACTED]';
+      } else if (value && typeof value === 'object') {
+        clone[key] = redactSensitiveBody(value);
+      } else {
+        clone[key] = value;
+      }
+    }
+    return clone;
+  } catch {
+    return '[redacted]';
+  }
+}
+
+function redactSensitiveQuery(query: any): any {
+  if (!query || typeof query !== 'object') return query;
+  try {
+    const clone: any = {};
+    for (const key of Object.keys(query)) {
+      clone[key] = SENSITIVE_KEYS.test(key) ? '[REDACTED]' : query[key];
+    }
+    return clone;
+  } catch {
+    return '[redacted]';
+  }
 }
 
 export function createApp() {
@@ -71,8 +110,8 @@ export function createApp() {
         `${req.method} ${req.originalUrl} -> ${res.statusCode} (${duration}ms)`,
         {
           ip: req.ip,
-          query: Object.keys(req.query).length ? req.query : undefined,
-          body: req.method !== 'GET' && Object.keys(req.body || {}).length ? req.body : undefined,
+          query: Object.keys(req.query).length ? redactSensitiveQuery(req.query) : undefined,
+          body: req.method !== 'GET' && Object.keys(req.body || {}).length ? redactSensitiveBody(req.body) : undefined,
         }
       );
     });
@@ -164,6 +203,23 @@ export function createApp() {
   // Telegram Webhook endpoint (Essential for Vercel Serverless execution)
   app.post(['/api/telegram/webhook', '/telegram/webhook'], async (req, res) => {
     try {
+      // SECURITY: verify Telegram's webhook secret token. Without this check anyone
+      // could POST forged Telegram updates (impersonating admins in the approval bot).
+      const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+      if (!webhookSecret) {
+        logger.error('TELEGRAM', 'Webhook reddedildi: TELEGRAM_WEBHOOK_SECRET tanımlı değil.');
+        return res.status(401).send('Unauthorized');
+      }
+      const providedSecret = req.headers['x-telegram-bot-api-secret-token'];
+      if (
+        typeof providedSecret !== 'string' ||
+        providedSecret.length !== webhookSecret.length ||
+        providedSecret !== webhookSecret
+      ) {
+        logger.warn('TELEGRAM', 'Webhook reddedildi: gizli token doğrulaması başarısız.');
+        return res.status(401).send('Unauthorized');
+      }
+
       const update = req.body;
       const sender =
         update?.message?.from?.username ||
@@ -192,7 +248,7 @@ export function createApp() {
   });
 
   // Telegram set webhook endpoint
-  app.get(['/api/admin/telegram/set-webhook', '/admin/telegram/set-webhook'], async (req, res) => {
+  app.get(['/api/admin/telegram/set-webhook', '/admin/telegram/set-webhook'], requireAdminAuth, async (req, res) => {
     try {
       const cfGatewayUrl = 'https://tavriko-realtime.uncertainidentity8.workers.dev/telegram/webhook';
       const vercelUrl = 'https://tavriko-app.vercel.app/api/telegram/webhook';
@@ -210,7 +266,7 @@ export function createApp() {
   });
 
   // Telegram webhook info
-  app.get(['/api/admin/telegram/webhook-info', '/admin/telegram/webhook-info'], async (req, res) => {
+  app.get(['/api/admin/telegram/webhook-info', '/admin/telegram/webhook-info'], requireAdminAuth, async (req, res) => {
     try {
       const info = await telegramBot.getWebhookInfo();
       return res.json({ success: true, info });
@@ -243,18 +299,19 @@ export function createApp() {
   });
 
   // Telegram bot status endpoint
-  app.get('/api/admin/telegram/status', async (req, res) => {
+  // SECURITY: the bot token is never returned in API responses (previously leaked
+  // via activeToken).
+  app.get('/api/admin/telegram/status', requireAdminAuth, async (req, res) => {
     const webhookInfo = await telegramBot.getWebhookInfo();
     res.json({
       running: telegramBot.isRunning(),
       tokenConfigured: !!(process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_BOT_TOKEN.includes('placeholder')),
-      activeToken: telegramBot.getActiveToken(),
       webhookInfo,
     });
   });
 
   // Telegram bot live configuration endpoint
-  app.post(['/api/admin/telegram/config', '/admin/telegram/config'], async (req, res) => {
+  app.post(['/api/admin/telegram/config', '/admin/telegram/config'], requireAdminAuth, async (req, res) => {
     try {
       const { token, adminIds } = req.body;
       if (!token || typeof token !== 'string' || token.trim().length < 15) {
@@ -287,7 +344,7 @@ export function createApp() {
   });
 
   // Telegram test & status check endpoint
-  app.get(['/api/admin/telegram/test', '/admin/telegram/test'], async (req, res) => {
+  app.get(['/api/admin/telegram/test', '/admin/telegram/test'], requireAdminAuth, async (req, res) => {
     try {
       const info = await telegramBot.getBotInfo();
       return res.json(info);
@@ -377,17 +434,17 @@ export function createApp() {
   }
 
   // Admin & Operations Portal (Password protected via jewelkaan01@gmail.com) — birincil adres /admin
-  app.get(['/admin', '/portal', '/dashboard', '/ops', '/dev', '/developer-portal', '/gelistirici'], (req, res) => {
+  app.get(['/admin', '/portal', '/dashboard', '/ops', '/dev', '/developer-portal', '/gelistirici'], requireAdminAuth, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(renderDashboardHtml());
   });
   // Eski /developer adresi artık /admin'e yönlendirir
-  app.get(['/developer', '/developer/'], (req, res) => {
+  app.get(['/developer', '/developer/'], requireAdminAuth, (req, res) => {
     res.redirect(301, '/admin');
   });
 
   // Telegram Admin dashboard
-  app.get('/telegram-admin', (req, res) => {
+  app.get('/telegram-admin', requireAdminAuth, (req, res) => {
     const isBotRunning = telegramBot.isRunning();
     const tokenSet = !!(process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_BOT_TOKEN.includes('placeholder'));
 
@@ -3312,7 +3369,6 @@ export function createApp() {
         telegramBot: {
           configured: telegramBot.isRunning(),
           tokenSet: !!(process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_BOT_TOKEN.includes('placeholder')),
-          activeToken: telegramBot.getActiveToken(),
         },
       },
     });
@@ -3423,9 +3479,11 @@ export function createApp() {
 
   // --- Cloudflare Durable Objects Internal Endpoints ---
   app.post('/api/internal/room-questions', async (req, res) => {
-    const internalSecret = process.env.INTERNAL_API_SECRET || 'tavriko_internal_secret_2026';
+    // SECURITY: internal endpoints are service-to-service only. The secret header is
+    // REQUIRED; previously a missing header bypassed the check entirely.
+    const internalSecret = process.env.INTERNAL_API_SECRET;
     const providedSecret = req.headers['x-internal-secret'];
-    if (providedSecret && providedSecret !== internalSecret) {
+    if (!internalSecret || typeof providedSecret !== 'string' || providedSecret !== internalSecret) {
       return res.status(403).json({ error: 'Yetkisiz erişim' });
     }
 
@@ -3445,9 +3503,11 @@ export function createApp() {
   });
 
   app.post('/api/internal/match-results', async (req, res) => {
-    const internalSecret = process.env.INTERNAL_API_SECRET || 'tavriko_internal_secret_2026';
+    // SECURITY: internal endpoints are service-to-service only. The secret header is
+    // REQUIRED; previously a missing header bypassed the check entirely.
+    const internalSecret = process.env.INTERNAL_API_SECRET;
     const providedSecret = req.headers['x-internal-secret'];
-    if (providedSecret && providedSecret !== internalSecret) {
+    if (!internalSecret || typeof providedSecret !== 'string' || providedSecret !== internalSecret) {
       return res.status(403).json({ error: 'Yetkisiz erişim' });
     }
 

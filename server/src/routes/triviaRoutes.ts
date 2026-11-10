@@ -5,6 +5,7 @@ import { generateQuestionsWithEvrenGLM } from '../ai/evrenLlmGenerator';
 import { cacheService } from '../cache/redisClient';
 import { supabaseService } from '../db/supabaseClient';
 import { importQuestionsFromJson } from '../utils/questionImporter';
+import { requireAdminAuth } from '../middleware/auth';
 
 const router = Router();
 
@@ -112,6 +113,10 @@ router.get('/questions/daily', async (req: Request, res: Response): Promise<void
   const daily = db.getDailyChallenge();
   res.json(daily);
 });
+
+// SECURITY: all admin & AI question management endpoints require admin
+// authentication (HTTP Basic / portal JWT / x-internal-secret).
+router.use('/admin/questions', requireAdminAuth);
 
 // -------------------------------------------------------------
 // Admin & AI Question Management Endpoints

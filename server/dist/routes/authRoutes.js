@@ -5,6 +5,7 @@ const express_1 = require("express");
 const prismaClient_1 = require("../db/prismaClient");
 const supabaseClient_1 = require("../db/supabaseClient");
 const logger_1 = require("../utils/logger");
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ||
     '411578437442-gs1rck2124rgr516fe9dn9tuu15ge9ig.apps.googleusercontent.com';
@@ -42,36 +43,43 @@ router.get('/google/session-status', (req, res) => {
 });
 router.post('/google/complete-session', async (req, res) => {
     try {
-        const { sessionId, accessToken, userEmail, userName, userAvatar } = req.body;
+        const { sessionId, accessToken } = req.body;
         logger_1.logger.info('GOOGLE', `complete-session isteği alındı (sessionId: ${sessionId || 'yok'})`, {
             hasAccessToken: !!accessToken,
-            userEmail,
         });
-        let email = userEmail;
-        let name = userName;
-        let avatar = userAvatar;
-        let googleId = undefined;
-        if (accessToken) {
-            try {
-                const client = supabaseClient_1.supabaseService.getClient();
-                if (client) {
-                    const { data, error } = await client.auth.getUser(accessToken);
-                    if (error) {
-                        logger_1.logger.warn('GOOGLE', `Supabase getUser uyarısı: ${error.message}`);
-                    }
-                    if (data?.user) {
-                        email = data.user.email || email;
-                        const meta = data.user.user_metadata || {};
-                        name = meta.full_name || meta.name || name || email?.split('@')[0];
-                        avatar = meta.avatar_url || meta.picture || avatar || 'av1';
-                        googleId = data.user.id;
-                        logger_1.logger.info('GOOGLE', `Supabase'den Google kullanıcısı alındı: ${email} (${name})`);
-                    }
-                }
+        // SECURITY: the identity is resolved exclusively from the verified access token.
+        // Client-supplied email/name values are intentionally ignored.
+        if (!accessToken || typeof accessToken !== 'string') {
+            res.status(401).json({ error: 'Google erişim tokeni zorunludur.' });
+            return;
+        }
+        let email;
+        let name;
+        let avatar;
+        let googleId;
+        try {
+            const client = supabaseClient_1.supabaseService.getClient();
+            if (!client) {
+                res.status(503).json({ error: 'Kimlik doğrulama servisi yapılandırılmamış.' });
+                return;
             }
-            catch (err) {
-                logger_1.logger.error('GOOGLE', 'Supabase token doğrulama hatası:', err);
+            const { data, error } = await client.auth.getUser(accessToken);
+            if (error || !data?.user) {
+                logger_1.logger.warn('GOOGLE', `Supabase getUser reddetti: ${error?.message || 'kullanıcı yok'}`);
+                res.status(401).json({ error: 'Google oturumu doğrulanamadı.' });
+                return;
             }
+            email = data.user.email || undefined;
+            const meta = data.user.user_metadata || {};
+            name = meta.full_name || meta.name || (email ? email.split('@')[0] : 'Oyuncu');
+            avatar = meta.avatar_url || meta.picture || 'av1';
+            googleId = data.user.id;
+            logger_1.logger.info('GOOGLE', `Supabase'den Google kullanıcısı doğrulandı: ${email}`);
+        }
+        catch (err) {
+            logger_1.logger.error('GOOGLE', 'Supabase token doğrulama hatası:', err);
+            res.status(401).json({ error: 'Google oturumu doğrulanamadı.' });
+            return;
         }
         if (!email) {
             if (sessionId && pendingSessions.has(sessionId)) {
@@ -327,11 +335,17 @@ router.get('/google/callback', (req, res) => {
 });
 router.post('/google', async (req, res) => {
     try {
-        const { idToken, accessToken, email, displayName, fullName, avatarUrl, countryCode, countryName, phone, birthDate, clientCoins, clientGems, clientXp, clientLevel, } = req.body;
-        let verifiedEmail = email;
-        let verifiedName = displayName || fullName;
-        let verifiedPicture = avatarUrl;
-        let googleSub = undefined;
+        const { idToken, accessToken, fullName, countryCode, countryName, phone, birthDate, } = req.body;
+        // SECURITY: identity is resolved exclusively from the verified idToken/accessToken.
+        // Client-supplied email/name/avatar are never trusted as identity.
+        let verifiedEmail;
+        let verifiedName;
+        let verifiedPicture;
+        let googleSub;
+        if (!idToken && !accessToken) {
+            res.status(401).json({ error: 'Google kimlik tokeni (idToken veya accessToken) zorunludur.' });
+            return;
+        }
         // If an actual Google OAuth idToken or accessToken is passed, verify against Google API
         if (idToken) {
             try {
@@ -397,27 +411,16 @@ router.post('/google', async (req, res) => {
             email: verifiedEmail,
             displayName: verifiedName || verifiedEmail.split('@')[0],
             fullName: fullName || verifiedName,
-            avatarUrl: verifiedPicture,
+            avatarUrl: verifiedPicture || 'av1',
             googleId: googleSub,
             countryCode,
             countryName,
             phone,
             birthDate,
         });
-        if ((typeof clientCoins === 'number' && clientCoins > (result.user.coins ?? 0)) ||
-            (typeof clientGems === 'number' && clientGems > (result.user.gems ?? 0)) ||
-            (typeof clientXp === 'number' && clientXp > (result.user.xp ?? 0)) ||
-            (typeof clientLevel === 'number' && clientLevel > (result.user.level ?? 1))) {
-            const synced = await prismaClient_1.db.syncWallet(result.user.id, {
-                coins: clientCoins,
-                gems: clientGems,
-                xp: clientXp,
-                level: clientLevel,
-            });
-            if (synced) {
-                result.user = synced;
-            }
-        }
+        // SECURITY: client-supplied wallet values (clientCoins/clientGems/clientXp/clientLevel)
+        // are intentionally NOT synced into the account. The server is authoritative for
+        // economy state; merging client values would allow wallet forgery on every login.
         res.json({
             ...result,
             googleClientId: GOOGLE_CLIENT_ID,
@@ -427,11 +430,12 @@ router.post('/google', async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
-router.post('/delete-account', async (req, res) => {
+// SECURITY: account deletion requires the account owner's verified session token.
+router.post('/delete-account', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId } = req.body;
+        const userId = req.authUserId;
         if (!userId) {
-            res.status(400).json({ error: 'userId zorunludur' });
+            res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
             return;
         }
         const result = await prismaClient_1.db.deleteAccount(userId);
@@ -449,14 +453,17 @@ router.post('/forgot-password', async (req, res) => {
             res.status(400).json({ error: 'Lütfen kayıtlı e-posta adresinizi veya kullanıcı adınızı girin.' });
             return;
         }
-        const result = await prismaClient_1.db.requestPasswordReset(target);
+        // SECURITY: the one-time code is delivered out-of-band (email), NEVER returned in
+        // the HTTP response. A generic response is sent whether or not the account exists
+        // to prevent user enumeration.
+        await prismaClient_1.db.requestPasswordReset(target).catch(() => undefined);
         res.json({
-            ...result,
-            resetCodeDemo: result.demoResetCode,
+            success: true,
+            message: 'Şifre sıfırlama kodu kayıtlı e-posta adresinize gönderildi.',
         });
     }
     catch (err) {
-        res.status(404).json({ error: err.message });
+        res.status(400).json({ error: err.message });
     }
 });
 router.post('/reset-password', async (req, res) => {
@@ -475,16 +482,12 @@ router.post('/reset-password', async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
-router.put('/profile', async (req, res) => {
+// SECURITY: profile updates are bound to the verified session identity. The old
+// implementation fell back to the body-supplied userId when the token was missing
+// or invalid, which allowed targeting any account.
+router.put('/profile', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const authHeader = req.headers.authorization;
-        let userId = req.body.userId;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            const token = authHeader.split(' ')[1];
-            const payload = prismaClient_1.db.verifyToken(token);
-            if (payload)
-                userId = payload.userId;
-        }
+        const userId = req.authUserId;
         if (!userId) {
             res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
             return;
@@ -499,16 +502,10 @@ router.put('/profile', async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
-router.post('/settings', async (req, res) => {
+// SECURITY: settings updates are bound to the verified session identity.
+router.post('/settings', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const authHeader = req.headers.authorization;
-        let userId = req.body.userId;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            const token = authHeader.split(' ')[1];
-            const payload = prismaClient_1.db.verifyToken(token);
-            if (payload)
-                userId = payload.userId;
-        }
+        const userId = req.authUserId;
         if (!userId) {
             res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
             return;
@@ -548,13 +545,15 @@ router.post('/change-password', async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
-router.post('/stats', async (req, res) => {
+// SECURITY: game stats are recorded against the verified session identity only.
+router.post('/stats', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, correctAnswers = 0, totalAnswers = 0, xpEarned = 0, coinsEarned = 0, bestStreak = 0, won = false, roomCode, category } = req.body;
+        const userId = req.authUserId;
         if (!userId) {
-            res.status(400).json({ error: 'userId gerekli' });
+            res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
             return;
         }
+        const { correctAnswers = 0, totalAnswers = 0, xpEarned = 0, coinsEarned = 0, bestStreak = 0, won = false, roomCode, category } = req.body;
         const updated = await prismaClient_1.db.recordGameStats(userId, {
             correctAnswers,
             totalAnswers,
@@ -571,13 +570,16 @@ router.post('/stats', async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
-router.post('/sync-wallet', async (req, res) => {
+// SECURITY: wallet sync is bound to the verified session identity; the token user
+// is the only account whose wallet may be written.
+router.post('/sync-wallet', auth_1.requireUserAuth, async (req, res) => {
     try {
-        const { userId, coins, gems, xp, level } = req.body;
+        const userId = req.authUserId;
         if (!userId) {
-            res.status(400).json({ error: 'userId gereklidir' });
+            res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
             return;
         }
+        const { coins, gems, xp, level } = req.body;
         const updatedUser = await prismaClient_1.db.syncWallet(userId, { coins, gems, xp, level });
         res.json({ success: true, user: updatedUser });
     }

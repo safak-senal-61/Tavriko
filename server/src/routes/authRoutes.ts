@@ -3,6 +3,7 @@ import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
 import { UserProfile } from '@trivia/shared';
 import { logger } from '../utils/logger';
+import { requireUserAuth } from '../middleware/auth';
 
 const router = Router();
 
@@ -57,36 +58,45 @@ router.get('/google/session-status', (req: Request, res: Response): void => {
 
 router.post('/google/complete-session', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { sessionId, accessToken, userEmail, userName, userAvatar } = req.body;
+    const { sessionId, accessToken } = req.body;
     logger.info('GOOGLE', `complete-session isteği alındı (sessionId: ${sessionId || 'yok'})`, {
       hasAccessToken: !!accessToken,
-      userEmail,
     });
-    let email = userEmail;
-    let name = userName;
-    let avatar = userAvatar;
-    let googleId = undefined;
 
-    if (accessToken) {
-      try {
-        const client = supabaseService.getClient();
-        if (client) {
-          const { data, error } = await client.auth.getUser(accessToken);
-          if (error) {
-            logger.warn('GOOGLE', `Supabase getUser uyarısı: ${error.message}`);
-          }
-          if (data?.user) {
-            email = data.user.email || email;
-            const meta = data.user.user_metadata || {};
-            name = meta.full_name || meta.name || name || email?.split('@')[0];
-            avatar = meta.avatar_url || meta.picture || avatar || 'av1';
-            googleId = data.user.id;
-            logger.info('GOOGLE', `Supabase'den Google kullanıcısı alındı: ${email} (${name})`);
-          }
-        }
-      } catch (err: any) {
-        logger.error('GOOGLE', 'Supabase token doğrulama hatası:', err);
+    // SECURITY: the identity is resolved exclusively from the verified access token.
+    // Client-supplied email/name values are intentionally ignored.
+    if (!accessToken || typeof accessToken !== 'string') {
+      res.status(401).json({ error: 'Google erişim tokeni zorunludur.' });
+      return;
+    }
+
+    let email: string | undefined;
+    let name: string | undefined;
+    let avatar: string | undefined;
+    let googleId: string | undefined;
+
+    try {
+      const client = supabaseService.getClient();
+      if (!client) {
+        res.status(503).json({ error: 'Kimlik doğrulama servisi yapılandırılmamış.' });
+        return;
       }
+      const { data, error } = await client.auth.getUser(accessToken);
+      if (error || !data?.user) {
+        logger.warn('GOOGLE', `Supabase getUser reddetti: ${error?.message || 'kullanıcı yok'}`);
+        res.status(401).json({ error: 'Google oturumu doğrulanamadı.' });
+        return;
+      }
+      email = data.user.email || undefined;
+      const meta = data.user.user_metadata || {};
+      name = meta.full_name || meta.name || (email ? email.split('@')[0] : 'Oyuncu');
+      avatar = meta.avatar_url || meta.picture || 'av1';
+      googleId = data.user.id;
+      logger.info('GOOGLE', `Supabase'den Google kullanıcısı doğrulandı: ${email}`);
+    } catch (err: any) {
+      logger.error('GOOGLE', 'Supabase token doğrulama hatası:', err);
+      res.status(401).json({ error: 'Google oturumu doğrulanamadı.' });
+      return;
     }
 
     if (!email) {
@@ -369,24 +379,24 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
     const {
       idToken,
       accessToken,
-      email,
-      displayName,
       fullName,
-      avatarUrl,
       countryCode,
       countryName,
       phone,
       birthDate,
-      clientCoins,
-      clientGems,
-      clientXp,
-      clientLevel,
     } = req.body;
 
-    let verifiedEmail = email;
-    let verifiedName = displayName || fullName;
-    let verifiedPicture = avatarUrl;
-    let googleSub = undefined;
+    // SECURITY: identity is resolved exclusively from the verified idToken/accessToken.
+    // Client-supplied email/name/avatar are never trusted as identity.
+    let verifiedEmail: string | undefined;
+    let verifiedName: string | undefined;
+    let verifiedPicture: string | undefined;
+    let googleSub: string | undefined;
+
+    if (!idToken && !accessToken) {
+      res.status(401).json({ error: 'Google kimlik tokeni (idToken veya accessToken) zorunludur.' });
+      return;
+    }
 
     // If an actual Google OAuth idToken or accessToken is passed, verify against Google API
     if (idToken) {
@@ -448,7 +458,7 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
       email: verifiedEmail,
       displayName: verifiedName || verifiedEmail.split('@')[0],
       fullName: fullName || verifiedName,
-      avatarUrl: verifiedPicture,
+      avatarUrl: verifiedPicture || 'av1',
       googleId: googleSub,
       countryCode,
       countryName,
@@ -456,22 +466,9 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
       birthDate,
     });
 
-    if (
-      (typeof clientCoins === 'number' && clientCoins > (result.user.coins ?? 0)) ||
-      (typeof clientGems === 'number' && clientGems > (result.user.gems ?? 0)) ||
-      (typeof clientXp === 'number' && clientXp > (result.user.xp ?? 0)) ||
-      (typeof clientLevel === 'number' && clientLevel > (result.user.level ?? 1))
-    ) {
-      const synced = await db.syncWallet(result.user.id, {
-        coins: clientCoins,
-        gems: clientGems,
-        xp: clientXp,
-        level: clientLevel,
-      });
-      if (synced) {
-        result.user = synced;
-      }
-    }
+    // SECURITY: client-supplied wallet values (clientCoins/clientGems/clientXp/clientLevel)
+    // are intentionally NOT synced into the account. The server is authoritative for
+    // economy state; merging client values would allow wallet forgery on every login.
 
     res.json({
       ...result,
@@ -482,11 +479,12 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.post('/delete-account', async (req: Request, res: Response): Promise<void> => {
+// SECURITY: account deletion requires the account owner's verified session token.
+router.post('/delete-account', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId } = req.body;
+    const userId = req.authUserId;
     if (!userId) {
-      res.status(400).json({ error: 'userId zorunludur' });
+      res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
       return;
     }
     const result = await db.deleteAccount(userId);
@@ -504,13 +502,17 @@ router.post('/forgot-password', async (req: Request, res: Response): Promise<voi
       res.status(400).json({ error: 'Lütfen kayıtlı e-posta adresinizi veya kullanıcı adınızı girin.' });
       return;
     }
-    const result = await db.requestPasswordReset(target);
+
+    // SECURITY: the one-time code is delivered out-of-band (email), NEVER returned in
+    // the HTTP response. A generic response is sent whether or not the account exists
+    // to prevent user enumeration.
+    await db.requestPasswordReset(target).catch(() => undefined);
     res.json({
-      ...result,
-      resetCodeDemo: result.demoResetCode,
+      success: true,
+      message: 'Şifre sıfırlama kodu kayıtlı e-posta adresinize gönderildi.',
     });
   } catch (err: any) {
-    res.status(404).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 });
 
@@ -530,17 +532,12 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
   }
 });
 
-router.put('/profile', async (req: Request, res: Response): Promise<void> => {
+// SECURITY: profile updates are bound to the verified session identity. The old
+// implementation fell back to the body-supplied userId when the token was missing
+// or invalid, which allowed targeting any account.
+router.put('/profile', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const authHeader = req.headers.authorization;
-    let userId = req.body.userId;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const payload = db.verifyToken(token);
-      if (payload) userId = payload.userId;
-    }
-
+    const userId = req.authUserId;
     if (!userId) {
       res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
       return;
@@ -556,17 +553,10 @@ router.put('/profile', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.post('/settings', async (req: Request, res: Response): Promise<void> => {
+// SECURITY: settings updates are bound to the verified session identity.
+router.post('/settings', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const authHeader = req.headers.authorization;
-    let userId = req.body.userId;
-
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const payload = db.verifyToken(token);
-      if (payload) userId = payload.userId;
-    }
-
+    const userId = req.authUserId;
     if (!userId) {
       res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
       return;
@@ -610,13 +600,15 @@ router.post('/change-password', async (req: Request, res: Response): Promise<voi
   }
 });
 
-router.post('/stats', async (req: Request, res: Response): Promise<void> => {
+// SECURITY: game stats are recorded against the verified session identity only.
+router.post('/stats', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, correctAnswers = 0, totalAnswers = 0, xpEarned = 0, coinsEarned = 0, bestStreak = 0, won = false, roomCode, category } = req.body;
+    const userId = req.authUserId;
     if (!userId) {
-      res.status(400).json({ error: 'userId gerekli' });
+      res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
       return;
     }
+    const { correctAnswers = 0, totalAnswers = 0, xpEarned = 0, coinsEarned = 0, bestStreak = 0, won = false, roomCode, category } = req.body;
     const updated = await db.recordGameStats(userId, {
       correctAnswers,
       totalAnswers,
@@ -633,13 +625,16 @@ router.post('/stats', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.post('/sync-wallet', async (req: Request, res: Response): Promise<void> => {
+// SECURITY: wallet sync is bound to the verified session identity; the token user
+// is the only account whose wallet may be written.
+router.post('/sync-wallet', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, coins, gems, xp, level } = req.body;
+    const userId = req.authUserId;
     if (!userId) {
-      res.status(400).json({ error: 'userId gereklidir' });
+      res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
       return;
     }
+    const { coins, gems, xp, level } = req.body;
     const updatedUser = await db.syncWallet(userId, { coins, gems, xp, level });
     res.json({ success: true, user: updatedUser });
   } catch (err: any) {

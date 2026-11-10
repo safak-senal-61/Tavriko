@@ -29,3 +29,9 @@ avatars_*.json
 icons_*.json
 extracted_avatars.json
 repomix-output.xml
+
+# SECURITY: local runtime DB snapshots may contain real user PII - never commit
+server/data/prisma/users.json
+server/data/prisma/user_notifications.json
+server/data/prisma/user_inventory_items.json
+server/data/prisma/match_history.json

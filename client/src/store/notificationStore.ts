@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { NotificationItem } from '@trivia/shared';
+import { authHeaders } from '../utils/apiAuth';
 
 const STORAGE_PREFIX = 'tavriko_notification_reads_v1:';
 const SAMPLE_PREFIXES = ['notif_fr_sample', 'notif_duel_sample', 'notif_rew_sample'];
@@ -107,7 +108,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     if (!owner) return;
     set({ loading: true, error: null });
     try {
-      const response = await fetch(`${base}/social/notifications/${encodeURIComponent(owner)}`);
+      const response = await fetch(`${base}/social/notifications/${encodeURIComponent(owner)}`, { headers: authHeaders() });
       if (!response.ok) throw new Error('Bildirimler alınamadı.');
       const data = await response.json();
       if (!Array.isArray(data.notifications)) throw new Error('Bildirimler alınamadı.');

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { requireUserAuth } from '../middleware/auth';
 import { db } from '../db/prismaClient';
 import { presenceManager } from '../services/presenceManager';
 import { SHOP_CATALOG, SEASON_1_TIERS, EVENT_DEFINITIONS } from '@trivia/shared';
@@ -29,9 +30,10 @@ router.get('/friends/:userId', async (req: Request, res: Response): Promise<void
   }
 });
 
-router.post('/friends/add', async (req: Request, res: Response): Promise<void> => {
+router.post('/friends/add', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, codeOrUsername } = req.body;
+    const userId = req.authUserId;
+    const { codeOrUsername } = req.body;
     if (!userId || !codeOrUsername) {
       res.status(400).json({ error: 'userId ve codeOrUsername gereklidir.' });
       return;
@@ -47,9 +49,10 @@ router.post('/friends/add', async (req: Request, res: Response): Promise<void> =
   }
 });
 
-router.post('/friends/remove', async (req: Request, res: Response): Promise<void> => {
+router.post('/friends/remove', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, friendId, targetUserId } = req.body;
+    const userId = req.authUserId;
+    const { friendId, targetUserId } = req.body;
     const target = friendId || targetUserId;
     if (!userId || !target) {
       res.status(400).json({ error: 'userId ve friendId zorunludur.' });
@@ -67,9 +70,10 @@ router.post('/friends/remove', async (req: Request, res: Response): Promise<void
 });
 
 // --- 1v1 Match Challenge (Yarış İsteği) ---
-router.post('/friends/challenge', async (req: Request, res: Response): Promise<void> => {
+router.post('/friends/challenge', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, targetUserId, category } = req.body;
+    const userId = req.authUserId;
+    const { targetUserId, category } = req.body;
     if (!userId || !targetUserId) {
       res.status(400).json({ error: 'userId ve targetUserId zorunludur.' });
       return;
@@ -86,9 +90,10 @@ router.post('/friends/challenge', async (req: Request, res: Response): Promise<v
 });
 
 // --- Real Notifications API ---
-router.get('/notifications/:userId', async (req: Request, res: Response): Promise<void> => {
+// SECURITY: notifications are private; the identity comes from the verified token.
+router.get('/notifications/:userId', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    const userId = req.authUserId;
     const notifications = await db.getUserNotificationsAsync(userId || 'anon');
     res.json({
       success: true,
@@ -99,9 +104,10 @@ router.get('/notifications/:userId', async (req: Request, res: Response): Promis
   }
 });
 
-router.post('/notifications/respond', async (req: Request, res: Response): Promise<void> => {
+router.post('/notifications/respond', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, notificationId, action } = req.body;
+    const userId = req.authUserId;
+    const { notificationId, action } = req.body;
     if (!userId || !notificationId || !action) {
       res.status(400).json({ error: 'userId, notificationId ve action zorunludur.' });
       return;
@@ -141,10 +147,9 @@ router.post('/presence/heartbeat', (req: Request, res: Response): void => {
 });
 
 // --- Room Status Sync ---
-router.post('/rooms/active', (req: Request, res: Response): void => {
+router.post('/rooms/active', requireUserAuth, (req: Request, res: Response): void => {
   try {
     const {
-      userId,
       roomCode,
       name,
       hostName,
@@ -158,6 +163,7 @@ router.post('/rooms/active', (req: Request, res: Response): void => {
       status,
       privacy,
     } = req.body;
+    const userId = req.authUserId;
     const resolvedPlayers = typeof players === 'number' ? players : typeof playerCount === 'number' ? playerCount : undefined;
     if (userId) {
       db.setUserActiveRoom(
@@ -207,9 +213,10 @@ router.get('/shop/catalog', (req: Request, res: Response): void => {
   });
 });
 
-router.post('/shop/purchase', async (req: Request, res: Response): Promise<void> => {
+router.post('/shop/purchase', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, productId, packId, paymentMethod = 'coins' } = req.body;
+    const userId = req.authUserId;
+    const { productId, packId, paymentMethod = 'coins' } = req.body;
     if (!userId) {
       res.status(400).json({ error: 'userId gerekli' });
       return;
@@ -250,9 +257,10 @@ router.post('/shop/purchase', async (req: Request, res: Response): Promise<void>
 });
 
 // --- Inventory & Chest Opening ---
-router.post('/inventory/use', async (req: Request, res: Response): Promise<void> => {
+router.post('/inventory/use', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, itemId } = req.body;
+    const userId = req.authUserId;
+    const { itemId } = req.body;
     if (!userId || !itemId) {
       res.status(400).json({ error: 'userId ve itemId gerekli' });
       return;
@@ -264,9 +272,10 @@ router.post('/inventory/use', async (req: Request, res: Response): Promise<void>
   }
 });
 
-router.post('/inventory/open-chest', async (req: Request, res: Response): Promise<void> => {
+router.post('/inventory/open-chest', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, chestId, keyId } = req.body;
+    const userId = req.authUserId;
+    const { chestId, keyId } = req.body;
     if (!userId || !chestId) {
       res.status(400).json({ error: 'userId ve chestId gereklidir.' });
       return;
@@ -289,9 +298,10 @@ router.get('/season/info', (req: Request, res: Response): void => {
   });
 });
 
-router.post('/season/claim', async (req: Request, res: Response): Promise<void> => {
+router.post('/season/claim', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, tier, track = 'free' } = req.body;
+    const userId = req.authUserId;
+    const { tier, track = 'free' } = req.body;
     if (!userId || !tier) {
       res.status(400).json({ error: 'userId ve tier gereklidir' });
       return;
@@ -303,9 +313,9 @@ router.post('/season/claim', async (req: Request, res: Response): Promise<void> 
   }
 });
 
-router.post('/season/premium-pass', async (req: Request, res: Response): Promise<void> => {
+router.post('/season/premium-pass', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId } = req.body;
+    const userId = req.authUserId;
     if (!userId) {
       res.status(400).json({ error: 'userId gereklidir' });
       return;
@@ -335,9 +345,10 @@ router.get('/events', (req: Request, res: Response): void => {
   }
 });
 
-router.post('/events/claim', async (req: Request, res: Response): Promise<void> => {
+router.post('/events/claim', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, eventId } = req.body;
+    const userId = req.authUserId;
+    const { eventId } = req.body;
     if (!userId || !eventId) {
       res.status(400).json({ error: 'userId ve eventId gereklidir' });
       return;
@@ -349,9 +360,10 @@ router.post('/events/claim', async (req: Request, res: Response): Promise<void> 
   }
 });
 
-router.post('/events/start', (req: Request, res: Response): void => {
+router.post('/events/start', requireUserAuth, (req: Request, res: Response): void => {
   try {
-    const { userId, eventId } = req.body;
+    const userId = req.authUserId;
+    const { eventId } = req.body;
     if (!userId || !eventId) {
       res.status(400).json({ error: 'userId ve eventId gereklidir' });
       return;
@@ -375,9 +387,10 @@ router.get('/profile/:userId', async (req: Request, res: Response): Promise<void
 });
 
 // --- Block / Unblock (kullanıcı engelleme sistemi) ---
-router.post('/block', async (req: Request, res: Response): Promise<void> => {
+router.post('/block', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, targetUserId } = req.body;
+    const userId = req.authUserId;
+    const { targetUserId } = req.body;
     if (!userId || !targetUserId) {
       res.status(400).json({ error: 'userId ve targetUserId zorunludur.' });
       return;
@@ -397,9 +410,10 @@ router.post('/block', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.post('/unblock', async (req: Request, res: Response): Promise<void> => {
+router.post('/unblock', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, targetUserId } = req.body;
+    const userId = req.authUserId;
+    const { targetUserId } = req.body;
     if (!userId || !targetUserId) {
       res.status(400).json({ error: 'userId ve targetUserId zorunludur.' });
       return;
@@ -415,9 +429,9 @@ router.post('/unblock', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.get('/blocked/:userId', async (req: Request, res: Response): Promise<void> => {
+router.get('/blocked/:userId', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+    const userId = req.authUserId;
     const blocked = await db.getBlockedUsers(userId || 'anon');
     res.json({ success: true, blockedUsers: blocked });
   } catch (err: any) {
@@ -426,9 +440,10 @@ router.get('/blocked/:userId', async (req: Request, res: Response): Promise<void
 });
 
 // --- Admin: bildirim gönder (developer paneli) ---
-router.post('/notifications/send', async (req: Request, res: Response): Promise<void> => {
+router.post('/notifications/send', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, targetUserId, title, sub, type = 'system' } = req.body;
+    const userId = req.authUserId;
+    const { targetUserId, title, sub, type = 'system' } = req.body;
     if (!userId || !targetUserId || !title) {
       res.status(400).json({ error: 'userId, targetUserId ve title zorunludur.' });
       return;
@@ -473,9 +488,10 @@ router.get('/users/by-code/:friendCode', async (req: Request, res: Response): Pr
   }
 });
 
-router.post('/daily-challenge/complete', async (req: Request, res: Response): Promise<void> => {
+router.post('/daily-challenge/complete', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId, correctAnswers, totalQuestions } = req.body;
+    const userId = req.authUserId;
+    const { correctAnswers, totalQuestions } = req.body;
     if (!userId) {
       res.status(400).json({ error: 'userId gereklidir' });
       return;

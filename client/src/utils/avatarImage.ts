@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { useGameStore } from '../store/gameStore';
 
 /**
  * Tavriko avatar yardımcıları
@@ -86,10 +87,22 @@ export const uploadAvatarToR2Async = async (
     if (!compressed || (!compressed.startsWith('data:') && !compressed.startsWith('blob:'))) {
       return compressed || rawUri;
     }
+
+    // SECURITY: the R2 upload endpoint now requires the authenticated player's
+    // session token. Without a token we keep the local (compressed) avatar
+    // instead of failing the profile save.
+    const token = useGameStore.getState().token;
+    if (!token) {
+      return compressed;
+    }
+
     const r2Endpoint = 'https://tavriko-realtime.uncertainidentity8.workers.dev/api/upload/avatar';
     const res = await fetch(r2Endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({ image: compressed, userId }),
     });
     if (res.ok) {
