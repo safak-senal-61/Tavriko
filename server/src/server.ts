@@ -86,6 +86,60 @@ export function createApp() {
   app.use(express.json({ limit: '15mb' }));
   app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
+  // SECURITY: baseline security headers on every response
+  app.use((_req: express.Request, res: express.Response, next: express.NextFunction) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    res.setHeader('X-XSS-Protection', '0');
+    res.setHeader(
+      'Strict-Transport-Security',
+      'max-age=31536000; includeSubDomains'
+    );
+    next();
+  });
+
+  // SECURITY: lightweight in-memory rate limiter for sensitive auth endpoints.
+  // Sliding window per IP; on Vercel each warm lambda instance keeps its own
+  // window, which still slows brute-force attacks significantly.
+  const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+  const RATE_LIMIT_MAX = 15;
+  const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
+  const rateLimitAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const key = `rl:${req.ip || req.socket?.remoteAddress || 'unknown'}`;
+    const now = Date.now();
+    const bucket = rateBuckets.get(key);
+    if (!bucket || bucket.resetAt <= now) {
+      rateBuckets.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+      return next();
+    }
+    bucket.count += 1;
+    if (bucket.count > RATE_LIMIT_MAX) {
+      res.setHeader('Retry-After', Math.ceil((bucket.resetAt - now) / 1000));
+      res.status(429).json({ error: 'Çok fazla istek. Lütfen birkaç dakika sonra tekrar deneyin.' });
+      return;
+    }
+    next();
+  };
+  // Periodic cleanup so the map never grows unbounded
+  const cleanupRateBuckets = () => {
+    const now = Date.now();
+    for (const [k, b] of rateBuckets) if (b.resetAt <= now) rateBuckets.delete(k);
+    setTimeout(cleanupRateBuckets, 10 * 60 * 1000).unref?.();
+  };
+  cleanupRateBuckets();
+  app.use(
+    [
+      '/api/auth/login',
+      '/api/auth/register',
+      '/api/auth/forgot-password',
+      '/api/auth/reset-password',
+      '/api/auth/google/complete-session',
+    ],
+    rateLimitAuth
+  );
+
   // Prometheus metrik aracisi (tavriko_http_* metrikleri)
   app.use(metricsMiddleware);
 
@@ -3464,8 +3518,9 @@ export function createApp() {
     }
   });
 
-  // Prometheus scrape endpoint (monitoring/prometheus.yml kullaniyor)
-  app.get('/metrics', metricsHandler);
+  // Prometheus scrape endpoint — SECURITY: admin authentication required so
+  // internal process/request metrics are not publicly exposed.
+  app.get('/metrics', requireAdminAuth, metricsHandler);
 
   // REST API Routes
   app.use('/api', logRouter);
@@ -3587,6 +3642,177 @@ export function createApp() {
     matchmaker.destroy();
     roomManager.cleanupAll();
   };
+
+  // ============================================================================
+  // Animated 404 page — final catch-all for unmatched routes.
+  // API paths get a JSON 404; browser requests get a styled animated page.
+  // ============================================================================
+  const renderNotFoundHtml = (): string => `
+    <!DOCTYPE html>
+    <html lang="tr">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>404 — Sayfa Bulunamadı | Tavriko</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body {
+          background: radial-gradient(circle at 20% 20%, #1e1b4b 0%, #0f172a 45%, #020617 100%);
+          color: #f8fafc;
+          font-family: 'Lilita One', 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 100vh;
+          overflow: hidden;
+          position: relative;
+        }
+        .stars, .stars2, .stars3 {
+          position: absolute; inset: 0; width: 100%; height: 100%;
+          background: transparent;
+        }
+        .stars { animation: drift 90s linear infinite; }
+        .stars2 { animation: drift 140s linear infinite; animation-delay: -45s; }
+        .stars3 { animation: drift 200s linear infinite; animation-delay: -100s; }
+        .stars span, .stars2 span, .stars3 span {
+          position: absolute; border-radius: 50%;
+          background: #fff; opacity: 0.8;
+          box-shadow: 0 0 6px 1px rgba(255,255,255,0.6);
+        }
+        @keyframes drift {
+          from { transform: translateY(0); }
+          to { transform: translateY(-2000px); }
+        }
+        .glow {
+          position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.35;
+          animation: pulse 6s ease-in-out infinite;
+        }
+        .glow-1 { width: 420px; height: 420px; background: #7c3aed; top: -120px; left: -120px; }
+        .glow-2 { width: 380px; height: 380px; background: #06b6d4; bottom: -140px; right: -100px; animation-delay: -3s; }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 0.3; }
+          50% { transform: scale(1.15); opacity: 0.5; }
+        }
+        .content { position: relative; z-index: 2; text-align: center; padding: 24px; }
+        .code {
+          font-size: clamp(96px, 22vw, 220px);
+          line-height: 1;
+          font-weight: 900;
+          letter-spacing: 0.04em;
+          background: linear-gradient(135deg, #a78bfa 0%, #22d3ee 50%, #f472b6 100%);
+          background-size: 200% 200%;
+          -webkit-background-clip: text; background-clip: text;
+          -webkit-text-fill-color: transparent; color: transparent;
+          animation: gradientShift 5s ease infinite, floatY 3.5s ease-in-out infinite;
+          text-shadow: 0 0 80px rgba(124, 58, 237, 0.35);
+        }
+        @keyframes gradientShift {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+        @keyframes floatY {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-14px); }
+        }
+        .title {
+          font-size: clamp(22px, 4.5vw, 38px);
+          margin-top: 8px;
+          animation: fadeUp 0.8s ease both 0.2s;
+        }
+        .subtitle {
+          font-family: 'Nunito', sans-serif;
+          color: #94a3b8; font-size: clamp(14px, 2.5vw, 18px);
+          margin-top: 12px; max-width: 460px;
+          animation: fadeUp 0.8s ease both 0.45s;
+        }
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(18px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .btn {
+          display: inline-block; margin-top: 34px;
+          padding: 16px 40px; font-size: 17px; font-weight: 700;
+          color: #fff; text-decoration: none;
+          background: linear-gradient(135deg, #7c3aed, #06b6d4);
+          border-radius: 999px;
+          box-shadow: 0 10px 30px rgba(124, 58, 237, 0.45);
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+          animation: fadeUp 0.8s ease both 0.7s;
+        }
+        .btn:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 16px 40px rgba(6, 182, 212, 0.5); }
+        .coin {
+          position: absolute; z-index: 1; font-size: 26px;
+          animation: coinFall linear infinite;
+          opacity: 0.85;
+        }
+        @keyframes coinFall {
+          0% { transform: translateY(-10vh) rotate(0deg); }
+          100% { transform: translateY(110vh) rotate(360deg); }
+        }
+        footer { position: absolute; bottom: 18px; width: 100%; text-align: center; color: #475569; font-size: 12px; font-family: 'Nunito', sans-serif; z-index: 2; }
+      </style>
+    </head>
+    <body>
+      <div class="stars"></div><div class="stars2"></div><div class="stars3"></div>
+      <div class="glow glow-1"></div><div class="glow glow-2"></div>
+      <div class="content">
+        <div class="code">404</div>
+        <div class="title">Sayfa Bulunamadı</div>
+        <div class="subtitle">Aradığın sayfa galiba başka bir evrende kayboldu. Merak etme, Tavriko evreninde hâlâ çok şey keşfedilecek.</div>
+        <a class="btn" href="/app">🎮 Oyuna Dön</a>
+      </div>
+      <footer>Tavriko — Trivia Evreni</footer>
+      <script>
+        (function () {
+          // Star field
+          var layers = document.querySelectorAll('.stars, .stars2, .stars3');
+          var counts = [60, 40, 25];
+          layers.forEach(function (layer, li) {
+            for (var i = 0; i < counts[li]; i++) {
+              var s = document.createElement('span');
+              var size = Math.random() * 2.4 + 0.6;
+              s.style.width = size + 'px';
+              s.style.height = size + 'px';
+              s.style.left = Math.random() * 100 + '%';
+              s.style.top = Math.random() * 100 + '%';
+              if (li === 2) s.style.opacity = '0.4';
+              layer.appendChild(s);
+            }
+          });
+          // Falling coins
+          var emojis = ['🪙', '💎', '⭐', '🪙', '🎯'];
+          for (var i = 0; i < 14; i++) {
+            var c = document.createElement('div');
+            c.className = 'coin';
+            c.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+            c.style.left = Math.random() * 100 + '%';
+            c.style.animationDuration = (Math.random() * 7 + 6) + 's';
+            c.style.animationDelay = '-' + (Math.random() * 12) + 's';
+            c.style.fontSize = (Math.random() * 16 + 16) + 'px';
+            document.body.appendChild(c);
+          }
+        })();
+      </script>
+    </body>
+    </html>`;
+
+  app.use((req: express.Request, res: express.Response) => {
+    // API paths keep a machine-readable JSON 404
+    if (req.path.startsWith('/api/') || req.path.startsWith('/api')) {
+      res.status(404).json({ error: 'Endpoint bulunamadı' });
+      return;
+    }
+    // Static-like asset requests get a plain 404
+    if (req.method !== 'GET' || /\.[a-zA-Z0-9]+$/.test(req.path.split('?')[0])) {
+      res.status(404).type('text/plain').send('Not found');
+      return;
+    }
+    // Browser navigation gets the animated page
+    res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(renderNotFoundHtml());
+  });
 
   return { app, httpServer, io, roomManager, matchmaker, telegramBot, close };
 }
