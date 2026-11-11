@@ -22,6 +22,9 @@ import { sanitizeString, sanitizeRoomCode, RateLimiter } from '../websocket/vali
 import { ApiService } from '../services/apiService';
 import { verifyJwt, AuthUser } from '../auth/authenticate';
 
+/** 1v1 düello / hızlı eşleşme maçlarındaki soru sayısı */
+export const DUEL_TOTAL_ROUNDS = 15;
+
 interface WsAttachment {
   playerId: string;
   username: string;
@@ -98,7 +101,14 @@ export class GameRoomDO extends DurableObject<Env> {
         difficulty: data.difficulty || 'medium',
         maxPlayers: 2,
         currentRound: 0,
-        totalRounds: 5,
+        // 1v1 düello ve hızlı eşleşme 15 sorudur (arayüz "15 Soru" yazıyor); önceden
+        // burada sabit 5 kullanıldığı için maçlar 5 soruda bitiyordu.
+        totalRounds:
+          Number(data.totalRounds) > 0
+            ? Math.min(50, Math.floor(Number(data.totalRounds)))
+            : (data.mode || 'duel') === 'duel' || data.mode === 'quick_match'
+              ? DUEL_TOTAL_ROUNDS
+              : 5,
         questionTimeSec: data.questionTimeSec || 15,
         penaltyForWrong: Boolean(data.penaltyForWrong),
         password: data.password || undefined,
@@ -134,7 +144,7 @@ export class GameRoomDO extends DurableObject<Env> {
       const questions = await this.apiService.fetchRoomQuestions(
         this.room.category,
         this.room.difficulty,
-        5
+        this.room.totalRounds
       );
       this.questions = questions || [];
       if (this.questions.length < (this.room.totalRounds || 5) && this.questions.length > 0) {
@@ -981,6 +991,7 @@ export class GameRoomDO extends DurableObject<Env> {
       roundNumber: this.room.currentRound,
       totalRounds: this.room.totalRounds,
       timeLimitSec: q.timeLimitSec || this.room.questionTimeSec || 15,
+      ...(q.subCategory ? { subCategory: q.subCategory } : {}),
     };
   }
 

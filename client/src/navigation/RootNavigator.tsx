@@ -4,6 +4,7 @@ import {
   StyleSheet,
   StatusBar,
   Platform,
+  Alert,
   AppState,
   Animated,
   useWindowDimensions,
@@ -114,6 +115,11 @@ import {
 } from '../utils/legalConsent';
 
 const API_BASE = DEFAULT_API_BASE;
+// 1v1 düello her zaman tüm kategorilerden karışık ve 15 soruluk oynanır. Keşfet'te en son
+// seçilen kategori (selectedCategory) düelloya taşınmamalı.
+const DUEL_CATEGORY: CategoryId = 'mixed';
+const DUEL_DIFFICULTY = 'mixed';
+const DUEL_TOTAL_ROUNDS = 15;
 export const RootNavigator: React.FC = () => {
   const [pendingReferral, setPendingReferral] = useState(() => captureReferralLink());
   const { width: windowWidth } = useWindowDimensions();
@@ -725,11 +731,11 @@ export const RootNavigator: React.FC = () => {
             mode: 'duel',
             hostId: user.id,
             status: 'countdown',
-            category: selectedCategory,
+            category: DUEL_CATEGORY,
             difficulty: selectedDifficulty,
             maxPlayers: 2,
             currentRound: 0,
-            totalRounds: 5,
+            totalRounds: DUEL_TOTAL_ROUNDS,
             questionTimeSec: 15,
             penaltyForWrong: false,
             players: initialPlayers,
@@ -993,7 +999,8 @@ export const RootNavigator: React.FC = () => {
         user.displayName,
         user.avatarUrl,
         'duel',
-        selectedCategory
+        DUEL_CATEGORY,
+        DUEL_DIFFICULTY
       );
       navigateTo('matchmaking');
     }, 'Hızlı Eşleşme (1v1 Düello)');
@@ -1203,6 +1210,19 @@ export const RootNavigator: React.FC = () => {
       );
       if (res.ok) {
         const data = await res.json();
+        if (subCategory && data.code === 'SUBCATEGORY_EMPTY') {
+          // Alt kategoride soru yoksa başka alt kategoriden soru göstermek yerine bilgilendir.
+          isGameActiveRef.current = false;
+          setIsSinglePlayerActive(false);
+          isSinglePlayerActiveRef.current = false;
+          const msg = `"${subCategory}" alt kategorisinde henüz yayınlanmış soru yok. Lütfen başka bir alt kategori seç.`;
+          if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+            window.alert(msg);
+          } else {
+            Alert.alert('Soru bulunamadı', msg);
+          }
+          return;
+        }
         if (data.questions && data.questions.length > 0) {
           setPracticeQuestions(data.questions);
           setPracticeIndex(0);
@@ -1804,7 +1824,7 @@ export const RootNavigator: React.FC = () => {
         )}
         {currentScreen === 'matchmaking' && (
           <MatchmakingRadarScreen
-            category={selectedCategory}
+            category={DUEL_CATEGORY}
             difficulty={selectedDifficulty}
             userName={user?.displayName || 'Sen'}
             avatarSeed={user?.avatarUrl || user?.displayName}
@@ -1824,7 +1844,7 @@ export const RootNavigator: React.FC = () => {
               rankTitle: duelOpponent?.isBot ? 'Yapay Zeka' : 'Düellocu',
               isBot: duelOpponent?.isBot,
             }}
-            categoryName={ALL_CATEGORIES.find(category => category.id === selectedCategory)?.name || 'Genel Kültür'}
+            categoryName={ALL_CATEGORIES.find(category => category.id === DUEL_CATEGORY)?.name || 'Karışık Kategoriler'}
             onCancel={handleCancelMatchmaking}
           />
         )}

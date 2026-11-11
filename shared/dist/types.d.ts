@@ -58,6 +58,8 @@ export interface ClientQuestion {
     roundNumber: number;
     totalRounds: number;
     timeLimitSec: number;
+    /** Sorunun ait olduğu alt kategori adı (ör. "Nişancı Oyunları (FPS)") */
+    subCategory?: string;
 }
 export interface Player {
     id: string;

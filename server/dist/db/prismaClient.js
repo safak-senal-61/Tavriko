@@ -2620,14 +2620,31 @@ class PrismaService {
         const categoryPool = canonCat === 'mixed'
             ? allPublished
             : allPublished.filter((q) => (0, shared_1.canonicalCategoryId)(q.categoryId) === canonCat);
-        // Alt kategori filtresi: eşleşen soru yoksa tüm kategori havuzuna geri düşer
+        // Alt kategori filtresi KATIDIR: "Rol Yapma Oyunları" seçildiyse yalnızca o alt
+        // kategorinin soruları gelir. Önceden eşleşme az/boş olduğunda üst kategorinin
+        // tamamından (ör. FPS soruları) doldurma yapılıyordu.
         let effectivePool = categoryPool;
-        if (subCategory && categoryPool.length > 0) {
-            const sub = subCategory.trim().toLowerCase();
-            const subPool = categoryPool.filter((q) => q.subCategory && q.subCategory.trim().toLowerCase() === sub);
-            if (subPool.length > 0) {
-                effectivePool = subPool;
+        const requestedSub = subCategory ? subCategory.trim().toLowerCase() : '';
+        if (requestedSub) {
+            const catDef = questionsData_1.ALL_CATEGORIES.find((c) => c.id === canonCat);
+            const subDef = catDef?.subCategories?.find((s) => s.id.toLowerCase() === requestedSub || s.name.trim().toLowerCase() === requestedSub);
+            const acceptedNames = new Set([requestedSub]);
+            if (subDef) {
+                acceptedNames.add(subDef.id.toLowerCase());
+                acceptedNames.add(subDef.name.trim().toLowerCase());
             }
+            const subPool = categoryPool.filter((q) => q.subCategory && acceptedNames.has(q.subCategory.trim().toLowerCase()));
+            const shuffledSub = [...subPool].sort(() => 0.5 - Math.random());
+            let subPicked = shuffledSub.filter((q) => !seenIds.includes(q.id));
+            if (difficulty && difficulty !== 'mixed') {
+                const withDiff = subPicked.filter((q) => q.difficulty === difficulty);
+                const others = subPicked.filter((q) => q.difficulty !== difficulty);
+                subPicked = [...withDiff, ...others];
+            }
+            if (subPicked.length < count) {
+                subPicked = [...subPicked, ...shuffledSub.filter((q) => !subPicked.includes(q))];
+            }
+            return subPicked.slice(0, count);
         }
         let primaryPool = effectivePool.length > 0 ? effectivePool : allPublished;
         if (difficulty && difficulty !== 'mixed') {

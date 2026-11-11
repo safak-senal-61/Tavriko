@@ -694,6 +694,9 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const opponentLeads = !!rightPlayer && rightPlayer.score > myScore;
   const categoryName = categoryObj?.name || 'Genel Kültür';
   const categoryEmoji = CATEGORY_EMOJI[question.categoryId] || '🧠';
+  const subCategoryName = (question.subCategory || '').trim();
+  const difficultyLabel = (diffMap[question.difficulty] || 'Orta').toLocaleUpperCase('tr-TR');
+  const difficultyColor = DIFFICULTY_COLORS[question.difficulty] || DIFFICULTY_COLORS.medium;
 
   return (
     <TavrikoScreen style={styles.screenContainer}>
@@ -714,9 +717,16 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         </View>
         <View style={styles.categoryPill}>
           <Text style={styles.categoryEmoji}>{categoryEmoji}</Text>
-          <Text style={styles.categoryPillText} numberOfLines={1}>
-            {categoryName}
-          </Text>
+          <View style={styles.categoryPillTexts}>
+            <Text style={styles.categoryPillText} numberOfLines={1}>
+              {categoryName}
+            </Text>
+            {subCategoryName ? (
+              <Text style={styles.subCategoryPillText} numberOfLines={1} accessibilityLabel={`Alt kategori: ${subCategoryName}`}>
+                {subCategoryName}
+              </Text>
+            ) : null}
+          </View>
         </View>
       </View>
 
@@ -798,7 +808,16 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           direction="diagonal"
         />
         <View style={styles.questionCardInner} pointerEvents="none" />
-        {!tiny && <Text style={styles.difficultyText}>{(diffMap[question.difficulty] || 'Orta').toLocaleUpperCase('tr-TR')}</Text>}
+        {!tiny && (
+          <View style={styles.difficultyRow}>
+            <View
+              style={[styles.difficultyBadge, { borderColor: difficultyColor, backgroundColor: `${difficultyColor}26` }]}
+              accessibilityLabel={`Zorluk: ${difficultyLabel}`}
+            >
+              <Text style={[styles.difficultyText, { color: difficultyColor, marginBottom: 0 }]}>{difficultyLabel}</Text>
+            </View>
+          </View>
+        )}
         <Text
           style={[
             styles.questionText,
@@ -972,6 +991,13 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   );
 };
 
+const DIFFICULTY_COLORS: Record<string, string> = {
+  easy: '#4ADE80',
+  medium: '#FFC43D',
+  hard: '#FF6B6B',
+  expert: '#E879F9',
+};
+
 const styles = StyleSheet.create({
   screenContainer: {
     justifyContent: 'space-between',
@@ -1011,8 +1037,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   categoryPill: {
-    height: 40,
-    maxWidth: 150,
+    minHeight: 40,
+    maxWidth: 190,
+    paddingVertical: 4,
     flexShrink: 1,
     paddingHorizontal: 12,
     borderRadius: 20,
@@ -1026,11 +1053,33 @@ const styles = StyleSheet.create({
   categoryEmoji: {
     fontSize: 16,
   },
+  categoryPillTexts: {
+    flexShrink: 1,
+    justifyContent: 'center',
+  },
   categoryPillText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontFamily: THEME.fonts.black,
     flexShrink: 1,
+  },
+  subCategoryPillText: {
+    color: '#D9CDF5',
+    fontSize: 10,
+    fontFamily: THEME.fonts.bold,
+    flexShrink: 1,
+    marginTop: 1,
+  },
+  difficultyRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  difficultyBadge: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
   dailyStrip: {
     flexDirection: 'row',
