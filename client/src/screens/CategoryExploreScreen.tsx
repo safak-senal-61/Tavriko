@@ -25,6 +25,7 @@ import {
 import { GuestDiscoveryCard } from '../components/DiscoveryArtwork';
 import {
   DISCOVER_CATEGORY_IMG,
+  DISCOVER_SUBCATEGORY_IMG,
   HERO_DISCOVER_IMG,
 } from '../components/DiscoverArtwork';
 
@@ -544,7 +545,14 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                           onPress={() => playSub(sheetCategory, sc.name)}
                           activeOpacity={0.8}
                         >
-                          <Text style={styles.subChipEmoji}>{sc.emoji}</Text>
+                          {DISCOVER_SUBCATEGORY_IMG[sc.id] ? (
+                            <Image
+                              source={DISCOVER_SUBCATEGORY_IMG[sc.id]}
+                              style={styles.subChipArt}
+                            />
+                          ) : (
+                            <Text style={styles.subChipEmoji}>{sc.emoji}</Text>
+                          )}
                           <Text style={styles.subChipName} numberOfLines={2}>
                             {sc.name}
                           </Text>
@@ -894,6 +902,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 8,
     gap: 6,
+  },
+  subChipArt: {
+    width: 34,
+    height: 34,
+    resizeMode: 'contain',
   },
   subChipEmoji: {
     fontSize: 17,

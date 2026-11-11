@@ -26,3 +26,12 @@ her kategori kendi `primaryColor` rengiyle uyumlu palet. Görseller
 `DISCOVER_CATEGORY_IMG` ve `HERO_DISCOVER_IMG` ile eşlenir; Keşfet ekranı
 (CategoryExploreScreen) bu haritayı kullanır. Sayılar ve metinler uygulama
 kodunda render edilir, görsellere gömülmez.
+
+## Alt kategori görselleri (2026-11)
+
+`subs/<alt-kategori-id>.png` — 377 adet, 128px, şeffaf zemin. 4x4 sprite
+sayfaları halinde üretilip hücrelere bölünmüştür; alt kategori id'leri
+`shared/src/categories.ts` kataloğundaki `subCategories[].id` ile birebir
+eşleşir. Eşleme `DiscoverArtwork.tsx` içindeki `DISCOVER_SUBCATEGORY_IMG`
+haritası üzerinden Keşfet alt sayfasındaki çiplerde kullanılır. Görselde
+metin bulunmaz; soru sayıları uygulama kodunda render edilir.
