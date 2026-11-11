@@ -3,6 +3,7 @@ import {
   View,
   Text,
   Image,
+  ImageSourcePropType,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
@@ -23,9 +24,12 @@ import {
   TavrikoTopBar,
   Button3D,
   XpStarIcon,
-  CategorySquircleIcon,
 } from '../components/TavrikoIcons';
 import { GradientFill } from '../components/TavrikoGradient';
+import {
+  DISCOVER_CATEGORY_IMG,
+  DISCOVER_SUBCATEGORY_IMG,
+} from '../components/DiscoverArtwork';
 
 const QUESTION_COUNT_OPTIONS = [5, 10, 15, 20] as const;
 
@@ -55,12 +59,53 @@ const DIFFICULTIES: {
   glow: string;
   stars: number;
   xpMultiplier: string;
+  xpShort: string;
   desc: string;
 }[] = [
-  { id: 'easy', title: 'Kolay', color: '#3FD08A', tint: 'rgba(63, 208, 138, 0.10)', glow: 'rgba(63, 208, 138, 0.45)', stars: 1, xpMultiplier: 'x1 XP', desc: 'Isınma turu' },
-  { id: 'medium', title: 'Orta', color: '#FFC43D', tint: 'rgba(255, 196, 61, 0.10)', glow: 'rgba(255, 196, 61, 0.45)', stars: 2, xpMultiplier: 'x1,5 XP', desc: 'Dengeli mücadele' },
-  { id: 'hard', title: 'Zor', color: '#FF9B2F', tint: 'rgba(255, 155, 47, 0.12)', glow: 'rgba(255, 155, 47, 0.45)', stars: 3, xpMultiplier: 'x2 XP', desc: 'Bilgi savaşçısı' },
-  { id: 'expert', title: 'Uzman', color: '#FF5A6A', tint: 'rgba(255, 90, 106, 0.12)', glow: 'rgba(255, 90, 106, 0.45)', stars: 4, xpMultiplier: 'x3 XP', desc: 'Efsane ayarı' },
+  {
+    id: 'easy',
+    title: 'Kolay',
+    color: '#3FD08A',
+    tint: 'rgba(63, 208, 138, 0.10)',
+    glow: 'rgba(63, 208, 138, 0.45)',
+    stars: 1,
+    xpMultiplier: 'x1 XP',
+    xpShort: 'x1',
+    desc: 'Isınma turu',
+  },
+  {
+    id: 'medium',
+    title: 'Orta',
+    color: '#FFC43D',
+    tint: 'rgba(255, 196, 61, 0.10)',
+    glow: 'rgba(255, 196, 61, 0.45)',
+    stars: 2,
+    xpMultiplier: 'x1,5 XP',
+    xpShort: 'x1,5',
+    desc: 'Dengeli mücadele',
+  },
+  {
+    id: 'hard',
+    title: 'Zor',
+    color: '#FF9B2F',
+    tint: 'rgba(255, 155, 47, 0.12)',
+    glow: 'rgba(255, 155, 47, 0.45)',
+    stars: 3,
+    xpMultiplier: 'x2 XP',
+    xpShort: 'x2',
+    desc: 'Bilgi savaşçısı',
+  },
+  {
+    id: 'expert',
+    title: 'Uzman',
+    color: '#FF5A6A',
+    tint: 'rgba(255, 90, 106, 0.12)',
+    glow: 'rgba(255, 90, 106, 0.45)',
+    stars: 4,
+    xpMultiplier: 'x3 XP',
+    xpShort: 'x3',
+    desc: 'Efsane ayarı',
+  },
 ];
 
 /** Seçilen çip/kart için yaylı (spring) vurgu ölçeği */
@@ -121,14 +166,23 @@ const DifficultyCard: React.FC<{
       <TouchableOpacity
         style={[
           styles.diffCard,
-          { borderLeftColor: diff.color, shadowColor: selected ? diff.glow : 'transparent' },
+          { shadowColor: selected ? diff.glow : 'transparent' },
           selected && { backgroundColor: diff.tint },
-          selected && styles.diffCardSelected,
           selected && { borderColor: diff.color },
         ]}
         onPress={onPress}
         activeOpacity={0.85}
       >
+        {/* Çarpan madalyonu: zorluk rengiyle parlayan daire */}
+        <View
+          style={[
+            styles.diffMedal,
+            { borderColor: `${diff.color}66`, backgroundColor: `${diff.color}14` },
+            selected && { shadowColor: diff.glow },
+          ]}
+        >
+          <Text style={[styles.diffMedalText, { color: diff.color }]}>{diff.xpShort}</Text>
+        </View>
         <View style={styles.diffBody}>
           <View style={styles.diffTitleRow}>
             <Text style={[styles.diffTitle, { color: diff.color }]}>{diff.title}</Text>
@@ -165,6 +219,17 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
   const category = ALL_CATEGORIES.find((c) => c.id === categoryId);
   const selectedDiff = useMemo(() => DIFFICULTIES.find((d) => d.id === selected), [selected]);
 
+  // Kategori ve alt kategori görselleri (Keşfet ekranındaki 3B ikonlar)
+  const categoryArt: ImageSourcePropType | undefined = DISCOVER_CATEGORY_IMG[categoryId];
+  // subCategory parametresi alt kategorinin GÖRÜNEN ADI olarak gelir;
+  // görseli id üzerinden eşleştirmek için ada göre id bulunur.
+  const subCategoryName = subCategory;
+  const subCategoryArt: ImageSourcePropType | undefined = useMemo(() => {
+    if (!category || !subCategory) return undefined;
+    const sub = category.subCategories.find((s) => s.name === subCategory);
+    return sub ? DISCOVER_SUBCATEGORY_IMG[sub.id] : undefined;
+  }, [category, subCategory]);
+
   return (
     <TavrikoScreen>
       <TavrikoTopBar
@@ -180,7 +245,7 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero banner: diğer sayfalardaki görsel başlık kartı dili */}
+        {/* Hero banner: kategori görseli + kademeli mor degrade */}
         <Animated.View
           entering={FadeInDown.duration(460).springify(0.8)}
           style={styles.heroBanner}
@@ -191,23 +256,26 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
             resizeMode="cover"
           />
           <GradientFill
-            colors={['rgba(24, 10, 48, 0.62)', 'rgba(24, 10, 48, 0.94)']}
+            colors={['rgba(24, 10, 48, 0.55)', 'rgba(24, 10, 48, 0.94)']}
             direction="diagonal"
           />
           <View style={styles.heroRow}>
-            <View style={styles.categoryMedal}>
-              <CategorySquircleIcon category={categoryId} size={58} />
-            </View>
             <View style={styles.heroCopy}>
               <Text style={styles.eyebrow}>TAVRİKO ARENA</Text>
               <Text style={styles.title}>ZORLUK SEVİYESİ</Text>
               <View style={styles.chipRow}>
                 <View style={styles.chip}>
+                  {categoryArt ? (
+                    <Image source={categoryArt} style={styles.chipIcon} />
+                  ) : null}
                   <Text style={styles.chipText}>{category?.name || 'Kategori'}</Text>
                 </View>
-                {subCategory ? (
+                {subCategoryName ? (
                   <View style={[styles.chip, styles.chipAccent]}>
-                    <Text style={[styles.chipText, { color: '#5ADBB5' }]}>{subCategory}</Text>
+                    {subCategoryArt ? (
+                      <Image source={subCategoryArt} style={styles.chipIcon} />
+                    ) : null}
+                    <Text style={[styles.chipText, { color: '#5ADBB5' }]}>{subCategoryName}</Text>
                   </View>
                 ) : null}
                 <View style={[styles.chip, styles.chipAccent]}>
@@ -215,6 +283,21 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
                 </View>
               </View>
             </View>
+            {/* Kategorinin 3B görseli: sağda büyük, ışıklı madalyon */}
+            {categoryArt ? (
+              <Animated.View
+                entering={ZoomIn.delay(120).duration(520).springify(0.7)}
+                style={styles.heroArtWrap}
+              >
+                <View style={styles.heroArtGlow} />
+                <Image source={categoryArt} style={styles.heroArt} />
+                {subCategoryArt ? (
+                  <View style={styles.heroSubBadge}>
+                    <Image source={subCategoryArt} style={styles.heroSubBadgeImg} />
+                  </View>
+                ) : null}
+              </Animated.View>
+            ) : null}
           </View>
         </Animated.View>
 
@@ -299,19 +382,59 @@ const styles = StyleSheet.create({
   heroRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 10,
     paddingVertical: 16,
     paddingHorizontal: 16,
-  },
-  categoryMedal: {
-    width: 66,
-    height: 66,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   heroCopy: {
     flex: 1,
     minWidth: 0,
+  },
+  heroArtWrap: {
+    position: 'relative',
+    width: 118,
+    height: 118,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroArtGlow: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
+    bottom: 12,
+    borderRadius: 60,
+    backgroundColor: 'rgba(154, 107, 255, 0.28)',
+    shadowColor: 'rgba(154, 107, 255, 0.55)',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 28,
+  },
+  heroArt: {
+    width: 104,
+    height: 104,
+    borderRadius: 24,
+  },
+  heroSubBadge: {
+    position: 'absolute',
+    left: -6,
+    bottom: -4,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(18, 8, 40, 0.96)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(90, 219, 181, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: 'rgba(90, 219, 181, 0.5)',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 10,
+  },
+  heroSubBadgeImg: {
+    width: 32,
+    height: 32,
   },
   eyebrow: {
     fontFamily: THEME.fonts.extraBold,
@@ -332,6 +455,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     backgroundColor: 'rgba(255, 255, 255, 0.10)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.16)',
@@ -342,6 +468,10 @@ const styles = StyleSheet.create({
   chipAccent: {
     borderColor: 'rgba(154, 107, 255, 0.40)',
     backgroundColor: 'rgba(154, 107, 255, 0.14)',
+  },
+  chipIcon: {
+    width: 16,
+    height: 16,
   },
   chipText: {
     color: '#E5DBFB',
@@ -390,14 +520,13 @@ const styles = StyleSheet.create({
   },
   diffCard: {
     minHeight: 84,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 10,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.07)',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    borderLeftWidth: 7,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -406,8 +535,21 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     elevation: 7,
   },
-  diffCardSelected: {
+  diffMedal: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  diffMedalText: {
+    fontFamily: THEME.fonts.extraBold,
+    fontSize: 16,
   },
   diffBody: {
     flex: 1,
