@@ -8,6 +8,8 @@ import {
   Animated,
   Platform,
   TextInput,
+  Image,
+  Modal,
 } from 'react-native';
 import Reanimated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { CategoryId, CategoryInfo, ALL_CATEGORIES } from '@trivia/shared';
@@ -21,6 +23,10 @@ import {
   Button3D,
 } from '../components/TavrikoIcons';
 import { GuestDiscoveryCard } from '../components/DiscoveryArtwork';
+import {
+  DISCOVER_CATEGORY_IMG,
+  HERO_DISCOVER_IMG,
+} from '../components/DiscoverArtwork';
 
 interface CategoryExploreScreenProps {
   onBack: () => void;
@@ -87,12 +93,15 @@ const GROUP_MEMBERS: Record<GroupTab, CategoryId[]> = {
 
 /** Yardımcı: hex rengi alfa ile rgba'ya çevirir */
 const withAlpha = (hex: string, alpha: number): string => {
-  const clean = hex.replace('#', '');
+  const clean = (hex || '').replace('#', '');
+  if (clean.length !== 6) return hex;
   const r = parseInt(clean.substring(0, 2), 16);
   const g = parseInt(clean.substring(2, 4), 16);
   const b = parseInt(clean.substring(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
+
+type CategoryWithCounts = CategoryInfo & { totalQuestions: number };
 
 export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   onBack,
@@ -115,6 +124,8 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   const [countsLoaded, setCountsLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeGroup, setActiveGroup] = useState<GroupTab>('all');
+  // Alt kategori seçim sayfası (bottom sheet) için seçili bölüm
+  const [sheetCategory, setSheetCategory] = useState<CategoryWithCounts | null>(null);
 
   useEffect(() => {
     Animated.parallel([
@@ -166,7 +177,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   }, [apiBaseUrl]);
 
   // Kategoriler canlı soru sayılarıyla
-  const categoriesWithRealCounts = useMemo((): CategoryInfo[] => {
+  const categoriesWithRealCounts = useMemo((): CategoryWithCounts[] => {
     return ALL_CATEGORIES.filter((c) => c.id !== 'mixed').map((cat) => ({
       ...cat,
       totalQuestions:
@@ -201,7 +212,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
         if (subs.length > 0) return { ...cat, subCategories: subs };
         return null;
       })
-      .filter((cat): cat is CategoryInfo & { totalQuestions: number } => cat !== null);
+      .filter((cat): cat is CategoryWithCounts => cat !== null);
   }, [categoriesWithRealCounts, activeGroup, searchQuery]);
 
   const totalSubCount = useMemo(
@@ -226,6 +237,28 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
     }
     const pick = allSubs[Math.floor(Math.random() * allSubs.length)];
     onSelectCategory(pick.catId, pick.subName);
+  };
+
+  const openSheet = (cat: CategoryWithCounts) => {
+    sound.playSound('tap');
+    sound.triggerHaptic('light');
+    setSheetCategory(cat);
+  };
+
+  const closeSheet = () => setSheetCategory(null);
+
+  const playAll = (cat: CategoryWithCounts) => {
+    sound.playSound('tap');
+    sound.triggerHaptic('medium');
+    closeSheet();
+    onSelectCategory(cat.id);
+  };
+
+  const playSub = (cat: CategoryWithCounts, subName: string) => {
+    sound.playSound('tap');
+    sound.triggerHaptic('light');
+    closeSheet();
+    onSelectCategory(cat.id, subName);
   };
 
   return (
@@ -263,12 +296,27 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
             }} />
           )}
 
-          {/* Sayfa Başlığı */}
-          <Text style={styles.title}>KEŞFET</Text>
-          <Text style={styles.subtitle}>
-            {visibleSections.length} bölüm · {totalSubCount} kategori ·{' '}
-            {countsLoaded ? `${totalQuestionCount}+ soru` : 'soru sayıları yükleniyor…'}
-          </Text>
+          {/* Kahraman Başlık Kartı */}
+          <View style={styles.hero}>
+            <Image source={HERO_DISCOVER_IMG} style={styles.heroArt} />
+            <View style={styles.heroContent}>
+              <View style={styles.heroKicker}>
+                <Text style={styles.heroKickerText}>✦ TAVRİKO</Text>
+              </View>
+              <Text style={styles.heroTitle}>KEŞFET</Text>
+              <Text style={styles.heroSubtitle} numberOfLines={2}>
+                {visibleSections.length} bölüm · {totalSubCount} kategori ·{' '}
+                {countsLoaded ? `${totalQuestionCount}+ soru` : 'soru sayıları yükleniyor…'}
+              </Text>
+              <TouchableOpacity
+                style={styles.heroRandom}
+                onPress={handleRandomCategory}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.heroRandomText}>🎲 Rastgele Kategori</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
 
           {/* Arama */}
           <View style={styles.searchBar}>
@@ -319,74 +367,60 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
             })}
           </ScrollView>
 
-          {/* Bölümler: üstte sadece bölüm adı yazısı, altında normal kategori gibi alt kategoriler */}
-          {visibleSections.map((cat, sIdx) => {
-            const accent = cat.primaryColor || '#8B5CF6';
-            return (
-              <Reanimated.View
-                key={`${activeGroup}-${cat.id}`}
-                entering={FadeInDown.delay(Math.min(sIdx, 6) * 60).duration(320)}
-                style={styles.sectionWrap}
-              >
-                {/* Bölüm Başlığı — sadece yazı */}
-                <View style={styles.sectionHeader}>
-                  <View style={styles.sectionHeaderLeft}>
-                    <View style={[styles.sectionAccentBar, { backgroundColor: accent }]} />
-                    <Text style={styles.sectionTitle}>{cat.name}</Text>
-                    <Text style={styles.sectionCount}>
-                      {countsLoaded ? `${cat.totalQuestions} soru` : '…'}
-                    </Text>
-                  </View>
+          {/* Kategori Kartları — 2 sütunlu modern ızgara */}
+          <View style={styles.grid}>
+            {visibleSections.map((cat, idx) => {
+              const accent = cat.primaryColor || '#8B5CF6';
+              const art = DISCOVER_CATEGORY_IMG[cat.id];
+              return (
+                <Reanimated.View
+                  key={`${activeGroup}-${cat.id}`}
+                  entering={FadeInDown.delay(Math.min(idx, 10) * 45).duration(320)}
+                  style={styles.catCell}
+                >
                   <TouchableOpacity
-                    style={styles.sectionPlayAll}
-                    onPress={() => {
-                      sound.playSound('tap');
-                      sound.triggerHaptic('light');
-                      onSelectCategory(cat.id);
-                    }}
-                    activeOpacity={0.75}
+                    style={[
+                      styles.catCard,
+                      {
+                        backgroundColor: withAlpha(accent, 0.13),
+                        borderColor: withAlpha(accent, 0.42),
+                      },
+                    ]}
+                    onPress={() => openSheet(cat)}
+                    activeOpacity={0.85}
                   >
-                    <Text style={styles.sectionPlayAllText}>Tümünü Oyna →</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Alt kategoriler: normal kategori kartları */}
-                <View style={styles.grid}>
-                  {(cat.subCategories || []).map((sc, idx) => (
-                    <Reanimated.View
-                      key={`${cat.id}-${sc.id}`}
-                      entering={FadeIn.delay(Math.min(idx, 10) * 25).duration(280)}
-                      style={styles.catCell}
-                    >
-                      <TouchableOpacity
+                    {art ? (
+                      <View
                         style={[
-                          styles.catTile,
-                          {
-                            backgroundColor: withAlpha(accent, 0.14),
-                            borderColor: withAlpha(accent, 0.45),
-                          },
+                          styles.catArtGlow,
+                          { boxShadow: `0 0 20px ${withAlpha(accent, 0.55)}` },
                         ]}
-                        onPress={() => {
-                          sound.playSound('tap');
-                          sound.triggerHaptic('light');
-                          onSelectCategory(cat.id, sc.name);
-                        }}
-                        activeOpacity={0.85}
                       >
-                        <Text style={styles.catEmoji}>{sc.emoji}</Text>
-                        <Text style={styles.catName} numberOfLines={2}>
-                          {sc.name}
+                        <Image source={art} style={styles.catArt} />
+                      </View>
+                    ) : (
+                      <Text style={styles.catEmojiFallback}>
+                        {(cat.subCategories && cat.subCategories[0]?.emoji) || '🎯'}
+                      </Text>
+                    )}
+                    <Text style={styles.catName} numberOfLines={2}>
+                      {cat.name}
+                    </Text>
+                    <View style={styles.catMetaRow}>
+                      <View style={styles.catCountPill}>
+                        <Text style={styles.catCountText}>
+                          {countsLoaded ? `${cat.totalQuestions} soru` : '…'}
                         </Text>
-                        <Text style={styles.catCount}>
-                          {countsLoaded ? `${sc.questionCount ?? 0} soru` : '…'}
-                        </Text>
-                      </TouchableOpacity>
-                    </Reanimated.View>
-                  ))}
-                </View>
-              </Reanimated.View>
-            );
-          })}
+                      </View>
+                      <Text style={styles.catSubCount}>
+                        {cat.subCategories?.length || 0} alt
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </Reanimated.View>
+              );
+            })}
+          </View>
 
           {visibleSections.length === 0 && (
             <View style={styles.emptyState}>
@@ -397,17 +431,136 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
               </Text>
             </View>
           )}
-
-          {/* Rastgele Kategori */}
-          <View style={{ marginTop: 20 }}>
-            <Button3D
-              title="🎲 RASTGELE KATEGORİ SEÇ"
-              variant="mint"
-              onPress={handleRandomCategory}
-            />
-          </View>
         </Animated.View>
       </ScrollView>
+
+      {/* Alt Kategori Seçim Sayfası */}
+      <Modal
+        visible={sheetCategory !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={closeSheet}
+      >
+        <TouchableOpacity
+          style={styles.sheetBackdrop}
+          activeOpacity={1}
+          onPress={closeSheet}
+        >
+          <TouchableOpacity
+            style={[
+              styles.sheet,
+              sheetCategory && {
+                borderColor: withAlpha(sheetCategory.primaryColor || '#8B5CF6', 0.45),
+              },
+            ]}
+            activeOpacity={1}
+            onPress={() => {}}
+          >
+            {sheetCategory && (
+              <View>
+                <View style={styles.sheetHandle} />
+
+                {/* Bölüm başlığı */}
+                <View style={styles.sheetHeader}>
+                  {DISCOVER_CATEGORY_IMG[sheetCategory.id] ? (
+                    <Image
+                      source={DISCOVER_CATEGORY_IMG[sheetCategory.id]}
+                      style={styles.sheetArt}
+                    />
+                  ) : null}
+                  <View style={styles.sheetHeaderText}>
+                    <Text style={styles.sheetTitle} numberOfLines={2}>
+                      {sheetCategory.name}
+                    </Text>
+                    <Text style={styles.sheetDesc} numberOfLines={2}>
+                      {sheetCategory.description}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.sheetClose}
+                    onPress={closeSheet}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.sheetCloseText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* İstatistikler */}
+                <View style={styles.sheetStatsRow}>
+                  <View style={styles.sheetStatPill}>
+                    <Text style={styles.sheetStatText}>
+                      {countsLoaded ? `${sheetCategory.totalQuestions} soru` : '…'}
+                    </Text>
+                  </View>
+                  <View style={styles.sheetStatPill}>
+                    <Text style={styles.sheetStatText}>
+                      {sheetCategory.subCategories?.length || 0} alt kategori
+                    </Text>
+                  </View>
+                </View>
+
+                <Button3D
+                  title="⚡ TÜMÜNÜ OYNA"
+                  variant="gold"
+                  onPress={() => playAll(sheetCategory)}
+                  style={{ marginTop: 12 }}
+                />
+
+                {/* Alt kategoriler */}
+                {(sheetCategory.subCategories || []).length > 0 && (
+                  <>
+                    <Text style={styles.sheetSubLabel}>ALT KATEGORİLER</Text>
+                    <ScrollView
+                      style={[
+                        styles.sheetSubScroll,
+                        {
+                          height: Math.min(
+                            340,
+                            Math.ceil(
+                              (sheetCategory.subCategories?.length || 0) / 2
+                            ) * 50 + 8
+                          ),
+                        },
+                      ]}
+                      contentContainerStyle={styles.sheetSubWrap}
+                      showsVerticalScrollIndicator={false}
+                    >
+                      {(sheetCategory.subCategories || []).map((sc) => (
+                        <TouchableOpacity
+                          key={sc.id}
+                          style={[
+                            styles.subChip,
+                            {
+                              backgroundColor: withAlpha(
+                                sheetCategory.primaryColor || '#8B5CF6',
+                                0.14
+                              ),
+                              borderColor: withAlpha(
+                                sheetCategory.primaryColor || '#8B5CF6',
+                                0.4
+                              ),
+                            },
+                          ]}
+                          onPress={() => playSub(sheetCategory, sc.name)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={styles.subChipEmoji}>{sc.emoji}</Text>
+                          <Text style={styles.subChipName} numberOfLines={2}>
+                            {sc.name}
+                          </Text>
+                          <Text style={styles.subChipCount}>
+                            {countsLoaded ? `${sc.questionCount ?? 0}` : '…'}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </>
+                )}
+              </View>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {!isGuest && (
         <TavrikoBottomNav
@@ -425,34 +578,89 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
 const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 120,
-    paddingHorizontal: 2,
+    paddingHorizontal: 12,
   },
-  title: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 30,
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginTop: 6,
-    marginBottom: 2,
+
+  // Kahraman başlık kartı
+  hero: {
+    minHeight: 150,
+    borderRadius: 24,
+    borderWidth: 1.4,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    backgroundColor: 'rgba(91, 44, 196, 0.22)',
+    overflow: 'hidden',
+    marginTop: 8,
+    marginBottom: 12,
+    paddingVertical: 12,
   },
-  subtitle: {
-    color: '#94A3B8',
-    fontSize: 12,
+  heroArt: {
+    position: 'absolute',
+    right: -6,
+    top: -6,
+    width: 196,
+    height: '118%',
+    resizeMode: 'contain',
+    opacity: 0.95,
+  },
+  heroContent: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingLeft: 16,
+    paddingRight: 158,
+  },
+  heroKicker: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(90, 219, 181, 0.14)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginBottom: 5,
+  },
+  heroKickerText: {
+    color: '#5ADBB5',
+    fontSize: 9.5,
     fontFamily: THEME.fonts.extraBold,
-    textAlign: 'center',
-    marginBottom: 10,
+    letterSpacing: 2,
   },
+  heroTitle: {
+    fontFamily: THEME.fonts.display,
+    fontSize: 32,
+    lineHeight: 34,
+    color: '#FFFFFF',
+    marginBottom: 3,
+  },
+  heroSubtitle: {
+    color: '#CBBFE8',
+    fontSize: 10.5,
+    fontFamily: THEME.fonts.extraBold,
+    lineHeight: 14,
+  },
+  heroRandom: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    backgroundColor: '#FFC43D',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  heroRandomText: {
+    color: '#241050',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    fontWeight: '900',
+  },
+
+  // Arama
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0F172A',
+    backgroundColor: 'rgba(10, 4, 24, 0.72)',
     borderRadius: 16,
-    borderWidth: 1.5,
+    borderWidth: 1.4,
     borderColor: 'rgba(255, 255, 255, 0.12)',
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginBottom: 12,
-    marginHorizontal: 4,
   },
   searchInput: {
     flex: 1,
@@ -460,14 +668,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: THEME.fonts.medium,
   },
+
+  // Grup sekmeleri
   tabFilterRow: {
     flexDirection: 'row',
     gap: 8,
-    paddingHorizontal: 4,
     marginBottom: 14,
   },
   tabFilterPill: {
-    backgroundColor: '#0F172A',
+    backgroundColor: 'rgba(10, 4, 24, 0.72)',
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -475,8 +684,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   tabFilterPillActive: {
-    backgroundColor: '#F59E0B',
-    borderColor: '#F59E0B',
+    backgroundColor: '#FFC43D',
+    borderColor: '#FFC43D',
   },
   tabFilterText: {
     color: '#94A3B8',
@@ -484,62 +693,8 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.extraBold,
   },
   tabFilterTextActive: {
-    color: '#0F172A',
+    color: '#241050',
     fontWeight: '900',
-  },
-
-  // Bölüm yapısı
-  sectionWrap: {
-    marginBottom: 22,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-    marginBottom: 10,
-  },
-  sectionHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 1,
-  },
-  sectionAccentBar: {
-    width: 4,
-    height: 20,
-    borderRadius: 2,
-    marginRight: 8,
-  },
-  sectionTitle: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontFamily: THEME.fonts.display,
-    letterSpacing: 0.5,
-  },
-  sectionCount: {
-    color: '#5ADBB5',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-    backgroundColor: 'rgba(90, 219, 181, 0.12)',
-    borderRadius: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    marginLeft: 8,
-    overflow: 'hidden',
-  },
-  sectionPlayAll: {
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    marginLeft: 8,
-  },
-  sectionPlayAllText: {
-    color: '#5ADBB5',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
   },
 
   // Kategori ızgarası
@@ -547,43 +702,76 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    rowGap: 10,
-    paddingHorizontal: 2,
+    rowGap: 12,
   },
   catCell: {
-    width: '31.8%',
+    width: '48.6%',
   },
-  catTile: {
-    height: 96,
-    borderRadius: 18,
-    borderWidth: 1.2,
+  catCard: {
+    borderRadius: 22,
+    borderWidth: 1.4,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingHorizontal: 6,
+    paddingTop: 16,
+    paddingBottom: 12,
+    paddingHorizontal: 10,
   },
-  catEmoji: {
-    fontSize: 30,
-    lineHeight: 34,
+  catArtGlow: {
+    borderRadius: 18,
+    marginBottom: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#8B5CF6',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.5,
+        shadowRadius: 14,
+      },
+      android: { elevation: 8 },
+      web: {},
+    }),
+  },
+  catArt: {
+    width: 84,
+    height: 84,
+    resizeMode: 'contain',
+  },
+  catEmojiFallback: {
+    fontSize: 40,
+    lineHeight: 92,
+    height: 92,
+    marginBottom: 8,
   },
   catName: {
     color: '#FFFFFF',
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 13,
+    lineHeight: 16,
     fontFamily: THEME.fonts.extraBold,
     textAlign: 'center',
+    minHeight: 32,
   },
-  catCount: {
-    color: 'rgba(255, 255, 255, 0.65)',
-    fontSize: 9.5,
+  catMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  catCountPill: {
+    backgroundColor: 'rgba(90, 219, 181, 0.12)',
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  catCountText: {
+    color: '#5ADBB5',
+    fontSize: 10,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  catSubCount: {
+    color: 'rgba(255, 255, 255, 0.55)',
+    fontSize: 10,
     fontFamily: THEME.fonts.bold,
-    textAlign: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 7,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    overflow: 'hidden',
   },
+
+  // Boş durum
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -600,5 +788,131 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.medium,
     textAlign: 'center',
     marginTop: 4,
+  },
+
+  // Alt sayfa (bottom sheet)
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(5, 2, 16, 0.74)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#1A0E3C',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1.4,
+    borderBottomWidth: 0,
+    maxHeight: '84%',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 26,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    marginBottom: 12,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  sheetArt: {
+    width: 64,
+    height: 64,
+    resizeMode: 'contain',
+  },
+  sheetHeaderText: {
+    flex: 1,
+  },
+  sheetTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    lineHeight: 22,
+    fontFamily: THEME.fonts.display,
+  },
+  sheetDesc: {
+    color: '#94A3B8',
+    fontSize: 11,
+    lineHeight: 14,
+    fontFamily: THEME.fonts.medium,
+    marginTop: 2,
+  },
+  sheetClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetCloseText: {
+    color: '#CBBFE8',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  sheetStatsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  sheetStatPill: {
+    backgroundColor: 'rgba(90, 219, 181, 0.12)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  sheetStatText: {
+    color: '#5ADBB5',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  sheetSubLabel: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 1.5,
+    marginTop: 16,
+    marginBottom: 10,
+  },
+  sheetSubScroll: {},
+  sheetSubWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingBottom: 4,
+  },
+  subChip: {
+    width: '48.4%',
+    borderRadius: 14,
+    borderWidth: 1.2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  subChipEmoji: {
+    fontSize: 17,
+  },
+  subChipName: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 10.5,
+    lineHeight: 13,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  subChipCount: {
+    color: '#5ADBB5',
+    fontSize: 9.5,
+    fontFamily: THEME.fonts.bold,
+    backgroundColor: 'rgba(10, 4, 24, 0.6)',
+    borderRadius: 7,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    overflow: 'hidden',
   },
 });

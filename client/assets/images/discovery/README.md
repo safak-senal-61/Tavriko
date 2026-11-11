@@ -16,3 +16,13 @@ animations are stopped on unmount; text and static artwork remain visible.
 ## Follow-up illustrations
 
 `settings.webp`, `bell.webp`, `robot.webp` and `social.webp` were generated specifically for Tavriko as a transparent four-cell illustration sheet, with the existing guest explorer used only as a visual-style reference. Each cell was cropped and optimized to at most 384 px with transparent WebP compression. Notification counts, settings switches, text and countdowns are rendered by application code, not baked into artwork.
+
+## Keşfet kategori görselleri (2026-11)
+
+`cat_*.png` (28 adet, 288px, şeffaf zemin) ve `hero_discover.png` (960px, 16:9)
+Keşfet ekranı için üretilmiştir: parlak 3D oyun ikonu stili, altın kenar,
+her kategori kendi `primaryColor` rengiyle uyumlu palet. Görseller
+`client/src/components/DiscoverArtwork.tsx` içindeki
+`DISCOVER_CATEGORY_IMG` ve `HERO_DISCOVER_IMG` ile eşlenir; Keşfet ekranı
+(CategoryExploreScreen) bu haritayı kullanır. Sayılar ve metinler uygulama
+kodunda render edilir, görsellere gömülmez.
