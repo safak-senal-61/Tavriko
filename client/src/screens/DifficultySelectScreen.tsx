@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,6 @@ import Animated, {
   FadeInDown,
   FadeInUp,
   ZoomIn,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
 } from 'react-native-reanimated';
 import { CategoryId, DifficultyLevel, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -108,29 +105,16 @@ const DIFFICULTIES: {
   },
 ];
 
-/** Seçilen çip/kart için yaylı (spring) vurgu ölçeği */
-const useSelectScale = (selected: boolean) => {
-  const scale = useSharedValue(1);
-  useEffect(() => {
-    scale.value = withSpring(selected ? 1.04 : 1, { damping: 14, stiffness: 240 });
-  }, [selected, scale]);
-  return useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-};
-
 const CountPill: React.FC<{
   count: number;
   selected: boolean;
   onPress: () => void;
   delay: number;
 }> = ({ count, selected, onPress, delay }) => {
-  const animatedStyle = useSelectScale(selected);
-  // Giriş animasyonu dış katmanda, ölçek animasyonu iç katmanda: Reanimated
-  // transform'un layout animasyonu tarafından ezilmesi uyarısını önler.
+  // Ölçek animasyonu kaldırıldı: basınca buton ekran dışına taşıyordu.
+  // Seçim vurgusu yalnızca renk/çerçeve ile verilir.
   return (
     <Animated.View entering={ZoomIn.delay(delay).duration(320).springify(0.7)} style={styles.countPillWrap}>
-      <Animated.View style={animatedStyle}>
       <TouchableOpacity
         style={[
           styles.countPill,
@@ -144,7 +128,6 @@ const CountPill: React.FC<{
           {count}
         </Text>
       </TouchableOpacity>
-      </Animated.View>
     </Animated.View>
   );
 };
@@ -155,14 +138,11 @@ const DifficultyCard: React.FC<{
   selected: boolean;
   onPress: () => void;
 }> = ({ diff, index, selected, onPress }) => {
-  const animatedStyle = useSelectScale(selected);
-  // Giriş animasyonu dış katmanda, ölçek animasyonu iç katmanda (Reanimated
-  // transform/layout çakışma uyarısını önler).
+  // Ölçek animasyonu kaldırıldı: basınca kart ekran dışına taşıyordu.
   return (
     <Animated.View
       entering={FadeInDown.delay(140 + index * 80).duration(420).springify(0.8)}
     >
-    <Animated.View style={animatedStyle}>
       <TouchableOpacity
         style={[
           styles.diffCard,
@@ -198,7 +178,6 @@ const DifficultyCard: React.FC<{
           <Text style={[styles.xpPillText, { color: diff.color }]}>{diff.xpMultiplier}</Text>
         </View>
       </TouchableOpacity>
-    </Animated.View>
     </Animated.View>
   );
 };
@@ -494,8 +473,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   countPill: {
-    height: 46,
-    borderRadius: 14,
+    height: 42,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.14)',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -519,10 +498,10 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   diffCard: {
-    minHeight: 84,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 10,
+    minHeight: 74,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.07)',
     borderWidth: 1.5,
@@ -536,9 +515,9 @@ const styles = StyleSheet.create({
     elevation: 7,
   },
   diffMedal: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
@@ -562,7 +541,7 @@ const styles = StyleSheet.create({
   },
   diffTitle: {
     fontFamily: THEME.fonts.display,
-    fontSize: 23,
+    fontSize: 20,
   },
   starsRow: {
     flexDirection: 'row',
