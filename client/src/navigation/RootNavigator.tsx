@@ -1992,14 +1992,6 @@ export const RootNavigator: React.FC = () => {
                 navigateTo(isGuest ? 'categories' : 'home');
               }}
             />
-            {/* Modern oyun uyarı modalı (alt kategoride soru yok vb.) */}
-            <GameAlertModal
-              visible={gameAlert !== null}
-              title={gameAlert?.title}
-              message={gameAlert?.message || ''}
-              variant="error"
-              onConfirm={() => setGameAlert(null)}
-            />
             {/* Daily Challenge Dedicated Result Modal */}
             {dailyResultModal && (
               <DailyChallengeResultModal
@@ -2343,6 +2335,17 @@ export const RootNavigator: React.FC = () => {
           <NotificationToast onOpen={() => navigateTo('notifications')} />
         )}
       </View>
+
+      {/* Modern oyun uyarı modalı (alt kategoride soru yok vb.)
+          — kök seviyede render edilir: quiz_arena koşuluna takılmadan
+          her ekranda görünebilir. */}
+      <GameAlertModal
+        visible={gameAlert !== null}
+        title={gameAlert?.title}
+        message={gameAlert?.message || ''}
+        variant="error"
+        onConfirm={() => setGameAlert(null)}
+      />
 
       {/* Paylaşılan profil bağlantısından gelen profil modalı */}
       {(sharedProfile || sharedProfileLoading) && (
