@@ -440,6 +440,7 @@ export class GameRoomManager {
       roundNumber: room.currentRound,
       totalRounds: room.totalRounds,
       timeLimitSec: room.currentQuestion.timeLimitSec || room.questionTimeSec,
+      ...(room.currentQuestion.subCategory ? { subCategory: room.currentQuestion.subCategory } : {}),
     };
   }
 

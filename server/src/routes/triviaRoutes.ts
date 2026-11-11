@@ -41,6 +41,7 @@ router.get('/questions/practice', async (req: Request, res: Response): Promise<v
     roundNumber: idx + 1,
     totalRounds: rawQuestions.length,
     timeLimitSec: q.timeLimitSec || 15,
+    ...(q.subCategory ? { subCategory: q.subCategory } : {}),
   }));
 
   // Authoritatively set expiry in cache for each question with realistic sequence offset
@@ -52,7 +53,19 @@ router.get('/questions/practice', async (req: Request, res: Response): Promise<v
     })
   );
 
-  res.json({ category, count: questions.length, questions });
+  if (subCategory && questions.length === 0) {
+    res.json({
+      category,
+      subCategory,
+      count: 0,
+      questions: [],
+      code: 'SUBCATEGORY_EMPTY',
+      message: 'Bu alt kategoride henüz yayınlanmış soru yok.',
+    });
+    return;
+  }
+
+  res.json({ category, subCategory: subCategory || null, count: questions.length, questions });
 });
 
 // Authoritative practice / guest answer validation endpoint

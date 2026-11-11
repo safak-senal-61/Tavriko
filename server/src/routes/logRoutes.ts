@@ -1,10 +1,17 @@
 import { Router, Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
 import { logger } from '../utils/logger';
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
 import { getPendingGoogleSessions } from './authRoutes';
-import { requireAdminAuth, getJwtSecret } from '../middleware/auth';
+import {
+  requireAdminAuth,
+  getJwtSecret,
+  checkAdminCredentials,
+  issueAdminSessionToken,
+  setAdminSessionCookie,
+  clearAdminSessionCookie,
+  getAdminSessionFromRequest,
+} from '../middleware/auth';
 
 // SECURITY: portal credentials come exclusively from environment variables.
 // The previously hardcoded values were exposed in the public repository and
@@ -16,40 +23,40 @@ const PORTAL_CONFIGURED = Boolean(PORTAL_ADMIN_EMAIL && PORTAL_ADMIN_PASSWORD &&
 export const logRouter = Router();
 
 logRouter.post('/portal/login', (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const { email, password } = req.body || {};
   if (!PORTAL_CONFIGURED) {
     logger.warn('AUTH', 'Portal girişi reddedildi: PORTAL_ADMIN_EMAIL/PORTAL_ADMIN_PASSWORD ortam değişkenleri tanımlı değil.');
     res.status(503).json({ success: false, error: 'Yönetici portalı yapılandırılmamış.' });
     return;
   }
-  if (email === PORTAL_ADMIN_EMAIL && password === PORTAL_ADMIN_PASSWORD) {
-    const token = jwt.sign(
-      { email: PORTAL_ADMIN_EMAIL, role: 'portal_super_admin' },
-      getJwtSecret(),
-      { expiresIn: '30d' }
-    );
-    logger.success('AUTH', `Portal Yöneticisi Giriş Yaptı: ${email}`);
-    res.json({ success: true, token, email: PORTAL_ADMIN_EMAIL });
+  if (checkAdminCredentials(email, password)) {
+    const token = issueAdminSessionToken(PORTAL_ADMIN_EMAIL.trim());
+    if (!token) {
+      res.status(503).json({ success: false, error: 'Yönetici portalı yapılandırılmamış.' });
+      return;
+    }
+    // Tarayıcı panelleri HttpOnly çerezle oturumu korur; böylece sayfa yenilense veya
+    // arka plan istekleri yapılsa da tekrar şifre sorulmaz.
+    setAdminSessionCookie(req, res, token);
+    logger.success('AUTH', `Portal Yöneticisi Giriş Yaptı: ${PORTAL_ADMIN_EMAIL}`);
+    res.json({ success: true, token, email: PORTAL_ADMIN_EMAIL.trim() });
   } else {
-    logger.warn('AUTH', `Başarısız portal giriş denemesi: ${email}`);
+    logger.warn('AUTH', `Başarısız portal giriş denemesi: ${typeof email === 'string' ? email : '-'}`);
     res.status(401).json({ success: false, error: 'Hatalı e-posta adresi veya yönetici şifresi!' });
   }
 });
 
+logRouter.post('/portal/logout', (_req: Request, res: Response) => {
+  clearAdminSessionCookie(res);
+  res.json({ success: true });
+});
+
 logRouter.get('/portal/verify', (req: Request, res: Response) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) {
-    res.status(401).json({ success: false, error: 'Oturum tokeni eksik' });
+  const session = getAdminSessionFromRequest(req);
+  if (session) {
+    res.json({ success: true, email: session.email || PORTAL_ADMIN_EMAIL });
     return;
   }
-  try {
-    const decoded = jwt.verify(token, getJwtSecret()) as any;
-    if (decoded && decoded.email === PORTAL_ADMIN_EMAIL) {
-      res.json({ success: true, email: decoded.email });
-      return;
-    }
-  } catch {}
   res.status(401).json({ success: false, error: 'Geçersiz veya süresi dolmuş oturum' });
 });
 
@@ -1992,19 +1999,18 @@ export function renderDashboardHtml(): string {
     let portalAuthToken = localStorage.getItem('tavriko_portal_token');
 
     async function checkPortalAuth() {
-      if (!portalAuthToken) {
-        showAuthOverlay();
-        return false;
-      }
+      // Oturum HttpOnly çerezde tutulur; eski sürümlerden kalan localStorage tokeni
+      // varsa Bearer olarak da gönderilir.
       try {
-        const res = await fetch('/api/portal/verify', {
-          headers: { 'Authorization': 'Bearer ' + portalAuthToken }
-        });
+        const headers = portalAuthToken ? { 'Authorization': 'Bearer ' + portalAuthToken } : {};
+        const res = await fetch('/api/portal/verify', { headers, credentials: 'same-origin' });
         if (res.ok) {
           hideAuthOverlay();
           return true;
         }
       } catch {}
+      localStorage.removeItem('tavriko_portal_token');
+      portalAuthToken = null;
       showAuthOverlay();
       return false;
     }
@@ -2030,6 +2036,7 @@ export function renderDashboardHtml(): string {
       try {
         const res = await fetch('/api/portal/login', {
           method: 'POST',
+          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
         });
@@ -2054,10 +2061,11 @@ export function renderDashboardHtml(): string {
       }
     }
 
-    function handlePortalLogout() {
+    async function handlePortalLogout() {
+      try { await fetch('/api/portal/logout', { method: 'POST', credentials: 'same-origin' }); } catch {}
       localStorage.removeItem('tavriko_portal_token');
       portalAuthToken = null;
-      showAuthOverlay();
+      window.location.href = '/admin/login';
     }
 
     function initCloudPortalUrls() {

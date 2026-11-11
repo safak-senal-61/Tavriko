@@ -37,7 +37,7 @@ describe('1v1 Live Duel & Guest Matchmaking System', () => {
       const room = roomManager.getRoom(roomCode);
       expect(room).toBeDefined();
       expect(room?.mode).toBe('duel');
-      expect(room?.totalRounds).toBe(5);
+      expect(room?.totalRounds).toBe(15);
       expect(room?.maxPlayers).toBe(2);
       expect(Object.keys(room!.players).length).toBe(2);
 

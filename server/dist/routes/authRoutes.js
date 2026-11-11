@@ -4,8 +4,18 @@ exports.getPendingGoogleSessions = getPendingGoogleSessions;
 const express_1 = require("express");
 const prismaClient_1 = require("../db/prismaClient");
 const supabaseClient_1 = require("../db/supabaseClient");
+const shared_1 = require("@trivia/shared");
 const logger_1 = require("../utils/logger");
 const auth_1 = require("../middleware/auth");
+const LEGAL_CONSENT_REQUIRED_ERROR = 'Devam etmek için Kullanım Koşulları, Gizlilik Politikası ve KVKK Aydınlatma Metni’ni onaylamalısın.';
+function buildLegalConsent(method) {
+    return {
+        version: shared_1.LEGAL_VERSION,
+        acceptedAt: new Date().toISOString(),
+        documents: [...shared_1.REQUIRED_LEGAL_DOCUMENTS],
+        method,
+    };
+}
 const router = (0, express_1.Router)();
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ||
     '411578437442-gs1rck2124rgr516fe9dn9tuu15ge9ig.apps.googleusercontent.com';
@@ -159,7 +169,12 @@ router.post('/guest', async (req, res) => {
 });
 router.post('/register', async (req, res) => {
     try {
-        const { username, email, displayName, fullName, password, countryCode, countryName, country, phone, phoneNumber, birthDate, gender, bio, avatarUrl, } = req.body;
+        const { username, email, displayName, fullName, password, countryCode, countryName, country, phone, phoneNumber, birthDate, gender, bio, avatarUrl, acceptedLegalVersion, } = req.body;
+        // Kayıt yalnızca güncel yasal metinler onaylandığında yapılır.
+        if (acceptedLegalVersion !== shared_1.LEGAL_VERSION) {
+            res.status(400).json({ error: LEGAL_CONSENT_REQUIRED_ERROR, code: 'LEGAL_CONSENT_REQUIRED', legalVersion: shared_1.LEGAL_VERSION });
+            return;
+        }
         const resolvedUsername = (username || displayName || (email ? email.split('@')[0] : '')).trim();
         if (!resolvedUsername || !password) {
             res.status(400).json({ error: 'Kullanıcı adı, e-posta ve şifre zorunludur.' });
@@ -179,6 +194,14 @@ router.post('/register', async (req, res) => {
             bio,
             avatarUrl,
         });
+        try {
+            const updatedUser = await prismaClient_1.db.updateUserSettings(result.user.id, { legalConsent: buildLegalConsent('register') });
+            res.json({ ...result, user: updatedUser });
+            return;
+        }
+        catch (consentErr) {
+            logger_1.logger.warn('AUTH', `Kayıt sonrası yasal onay kaydedilemedi: ${consentErr.message}`);
+        }
         res.json(result);
     }
     catch (err) {
@@ -502,6 +525,28 @@ router.put('/profile', auth_1.requireUserAuth, async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
+// Yasal metin onayı (Google ile giriş, metin güncellemesi sonrası yeniden onay vb.)
+router.post('/legal-consent', auth_1.requireUserAuth, async (req, res) => {
+    try {
+        const userId = req.authUserId;
+        if (!userId) {
+            res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
+            return;
+        }
+        const { version, method } = req.body || {};
+        if (version !== shared_1.LEGAL_VERSION) {
+            res.status(409).json({ error: 'Yasal metinler güncellendi, lütfen güncel metni onaylayın.', legalVersion: shared_1.LEGAL_VERSION });
+            return;
+        }
+        const safeMethod = method === 'google' || method === 'register' ? method : 'in_app';
+        const updated = await prismaClient_1.db.updateUserSettings(userId, { legalConsent: buildLegalConsent(safeMethod) });
+        logger_1.logger.info('AUTH', `Yasal metin onayı kaydedildi (${safeMethod}, ${shared_1.LEGAL_VERSION}): ${userId}`);
+        res.json({ success: true, user: updated, legalVersion: shared_1.LEGAL_VERSION });
+    }
+    catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
 // SECURITY: settings updates are bound to the verified session identity.
 router.post('/settings', auth_1.requireUserAuth, async (req, res) => {
     try {
@@ -511,7 +556,10 @@ router.post('/settings', auth_1.requireUserAuth, async (req, res) => {
             return;
         }
         const { settings } = req.body;
-        const updated = await prismaClient_1.db.updateUserSettings(userId, settings || {});
+        // legalConsent yalnızca /legal-consent ucu tarafından sunucu saatiyle yazılır.
+        const safeSettings = settings && typeof settings === 'object' ? { ...settings } : {};
+        delete safeSettings.legalConsent;
+        const updated = await prismaClient_1.db.updateUserSettings(userId, safeSettings);
         res.json({ success: true, user: updated });
     }
     catch (err) {

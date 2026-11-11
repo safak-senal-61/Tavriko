@@ -19,7 +19,10 @@ import { DISCOVERY_IMG, DiscoveryArtwork } from '../components/DiscoveryArtwork'
 import { PreferenceSwitch } from '../components/PreferenceSwitch';
 import { GradientFill } from '../components/TavrikoGradient';
 import { applyAudioPreferences, loadStoredPreferences } from '../store/appPrefs';
-import { Volume2, Gamepad2, ShieldCheck, UserRound, Sparkles } from 'lucide-react-native';
+import { Volume2, Gamepad2, ShieldCheck, UserRound, Sparkles, FileText } from 'lucide-react-native';
+import type { LegalDocumentId } from '@trivia/shared';
+import { LegalDocumentList, LegalDocumentModal } from '../components/LegalDocuments';
+import { getLegalConsent } from '../utils/legalConsent';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -132,7 +135,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   // Sync state
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
-  const [settingsTab, setSettingsTab] = useState<'sound' | 'game' | 'privacy' | 'account'>('sound');
+  const [settingsTab, setSettingsTab] = useState<'sound' | 'game' | 'privacy' | 'account' | 'legal'>('sound');
+  const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocumentId | null>(null);
 
   // Audio & Haptics
   const [sfxEnabled, setSfxEnabled] = useState<boolean>(pick('sfxEnabled', (saved as any).soundEnabled ?? sound.isSoundEnabled()));
@@ -437,7 +441,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         <View accessibilityRole="tablist" style={styles.preferenceTabs}>
           {([
             ['sound', 'Ses', Volume2], ['game', 'Oyun', Gamepad2],
-            ['privacy', 'Gizlilik', ShieldCheck], ['account', 'Hesap', UserRound],
+            ['privacy', 'Gizlilik', ShieldCheck], ['account', 'Hesap', UserRound], ['legal', 'Yasal', FileText],
           ] as const).map(([key, label, Icon]) => (
             <TouchableOpacity key={key} accessibilityRole="tab" accessibilityState={{ selected: settingsTab === key }} aria-selected={settingsTab === key}
               onPress={() => { sound.playSound('tap'); setSettingsTab(key); }}
@@ -784,6 +788,17 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </TouchableOpacity>
         </View>
         </>}
+
+        {settingsTab === 'legal' && <>
+        <View style={styles.sectionHeader}>
+          <FileText size={18} color="#FFC43D" />
+          <Text style={styles.sectionTitle}>Sözleşmeler ve Politikalar</Text>
+        </View>
+        <View style={styles.groupCard}>
+          <LegalDocumentList onOpen={setOpenLegalDoc} acceptedAt={getLegalConsent(user)?.acceptedAt ?? null} />
+        </View>
+        </>}
+        <LegalDocumentModal documentId={openLegalDoc} onClose={() => setOpenLegalDoc(null)} />
 
         {/* System & Build Footer */}
         <View style={styles.footerWrap}>

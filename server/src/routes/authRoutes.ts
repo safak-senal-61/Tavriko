@@ -1,9 +1,21 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
-import { UserProfile } from '@trivia/shared';
+import { UserProfile, LEGAL_VERSION, REQUIRED_LEGAL_DOCUMENTS, LegalConsentRecord } from '@trivia/shared';
 import { logger } from '../utils/logger';
 import { requireUserAuth } from '../middleware/auth';
+
+const LEGAL_CONSENT_REQUIRED_ERROR =
+  'Devam etmek için Kullanım Koşulları, Gizlilik Politikası ve KVKK Aydınlatma Metni’ni onaylamalısın.';
+
+function buildLegalConsent(method: LegalConsentRecord['method']): LegalConsentRecord {
+  return {
+    version: LEGAL_VERSION,
+    acceptedAt: new Date().toISOString(),
+    documents: [...REQUIRED_LEGAL_DOCUMENTS],
+    method,
+  };
+}
 
 const router = Router();
 
@@ -197,7 +209,14 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
       gender,
       bio,
       avatarUrl,
+      acceptedLegalVersion,
     } = req.body;
+
+    // Kayıt yalnızca güncel yasal metinler onaylandığında yapılır.
+    if (acceptedLegalVersion !== LEGAL_VERSION) {
+      res.status(400).json({ error: LEGAL_CONSENT_REQUIRED_ERROR, code: 'LEGAL_CONSENT_REQUIRED', legalVersion: LEGAL_VERSION });
+      return;
+    }
 
     const resolvedUsername = (username || displayName || (email ? email.split('@')[0] : '')).trim();
     if (!resolvedUsername || !password) {
@@ -219,6 +238,13 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
       bio,
       avatarUrl,
     });
+    try {
+      const updatedUser = await db.updateUserSettings(result.user.id, { legalConsent: buildLegalConsent('register') });
+      res.json({ ...result, user: updatedUser });
+      return;
+    } catch (consentErr: any) {
+      logger.warn('AUTH', `Kayıt sonrası yasal onay kaydedilemedi: ${consentErr.message}`);
+    }
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -553,6 +579,28 @@ router.put('/profile', requireUserAuth, async (req: Request, res: Response): Pro
   }
 });
 
+// Yasal metin onayı (Google ile giriş, metin güncellemesi sonrası yeniden onay vb.)
+router.post('/legal-consent', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
+      return;
+    }
+    const { version, method } = req.body || {};
+    if (version !== LEGAL_VERSION) {
+      res.status(409).json({ error: 'Yasal metinler güncellendi, lütfen güncel metni onaylayın.', legalVersion: LEGAL_VERSION });
+      return;
+    }
+    const safeMethod: LegalConsentRecord['method'] = method === 'google' || method === 'register' ? method : 'in_app';
+    const updated = await db.updateUserSettings(userId, { legalConsent: buildLegalConsent(safeMethod) });
+    logger.info('AUTH', `Yasal metin onayı kaydedildi (${safeMethod}, ${LEGAL_VERSION}): ${userId}`);
+    res.json({ success: true, user: updated, legalVersion: LEGAL_VERSION });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // SECURITY: settings updates are bound to the verified session identity.
 router.post('/settings', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -563,7 +611,10 @@ router.post('/settings', requireUserAuth, async (req: Request, res: Response): P
     }
 
     const { settings } = req.body;
-    const updated = await db.updateUserSettings(userId, settings || {});
+    // legalConsent yalnızca /legal-consent ucu tarafından sunucu saatiyle yazılır.
+    const safeSettings = settings && typeof settings === 'object' ? { ...settings } : {};
+    delete (safeSettings as any).legalConsent;
+    const updated = await db.updateUserSettings(userId, safeSettings);
     res.json({ success: true, user: updated });
   } catch (err: any) {
     res.status(400).json({ error: err.message });

@@ -14,7 +14,7 @@ import { GameRoomManager } from './engine/GameRoomManager';
 import { Matchmaker } from './engine/Matchmaker';
 import { setupSocketHandlers } from './socket/socketHandler';
 import { presenceManager } from './services/presenceManager';
-import { TelegramBotService } from './telegram/telegramBot';
+import { TelegramBotService, safeEqualStrings } from './telegram/telegramBot';
 import { supabaseService } from './db/supabaseClient';
 import { cacheService } from './cache/redisClient';
 import { logger } from './utils/logger';
@@ -27,7 +27,9 @@ import { initErrorMonitor, captureError } from './utils/errorMonitor';
 import triviaRoutes from './routes/triviaRoutes';
 import socialRoutes from './routes/socialRoutes';
 import referralRoutes from './routes/referralRoutes';
-import { requireAdminAuth } from './middleware/auth';
+import { requireAdminAuth, getAdminSessionFromRequest, setTelegramAdminVerifier } from './middleware/auth';
+import { renderAdminLoginHtml, sanitizeNextPath } from './routes/adminLoginPage';
+import { legalRouter } from './routes/legalRoutes';
 
 function getLocalIpAddress(): string {
   const interfaces = os.networkInterfaces();
@@ -136,6 +138,7 @@ export function createApp() {
       '/api/auth/forgot-password',
       '/api/auth/reset-password',
       '/api/auth/google/complete-session',
+      '/api/portal/login',
     ],
     rateLimitAuth
   );
@@ -253,24 +256,27 @@ export function createApp() {
 
   // Initialize Telegram Bot & Admin Approval Service
   const telegramBot = new TelegramBotService({ db, roomManager });
+  // Telegram menüsündeki WebApp paneli, /api/admin/* uçlarına Telegram'ın imzaladığı
+  // initData ile erişir (tarayıcı şifresi gerekmez).
+  setTelegramAdminVerifier((initData) => telegramBot.verifyWebAppInitData(initData));
 
   // Telegram Webhook endpoint (Essential for Vercel Serverless execution)
   app.post(['/api/telegram/webhook', '/telegram/webhook'], async (req, res) => {
     try {
       // SECURITY: verify Telegram's webhook secret token. Without this check anyone
       // could POST forged Telegram updates (impersonating admins in the approval bot).
-      const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+      // Anahtar TELEGRAM_WEBHOOK_SECRET'tan (yoksa bot tokeninden) türetilir ve
+      // setWebhook çağrılarında Telegram'a secret_token olarak verilir.
+      const webhookSecret = await telegramBot.getWebhookSecret();
       if (!webhookSecret) {
-        logger.error('TELEGRAM', 'Webhook reddedildi: TELEGRAM_WEBHOOK_SECRET tanımlı değil.');
-        return res.status(401).send('Unauthorized');
+        logger.error('TELEGRAM', 'Webhook reddedildi: Telegram bot tokeni yapılandırılmamış.');
+        return res.status(503).send('Bot not configured');
       }
       const providedSecret = req.headers['x-telegram-bot-api-secret-token'];
-      if (
-        typeof providedSecret !== 'string' ||
-        providedSecret.length !== webhookSecret.length ||
-        providedSecret !== webhookSecret
-      ) {
-        logger.warn('TELEGRAM', 'Webhook reddedildi: gizli token doğrulaması başarısız.');
+      if (typeof providedSecret !== 'string' || !safeEqualStrings(providedSecret, webhookSecret)) {
+        logger.warn('TELEGRAM', 'Webhook reddedildi: gizli token doğrulaması başarısız. Webhook kaydı onarılıyor.');
+        // Telegram'daki kayıt eski/anahtarsızsa doğru anahtarla yeniden kur (kısıtlı sıklıkta).
+        await telegramBot.repairWebhook().catch(() => false);
         return res.status(401).send('Unauthorized');
       }
 
@@ -487,7 +493,21 @@ export function createApp() {
     });
   }
 
-  // Admin & Operations Portal (Password protected via jewelkaan01@gmail.com) — birincil adres /admin
+  // Yönetici giriş sayfası: tarayıcının yerel şifre penceresi yerine kalıcı oturum çerezi.
+  app.get('/admin/login', (req, res) => {
+    const nextPath = sanitizeNextPath(req.query.next);
+    if (getAdminSessionFromRequest(req)) {
+      return res.redirect(302, nextPath);
+    }
+    const configured = Boolean(
+      process.env.PORTAL_ADMIN_EMAIL && process.env.PORTAL_ADMIN_PASSWORD && (process.env.JWT_SECRET || process.env.SUPABASE_JWT_SECRET)
+    );
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.send(renderAdminLoginHtml(nextPath, configured));
+  });
+
+  // Admin & Operations Portal — birincil adres /admin (oturum çereziyle korunur)
   app.get(['/admin', '/portal', '/dashboard', '/ops', '/dev', '/developer-portal', '/gelistirici'], requireAdminAuth, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(renderDashboardHtml());
@@ -1191,6 +1211,28 @@ export function createApp() {
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
+        <script>
+          // Yönetici uçlarına Telegram'ın imzaladığı initData ile kimlik doğrulaması:
+          // tarayıcı şifre penceresi Telegram içinde açılamadığı için butonlar 401 alıyordu.
+          (function () {
+            var originalFetch = window.fetch.bind(window);
+            window.fetch = function (input, init) {
+              try {
+                var url = typeof input === 'string' ? input : (input && input.url) || '';
+                var sameOrigin = url.charAt(0) === '/' || url.indexOf(window.location.origin) === 0;
+                var initData = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData;
+                if (sameOrigin && initData) {
+                  init = init || {};
+                  var headers = new Headers(init.headers || (typeof input !== 'string' && input.headers) || {});
+                  if (!headers.has('X-Telegram-Init-Data')) headers.set('X-Telegram-Init-Data', initData);
+                  init.headers = headers;
+                  init.credentials = init.credentials || 'same-origin';
+                }
+              } catch (e) {}
+              return originalFetch(input, init);
+            };
+          })();
+        </script>
         <style>
           :root {
             --bg-color: #0B0818;
@@ -3531,6 +3573,7 @@ export function createApp() {
   app.use('/api', triviaRoutes);
   app.use('/api/social', socialRoutes);
   app.use('/api/referrals', referralRoutes);
+  app.use(legalRouter);
 
   // --- Cloudflare Durable Objects Internal Endpoints ---
   app.post('/api/internal/room-questions', async (req, res) => {

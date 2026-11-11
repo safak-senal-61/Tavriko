@@ -1,12 +1,8 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.logRouter = void 0;
 exports.renderDashboardHtml = renderDashboardHtml;
 const express_1 = require("express");
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const logger_1 = require("../utils/logger");
 const prismaClient_1 = require("../db/prismaClient");
 const authRoutes_1 = require("./authRoutes");
@@ -19,37 +15,39 @@ const PORTAL_ADMIN_PASSWORD = process.env.PORTAL_ADMIN_PASSWORD || '';
 const PORTAL_CONFIGURED = Boolean(PORTAL_ADMIN_EMAIL && PORTAL_ADMIN_PASSWORD && (0, auth_1.getJwtSecret)());
 exports.logRouter = (0, express_1.Router)();
 exports.logRouter.post('/portal/login', (req, res) => {
-    const { email, password } = req.body;
+    const { email, password } = req.body || {};
     if (!PORTAL_CONFIGURED) {
         logger_1.logger.warn('AUTH', 'Portal girişi reddedildi: PORTAL_ADMIN_EMAIL/PORTAL_ADMIN_PASSWORD ortam değişkenleri tanımlı değil.');
         res.status(503).json({ success: false, error: 'Yönetici portalı yapılandırılmamış.' });
         return;
     }
-    if (email === PORTAL_ADMIN_EMAIL && password === PORTAL_ADMIN_PASSWORD) {
-        const token = jsonwebtoken_1.default.sign({ email: PORTAL_ADMIN_EMAIL, role: 'portal_super_admin' }, (0, auth_1.getJwtSecret)(), { expiresIn: '30d' });
-        logger_1.logger.success('AUTH', `Portal Yöneticisi Giriş Yaptı: ${email}`);
-        res.json({ success: true, token, email: PORTAL_ADMIN_EMAIL });
+    if ((0, auth_1.checkAdminCredentials)(email, password)) {
+        const token = (0, auth_1.issueAdminSessionToken)(PORTAL_ADMIN_EMAIL.trim());
+        if (!token) {
+            res.status(503).json({ success: false, error: 'Yönetici portalı yapılandırılmamış.' });
+            return;
+        }
+        // Tarayıcı panelleri HttpOnly çerezle oturumu korur; böylece sayfa yenilense veya
+        // arka plan istekleri yapılsa da tekrar şifre sorulmaz.
+        (0, auth_1.setAdminSessionCookie)(req, res, token);
+        logger_1.logger.success('AUTH', `Portal Yöneticisi Giriş Yaptı: ${PORTAL_ADMIN_EMAIL}`);
+        res.json({ success: true, token, email: PORTAL_ADMIN_EMAIL.trim() });
     }
     else {
-        logger_1.logger.warn('AUTH', `Başarısız portal giriş denemesi: ${email}`);
+        logger_1.logger.warn('AUTH', `Başarısız portal giriş denemesi: ${typeof email === 'string' ? email : '-'}`);
         res.status(401).json({ success: false, error: 'Hatalı e-posta adresi veya yönetici şifresi!' });
     }
 });
+exports.logRouter.post('/portal/logout', (_req, res) => {
+    (0, auth_1.clearAdminSessionCookie)(res);
+    res.json({ success: true });
+});
 exports.logRouter.get('/portal/verify', (req, res) => {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (!token) {
-        res.status(401).json({ success: false, error: 'Oturum tokeni eksik' });
+    const session = (0, auth_1.getAdminSessionFromRequest)(req);
+    if (session) {
+        res.json({ success: true, email: session.email || PORTAL_ADMIN_EMAIL });
         return;
     }
-    try {
-        const decoded = jsonwebtoken_1.default.verify(token, (0, auth_1.getJwtSecret)());
-        if (decoded && decoded.email === PORTAL_ADMIN_EMAIL) {
-            res.json({ success: true, email: decoded.email });
-            return;
-        }
-    }
-    catch { }
     res.status(401).json({ success: false, error: 'Geçersiz veya süresi dolmuş oturum' });
 });
 // SECURITY: log access is restricted to authenticated admins. Server logs contain
@@ -1986,19 +1984,18 @@ function renderDashboardHtml() {
     let portalAuthToken = localStorage.getItem('tavriko_portal_token');
 
     async function checkPortalAuth() {
-      if (!portalAuthToken) {
-        showAuthOverlay();
-        return false;
-      }
+      // Oturum HttpOnly çerezde tutulur; eski sürümlerden kalan localStorage tokeni
+      // varsa Bearer olarak da gönderilir.
       try {
-        const res = await fetch('/api/portal/verify', {
-          headers: { 'Authorization': 'Bearer ' + portalAuthToken }
-        });
+        const headers = portalAuthToken ? { 'Authorization': 'Bearer ' + portalAuthToken } : {};
+        const res = await fetch('/api/portal/verify', { headers, credentials: 'same-origin' });
         if (res.ok) {
           hideAuthOverlay();
           return true;
         }
       } catch {}
+      localStorage.removeItem('tavriko_portal_token');
+      portalAuthToken = null;
       showAuthOverlay();
       return false;
     }
@@ -2024,6 +2021,7 @@ function renderDashboardHtml() {
       try {
         const res = await fetch('/api/portal/login', {
           method: 'POST',
+          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
         });
@@ -2048,10 +2046,11 @@ function renderDashboardHtml() {
       }
     }
 
-    function handlePortalLogout() {
+    async function handlePortalLogout() {
+      try { await fetch('/api/portal/logout', { method: 'POST', credentials: 'same-origin' }); } catch {}
       localStorage.removeItem('tavriko_portal_token');
       portalAuthToken = null;
-      showAuthOverlay();
+      window.location.href = '/admin/login';
     }
 
     function initCloudPortalUrls() {

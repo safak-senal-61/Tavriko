@@ -4,6 +4,7 @@ import {
   StyleSheet,
   StatusBar,
   Platform,
+  Alert,
   AppState,
   Animated,
   useWindowDimensions,
@@ -104,8 +105,21 @@ export type ScreenName =
   | 'payment'
   | 'developer';
 import { DEFAULT_API_BASE, getRealtimeWsUrl } from '../config';
+import { LegalConsentGate } from '../components/LegalDocuments';
+import {
+  consumeGoogleLegalAck,
+  isLegalUpdate,
+  needsLegalConsent,
+  rememberLocalConsent,
+  submitLegalConsent,
+} from '../utils/legalConsent';
 
 const API_BASE = DEFAULT_API_BASE;
+// 1v1 düello her zaman tüm kategorilerden karışık ve 15 soruluk oynanır. Keşfet'te en son
+// seçilen kategori (selectedCategory) düelloya taşınmamalı.
+const DUEL_CATEGORY: CategoryId = 'mixed';
+const DUEL_DIFFICULTY = 'mixed';
+const DUEL_TOTAL_ROUNDS = 15;
 export const RootNavigator: React.FC = () => {
   const [pendingReferral, setPendingReferral] = useState(() => captureReferralLink());
   const { width: windowWidth } = useWindowDimensions();
@@ -247,10 +261,54 @@ export const RootNavigator: React.FC = () => {
       ) {
         preservedAvatar = current.avatarUrl;
       }
-      setUser({ ...(current || {}), ...fresh, avatarUrl: preservedAvatar } as UserProfile);
+      // Bazı profil uçları settings alanını kısmi döndürür; yasal onay kaydı kaybolmasın.
+      const currentConsent = (current?.settings as any)?.legalConsent;
+      const freshSettings = fresh.settings
+        ? { ...fresh.settings, ...(currentConsent && !(fresh.settings as any).legalConsent ? { legalConsent: currentConsent } : {}) }
+        : current?.settings;
+      setUser({ ...(current || {}), ...fresh, settings: freshSettings, avatarUrl: preservedAvatar } as UserProfile);
     },
     [setUser]
   );
+
+  // ===== Yasal metin onayı (Google ile ilk giriş, metin güncellemeleri) =====
+  const [legalSubmitting, setLegalSubmitting] = useState(false);
+  const [legalGateError, setLegalGateError] = useState<string | null>(null);
+  const [autoLegalInFlight, setAutoLegalInFlight] = useState(false);
+  const autoGoogleConsentTriedRef = useRef<string | null>(null);
+  const realSessionToken = token && token !== 'mock_token' ? token : null;
+  const showLegalGate =
+    Boolean(realSessionToken) && currentScreen !== 'auth' && currentScreen !== 'splash' && needsLegalConsent(user, isGuest);
+
+  const acceptLegal = useCallback(
+    async (method: 'google' | 'in_app') => {
+      const current = useGameStore.getState();
+      if (!current.user || !current.token) return;
+      setLegalSubmitting(true);
+      setLegalGateError(null);
+      try {
+        const updated = await submitLegalConsent(API_BASE, current.token, method);
+        rememberLocalConsent(current.user.id);
+        if (updated) syncWithFreshUser(updated);
+        else setUser({ ...current.user } as UserProfile);
+      } catch (err: any) {
+        setLegalGateError(err?.message || 'Onay kaydedilemedi. Lütfen tekrar dene.');
+      } finally {
+        setLegalSubmitting(false);
+      }
+    },
+    [syncWithFreshUser, setUser]
+  );
+
+  // Google butonunun altındaki bildirimle giriş yapıldıysa onayı otomatik kaydet.
+  useEffect(() => {
+    if (!showLegalGate || !user?.id || autoGoogleConsentTriedRef.current === user.id) return;
+    autoGoogleConsentTriedRef.current = user.id;
+    if (consumeGoogleLegalAck()) {
+      setAutoLegalInFlight(true);
+      void acceptLegal('google').finally(() => setAutoLegalInFlight(false));
+    }
+  }, [showLegalGate, user?.id, acceptLegal]);
 
   const refreshUserProfile = useCallback(async () => {
     const current = useGameStore.getState();
@@ -673,11 +731,11 @@ export const RootNavigator: React.FC = () => {
             mode: 'duel',
             hostId: user.id,
             status: 'countdown',
-            category: selectedCategory,
+            category: DUEL_CATEGORY,
             difficulty: selectedDifficulty,
             maxPlayers: 2,
             currentRound: 0,
-            totalRounds: 5,
+            totalRounds: DUEL_TOTAL_ROUNDS,
             questionTimeSec: 15,
             penaltyForWrong: false,
             players: initialPlayers,
@@ -941,7 +999,8 @@ export const RootNavigator: React.FC = () => {
         user.displayName,
         user.avatarUrl,
         'duel',
-        selectedCategory
+        DUEL_CATEGORY,
+        DUEL_DIFFICULTY
       );
       navigateTo('matchmaking');
     }, 'Hızlı Eşleşme (1v1 Düello)');
@@ -1151,6 +1210,19 @@ export const RootNavigator: React.FC = () => {
       );
       if (res.ok) {
         const data = await res.json();
+        if (subCategory && data.code === 'SUBCATEGORY_EMPTY') {
+          // Alt kategoride soru yoksa başka alt kategoriden soru göstermek yerine bilgilendir.
+          isGameActiveRef.current = false;
+          setIsSinglePlayerActive(false);
+          isSinglePlayerActiveRef.current = false;
+          const msg = `"${subCategory}" alt kategorisinde henüz yayınlanmış soru yok. Lütfen başka bir alt kategori seç.`;
+          if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+            window.alert(msg);
+          } else {
+            Alert.alert('Soru bulunamadı', msg);
+          }
+          return;
+        }
         if (data.questions && data.questions.length > 0) {
           setPracticeQuestions(data.questions);
           setPracticeIndex(0);
@@ -1752,7 +1824,7 @@ export const RootNavigator: React.FC = () => {
         )}
         {currentScreen === 'matchmaking' && (
           <MatchmakingRadarScreen
-            category={selectedCategory}
+            category={DUEL_CATEGORY}
             difficulty={selectedDifficulty}
             userName={user?.displayName || 'Sen'}
             avatarSeed={user?.avatarUrl || user?.displayName}
@@ -1772,7 +1844,7 @@ export const RootNavigator: React.FC = () => {
               rankTitle: duelOpponent?.isBot ? 'Yapay Zeka' : 'Düellocu',
               isBot: duelOpponent?.isBot,
             }}
-            categoryName={ALL_CATEGORIES.find(category => category.id === selectedCategory)?.name || 'Genel Kültür'}
+            categoryName={ALL_CATEGORIES.find(category => category.id === DUEL_CATEGORY)?.name || 'Karışık Kategoriler'}
             onCancel={handleCancelMatchmaking}
           />
         )}
@@ -2336,6 +2408,21 @@ export const RootNavigator: React.FC = () => {
           </View>
         </View>
       )}
+      <LegalConsentGate
+        visible={showLegalGate && !autoLegalInFlight}
+        isUpdate={isLegalUpdate(user)}
+        submitting={legalSubmitting}
+        errorMsg={legalGateError}
+        onAccept={() => { void acceptLegal('in_app'); }}
+        onLogout={() => {
+          setLegalGateError(null);
+          setIsGuest(false);
+          setAuthRedirectNotice(null);
+          setUser(null, null);
+          resetGame();
+          navigateTo('auth');
+        }}
+      />
     </View>
   );
 };

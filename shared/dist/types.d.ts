@@ -58,6 +58,8 @@ export interface ClientQuestion {
     roundNumber: number;
     totalRounds: number;
     timeLimitSec: number;
+    /** Sorunun ait olduğu alt kategori adı (ör. "Nişancı Oyunları (FPS)") */
+    subCategory?: string;
 }
 export interface Player {
     id: string;
@@ -259,6 +261,13 @@ export interface UserSettings {
     friendActivity?: boolean;
     themeMode?: 'dark' | 'vibrant' | 'midnight';
     equippedTitle?: string;
+    /** Yasal metin onayı (sunucu tarafından yazılır, istemci değiştiremez). */
+    legalConsent?: {
+        version: string;
+        acceptedAt: string;
+        documents: string[];
+        method: 'register' | 'google' | 'in_app';
+    };
 }
 export interface UserProfile {
     isGuest?: boolean;

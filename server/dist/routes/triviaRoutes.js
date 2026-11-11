@@ -38,6 +38,7 @@ router.get('/questions/practice', async (req, res) => {
         roundNumber: idx + 1,
         totalRounds: rawQuestions.length,
         timeLimitSec: q.timeLimitSec || 15,
+        ...(q.subCategory ? { subCategory: q.subCategory } : {}),
     }));
     // Authoritatively set expiry in cache for each question with realistic sequence offset
     let cumulativeMs = Date.now();
@@ -45,7 +46,18 @@ router.get('/questions/practice', async (req, res) => {
         cumulativeMs += q.timeLimitSec * 1000 + 4000;
         return redisClient_1.cacheService.setQuestionExpiry(sessionId, q.id, cumulativeMs, 300);
     }));
-    res.json({ category, count: questions.length, questions });
+    if (subCategory && questions.length === 0) {
+        res.json({
+            category,
+            subCategory,
+            count: 0,
+            questions: [],
+            code: 'SUBCATEGORY_EMPTY',
+            message: 'Bu alt kategoride henüz yayınlanmış soru yok.',
+        });
+        return;
+    }
+    res.json({ category, subCategory: subCategory || null, count: questions.length, questions });
 });
 // Authoritative practice / guest answer validation endpoint
 router.post('/questions/submit', async (req, res) => {
