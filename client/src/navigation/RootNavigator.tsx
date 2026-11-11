@@ -4,7 +4,6 @@ import {
   StyleSheet,
   StatusBar,
   Platform,
-  Alert,
   AppState,
   Animated,
   useWindowDimensions,
@@ -44,6 +43,7 @@ import { CustomRoomScreen } from '../screens/CustomRoomScreen';
 import { LobbyScreen } from '../screens/LobbyScreen';
 import { QuizArenaScreen, RoundFeedback } from '../screens/QuizArenaScreen';
 import { AnswerFeedbackModal } from '../screens/AnswerFeedbackModal';
+import { GameAlertModal } from '../components/GameAlertModal';
 import { PracticeSummaryModal, PracticeStats } from '../screens/PracticeSummaryModal';
 import { DailyChallengeResultModal } from '../screens/DailyChallengeResultModal';
 import { IntermissionLeaderboardScreen } from '../screens/IntermissionLeaderboardScreen';
@@ -155,6 +155,8 @@ export const RootNavigator: React.FC = () => {
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>('medium');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  /** Alt kategoride soru yok uyarısı: window.alert yerine marka dilinde modal */
+  const [gameAlert, setGameAlert] = useState<{ message: string; title?: string } | null>(null);
   const [selectedPaymentItem, setSelectedPaymentItem] = useState<PaymentItem | null>(null);
   // Guest Restriction & Redirect Banner State
   const [isGuest, setIsGuest] = useState<boolean>(false);
@@ -1215,12 +1217,10 @@ export const RootNavigator: React.FC = () => {
           isGameActiveRef.current = false;
           setIsSinglePlayerActive(false);
           isSinglePlayerActiveRef.current = false;
-          const msg = `"${subCategory}" alt kategorisinde henüz yayınlanmış soru yok. Lütfen başka bir alt kategori seç.`;
-          if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
-            window.alert(msg);
-          } else {
-            Alert.alert('Soru bulunamadı', msg);
-          }
+          setGameAlert({
+            title: 'Soru Bulunamadı',
+            message: `"${subCategory}" alt kategorisinde henüz yayınlanmış soru yok. Lütfen başka bir alt kategori seç.`,
+          });
           return;
         }
         if (data.questions && data.questions.length > 0) {
@@ -1991,6 +1991,14 @@ export const RootNavigator: React.FC = () => {
                 setIsPracticeSummaryVisible(false);
                 navigateTo(isGuest ? 'categories' : 'home');
               }}
+            />
+            {/* Modern oyun uyarı modalı (alt kategoride soru yok vb.) */}
+            <GameAlertModal
+              visible={gameAlert !== null}
+              title={gameAlert?.title}
+              message={gameAlert?.message || ''}
+              variant="error"
+              onConfirm={() => setGameAlert(null)}
             />
             {/* Daily Challenge Dedicated Result Modal */}
             {dailyResultModal && (
