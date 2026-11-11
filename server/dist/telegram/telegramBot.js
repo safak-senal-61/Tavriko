@@ -1,6 +1,13 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TelegramBotService = exports.DIFFICULTIES_CONFIG = exports.CATEGORIES_CONFIG = void 0;
+exports.deriveTelegramWebhookSecret = deriveTelegramWebhookSecret;
+exports.safeEqualStrings = safeEqualStrings;
+exports.verifyTelegramInitData = verifyTelegramInitData;
+const crypto_1 = __importDefault(require("crypto"));
 const telegraf_1 = require("telegraf");
 const evrenLlmGenerator_1 = require("../ai/evrenLlmGenerator");
 const supabaseClient_1 = require("../db/supabaseClient");
@@ -147,6 +154,56 @@ const DIFFICULTY_MAP = {
     uzman: 'expert',
     expert: 'expert',
 };
+const DEFAULT_TELEGRAM_WEBHOOK_URL = 'https://tavriko-realtime.uncertainidentity8.workers.dev/telegram/webhook';
+const WEBHOOK_REPAIR_INTERVAL_MS = 5 * 60 * 1000;
+const WEBAPP_INIT_DATA_MAX_AGE_SEC = 24 * 60 * 60;
+/**
+ * Telegram webhook gizli anahtarını türetir.
+ * Telegram yalnızca A-Z, a-z, 0-9, _ ve - karakterlerine izin verir (1-256).
+ * TELEGRAM_WEBHOOK_SECRET tanımlıysa ondan, değilse bot tokeninden türetilir;
+ * böylece ek bir ortam değişkeni olmadan da webhook doğrulaması çalışır.
+ */
+function deriveTelegramWebhookSecret(botToken, configuredSecret) {
+    const base = (configuredSecret && configuredSecret.trim()) || botToken;
+    return crypto_1.default.createHash('sha256').update(`tavriko-telegram-webhook:${base}`).digest('hex');
+}
+function safeEqualStrings(a, b) {
+    const ab = Buffer.from(a);
+    const bb = Buffer.from(b);
+    return ab.length === bb.length && crypto_1.default.timingSafeEqual(ab, bb);
+}
+/**
+ * Telegram WebApp initData imzasını doğrular.
+ * https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
+ * Geçerliyse Telegram kullanıcı kimliğini döndürür.
+ */
+function verifyTelegramInitData(initData, botToken, nowSec = Math.floor(Date.now() / 1000)) {
+    try {
+        const params = new URLSearchParams(initData);
+        const hash = params.get('hash');
+        if (!hash || !/^[a-f0-9]{64}$/i.test(hash))
+            return null;
+        params.delete('hash');
+        const dataCheckString = Array.from(params.entries())
+            .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+            .map(([k, v]) => `${k}=${v}`)
+            .join('\n');
+        const secretKey = crypto_1.default.createHmac('sha256', 'WebAppData').update(botToken).digest();
+        const computed = crypto_1.default.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+        if (!safeEqualStrings(computed, hash.toLowerCase()))
+            return null;
+        const authDate = Number(params.get('auth_date'));
+        if (!Number.isFinite(authDate) || nowSec - authDate > WEBAPP_INIT_DATA_MAX_AGE_SEC)
+            return null;
+        const user = JSON.parse(params.get('user') || 'null');
+        if (!user || user.id === undefined || user.id === null)
+            return null;
+        return String(user.id);
+    }
+    catch {
+        return null;
+    }
+}
 class TelegramBotService {
     bot = null;
     adminIds;
@@ -155,6 +212,7 @@ class TelegramBotService {
     running = false;
     activeToken = null;
     isStarting = false;
+    lastWebhookRepairAt = 0;
     constructor(config) {
         this.db = config.db;
         this.roomManager = config.roomManager;
@@ -283,7 +341,11 @@ class TelegramBotService {
             return { success: false, message: 'Bot başlatılmamış veya token tanımlanmamış.' };
         }
         try {
-            await this.bot.telegram.setWebhook(url, { drop_pending_updates: true });
+            await this.bot.telegram.setWebhook(url, {
+                drop_pending_updates: true,
+                secret_token: this.webhookSecretFor(this.activeToken),
+            });
+            this.lastWebhookRepairAt = Date.now();
             const info = await this.bot.telegram.getWebhookInfo();
             this.running = true;
             logger_1.logger.success('TELEGRAM', `Webhook güncellendi: ${url}`, info);
@@ -307,6 +369,74 @@ class TelegramBotService {
         catch {
             return null;
         }
+    }
+    webhookSecretFor(token) {
+        if (!token)
+            return undefined;
+        return deriveTelegramWebhookSecret(token, process.env.TELEGRAM_WEBHOOK_SECRET);
+    }
+    /** Bot tokenini (ortam değişkeni veya kayıtlı yapılandırma) botu başlatmadan çözer. */
+    async resolveToken() {
+        if (this.activeToken)
+            return this.activeToken;
+        const envToken = process.env.TELEGRAM_BOT_TOKEN;
+        if (envToken && !envToken.includes('placeholder') && envToken.trim().length >= 15) {
+            return envToken.trim();
+        }
+        try {
+            const saved = await redisClient_1.cacheService.getCustomValue('tavriko:telegram:config');
+            if (saved?.adminIds && Array.isArray(saved.adminIds)) {
+                saved.adminIds.forEach((id) => this.adminIds.add(String(id).trim()));
+            }
+            if (saved?.token && saved.token.trim().length >= 15)
+                return saved.token.trim();
+        }
+        catch { }
+        return null;
+    }
+    /** Webhook isteklerinde beklenen gizli anahtar (bot yapılandırılmamışsa null). */
+    async getWebhookSecret() {
+        const token = await this.resolveToken();
+        return this.webhookSecretFor(token) || null;
+    }
+    /**
+     * Webhook anahtarı uyuşmadığında Telegram tarafındaki kaydı doğru anahtarla yeniler.
+     * Kötüye kullanıma karşı her sunucu örneğinde en fazla 5 dakikada bir çalışır.
+     */
+    async repairWebhook() {
+        const now = Date.now();
+        if (now - this.lastWebhookRepairAt < WEBHOOK_REPAIR_INTERVAL_MS)
+            return false;
+        this.lastWebhookRepairAt = now;
+        if (!this.bot) {
+            // initBot üretimde webhook'u anahtarla birlikte kurar.
+            return this.ensureBotReady();
+        }
+        try {
+            const info = await this.bot.telegram.getWebhookInfo();
+            const url = info?.url || process.env.TELEGRAM_WEBHOOK_URL || DEFAULT_TELEGRAM_WEBHOOK_URL;
+            await this.bot.telegram.setWebhook(url, {
+                drop_pending_updates: false,
+                secret_token: this.webhookSecretFor(this.activeToken),
+            });
+            logger_1.logger.info('TELEGRAM', `Webhook gizli anahtarla yeniden kuruldu: ${url}`);
+            return true;
+        }
+        catch (err) {
+            logger_1.logger.error('TELEGRAM', `Webhook onarımı başarısız: ${err.message}`);
+            return false;
+        }
+    }
+    /** Telegram WebApp initData'sının bir yöneticiden geldiğini doğrular. */
+    async verifyWebAppInitData(initData) {
+        const token = await this.resolveToken();
+        if (!token)
+            return false;
+        const userId = verifyTelegramInitData(initData, token);
+        if (!userId)
+            return false;
+        // HTTP yönetici erişimi için yönetici listesi açıkça tanımlı olmalıdır.
+        return this.adminIds.size > 0 && this.adminIds.has(userId);
     }
     async setupMenuButton() {
         if (!this.bot)
@@ -375,11 +505,18 @@ class TelegramBotService {
             this.registerTelegrafHandlers();
             const isVercel = Boolean(process.env.VERCEL || process.env.VERCEL_ENV || process.env.NOW_REGION);
             // Prefer Cloudflare Workers 24/7 Edge Webhook Gateway to avoid Vercel cold starts
-            const cfGatewayWebhookUrl = 'https://tavriko-realtime.uncertainidentity8.workers.dev/telegram/webhook';
-            const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL || cfGatewayWebhookUrl;
+            const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL || DEFAULT_TELEGRAM_WEBHOOK_URL;
             if (isVercel || process.env.NODE_ENV === 'production') {
                 try {
-                    await this.bot.telegram.setWebhook(webhookUrl, { drop_pending_updates: true });
+                    // secret_token zorunlu: webhook uç noktası bu anahtarı doğrular. Önceden
+                    // anahtarsız kuruluyordu ve her soğuk başlatmada sıfırlanıyordu; bu yüzden
+                    // tüm Telegram güncellemeleri (/start, butonlar) 401 ile reddediliyordu.
+                    // Soğuk başlatmalarda bekleyen mesajlar silinmez (drop_pending_updates: false).
+                    await this.bot.telegram.setWebhook(webhookUrl, {
+                        drop_pending_updates: false,
+                        secret_token: this.webhookSecretFor(token),
+                    });
+                    this.lastWebhookRepairAt = Date.now();
                     console.log(`🤖 [TelegramBot] Webhook başarıyla ayarlandı: ${webhookUrl}`);
                     logger_1.logger.success('TELEGRAM', `Webhook başarıyla kuruldu: ${webhookUrl}`);
                     this.running = true;

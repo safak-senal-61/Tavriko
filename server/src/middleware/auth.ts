@@ -56,67 +56,170 @@ export function requireUserAuth(req: Request, res: Response, next: NextFunction)
   next();
 }
 
+export const ADMIN_SESSION_COOKIE = 'tavriko_admin_session';
+export const ADMIN_SESSION_MAX_AGE_SEC = 7 * 24 * 60 * 60; // 7 gün
+
+function readCookie(req: Request, name: string): string | null {
+  const header = req.headers.cookie;
+  if (!header) return null;
+  for (const part of header.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx < 0) continue;
+    if (part.slice(0, idx).trim() === name) {
+      try {
+        return decodeURIComponent(part.slice(idx + 1).trim());
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+/** Portal yöneticisi için imzalı oturum tokeni üretir. */
+export function issueAdminSessionToken(email: string): string | null {
+  const secret = getJwtSecret();
+  if (!secret) return null;
+  return jwt.sign({ email, role: 'portal_super_admin' }, secret, { expiresIn: ADMIN_SESSION_MAX_AGE_SEC });
+}
+
+/** Tarayıcıya HttpOnly yönetici oturum çerezini yazar. */
+export function setAdminSessionCookie(req: Request, res: Response, token: string): void {
+  const secure = req.secure || req.headers['x-forwarded-proto'] === 'https' || Boolean(process.env.VERCEL);
+  const parts = [
+    `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${ADMIN_SESSION_MAX_AGE_SEC}`,
+  ];
+  if (secure) parts.push('Secure');
+  res.append('Set-Cookie', parts.join('; '));
+}
+
+export function clearAdminSessionCookie(res: Response): void {
+  res.append('Set-Cookie', `${ADMIN_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+}
+
+/** Portal JWT'sini doğrular (Bearer başlığı veya oturum çerezi). */
+export function verifyAdminSessionToken(token: string | null | undefined): { email: string } | null {
+  if (!token) return null;
+  const secret = getJwtSecret();
+  if (!secret) return null;
+  try {
+    const decoded = jwt.verify(token, secret) as any;
+    if (!decoded || decoded.role !== 'portal_super_admin') return null;
+    const creds = getAdminCredentials();
+    // Yönetici e-postası değiştiyse eski oturumlar geçersiz olur.
+    if (creds && decoded.email && decoded.email !== creds.email) return null;
+    return { email: String(decoded.email || '') };
+  } catch {
+    return null;
+  }
+}
+
+export function getAdminSessionFromRequest(req: Request): { email: string } | null {
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Bearer ')) {
+    const viaBearer = verifyAdminSessionToken(authHeader.slice(7));
+    if (viaBearer) return viaBearer;
+  }
+  return verifyAdminSessionToken(readCookie(req, ADMIN_SESSION_COOKIE));
+}
+
+export function checkAdminCredentials(email: unknown, password: unknown): boolean {
+  const creds = getAdminCredentials();
+  if (!creds || typeof email !== 'string' || typeof password !== 'string') return false;
+  return (
+    email.trim().toLowerCase() === creds.email.toLowerCase() &&
+    password.length === creds.password.length &&
+    password === creds.password
+  );
+}
+
+/**
+ * Telegram WebApp (bot menüsündeki panel) için yönetici doğrulayıcısı.
+ * TelegramBotService başlatıldığında kaydedilir; initData imzasını bot tokeni ile
+ * doğrular ve kullanıcının yönetici listesinde olup olmadığını kontrol eder.
+ */
+type TelegramAdminVerifier = (initData: string) => Promise<boolean>;
+let telegramAdminVerifier: TelegramAdminVerifier | null = null;
+export function setTelegramAdminVerifier(fn: TelegramAdminVerifier | null): void {
+  telegramAdminVerifier = fn;
+}
+
+function wantsHtml(req: Request): boolean {
+  if (req.method !== 'GET') return false;
+  if (req.path.startsWith('/api/') || req.originalUrl.startsWith('/api/')) return false;
+  const accept = String(req.headers.accept || '');
+  return accept.includes('text/html');
+}
+
 /**
  * Admin gate for /api/admin/* surfaces and the ops panels.
  * Accepts one of:
  *  1. x-internal-secret header matching INTERNAL_API_SECRET (service-to-service)
- *  2. HTTP Basic auth matching PORTAL_ADMIN_EMAIL / PORTAL_ADMIN_PASSWORD (browser panels)
+ *  2. HttpOnly portal session cookie (set by /api/portal/login — browser panels)
  *  3. Bearer portal JWT with role "portal_super_admin" (issued by /api/portal/login)
+ *  4. HTTP Basic auth matching PORTAL_ADMIN_EMAIL / PORTAL_ADMIN_PASSWORD (curl / Prometheus)
+ *  5. x-telegram-init-data from the Telegram WebApp, signed by the bot and sent by an admin
+ *
+ * Tarayıcıya bilerek WWW-Authenticate başlığı gönderilmez: aksi hâlde tarayıcı her
+ * arka plan isteğinde kendi şifre penceresini tekrar tekrar açıyordu. Oturumu
+ * olmayan tarayıcı sayfa istekleri /admin/login sayfasına yönlendirilir.
  */
-export function requireAdminAuth(req: Request, res: Response, next: NextFunction): void {
-  // 1) Service-to-service internal secret
-  const internalSecret = getInternalSecret();
-  const providedInternal = req.headers['x-internal-secret'];
-  if (
-    internalSecret &&
-    typeof providedInternal === 'string' &&
-    providedInternal.length === internalSecret.length &&
-    providedInternal === internalSecret
-  ) {
-    next();
-    return;
-  }
-
-  const authHeader = req.headers.authorization || '';
-  const creds = getAdminCredentials();
-
-  // 2) HTTP Basic auth (browsers prompt natively and re-send for same-origin requests)
-  if (creds && authHeader.startsWith('Basic ')) {
-    try {
-      const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf-8');
-      const idx = decoded.indexOf(':');
-      if (idx > 0) {
-        const email = decoded.slice(0, idx);
-        const password = decoded.slice(idx + 1);
-        if (email === creds.email && password.length === creds.password.length && password === creds.password) {
-          next();
-          return;
-        }
-      }
-    } catch {
-      // fall through to other methods
+export async function requireAdminAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    // 1) Service-to-service internal secret
+    const internalSecret = getInternalSecret();
+    const providedInternal = req.headers['x-internal-secret'];
+    if (
+      internalSecret &&
+      typeof providedInternal === 'string' &&
+      providedInternal.length === internalSecret.length &&
+      providedInternal === internalSecret
+    ) {
+      next();
+      return;
     }
-  }
 
-  // 3) Portal super-admin JWT
-  if (authHeader.startsWith('Bearer ')) {
-    const token = authHeader.slice(7);
-    const secret = getJwtSecret();
-    if (secret) {
+    // 2) + 3) Portal session (cookie or Bearer)
+    if (getAdminSessionFromRequest(req)) {
+      next();
+      return;
+    }
+
+    // 4) HTTP Basic auth (preemptive; for curl / Prometheus scrapers)
+    const authHeader = req.headers.authorization || '';
+    if (authHeader.startsWith('Basic ')) {
       try {
-        const decoded = jwt.verify(token, secret) as any;
-        if (decoded && decoded.role === 'portal_super_admin') {
+        const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf-8');
+        const idx = decoded.indexOf(':');
+        if (idx > 0 && checkAdminCredentials(decoded.slice(0, idx), decoded.slice(idx + 1))) {
           next();
           return;
         }
       } catch {
-        // invalid token -> fall through
+        // fall through to other methods
       }
     }
+
+    // 5) Telegram WebApp initData
+    const initData = req.headers['x-telegram-init-data'];
+    if (telegramAdminVerifier && typeof initData === 'string' && initData.length > 0 && initData.length < 8192) {
+      if (await telegramAdminVerifier(initData)) {
+        next();
+        return;
+      }
+    }
+  } catch {
+    // fall through to rejection
   }
 
-  if (creds) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="Tavriko Admin", charset="UTF-8"');
+  if (wantsHtml(req)) {
+    const nextPath = req.originalUrl && req.originalUrl.startsWith('/') ? req.originalUrl : '/admin';
+    res.redirect(302, `/admin/login?next=${encodeURIComponent(nextPath)}`);
+    return;
   }
   res.status(401).json({ error: 'Yetkisiz erişim' });
 }

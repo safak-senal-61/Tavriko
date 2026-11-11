@@ -33,7 +33,13 @@ const clientSupabase = createClient(
     },
   }
 );
-import { UserProfile } from '@trivia/shared';
+import { UserProfile, LEGAL_VERSION, LegalDocumentId } from '@trivia/shared';
+import {
+  LegalConsentCheckbox,
+  LegalDocumentModal,
+  LegalLinksText,
+} from '../components/LegalDocuments';
+import { markGoogleLegalAcknowledged } from '../utils/legalConsent';
 import { THEME } from '../theme/tokens';
 import {
   CharacterAvatar,
@@ -102,6 +108,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 }) => {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [regStep, setRegStep] = useState<1 | 2 | 3 | 4>(1);
+  // Yasal metin onayı (kayıt) ve metin görüntüleyici
+  const [legalAccepted, setLegalAccepted] = useState(false);
+  const [legalError, setLegalError] = useState(false);
+  const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocumentId | null>(null);
   // Login & Register core fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -261,6 +271,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         setRegStep(1);
         return;
       }
+      if (!legalAccepted) {
+        sound.playSound('wrong');
+        setLegalError(true);
+        setErrorMsg('Kayıt olmak için Kullanım Koşulları, Gizlilik Politikası ve KVKK Aydınlatma Metni’ni onaylamalısın.');
+        return;
+      }
     }
     setLoading(true);
     try {
@@ -283,6 +299,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               gender,
               bio: bio.trim() || undefined,
               avatarUrl: finalAvatar,
+              acceptedLegalVersion: LEGAL_VERSION,
             };
       const res = await fetch(`${apiBaseUrl}${endpoint}`, {
         method: 'POST',
@@ -484,6 +501,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     sound.triggerHaptic('medium');
     setErrorMsg(null);
     setLoading(true);
+    // Google butonunun altındaki yasal metin bildirimiyle devam edildiğini kaydet;
+    // giriş tamamlanınca onay sunucuya 'google' yöntemiyle yazılır.
+    markGoogleLegalAcknowledged();
     sendClientLog('INFO', 'Google ile Giriş Yap butonuna tıklandı');
 
     const redirectUri = `${apiBaseUrl}/auth/google/callback`;
@@ -1169,6 +1189,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       Kayıt Başlangıç Paketi: +{stepBonusCoins} Altın & +{stepBonusGems} Elmas hesabınıza tanımlanır!
                     </Text>
                   </View>
+                  <LegalConsentCheckbox
+                    checked={legalAccepted}
+                    onToggle={() => {
+                      sound.playSound('tap');
+                      setLegalAccepted((v) => !v);
+                      setLegalError(false);
+                    }}
+                    onOpen={setOpenLegalDoc}
+                    highlightError={legalError}
+                  />
                   {errorMsg && (
                     <View style={styles.errorBanner}>
                       <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
@@ -1329,6 +1359,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   {loading ? 'Google Bağlanıyor...' : 'Google ile Giriş Yap'}
                 </Text>
               </TouchableOpacity>
+              <LegalLinksText
+                prefix="Google ile devam ederek "
+                suffix=" okuduğunu ve kabul ettiğini onaylamış olursun."
+                onOpen={setOpenLegalDoc}
+                style={{ marginTop: 12, textAlign: 'center', fontSize: 12, lineHeight: 18 }}
+              />
             </>
           )}
         </Reanimated.View>
@@ -1344,6 +1380,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           />
         </Reanimated.View>
       </ScrollView>
+      <LegalDocumentModal documentId={openLegalDoc} onClose={() => setOpenLegalDoc(null)} />
       {/* Country Picker Modal */}
       <Modal
         visible={countryPickerOpen}

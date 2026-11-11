@@ -104,6 +104,14 @@ export type ScreenName =
   | 'payment'
   | 'developer';
 import { DEFAULT_API_BASE, getRealtimeWsUrl } from '../config';
+import { LegalConsentGate } from '../components/LegalDocuments';
+import {
+  consumeGoogleLegalAck,
+  isLegalUpdate,
+  needsLegalConsent,
+  rememberLocalConsent,
+  submitLegalConsent,
+} from '../utils/legalConsent';
 
 const API_BASE = DEFAULT_API_BASE;
 export const RootNavigator: React.FC = () => {
@@ -247,10 +255,54 @@ export const RootNavigator: React.FC = () => {
       ) {
         preservedAvatar = current.avatarUrl;
       }
-      setUser({ ...(current || {}), ...fresh, avatarUrl: preservedAvatar } as UserProfile);
+      // Bazı profil uçları settings alanını kısmi döndürür; yasal onay kaydı kaybolmasın.
+      const currentConsent = (current?.settings as any)?.legalConsent;
+      const freshSettings = fresh.settings
+        ? { ...fresh.settings, ...(currentConsent && !(fresh.settings as any).legalConsent ? { legalConsent: currentConsent } : {}) }
+        : current?.settings;
+      setUser({ ...(current || {}), ...fresh, settings: freshSettings, avatarUrl: preservedAvatar } as UserProfile);
     },
     [setUser]
   );
+
+  // ===== Yasal metin onayı (Google ile ilk giriş, metin güncellemeleri) =====
+  const [legalSubmitting, setLegalSubmitting] = useState(false);
+  const [legalGateError, setLegalGateError] = useState<string | null>(null);
+  const [autoLegalInFlight, setAutoLegalInFlight] = useState(false);
+  const autoGoogleConsentTriedRef = useRef<string | null>(null);
+  const realSessionToken = token && token !== 'mock_token' ? token : null;
+  const showLegalGate =
+    Boolean(realSessionToken) && currentScreen !== 'auth' && currentScreen !== 'splash' && needsLegalConsent(user, isGuest);
+
+  const acceptLegal = useCallback(
+    async (method: 'google' | 'in_app') => {
+      const current = useGameStore.getState();
+      if (!current.user || !current.token) return;
+      setLegalSubmitting(true);
+      setLegalGateError(null);
+      try {
+        const updated = await submitLegalConsent(API_BASE, current.token, method);
+        rememberLocalConsent(current.user.id);
+        if (updated) syncWithFreshUser(updated);
+        else setUser({ ...current.user } as UserProfile);
+      } catch (err: any) {
+        setLegalGateError(err?.message || 'Onay kaydedilemedi. Lütfen tekrar dene.');
+      } finally {
+        setLegalSubmitting(false);
+      }
+    },
+    [syncWithFreshUser, setUser]
+  );
+
+  // Google butonunun altındaki bildirimle giriş yapıldıysa onayı otomatik kaydet.
+  useEffect(() => {
+    if (!showLegalGate || !user?.id || autoGoogleConsentTriedRef.current === user.id) return;
+    autoGoogleConsentTriedRef.current = user.id;
+    if (consumeGoogleLegalAck()) {
+      setAutoLegalInFlight(true);
+      void acceptLegal('google').finally(() => setAutoLegalInFlight(false));
+    }
+  }, [showLegalGate, user?.id, acceptLegal]);
 
   const refreshUserProfile = useCallback(async () => {
     const current = useGameStore.getState();
@@ -2336,6 +2388,21 @@ export const RootNavigator: React.FC = () => {
           </View>
         </View>
       )}
+      <LegalConsentGate
+        visible={showLegalGate && !autoLegalInFlight}
+        isUpdate={isLegalUpdate(user)}
+        submitting={legalSubmitting}
+        errorMsg={legalGateError}
+        onAccept={() => { void acceptLegal('in_app'); }}
+        onLogout={() => {
+          setLegalGateError(null);
+          setIsGuest(false);
+          setAuthRedirectNotice(null);
+          setUser(null, null);
+          resetGame();
+          navigateTo('auth');
+        }}
+      />
     </View>
   );
 };
