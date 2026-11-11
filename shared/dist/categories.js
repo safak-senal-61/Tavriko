@@ -141,6 +141,7 @@ exports.ALL_CATEGORIES = [
             { id: 'movie_music', name: 'Film ve Dizi Müzikleri', emoji: '🎶' },
             { id: 'tv_awards', name: 'Dizi Ödülleri', emoji: '🥇' },
             { id: 'book_to_movie', name: 'Kitaptan Filme Uyarlamalar', emoji: '📚' },
+            { id: 'yesilcam_legends', name: 'Yeşilçam Efsaneleri', emoji: '🎞️' },
         ],
     },
     {
@@ -239,6 +240,7 @@ exports.ALL_CATEGORIES = [
             { id: 'female_artists', name: 'Kadın Sanatçılar', emoji: '👩‍🎤' },
             { id: 'world_music', name: 'Dünya Müziği', emoji: '🌍' },
             { id: 'radio_industry', name: 'Radyo ve Müzik Endüstrisi', emoji: '📻' },
+            { id: 'turkish_pop_nostalgia', name: 'Türk Pop Nostaljisi', emoji: '📼' },
         ],
     },
     {
@@ -366,6 +368,7 @@ exports.ALL_CATEGORIES = [
             { id: 'great_discoveries', name: 'Büyük Keşifler', emoji: '🚢' },
             { id: 'far_east_history', name: 'Uzak Doğu Tarihi', emoji: '🏯' },
             { id: 'ancient_anatolia', name: 'Antik Anadolu Medeniyetleri', emoji: '🔱' },
+            { id: 'ottoman_dynasty', name: 'Osmanlı ve Hanedan', emoji: '👑' },
         ],
     },
     {
@@ -444,6 +447,7 @@ exports.ALL_CATEGORIES = [
             { id: 'super_lig_clubs', name: 'Süper Lig ve Kulüpler', emoji: '⚽' },
             { id: 'legendary_athletes', name: 'Efsane Sporcular', emoji: '🥇' },
             { id: 'sports_records', name: 'Spor Rekorları', emoji: '📏' },
+            { id: 'super_lig_derbies', name: 'Süper Lig Derbileri', emoji: '🏟️' },
         ],
     },
     {
