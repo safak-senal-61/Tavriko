@@ -634,7 +634,10 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 style={[styles.playerRow, isMe && styles.playerRowMe]}
               >
                 <View style={styles.playerAvatarWrap}>
-                  <CharacterAvatar seed={p.avatarUrl || p.displayName} index={index} size={42} />
+                  {/* index prop'u verilirse seed çözümü atlanıp liste sırası
+                      avatarı ezeliyordu; seçilen avatar her oyuncuda görünsün
+                      diye index kaldırıldı (seed artık tek belirleyici). */}
+                  <CharacterAvatar seed={p.avatarUrl || p.displayName} size={42} />
                   {playerIsHost && (
                     <View style={styles.hostCrown}>
                       <Text style={styles.hostCrownText}>👑</Text>
