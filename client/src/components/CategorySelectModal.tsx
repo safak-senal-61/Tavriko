@@ -9,11 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
-import {
-  CategoryData,
-  GENERAL_CATEGORIES,
-  SPECIAL_CATEGORIES,
-} from './CategorySquircleCard';
+import { CategoryData, GENERAL_CATEGORIES } from './CategorySquircleCard';
 
 /**
  * "Genel" sekmesi: herkesin çözdüğü popüler ana kategoriler.
@@ -36,9 +32,12 @@ const POPULAR_CATEGORIES = GENERAL_CATEGORIES.filter((c) =>
 );
 
 /**
- * "Özel" sekmesi: oyundaki TÜM kategoriler (ana kategoriler + tematik paketler).
+ * "Özel" sekmesi: Keşfet'teki TÜM kategoriler — tek doğruluk kaynağı
+ * shared/src/categories.ts kataloğudur (GENERAL_CATEGORIES buradan türetilir).
+ * Eskiden burada sunucuda var olmayan sahte "tematik paket" id'leri
+ * (yesilcam, world_capitals vb.) listeleniyordu; Keşfet ile uyuşmuyordu.
  */
-const ALL_CATEGORIES: CategoryData[] = [...GENERAL_CATEGORIES, ...SPECIAL_CATEGORIES];
+const ALL_CATEGORIES: CategoryData[] = [...GENERAL_CATEGORIES];
 import { SegmentedFilter } from './SegmentedFilter';
 import { CategoryCarousel } from './CategoryCarousel';
 import { sound } from '../services/soundService';

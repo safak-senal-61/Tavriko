@@ -458,7 +458,7 @@ export const CategorySquircleIcon: React.FC<{
         </>
       );
     }
-    if (key.includes('doga') || key === 'biology') {
+    if (key.includes('doga') || key.includes('nature') || key === 'biology') {
       return (
         <>
           <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t4)" />
@@ -470,7 +470,7 @@ export const CategorySquircleIcon: React.FC<{
         </>
       );
     }
-    if (key.includes('yemek') || key === 'language_vocab') {
+    if (key.includes('yemek') || key.includes('food')) {
       return (
         <>
           <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t3)" />
@@ -478,6 +478,18 @@ export const CategorySquircleIcon: React.FC<{
           <G fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
             <Path d="M14 10v14c0 4 3 6 6 6s6-2 6-6V10M20 10v44" />
             <Path d="M46 54V10c-8 4-10 12-10 20h10" />
+          </G>
+        </>
+      );
+    }
+    if (key.includes('language') || key.includes('dil')) {
+      return (
+        <>
+          <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t6)" />
+          <Path d="M3 21a18 18 0 0118-18h22a18 18 0 0118 18v8H3z" fill="#fff" opacity="0.12" />
+          <G fill="none" stroke="#fff" strokeWidth="3.6" strokeLinecap="round" strokeLinejoin="round">
+            <Path d="M14 18h36a4 4 0 014 4v16a4 4 0 01-4 4H30l-10 8v-8h-6a4 4 0 01-4-4V22a4 4 0 014-4z" />
+            <Path d="M20 26h24M20 34h16" />
           </G>
         </>
       );
@@ -506,7 +518,7 @@ export const CategorySquircleIcon: React.FC<{
         </>
       );
     }
-    if (key.includes('hayvanlar')) {
+    if (key.includes('hayvanlar') || key.includes('animals')) {
       return (
         <>
           <Rect x="3" y="3" width="58" height="58" rx="18" fill="url(#t7)" />

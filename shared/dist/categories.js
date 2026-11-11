@@ -2,6 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ALL_CATEGORIES = void 0;
 exports.canonicalCategoryId = canonicalCategoryId;
+// NOT: totalQuestions değerleri yer tutucu olarak 0'dır. Gerçek soru sayıları
+// sunucudaki /categories uç noktasından canlı hesaplanır (db.getCategories).
+// İstemci bu statik değerleri göstermemeli; canlı sayı gelene kadar yer tutucu
+// gösterir (bkz. CategoryExploreScreen).
 exports.ALL_CATEGORIES = [
     {
         id: 'gaming_videogames',
@@ -10,7 +14,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Gamepad2',
         primaryColor: '#8B5CF6',
         accentColor: '#C4B5FD',
-        totalQuestions: 250,
+        totalQuestions: 0,
         subCategories: [
             { id: 'console_games', name: 'Konsol Oyunları', emoji: '🎮' },
             { id: 'pc_games', name: 'PC Oyunları', emoji: '🖥️' },
@@ -51,7 +55,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Sparkles',
         primaryColor: '#EC4899',
         accentColor: '#FBCFE8',
-        totalQuestions: 220,
+        totalQuestions: 0,
         subCategories: [
             { id: 'anime_general', name: 'Anime Genel', emoji: '🍥' },
             { id: 'manga', name: 'Manga', emoji: '📖' },
@@ -89,7 +93,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Clapperboard',
         primaryColor: '#F59E0B',
         accentColor: '#FDE68A',
-        totalQuestions: 180,
+        totalQuestions: 0,
         subCategories: [
             { id: 'classic_cartoons', name: 'Klasik Çizgi Filmler', emoji: '🎠' },
             { id: 'nostalgic_cartoons', name: 'Nostaljik Çizgi Filmler', emoji: '📺' },
@@ -110,7 +114,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Film',
         primaryColor: '#E11D48',
         accentColor: '#FDA4AF',
-        totalQuestions: 290,
+        totalQuestions: 0,
         subCategories: [
             { id: 'legendary_movies', name: 'Efsane Filmler', emoji: '🎬' },
             { id: 'oscars', name: 'Oscar Ödülleri', emoji: '🏆' },
@@ -146,7 +150,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Shield',
         primaryColor: '#0284C7',
         accentColor: '#7DD3FC',
-        totalQuestions: 170,
+        totalQuestions: 0,
         subCategories: [
             { id: 'superhero_universes', name: 'Süper Kahraman Evrenleri', emoji: '🦸' },
             { id: 'villains', name: 'Kötü Karakterler', emoji: '🦹' },
@@ -165,7 +169,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Flame',
         primaryColor: '#7C3AED',
         accentColor: '#DDD6FE',
-        totalQuestions: 210,
+        totalQuestions: 0,
         subCategories: [
             { id: 'dragons', name: 'Ejderhalar', emoji: '🐉' },
             { id: 'elves_dwarves_orcs', name: 'Elfler, Cüceler ve Orklar', emoji: '🧝' },
@@ -191,7 +195,7 @@ exports.ALL_CATEGORIES = [
         icon: 'BookOpen',
         primaryColor: '#D97706',
         accentColor: '#FDE68A',
-        totalQuestions: 210,
+        totalQuestions: 0,
         subCategories: [
             { id: 'world_classics', name: 'Dünya Klasikleri', emoji: '📚' },
             { id: 'fantasy_novels', name: 'Fantastik Romanlar', emoji: '🧙' },
@@ -217,7 +221,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Music2',
         primaryColor: '#14B8A6',
         accentColor: '#99F6E4',
-        totalQuestions: 240,
+        totalQuestions: 0,
         subCategories: [
             { id: 'hiphop_rap', name: 'Hip Hop ve Rap', emoji: '🎤' },
             { id: 'rock_legends', name: 'Rock Efsaneleri', emoji: '🎸' },
@@ -244,7 +248,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Globe',
         primaryColor: '#06B6D4',
         accentColor: '#A5F3FC',
-        totalQuestions: 170,
+        totalQuestions: 0,
         subCategories: [
             { id: 'social_platforms', name: 'Sosyal Medya Platformları', emoji: '📱' },
             { id: 'video_platforms', name: 'Video Platformları', emoji: '🎥' },
@@ -267,7 +271,7 @@ exports.ALL_CATEGORIES = [
         icon: 'PawPrint',
         primaryColor: '#10B981',
         accentColor: '#A7F3D0',
-        totalQuestions: 210,
+        totalQuestions: 0,
         subCategories: [
             { id: 'dogs', name: 'Köpekler', emoji: '🐶' },
             { id: 'cats', name: 'Kediler', emoji: '🐱' },
@@ -294,7 +298,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Zap',
         primaryColor: '#F59E0B',
         accentColor: '#FDE68A',
-        totalQuestions: 200,
+        totalQuestions: 0,
         subCategories: [
             { id: 'greek_mythology', name: 'Yunan Mitolojisi', emoji: '⚡' },
             { id: 'roman_mythology', name: 'Roma Mitolojisi', emoji: '🔱' },
@@ -317,7 +321,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Compass',
         primaryColor: '#10B981',
         accentColor: '#6EE7B7',
-        totalQuestions: 190,
+        totalQuestions: 0,
         subCategories: [
             { id: 'fishing', name: 'Balıkçılık', emoji: '🎣' },
             { id: 'camping_outdoors', name: 'Kampçılık ve Doğa', emoji: '🏕️' },
@@ -346,7 +350,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Landmark',
         primaryColor: '#8B5CF6',
         accentColor: '#DDD6FE',
-        totalQuestions: 290,
+        totalQuestions: 0,
         subCategories: [
             { id: 'middle_ages', name: 'Orta Çağ', emoji: '🏰' },
             { id: 'egypt_pyramids', name: 'Mısır ve Piramitler', emoji: '🗿' },
@@ -371,7 +375,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Globe2',
         primaryColor: '#3B82F6',
         accentColor: '#BFDBFE',
-        totalQuestions: 260,
+        totalQuestions: 0,
         subCategories: [
             { id: 'asia', name: 'Asya', emoji: '🗾' },
             { id: 'africa', name: 'Afrika', emoji: '🌍' },
@@ -397,7 +401,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Palette',
         primaryColor: '#F97316',
         accentColor: '#FED7AA',
-        totalQuestions: 210,
+        totalQuestions: 0,
         subCategories: [
             { id: 'modern_art', name: 'Modern Sanat', emoji: '🖌️' },
             { id: 'museums_galleries', name: 'Müzeler ve Galeriler', emoji: '🏛️' },
@@ -418,7 +422,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Trophy',
         primaryColor: '#EF4444',
         accentColor: '#FECACA',
-        totalQuestions: 280,
+        totalQuestions: 0,
         subCategories: [
             { id: 'basketball', name: 'Basketbol', emoji: '🏀' },
             { id: 'athletics', name: 'Atletizm', emoji: '🏃' },
@@ -449,7 +453,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Cpu',
         primaryColor: '#06B6D4',
         accentColor: '#A5F3FC',
-        totalQuestions: 270,
+        totalQuestions: 0,
         subCategories: [
             { id: 'astronomy_planets', name: 'Astronomi ve Gezegenler', emoji: '🔭' },
             { id: 'periodic_table', name: 'Periyodik Tablo ve Elementler', emoji: '🧪' },
@@ -478,7 +482,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Brain',
         primaryColor: '#EC4899',
         accentColor: '#FBCFE8',
-        totalQuestions: 220,
+        totalQuestions: 0,
         subCategories: [
             { id: 'jigsaw_crosswords', name: 'Yapboz ve Bulmacalar', emoji: '🧩' },
             { id: 'board_games', name: 'Masa Oyunları', emoji: '🎲' },
@@ -501,7 +505,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Binary',
         primaryColor: '#10B981',
         accentColor: '#A7F3D0',
-        totalQuestions: 230,
+        totalQuestions: 0,
         subCategories: [
             { id: 'basic_operations', name: 'Temel İşlemler', emoji: '➕' },
             { id: 'geometry', name: 'Geometri', emoji: '📐' },
@@ -520,7 +524,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Utensils',
         primaryColor: '#F59E0B',
         accentColor: '#FDE68A',
-        totalQuestions: 210,
+        totalQuestions: 0,
         subCategories: [
             { id: 'italian_cuisine', name: 'İtalyan Mutfağı', emoji: '🍝' },
             { id: 'spanish_cuisine', name: 'İspanyol Mutfağı', emoji: '🥘' },
@@ -544,7 +548,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Users',
         primaryColor: '#6366F1',
         accentColor: '#C7D2FE',
-        totalQuestions: 180,
+        totalQuestions: 0,
         subCategories: [
             { id: 'family_relationships', name: 'Aile ve İlişkiler', emoji: '👨‍👩‍👧' },
             { id: 'psychology', name: 'Psikoloji', emoji: '🧘' },
@@ -573,7 +577,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Moon',
         primaryColor: '#DC2626',
         accentColor: '#FECACA',
-        totalQuestions: 260,
+        totalQuestions: 0,
         subCategories: [
             { id: 'turkey_history', name: 'Türkiye Tarihi', emoji: '🇹🇷' },
             { id: 'turkey_natural_beauties', name: 'Türkiye’nin Doğal Güzellikleri', emoji: '🏞️' },
@@ -599,7 +603,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Rocket',
         primaryColor: '#6366F1',
         accentColor: '#C7D2FE',
-        totalQuestions: 200,
+        totalQuestions: 0,
         subCategories: [
             { id: 'solar_system', name: 'Güneş Sistemi', emoji: '🪐' },
             { id: 'black_holes', name: 'Kara Delikler ve Kuasarlar', emoji: '🕳️' },
@@ -614,7 +618,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Dna',
         primaryColor: '#22C55E',
         accentColor: '#BBF7D0',
-        totalQuestions: 210,
+        totalQuestions: 0,
         subCategories: [
             { id: 'human_anatomy', name: 'İnsan Anatomisi', emoji: '🦴' },
             { id: 'genetics', name: 'Genetik ve DNA', emoji: '🧬' },
@@ -630,7 +634,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Atom',
         primaryColor: '#A855F7',
         accentColor: '#E9D5FF',
-        totalQuestions: 200,
+        totalQuestions: 0,
         subCategories: [
             { id: 'elements_reactions', name: 'Elementler ve Tepkimeler', emoji: '🧪' },
             { id: 'mechanics_energy', name: 'Mekanik ve Enerji', emoji: '⚡' },
@@ -645,7 +649,7 @@ exports.ALL_CATEGORIES = [
         icon: 'SpellCheck',
         primaryColor: '#0284C7',
         accentColor: '#BAE6FD',
-        totalQuestions: 210,
+        totalQuestions: 0,
         subCategories: [
             { id: 'proverbs_idioms', name: 'Atasözleri ve Deyimler', emoji: '📜' },
             { id: 'etymology', name: 'Etimoloji ve Kökenler', emoji: '🔤' },
@@ -660,7 +664,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Trees',
         primaryColor: '#22C55E',
         accentColor: '#BBF7D0',
-        totalQuestions: 200,
+        totalQuestions: 0,
         subCategories: [
             { id: 'climate_weather', name: 'İklim ve Hava Olayları', emoji: '⛈️' },
             { id: 'forests_jungles', name: 'Ormanlar ve Korular', emoji: '🌲' },
@@ -676,7 +680,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Sparkles',
         primaryColor: '#F59E0B',
         accentColor: '#FDE68A',
-        totalQuestions: 380,
+        totalQuestions: 0,
         subCategories: [
             { id: 'world_records', name: 'Dünya Rekorları', emoji: '🏅' },
             { id: 'interesting_facts', name: 'İlginç Gerçekler', emoji: '💡' },
@@ -691,7 +695,7 @@ exports.ALL_CATEGORIES = [
         icon: 'Shuffle',
         primaryColor: '#8B5CF6',
         accentColor: '#C084FC',
-        totalQuestions: 500,
+        totalQuestions: 0,
     },
 ];
 const CATEGORY_ALIAS_MAP = {

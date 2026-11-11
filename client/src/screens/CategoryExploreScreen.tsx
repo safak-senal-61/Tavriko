@@ -110,6 +110,9 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   const slideAnim = useRef(new Animated.Value(16)).current;
   const [liveCounts, setLiveCounts] = useState<Record<string, number>>({});
   const [liveSubCounts, setLiveSubCounts] = useState<Record<string, number>>({});
+  // Canlı sayılar yüklenene kadar statik (yanıltıcı) değerler gösterilmez;
+  // sayı rozetlerinde "…" yer tutucusu görünür.
+  const [countsLoaded, setCountsLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeGroup, setActiveGroup] = useState<GroupTab>('all');
 
@@ -150,8 +153,13 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
         }
         setLiveCounts(map);
         setLiveSubCounts(subMap);
+        setCountsLoaded(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        // Hata olsa bile arayüz "…" üzerinde takılı kalmasın; statik değerler
+        // artık gerçekçi olmadığı için 0 üzerinden render edilir.
+        setCountsLoaded(true);
+      });
     return () => {
       isMounted = false;
     };
@@ -258,7 +266,8 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
           {/* Sayfa Başlığı */}
           <Text style={styles.title}>KEŞFET</Text>
           <Text style={styles.subtitle}>
-            {visibleSections.length} bölüm · {totalSubCount} kategori · {totalQuestionCount}+ soru
+            {visibleSections.length} bölüm · {totalSubCount} kategori ·{' '}
+            {countsLoaded ? `${totalQuestionCount}+ soru` : 'soru sayıları yükleniyor…'}
           </Text>
 
           {/* Arama */}
@@ -324,7 +333,9 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                   <View style={styles.sectionHeaderLeft}>
                     <View style={[styles.sectionAccentBar, { backgroundColor: accent }]} />
                     <Text style={styles.sectionTitle}>{cat.name}</Text>
-                    <Text style={styles.sectionCount}>{cat.totalQuestions} soru</Text>
+                    <Text style={styles.sectionCount}>
+                      {countsLoaded ? `${cat.totalQuestions} soru` : '…'}
+                    </Text>
                   </View>
                   <TouchableOpacity
                     style={styles.sectionPlayAll}
@@ -367,7 +378,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                           {sc.name}
                         </Text>
                         <Text style={styles.catCount}>
-                          {sc.questionCount ?? 0} soru
+                          {countsLoaded ? `${sc.questionCount ?? 0} soru` : '…'}
                         </Text>
                       </TouchableOpacity>
                     </Reanimated.View>
