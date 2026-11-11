@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
+  Image,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
@@ -12,10 +13,7 @@ import Animated, {
   ZoomIn,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
-  withSequence,
   withSpring,
-  withTiming,
 } from 'react-native-reanimated';
 import { CategoryId, DifficultyLevel, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -42,26 +40,34 @@ interface DifficultySelectScreenProps {
   isGuest?: boolean;
   onLoginPrompt?: () => void;
 }
+
+/**
+ * Kart dili diğer Tavriko sayfalarıyla birebir aynı bırakıldı:
+ * koyu mor gövde + neon renk kenar şeridi + seçiliyse renkli çerçeve
+ * ve yumuşak ışıma. (Dolgu animasyonu yerine statik ince renk tonu
+ * kullanılır; köşe kesmesi/taşma oluşturmaz.)
+ */
 const DIFFICULTIES: {
   id: DifficultyLevel;
   title: string;
   color: string;
+  tint: string;
   glow: string;
   stars: number;
   xpMultiplier: string;
   desc: string;
 }[] = [
-  { id: 'easy', title: 'Kolay', color: '#3FD08A', glow: 'rgba(63, 208, 138, 0.35)', stars: 1, xpMultiplier: 'x1 XP', desc: 'Isınma turu' },
-  { id: 'medium', title: 'Orta', color: '#FFC43D', glow: 'rgba(255, 196, 61, 0.35)', stars: 2, xpMultiplier: 'x1,5 XP', desc: 'Dengeli mücadele' },
-  { id: 'hard', title: 'Zor', color: '#FF9B2F', glow: 'rgba(255, 155, 47, 0.35)', stars: 3, xpMultiplier: 'x2 XP', desc: 'Bilgi savaşçısı' },
-  { id: 'expert', title: 'Uzman', color: '#FF5A6A', glow: 'rgba(255, 90, 106, 0.35)', stars: 4, xpMultiplier: 'x3 XP', desc: 'Efsane ayarı' },
+  { id: 'easy', title: 'Kolay', color: '#3FD08A', tint: 'rgba(63, 208, 138, 0.10)', glow: 'rgba(63, 208, 138, 0.45)', stars: 1, xpMultiplier: 'x1 XP', desc: 'Isınma turu' },
+  { id: 'medium', title: 'Orta', color: '#FFC43D', tint: 'rgba(255, 196, 61, 0.10)', glow: 'rgba(255, 196, 61, 0.45)', stars: 2, xpMultiplier: 'x1,5 XP', desc: 'Dengeli mücadele' },
+  { id: 'hard', title: 'Zor', color: '#FF9B2F', tint: 'rgba(255, 155, 47, 0.12)', glow: 'rgba(255, 155, 47, 0.45)', stars: 3, xpMultiplier: 'x2 XP', desc: 'Bilgi savaşçısı' },
+  { id: 'expert', title: 'Uzman', color: '#FF5A6A', tint: 'rgba(255, 90, 106, 0.12)', glow: 'rgba(255, 90, 106, 0.45)', stars: 4, xpMultiplier: 'x3 XP', desc: 'Efsane ayarı' },
 ];
 
 /** Seçilen çip/kart için yaylı (spring) vurgu ölçeği */
 const useSelectScale = (selected: boolean) => {
   const scale = useSharedValue(1);
   useEffect(() => {
-    scale.value = withSpring(selected ? 1.05 : 1, { damping: 12, stiffness: 220 });
+    scale.value = withSpring(selected ? 1.04 : 1, { damping: 14, stiffness: 240 });
   }, [selected, scale]);
   return useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -75,18 +81,25 @@ const CountPill: React.FC<{
   delay: number;
 }> = ({ count, selected, onPress, delay }) => {
   const animatedStyle = useSelectScale(selected);
+  // Giriş animasyonu dış katmanda, ölçek animasyonu iç katmanda: Reanimated
+  // transform'un layout animasyonu tarafından ezilmesi uyarısını önler.
   return (
-    <Animated.View entering={ZoomIn.delay(delay).duration(320).springify(0.7)} style={[styles.countPillWrap, animatedStyle]}>
+    <Animated.View entering={ZoomIn.delay(delay).duration(320).springify(0.7)} style={styles.countPillWrap}>
+      <Animated.View style={animatedStyle}>
       <TouchableOpacity
-        style={[styles.countPill, selected && styles.countPillSelected, selected && { borderColor: '#FFC43D', shadowColor: 'rgba(255, 196, 61, 0.55)' }]}
+        style={[
+          styles.countPill,
+          selected && styles.countPillSelected,
+          selected && { shadowColor: 'rgba(255, 196, 61, 0.5)' },
+        ]}
         onPress={onPress}
         activeOpacity={0.85}
       >
-        {selected && <View style={styles.countPillGlow} />}
         <Text style={[styles.countPillText, selected && styles.countPillTextSelected]}>
           {count}
         </Text>
       </TouchableOpacity>
+      </Animated.View>
     </Animated.View>
   );
 };
@@ -98,63 +111,40 @@ const DifficultyCard: React.FC<{
   onPress: () => void;
 }> = ({ diff, index, selected, onPress }) => {
   const animatedStyle = useSelectScale(selected);
-  // Seçili kartta yumuşak "nefes" ışıması: hafif parlaklık salınımı
-  const glow = useSharedValue(0);
-  useEffect(() => {
-    if (selected) {
-      glow.value = withRepeat(
-        withSequence(
-          withTiming(1, { duration: 1100 }),
-          withTiming(0.35, { duration: 1100 })
-        ),
-        -1,
-        true
-      );
-    } else {
-      glow.value = 0;
-    }
-  }, [selected, glow]);
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: 0.25 + glow.value * 0.55,
-  }));
-
+  // Giriş animasyonu dış katmanda, ölçek animasyonu iç katmanda (Reanimated
+  // transform/layout çakışma uyarısını önler).
   return (
     <Animated.View
-      entering={FadeInDown.delay(160 + index * 90).duration(420).springify(0.8)}
-      style={animatedStyle}
+      entering={FadeInDown.delay(140 + index * 80).duration(420).springify(0.8)}
     >
+    <Animated.View style={animatedStyle}>
       <TouchableOpacity
         style={[
           styles.diffCard,
-          { borderLeftColor: diff.color, shadowColor: diff.glow },
+          { borderLeftColor: diff.color, shadowColor: selected ? diff.glow : 'transparent' },
+          selected && { backgroundColor: diff.tint },
           selected && styles.diffCardSelected,
           selected && { borderColor: diff.color },
         ]}
         onPress={onPress}
         activeOpacity={0.85}
       >
-        {/* Seçili kartın nefes alan neon ışıması */}
-        {selected && (
-          <Animated.View
-            pointerEvents="none"
-            style={[StyleSheet.absoluteFill, styles.diffCardGlowLayer, { backgroundColor: diff.color }, glowStyle]}
-          />
-        )}
-        <View style={{ flex: 1, zIndex: 1 }}>
+        <View style={styles.diffBody}>
           <View style={styles.diffTitleRow}>
             <Text style={[styles.diffTitle, { color: diff.color }]}>{diff.title}</Text>
-            <View style={[styles.xpPill, { borderColor: `${diff.color}55` }]}>
-              <Text style={[styles.xpPillText, { color: diff.color }]}>{diff.xpMultiplier}</Text>
+            <View style={styles.starsRow}>
+              {Array.from({ length: diff.stars }).map((_, idx) => (
+                <XpStarIcon key={idx} size={17} />
+              ))}
             </View>
           </View>
           <Text style={styles.diffDesc}>{diff.desc}</Text>
-          <View style={styles.starsRow}>
-            {Array.from({ length: diff.stars }).map((_, idx) => (
-              <XpStarIcon key={idx} size={16} />
-            ))}
-          </View>
+        </View>
+        <View style={[styles.xpPill, { borderColor: `${diff.color}59` }]}>
+          <Text style={[styles.xpPillText, { color: diff.color }]}>{diff.xpMultiplier}</Text>
         </View>
       </TouchableOpacity>
+    </Animated.View>
     </Animated.View>
   );
 };
@@ -190,29 +180,39 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Kategori madalyonu + başlık künyesi */}
+        {/* Hero banner: diğer sayfalardaki görsel başlık kartı dili */}
         <Animated.View
           entering={FadeInDown.duration(460).springify(0.8)}
-          style={styles.heroRow}
+          style={styles.heroBanner}
         >
-          <View style={[styles.categoryMedal, { shadowColor: 'rgba(154, 107, 255, 0.5)' }]}>
-            <CategorySquircleIcon category={categoryId} size={64} />
-            <View style={styles.medalRing} />
-          </View>
-          <View style={styles.heroCopy}>
-            <Text style={styles.eyebrow}>TAVRİKO ARENA</Text>
-            <Text style={styles.title}>ZORLUK SEVİYESİ</Text>
-            <View style={styles.chipRow}>
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>{category?.name || 'Kategori'}</Text>
-              </View>
-              {subCategory ? (
-                <View style={[styles.chip, styles.chipAccent]}>
-                  <Text style={[styles.chipText, { color: '#5ADBB5' }]}>{subCategory}</Text>
+          <Image
+            source={require('../../assets/images/discovery/duel_arena.webp')}
+            style={styles.heroBackdrop}
+            resizeMode="cover"
+          />
+          <GradientFill
+            colors={['rgba(24, 10, 48, 0.62)', 'rgba(24, 10, 48, 0.94)']}
+            direction="diagonal"
+          />
+          <View style={styles.heroRow}>
+            <View style={styles.categoryMedal}>
+              <CategorySquircleIcon category={categoryId} size={58} />
+            </View>
+            <View style={styles.heroCopy}>
+              <Text style={styles.eyebrow}>TAVRİKO ARENA</Text>
+              <Text style={styles.title}>ZORLUK SEVİYESİ</Text>
+              <View style={styles.chipRow}>
+                <View style={styles.chip}>
+                  <Text style={styles.chipText}>{category?.name || 'Kategori'}</Text>
                 </View>
-              ) : null}
-              <View style={[styles.chip, styles.chipAccent]}>
-                <Text style={[styles.chipText, { color: '#FFC43D' }]}>{questionCount} soru</Text>
+                {subCategory ? (
+                  <View style={[styles.chip, styles.chipAccent]}>
+                    <Text style={[styles.chipText, { color: '#5ADBB5' }]}>{subCategory}</Text>
+                  </View>
+                ) : null}
+                <View style={[styles.chip, styles.chipAccent]}>
+                  <Text style={[styles.chipText, { color: '#FFC43D' }]}>{questionCount} soru</Text>
+                </View>
               </View>
             </View>
           </View>
@@ -225,7 +225,7 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
             <CountPill
               key={count}
               count={count}
-              delay={80 + idx * 60}
+              delay={60 + idx * 55}
               selected={count === questionCount}
               onPress={() => {
                 sound.playSound('tap');
@@ -250,10 +250,10 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
           />
         ))}
 
-        <Animated.View entering={FadeInUp.delay(560).duration(480).springify(0.8)} style={styles.footerWrap}>
+        <Animated.View entering={FadeInUp.delay(500).duration(460).springify(0.8)} style={styles.footerWrap}>
           {/* Seçilen zorluğun mini özeti */}
           <View style={styles.selectionSummary}>
-            <GradientFill colors={['rgba(154,107,255,0.22)', 'rgba(154,107,255,0.04)']} direction="diagonal" />
+            <GradientFill colors={['rgba(154,107,255,0.20)', 'rgba(154,107,255,0.03)']} direction="diagonal" />
             <View style={styles.summaryInner}>
               <Text style={styles.summaryLabel}>SEÇİMİN</Text>
               <Text style={styles.summaryValue}>
@@ -273,50 +273,56 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
 };
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 32,
+    paddingBottom: 28,
   },
-  heroRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginTop: 10,
-    marginBottom: 18,
-    paddingHorizontal: 4,
-  },
-  categoryMedal: {
+  heroBanner: {
     position: 'relative',
-    width: 76,
-    height: 76,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowOffset: { width: 0, height: 0 },
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginTop: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(154, 107, 255, 0.30)',
+    shadowColor: 'rgba(154, 107, 255, 0.35)',
+    shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 1,
-    shadowRadius: 22,
+    shadowRadius: 24,
     elevation: 10,
   },
-  medalRing: {
+  heroBackdrop: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: 'rgba(154, 107, 255, 0.45)',
+  },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  categoryMedal: {
+    width: 66,
+    height: 66,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   heroCopy: {
     flex: 1,
+    minWidth: 0,
   },
   eyebrow: {
     fontFamily: THEME.fonts.extraBold,
-    fontSize: 11,
+    fontSize: 10.5,
     letterSpacing: 3,
     color: '#5ADBB5',
     marginBottom: 2,
   },
   title: {
     fontFamily: THEME.fonts.display,
-    fontSize: 30,
+    fontSize: 26,
     color: '#FFFFFF',
     marginBottom: 8,
   },
@@ -326,95 +332,86 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   chip: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
   },
   chipAccent: {
-    borderColor: 'rgba(154, 107, 255, 0.35)',
-    backgroundColor: 'rgba(154, 107, 255, 0.12)',
+    borderColor: 'rgba(154, 107, 255, 0.40)',
+    backgroundColor: 'rgba(154, 107, 255, 0.14)',
   },
   chipText: {
-    color: '#D9CDF5',
-    fontSize: 11.5,
+    color: '#E5DBFB',
+    fontSize: 11,
     fontFamily: THEME.fonts.extraBold,
   },
   countLabel: {
     fontFamily: THEME.fonts.display,
-    fontSize: 14,
+    fontSize: 13,
     letterSpacing: 1.5,
     color: THEME.colors.textMuted,
-    marginTop: 4,
     marginBottom: 10,
   },
   countRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   countPillWrap: {
     flex: 1,
   },
   countPill: {
-    height: 48,
+    height: 46,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.14)',
-    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
-    shadowRadius: 14,
-    elevation: 6,
-  },
-  countPillGlow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(98, 54, 255, 0.30)',
+    shadowRadius: 12,
+    elevation: 5,
   },
   countPillSelected: {
-    backgroundColor: 'rgba(98, 54, 255, 0.18)',
+    borderColor: '#FFC43D',
+    backgroundColor: 'rgba(98, 54, 255, 0.22)',
   },
   countPillText: {
     fontFamily: THEME.fonts.display,
-    fontSize: 18,
+    fontSize: 17,
     color: '#CBBFE8',
   },
   countPillTextSelected: {
     color: '#FFFFFF',
   },
   diffCard: {
-    height: 96,
-    paddingHorizontal: 18,
-    marginBottom: 12,
+    minHeight: 84,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 10,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.09)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    borderLeftWidth: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderLeftWidth: 7,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    overflow: 'hidden',
-    shadowOffset: { width: 0, height: 8 },
+    gap: 12,
+    shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowRadius: 18,
+    elevation: 7,
   },
   diffCardSelected: {
-    backgroundColor: 'rgba(255, 255, 255, 0.13)',
+    borderWidth: 1.5,
   },
-  diffCardGlowLayer: {
-    borderRadius: 20,
-    opacity: 0.15,
+  diffBody: {
+    flex: 1,
+    justifyContent: 'center',
   },
   diffTitleRow: {
     flexDirection: 'row',
@@ -423,21 +420,20 @@ const styles = StyleSheet.create({
   },
   diffTitle: {
     fontFamily: THEME.fonts.display,
-    fontSize: 26,
+    fontSize: 23,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: 2,
   },
   diffDesc: {
     color: '#B8A9DC',
     fontSize: 12,
     fontFamily: THEME.fonts.body,
-    marginTop: 2,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    gap: 2,
-    marginTop: 4,
+    marginTop: 3,
   },
   xpPill: {
-    backgroundColor: 'rgba(10, 4, 24, 0.72)',
+    backgroundColor: 'rgba(10, 4, 24, 0.78)',
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 5,
@@ -448,22 +444,22 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.extraBold,
   },
   footerWrap: {
-    marginTop: 8,
+    marginTop: 10,
   },
   selectionSummary: {
     position: 'relative',
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(154, 107, 255, 0.28)',
     overflow: 'hidden',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   summaryInner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
   },
   summaryLabel: {
     fontFamily: THEME.fonts.extraBold,
