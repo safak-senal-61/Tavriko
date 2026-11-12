@@ -429,11 +429,15 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                           <CoinIcon size={22} />
                         ) : rew.type === 'gems' ? (
                           <GemIcon size={22} />
+                        ) : rew.type === 'item' ? (
+                          <CrownIcon size={22} />
                         ) : (
                           <SpeedBoltIcon size={22} />
                         )}
                         <Text style={styles.rewardText}>
-                          +{rew.amount} {rew.type === 'coins' ? 'Altın' : rew.type === 'gems' ? 'Elmas' : 'XP'}
+                          {rew.type === 'item'
+                            ? `🎁 Bonus: ${rew.label ?? 'Özel Eşya'}${rew.amount > 1 ? ` x${rew.amount}` : ''}`
+                            : `+${rew.amount} ${rew.type === 'coins' ? 'Altın' : rew.type === 'gems' ? 'Elmas' : 'XP'}`}
                         </Text>
                       </Reanimated.View>
                     ))}

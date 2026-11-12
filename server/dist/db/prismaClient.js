@@ -471,6 +471,15 @@ class PrismaService {
             equippedNameEffectExpiresAt: this.toNumberSafe(u.equippedNameEffectExpiresAt),
             equippedBackgroundExpiresAt: this.toNumberSafe(u.equippedBackgroundExpiresAt),
             blockedUserIds: Array.isArray(u.blockedUserIds) ? u.blockedUserIds : [],
+            activeBoosterExpiresAt: (() => {
+                const raw = u.settings?.xpBoosterExpiresAt;
+                if (raw === null || raw === undefined)
+                    return undefined;
+                if (typeof raw === 'number')
+                    return raw; // Eski kayıtlar: epoch ms
+                const parsed = new Date(raw).getTime(); // Yeni format: ISO string
+                return Number.isFinite(parsed) ? parsed : undefined;
+            })(),
             eventProgress: u.eventProgress || {},
             friendIds: Array.isArray(u.friendIds) ? u.friendIds : [],
             categoryMastery: u.categoryMastery || {},
@@ -478,6 +487,33 @@ class PrismaService {
             stats: sanitizedStats,
             createdAt: u.createdAt ? new Date(u.createdAt).getTime() : Date.now(),
         };
+    }
+    /**
+     * Kullanıcı kaydını önce kalıcı veritabanından okur; DB erişilemezse önbelleğe düşer.
+     * Serverless ortamda her örnek kendi önbelleğini tuttuğu için, mutasyon öncesi
+     * DB'den taze okuma yapmak "seviye geriye düştü" tarzı bayat-önbellek
+     * tutarsızlıklarını önler (DB her zaman gerçek kaynaktır).
+     */
+    async loadRecord(userId) {
+        try {
+            const u = await this.rawClient.user.findFirst({
+                where: { OR: [{ id: userId }, { username: userId }, { email: userId.toLowerCase() }] },
+                include: { inventoryItems: true },
+            });
+            if (u) {
+                const rec = this.prismaUserToRecord(u);
+                this.users.set(rec.id, rec);
+                if (rec.username)
+                    this.users.set(rec.username, rec);
+                if (rec.email)
+                    this.users.set(rec.email.toLowerCase(), rec);
+                return rec;
+            }
+        }
+        catch {
+            // DB yok/erişilemez (test ortamı, kesinti) → önbelleğe düş
+        }
+        return this.users.get(userId) || null;
     }
     user = {
         upsert: async (args) => {
@@ -1785,22 +1821,7 @@ class PrismaService {
         };
     }
     async updateUserProfile(userId, updates) {
-        let record = this.users.get(userId);
-        if (!record) {
-            try {
-                const u = await this.rawClient.user.findFirst({
-                    where: { OR: [{ id: userId }, { username: userId }] },
-                    include: { inventoryItems: true },
-                });
-                if (u) {
-                    record = this.prismaUserToRecord(u);
-                    this.users.set(record.id, record);
-                }
-            }
-            catch (findErr) {
-                console.warn('[updateUserProfile] Prisma search error:', findErr);
-            }
-        }
+        let record = await this.loadRecord(userId);
         if (!record) {
             throw new Error('Kullanıcı bulunamadı.');
         }
@@ -1897,19 +1918,7 @@ class PrismaService {
         return this.toProfile(record);
     }
     async updateUserSettings(userId, newSettings) {
-        let record = this.users.get(userId);
-        if (!record) {
-            try {
-                const u = await this.rawClient.user.findFirst({
-                    where: { OR: [{ id: userId }, { username: userId }] },
-                });
-                if (u) {
-                    record = this.prismaUserToRecord(u);
-                    this.users.set(record.id, record);
-                }
-            }
-            catch { }
-        }
+        let record = await this.loadRecord(userId);
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
         record.settings = { ...(record.settings || {}), ...newSettings };
@@ -1946,12 +1955,7 @@ class PrismaService {
         return this.toProfile(record);
     }
     async changeUserPassword(userId, currentPass, newPass) {
-        let record = this.users.get(userId);
-        if (!record) {
-            const u = await this.rawClient.user.findFirst({ where: { OR: [{ id: userId }, { username: userId }] } });
-            if (u)
-                record = this.prismaUserToRecord(u);
-        }
+        let record = await this.loadRecord(userId);
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
         if (record.isGuest)
@@ -1987,19 +1991,7 @@ class PrismaService {
         return { success: true, message: 'Şifreniz başarıyla değiştirildi!' };
     }
     async recordGameStats(userId, delta) {
-        let record = this.users.get(userId);
-        if (!record) {
-            try {
-                const u = await this.rawClient.user.findFirst({
-                    where: { OR: [{ id: userId }, { username: userId }] },
-                });
-                if (u) {
-                    record = this.prismaUserToRecord(u);
-                    this.users.set(record.id, record);
-                }
-            }
-            catch { }
-        }
+        let record = await this.loadRecord(userId);
         if (!record)
             return null;
         if (delta.roomCode) {
@@ -2028,7 +2020,9 @@ class PrismaService {
         const cappedCoins = isZeroPerformance
             ? 0
             : Math.max(0, Math.min(Math.round(Number(delta.coinsEarned) || 0), delta.won ? 15 : 6));
-        record.xp += cappedXp;
+        // 2x XP artırıcı: aktifken maçtan kazanılan XP 2 katına çıkar (1v1, özel oda vb. tüm maçlar).
+        const boosterActive = (record.activeBoosterExpiresAt || 0) > Date.now();
+        record.xp += boosterActive ? cappedXp * 2 : cappedXp;
         record.coins += cappedCoins;
         // Season 1 Pass XP progression (0 doğru için sezon XP verilmez)
         const seasonXpGain = isZeroPerformance ? 0 : delta.won ? 25 : 10;
@@ -2117,52 +2111,16 @@ class PrismaService {
         }
         return this.toProfile(record);
     }
-    async syncWallet(userId, data) {
-        let record = this.users.get(userId);
-        if (!record) {
-            try {
-                const u = await this.rawClient.user.findFirst({
-                    where: { OR: [{ id: userId }, { username: userId }] },
-                });
-                if (u) {
-                    record = this.prismaUserToRecord(u);
-                    this.users.set(record.id, record);
-                }
-            }
-            catch { }
-        }
+    /**
+     * Cüzdan eşitleme artık SALT OKUNURDUR: istemciden gelen coins/gems/xp/level
+     * değerleri YOK SAYILIR ve sunucudaki yetkili kayıt döndürülür.
+     * Eskiden istemci değerleriyle üzerine yazmak hem cüzdan sahteciliğine hem de
+     * "seviye geriye düştü" tutarsızlığına yol açıyordu.
+     */
+    async syncWallet(userId, _data) {
+        const record = await this.loadRecord(userId);
         if (!record)
             return null;
-        if (typeof data.coins === 'number') {
-            record.coins = data.coins;
-        }
-        if (typeof data.gems === 'number') {
-            record.gems = data.gems;
-        }
-        if (typeof data.xp === 'number') {
-            record.xp = data.xp;
-        }
-        if (typeof data.level === 'number' && data.level > 0) {
-            record.level = data.level;
-        }
-        record.updatedAt = Date.now();
-        this.users.set(record.id, record);
-        this.savePersistedUsers();
-        try {
-            await this.rawClient.user.update({
-                where: { id: record.id },
-                data: {
-                    coins: record.coins,
-                    gems: record.gems,
-                    xp: record.xp,
-                    level: record.level,
-                    updatedAt: new Date(),
-                },
-            });
-        }
-        catch (err) {
-            console.error('[syncWallet] PostgreSQL update error:', err);
-        }
         return this.toProfile(record);
     }
     updateStartedEvents(record, delta) {
@@ -2258,19 +2216,7 @@ class PrismaService {
         return record ? this.toProfile(record) : null;
     }
     async recordDailyChallengeCompletion(userId, data) {
-        let record = this.users.get(userId);
-        if (!record) {
-            try {
-                const u = await this.rawClient.user.findFirst({
-                    where: { OR: [{ id: userId }, { username: userId }] },
-                });
-                if (u) {
-                    record = this.prismaUserToRecord(u);
-                    this.users.set(record.id, record);
-                }
-            }
-            catch { }
-        }
+        let record = await this.loadRecord(userId);
         if (!record) {
             return { success: false, user: null, error: 'Kullanıcı bulunamadı', streakIncreased: false };
         }
@@ -3900,19 +3846,7 @@ class PrismaService {
         };
     }
     async purchaseShopPack(userId, pack) {
-        let record = this.users.get(userId);
-        if (!record) {
-            try {
-                const u = await this.rawClient.user.findFirst({
-                    where: { OR: [{ id: userId }, { username: userId }] },
-                });
-                if (u) {
-                    record = this.prismaUserToRecord(u);
-                    this.users.set(record.id, record);
-                }
-            }
-            catch { }
-        }
+        let record = await this.loadRecord(userId);
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
         // Balance validation to prevent bugs and negative balances
@@ -3977,19 +3911,7 @@ class PrismaService {
         return this.toProfile(record);
     }
     async useInventoryItem(userId, itemId) {
-        let record = this.users.get(userId);
-        if (!record) {
-            try {
-                const u = await this.rawClient.user.findFirst({
-                    where: { OR: [{ id: userId }, { username: userId }] },
-                });
-                if (u) {
-                    record = this.prismaUserToRecord(u);
-                    this.users.set(record.id, record);
-                }
-            }
-            catch { }
-        }
+        let record = await this.loadRecord(userId);
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
         if (!record.inventory)
@@ -4022,6 +3944,16 @@ class PrismaService {
             record.coins += 100;
             rewardText = '+100 Altın hesabına eklendi!';
         }
+        else if (itemId.startsWith('booster')) {
+            // 2x XP artırıcı: anında XP VERMEZ; süre boyunca maçlardan kazanılan XP 2 katına çıkar.
+            const durationMs = itemId.includes('24h') ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000;
+            const base = Math.max(Date.now(), record.activeBoosterExpiresAt || 0);
+            record.activeBoosterExpiresAt = base + durationMs;
+            // Kalıcılık: serverless yeniden başlamalarda kaybolmaması için settings jsonb'ye yaz.
+            record.settings = { ...(record.settings || {}), xpBoosterExpiresAt: new Date(record.activeBoosterExpiresAt).toISOString() };
+            const mins = Math.round(durationMs / 60000);
+            rewardText = `⚡ 2x XP artırıcı aktif! ${mins >= 60 ? `${Math.round(mins / 60)} saat` : `${mins} dakika`} boyunca maçlardan kazanacağın XP 2 katına çıkar.`;
+        }
         else {
             record.xp += 100;
             rewardText = `${item.name} aktif edildi: +100 XP kazandın!`;
@@ -4043,6 +3975,7 @@ class PrismaService {
                         gems: record.gems,
                         xp: record.xp,
                         level: record.level,
+                        settings: (record.settings || {}),
                         updatedAt: new Date(),
                     },
                 });
@@ -4054,19 +3987,7 @@ class PrismaService {
         return { user: this.toProfile(record), rewardText };
     }
     async claimSeasonTier(userId, tier, track = 'free') {
-        let record = this.users.get(userId);
-        if (!record) {
-            try {
-                const u = await this.rawClient.user.findFirst({
-                    where: { OR: [{ id: userId }, { username: userId }] },
-                });
-                if (u) {
-                    record = this.prismaUserToRecord(u);
-                    this.users.set(record.id, record);
-                }
-            }
-            catch { }
-        }
+        let record = await this.loadRecord(userId);
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
         if (tier < 1 || tier > 50) {
@@ -4200,20 +4121,7 @@ class PrismaService {
         return this.toProfile(record);
     }
     async purchaseShopProduct(userId, productId, paymentMethod = 'coins') {
-        let record = this.users.get(userId);
-        if (!record) {
-            try {
-                const u = await this.rawClient.user.findFirst({
-                    where: { OR: [{ id: userId }, { username: userId }, { email: userId.toLowerCase() }] },
-                    include: { inventoryItems: true },
-                });
-                if (u) {
-                    record = this.prismaUserToRecord(u);
-                    this.users.set(record.id, record);
-                }
-            }
-            catch { }
-        }
+        let record = await this.loadRecord(userId);
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
         const product = shared_1.SHOP_CATALOG.find((p) => p.id === productId);
@@ -4344,20 +4252,7 @@ class PrismaService {
         };
     }
     async openChest(userId, chestId, keyId) {
-        let record = this.users.get(userId);
-        if (!record) {
-            try {
-                const u = await this.rawClient.user.findFirst({
-                    where: { OR: [{ id: userId }, { username: userId }, { email: userId.toLowerCase() }] },
-                    include: { inventoryItems: true },
-                });
-                if (u) {
-                    record = this.prismaUserToRecord(u);
-                    this.users.set(record.id, record);
-                }
-            }
-            catch { }
-        }
+        let record = await this.loadRecord(userId);
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
         if (!record.inventory)
@@ -4397,15 +4292,25 @@ class PrismaService {
         if (keyItem)
             keyItem.qty -= 1;
         record.inventory = record.inventory.filter((i) => i.qty > 0);
+        const rollTier = (pLow, pMid) => {
+            const r = Math.random();
+            return r < pLow ? 'low' : r < pLow + pMid ? 'mid' : 'high';
+        };
+        const randInt = (min, max) => Math.floor(min + Math.random() * (max - min + 1));
+        const bracket = (t, low, mid, high) => {
+            const [a, b] = t === 'low' ? low : t === 'mid' ? mid : high;
+            return randInt(a, b);
+        };
         let coins = 0;
         let gems = 0;
         let xp = 0;
         let bonusItem;
         if (isGiftBox) {
-            // 7 günlük meydan okuma hediye kutusu: cömert epik ödüller
-            coins = Math.floor(2000 + Math.random() * 2500);
-            gems = Math.floor(60 + Math.random() * 60);
-            xp = Math.floor(400 + Math.random() * 400);
+            // 7 günlük meydan okuma hediye kutusu: cömert ama değişken epik ödüller
+            const t = rollTier(0.5, 0.35);
+            coins = bracket(t, [800, 1500], [1500, 2800], [2800, 4500]);
+            gems = Math.random() < 0.5 ? randInt(30, 70) : 0;
+            xp = bracket(t, [200, 400], [400, 600], [600, 800]);
             const giftBonusPool = [
                 {
                     id: 'booster_xp_2x_1h',
@@ -4427,9 +4332,10 @@ class PrismaService {
             bonusItem = giftBonusPool[Math.floor(Math.random() * giftBonusPool.length)];
         }
         else if (chestId.includes('legendary')) {
-            coins = Math.floor(4000 + Math.random() * 6000);
-            gems = Math.floor(100 + Math.random() * 200);
-            xp = Math.floor(800 + Math.random() * 800);
+            const t = rollTier(0.45, 0.38);
+            coins = bracket(t, [1000, 2000], [2000, 4000], [4000, 6500]);
+            gems = Math.random() < 0.45 ? randInt(50, 110) : 0;
+            xp = bracket(t, [400, 600], [600, 900], [900, 1300]);
             bonusItem = {
                 id: 'frame_flame',
                 name: 'Alev Çerçevesi',
@@ -4440,9 +4346,10 @@ class PrismaService {
             };
         }
         else if (chestId.includes('gold')) {
-            coins = Math.floor(1500 + Math.random() * 2500);
-            gems = Math.floor(40 + Math.random() * 60);
-            xp = Math.floor(350 + Math.random() * 350);
+            const t = rollTier(0.5, 0.35);
+            coins = bracket(t, [500, 900], [900, 1800], [1800, 2800]);
+            gems = Math.random() < 0.4 ? randInt(20, 45) : 0;
+            xp = bracket(t, [200, 320], [320, 480], [480, 650]);
             bonusItem = {
                 id: 'booster_xp_2x_1h',
                 name: '2x XP (1 Saat)',
@@ -4453,14 +4360,17 @@ class PrismaService {
             };
         }
         else if (chestId.includes('silver')) {
-            coins = Math.floor(600 + Math.random() * 900);
-            gems = Math.floor(15 + Math.random() * 25);
-            xp = Math.floor(150 + Math.random() * 200);
+            const t = rollTier(0.55, 0.32);
+            coins = bracket(t, [250, 500], [500, 900], [900, 1400]);
+            gems = Math.random() < 0.35 ? randInt(8, 20) : 0;
+            xp = bracket(t, [100, 180], [180, 280], [280, 400]);
         }
         else {
-            coins = Math.floor(250 + Math.random() * 350);
-            gems = Math.floor(5 + Math.random() * 10);
-            xp = Math.floor(80 + Math.random() * 100);
+            // Ahşap sandık: çoğunlukla mütevazı ödül
+            const t = rollTier(0.6, 0.3);
+            coins = bracket(t, [80, 180], [180, 350], [350, 500]);
+            gems = Math.random() < 0.35 ? randInt(3, 8) : 0;
+            xp = bracket(t, [40, 90], [90, 150], [150, 220]);
         }
         record.coins += coins;
         record.gems = (record.gems || 0) + gems;
@@ -4541,8 +4451,19 @@ class PrismaService {
             }
         }
         const rewardText = `🎉 Sandık açıldı: +${coins} Altın, +${gems} Elmas ve +${xp} XP kazandınız!${bonusItem ? ` Bonus: ${bonusItem.name}!` : ''}`;
+        // İstemcinin ödül modalünde gösterdiği liste (boş olanlar filtrelenir).
+        const rewards = [];
+        if (coins > 0)
+            rewards.push({ type: 'coins', amount: coins });
+        if (gems > 0)
+            rewards.push({ type: 'gems', amount: gems });
+        if (xp > 0)
+            rewards.push({ type: 'xp', amount: xp });
+        if (bonusItem)
+            rewards.push({ type: 'item', amount: bonusItem.qty, label: bonusItem.name, rarity: bonusItem.rarity });
         return {
             user: this.toProfile(record),
+            rewards,
             reward: {
                 coins,
                 gems,
@@ -4779,6 +4700,7 @@ class PrismaService {
             equippedNameEffectExpiresAt: record.equippedNameEffectExpiresAt,
             equippedBackgroundExpiresAt: record.equippedBackgroundExpiresAt,
             blockedUserIds: record.blockedUserIds || [],
+            activeBoosterExpiresAt: record.activeBoosterExpiresAt,
             eventProgress: record.eventProgress || {},
             friendIds: record.friendIds || [],
             notifications: record.notifications,

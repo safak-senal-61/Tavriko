@@ -619,7 +619,8 @@ router.post('/stats', auth_1.requireUserAuth, async (req, res) => {
     }
 });
 // SECURITY: wallet sync is bound to the verified session identity; the token user
-// is the only account whose wallet may be written.
+// is the only account whose wallet may be read. Bu uç artık SALT OKUNURDUR:
+// istemciden gelen cüzdan değerleri yok sayılır, sunucudaki yetkili kayıt döndürülür.
 router.post('/sync-wallet', auth_1.requireUserAuth, async (req, res) => {
     try {
         const userId = req.authUserId;
@@ -627,8 +628,7 @@ router.post('/sync-wallet', auth_1.requireUserAuth, async (req, res) => {
             res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
             return;
         }
-        const { coins, gems, xp, level } = req.body;
-        const updatedUser = await prismaClient_1.db.syncWallet(userId, { coins, gems, xp, level });
+        const updatedUser = await prismaClient_1.db.syncWallet(userId);
         res.json({ success: true, user: updatedUser });
     }
     catch (err) {
