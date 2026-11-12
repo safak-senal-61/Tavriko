@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
   Modal,
   TouchableOpacity,
   ScrollView,
+  TextInput,
   Image,
   StyleSheet,
   Platform,
 } from 'react-native';
+import { Search, X, Check } from 'lucide-react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { ALL_CATEGORIES as SHARED_CATEGORIES } from '@trivia/shared';
 import { CategoryData, GENERAL_CATEGORIES } from './CategorySquircleCard';
@@ -100,6 +102,39 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
     }));
   }, [selectedMain.id, counts]);
 
+  const [query, setQuery] = useState('');
+  const [emptyNotice, setEmptyNotice] = useState<string | null>(null);
+  const chipScrollRef = useRef<any>(null);
+  const chipX = useRef<Record<string, { x: number; w: number }>>({});
+
+  // Soru olanlar önde, sonra katalog sırası; arama filtresi uygulanır
+  const visibleSubs = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase('tr');
+    const filtered = q
+      ? subList.filter((sc) => sc.name.toLocaleLowerCase('tr').includes(q))
+      : subList;
+    return filtered
+      .map((sc, i) => ({ sc, i }))
+      .sort((a, b) => {
+        const ea = a.sc.questionCount === 0 ? 1 : 0;
+        const eb = b.sc.questionCount === 0 ? 1 : 0;
+        return ea - eb || a.i - b.i;
+      })
+      .map((x) => x.sc);
+  }, [subList, query]);
+
+  // Seçili ana kategori çipini ortaya kaydır; sekme/kategori değişince arama sıfırlansın
+  useEffect(() => {
+    setQuery('');
+    setEmptyNotice(null);
+    if (activeTab !== 'special') return;
+    const t = setTimeout(() => {
+      const pos = chipX.current[selectedMain.id];
+      if (pos) chipScrollRef.current?.scrollTo({ x: Math.max(0, pos.x - 90), animated: true });
+    }, 80);
+    return () => clearTimeout(t);
+  }, [selectedMain.id, activeTab]);
+
   const selectedSub = subList.find((sc) => sc.id === selectedSubId) || null;
   const selectedSubEmpty = !!selectedSub && selectedSub.questionCount === 0;
 
@@ -183,11 +218,13 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
               />
             ) : (
               <View style={styles.specialWrap}>
-                {/* Ana kategori seçici (görselli) */}
+                {/* Ana kategori seçici: seçilen çip otomatik görünür alana kayar */}
                 <ScrollView
+                  ref={chipScrollRef}
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.mainRow}
+                  style={styles.mainScroll}
                 >
                   {mainWithCounts.map((cat) => {
                     const active = cat.id === selectedMain.id;
@@ -195,13 +232,22 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
                       <TouchableOpacity
                         key={cat.id}
                         activeOpacity={0.85}
+                        onLayout={(e) => {
+                          chipX.current[cat.id] = {
+                            x: e.nativeEvent.layout.x,
+                            w: e.nativeEvent.layout.width,
+                          };
+                        }}
                         onPress={() => {
                           sound.playSound('tap');
                           handlePickMain(cat);
                         }}
                         style={[
                           styles.mainChip,
-                          active && { borderColor: cat.primaryColor, backgroundColor: 'rgba(255,255,255,0.10)' },
+                          active && {
+                            borderColor: cat.primaryColor,
+                            backgroundColor: 'rgba(255,255,255,0.14)',
+                          },
                         ]}
                       >
                         <Image
@@ -209,7 +255,10 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
                           style={styles.mainChipArt}
                           resizeMode="contain"
                         />
-                        <Text style={[styles.mainChipText, active && styles.mainChipTextActive]} numberOfLines={1}>
+                        <Text
+                          style={[styles.mainChipText, active && styles.mainChipTextActive]}
+                          numberOfLines={1}
+                        >
                           {cat.name}
                         </Text>
                       </TouchableOpacity>
@@ -217,19 +266,48 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
                   })}
                 </ScrollView>
 
-                <Text style={styles.subHeader} numberOfLines={1}>
-                  {selectedMain.name} · {subList.length} alt kategori
-                  {selectedMain.questionCount !== undefined ? ` · ${selectedMain.questionCount} soru` : ''}
-                </Text>
+                {/* Başlık satırı */}
+                <View style={styles.subHeaderRow}>
+                  <Text style={styles.subHeader} numberOfLines={1}>
+                    {selectedMain.name}
+                  </Text>
+                  <Text style={styles.subHeaderMeta}>
+                    {subList.length} alt kategori
+                    {selectedMain.questionCount !== undefined
+                      ? ` · ${selectedMain.questionCount} soru`
+                      : ''}
+                  </Text>
+                </View>
 
-                {/* Alt kategori ızgarası: görsel + ad + soru sayısı */}
+                {/* Arama */}
+                <View style={styles.searchBox}>
+                  <Search size={15} color="rgba(233,225,255,0.55)" />
+                  <TextInput
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Alt kategori ara"
+                    placeholderTextColor="rgba(233,225,255,0.4)"
+                    style={styles.searchInput}
+                    autoCorrect={false}
+                  />
+                  {query.length > 0 && (
+                    <TouchableOpacity onPress={() => setQuery('')} hitSlop={8}>
+                      <X size={15} color="rgba(233,225,255,0.7)" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Alt kategori ızgarası */}
                 <ScrollView
                   style={styles.subScroll}
                   contentContainerStyle={styles.subGrid}
                   showsVerticalScrollIndicator={false}
                   nestedScrollEnabled
                 >
-                  {subList.map((sc) => {
+                  {visibleSubs.length === 0 && (
+                    <Text style={styles.noResult}>Eşleşen alt kategori yok</Text>
+                  )}
+                  {visibleSubs.map((sc) => {
                     const active = sc.id === selectedSubId;
                     const empty = sc.questionCount === 0;
                     return (
@@ -237,20 +315,27 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
                         <TouchableOpacity
                           activeOpacity={0.85}
                           onPress={() => {
-                            sound.playSound(empty ? 'wrong' : 'tap');
+                            if (empty) {
+                              sound.playSound('wrong');
+                              setEmptyNotice(sc.name);
+                              return;
+                            }
+                            sound.playSound('tap');
+                            sound.triggerHaptic('light');
+                            setEmptyNotice(null);
                             setSelectedSubId(sc.id);
                           }}
                           style={[
                             styles.subCard,
-                            active && { borderColor: '#00F0FF', backgroundColor: 'rgba(0,240,255,0.10)' },
+                            active && styles.subCardActive,
                             empty && styles.subCardEmpty,
                           ]}
                         >
-                          <View style={styles.subCountPill}>
-                            <Text style={styles.subCountText}>
-                              {sc.questionCount === undefined ? '…' : sc.questionCount}
-                            </Text>
-                          </View>
+                          {active && (
+                            <View style={styles.subCheck}>
+                              <Check size={12} color="#06232A" strokeWidth={4} />
+                            </View>
+                          )}
                           {DISCOVER_SUBCATEGORY_IMG[sc.id] ? (
                             <Image
                               source={DISCOVER_SUBCATEGORY_IMG[sc.id]}
@@ -263,17 +348,50 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
                           <Text style={styles.subName} numberOfLines={2}>
                             {sc.name}
                           </Text>
+                          <View
+                            style={[
+                              styles.subPill,
+                              empty && styles.subPillEmpty,
+                              active && styles.subPillActive,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.subPillText,
+                                empty && styles.subPillTextEmpty,
+                                active && styles.subPillTextActive,
+                              ]}
+                            >
+                              {sc.questionCount === undefined
+                                ? '…'
+                                : empty
+                                  ? 'Yakında'
+                                  : `${sc.questionCount} soru`}
+                            </Text>
+                          </View>
                         </TouchableOpacity>
                       </View>
                     );
                   })}
                 </ScrollView>
 
-                {selectedSubEmpty && (
-                  <Text style={styles.emptyWarn}>
-                    Bu alt kategoride henüz yayınlanmış soru yok. Başka bir alt kategori seç.
-                  </Text>
-                )}
+                {/* Durum çubuğu: seçim özeti / uyarı */}
+                <View style={styles.statusBar}>
+                  {emptyNotice ? (
+                    <Text style={styles.statusWarn} numberOfLines={2}>
+                      "{emptyNotice}" için henüz soru yok. Başka bir alt kategori seç.
+                    </Text>
+                  ) : selectedSub ? (
+                    <Text style={styles.statusOk} numberOfLines={1}>
+                      Seçili: {selectedSub.name}
+                      {selectedSub.questionCount !== undefined
+                        ? ` · ${selectedSub.questionCount} soru`
+                        : ''}
+                    </Text>
+                  ) : (
+                    <Text style={styles.statusHint}>Bir alt kategori seç</Text>
+                  )}
+                </View>
               </View>
             )}
 
@@ -320,52 +438,93 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
 
 const styles = StyleSheet.create({
   specialWrap: { width: '100%', alignItems: 'center' },
-  mainRow: { paddingHorizontal: 4, gap: 8, paddingVertical: 4 },
+  mainScroll: { width: '100%', flexGrow: 0 },
+  mainRow: { paddingHorizontal: 2, gap: 8, paddingVertical: 4 },
   mainChip: {
-    width: 74,
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
-    borderRadius: 16,
+    gap: 6,
+    height: 40,
+    paddingLeft: 6,
+    paddingRight: 12,
+    borderRadius: 20,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  mainChipArt: { width: 40, height: 40 },
-  mainChipText: {
-    marginTop: 3,
-    fontSize: 10,
-    fontWeight: '800',
-    color: 'rgba(233,225,255,0.7)',
-    paddingHorizontal: 3,
-    textAlign: 'center',
-  },
+  mainChipArt: { width: 28, height: 28 },
+  mainChipText: { fontSize: 12, fontWeight: '800', color: 'rgba(233,225,255,0.7)' },
   mainChipTextActive: { color: '#FFFFFF' },
-  subHeader: {
-    marginTop: 8,
-    marginBottom: 6,
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#5ADBB5',
-    textAlign: 'center',
+  subHeaderRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingHorizontal: 4,
   },
-  subScroll: { width: '100%', maxHeight: 300 },
-  subGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingBottom: 4 },
+  subHeader: {
+    flexShrink: 1,
+    fontSize: 17,
+    fontFamily: THEME.fonts.display,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  subHeaderMeta: { fontSize: 11, fontWeight: '800', color: '#5ADBB5' },
+  searchBox: {
+    width: '100%',
+    height: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    paddingVertical: 0,
+    ...Platform.select({ web: { outlineStyle: 'none' } as any, default: {} }),
+  },
+  subScroll: { width: '100%', height: 292, marginTop: 8 },
+  subGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingBottom: 6 },
   subCell: { width: '33.333%', padding: 4 },
   subCard: {
     alignItems: 'center',
-    minHeight: 112,
-    paddingTop: 8,
-    paddingBottom: 6,
+    paddingTop: 10,
+    paddingBottom: 8,
     paddingHorizontal: 4,
-    borderRadius: 16,
-    borderWidth: 2,
+    height: 130,
+    borderRadius: 18,
+    borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.10)',
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  subCardEmpty: { opacity: 0.5 },
-  subArt: { width: 56, height: 56 },
-  subEmoji: { fontSize: 36, height: 56, lineHeight: 56 },
+  subCardActive: {
+    borderColor: '#00F0FF',
+    backgroundColor: 'rgba(0,240,255,0.12)',
+    ...Platform.select({
+      web: { boxShadow: '0 0 14px rgba(0,240,255,0.45)' } as any,
+      ios: {
+        shadowColor: '#00F0FF',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.6,
+        shadowRadius: 8,
+      },
+      default: {},
+    }),
+  },
+  subCardEmpty: { opacity: 0.7, borderStyle: 'dashed' },
+  subArt: { width: 54, height: 54 },
+  subEmoji: { fontSize: 34, height: 54, lineHeight: 54 },
   subName: {
+    flex: 1,
     marginTop: 4,
     fontSize: 11,
     lineHeight: 14,
@@ -373,27 +532,44 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
   },
-  subCountPill: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    zIndex: 2,
-    minWidth: 22,
-    paddingHorizontal: 5,
+  subPill: {
+    minWidth: 52,
     height: 18,
+    paddingHorizontal: 8,
     borderRadius: 9,
     backgroundColor: '#FFC43D',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  subCountText: { fontSize: 10, fontWeight: '900', color: '#3B1500' },
-  emptyWarn: {
-    marginTop: 6,
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#FFD2DC',
-    textAlign: 'center',
+  subPillEmpty: { backgroundColor: 'rgba(255,255,255,0.12)' },
+  subPillActive: { backgroundColor: '#00F0FF' },
+  subPillText: { fontSize: 10, fontWeight: '900', color: '#3B1500' },
+  subPillTextEmpty: { color: 'rgba(233,225,255,0.7)', fontWeight: '800' },
+  subPillTextActive: { color: '#06232A' },
+  subCheck: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#00F0FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 3,
   },
+  noResult: {
+    width: '100%',
+    textAlign: 'center',
+    paddingVertical: 24,
+    fontSize: 12,
+    fontWeight: '800',
+    color: 'rgba(233,225,255,0.6)',
+  },
+  statusBar: { minHeight: 34, justifyContent: 'center', marginTop: 4, paddingHorizontal: 6 },
+  statusOk: { fontSize: 13, fontWeight: '900', color: '#00F0FF', textAlign: 'center' },
+  statusHint: { fontSize: 12, fontWeight: '800', color: 'rgba(233,225,255,0.6)', textAlign: 'center' },
+  statusWarn: { fontSize: 12, fontWeight: '800', color: '#FFB4C4', textAlign: 'center' },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(9, 4, 24, 0.88)',
