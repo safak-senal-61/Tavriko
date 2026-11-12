@@ -25,6 +25,8 @@ export interface ImportResult {
   totalProcessed: number;
   importedCount: number;
   duplicateCount: number;
+  /** Doldurulmamış şablon satırı olduğu için atlanan kayıt sayısı */
+  templateSkippedCount: number;
   errorCount: number;
   questions: Question[];
   errors: string[];
@@ -476,6 +478,7 @@ export function importQuestionsFromJson(
     totalProcessed: 0,
     importedCount: 0,
     duplicateCount: 0,
+    templateSkippedCount: 0,
     errorCount: 0,
     questions: [],
     errors: [],
@@ -516,6 +519,13 @@ export function importQuestionsFromJson(
     if (!text || text.length < 5) {
       result.errorCount++;
       result.errors.push(`${indexLabel}: Soru metni çok kısa veya eksik.`);
+      continue;
+    }
+
+    // Şablon dosyasındaki henüz doldurulmamış satırlar ("DOLDUR: ...") sessizce atlanır;
+    // böylece şablon olduğu gibi yüklense bile veritabanına yer tutucu soru girmez.
+    if (/^doldur\s*:/i.test(text)) {
+      result.templateSkippedCount++;
       continue;
     }
 
