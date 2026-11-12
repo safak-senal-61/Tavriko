@@ -18,7 +18,8 @@ import { socketService } from '../services/socketService';
 import { DISCOVERY_IMG, DiscoveryArtwork } from '../components/DiscoveryArtwork';
 import { PreferenceSwitch } from '../components/PreferenceSwitch';
 import { GradientFill } from '../components/TavrikoGradient';
-import { applyAudioPreferences, loadStoredPreferences } from '../store/appPrefs';
+import { savePreferences, loadStoredPreferences } from '../store/appPrefs';
+import { InfoHint } from '../components/InfoHint';
 import { Volume2, Gamepad2, ShieldCheck, UserRound, Sparkles, FileText } from 'lucide-react-native';
 import type { LegalDocumentId } from '@trivia/shared';
 import { LegalDocumentList, LegalDocumentModal } from '../components/LegalDocuments';
@@ -109,14 +110,6 @@ const loadLocalSettings = (): UserSettings => {
   return loadStoredPreferences();
 };
 
-const saveLocalSettings = (settings: UserSettings) => {
-  try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-    }
-  } catch {}
-};
-
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   user,
   apiBaseUrl,
@@ -202,7 +195,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     profilePublic,
   };
   const settingsSig = JSON.stringify(currentSettings);
-  useEffect(() => { applyAudioPreferences(currentSettings); }, [settingsSig]);
+  // Her değişiklikte: cihaza yaz + ses/haptik motorlarına uygula + dinleyen ekranlara (animasyon, vb.) duyur
+  useEffect(() => { savePreferences(currentSettings); }, [settingsSig]);
 
   // Auto-save debounced to PostgreSQL via API + WebSocket Presence update
   useEffect(() => {
@@ -210,8 +204,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       isFirstRenderRef.current = false;
       return;
     }
-
-    saveLocalSettings(currentSettings);
 
     // Broadcast presence update live over WebSocket
     if (user?.id) {
@@ -418,6 +410,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               </View>
               <View style={styles.walletPill}>
                 <Text style={[styles.walletText, { color: '#00F0FF' }]}>⚡ {user.xp ?? 0} XP</Text>
+                <InfoHint topic="xp" size={16} color="#00F0FF" label="XP nasıl kazanılır?" />
               </View>
             </View>
 
@@ -635,8 +628,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           {/* Penalty for wrong answers */}
           <View style={styles.itemRow}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={styles.itemLabel}>Yanlış Cevap Puan Kesintisi</Text>
-              <Text style={styles.itemSub}>Rekabetçi maçlarda hatalı cevaplarda -10 RP</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.itemLabel}>Yanlış Cevap Puan Kesintisi</Text>
+                <InfoHint topic="lp" size={18} label="Lig Puanı (LP) nasıl kazanılır?" />
+              </View>
+              <Text style={styles.itemSub}>Dereceli maçlarda her yanlış veya boş cevapta -10 LP</Text>
             </View>
             {renderToggle(penaltyForWrong, () => setPenaltyForWrong((v) => !v), 'Yanlış Cevap Puan Kesintisi')}
           </View>
@@ -645,7 +641,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           <View style={[styles.itemRow, { borderBottomWidth: 0 }]}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={styles.itemLabel}>Otomatik Sonraki Soru</Text>
-              <Text style={styles.itemSub}>Cevaplandıktan 1.5 sn sonra devam et</Text>
+              <Text style={styles.itemSub}>Tek kişilik oyunlarda cevaptan 1.5 sn sonra devam et; kapalıysa "Sonraki Soru" düğmesine dokunursun</Text>
             </View>
             {renderToggle(autoNextQuestion, () => setAutoNextQuestion((v) => !v), 'Otomatik Sonraki Soru')}
           </View>

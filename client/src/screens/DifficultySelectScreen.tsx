@@ -23,6 +23,7 @@ import {
   XpStarIcon,
 } from '../components/TavrikoIcons';
 import { GradientFill } from '../components/TavrikoGradient';
+import { loadStoredPreferences } from '../store/appPrefs';
 import {
   DISCOVER_CATEGORY_IMG,
   DISCOVER_SUBCATEGORY_IMG,
@@ -193,7 +194,7 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
   isGuest = false,
   onLoginPrompt,
 }) => {
-  const [selected, setSelected] = useState<DifficultyLevel>('hard');
+  const [selected, setSelected] = useState<DifficultyLevel>(() => loadStoredPreferences().defaultDifficulty ?? 'medium');
   const [questionCount, setQuestionCount] = useState<number>(5);
   const category = ALL_CATEGORIES.find((c) => c.id === categoryId);
   const selectedDiff = useMemo(() => DIFFICULTIES.find((d) => d.id === selected), [selected]);

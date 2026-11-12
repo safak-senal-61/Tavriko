@@ -18,6 +18,7 @@ import {
   CrownIcon,
 } from '../components/TavrikoIcons';
 import { formatNumberTR } from '../components/TavrikoGradient';
+import { InfoHint } from '../components/InfoHint';
 import Animated, {
   FadeInDown,
   FadeInUp,
@@ -186,7 +187,15 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
               accessibilityRole="tab"
               accessibilityState={{ selected: activeTab === key }}
             >
-              <Text style={[styles.segmentText, activeTab === key && styles.segmentTextActive]}>{label}</Text>
+              <View style={styles.segmentLabelRow}>
+                <Text style={[styles.segmentText, activeTab === key && styles.segmentTextActive]}>{label}</Text>
+                <InfoHint
+                  topic={key === 'weekly' ? 'lp' : 'xp'}
+                  size={18}
+                  color={activeTab === key ? '#FFFFFF' : '#FFC43D'}
+                  label={key === 'weekly' ? 'Lig Puanı (LP) nedir, nasıl kazanılır?' : 'XP nedir, nasıl kazanılır?'}
+                />
+              </View>
             </TouchableOpacity>
           ))}
         </View>
@@ -321,6 +330,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontFamily: THEME.fonts.black,
   },
+  segmentLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   segment: {
     flexDirection: 'row',
     padding: 4,

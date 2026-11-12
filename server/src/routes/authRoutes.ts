@@ -659,7 +659,7 @@ router.post('/stats', requireUserAuth, async (req: Request, res: Response): Prom
       res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
       return;
     }
-    const { correctAnswers = 0, totalAnswers = 0, bestStreak = 0, won = false, roomCode, category, mode, difficulty } = req.body;
+    const { correctAnswers = 0, totalAnswers = 0, bestStreak = 0, won = false, roomCode, category, mode, difficulty, ranked } = req.body;
     const validDifficulty = ['easy', 'medium', 'hard', 'expert'].includes(difficulty) ? difficulty : undefined;
     const result = await db.recordMatchResult(userId, {
       correctAnswers,
@@ -668,6 +668,7 @@ router.post('/stats', requireUserAuth, async (req: Request, res: Response): Prom
       won,
       mode: mode === 'solo' ? 'solo' : 'multiplayer',
       difficulty: validDifficulty,
+      ranked: ranked === true && mode !== 'solo',
       roomCode: typeof roomCode === 'string' && roomCode.trim() ? roomCode.trim() : undefined,
       category: typeof category === 'string' && category.trim() ? category.trim() : undefined,
     });

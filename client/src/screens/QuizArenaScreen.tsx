@@ -62,6 +62,8 @@ interface QuizArenaScreenProps {
   onSelectOption: (optionId: string, timeRemainingMs: number) => void;
   onTimeExpired?: () => void;
   onExit?: () => void;
+  /** Otomatik sonraki soru kapalıyken gösterilen "Sonraki Soru" düğmesinin eylemi */
+  onNext?: () => void;
   isDuelMode?: boolean;
   myDisplayName?: string;
   /** Profil fotoğrafı yoksa karakter avatarı seçmek için tohum (avatarUrl veya isim) */
@@ -472,6 +474,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   onSelectOption,
   onTimeExpired,
   onExit,
+  onNext,
   isDuelMode = false,
   myDisplayName = 'Sen',
   myAvatarUrl,
@@ -575,8 +578,8 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   }, []);
   const handleSecondChange = useCallback((sec: number) => {
     setSecondsLeft(sec);
-    if (sec <= 3 && sec > 0) {
-      // Settings > "Süre Uyarı Sesi" — kapalıysa geri sayım tiki çalınmaz
+    if (sec <= 5 && sec > 0) {
+      // Settings > "Süre Uyarı Sesi" (son 5 saniye) — kapalıysa geri sayım tiki çalınmaz
       const alertOn = loadStoredPreferences().timerAlertSound !== false;
       if (alertOn) {
         sound.playSound('timer_tick');
@@ -955,6 +958,24 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
               <Text style={styles.inlineFeedbackSub} numberOfLines={2}>
                 {feedback.explanation}
               </Text>
+            ) : null}
+            {onNext ? (
+              <TouchableOpacity
+                onPress={onNext}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Sonraki soru"
+                style={{
+                  marginTop: 8,
+                  alignSelf: 'center',
+                  paddingHorizontal: 22,
+                  paddingVertical: 8,
+                  borderRadius: 14,
+                  backgroundColor: '#6B3CFF',
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: THEME.fonts.extraBold }}>SONRAKİ SORU</Text>
+              </TouchableOpacity>
             ) : null}
           </Animated.View>
         ) : answerState === 'submitting' ? (

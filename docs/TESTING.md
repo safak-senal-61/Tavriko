@@ -51,3 +51,9 @@ A root [`repomix.config.json`](file:///c:/Users/%C3%96mer%20faruk%20%C5%9Fener/.
 ```powershell
 npx -y repomix --ignore "node_modules,dist,build,.git,.next,coverage,.expo,*.lock,.env*"
 ```
+
+## Lig Puanı (LP) kuralları
+
+LP yalnızca sıralı (ranked) maçlarda, yani botsuz 1v1 hızlı eşleşmede değişir (`isRankedMatch`, `shared/src/rewards.ts`).
+Galibiyet +20 ve her doğru cevap için +2; mağlubiyet -5; dereceli maçta her yanlış/boş cevap -10 (ayarlardan kapatılabilir).
+Galibiyette net kazanç en az +5, LP 0'ın altına düşmez. Testler: `shared/src/leaguePoints.test.ts`.

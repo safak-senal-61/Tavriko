@@ -383,6 +383,31 @@ router.get('/profile/:userId', async (req: Request, res: Response): Promise<void
     res.status(404).json({ error: 'Profil bulunamadı' });
     return;
   }
+
+  // Ayarlar > Gizlilik > "Herkese Açık Profil" kapalıysa yalnızca temel kimlik bilgileri görünür.
+  // Sahibi ve arkadaşları tam profili görmeye devam eder.
+  if ((profile.settings as any)?.profilePublic === false) {
+    let viewerId: string | undefined;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const payload = db.verifyToken(authHeader.split(' ')[1]);
+      if (payload) viewerId = payload.userId;
+    }
+    const isOwner = !!viewerId && viewerId === profile.id;
+    const isFriend = !!viewerId && (profile.friendIds || []).includes(viewerId);
+    if (!isOwner && !isFriend) {
+      res.json({
+        id: profile.id,
+        displayName: profile.displayName,
+        username: profile.username,
+        avatarUrl: profile.avatarUrl,
+        level: profile.level,
+        rankTitle: profile.rankTitle,
+        isPrivate: true,
+      });
+      return;
+    }
+  }
   res.json(profile);
 });
 

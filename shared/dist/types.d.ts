@@ -89,6 +89,8 @@ export interface GameRoom {
     hostId: string;
     status: RoomStatus;
     category: CategoryId;
+    /** Seçiliyse sorular yalnızca bu alt kategoriden gelir (alt kategori id'si) */
+    subCategory?: string;
     difficulty: DifficultyLevel;
     maxPlayers: number;
     currentRound: number;
@@ -134,6 +136,8 @@ export interface CustomRoomSettings {
     difficulty: DifficultyLevel | 'mixed';
     questionTimeSec: number;
     categories?: CategoryId[];
+    /** Tek alt kategori seçildiyse alt kategori id'si; sorular yalnızca ondan gelir */
+    subCategory?: string;
     mixedCategories?: boolean;
     penaltyForWrong?: boolean;
     privacy?: 'public' | 'private';
@@ -224,6 +228,8 @@ export interface NotificationItem {
     title: string;
     sub: string;
     timeText: string;
+    /** Bildirimin oluşturulma zamanı (epoch ms). İstemci tam saati bundan biçimlendirir. */
+    createdAt?: number;
     handled?: 'accepted' | 'declined' | null;
     senderId?: string;
     senderName?: string;
