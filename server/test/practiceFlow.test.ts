@@ -7,18 +7,18 @@ describe('Authoritative Question Submit & Practice Flow API', () => {
   let server: Server;
   let teardown: () => void;
 
-  beforeAll((done) => {
+  beforeAll(async () => {
     const created = createApp();
     app = created.app;
     teardown = created.close;
-    server = created.httpServer.listen(0, () => {
-      done();
+    await new Promise<void>((resolve) => {
+      server = created.httpServer.listen(0, () => resolve());
     });
   });
 
-  afterAll((done) => {
+  afterAll(async () => {
     teardown();
-    server.close(done);
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
   it('validates a correct answer submission authoritatively with speed bonus and explanation', async () => {

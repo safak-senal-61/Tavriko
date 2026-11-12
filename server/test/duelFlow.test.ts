@@ -19,7 +19,9 @@ describe('1v1 Live Duel & Guest Matchmaking System', () => {
     roomManager.cleanupAll();
   });
 
-  it('pairs two guest players in 1v1 duel mode and assigns opponent details', (done) => {
+  it('pairs two guest players in 1v1 duel mode and assigns opponent details', async () => {
+    let finish!: () => void;
+    const finished = new Promise<void>((resolve) => { finish = resolve; });
     let matchFoundCalled = false;
 
     matchmaker.onMatchFound = (roomCode, players) => {
@@ -41,7 +43,7 @@ describe('1v1 Live Duel & Guest Matchmaking System', () => {
       expect(room?.maxPlayers).toBe(2);
       expect(Object.keys(room!.players).length).toBe(2);
 
-      done();
+      finish();
     };
 
     // Guest 1 joins queue
@@ -67,6 +69,9 @@ describe('1v1 Live Duel & Guest Matchmaking System', () => {
       difficulty: 'medium',
       queuedAt: Date.now(),
     });
+
+    await finished;
+    expect(matchFoundCalled).toBe(true);
   });
 
   it('runs an authoritative 1v1 round with synchronized answers and score updates', () => {
@@ -115,7 +120,9 @@ describe('1v1 Live Duel & Guest Matchmaking System', () => {
     expect(leaderboard[1].rank).toBe(2);
   });
 
-  it('pairs with intelligent rival bot if player waits over 6 seconds', (done) => {
+  it('pairs with intelligent rival bot if player waits over 6 seconds', async () => {
+    let finish!: () => void;
+    const finished = new Promise<void>((resolve) => { finish = resolve; });
     matchmaker.onMatchFound = (roomCode, players) => {
       expect(players.length).toBe(2);
       expect(players[0].playerId).toBe('guest_solo');
@@ -124,7 +131,7 @@ describe('1v1 Live Duel & Guest Matchmaking System', () => {
       const room = roomManager.getRoom(roomCode);
       expect(room).toBeDefined();
       expect(room?.mode).toBe('duel');
-      done();
+      finish();
     };
 
     // Queue simulated with queuedAt in the past (7 seconds ago)
@@ -135,5 +142,7 @@ describe('1v1 Live Duel & Guest Matchmaking System', () => {
       mode: 'duel',
       queuedAt: Date.now() - 7000,
     });
+
+    await finished;
   });
 });

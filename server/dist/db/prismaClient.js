@@ -98,7 +98,8 @@ class PrismaService {
     // Aynı örnek içinden eşzamanlı bulut yazımlarını sıraya sokar (okuma-değiştirme-yazma yarışını önler)
     cloudQuestionsWriteChain = Promise.resolve();
     categories = [...questionsData_1.ALL_CATEGORIES];
-    isJest = Boolean(process.env.JEST_WORKER_ID);
+    // Test çalıştırıcısı (Jest veya Vitest) altında disk/bulut yan etkileri kapatılır.
+    isJest = Boolean(process.env.JEST_WORKER_ID) || Boolean(process.env.VITEST);
     activeUserRooms = new Map();
     recordedMatchKeys = new Set();
     activePublicRooms = new Map();

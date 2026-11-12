@@ -32,7 +32,16 @@
       "expo-font",
       "expo-audio",
       "expo-web-browser",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "organization": "tavriko",
+          "project": "react-native",
+          "disableAutoUpload": true
+        }
+      ]
     ]
   }
 }

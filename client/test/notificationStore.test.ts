@@ -119,7 +119,7 @@ describe('Shared notification inbox and exact unread count', () => {
 
   it('ignores an HTTP response after changing accounts', async () => {
     let resolve!: (value: unknown) => void;
-    globalThis.fetch = jest.fn(() => new Promise(done => { resolve = done; })) as any;
+    globalThis.fetch = vi.fn(() => new Promise(done => { resolve = done; })) as any;
     const request = inbox().refresh('/api');
     inbox().activate('player-b');
     resolve({ ok: true, json: async () => ({ notifications: [makeNotification('private-a')] }) });
@@ -130,7 +130,7 @@ describe('Shared notification inbox and exact unread count', () => {
 
   it('shows a retryable error without losing existing messages', async () => {
     inbox().receive(makeNotification('one'));
-    globalThis.fetch = jest.fn().mockRejectedValue(new Error('offline'));
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('offline'));
     await inbox().refresh('/api');
     expect(inbox().error).toContain('yeniden');
     expect(inbox().items).toHaveLength(1);

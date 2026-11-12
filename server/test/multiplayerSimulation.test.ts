@@ -14,27 +14,31 @@ describe('Real-Time Multi-Client Multiplayer Simulation', () => {
   let clientB: ClientSocketType;
   let clientC: ClientSocketType;
 
-  beforeAll((done) => {
+  beforeAll(async () => {
     const created = createApp();
     teardown = created.close;
-    server = created.httpServer.listen(0, () => {
-      const addr = server.address();
-      if (addr && typeof addr === 'object') {
-        serverPort = addr.port;
-      }
-      done();
+    await new Promise<void>((resolve) => {
+      server = created.httpServer.listen(0, () => {
+        const addr = server.address();
+        if (addr && typeof addr === 'object') {
+          serverPort = addr.port;
+        }
+        resolve();
+      });
     });
   });
 
-  afterAll((done) => {
+  afterAll(async () => {
     if (clientA) clientA.disconnect();
     if (clientB) clientB.disconnect();
     if (clientC) clientC.disconnect();
     teardown();
-    server.close(done);
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  it('orchestrates 3 live players through room creation, synchronization, authoritative answer submission, and score ranking', (done) => {
+  it('orchestrates 3 live players through room creation, synchronization, authoritative answer submission, and score ranking', async () => {
+    let finish!: () => void;
+    const finished = new Promise<void>((resolve) => { finish = resolve; });
     const url = `http://localhost:${serverPort}`;
     clientA = ClientSocket(url);
     clientB = ClientSocket(url);
@@ -134,17 +138,21 @@ describe('Real-Time Multi-Client Multiplayer Simulation', () => {
       expect(rank3.playerId).toBe('player_c');
       expect(rank3.score).toBe(0);
 
-      done();
+      finish();
     });
+    await finished;
   }, 10000);
 
-  it('handles client disconnection and continues match without crashing the room', (done) => {
+  it('handles client disconnection and continues match without crashing the room', async () => {
+    let finish!: () => void;
+    const finished = new Promise<void>((resolve) => { finish = resolve; });
     clientA.on(SOCKET_EVENTS.PLAYER_DISCONNECTED, (data: { playerId: string }) => {
       expect(data.playerId).toBe('player_c');
-      done();
+      finish();
     });
 
     // Client C disconnects
     clientC.disconnect();
+    await finished;
   });
 });

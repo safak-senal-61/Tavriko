@@ -1,4 +1,5 @@
 import React from 'react';
+import * as Sentry from '@sentry/react-native';
 import { useFonts } from 'expo-font';
 import {
   Nunito_400Regular,
@@ -9,6 +10,15 @@ import {
 } from '@expo-google-fonts/nunito';
 import { View, ActivityIndicator, Platform } from 'react-native';
 import { RootNavigator } from './src/navigation/RootNavigator';
+
+// Sentry hata izleme: EXPO_PUBLIC_SENTRY_DSN tanımlı değilse sessizce kapalı kalır.
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    environment: __DEV__ ? 'development' : 'production',
+  });
+}
 
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   const styleId = 'tavriko-web-styles';
@@ -63,7 +73,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
   }
 }
 
-export default function App() {
+function AppInner() {
   const [fontsLoaded] = useFonts({
     Nunito_400Regular,
     Nunito_600SemiBold,
@@ -82,3 +92,6 @@ export default function App() {
 
   return <RootNavigator />;
 }
+
+// Sentry.wrap, SDK kapalıyken bile bileşeni değiştirmeden geçirir.
+export default Sentry.wrap(AppInner);
