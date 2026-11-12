@@ -659,18 +659,20 @@ router.post('/stats', requireUserAuth, async (req: Request, res: Response): Prom
       res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
       return;
     }
-    const { correctAnswers = 0, totalAnswers = 0, xpEarned = 0, coinsEarned = 0, bestStreak = 0, won = false, roomCode, category } = req.body;
-    const updated = await db.recordGameStats(userId, {
+    const { correctAnswers = 0, totalAnswers = 0, bestStreak = 0, won = false, roomCode, category, mode, difficulty } = req.body;
+    const validDifficulty = ['easy', 'medium', 'hard', 'expert'].includes(difficulty) ? difficulty : undefined;
+    const result = await db.recordMatchResult(userId, {
       correctAnswers,
       totalAnswers,
-      xpEarned,
-      coinsEarned,
       bestStreak,
       won,
+      mode: mode === 'solo' ? 'solo' : 'multiplayer',
+      difficulty: validDifficulty,
       roomCode: typeof roomCode === 'string' && roomCode.trim() ? roomCode.trim() : undefined,
       category: typeof category === 'string' && category.trim() ? category.trim() : undefined,
     });
-    res.json({ success: true, user: updated });
+    // rewards: hesaba GERÇEKTEN yazılan XP/altın (istemci bunu aynen göstermelidir)
+    res.json({ success: true, user: result?.user ?? null, rewards: result?.rewards ?? null });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }

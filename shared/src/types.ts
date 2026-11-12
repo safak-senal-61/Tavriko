@@ -1187,7 +1187,7 @@ export const EVENT_DEFINITIONS: GameEvent[] = [
     metric: 'matches_played',
     rewardCoins: 350,
     rewardGems: 10,
-    rewardXp: 120,
+    rewardXp: 40,
     rewardSeasonXp: 60,
     endsInHours: 24,
   },
@@ -1200,7 +1200,7 @@ export const EVENT_DEFINITIONS: GameEvent[] = [
     metric: 'correct_answers',
     rewardCoins: 250,
     rewardGems: 15,
-    rewardXp: 100,
+    rewardXp: 40,
     rewardSeasonXp: 50,
     endsInHours: 24,
   },
@@ -1213,7 +1213,7 @@ export const EVENT_DEFINITIONS: GameEvent[] = [
     metric: 'wins',
     rewardCoins: 500,
     rewardGems: 20,
-    rewardXp: 150,
+    rewardXp: 60,
     rewardSeasonXp: 80,
     rewardItem: { id: 'chest_wood', name: 'Ahşap Sandık', desc: 'Gümüş anahtar ile açılır', qty: 1, category: 'chest', rarity: 'common' },
     endsInHours: 24,
@@ -1227,7 +1227,7 @@ export const EVENT_DEFINITIONS: GameEvent[] = [
     metric: 'streak',
     rewardCoins: 400,
     rewardGems: 20,
-    rewardXp: 160,
+    rewardXp: 60,
     rewardSeasonXp: 70,
     rewardItem: { id: 'key_silver', name: 'Gümüş Anahtar', desc: 'Sandıkları açar', qty: 1, category: 'key', rarity: 'rare' },
     endsInHours: 24,
@@ -1243,7 +1243,7 @@ export const EVENT_DEFINITIONS: GameEvent[] = [
     metric: 'matches_played',
     rewardCoins: 2000,
     rewardGems: 50,
-    rewardXp: 400,
+    rewardXp: 150,
     rewardSeasonXp: 200,
     rewardItem: { id: 'chest_silver', name: 'Gümüş Sandık', desc: 'Gümüş anahtar ile açılır', qty: 1, category: 'chest', rarity: 'rare' },
     endsInHours: 168,
@@ -1257,7 +1257,7 @@ export const EVENT_DEFINITIONS: GameEvent[] = [
     metric: 'correct_answers',
     rewardCoins: 3000,
     rewardGems: 80,
-    rewardXp: 600,
+    rewardXp: 200,
     rewardSeasonXp: 300,
     rewardItem: { id: 'key_gold', name: 'Altın Anahtar', desc: 'Altın sandıkları açar', qty: 1, category: 'key', rarity: 'epic' },
     endsInHours: 168,
@@ -1271,7 +1271,7 @@ export const EVENT_DEFINITIONS: GameEvent[] = [
     metric: 'wins',
     rewardCoins: 4500,
     rewardGems: 120,
-    rewardXp: 800,
+    rewardXp: 250,
     rewardSeasonXp: 400,
     rewardItem: { id: 'chest_gold', name: 'Altın Sandık', desc: 'Altın anahtar ile açılır', qty: 1, category: 'chest', rarity: 'epic' },
     endsInHours: 168,
@@ -1287,7 +1287,7 @@ export const EVENT_DEFINITIONS: GameEvent[] = [
     metric: 'wins',
     rewardCoins: 5000,
     rewardGems: 150,
-    rewardXp: 1000,
+    rewardXp: 300,
     rewardSeasonXp: 500,
     rewardItem: { id: 'chest_legendary', name: 'Efsanevi Sandık', desc: 'Elmas anahtar ile açılır', qty: 1, category: 'chest', rarity: 'mythic' },
     endsInHours: 72,
@@ -1301,7 +1301,7 @@ export const EVENT_DEFINITIONS: GameEvent[] = [
     metric: 'matches_played',
     rewardCoins: 4000,
     rewardGems: 100,
-    rewardXp: 800,
+    rewardXp: 250,
     rewardSeasonXp: 350,
     rewardItem: { id: 'key_diamond', name: 'Elmas Anahtar', desc: 'Efsanevi sandıkları açar', qty: 1, category: 'key', rarity: 'legendary' },
     endsInHours: 48,
@@ -1349,7 +1349,8 @@ export function getDailyChallengeConfig(streakDay: number = 1): DailyChallengeCo
     requiredCorrect = 9;
   }
 
-  const rewardXp = 50 + dayNumber * 25;
+  // Mütevazı XP: 40..100 (seviye 1 için 500 XP gerekir)
+  const rewardXp = 30 + dayNumber * 10;
   const rewardCoins = 40 + dayNumber * 20;
   const rewardGems = 5 + dayNumber * 5;
   // Hediye kutusu yalnızca 7 günlük serinin tamamlanmasında verilir (boş yere görünmez)

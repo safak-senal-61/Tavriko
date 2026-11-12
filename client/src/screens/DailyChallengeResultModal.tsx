@@ -69,15 +69,15 @@ export const DailyChallengeResultModal: React.FC<DailyChallengeResultModalProps>
               <Text style={styles.rewardsTitle}>KAZANILAN ÖDÜLLER</Text>
               <View style={styles.rewardsRow}>
                 <View style={styles.rewardItem}>
-                  <Text style={styles.rewardItemVal}>+{rewards?.xp || 75} XP</Text>
+                  <Text style={styles.rewardItemVal}>+{rewards?.xp ?? 0} XP</Text>
                 </View>
                 <View style={styles.rewardItem}>
                   <CoinIcon size={16} />
-                  <Text style={styles.rewardItemVal}> +{rewards?.coins || 50}</Text>
+                  <Text style={styles.rewardItemVal}> +{rewards?.coins ?? 0}</Text>
                 </View>
                 <View style={styles.rewardItem}>
                   <GemIcon size={16} />
-                  <Text style={styles.rewardItemVal}> +{rewards?.gems || 10}</Text>
+                  <Text style={styles.rewardItemVal}> +{rewards?.gems ?? 0}</Text>
                 </View>
                 {rewards?.chest && (
                   <View style={styles.rewardItem}>

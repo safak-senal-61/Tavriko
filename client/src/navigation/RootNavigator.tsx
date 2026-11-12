@@ -205,6 +205,9 @@ export const RootNavigator: React.FC = () => {
   const [practiceFeedback, setPracticeFeedback] = useState<RoundFeedback | null>(null);
   const [multiplayerFeedback, setMultiplayerFeedback] = useState<RoundFeedback | null>(null);
   const [isPracticeSummaryVisible, setIsPracticeSummaryVisible] = useState<boolean>(false);
+  // Sunucunun hesaba gerçekten yazdığı maç ödülleri (ekranda aynen gösterilir)
+  const [practiceRewards, setPracticeRewards] = useState<{ xp: number; coins: number; boosted: boolean } | null>(null);
+  const [matchRewards, setMatchRewards] = useState<{ xp: number; coins: number; boosted: boolean } | null>(null);
   const [activeDailyConfig, setActiveDailyConfig] = useState<DailyChallengeConfig | null>(null);
   const [dailyResultModal, setDailyResultModal] = useState<{
     visible: boolean;
@@ -649,9 +652,7 @@ export const RootNavigator: React.FC = () => {
           typeof myRankEntry?.correctAnswersCount === 'number'
             ? myRankEntry.correctAnswersCount
             : matchQuestionsReviewRef.current.filter((q) => q.isCorrect).length;
-        const isZero = correctAnswers === 0;
-        const xpEarned = isZero ? 0 : won ? Math.min(35, correctAnswers * 5 + 10) : Math.min(15, correctAnswers * 3);
-        const coinsEarned = isZero ? 0 : won ? Math.min(15, correctAnswers * 2 + 5) : Math.min(6, correctAnswers * 1);
+        setMatchRewards(null);
         fetch(`${API_BASE}/auth/stats`, {
           method: 'POST',
           headers: {
@@ -663,8 +664,7 @@ export const RootNavigator: React.FC = () => {
             won,
             correctAnswers,
             totalAnswers: summary.totalRounds || 5,
-            xpEarned,
-            coinsEarned,
+            mode: 'multiplayer',
             bestStreak: myRankEntry?.streak || 1,
             roomCode: summary.roomCode,
             category: (summary as any).category || activeRoom?.category || selectedCategory || 'general_culture',
@@ -674,6 +674,10 @@ export const RootNavigator: React.FC = () => {
           .then((data) => {
             if (data?.user) {
               setUser(data.user);
+            }
+            // Sunucunun hesaba GERÇEKTEN yazdığı ödül
+            if (data?.rewards && !(data.rewards.alreadyRecorded && !data.rewards.xp)) {
+              setMatchRewards({ xp: data.rewards.xp, coins: data.rewards.coins, boosted: !!data.rewards.boosted });
             }
           })
           .catch(() => {});
@@ -1420,6 +1424,7 @@ export const RootNavigator: React.FC = () => {
         }
         return;
       }
+      setPracticeRewards(null);
       setIsPracticeSummaryVisible(true);
       if (user && !isGuest) {
         const totalAns = Math.max(1, questionsList.length);
@@ -1436,8 +1441,8 @@ export const RootNavigator: React.FC = () => {
             won,
             correctAnswers: correctAns,
             totalAnswers: totalAns,
-            xpEarned: correctAns === 0 ? 0 : Math.min(25, correctAns * 4 + (won ? 8 : 0)),
-            coinsEarned: correctAns === 0 ? 0 : Math.min(8, correctAns * 1 + (won ? 3 : 0)),
+            mode: 'solo',
+            difficulty: selectedDifficulty,
             bestStreak: practiceStreak,
             category: selectedCategory || (practiceCategory as any) || 'general_culture',
           }),
@@ -1446,6 +1451,9 @@ export const RootNavigator: React.FC = () => {
           .then((data) => {
             if (data?.user) {
               setUser(data.user);
+            }
+            if (data?.rewards) {
+              setPracticeRewards({ xp: data.rewards.xp, coins: data.rewards.coins, boosted: !!data.rewards.boosted });
             }
           })
           .catch(() => {});
@@ -1984,6 +1992,10 @@ export const RootNavigator: React.FC = () => {
             <PracticeSummaryModal
               visible={isPracticeSummaryVisible}
               stats={practiceStats}
+              isGuest={isGuest}
+              difficulty={selectedDifficulty}
+              rewards={practiceRewards}
+              userXp={user?.xp}
               onPlayAgain={() => {
                 setIsPracticeSummaryVisible(false);
                 handleStartPractice(selectedCategory, selectedDifficulty);
@@ -2035,6 +2047,7 @@ export const RootNavigator: React.FC = () => {
             currentUserId={user.id}
             questionReviews={finalSummary.questionReviews || matchQuestionsReview}
             userXp={user.xp}
+            rewards={matchRewards}
             onPlayAgain={() => {
               resetGame();
               handleStartQuickMatch();

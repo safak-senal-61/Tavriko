@@ -16,6 +16,7 @@ import {
   MatchQuestionReviewItem,
   PlayerScoreSummary,
   calculateLevelFromXp,
+  calculateMatchRewards,
 } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -37,6 +38,8 @@ interface MatchResultPodiumScreenProps {
   questionReviews?: MatchQuestionReviewItem[];
   /** Kullanıcının güncel toplam XP'si; verilirse gerçek seviye ilerlemesi gösterilir */
   userXp?: number;
+  /** Sunucunun hesaba gerçekten yazdığı ödül; gelene kadar paylaşılan formülle hesaplanan değer gösterilir */
+  rewards?: { xp: number; coins: number; boosted?: boolean } | null;
   onPlayAgain: () => void;
   onHome: () => void;
 }
@@ -137,6 +140,7 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
   currentUserId,
   questionReviews,
   userXp,
+  rewards,
   onPlayAgain,
   onHome,
 }) => {
@@ -162,16 +166,14 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
 
   // KURAL: 0 doğru cevap veya erken çıkışta para/XP ödülü sıfırlanır!
   const isZeroPerformance = correctCount === 0 || (myRanking?.score || 0) <= 0;
-  const xpEarned = isZeroPerformance
-    ? 0
-    : isWinner
-    ? Math.min(35, correctCount * 5 + 10)
-    : Math.min(15, correctCount * 3);
-  const coinsEarned = isZeroPerformance
-    ? 0
-    : isWinner
-    ? Math.min(15, correctCount * 2 + 5)
-    : Math.min(6, correctCount * 1);
+  const computed = calculateMatchRewards({
+    correct: isZeroPerformance ? 0 : correctCount,
+    total: totalRounds,
+    won: !!isWinner,
+    mode: 'multiplayer',
+  });
+  const xpEarned = rewards ? rewards.xp : computed.xp;
+  const coinsEarned = rewards ? rewards.coins : computed.coins;
 
   const levelInfo = typeof userXp === 'number' ? calculateLevelFromXp(userXp) : null;
 
@@ -249,7 +251,7 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
               <Text style={styles.sectionTitle}>Kazandıkların</Text>
               <View style={styles.rewardChips}>
                 <Animated.View entering={ZoomIn.delay(700).springify()} style={styles.rewardChip}>
-                  <Text style={styles.xpChipText}>+{xpEarned} XP</Text>
+                  <Text style={styles.xpChipText}>+{xpEarned} XP{rewards?.boosted ? ' (2x)' : ''}</Text>
                 </Animated.View>
                 <Animated.View entering={ZoomIn.delay(800).springify()} style={styles.rewardChip}>
                   <CoinIcon size={16} />

@@ -24,6 +24,7 @@ import {
   InventoryItem,
   NotificationItem,
   calculateLevelFromXp,
+  calculateMatchRewards,
   getDailyChallengeConfig,
   SEASON_1_TIERS,
   SHOP_CATALOG,
@@ -177,6 +178,31 @@ interface PrismaTableStore {
 // Eski sürümlerde yeni kullanıcılara otomatik eklenen sahte bildirimler.
 const MOCK_NOTIFICATION_IDS = new Set(['notif_welcome', 'notif_duel_1', 'notif_season']);
 
+/** Bir maç sonucunu kaydetmek için gönderilen veri. XP/altın artık sunucuda hesaplanır. */
+export interface GameStatsDelta {
+  correctAnswers: number;
+  totalAnswers: number;
+  /** Eski istemciler için kabul edilir ama YOK SAYILIR (ödül sunucuda hesaplanır) */
+  xpEarned?: number;
+  coinsEarned?: number;
+  bestStreak: number;
+  won?: boolean;
+  roomCode?: string;
+  category?: string;
+  /** 'solo': Keşfet/pratik, diğerleri çok oyunculu */
+  mode?: 'solo' | 'multiplayer';
+  difficulty?: DifficultyLevel;
+}
+
+/** Hesaba gerçekten yazılan ödül (2x artırıcı dahil) */
+export interface AppliedMatchRewards {
+  xp: number;
+  coins: number;
+  seasonXp: number;
+  boosted: boolean;
+  alreadyRecorded?: boolean;
+}
+
 export class PrismaService {
   public readonly rawClient: PrismaClient;
   private store: PrismaTableStore = {
@@ -202,6 +228,7 @@ export class PrismaService {
   private isJest = Boolean(process.env.JEST_WORKER_ID) || Boolean(process.env.VITEST);
   public activeUserRooms: Map<string, { roomCode: string; joinedAt: number }> = new Map();
   private recordedMatchKeys: Set<string> = new Set();
+  private recordedMatchRewards: Map<string, AppliedMatchRewards> = new Map();
   public activePublicRooms: Map<
     string,
     {
@@ -2319,29 +2346,42 @@ export class PrismaService {
 
   public async recordGameStats(
     userId: string,
-    delta: {
-      correctAnswers: number;
-      totalAnswers: number;
-      xpEarned: number;
-      coinsEarned: number;
-      bestStreak: number;
-      won?: boolean;
-      roomCode?: string;
-      category?: string;
-    }
+    delta: GameStatsDelta
   ): Promise<UserProfile | null> {
+    const res = await this.recordMatchResult(userId, delta);
+    return res ? res.user : null;
+  }
+
+  /**
+   * Maç sonucunu kaydeder ve GERÇEKTEN hesaba yazılan ödülü döndürür.
+   * Ödül sunucuda calculateMatchRewards ile hesaplanır; istemcinin gönderdiği
+   * xpEarned/coinsEarned değerleri artık yok sayılır. Böylece ekranda gösterilen
+   * XP ile çubuğa yansıyan XP her zaman aynıdır.
+   */
+  public async recordMatchResult(
+    userId: string,
+    delta: GameStatsDelta
+  ): Promise<{ user: UserProfile; rewards: AppliedMatchRewards } | null> {
     let record = await this.loadRecord(userId);
     if (!record) return null;
 
     if (delta.roomCode) {
       const matchKey = `${record.id}:${delta.roomCode}`;
       if (this.recordedMatchKeys.has(matchKey)) {
-        return this.toProfile(record);
+        // Aynı maç ikinci kez bildirilirse ilk kayıttaki ödülü aynen döndür
+        const prev = this.recordedMatchRewards.get(matchKey);
+        return {
+          user: this.toProfile(record),
+          rewards: prev || { xp: 0, coins: 0, seasonXp: 0, boosted: false, alreadyRecorded: true },
+        };
       }
       this.recordedMatchKeys.add(matchKey);
       if (this.recordedMatchKeys.size > 2000) {
         const firstKey = this.recordedMatchKeys.values().next().value;
-        if (firstKey) this.recordedMatchKeys.delete(firstKey);
+        if (firstKey) {
+          this.recordedMatchKeys.delete(firstKey);
+          this.recordedMatchRewards.delete(firstKey);
+        }
       }
     }
 
@@ -2353,24 +2393,31 @@ export class PrismaService {
     record.stats = this.sanitizeUserStats(record.stats);
 
     // KURAL: Soru çözmeyen / 0 doğru yapan oyuncuya kesinlikle para (coin) ve XP verilmez!
-    const isZeroPerformance = safeCorrect === 0;
-
-    // Zorlaştırılmış ekonomi: Tek maçtan kazanılan XP ve Altın sınırlandırıldı
-    const cappedXp = isZeroPerformance
-      ? 0
-      : Math.max(0, Math.min(Number(delta.xpEarned) || 0, delta.won ? 35 : 15));
-    const cappedCoins = isZeroPerformance
-      ? 0
-      : Math.max(0, Math.min(Math.round(Number(delta.coinsEarned) || 0), delta.won ? 15 : 6));
+    // Ödül TAMAMEN sunucuda hesaplanır (paylaşılan tek formül)
+    const baseRewards = calculateMatchRewards({
+      correct: safeCorrect,
+      total: safeTotal,
+      won: !!delta.won,
+      mode: delta.mode === 'solo' ? 'solo' : 'multiplayer',
+      difficulty: delta.difficulty,
+    });
 
     // 2x XP artırıcı: aktifken maçtan kazanılan XP 2 katına çıkar (1v1, özel oda vb. tüm maçlar).
     const boosterActive = (record.activeBoosterExpiresAt || 0) > Date.now();
-    record.xp += boosterActive ? cappedXp * 2 : cappedXp;
-    record.coins += cappedCoins;
+    const appliedXp = boosterActive ? baseRewards.xp * 2 : baseRewards.xp;
+    record.xp += appliedXp;
+    record.coins += baseRewards.coins;
+    record.seasonXp = (record.seasonXp || 0) + baseRewards.seasonXp;
 
-    // Season 1 Pass XP progression (0 doğru için sezon XP verilmez)
-    const seasonXpGain = isZeroPerformance ? 0 : delta.won ? 25 : 10;
-    record.seasonXp = (record.seasonXp || 0) + seasonXpGain;
+    const appliedRewards: AppliedMatchRewards = {
+      xp: appliedXp,
+      coins: baseRewards.coins,
+      seasonXp: baseRewards.seasonXp,
+      boosted: boosterActive && baseRewards.xp > 0,
+    };
+    if (delta.roomCode) {
+      this.recordedMatchRewards.set(`${record.id}:${delta.roomCode}`, appliedRewards);
+    }
 
     const progress = calculateLevelFromXp(record.xp);
     record.level = progress.level;
@@ -2456,7 +2503,7 @@ export class PrismaService {
         console.error('[recordGameStats] PostgreSQL update error:', err);
       }
     }
-    return this.toProfile(record);
+    return { user: this.toProfile(record), rewards: appliedRewards };
   }
 
   /**
@@ -2967,6 +3014,59 @@ export class PrismaService {
     return stats;
   }
 
+  /**
+   * Karışık mod için: sorular önce kategoriler arasında, sonra her kategorinin
+   * alt kategorileri arasında dönüşümlü (round-robin) dağıtılır. Böylece ilk N soru
+   * mümkün olduğunca N farklı ana kategoriden ve farklı alt kategorilerden gelir.
+   */
+  private spreadAcrossCategories(pool: Question[]): Question[] {
+    const shuffle = <T,>(arr: T[]): T[] => [...arr].sort(() => 0.5 - Math.random());
+    const byCat = new Map<string, Question[]>();
+    for (const q of pool) {
+      const key = canonicalCategoryId(q.categoryId);
+      const list = byCat.get(key);
+      if (list) list.push(q);
+      else byCat.set(key, [q]);
+    }
+    const interleaveSubs = (qs: Question[]): Question[] => {
+      const bySub = new Map<string, Question[]>();
+      for (const q of shuffle(qs)) {
+        const k = (q.subCategory || '').trim().toLowerCase();
+        const l = bySub.get(k);
+        if (l) l.push(q);
+        else bySub.set(k, [q]);
+      }
+      const queues = shuffle(Array.from(bySub.values()));
+      const out: Question[] = [];
+      let more = true;
+      while (more) {
+        more = false;
+        for (const queue of queues) {
+          const next = queue.shift();
+          if (next) {
+            out.push(next);
+            more = true;
+          }
+        }
+      }
+      return out;
+    };
+    const catQueues = shuffle(Array.from(byCat.values())).map(interleaveSubs);
+    const result: Question[] = [];
+    let more = true;
+    while (more) {
+      more = false;
+      for (const queue of shuffle(catQueues)) {
+        const next = queue.shift();
+        if (next) {
+          result.push(next);
+          more = true;
+        }
+      }
+    }
+    return result;
+  }
+
   public getQuestions(
     category: CategoryId = 'mixed',
     difficulty?: DifficultyLevel,
@@ -3022,7 +3122,10 @@ export class PrismaService {
       }
     }
 
-    const shuffledPrimary = [...primaryPool].sort(() => 0.5 - Math.random());
+    const shuffledPrimary =
+      canonCat === 'mixed'
+        ? this.spreadAcrossCategories(primaryPool)
+        : [...primaryPool].sort(() => 0.5 - Math.random());
 
     for (const q of shuffledPrimary) {
       if (pickedMap.size >= count) break;
@@ -4591,8 +4694,8 @@ export class PrismaService {
     } else if (itemId === 'chest' || itemId === 'gift') {
       record.coins += 200;
       record.gems = (record.gems || 0) + 10;
-      record.xp += 150;
-      rewardText = 'Sandık açıldı: +200 Altın, +10 Elmas ve +150 XP kazandın!';
+      record.xp += 50;
+      rewardText = 'Sandık açıldı: +200 Altın, +10 Elmas ve +50 XP kazandın!';
     } else if (itemId === 'gem') {
       record.gems = (record.gems || 0) + 10;
       rewardText = '+10 Elmas hesabına eklendi!';
@@ -4609,8 +4712,8 @@ export class PrismaService {
       const mins = Math.round(durationMs / 60000);
       rewardText = `⚡ 2x XP artırıcı aktif! ${mins >= 60 ? `${Math.round(mins / 60)} saat` : `${mins} dakika`} boyunca maçlardan kazanacağın XP 2 katına çıkar.`;
     } else {
-      record.xp += 100;
-      rewardText = `${item.name} aktif edildi: +100 XP kazandın!`;
+      record.xp += 30;
+      rewardText = `${item.name} aktif edildi: +30 XP kazandın!`;
     }
 
     const prog = calculateLevelFromXp(record.xp);
@@ -4998,7 +5101,7 @@ export class PrismaService {
       const t = rollTier(0.5, 0.35);
       coins = bracket(t, [800, 1500], [1500, 2800], [2800, 4500]);
       gems = Math.random() < 0.5 ? randInt(30, 70) : 0;
-      xp = bracket(t, [200, 400], [400, 600], [600, 800]);
+      xp = bracket(t, [100, 150], [150, 200], [200, 250]);
       const giftBonusPool: InventoryItem[] = [
         {
           id: 'booster_xp_2x_1h',
@@ -5022,7 +5125,7 @@ export class PrismaService {
       const t = rollTier(0.45, 0.38);
       coins = bracket(t, [1000, 2000], [2000, 4000], [4000, 6500]);
       gems = Math.random() < 0.45 ? randInt(50, 110) : 0;
-      xp = bracket(t, [400, 600], [600, 900], [900, 1300]);
+      xp = bracket(t, [80, 120], [120, 180], [180, 250]);
       bonusItem = {
         id: 'frame_flame',
         name: 'Alev Çerçevesi',
@@ -5035,7 +5138,7 @@ export class PrismaService {
       const t = rollTier(0.5, 0.35);
       coins = bracket(t, [500, 900], [900, 1800], [1800, 2800]);
       gems = Math.random() < 0.4 ? randInt(20, 45) : 0;
-      xp = bracket(t, [200, 320], [320, 480], [480, 650]);
+      xp = bracket(t, [50, 80], [80, 120], [120, 160]);
       bonusItem = {
         id: 'booster_xp_2x_1h',
         name: '2x XP (1 Saat)',
@@ -5048,13 +5151,13 @@ export class PrismaService {
       const t = rollTier(0.55, 0.32);
       coins = bracket(t, [250, 500], [500, 900], [900, 1400]);
       gems = Math.random() < 0.35 ? randInt(8, 20) : 0;
-      xp = bracket(t, [100, 180], [180, 280], [280, 400]);
+      xp = bracket(t, [25, 45], [45, 70], [70, 100]);
     } else {
       // Ahşap sandık: çoğunlukla mütevazı ödül
       const t = rollTier(0.6, 0.3);
       coins = bracket(t, [80, 180], [180, 350], [350, 500]);
       gems = Math.random() < 0.35 ? randInt(3, 8) : 0;
-      xp = bracket(t, [40, 90], [90, 150], [150, 220]);
+      xp = bracket(t, [10, 20], [20, 35], [35, 50]);
     }
 
     record.coins += coins;

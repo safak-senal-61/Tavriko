@@ -34,6 +34,7 @@ export const DISCOVER_CATEGORY_IMG: Record<string, ImageSourcePropType> = {
   language_vocab: require('../../assets/images/discovery/cat_language.png'),
   geography: require('../../assets/images/discovery/cat_geography.png'),
   general_culture: require('../../assets/images/discovery/cat_general.png'),
+  mixed: require('../../assets/images/discovery/cat_mixed.png'),
 };
 
 /** Keşfet başlığının geniş portal görseli (şeffaf zemin, 16:9). */

@@ -7,6 +7,7 @@ import {
   AppState,
   AppStateStatus,
   useWindowDimensions,
+  Image,
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
 import Animated, {
@@ -35,6 +36,7 @@ import {
   CloseXIcon,
 } from '../components/TavrikoIcons';
 import { GradientFill } from '../components/TavrikoGradient';
+import { DISCOVER_CATEGORY_IMG, DISCOVER_SUBCATEGORY_IMG } from '../components/DiscoverArtwork';
 export type QuestionAnswerState =
   | 'answerable'
   | 'submitting'
@@ -461,38 +463,6 @@ const DuelPlayerBlock: React.FC<{
   );
 };
 
-const CATEGORY_EMOJI: Record<string, string> = {
-  gaming_videogames: '🎮',
-  anime_manga: '🍥',
-  cartoons_animation: '📺',
-  cinema_tv: '🎬',
-  comics_superheroes: '🦸',
-  fantasy_fiction: '🐉',
-  literature: '📚',
-  music: '🎵',
-  social_internet: '📱',
-  animals_wildlife: '🦁',
-  mythology_ancient: '🏛️',
-  hobbies_leisure: '🎲',
-  history: '📜',
-  geography: '🌍',
-  art_culture: '🎨',
-  sports: '⚽',
-  science_tech: '🔬',
-  logic_puzzles: '🧩',
-  mathematics: '➗',
-  food_gastronomy: '🍲',
-  daily_life: '🏠',
-  turkey_special: '🇹🇷',
-  space_astronomy: '🚀',
-  biology: '🧬',
-  physics_chemistry: '⚗️',
-  language_vocab: '🔤',
-  nature_ecology: '🌿',
-  general_culture: '🧠',
-  mixed: '✨',
-};
-
 export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   question,
   selectedOptionId,
@@ -693,8 +663,20 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const meLeads = !!rightPlayer && myScore > rightPlayer.score;
   const opponentLeads = !!rightPlayer && rightPlayer.score > myScore;
   const categoryName = categoryObj?.name || 'Genel Kültür';
-  const categoryEmoji = CATEGORY_EMOJI[question.categoryId] || '🧠';
   const subCategoryName = (question.subCategory || '').trim();
+  const normalizeKey = (v: string) => v.trim().toLocaleLowerCase('tr-TR');
+  const subCategoryObj = subCategoryName
+    ? categoryObj?.subCategories?.find(
+        (sc: { id: string; name: string }) =>
+          normalizeKey(sc.id) === normalizeKey(subCategoryName) ||
+          normalizeKey(sc.name) === normalizeKey(subCategoryName)
+      )
+    : undefined;
+  const categoryArt =
+    (subCategoryObj && DISCOVER_SUBCATEGORY_IMG[subCategoryObj.id]) ||
+    DISCOVER_CATEGORY_IMG[question.categoryId] ||
+    DISCOVER_CATEGORY_IMG.general_culture;
+  const subCategoryLabel = subCategoryObj?.name || subCategoryName;
   const difficultyLabel = (diffMap[question.difficulty] || 'Orta').toLocaleUpperCase('tr-TR');
   const difficultyColor = DIFFICULTY_COLORS[question.difficulty] || DIFFICULTY_COLORS.medium;
 
@@ -716,14 +698,14 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           </Text>
         </View>
         <View style={styles.categoryPill}>
-          <Text style={styles.categoryEmoji}>{categoryEmoji}</Text>
+          <Image source={categoryArt} style={styles.categoryArt} resizeMode="contain" />
           <View style={styles.categoryPillTexts}>
             <Text style={styles.categoryPillText} numberOfLines={1}>
               {categoryName}
             </Text>
-            {subCategoryName ? (
-              <Text style={styles.subCategoryPillText} numberOfLines={1} accessibilityLabel={`Alt kategori: ${subCategoryName}`}>
-                {subCategoryName}
+            {subCategoryLabel ? (
+              <Text style={styles.subCategoryPillText} numberOfLines={1} accessibilityLabel={`Alt kategori: ${subCategoryLabel}`}>
+                {subCategoryLabel}
               </Text>
             ) : null}
           </View>
@@ -1038,8 +1020,8 @@ const styles = StyleSheet.create({
   },
   categoryPill: {
     minHeight: 40,
-    maxWidth: 190,
-    paddingVertical: 4,
+    maxWidth: 210,
+    paddingVertical: 3,
     flexShrink: 1,
     paddingHorizontal: 12,
     borderRadius: 20,
@@ -1050,8 +1032,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  categoryEmoji: {
-    fontSize: 16,
+  categoryArt: {
+    width: 32,
+    height: 32,
   },
   categoryPillTexts: {
     flexShrink: 1,

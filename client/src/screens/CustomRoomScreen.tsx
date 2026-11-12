@@ -403,7 +403,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                   ]}
                 >
                   {selectedCategory === 'mixed' ? (
-                    <CategorySquircleIcon category="genel_kultur" size={26} />
+                    <Image source={DISCOVER_CATEGORY_IMG.mixed} style={styles.dropdownArt} resizeMode="contain" />
                   ) : selectedSub && DISCOVER_SUBCATEGORY_IMG[selectedSub.id] ? (
                     <Image source={DISCOVER_SUBCATEGORY_IMG[selectedSub.id]} style={styles.dropdownArt} resizeMode="contain" />
                   ) : DISCOVER_CATEGORY_IMG[selectedCategory.id] ? (

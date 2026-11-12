@@ -77,8 +77,8 @@ const DIFFICULTIES: {
     tint: 'rgba(255, 196, 61, 0.10)',
     glow: 'rgba(255, 196, 61, 0.45)',
     stars: 2,
-    xpMultiplier: 'x1,5 XP',
-    xpShort: 'x1,5',
+    xpMultiplier: 'x1,25 XP',
+    xpShort: 'x1,25',
     desc: 'Dengeli mücadele',
   },
   {
@@ -88,8 +88,8 @@ const DIFFICULTIES: {
     tint: 'rgba(255, 155, 47, 0.12)',
     glow: 'rgba(255, 155, 47, 0.45)',
     stars: 3,
-    xpMultiplier: 'x2 XP',
-    xpShort: 'x2',
+    xpMultiplier: 'x1,5 XP',
+    xpShort: 'x1,5',
     desc: 'Bilgi savaşçısı',
   },
   {
@@ -99,8 +99,8 @@ const DIFFICULTIES: {
     tint: 'rgba(255, 90, 106, 0.12)',
     glow: 'rgba(255, 90, 106, 0.45)',
     stars: 4,
-    xpMultiplier: 'x3 XP',
-    xpShort: 'x3',
+    xpMultiplier: 'x2 XP',
+    xpShort: 'x2',
     desc: 'Efsane ayarı',
   },
 ];

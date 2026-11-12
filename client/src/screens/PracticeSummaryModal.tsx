@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Modal } from 'react-native';
+import { calculateLevelFromXp, calculateMatchRewards, DifficultyLevel, DIFFICULTY_XP_LABEL } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import {
@@ -18,12 +19,21 @@ export interface PracticeStats {
 interface PracticeSummaryModalProps {
   visible: boolean;
   stats: PracticeStats;
+  isGuest?: boolean;
+  difficulty?: DifficultyLevel;
+  /** Sunucunun hesaba gerçekten yazdığı ödül (gelene kadar paylaşılan formülle tahmin gösterilir) */
+  rewards?: { xp: number; coins: number; boosted?: boolean } | null;
+  userXp?: number;
   onPlayAgain: () => void;
   onHome: () => void;
 }
 export const PracticeSummaryModal: React.FC<PracticeSummaryModalProps> = ({
   visible,
   stats,
+  isGuest,
+  difficulty,
+  rewards,
+  userXp,
   onPlayAgain,
   onHome,
 }) => {
@@ -38,6 +48,17 @@ export const PracticeSummaryModal: React.FC<PracticeSummaryModalProps> = ({
     stats.totalQuestions > 0
       ? Math.round((stats.correctAnswers / stats.totalQuestions) * 100)
       : 0;
+  const won = stats.correctAnswers >= Math.ceil(Math.max(1, stats.totalQuestions) / 2);
+  const estimate = calculateMatchRewards({
+    correct: stats.correctAnswers,
+    total: stats.totalQuestions,
+    won,
+    mode: 'solo',
+    difficulty,
+  });
+  const xpShown = rewards ? rewards.xp : estimate.xp;
+  const coinsShown = rewards ? rewards.coins : estimate.coins;
+  const level = typeof userXp === 'number' && !isGuest ? calculateLevelFromXp(userXp) : null;
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
@@ -72,16 +93,26 @@ export const PracticeSummaryModal: React.FC<PracticeSummaryModalProps> = ({
           <View style={styles.rewardCard}>
             <View style={styles.rewardTop}>
               <Text style={styles.xpText}>
-                +{Math.max(50, stats.correctAnswers * 40)} XP
+                {isGuest ? 'Misafir: ödül yok' : `+${xpShown} XP${rewards?.boosted ? ' (2x)' : ''}`}
               </Text>
-              <View style={styles.coinPill}>
-                <CoinIcon size={18} />
-                <Text style={styles.coinText}>
-                  +{Math.max(10, stats.correctAnswers * 15)}
-                </Text>
-              </View>
+              {!isGuest && (
+                <View style={styles.coinPill}>
+                  <CoinIcon size={18} />
+                  <Text style={styles.coinText}>+{coinsShown}</Text>
+                </View>
+              )}
             </View>
-            <TavrikoProgressBar progress={82} height={10} />
+            {level ? (
+              <>
+                <TavrikoProgressBar progress={level.progressPct} height={10} />
+                <Text style={styles.levelLine}>
+                  Seviye {level.level} · {level.currentLevelXp} / {level.nextLevelXpRequired} XP
+                  {difficulty ? ` · ${DIFFICULTY_XP_LABEL[difficulty]}` : ''}
+                </Text>
+              </>
+            ) : isGuest ? (
+              <Text style={styles.levelLine}>XP ve altın kazanmak için giriş yap.</Text>
+            ) : null}
           </View>
           <View style={styles.actionsRow}>
             <Button3D
@@ -104,6 +135,7 @@ export const PracticeSummaryModal: React.FC<PracticeSummaryModalProps> = ({
   );
 };
 const styles = StyleSheet.create({
+  levelLine: { marginTop: 6, fontSize: 11, fontWeight: '800', color: 'rgba(233,225,255,0.7)', textAlign: 'center' },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(8, 3, 20, 0.82)',

@@ -3645,24 +3645,10 @@ export function createApp() {
             : Math.min(totalRounds, Math.round((rankItem.score || 0) / 140));
         const safeCorrect = Math.max(0, Math.min(totalRounds, rawCorrect));
 
-        // Sıfır doğru cevap veya oyundan erken ayrılmada 0 coin ve 0 xp
-        const isZero = safeCorrect === 0;
-        const coinsEarned = isZero
-          ? 0
-          : isWinner
-          ? Math.min(15, safeCorrect * 2 + 5)
-          : Math.min(6, safeCorrect * 1);
-        const xpEarned = isZero
-          ? 0
-          : isWinner
-          ? Math.min(35, safeCorrect * 5 + 10)
-          : Math.min(15, safeCorrect * 3);
-
+        // XP/altın sunucuda recordMatchResult içinde paylaşılan formülle hesaplanır
         await db.recordGameStats(rankItem.playerId, {
           correctAnswers: safeCorrect,
           totalAnswers: totalRounds,
-          xpEarned,
-          coinsEarned,
           bestStreak: Math.min(safeCorrect, rankItem.streak || 0),
           won: isWinner,
           roomCode: summary.roomCode,
