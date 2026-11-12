@@ -1,3 +1,4 @@
+import { cdnImage } from '../utils/cdn';
 import React, { useMemo, useState } from 'react';
 import {
   View,
@@ -231,7 +232,7 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
           style={styles.heroBanner}
         >
           <Image
-            source={require('../../assets/images/discovery/duel_arena.webp')}
+            source={cdnImage('images/discovery/duel_arena.webp')}
             style={styles.heroBackdrop}
             resizeMode="cover"
           />

@@ -1,3 +1,4 @@
+import { cdnImage } from '../utils/cdn';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -54,7 +55,7 @@ import { GuestDiscoveryCard } from '../components/DiscoveryArtwork';
 import Reanimated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { sound } from '../services/soundService';
 
-const AUTH_CROWN = require('../../assets/images/ui/auth_crown.png');
+const AUTH_CROWN = cdnImage('images/ui/auth_crown.png');
 const GOOGLE_CLIENT_ID =
   '411578437442-gs1rck2124rgr516fe9dn9tuu15ge9ig.apps.googleusercontent.com';
 interface AuthScreenProps {

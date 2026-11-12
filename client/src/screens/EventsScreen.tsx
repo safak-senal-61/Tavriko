@@ -1,3 +1,4 @@
+import { cdnImage } from '../utils/cdn';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -42,15 +43,15 @@ type EventTab = 'daily' | 'weekly' | 'special';
 
 // Etkinlik kartlarına özel üretilmiş görseller
 const EVENT_TYPE_IMG: Record<EventTab, ImageSourcePropType> = {
-  daily: require('../../assets/images/ui/event_daily.png'),
-  weekly: require('../../assets/images/ui/event_weekly.png'),
-  special: require('../../assets/images/ui/event_special.png'),
+  daily: cdnImage('images/ui/event_daily.png'),
+  weekly: cdnImage('images/ui/event_weekly.png'),
+  special: cdnImage('images/ui/event_special.png'),
 };
 
 const EVENT_METRIC_IMG: Record<string, ImageSourcePropType> = {
-  wins: require('../../assets/images/ui/event_wins.png'),
-  streak: require('../../assets/images/ui/event_streak.png'),
-  correct_answers: require('../../assets/images/ui/event_correct.png'),
+  wins: cdnImage('images/ui/event_wins.png'),
+  streak: cdnImage('images/ui/event_streak.png'),
+  correct_answers: cdnImage('images/ui/event_correct.png'),
 };
 
 export const EventsScreen: React.FC<EventsScreenProps> = ({

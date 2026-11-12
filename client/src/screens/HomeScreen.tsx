@@ -1,3 +1,4 @@
+import { cdnImage } from '../utils/cdn';
 import React, { useEffect, useRef } from 'react';
 import {
   View,
@@ -33,13 +34,13 @@ import { NotificationBell } from '../components/NotificationUI';
 import { InfoHint } from '../components/InfoHint';
 import { useUnreadCount } from '../store/notificationStore';
 
-const LOGO_MARK = require('../../assets/images/logo_mark.png');
-const DUEL_BANNER = require('../../assets/images/duel_arena_banner.jpg');
+const LOGO_MARK = cdnImage('images/logo_mark.png');
+const DUEL_BANNER = cdnImage('images/duel_arena_banner.jpg');
 const MODE_IMAGES = {
-  customRoom: require('../../assets/images/modes/custom_room.png'),
-  singlePlayer: require('../../assets/images/modes/single_player.png'),
-  daily: require('../../assets/images/modes/daily.png'),
-  friends: require('../../assets/images/modes/friends.png'),
+  customRoom: cdnImage('images/modes/custom_room.png'),
+  singlePlayer: cdnImage('images/modes/single_player.png'),
+  daily: cdnImage('images/modes/daily.png'),
+  friends: cdnImage('images/modes/friends.png'),
 };
 
 interface HomeScreenProps {

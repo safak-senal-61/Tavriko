@@ -1,3 +1,4 @@
+import { cdnImage } from '../utils/cdn';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -317,7 +318,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               : 'Davet kodunu gir, arkadaşlarının oyununa hemen dahil ol.'}</Text>
           </View>
           <DiscoveryArtwork source={activeTab === 'create'
-            ? require('../../assets/images/modes/custom_room.png') : DISCOVERY_IMG.social} size={96} />
+            ? cdnImage('images/modes/custom_room.png') : DISCOVERY_IMG.social} size={96} />
         </View>
         <View style={styles.tabToggleRow} accessibilityRole="tablist">
           <TouchableOpacity

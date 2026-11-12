@@ -1,0 +1,16 @@
+{
+  "$schema": "../cloudflare/node_modules/wrangler/config-schema.json",
+  // Statik varlık CDN'i: client/assets klasörünün tamamı yayınlanır.
+  // Dağıtım: `npm run deploy:cdn` (Node 22+ ve CLOUDFLARE_API_TOKEN gerekir)
+  "name": "tavriko-cdn",
+  "main": "src/worker.js",
+  "compatibility_date": "2025-02-01",
+  "workers_dev": true,
+  "assets": {
+    "directory": "../client/assets",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "not_found_handling": "none",
+    "run_worker_first": true
+  }
+}

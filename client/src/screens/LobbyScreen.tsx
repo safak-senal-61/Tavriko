@@ -1,3 +1,4 @@
+import { cdnImage } from '../utils/cdn';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -100,8 +101,8 @@ const LOBBY_REACTION_EMOJIS = ['🔥', '👏', '😂', '❤️', '⚡', '🎯', 
 
 /* Üretilmiş lobi görselleri: sahne banner'ı ve şeffaf arka plansız soru işareti */
 const LOBBY_IMG = {
-  hero: require('../../assets/images/lobby/lobby_hero.png'),
-  questionMark: require('../../assets/images/lobby/question_mark.png'),
+  hero: cdnImage('images/lobby/lobby_hero.png'),
+  questionMark: cdnImage('images/lobby/question_mark.png'),
 };
 
 /** Özel oda katılım bağlantısı: ?oda=KOD ile tıklayan doğrudan odaya katılır */

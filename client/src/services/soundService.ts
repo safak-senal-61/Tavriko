@@ -1,4 +1,5 @@
-import { Platform, Vibration } from 'react-native';
+import { AppState, Platform, Vibration } from 'react-native';
+import { cdnUrl } from '../utils/cdn';
 
 export type SoundEffect =
   | 'tap'
@@ -28,18 +29,25 @@ try {
   expoHapticsModule = null;
 }
 
-const SOUND_ASSETS: Record<SoundEffect, any> = {
-  tap: require('../../assets/sounds/tap.wav'),
-  nav: require('../../assets/sounds/nav.wav'),
-  correct: require('../../assets/sounds/correct.wav'),
-  wrong: require('../../assets/sounds/wrong.wav'),
-  streak: require('../../assets/sounds/streak.wav'),
-  timer_tick: require('../../assets/sounds/timer_tick.wav'),
-  radar_ping: require('../../assets/sounds/radar_ping.wav'),
-  match_found: require('../../assets/sounds/match_found.wav'),
-  victory: require('../../assets/sounds/victory.wav'),
-  reward: require('../../assets/sounds/reward.wav'),
+// Ses efektleri ve müzik Cloudflare CDN'inden (tavriko-cdn) çekilir
+const SOUND_FILES: Record<SoundEffect, string> = {
+  tap: 'sounds/tap.wav',
+  nav: 'sounds/nav.wav',
+  correct: 'sounds/correct.wav',
+  wrong: 'sounds/wrong.wav',
+  streak: 'sounds/streak.wav',
+  timer_tick: 'sounds/timer_tick.wav',
+  radar_ping: 'sounds/radar_ping.wav',
+  match_found: 'sounds/match_found.wav',
+  victory: 'sounds/victory.wav',
+  reward: 'sounds/reward.wav',
 };
+const SOUND_URLS = Object.fromEntries(
+  (Object.keys(SOUND_FILES) as SoundEffect[]).map((k) => [k, cdnUrl(SOUND_FILES[k])])
+) as Record<SoundEffect, string>;
+export const MUSIC_URL = cdnUrl('music/tavriko_theme.mp3');
+// Müzik dosyası tepe seviyeye yakın normalize edildiği için ayar yüzdesi bu katsayıyla ölçeklenir
+const MUSIC_GAIN = 0.6;
 
 // Singleton Web AudioContext and user gesture tracking for modern browser autoplay policies
 let sharedWebAudioCtx: any = null;
@@ -72,7 +80,6 @@ class SoundService {
   private hapticIntensity: 'light' | 'medium' | 'strong' = 'medium';
   private musicEnabled: boolean = false;
   private musicVolume: number = 0.5; // 0..1
-  private musicStop: (() => void) | null = null;
   private players: Partial<Record<SoundEffect, any>> = {};
   private audioModeConfigured: boolean = false;
 
@@ -124,19 +131,11 @@ class SoundService {
     return this.hapticsEnabled;
   }
 
-  // --- Background music (soft generated ambient pad, web) ---
+  // --- Arka plan müziği (CDN'den akan döngü; web: HTMLAudio, mobil: expo-audio) ---
   public setMusicEnabled(enabled: boolean) {
     this.musicEnabled = enabled;
     if (enabled) this.startMusic();
     else this.stopMusic();
-    // Müzik açık ama tarayıcı henüz kullanıcı etkileşimi görmediyse ilk dokunuşta başlat
-    if (enabled && !hasUserGesture) {
-      const retry = () => {
-        gestureListeners.delete(retry);
-        if (this.musicEnabled) this.startMusic();
-      };
-      gestureListeners.add(retry);
-    }
   }
 
   public isMusicEnabled(): boolean {
@@ -145,97 +144,146 @@ class SoundService {
 
   public setMusicVolume(volume01: number) {
     this.musicVolume = Math.min(1, Math.max(0, Number(volume01) || 0));
-    if (this.musicGainNode) {
-      try {
-        this.musicGainNode.gain.setTargetAtTime(this.musicVolume * 0.12, sharedWebAudioCtx.currentTime, 0.2);
-      } catch {}
-    }
+    const v = this.musicVolume * MUSIC_GAIN;
+    try {
+      if (this.musicEl) this.musicEl.volume = v;
+      if (this.musicPlayer) this.musicPlayer.volume = v;
+    } catch {}
   }
 
   public getMusicVolume(): number {
     return this.musicVolume;
   }
 
-  private musicGainNode: any = null;
-  private musicOscillators: any[] = [];
+  private musicEl: any = null; // web HTMLAudioElement
+  private musicPlayer: any = null; // native expo-audio player
+  private musicRetryArmed: boolean = false;
+  private lifecycleBound: boolean = false;
+
+  /** Tarayıcı otomatik oynatmayı engellediyse ilk kullanıcı etkileşiminde yeniden dene */
+  private armMusicRetry() {
+    if (this.musicRetryArmed) return;
+    this.musicRetryArmed = true;
+    const retry = () => {
+      this.musicRetryArmed = false;
+      gestureListeners.delete(retry);
+      if (this.musicEnabled) this.startMusic();
+    };
+    gestureListeners.add(retry);
+  }
+
+  private bindMusicLifecycle() {
+    if (this.lifecycleBound) return;
+    this.lifecycleBound = true;
+    try {
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) this.pauseMusic();
+          else if (this.musicEnabled) this.startMusic();
+        });
+      } else {
+        AppState.addEventListener('change', (state) => {
+          if (state === 'active') {
+            if (this.musicEnabled) this.startMusic();
+          } else {
+            this.pauseMusic();
+          }
+        });
+      }
+    } catch {}
+  }
 
   private startMusic() {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') {
-      // Native platforms have no ambient music asset — keep the preference
-      // stored so it still persists per user
-      return;
-    }
+    this.bindMusicLifecycle();
+    const volume = this.musicVolume * MUSIC_GAIN;
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      if (!sharedWebAudioCtx) sharedWebAudioCtx = new AudioCtx();
-      if (sharedWebAudioCtx.state === 'suspended') {
-        sharedWebAudioCtx.resume().catch(() => {});
+      if (Platform.OS === 'web') {
+        if (typeof window === 'undefined' || typeof (window as any).Audio === 'undefined') return;
+        if (!hasUserGesture) {
+          this.armMusicRetry();
+          return;
+        }
+        if (!this.musicEl) {
+          const el = new (window as any).Audio(MUSIC_URL);
+          el.loop = true;
+          el.preload = 'auto';
+          this.musicEl = el;
+        }
+        this.musicEl.volume = volume;
+        const result = this.musicEl.play();
+        if (result && typeof result.catch === 'function') {
+          result.catch(() => this.armMusicRetry());
+        }
+        return;
       }
-      if (this.musicStop) return; // already playing
-
-      const ctx = sharedWebAudioCtx;
-      const master = ctx.createGain();
-      master.gain.value = 0;
-      master.connect(ctx.destination);
-      this.musicGainNode = master;
-      master.gain.setTargetAtTime(this.musicVolume * 0.12, ctx.currentTime, 2.5);
-
-      // Slow "breathing" modulation on the pad level
-      const lfo = ctx.createOscillator();
-      lfo.type = 'sine';
-      lfo.frequency.value = 0.06;
-      const lfoGain = ctx.createGain();
-      lfoGain.gain.value = this.musicVolume * 0.045;
-      lfo.connect(lfoGain);
-      lfoGain.connect(master.gain);
-      lfo.start();
-      this.musicOscillators.push(lfo);
-
-      // Gentle ambient pad chord (C3 / G3 / C4 / E4)
-      const freqs = [130.81, 196.0, 261.63, 329.63];
-      for (const f of freqs) {
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.value = f;
-        const g = ctx.createGain();
-        g.gain.value = 0.22;
-        osc.connect(g);
-        g.connect(master);
-        osc.start();
-        this.musicOscillators.push(osc);
-      }
-
-      this.musicStop = () => {
+      if (!expoAudioModule?.createAudioPlayer) return;
+      this.ensureAudioMode();
+      if (!this.musicPlayer) {
+        const player = expoAudioModule.createAudioPlayer({ uri: MUSIC_URL });
         try {
-          master.gain.setTargetAtTime(0, sharedWebAudioCtx.currentTime, 0.4);
+          player.loop = true;
         } catch {}
-        setTimeout(() => {
-          for (const o of this.musicOscillators) {
-            try {
-              o.stop();
-              o.disconnect();
-            } catch {}
-          }
-          this.musicOscillators = [];
-          try {
-            master.disconnect();
-          } catch {}
-        }, 1200);
-        this.musicGainNode = null;
-      };
+        this.musicPlayer = player;
+      }
+      this.musicPlayer.volume = volume;
+      this.musicPlayer.play();
     } catch {
-      this.musicStop = null;
+      // Müzik başlatılamadıysa sessizce devam et; tercih yine de saklı kalır
     }
   }
 
+  private pauseMusic() {
+    try {
+      if (this.musicEl && typeof this.musicEl.pause === 'function') this.musicEl.pause();
+      if (this.musicPlayer && typeof this.musicPlayer.pause === 'function') this.musicPlayer.pause();
+    } catch {}
+  }
+
   private stopMusic() {
-    if (this.musicStop) {
-      try {
-        this.musicStop();
-      } catch {}
-      this.musicStop = null;
-    }
+    this.pauseMusic();
+    try {
+      if (this.musicEl) this.musicEl.currentTime = 0;
+      if (this.musicPlayer && typeof this.musicPlayer.seekTo === 'function') this.musicPlayer.seekTo(0);
+    } catch {}
+  }
+
+  private sfxBuffers: Partial<Record<SoundEffect, any>> = {};
+  private sfxLoading: Partial<Record<SoundEffect, boolean>> = {};
+
+  private loadSfxBuffer(effect: SoundEffect) {
+    if (this.sfxBuffers[effect] || this.sfxLoading[effect]) return;
+    if (Platform.OS !== 'web' || typeof fetch === 'undefined') return;
+    const AudioCtx = typeof window !== 'undefined' ? window.AudioContext || (window as any).webkitAudioContext : null;
+    if (!AudioCtx) return;
+    if (!sharedWebAudioCtx) sharedWebAudioCtx = new AudioCtx();
+    this.sfxLoading[effect] = true;
+    fetch(SOUND_URLS[effect])
+      .then((res) => {
+        if (!res.ok) throw new Error('sfx fetch failed');
+        return res.arrayBuffer();
+      })
+      .then(
+        (data) =>
+          new Promise<any>((resolve, reject) => {
+            const ctx = sharedWebAudioCtx;
+            const maybe = ctx.decodeAudioData(data, resolve, reject);
+            if (maybe && typeof maybe.then === 'function') maybe.then(resolve, reject);
+          })
+      )
+      .then((decoded) => {
+        this.sfxBuffers[effect] = decoded;
+      })
+      .catch(() => {
+        // Ağ hatasında sentezlenmiş sese düşmeye devam edilir; sonraki çalışta yeniden denenir
+      })
+      .finally(() => {
+        this.sfxLoading[effect] = false;
+      });
+  }
+
+  /** İlk kullanıcı etkileşiminde tüm efektleri CDN'den önceden indir (web) */
+  public preloadWebSounds() {
+    (Object.keys(SOUND_URLS) as SoundEffect[]).forEach((k) => this.loadSfxBuffer(k));
   }
 
   public playSound(effect: SoundEffect): void {
@@ -247,7 +295,7 @@ class SoundService {
         this.ensureAudioMode();
         let player = this.players[effect];
         if (!player) {
-          player = expoAudioModule.createAudioPlayer(SOUND_ASSETS[effect]);
+          player = expoAudioModule.createAudioPlayer({ uri: SOUND_URLS[effect] });
           this.players[effect] = player;
         }
         if (typeof player.seekTo === 'function') {
@@ -290,6 +338,19 @@ class SoundService {
         }
 
         const ctx = sharedWebAudioCtx;
+        // CDN'den indirilen gerçek ses efekti hazırsa onu çal; değilse bu seferlik sentezlenmiş sesi kullan
+        const buffer = this.sfxBuffers[effect];
+        if (buffer) {
+          const src = ctx.createBufferSource();
+          src.buffer = buffer;
+          const sfxGain = ctx.createGain();
+          sfxGain.gain.value = this.sfxVolume;
+          src.connect(sfxGain);
+          sfxGain.connect(ctx.destination);
+          src.start();
+          return;
+        }
+        this.loadSfxBuffer(effect);
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
@@ -453,3 +514,6 @@ class SoundService {
 }
 
 export const sound = new SoundService();
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  gestureListeners.add(() => sound.preloadWebSounds());
+}

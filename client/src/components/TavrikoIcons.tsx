@@ -1,3 +1,4 @@
+import { cdnImage } from '../utils/cdn';
 import React, { useState } from 'react';
 import { GradientFill } from './TavrikoGradient';
 import {
@@ -29,9 +30,9 @@ import { NotificationBell } from './NotificationUI';
 import { useUnreadCount } from '../store/notificationStore';
 import { BackgroundScene, backgroundFor } from './StoreKit';
 // Brand Assets
-export const BRAND_LOGO_MAIN = require('../../assets/images/brand/logo_full.png');
-export const BRAND_LOGO_BANNER = require('../../assets/images/brand/logo_full.png');
-export const BRAND_APP_ICON = require('../../assets/images/app_icon.png');
+export const BRAND_LOGO_MAIN = cdnImage('images/brand/logo_full.png');
+export const BRAND_LOGO_BANNER = cdnImage('images/brand/logo_full.png');
+export const BRAND_APP_ICON = cdnImage('images/app_icon.png');
 // Shared SVG Gradients from Tavriko UI Kit
 const SharedSvgDefs = () => (
   <Defs>
@@ -136,8 +137,8 @@ export const GoogleGIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
 // 2. ECONOMY & REWARD ICONS (13 Icons from page28)
 // ============================================================================
 /* Mağazadaki 3B para/elmas görselleri — oyun genelinde aynı görsel kullanılır */
-const COIN_3D_IMG = require('../../assets/images/store/coins_s.png');
-const GEM_3D_IMG = require('../../assets/images/store/gems_s.png');
+const COIN_3D_IMG = cdnImage('images/store/coins_s.png');
+const GEM_3D_IMG = cdnImage('images/store/gems_s.png');
 export const CoinIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
   <Image source={COIN_3D_IMG} style={{ width: size, height: size }} resizeMode="contain" />
 );
