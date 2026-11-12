@@ -4,11 +4,13 @@ import { authHeaders } from '../utils/apiAuth';
 
 const STORAGE_PREFIX = 'tavriko_notification_reads_v1:';
 const SAMPLE_PREFIXES = ['notif_fr_sample', 'notif_duel_sample', 'notif_rew_sample'];
+// Eski sürümlerin sahte varsayılan bildirimleri (tam eşleşme).
+const MOCK_IDS = ['notif_welcome', 'notif_duel_1', 'notif_season'];
 
 export function cleanNotifications(items: NotificationItem[]): NotificationItem[] {
   const unique = new Map<string, NotificationItem>();
   for (const item of items) {
-    if (!item || typeof item.id !== 'string' || SAMPLE_PREFIXES.some(p => item.id.startsWith(p))) continue;
+    if (!item || typeof item.id !== 'string' || SAMPLE_PREFIXES.some(p => item.id.startsWith(p)) || MOCK_IDS.includes(item.id)) continue;
     unique.set(item.id, { ...unique.get(item.id), ...item });
   }
   return Array.from(unique.values());

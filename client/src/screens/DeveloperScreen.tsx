@@ -244,7 +244,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
   const loadBlockedUsers = async () => {
     if (!user?.id) return;
     try {
-      const res = await fetch(`${base}/social/blocked/${user.id}`);
+      const res = await fetch(`${base}/social/blocked/${user.id}`, { headers: authHeaders() });
       if (res.ok) {
         const data = await res.json();
         if (data.success) setBlockedUsers(data.blockedUsers || []);

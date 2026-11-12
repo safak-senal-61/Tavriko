@@ -174,6 +174,9 @@ interface PrismaTableStore {
  * UserNotification, MatchHistory, PasswordResetToken) doğrudan yönetir ve
  * Supabase (rjvbgofzsfescnfohzgu.supabase.co) ile çift yönlü senkronize eder.
  */
+// Eski sürümlerde yeni kullanıcılara otomatik eklenen sahte bildirimler.
+const MOCK_NOTIFICATION_IDS = new Set(['notif_welcome', 'notif_duel_1', 'notif_season']);
+
 export class PrismaService {
   public readonly rawClient: PrismaClient;
   private store: PrismaTableStore = {
@@ -3123,33 +3126,18 @@ export class PrismaService {
     return [];
   }
 
-  private defaultNotifications(displayName: string): NotificationItem[] {
-    return [
-      {
-        id: 'notif_welcome',
-        type: 'reward',
-        title: `Hoş geldin ${displayName}!`,
-        sub: 'Başlangıç ödüllerin hesabına tanımlandı',
-        timeText: 'Az önce',
-        handled: null,
-      },
-      {
-        id: 'notif_duel_1',
-        type: 'duel',
-        title: 'Bilgi Avcısı seni düelloya davet etti',
-        sub: 'Genel Kültür · 5 soru',
-        timeText: '5dk',
-        handled: null,
-      },
-      {
-        id: 'notif_season',
-        type: 'league',
-        title: 'Sezon 1 Pass aktif!',
-        sub: 'Maç kazanarak sezon kademelerini aç',
-        timeText: '1sa',
-        handled: null,
-      },
-    ];
+  // Mock/demo bildirimler kaldırıldı: yeni kullanıcılar boş gelen kutusuyla başlar.
+  private defaultNotifications(_displayName: string): NotificationItem[] {
+    return [];
+  }
+
+  private isMockNotification(n: { id: string }): boolean {
+    return (
+      MOCK_NOTIFICATION_IDS.has(n.id) ||
+      n.id.startsWith('notif_fr_sample') ||
+      n.id.startsWith('notif_duel_sample') ||
+      n.id.startsWith('notif_rew_sample')
+    );
   }
 
   private generateFriendCode(id: string): string {
@@ -4149,14 +4137,9 @@ export class PrismaService {
     const user = this.users.get(userId);
     if (!user) return [];
 
-    // Filter out old mock sample items
+    // Eski mock/örnek bildirimleri ele
     if (user.notifications) {
-      return user.notifications.filter(
-        (n) =>
-          !n.id.startsWith('notif_fr_sample') &&
-          !n.id.startsWith('notif_duel_sample') &&
-          !n.id.startsWith('notif_rew_sample')
-      );
+      return user.notifications.filter((n) => !this.isMockNotification(n));
     }
     return [];
   }
@@ -4169,7 +4152,7 @@ export class PrismaService {
         take: 50,
       });
 
-      if (dbNotifs.length === 0) {
+      if (dbNotifs.filter((n) => !this.isMockNotification(n)).length === 0) {
         const memNotifs = this.getUserNotifications(userId);
         if (memNotifs.length > 0) return memNotifs;
 
@@ -4206,7 +4189,7 @@ export class PrismaService {
         return [welcomeNotif];
       }
 
-      return dbNotifs.map((n) => ({
+      return dbNotifs.filter((n) => !this.isMockNotification(n)).map((n) => ({
         id: n.id,
         type: n.type as any,
         title: n.title,

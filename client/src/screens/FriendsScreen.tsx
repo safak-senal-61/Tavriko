@@ -479,7 +479,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     try {
       const res = await fetch(`${base}/social/friends/challenge`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           userId: user.id,
           targetUserId: friend.id,

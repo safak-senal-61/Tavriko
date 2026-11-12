@@ -1,4 +1,4 @@
-import { Question, CategoryId, DifficultyLevel, QuestionOption } from '@trivia/shared';
+import { Question, CategoryId, DifficultyLevel, QuestionOption, ALL_CATEGORIES } from '@trivia/shared';
 import type { DatabaseAdapter } from '../db/prismaClient';
 
 export interface ImportQuestionDetail {
@@ -267,7 +267,31 @@ const DIFFICULTY_MAP_TR: Record<string, DifficultyLevel> = {
   hard: 'hard',
   uzman: 'expert',
   expert: 'expert',
+  // Şablon dosyasındaki Türkçe etiketler: Kolay / Standart / Zor / Çok Zor
+  standart: 'medium',
+  standard: 'medium',
+  'çok zor': 'expert',
+  'cok zor': 'expert',
+  cok_zor: 'expert',
+  çok_zor: 'expert',
+  very_hard: 'expert',
 };
+
+/**
+ * Alt kategori değerini (id veya ad) kategorinin kanonik adına çevirir.
+ * Sayaçlar ve soru seçimi alt kategori ADI üzerinden çalıştığı için id ile
+ * yüklenen sorular da (ör. "capitals_currencies") doğru gruba düşer.
+ */
+export function resolveSubCategoryName(categoryId: string, rawSub: unknown): string | undefined {
+  if (rawSub === undefined || rawSub === null) return undefined;
+  const value = String(rawSub).trim();
+  if (!value) return undefined;
+  const key = value.toLowerCase().replace(/[’`´]/g, "'");
+  const norm = (t: string) => t.trim().toLowerCase().replace(/[’`´]/g, "'");
+  const cat = ALL_CATEGORIES.find((c) => c.id === categoryId);
+  const match = cat?.subCategories?.find((sc) => sc.id.toLowerCase() === key || norm(sc.name) === key);
+  return match ? match.name : value;
+}
 
 export function parseAndNormalizeQuestions(rawInput: any): any[] {
   console.log('🔍 [questionImporter] parseAndNormalizeQuestions çağrıldı, girdi tipi:', typeof rawInput);
@@ -588,7 +612,10 @@ export function importQuestionsFromJson(
     try {
       const created = db.createQuestion({
         categoryId,
-        subCategory: raw.subCategory || raw.altKategori || undefined,
+        subCategory: resolveSubCategoryName(
+          categoryId,
+          raw.subCategoryId || raw.subCategory || raw.altKategori || raw.altKategoriId
+        ),
         difficulty,
         text,
         options,

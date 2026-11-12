@@ -5,6 +5,7 @@ import { Check, CheckCheck, Clock3, RefreshCw, X } from 'lucide-react-native';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
+import { authHeaders } from '../utils/apiAuth';
 import { socketService } from '../services/socketService';
 import { TavrikoScreen, TavrikoTopBar, CharacterAvatar } from '../components/TavrikoIcons';
 import { DISCOVERY_IMG, DiscoveryArtwork } from '../components/DiscoveryArtwork';
@@ -43,7 +44,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
     // Do not pretend an invite succeeded until the server confirms it.
     try {
       const res = await fetch(`${base}/social/notifications/respond`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ userId: owner, notificationId: notification.id, action }),
       });
       const data = await res.json();

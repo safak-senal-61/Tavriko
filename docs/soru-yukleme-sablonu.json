@@ -1,0 +1,605 @@
+{
+  "_aciklama": [
+    "Tavriko toplu soru yükleme şablonu. Bu dosya olduğu gibi yüklenebilir; yalnızca \"questions\" dizisi işlenir, diğer bölümler (difficulties, categories) başvuru içindir.",
+    "Her soru için categoryId, subCategory (alt kategori id) ve difficulty alanlarını aşağıdaki listelerden birebir kopyalayın.",
+    "options tam 4 seçenek olmalıdır. Doğru cevap correctAnswerIndex ile verilir (0=A, 1=B, 2=C, 3=D).",
+    "targetPool: standard (normal havuz) | daily_challenge (günlük meydan okuma) | custom_room (yalnızca özel oda). Boş bırakılırsa standard kullanılır.",
+    "subCategory alanı alt kategori id ile (ör. \"capitals_currencies\") yazılır; sunucu bunu otomatik olarak doğru alt kategoriye eşler. Alt kategori yazılmazsa soru yalnızca üst kategoriye eklenir.",
+    "Aynı soru metni daha önce eklenmişse mükerrer sayılır ve atlanır. Aşağıdaki \"questions\" bölümündeki 4 örneği silip kendi sorularınızı ekleyin."
+  ],
+  "difficulties": [
+    { "id": "easy", "label": "Kolay" },
+    { "id": "medium", "label": "Standart" },
+    { "id": "hard", "label": "Zor" },
+    { "id": "expert", "label": "Çok Zor" }
+  ],
+  "categories": [
+    {
+      "id": "gaming_videogames",
+      "name": "Video Oyunları",
+      "subCategories": [
+        { "id": "console_games", "name": "Konsol Oyunları" },
+        { "id": "pc_games", "name": "PC Oyunları" },
+        { "id": "mobile_games", "name": "Mobil Oyunlar" },
+        { "id": "rpg_games", "name": "Rol Yapma Oyunları (RPG)" },
+        { "id": "fps_games", "name": "Nişancı Oyunları (FPS)" },
+        { "id": "racing_games", "name": "Yarış Oyunları" },
+        { "id": "survival_horror", "name": "Hayatta Kalma ve Korku" },
+        { "id": "sandbox_building", "name": "Sandbox ve İnşa" },
+        { "id": "fantasy_worlds", "name": "Fantastik Oyun Dünyaları" },
+        { "id": "open_world", "name": "Açık Dünya Oyunları" },
+        { "id": "action_adventure", "name": "Aksiyon ve Macera" },
+        { "id": "puzzle_games", "name": "Bulmaca Oyunları" },
+        { "id": "strategy_war", "name": "Strateji ve Savaş" },
+        { "id": "moba_online", "name": "MOBA ve Online Oyunlar" },
+        { "id": "life_farming_sim", "name": "Çiftlik ve Yaşam Simülasyonları" },
+        { "id": "fighting_games", "name": "Dövüş Oyunları" },
+        { "id": "sports_games", "name": "Spor Oyunları" },
+        { "id": "music_rhythm", "name": "Müzik ve Ritim Oyunları" },
+        { "id": "arcade_classics", "name": "Arcade ve Efsane Oyunlar" },
+        { "id": "indie_games", "name": "Bağımsız (Indie) Oyunlar" },
+        { "id": "space_games", "name": "Uzay Oyunları" },
+        { "id": "game_mechanics", "name": "Oyun Mekanikleri ve Terimleri" },
+        { "id": "streamers_creators", "name": "Yayıncılar ve İçerik Üreticileri" },
+        { "id": "esports_tournaments", "name": "E-spor Turnuvaları" },
+        { "id": "gaming_history", "name": "Oyun Tarihi" },
+        { "id": "game_companies_consoles", "name": "Oyun Şirketleri ve Konsollar" },
+        { "id": "soundtracks", "name": "Oyun Müzikleri" },
+        { "id": "weapons_equipment", "name": "Oyun Silahları ve Ekipmanları" },
+        { "id": "bosses_monsters", "name": "Oyun Canavarları ve Bosslar" },
+        { "id": "maps_locations", "name": "Oyun Haritaları ve Mekanlar" }
+      ]
+    },
+    {
+      "id": "anime_manga",
+      "name": "Anime ve Manga",
+      "subCategories": [
+        { "id": "anime_general", "name": "Anime Genel" },
+        { "id": "manga", "name": "Manga" },
+        { "id": "shonen", "name": "Shonen Animeleri" },
+        { "id": "shojo_romance", "name": "Shojo ve Romantik Animeler" },
+        { "id": "mecha_robots", "name": "Mecha ve Robot Animeleri" },
+        { "id": "ninja_samurai", "name": "Ninja ve Samuray Animeleri" },
+        { "id": "sports_anime", "name": "Spor Animeleri" },
+        { "id": "supernatural_horror", "name": "Doğaüstü ve Korku Animeleri" },
+        { "id": "isekai", "name": "Isekai Animeleri" },
+        { "id": "psychological_thriller", "name": "Psikolojik ve Gerilim Animeleri" },
+        { "id": "comedy_anime", "name": "Komedi Animeleri" },
+        { "id": "food_anime", "name": "Yemek Animeleri" },
+        { "id": "school_life", "name": "Okul Hayatı Animeleri" },
+        { "id": "anime_movies", "name": "Anime Filmleri" },
+        { "id": "anime_studios", "name": "Anime Stüdyoları" },
+        { "id": "anime_music_ops", "name": "Anime Müzikleri ve Açılış Şarkıları" },
+        { "id": "directors_mangaka", "name": "Anime Yönetmenleri ve Mangakalar" },
+        { "id": "japanese_culture", "name": "Japon Kültürü" },
+        { "id": "japanese_history", "name": "Japon Tarihi" },
+        { "id": "japanese_food", "name": "Japon Mutfağı" },
+        { "id": "japanese_words", "name": "Japonca Kelimeler" },
+        { "id": "cosplay_fandom", "name": "Cosplay ve Fan Kültürü" },
+        { "id": "chibi_kawaii", "name": "Chibi ve Kawaii Kültürü" },
+        { "id": "korean_culture_kpop", "name": "Kore Kültürü ve K-Pop" },
+        { "id": "kdrama", "name": "Koreli Diziler (K-Drama)" },
+        { "id": "chinese_culture_wuxia", "name": "Çin Kültürü ve Wuxia" },
+        { "id": "asian_mythology", "name": "Asya Mitolojisi" }
+      ]
+    },
+    {
+      "id": "cartoons_animation",
+      "name": "Çizgi Film ve Animasyon",
+      "subCategories": [
+        { "id": "classic_cartoons", "name": "Klasik Çizgi Filmler" },
+        { "id": "nostalgic_cartoons", "name": "Nostaljik Çizgi Filmler" },
+        { "id": "kids_cartoons", "name": "Çocuk Çizgi Filmleri" },
+        { "id": "adult_animation", "name": "Yetişkin Animasyonlar" },
+        { "id": "animated_movies", "name": "Animasyon Filmleri" },
+        { "id": "animation_tech", "name": "2D ve 3D Animasyon Teknikleri" },
+        { "id": "voice_actors", "name": "Seslendirme Sanatçıları" },
+        { "id": "cartoon_characters", "name": "Animasyon Karakterleri" },
+        { "id": "fairy_tale_adaptations", "name": "Masal Uyarlamaları" },
+        { "id": "fantasy_cartoons", "name": "Büyü ve Fantezi Çizgi Filmleri" }
+      ]
+    },
+    {
+      "id": "cinema_tv",
+      "name": "Sinema ve Diziler",
+      "subCategories": [
+        { "id": "legendary_movies", "name": "Efsane Filmler" },
+        { "id": "oscars", "name": "Oscar Ödülleri" },
+        { "id": "superhero_movies", "name": "Süper Kahraman Filmleri" },
+        { "id": "space_operas", "name": "Uzay Operaları" },
+        { "id": "wizard_fantasy_cinema", "name": "Büyücülük ve Fantezi Evrenleri" },
+        { "id": "spy_secret_agent", "name": "Casus ve Ajan Filmleri" },
+        { "id": "vampire_monsters", "name": "Vampir ve Canavar Filmleri" },
+        { "id": "holiday_movies", "name": "Yılbaşı Filmleri" },
+        { "id": "sports_movies", "name": "Spor Filmleri" },
+        { "id": "crime_series", "name": "Polisiye Diziler" },
+        { "id": "medical_dramas", "name": "Doktor ve Hastane Dizileri" },
+        { "id": "law_dramas", "name": "Hukuk Dizileri" },
+        { "id": "sitcoms_comedy", "name": "Sitcom ve Komedi Dizileri" },
+        { "id": "sea_adventure", "name": "Macera ve Deniz Filmleri" },
+        { "id": "documentaries", "name": "Belgeseller" },
+        { "id": "musicals", "name": "Müzikaller" },
+        { "id": "nostalgia_90s", "name": "90’lar Nostaljisi" },
+        { "id": "nostalgia_2000s", "name": "2000’ler Nostaljisi" },
+        { "id": "famous_quotes", "name": "Film Replikleri" },
+        { "id": "behind_the_scenes", "name": "Kamera Arkası ve Sinema Teknikleri" },
+        { "id": "filming_locations", "name": "Dizilerin Çekildiği Şehirler" },
+        { "id": "actors_actresses", "name": "Aktörler ve Aktrisler" },
+        { "id": "movie_music", "name": "Film ve Dizi Müzikleri" },
+        { "id": "tv_awards", "name": "Dizi Ödülleri" },
+        { "id": "book_to_movie", "name": "Kitaptan Filme Uyarlamalar" },
+        { "id": "yesilcam_legends", "name": "Yeşilçam Efsaneleri" }
+      ]
+    },
+    {
+      "id": "comics_superheroes",
+      "name": "Çizgi Roman & Süper Kahramanlar",
+      "subCategories": [
+        { "id": "superhero_universes", "name": "Süper Kahraman Evrenleri" },
+        { "id": "villains", "name": "Kötü Karakterler" },
+        { "id": "comic_history", "name": "Çizgi Roman Tarihi" },
+        { "id": "sci_fi_universes", "name": "Bilim Kurgu Evrenleri" },
+        { "id": "legendary_heroes", "name": "Efsanevi Kahramanlar" },
+        { "id": "super_powers", "name": "Süper Güçler ve Yetenekler" },
+        { "id": "masked_heroes", "name": "Maskeli Kahramanlar" },
+        { "id": "comic_creators", "name": "Çizgi Roman Yazar ve Çizerleri" }
+      ]
+    },
+    {
+      "id": "fantasy_fiction",
+      "name": "Fantastik & Kurgusal Dünyalar",
+      "subCategories": [
+        { "id": "dragons", "name": "Ejderhalar" },
+        { "id": "elves_dwarves_orcs", "name": "Elfler, Cüceler ve Orklar" },
+        { "id": "magic_wizards", "name": "Büyü ve Büyücüler" },
+        { "id": "fantasy_kingdoms", "name": "Fantastik Krallıklar" },
+        { "id": "creatures_monsters", "name": "Yaratıklar ve Canavarlar" },
+        { "id": "legendary_weapons", "name": "Kılıçlar ve Efsanevi Silahlar" },
+        { "id": "prophecies", "name": "Efsanevi Kehanetler" },
+        { "id": "epic_battles", "name": "Destansı Savaşlar" },
+        { "id": "space_battles", "name": "Uzay Savaşları" },
+        { "id": "dystopian_worlds", "name": "Distopya ve Gelecek Dünyaları" },
+        { "id": "aliens", "name": "Uzaylılar" },
+        { "id": "ai_stories", "name": "Yapay Zekâ Hikâyeleri" },
+        { "id": "time_travel", "name": "Zaman Yolculuğu" },
+        { "id": "parallel_universes", "name": "Paralel Evrenler" },
+        { "id": "post_apocalyptic", "name": "Kıyamet Sonrası Dünyalar" }
+      ]
+    },
+    {
+      "id": "literature",
+      "name": "Kitaplar ve Edebiyat",
+      "subCategories": [
+        { "id": "world_classics", "name": "Dünya Klasikleri" },
+        { "id": "fantasy_novels", "name": "Fantastik Romanlar" },
+        { "id": "crime_mystery_novels", "name": "Polisiye Romanlar" },
+        { "id": "sci_fi_novels", "name": "Bilim Kurgu Romanları" },
+        { "id": "romance_novels", "name": "Aşk Romanları" },
+        { "id": "young_adult", "name": "Gençlik Romanları" },
+        { "id": "historical_novels", "name": "Tarihi Romanlar" },
+        { "id": "short_stories", "name": "Öykü ve Hikâye" },
+        { "id": "nobel_literature", "name": "Nobel Edebiyat Ödülü" },
+        { "id": "children_books", "name": "Çocuk Kitapları" },
+        { "id": "self_improvement", "name": "Kişisel Gelişim Kitapları" },
+        { "id": "bestsellers", "name": "En Çok Satan Kitaplar" },
+        { "id": "world_authors", "name": "Dünya Yazarları" },
+        { "id": "turkish_authors", "name": "Türk Yazarlar" },
+        { "id": "theater_plays", "name": "Tiyatro Oyunları ve Yazarları" }
+      ]
+    },
+    {
+      "id": "music",
+      "name": "Müzik Dünyası",
+      "subCategories": [
+        { "id": "hiphop_rap", "name": "Hip Hop ve Rap" },
+        { "id": "rock_legends", "name": "Rock Efsaneleri" },
+        { "id": "piano_keyboard", "name": "Piyano ve Klavye" },
+        { "id": "orchestra_composers", "name": "Orkestra ve Besteciler" },
+        { "id": "dj_electronic", "name": "DJ ve Elektronik Müzik" },
+        { "id": "folk_country", "name": "Folk ve Country" },
+        { "id": "turkish_pop", "name": "Türk Pop Müziği" },
+        { "id": "retro_80s_90s_music", "name": "80’ler ve 90’lar Müziği" },
+        { "id": "music_theory", "name": "Müzik Teorisi" },
+        { "id": "instruments_history", "name": "Müzik Aletleri Tarihi" },
+        { "id": "albums_history", "name": "Albümler ve Müzik Tarihi" },
+        { "id": "concerts_festivals", "name": "Konserler ve Festivaller" },
+        { "id": "music_awards", "name": "Müzik Ödülleri" },
+        { "id": "female_artists", "name": "Kadın Sanatçılar" },
+        { "id": "world_music", "name": "Dünya Müziği" },
+        { "id": "radio_industry", "name": "Radyo ve Müzik Endüstrisi" },
+        { "id": "turkish_pop_nostalgia", "name": "Türk Pop Nostaljisi" }
+      ]
+    },
+    {
+      "id": "social_internet",
+      "name": "Sosyal Medya & İnternet Kültürü",
+      "subCategories": [
+        { "id": "social_platforms", "name": "Sosyal Medya Platformları" },
+        { "id": "video_platforms", "name": "Video Platformları" },
+        { "id": "meme_culture", "name": "Meme Kültürü" },
+        { "id": "internet_history", "name": "İnternet Tarihi" },
+        { "id": "photo_video_sharing", "name": "Fotoğraf ve Video Paylaşımı" },
+        { "id": "content_creators", "name": "İçerik Üreticileri" },
+        { "id": "messaging_apps", "name": "Mesajlaşma Uygulamaları" },
+        { "id": "viral_events", "name": "Viral Olaylar" },
+        { "id": "trends_challenges", "name": "Trendler ve Akımlar" },
+        { "id": "digital_literacy", "name": "Dijital Okuryazarlık" },
+        { "id": "ecommerce", "name": "E-ticaret Dünyası" },
+        { "id": "privacy_security", "name": "Gizlilik ve Güvenlik" }
+      ]
+    },
+    {
+      "id": "animals_wildlife",
+      "name": "Hayvanlar Alemi",
+      "subCategories": [
+        { "id": "dogs", "name": "Köpekler" },
+        { "id": "cats", "name": "Kediler" },
+        { "id": "horses", "name": "Atlar" },
+        { "id": "african_wildlife", "name": "Afrika Hayvanları" },
+        { "id": "polar_animals", "name": "Kutup Hayvanları" },
+        { "id": "reptiles", "name": "Sürüngenler" },
+        { "id": "frogs_amphibians", "name": "Kurbağalar ve Amfibiler" },
+        { "id": "butterflies_insects", "name": "Kelebekler ve Böcekler" },
+        { "id": "microscopic_life", "name": "Mikroskobik Canlılar" },
+        { "id": "deep_sea_creatures", "name": "Derin Deniz Canlıları" },
+        { "id": "exotic_birds", "name": "Egzotik Kuşlar" },
+        { "id": "forest_wildlife", "name": "Ormanlar ve Yaban Hayatı" },
+        { "id": "australian_animals", "name": "Avustralya Hayvanları" },
+        { "id": "aquarium_fish", "name": "Akvaryum Balıkları" },
+        { "id": "extinct_endangered", "name": "Nesli Tükenen Hayvanlar" },
+        { "id": "prehistoric_dinosaurs", "name": "Tarih Öncesi Dinozorlar" }
+      ]
+    },
+    {
+      "id": "mythology_ancient",
+      "name": "Mitoloji ve Efsaneler",
+      "subCategories": [
+        { "id": "greek_mythology", "name": "Yunan Mitolojisi" },
+        { "id": "roman_mythology", "name": "Roma Mitolojisi" },
+        { "id": "norse_mythology", "name": "İskandinav Mitolojisi" },
+        { "id": "turkish_mythology", "name": "Türk Mitolojisi" },
+        { "id": "egyptian_mythology", "name": "Mısır Mitolojisi" },
+        { "id": "asian_legends", "name": "Çin ve Japon Efsaneleri" },
+        { "id": "celtic_legends", "name": "Kelt Efsaneleri" },
+        { "id": "mesoamerican_mythology", "name": "Maya, Aztek ve İnka" },
+        { "id": "arabian_nights", "name": "Binbir Gece Masalları" },
+        { "id": "ancient_tales", "name": "Antik Efsaneler" },
+        { "id": "legendary_rulers", "name": "Efsanevi Krallar ve Kraliçeler" },
+        { "id": "warrior_tribes", "name": "Savaşçı Halklar" }
+      ]
+    },
+    {
+      "id": "hobbies_leisure",
+      "name": "Eğlence ve Hobiler",
+      "subCategories": [
+        { "id": "fishing", "name": "Balıkçılık" },
+        { "id": "camping_outdoors", "name": "Kampçılık ve Doğa" },
+        { "id": "gardening", "name": "Bahçecilik" },
+        { "id": "crafts_knitting", "name": "Örgü ve El Sanatları" },
+        { "id": "painting_drawing", "name": "Resim ve Çizim" },
+        { "id": "photography_techniques", "name": "Fotoğraf Teknikleri" },
+        { "id": "collecting", "name": "Koleksiyonculuk" },
+        { "id": "outdoor_games", "name": "Açık Hava Oyunları" },
+        { "id": "car_enthusiasts", "name": "Araba Meraklıları" },
+        { "id": "motorcycles", "name": "Motosiklet Dünyası" },
+        { "id": "drones_flying", "name": "Drone ve Uçan Araçlar" },
+        { "id": "diy_projects", "name": "Yap-Yap Projeleri (DIY)" },
+        { "id": "karaoke_guess_song", "name": "Karaoke ve Şarkı Tahmini" },
+        { "id": "baking_pastry", "name": "Pasta ve Tatlı Yapımı" },
+        { "id": "coffee_culture", "name": "Kahve Kültürü" },
+        { "id": "tea_culture", "name": "Çay Kültürü" },
+        { "id": "party_games", "name": "Parti ve Eğlence Oyunları" },
+        { "id": "astrology_horoscopes", "name": "Burçlar ve Astroloji" }
+      ]
+    },
+    {
+      "id": "history",
+      "name": "Tarih",
+      "subCategories": [
+        { "id": "middle_ages", "name": "Orta Çağ" },
+        { "id": "egypt_pyramids", "name": "Mısır ve Piramitler" },
+        { "id": "ancient_greece_rome", "name": "Antik Yunan ve Roma" },
+        { "id": "seljuks_beyliks", "name": "Selçuklular ve Beylikler" },
+        { "id": "world_wars", "name": "I. ve II. Dünya Savaşı" },
+        { "id": "war_of_independence", "name": "Kurtuluş Savaşı" },
+        { "id": "recent_history", "name": "Yakın Tarih" },
+        { "id": "pirates_maritime", "name": "Korsanlar ve Denizcilik" },
+        { "id": "myths_epics", "name": "Efsaneler ve Destanlar" },
+        { "id": "ancient_scripts", "name": "Eski Yazıtlar ve Yazı Tarihi" },
+        { "id": "archaeology", "name": "Arkeoloji" },
+        { "id": "great_discoveries", "name": "Büyük Keşifler" },
+        { "id": "far_east_history", "name": "Uzak Doğu Tarihi" },
+        { "id": "ancient_anatolia", "name": "Antik Anadolu Medeniyetleri" },
+        { "id": "ottoman_dynasty", "name": "Osmanlı ve Hanedan" }
+      ]
+    },
+    {
+      "id": "geography",
+      "name": "Coğrafya",
+      "subCategories": [
+        { "id": "asia", "name": "Asya" },
+        { "id": "africa", "name": "Afrika" },
+        { "id": "europe", "name": "Avrupa" },
+        { "id": "americas", "name": "Amerika Kıtaları" },
+        { "id": "oceania_australia", "name": "Okyanusya ve Avustralya" },
+        { "id": "poles_glaciers", "name": "Kutuplar ve Buzullar" },
+        { "id": "deserts", "name": "Çöller" },
+        { "id": "tropical_regions", "name": "Tropikal Bölgeler" },
+        { "id": "lakes_waterfalls", "name": "Göller ve Şelaleler" },
+        { "id": "turkey_regions", "name": "Türkiye’nin Bölgeleri" },
+        { "id": "maps_coordinates", "name": "Haritalar ve Koordinatlar" },
+        { "id": "major_cities", "name": "Dünyanın Büyük Şehirleri" },
+        { "id": "tourist_spots", "name": "Ünlü Turistik Yerler" },
+        { "id": "world_heritage", "name": "Dünya Mirası Alanları" },
+        { "id": "capitals_currencies", "name": "Başkentler ve Para Birimleri" }
+      ]
+    },
+    {
+      "id": "art_culture",
+      "name": "Sanat ve Kültür",
+      "subCategories": [
+        { "id": "modern_art", "name": "Modern Sanat" },
+        { "id": "museums_galleries", "name": "Müzeler ve Galeriler" },
+        { "id": "handicrafts", "name": "El Sanatları" },
+        { "id": "dance", "name": "Dans" },
+        { "id": "circus_shows", "name": "Sirk ve Gösteri" },
+        { "id": "folk_literature", "name": "Divan ve Halk Edebiyatı" },
+        { "id": "directors_actors", "name": "Yönetmenler ve Oyuncular" },
+        { "id": "jazz_blues", "name": "Caz ve Blues" },
+        { "id": "classical_instruments", "name": "Enstrümanlar" },
+        { "id": "sculpture_architecture", "name": "Heykeltıraşlık ve Mimari" }
+      ]
+    },
+    {
+      "id": "sports",
+      "name": "Spor",
+      "subCategories": [
+        { "id": "basketball", "name": "Basketbol" },
+        { "id": "athletics", "name": "Atletizm" },
+        { "id": "fitness_bodybuilding", "name": "Fitness ve Vücut Geliştirme" },
+        { "id": "gymnastics", "name": "Jimnastik" },
+        { "id": "winter_sports", "name": "Kış Sporları" },
+        { "id": "water_sports", "name": "Sörf ve Deniz Sporları" },
+        { "id": "cycling", "name": "Bisiklet" },
+        { "id": "martial_arts", "name": "Judo ve Karate" },
+        { "id": "archery_shooting", "name": "Okçuluk ve Atıcılık" },
+        { "id": "golf", "name": "Golf" },
+        { "id": "rugby_american_football", "name": "Rugby ve Amerikan Futbolu" },
+        { "id": "ice_hockey", "name": "Buz Hokeyi" },
+        { "id": "table_tennis_badminton", "name": "Masa Tenisi ve Badminton" },
+        { "id": "climbing_outdoors", "name": "Doğa Sporları ve Tırmanış" },
+        { "id": "horse_racing", "name": "At Yarışı ve Binicilik" },
+        { "id": "world_cup", "name": "Dünya Kupası" },
+        { "id": "olympics", "name": "Olimpiyatlar" },
+        { "id": "super_lig_clubs", "name": "Süper Lig ve Kulüpler" },
+        { "id": "legendary_athletes", "name": "Efsane Sporcular" },
+        { "id": "sports_records", "name": "Spor Rekorları" },
+        { "id": "super_lig_derbies", "name": "Süper Lig Derbileri" }
+      ]
+    },
+    {
+      "id": "science_tech",
+      "name": "Bilim ve Teknoloji",
+      "subCategories": [
+        { "id": "astronomy_planets", "name": "Astronomi ve Gezegenler" },
+        { "id": "periodic_table", "name": "Periyodik Tablo ve Elementler" },
+        { "id": "microbiology_viruses", "name": "Mikrobiyoloji ve Virüsler" },
+        { "id": "genetics_dna", "name": "Genetik ve DNA" },
+        { "id": "quantum_physics", "name": "Kuantum ve Modern Fizik" },
+        { "id": "laboratory_experiments", "name": "Laboratuvar ve Deneyler" },
+        { "id": "electricity_magnetism", "name": "Elektrik ve Manyetizma" },
+        { "id": "computer_history", "name": "Bilgisayar Tarihi" },
+        { "id": "circuits_electronics", "name": "Elektronik ve Devreler" },
+        { "id": "satellites_space_tech", "name": "Uydular ve Uzay Teknolojisi" },
+        { "id": "robotics", "name": "Robotlar" },
+        { "id": "energy_sources", "name": "Enerji Kaynakları" },
+        { "id": "programming_languages", "name": "Programlama Dilleri" },
+        { "id": "web_networking", "name": "Web ve Ağ Teknolojileri" },
+        { "id": "telecom_tech", "name": "İletişim Teknolojileri" },
+        { "id": "vr_ar", "name": "Sanal ve Artırılmış Gerçeklik" },
+        { "id": "blockchain_crypto", "name": "Blokzincir ve Kripto" },
+        { "id": "great_inventions", "name": "Büyük Buluşlar" }
+      ]
+    },
+    {
+      "id": "logic_puzzles",
+      "name": "Oyun ve Zeka",
+      "subCategories": [
+        { "id": "jigsaw_crosswords", "name": "Yapboz ve Bulmacalar" },
+        { "id": "board_games", "name": "Masa Oyunları" },
+        { "id": "card_games", "name": "Kart Oyunları" },
+        { "id": "retro_games", "name": "Retro Oyunlar" },
+        { "id": "strategy_puzzles", "name": "Strateji Oyunları" },
+        { "id": "esports_general", "name": "E-spor" },
+        { "id": "number_puzzles", "name": "Sayı Bulmacaları" },
+        { "id": "word_puzzles", "name": "Kelime Oyunları" },
+        { "id": "memory_puzzles", "name": "Hafıza Oyunları" },
+        { "id": "cipher_decoding", "name": "Şifre ve Kod Çözme" },
+        { "id": "brain_teasers", "name": "Zeka Soruları" },
+        { "id": "magic_illusions", "name": "Sihir ve İllüzyon" }
+      ]
+    },
+    {
+      "id": "mathematics",
+      "name": "Matematik ve Mantık",
+      "subCategories": [
+        { "id": "basic_operations", "name": "Temel İşlemler" },
+        { "id": "geometry", "name": "Geometri" },
+        { "id": "statistics_probability", "name": "İstatistik ve Olasılık" },
+        { "id": "number_theory", "name": "Sayılar ve Sayı Teorisi" },
+        { "id": "algebra", "name": "Cebir" },
+        { "id": "logic_sets", "name": "Mantık ve Kümeler" },
+        { "id": "units_measurement", "name": "Ölçüler ve Birimler" },
+        { "id": "famous_mathematicians", "name": "Matematikçiler" }
+      ]
+    },
+    {
+      "id": "food_gastronomy",
+      "name": "Yemek ve Mutfak",
+      "subCategories": [
+        { "id": "italian_cuisine", "name": "İtalyan Mutfağı" },
+        { "id": "spanish_cuisine", "name": "İspanyol Mutfağı" },
+        { "id": "asian_cuisine", "name": "Uzak Doğu Mutfağı" },
+        { "id": "turkish_cuisine", "name": "Türk Mutfağı" },
+        { "id": "fast_food", "name": "Fast Food" },
+        { "id": "cheese_dairy", "name": "Peynir ve Süt Ürünleri" },
+        { "id": "drink_culture", "name": "Çay, Kahve ve İçecek Kültürü" },
+        { "id": "chocolate_sweets", "name": "Çikolata ve Şekerlemeler" },
+        { "id": "healthy_nutrition", "name": "Sağlıklı Beslenme" },
+        { "id": "spices", "name": "Baharatlar" },
+        { "id": "pastry_bakery", "name": "Fırın ve Hamur İşleri" },
+        { "id": "fruits_vegetables", "name": "Meyve ve Sebzeler" },
+        { "id": "chefs_techniques", "name": "Şefler ve Mutfak Teknikleri" }
+      ]
+    },
+    {
+      "id": "daily_life",
+      "name": "Günlük Hayat ve Toplum",
+      "subCategories": [
+        { "id": "family_relationships", "name": "Aile ve İlişkiler" },
+        { "id": "psychology", "name": "Psikoloji" },
+        { "id": "first_aid", "name": "İlk Yardım" },
+        { "id": "shopping_brands", "name": "Alışveriş ve Markalar" },
+        { "id": "banking_finance", "name": "Bankacılık ve Finans" },
+        { "id": "entrepreneurship", "name": "Girişimcilik ve İş Dünyası" },
+        { "id": "law_rights", "name": "Hukuk ve Haklar" },
+        { "id": "politics_governance", "name": "Siyaset ve Yönetim" },
+        { "id": "media_journalism", "name": "Gazetecilik ve Medya" },
+        { "id": "education_history", "name": "Eğitim Tarihi" },
+        { "id": "professions", "name": "Meslekler" },
+        { "id": "pet_care", "name": "Evcil Hayvan Bakımı" },
+        { "id": "practical_life_tips", "name": "Pratik Bilgiler" },
+        { "id": "time_calendar", "name": "Zaman ve Takvim" },
+        { "id": "traffic_roads", "name": "Trafik ve Yol Bilgisi" },
+        { "id": "travel_culture", "name": "Seyahat Kültürü" },
+        { "id": "sleep_dreams", "name": "Uyku ve Rüyalar" },
+        { "id": "customs_traditions", "name": "Gelenekler ve Görenekler" }
+      ]
+    },
+    {
+      "id": "turkey_special",
+      "name": "Türkiye’ye Özel",
+      "subCategories": [
+        { "id": "turkey_history", "name": "Türkiye Tarihi" },
+        { "id": "turkey_natural_beauties", "name": "Türkiye’nin Doğal Güzellikleri" },
+        { "id": "regional_dishes", "name": "Yöresel Yemekler" },
+        { "id": "turkish_folk_music", "name": "Türk Halk Müziği" },
+        { "id": "yesilcam_cinema", "name": "Yeşilçam ve Türk Sineması" },
+        { "id": "turkish_tv_series", "name": "Türk Dizileri" },
+        { "id": "turkish_athletes", "name": "Türk Sporcular" },
+        { "id": "turkish_literature", "name": "Türk Edebiyatı" },
+        { "id": "mosques_historic_buildings", "name": "Camiler ve Tarihi Yapılar" },
+        { "id": "istanbul_special", "name": "İstanbul" },
+        { "id": "anatolian_cities", "name": "Anadolu Şehirleri" },
+        { "id": "turkish_traditions_customs", "name": "Türk Kültürü ve Adetleri" },
+        { "id": "childhood_nostalgia", "name": "Çocukluk Oyunları ve Nostalji" },
+        { "id": "turkish_scientists", "name": "Türk Bilim İnsanları" },
+        { "id": "turkey_mountains_rivers", "name": "Türkiye’nin Dağları ve Nehirleri" }
+      ]
+    },
+    {
+      "id": "space_astronomy",
+      "name": "Uzay ve Astronomi",
+      "subCategories": [
+        { "id": "solar_system", "name": "Güneş Sistemi" },
+        { "id": "black_holes", "name": "Kara Delikler ve Kuasarlar" },
+        { "id": "space_missions", "name": "Uzay Görevleri ve Roketler" },
+        { "id": "galaxies_stars", "name": "Galaksiler ve Takımyıldızlar" }
+      ]
+    },
+    {
+      "id": "biology",
+      "name": "Biyoloji",
+      "subCategories": [
+        { "id": "human_anatomy", "name": "İnsan Anatomisi" },
+        { "id": "genetics", "name": "Genetik ve DNA" },
+        { "id": "cell_biology", "name": "Hücre Biyolojisi" },
+        { "id": "botany_plants", "name": "Bitkiler Alemi" },
+        { "id": "ecology", "name": "Ekoloji ve Canlılar" }
+      ]
+    },
+    {
+      "id": "physics_chemistry",
+      "name": "Fizik ve Kimya",
+      "subCategories": [
+        { "id": "elements_reactions", "name": "Elementler ve Tepkimeler" },
+        { "id": "mechanics_energy", "name": "Mekanik ve Enerji" },
+        { "id": "optics_waves", "name": "Optik ve Dalgalar" },
+        { "id": "nuclear_quantum", "name": "Kuantum ve Nükleer Fizik" }
+      ]
+    },
+    {
+      "id": "language_vocab",
+      "name": "Dil ve Kelime",
+      "subCategories": [
+        { "id": "proverbs_idioms", "name": "Atasözleri ve Deyimler" },
+        { "id": "etymology", "name": "Etimoloji ve Kökenler" },
+        { "id": "foreign_words", "name": "Yabancı Kelimeler" },
+        { "id": "grammar_rules", "name": "Dil Bilgisi ve İmla" }
+      ]
+    },
+    {
+      "id": "nature_ecology",
+      "name": "Doğa ve Ekoloji",
+      "subCategories": [
+        { "id": "climate_weather", "name": "İklim ve Hava Olayları" },
+        { "id": "forests_jungles", "name": "Ormanlar ve Korular" },
+        { "id": "bees_honey", "name": "Arılar ve Bal" },
+        { "id": "sustainability", "name": "Sürdürülebilirlik ve Çevre" },
+        { "id": "natural_disasters", "name": "Doğal Afetler" }
+      ]
+    },
+    {
+      "id": "general_culture",
+      "name": "Genel Kültür",
+      "subCategories": [
+        { "id": "world_records", "name": "Dünya Rekorları" },
+        { "id": "interesting_facts", "name": "İlginç Gerçekler" },
+        { "id": "general_knowledge", "name": "Genel Bilgi Havuzu" },
+        { "id": "pop_culture_trivia", "name": "Popüler Kültür Bilgileri" }
+      ]
+    }
+  ],
+  "questions": [
+    {
+      "text": "Japonya'nın başkenti neresidir?",
+      "options": ["Kyoto", "Osaka", "Tokyo", "Nagoya"],
+      "correctAnswerIndex": 2,
+      "categoryId": "geography",
+      "subCategory": "capitals_currencies",
+      "difficulty": "easy",
+      "explanation": "Japonya'nın başkenti Tokyo'dur.",
+      "targetPool": "standard"
+    },
+    {
+      "text": "Periyodik tabloda atom numarası 26 olan element hangisidir?",
+      "options": ["Demir", "Bakır", "Çinko", "Nikel"],
+      "correctAnswerIndex": 0,
+      "categoryId": "science_tech",
+      "subCategory": "periodic_table",
+      "difficulty": "medium",
+      "explanation": "Atom numarası 26 olan element demirdir (Fe).",
+      "targetPool": "standard"
+    },
+    {
+      "text": "Osmanlı Devleti'nde Lale Devri hangi padişah döneminde yaşanmıştır?",
+      "options": ["II. Mahmud", "IV. Murad", "I. Abdülhamid", "III. Ahmed"],
+      "correctAnswerIndex": 3,
+      "categoryId": "history",
+      "subCategory": "ottoman_dynasty",
+      "difficulty": "hard",
+      "explanation": "Lale Devri (1718-1730), III. Ahmed döneminde yaşanmıştır.",
+      "targetPool": "standard"
+    },
+    {
+      "text": "Fermat'nın Son Teoremi'ni 1994'te kanıtlayan matematikçi kimdir?",
+      "options": ["Grigori Perelman", "Andrew Wiles", "Terence Tao", "Paul Erdős"],
+      "correctAnswerIndex": 1,
+      "categoryId": "mathematics",
+      "subCategory": "famous_mathematicians",
+      "difficulty": "expert",
+      "explanation": "Andrew Wiles, Fermat'nın Son Teoremi'nin kanıtını 1994'te tamamlamıştır.",
+      "targetPool": "standard"
+    }
+  ]
+}

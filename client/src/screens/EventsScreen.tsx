@@ -12,6 +12,7 @@ import { UserProfile, GameEvent } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
+import { authHeaders } from '../utils/apiAuth';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -128,7 +129,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
       try {
         const res = await fetch(`${base}/social/events/claim`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({ userId: user.id, eventId: event.id }),
         });
 
@@ -167,7 +168,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
       try {
         const res = await fetch(`${base}/social/events/start`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({ userId: user.id, eventId: event.id }),
         });
 
