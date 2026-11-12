@@ -8,17 +8,17 @@
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "deploy": "wrangler deploy",
-    "test": "jest"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
+    "@sentry/cloudflare": "^11.12.0",
     "@trivia/shared": "file:../shared"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261023.1",
-    "@types/jest": "^29.5.14",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.2.5",
     "typescript": "^5.7.3",
+    "vitest": "^4.1.12",
     "wrangler": "^4.156.0"
   }
 }

@@ -11,11 +11,11 @@ describe('Davet bağlantısının giriş boyunca korunması', () => {
         setItem: (k: string, v: string) => values.set(k, v),
         removeItem: (k: string) => values.delete(k),
       },
-      history: { state: null, replaceState: jest.fn() },
+      history: { state: null, replaceState: vi.fn() },
     };
     clearPendingReferral();
   });
-  afterEach(() => { jest.restoreAllMocks(); delete (globalThis as any).window; });
+  afterEach(() => { vi.restoreAllMocks(); delete (globalThis as any).window; });
   it('remembers the invite through OAuth URLs and reload-like reads', () => {
     expect(captureReferralLink(`https://tavriko-app.vercel.app/app?invite=${token}`)).toBe(token);
     expect(captureReferralLink('https://tavriko-app.vercel.app/app?code=oauth')).toBe(token);
@@ -35,7 +35,7 @@ describe('Davet bağlantısının giriş boyunca korunması', () => {
   });
   it('expires the pending link after seven days', () => {
     captureReferralLink(`https://tavriko-app.vercel.app/app?invite=${token}`);
-    jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 8 * 86400000);
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 8 * 86400000);
     expect(getPendingReferral()).toBeNull();
   });
   it('is safe with blocked browser storage', () => {

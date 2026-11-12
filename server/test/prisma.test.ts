@@ -3,7 +3,10 @@ import { createApp } from '../src/server';
 import { prisma } from '../src/db/prismaClient';
 import { db } from '../src/db/prismaClient';
 
-describe('Prisma ORM & Supabase Integration Tests', () => {
+// Bu dosya gerçek bir Postgres (DATABASE_URL) gerektirir; yoksa tamamı atlanır.
+const describeIfDb = process.env.DATABASE_URL ? describe : describe.skip;
+
+describeIfDb('Prisma ORM & Supabase Integration Tests', () => {
   const { app, close } = createApp();
 
   afterAll(() => {

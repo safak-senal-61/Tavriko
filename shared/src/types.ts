@@ -340,6 +340,11 @@ export interface UserSettings {
   friendActivity?: boolean;
   themeMode?: 'dark' | 'vibrant' | 'midnight';
   equippedTitle?: string; // Player-chosen display title (persisted in users.settings jsonb)
+  /**
+   * 2x XP hızlandırıcısının (booster_xp_2x_1h / booster_xp_2x_24h) bitiş zamanı.
+   * Sunucu tarafından yazılır; istemci yalnızca okur (profildeki kalan süre barı için).
+   */
+  xpBoosterExpiresAt?: string; // ISO tarih; sunucu yetkili kaynağıdır
   /** Yasal metin onayı (sunucu tarafından yazılır, istemci değiştiremez). */
   legalConsent?: {
     version: string;

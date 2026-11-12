@@ -11,7 +11,7 @@
   "scripts": {
     "vercel-build": "npx prisma generate --schema=server/prisma/schema.prisma && npm run build:shared && npm run build:server && npm run build:client:web",
     "build": "npx prisma generate --schema=server/prisma/schema.prisma && npm run build:shared && npm run build:server && npm run build:client:web && npm run build:cloudflare",
-    "test:all": "scripts\\run-all-tests.bat",
+    "test:all": "npm run test:shared && npm run test:server && npm run test:client && npm run test:cloudflare",
     "test:shared": "npm --prefix shared test",
     "test:server": "npm --prefix server test",
     "test:client": "npm --prefix client test",

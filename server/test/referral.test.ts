@@ -7,16 +7,16 @@ describe('Referral ledger and friendship transaction', () => {
     inviter = { id: 'owner', displayName: 'Davet Sahibi', friendIds: ['existing-a'], coins: 500 };
     invitee = { id: 'new', displayName: 'Yeni Oyuncu', friendIds: ['existing-b'], createdAt: new Date(2000) };
     tx = {
-      referralLink: { findUnique: jest.fn().mockResolvedValue({ token, inviterId: 'owner', createdAt: new Date(1000) }) },
-      referralRedemption: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({}) },
-      $queryRaw: jest.fn().mockResolvedValue([{ id: 'new' }, { id: 'owner' }]),
+      referralLink: { findUnique: vi.fn().mockResolvedValue({ token, inviterId: 'owner', createdAt: new Date(1000) }) },
+      referralRedemption: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({}) },
+      $queryRaw: vi.fn().mockResolvedValue([{ id: 'new' }, { id: 'owner' }]),
       user: {
-        findUnique: jest.fn().mockImplementation(({ where }: any) => Promise.resolve(where.id === 'owner' ? inviter : invitee)),
-        update: jest.fn().mockResolvedValue({}),
+        findUnique: vi.fn().mockImplementation(({ where }: any) => Promise.resolve(where.id === 'owner' ? inviter : invitee)),
+        update: vi.fn().mockResolvedValue({}),
       },
-      userNotification: { updateMany: jest.fn().mockResolvedValue({ count: 0 }), create: jest.fn().mockResolvedValue({ id: 'n' }) },
+      userNotification: { updateMany: vi.fn().mockResolvedValue({ count: 0 }), create: vi.fn().mockResolvedValue({ id: 'n' }) },
     };
-    prisma = { ...tx, $transaction: jest.fn().mockImplementation((fn: any) => fn(tx)) };
+    prisma = { ...tx, $transaction: vi.fn().mockImplementation((fn: any) => fn(tx)) };
     service = new ReferralService(prisma);
   });
   it('awards new accounts once and adds both IDs without losing other friends', async () => {

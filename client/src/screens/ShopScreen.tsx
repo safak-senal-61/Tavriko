@@ -374,6 +374,10 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
   const filteredProducts = SHOP_CATALOG.filter((p) => p.category === activeTab);
 
+  // 2x XP artırıcı aktif mi? Kalan süre (ms) yoksa null.
+  const boosterExp = user?.activeBoosterExpiresAt ?? 0;
+  const boosterRemainingMs = boosterExp > Date.now() ? boosterExp - Date.now() : null;
+
   const isProductOwned = (product: ShopProduct): boolean => {
     if (!user) return false;
     if (product.grantPremiumPass && user.hasPremiumPass) return true;
@@ -588,6 +592,27 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                 {/* İsim & Açıklama */}
                 <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
                 <Text style={styles.productDesc} numberOfLines={2}>{item.desc}</Text>
+
+                {/* 2x XP Artırıcı Aktifse: Kalan Süre Barı */}
+                {(item.category === 'boosters' || item.id.includes('booster')) &&
+                  boosterRemainingMs !== null &&
+                  (() => {
+                    const totalMs = item.id.includes('24h') ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000;
+                    const pct = Math.max(2, Math.min(100, (boosterRemainingMs / totalMs) * 100));
+                    const totalMin = Math.max(1, Math.round(boosterRemainingMs / 60000));
+                    const remainingLabel =
+                      totalMin >= 60
+                        ? `${Math.floor(totalMin / 60)} sa ${totalMin % 60} dk`
+                        : `${totalMin} dk`;
+                    return (
+                      <View style={styles.boosterTimerWrap}>
+                        <View style={styles.boosterTimerTrack}>
+                          <View style={[styles.boosterTimerFill, { width: `${pct}%` }]} />
+                        </View>
+                        <Text style={styles.boosterTimerText}>⚡ Aktif — kalan süre: {remainingLabel}</Text>
+                      </View>
+                    );
+                  })()}
 
                 {/* Fiyat Butonu (Tavriko Altın/Elmas Butonu) */}
                 <TouchableOpacity
@@ -967,6 +992,29 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 9,
     fontWeight: 'bold',
+  },
+  boosterTimerWrap: {
+    marginTop: 8,
+    marginBottom: 2,
+    width: '100%',
+  },
+  boosterTimerTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(90, 219, 181, 0.15)',
+    overflow: 'hidden',
+  },
+  boosterTimerFill: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#5ADBB5',
+  },
+  boosterTimerText: {
+    marginTop: 4,
+    color: '#5ADBB5',
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   fallbackVisualEmoji: {
     fontSize: 32,

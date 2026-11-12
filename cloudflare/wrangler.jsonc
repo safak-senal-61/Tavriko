@@ -27,6 +27,8 @@
     "BACKEND_API_URL": "https://tavriko-app.vercel.app",
     "RECONNECTION_GRACE_SEC": 60,
     "ROUND_INTERMISSION_SEC": 3.5,
-    "COUNTDOWN_DURATION_SEC": 3
+    "COUNTDOWN_DURATION_SEC": 3,
+    // Sentry hata izleme: boş bırakılırsa kapalı kalır. DSN'u buraya veya `wrangler secret put SENTRY_DSN` ile ekleyin.
+    "SENTRY_DSN": ""
   }
 }

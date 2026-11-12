@@ -3,10 +3,11 @@ import { GameRoomDO } from './durable-objects/GameRoom';
 import { MatchmakerDO } from './durable-objects/Matchmaker';
 import { sanitizeRoomCode } from './websocket/validation';
 import { verifyJwt } from './auth/authenticate';
+import * as Sentry from '@sentry/cloudflare';
 
 export { GameRoomDO, MatchmakerDO };
 
-export default {
+const worker: ExportedHandler<Env> = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
@@ -334,3 +335,13 @@ export default {
     });
   },
 };
+
+// Sentry hata izleme: wrangler.jsonc içindeki SENTRY_DSN tanımsızsa sessizce kapalı kalır.
+export default Sentry.withSentry(
+  (env: Env) => ({
+    dsn: env.SENTRY_DSN,
+    environment: env.ENVIRONMENT ?? 'production',
+    tracesSampleRate: 0.2,
+  }),
+  worker,
+);
