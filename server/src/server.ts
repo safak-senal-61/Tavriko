@@ -462,6 +462,23 @@ export function createApp() {
     app.get('/favicon.ico', (req, res) => {
       res.sendFile(path.join(clientDistDir!, 'favicon.ico'));
     });
+    // Marka ikonları, manifest ve paylaşım görseli (client/public -> client/dist)
+    const brandStaticFiles = [
+      'favicon-16.png',
+      'favicon-32.png',
+      'apple-touch-icon.png',
+      'icon-192.png',
+      'icon-512.png',
+      'icon-maskable-512.png',
+      'og-image.png',
+      'manifest.json',
+    ];
+    app.get(brandStaticFiles.map((name) => `/${name}`), (req, res, next) => {
+      const filePath = path.join(clientDistDir!, path.basename(req.path));
+      if (!fs.existsSync(filePath)) return next();
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.sendFile(filePath);
+    });
 
     // 4. Playable Web App at /app
     app.get(['/app', '/app/'], (req, res) => {

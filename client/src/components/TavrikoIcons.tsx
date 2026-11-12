@@ -29,9 +29,9 @@ import { NotificationBell } from './NotificationUI';
 import { useUnreadCount } from '../store/notificationStore';
 import { BackgroundScene, backgroundFor } from './StoreKit';
 // Brand Assets
-export const BRAND_LOGO_MAIN = require('../../assets/images/logo_main.jpg');
-export const BRAND_LOGO_BANNER = require('../../assets/images/logo_banner.jpg');
-export const BRAND_APP_ICON = require('../../assets/images/app_icon.jpg');
+export const BRAND_LOGO_MAIN = require('../../assets/images/brand/logo_full.png');
+export const BRAND_LOGO_BANNER = require('../../assets/images/brand/logo_full.png');
+export const BRAND_APP_ICON = require('../../assets/images/app_icon.png');
 // Shared SVG Gradients from Tavriko UI Kit
 const SharedSvgDefs = () => (
   <Defs>
@@ -916,114 +916,12 @@ export const TavrikoHeroLogo: React.FC<{
   width?: number;
   height?: number;
 }> = ({ width = 230, height = 135 }) => (
-  <Svg width={width} height={height} viewBox="0 0 260 155">
-    <Defs>
-      <LinearGradient id="heroBubBlue" x1="0" y1="0" x2="1" y2="1">
-        <Stop offset="0" stopColor="#26A8FF" />
-        <Stop offset="0.55" stopColor="#4345F6" />
-        <Stop offset="1" stopColor="#8A24E6" />
-      </LinearGradient>
-      <LinearGradient id="heroBubPink" x1="0" y1="0" x2="1" y2="1">
-        <Stop offset="0" stopColor="#E154FF" />
-        <Stop offset="1" stopColor="#6918C8" />
-      </LinearGradient>
-      <LinearGradient id="heroCrownGold" x1="0" y1="0" x2="0" y2="1">
-        <Stop offset="0" stopColor="#FFF078" />
-        <Stop offset="0.6" stopColor="#FFB01F" />
-        <Stop offset="1" stopColor="#D66500" />
-      </LinearGradient>
-      <LinearGradient id="heroQMark" x1="0" y1="0" x2="0" y2="1">
-        <Stop offset="0" stopColor="#94FFFF" />
-        <Stop offset="1" stopColor="#08A6FF" />
-      </LinearGradient>
-    </Defs>
-    {/* Ambient Sparkle Rays */}
-    <Path
-      d="M52 46l-18-8 4 12z"
-      fill="#FF9248"
-      opacity="0.9"
-    />
-    <Path
-      d="M46 66l-14 4 8 8z"
-      fill="#FFD147"
-      opacity="0.85"
-    />
-    <Path
-      d="M206 32l12-10 4 12z"
-      fill="#3CE8FF"
-      opacity="0.9"
-    />
-    <Path
-      d="M214 54l16-4-4 12z"
-      fill="#FF8547"
-      opacity="0.9"
-    />
-    <Path
-      d="M212 76l14 4-8 10z"
-      fill="#38A8FF"
-      opacity="0.85"
-    />
-    {/* Back Pink Speech Bubble */}
-    <Rect
-      x="95"
-      y="24"
-      width="98"
-      height="74"
-      rx="28"
-      fill="url(#heroBubPink)"
-      stroke="#FF9AF5"
-      strokeWidth="2.5"
-    />
-    {/* Front Blue Speech Bubble */}
-    <Path
-      d="M94 26h66a28 28 0 0128 28v18a28 28 0 01-28 28h-38l-18 14 3-14H94a28 28 0 01-28-28V54a28 28 0 0128-28z"
-      fill="url(#heroBubBlue)"
-      stroke="#66D9FF"
-      strokeWidth="2.5"
-    />
-    {/* Golden crown removed per user request for clean modern look */}
-    {/* 3D Cyan Question Mark */}
-    <Path
-      d="M116 49c0-9 8-15 19-15s19 6 19 15c0 7-4 11-11 14-4 2-6 4-6 8h-11c0-7 3-11 9-14 4-2 6-4 6-7 0-3-3-5-7-5s-7 2-7 6h-11z"
-      fill="url(#heroQMark)"
-      stroke="#FFFFFF"
-      strokeWidth="1.5"
-    />
-    <Circle
-      cx="131"
-      cy="86"
-      r="6.5"
-      fill="url(#heroQMark)"
-      stroke="#FFFFFF"
-      strokeWidth="1.5"
-    />
-    {/* "Tavriko" 3D Typography with Deep Purple Outline */}
-    <SvgText
-      x="130"
-      y="142"
-      textAnchor="middle"
-      fontWeight="900"
-      fontSize="44"
-      fontFamily={THEME.fonts.display}
-      stroke="#23085A"
-      strokeWidth="10"
-      strokeLinejoin="round"
-      fill="#23085A"
-    >
-      Tavriko
-    </SvgText>
-    <SvgText
-      x="130"
-      y="140"
-      textAnchor="middle"
-      fontWeight="900"
-      fontSize="44"
-      fontFamily={THEME.fonts.display}
-      fill="#FFFFFF"
-    >
-      Tavriko
-    </SvgText>
-  </Svg>
+  <Image
+    source={BRAND_LOGO_MAIN}
+    style={{ width, height }}
+    resizeMode="contain"
+    accessibilityLabel="Tavriko"
+  />
 );
 export const TavrikoBadgeBanner: React.FC<{
   scale?: number;

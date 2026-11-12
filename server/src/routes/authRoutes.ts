@@ -351,9 +351,20 @@ router.get('/google/callback', (req: Request, res: Response): void => {
       }
 
       const activeHost = window.location.hostname || '${currentHost}';
-      const webTarget = '/app#' + payload;
+      let webTarget = '/app#' + payload;
       const isExpoClient = /Expo/i.test(navigator.userAgent);
       const btn = document.getElementById('appBtn');
+
+      // Oturum zaten sunucuda tamamlandı: kullanıcıyı ve belirteci doğrudan kaydet.
+      // Böylece uygulama açılışta giriş yapılmış olarak başlar; ikinci bir doğrulama turu
+      // ve giriş ekranının görünmesi gerekmez.
+      if (user && token && !isExpoClient) {
+        try {
+          window.localStorage.setItem('tavriko_auth_user', JSON.stringify(user));
+          window.localStorage.setItem('tavriko_auth_token', token);
+          webTarget = '/app';
+        } catch (e) {}
+      }
 
       if (btn) {
         btn.href = isExpoClient ? 'exp://' + activeHost + ':8081/--/auth-callback?' + payload : webTarget;
@@ -366,7 +377,7 @@ router.get('/google/callback', (req: Request, res: Response): void => {
         }, 1000);
       } else {
         // Web browser: Redirect straight to Tavriko web application!
-        window.location.href = webTarget;
+        window.location.replace(webTarget);
       }
     }
 
@@ -381,9 +392,7 @@ router.get('/google/callback', (req: Request, res: Response): void => {
       .then(function(d) {
         if (d && d.user) {
           document.getElementById('msg').innerText = 'Hoş geldin ' + d.user.displayName + '! Tavriko açılıyor...';
-          setTimeout(function() {
-            navigateToApp(d.user, d.token);
-          }, 350);
+          navigateToApp(d.user, d.token);
         } else {
           navigateToApp(null, null);
         }
