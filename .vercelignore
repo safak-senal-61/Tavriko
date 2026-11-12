@@ -1,0 +1,6 @@
+# Görseller, ses efektleri ve müzik Cloudflare CDN'inden (tavriko-cdn) sunulur;
+# Vercel'e yüklenmeleri gerekmez. Uygulama ikonu/splash dosyaları (client/assets/*.png) derleme için kalır.
+client/assets/images
+client/assets/sounds
+client/assets/music
+cdn
