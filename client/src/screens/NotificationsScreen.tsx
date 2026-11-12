@@ -1,3 +1,4 @@
+import { formatNotificationTime } from '../utils/notificationTime';
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
 import type { UserProfile, NotificationItem } from '@trivia/shared';
@@ -151,7 +152,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                 <View style={styles.cardHeading}>
                   <Text style={[styles.type, { color: visual.color }]}>{visual.label}</Text>
                   <Text style={styles.cardTitle}>{item.title}</Text>
-                  <View style={styles.timeRow}><Clock3 size={12} color="#CCBDDD" /><Text style={styles.meta}>{item.timeText || 'Şimdi'}</Text>
+                  <View style={styles.timeRow}><Clock3 size={12} color="#CCBDDD" /><Text style={styles.meta}>{formatNotificationTime(item) || 'Şimdi'}</Text>
                     {fresh && <View style={styles.newPill}><Text style={styles.newText}>Yeni</Text></View>}
                   </View>
                 </View>

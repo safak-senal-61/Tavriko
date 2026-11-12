@@ -332,10 +332,10 @@ router.post('/season/premium-pass', requireUserAuth, async (req: Request, res: R
 });
 
 // --- Live Events ---
-router.get('/events', (req: Request, res: Response): void => {
+router.get('/events', async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req.query.userId as string) || '';
-    const result = db.getUserEvents(userId);
+    const result = await db.getUserEvents(userId);
     res.json({
       success: true,
       events: result.events,
@@ -360,7 +360,7 @@ router.post('/events/claim', requireUserAuth, async (req: Request, res: Response
   }
 });
 
-router.post('/events/start', requireUserAuth, (req: Request, res: Response): void => {
+router.post('/events/start', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.authUserId;
     const { eventId } = req.body;
@@ -368,7 +368,7 @@ router.post('/events/start', requireUserAuth, (req: Request, res: Response): voi
       res.status(400).json({ error: 'userId ve eventId gereklidir' });
       return;
     }
-    const result = db.startEvent(userId, eventId);
+    const result = await db.startEvent(userId, eventId);
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(400).json({ error: err.message });

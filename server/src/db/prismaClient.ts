@@ -1503,6 +1503,7 @@ export class PrismaService {
             senderName: notif.senderName ?? null,
             senderAvatar: notif.senderAvatar ?? null,
             roomCode: notif.roomCode ?? null,
+            createdAt: notif.createdAt ? new Date(notif.createdAt) : undefined,
           },
         }).catch(() => {});
       }
@@ -2496,6 +2497,7 @@ export class PrismaService {
             totalAnswers: record.stats.totalAnswers,
             bestStreak: record.stats.bestStreak,
             categoryMastery: record.categoryMastery,
+            eventProgress: (record.eventProgress || {}) as any,
             updatedAt: new Date(),
           },
         });
@@ -2519,6 +2521,20 @@ export class PrismaService {
     const record = await this.loadRecord(userId);
     if (!record) return null;
     return this.toProfile(record);
+  }
+
+  /** Etkinlik ilerlemesini veritabanına yazar (sunucusuz ortamda bellek kaybolduğu için şart). */
+  private async persistEventProgress(record: any, extra: Record<string, unknown> = {}): Promise<void> {
+    if (record.isGuest) return;
+    this.savePersistedUsers();
+    try {
+      await this.rawClient.user.update({
+        where: { id: record.id },
+        data: { eventProgress: (record.eventProgress || {}) as any, ...extra, updatedAt: new Date() },
+      });
+    } catch (err) {
+      console.error('[persistEventProgress] DB update error:', err);
+    }
   }
 
   private updateStartedEvents(
@@ -2695,7 +2711,9 @@ export class PrismaService {
     this.users.set(record.id, record);
     if (!record.isGuest) {
       this.savePersistedUsers();
-      this.syncUserToPrisma(record).catch(() => {});
+      this.syncUserToPrisma(record)
+        .catch(() => {})
+        .finally(() => { void this.persistEventProgress(record); });
     }
 
     return {
@@ -3785,6 +3803,7 @@ export class PrismaService {
           title: n.title,
           sub: n.sub,
           timeText: n.timeText || 'Az önce',
+          createdAt: n.createdAt ? new Date(n.createdAt).getTime() : undefined,
           handled: n.handled || null,
           senderId: n.senderId || undefined,
           senderName: n.senderName || undefined,
@@ -3937,6 +3956,7 @@ export class PrismaService {
       title: payload.title,
       sub: payload.sub || '',
       timeText: 'Az önce',
+      createdAt: Date.now(),
       senderId: sender.id,
       senderName: sender.displayName,
       senderAvatar: sender.avatarUrl || 'av1',
@@ -4078,6 +4098,7 @@ export class PrismaService {
       title: `${me.displayName} sana arkadaşlık isteği gönderdi!`,
       sub: 'Arkadaş olarak eklemek ve birlikte yarışmak için isteği kabul et.',
       timeText: 'Az önce',
+      createdAt: Date.now(),
       senderId: me.id,
       senderName: me.displayName,
       senderAvatar: me.avatarUrl || 'av1',
@@ -4274,6 +4295,7 @@ export class PrismaService {
           title: 'Tavriko Bilgi Dünyasına Hoş Geldin! 🦉',
           sub: 'Profilini tamamla, 1v1 düellolara katıl ve arkadaşlarınla yarış!',
           timeText: 'Bugün',
+          createdAt: Date.now(),
           handled: null,
         };
 
@@ -4306,6 +4328,7 @@ export class PrismaService {
         title: n.title,
         sub: n.sub,
         timeText: n.timeText || 'Az önce',
+          createdAt: n.createdAt ? new Date(n.createdAt).getTime() : undefined,
         handled: (n.handled as any) || null,
         senderId: n.senderId || undefined,
         senderName: n.senderName || undefined,
@@ -4416,6 +4439,7 @@ export class PrismaService {
             title: `${user.displayName} arkadaşlık isteğini kabul etti!`,
             sub: 'Artık Arkadaşlarım listesinde görebilir ve 1v1 düelloya davet edebilirsin.',
             timeText: 'Az önce',
+            createdAt: Date.now(),
             handled: 'accepted',
           };
           createdSenderNotif = senderNotif;
@@ -4522,6 +4546,7 @@ export class PrismaService {
       title: `${me.displayName} sana 1v1 Düello Meydan Okudu!`,
       sub: 'Özel 1v1 düello odası hazır. Kabul et ve hemen yarışmaya başla!',
       timeText: 'Az önce',
+      createdAt: Date.now(),
       senderId: me.id,
       senderName: me.displayName,
       senderAvatar: me.avatarUrl || 'av1',
@@ -5263,8 +5288,8 @@ export class PrismaService {
     };
   }
 
-  public getUserEvents(userId: string): { events: any[] } {
-    const record = this.users.get(userId);
+  public async getUserEvents(userId: string): Promise<{ events: any[] }> {
+    const record = userId ? await this.loadRecord(userId) : null;
     const progressMap = record?.eventProgress || {};
 
     const events = EVENT_DEFINITIONS.map((ev) => {
@@ -5289,8 +5314,8 @@ export class PrismaService {
     return { events };
   }
 
-  public startEvent(userId: string, eventId: string): { user: UserProfile; event: any; message: string } {
-    const record = this.users.get(userId);
+  public async startEvent(userId: string, eventId: string): Promise<{ user: UserProfile; event: any; message: string }> {
+    const record = await this.loadRecord(userId);
     if (!record) throw new Error('Kullanıcı bulunamadı.');
 
     const event = EVENT_DEFINITIONS.find((e) => e.id === eventId);
@@ -5322,9 +5347,7 @@ export class PrismaService {
       claimed: !!state.claimed,
     };
 
-    if (!record.isGuest) {
-      this.savePersistedUsers();
-    }
+    await this.persistEventProgress(record);
 
     return {
       user: this.toProfile(record),
@@ -5334,7 +5357,7 @@ export class PrismaService {
   }
 
   public async claimEventReward(userId: string, eventId: string): Promise<{ user: UserProfile; message: string }> {
-    const record = this.users.get(userId);
+    const record = await this.loadRecord(userId);
     if (!record) throw new Error('Kullanıcı bulunamadı.');
 
     const event = EVENT_DEFINITIONS.find((e) => e.id === eventId);
@@ -5386,11 +5409,13 @@ export class PrismaService {
             gems: record.gems,
             xp: record.xp,
             level: record.level,
+            seasonXp: record.seasonXp || 0,
+            eventProgress: (record.eventProgress || {}) as any,
             updatedAt: new Date(),
           },
         });
       } catch (err) {
-        console.error('[openChest] DB update error:', err);
+        console.error('[claimEventReward] DB update error:', err);
       }
     }
 

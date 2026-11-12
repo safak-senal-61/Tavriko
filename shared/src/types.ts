@@ -306,6 +306,8 @@ export interface NotificationItem {
   title: string;
   sub: string;
   timeText: string;
+  /** Bildirimin oluşturulma zamanı (epoch ms). İstemci tam saati bundan biçimlendirir. */
+  createdAt?: number;
   handled?: 'accepted' | 'declined' | null;
   senderId?: string;
   senderName?: string;
