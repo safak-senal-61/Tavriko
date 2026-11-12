@@ -39,7 +39,7 @@ import {
   AvatarPreset,
 } from '../components/TavrikoIcons';
 import { UI_IMG, FloatingImage, ShimmerView, CATEGORY_IMG, FramedAvatar, AnimatedFrame, AnimatedNameText, ANIMATED_FRAME_COLORS, backgroundFor, BackgroundScene } from '../components/StoreKit';
-import { DISCOVERY_IMG, DiscoveryArtwork, AchievementState } from '../components/DiscoveryArtwork';
+import { DISCOVERY_IMG, PROFILE_IMG, DiscoveryArtwork, AchievementState } from '../components/DiscoveryArtwork';
 import { Settings, UserRound } from 'lucide-react-native';
 import { PreferenceSwitch } from '../components/PreferenceSwitch';
 import { InfoHint } from '../components/InfoHint';
@@ -558,17 +558,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const bestCategory = masteryList[0]?.correctCount > 0 ? masteryList[0] : null;
 
   const achievements = [
-    { name: 'İlk Zafer', desc: '1 maç kazan', done: wins >= 1, image: DISCOVERY_IMG.victory },
+    { name: 'İlk Zafer', desc: '1 maç kazan', done: wins >= 1, image: PROFILE_IMG.achFirstWin },
     {
       name: 'Hız Ustası',
       desc: 'Ort. cevap < 5 sn',
       done: !!user.stats?.avgResponseTimeMs && user.stats.avgResponseTimeMs < 5000,
-      image: DISCOVERY_IMG.speed,
+      image: PROFILE_IMG.achSpeed,
     },
-    { name: 'Seri Kralı', desc: '3+ doğru seri', done: (user.stats?.bestStreak || 0) >= 3, image: DISCOVERY_IMG.streak },
-    { name: '100 Doğru', desc: '100 doğru cevap', done: correctAnswers >= 100, image: DISCOVERY_IMG.accuracy },
-    { name: 'Uzman', desc: 'Seviye 5', done: prog.level >= 5, image: DISCOVERY_IMG.expert },
-    { name: 'Koleksiyoncu', desc: '5+ eşya', done: (user.inventory?.length || 0) >= 5, image: DISCOVERY_IMG.collector },
+    { name: 'Seri Kralı', desc: '3+ doğru seri', done: (user.stats?.bestStreak || 0) >= 3, image: PROFILE_IMG.achStreak },
+    { name: '100 Doğru', desc: '100 doğru cevap', done: correctAnswers >= 100, image: PROFILE_IMG.achHundred },
+    { name: 'Uzman', desc: 'Seviye 5', done: prog.level >= 5, image: PROFILE_IMG.achExpert },
+    { name: 'Koleksiyoncu', desc: '5+ eşya', done: (user.inventory?.length || 0) >= 5, image: PROFILE_IMG.achCollector },
   ];
   const doneAchievements = achievements.filter((a) => a.done).length;
 
@@ -652,7 +652,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           >
             {tKey === 'settings' ? <Settings size={22} color={isActive ? '#281543' : '#D9CDF5'} />
               : tKey === 'account' ? <UserRound size={22} color={isActive ? '#281543' : '#D9CDF5'} />
-              : <Image source={tKey === 'overview' ? DISCOVERY_IMG.victory : tKey === 'mastery' ? DISCOVERY_IMG.accuracy : DISCOVERY_IMG.expert}
+              : <Image source={tKey === 'overview' ? PROFILE_IMG.tabOverview : tKey === 'mastery' ? PROFILE_IMG.tabMastery : PROFILE_IMG.tabTitles}
                   style={styles.profileTabImage} resizeMode="contain" />}
             <Text
               style={[styles.tabText, isActive && styles.tabTextActive]}
@@ -983,7 +983,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             {/* Primary 2x2 Key Performance Cards */}
             <View style={styles.primaryStatsGrid}>
               <View style={styles.primaryStatBox}>
-                <Image source={DISCOVERY_IMG.victory} style={styles.statArtwork} resizeMode="contain" />
+                <Image source={PROFILE_IMG.statMatches} style={styles.statArtwork} resizeMode="contain" />
                 <View
                   style={[
                     styles.statIconChip,
@@ -999,7 +999,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </Text>
               </View>
               <View style={styles.primaryStatBox}>
-                <Image source={DISCOVERY_IMG.expert} style={styles.statArtwork} resizeMode="contain" />
+                <Image source={PROFILE_IMG.statWinrate} style={styles.statArtwork} resizeMode="contain" />
                 <View
                   style={[
                     styles.statIconChip,
@@ -1013,7 +1013,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.primaryStatSub}>{wins} Galibiyet</Text>
               </View>
               <View style={styles.primaryStatBox}>
-                <Image source={DISCOVERY_IMG.speed} style={styles.statArtwork} resizeMode="contain" />
+                <Image source={PROFILE_IMG.statCorrect} style={styles.statArtwork} resizeMode="contain" />
                 <View
                   style={[
                     styles.statIconChip,
@@ -1030,7 +1030,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.primaryStatSub}>Toplam {totalAnswers} soru</Text>
               </View>
               <View style={styles.primaryStatBox}>
-                <Image source={DISCOVERY_IMG.accuracy} style={styles.statArtwork} resizeMode="contain" />
+                <Image source={PROFILE_IMG.statAccuracy} style={styles.statArtwork} resizeMode="contain" />
                 <View
                   style={[
                     styles.statIconChip,
@@ -1048,11 +1048,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             {/* Compact Secondary Metrics Strip */}
             <View style={styles.secondaryMetricsCard}>
               <View style={styles.secondaryMetricItem}>
+                <Image source={PROFILE_IMG.metricTime} style={styles.metricArtwork} resizeMode="contain" />
                 <Text style={styles.secondaryMetricVal}>{avgSec} sn</Text>
                 <Text style={styles.secondaryMetricLbl}>Ort. Süre</Text>
               </View>
               <View style={styles.secondaryMetricDivider} />
               <View style={styles.secondaryMetricItem}>
+                <Image source={PROFILE_IMG.metricStreak} style={styles.metricArtwork} resizeMode="contain" />
                 <Text style={styles.secondaryMetricVal}>
                   {user.dailyStreak || user.dailyChallenge?.streakDay || 0} gün
                 </Text>
@@ -1060,6 +1062,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </View>
               <View style={styles.secondaryMetricDivider} />
               <View style={styles.secondaryMetricItem}>
+                <Image source={PROFILE_IMG.metricXp} style={styles.metricArtwork} resizeMode="contain" />
                 <Text style={styles.secondaryMetricVal}>{user.xp ?? 0}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Text style={styles.secondaryMetricLbl}>Toplam XP</Text>
@@ -1815,6 +1818,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   statArtwork: { position: 'absolute', right: 8, top: 4, width: 48, height: 48, opacity: 0.9 },
+  metricArtwork: { width: 34, height: 34, marginBottom: 4 },
   profileTabImage: { width: 26, height: 26 },
   statIconChip: {
     width: 26,

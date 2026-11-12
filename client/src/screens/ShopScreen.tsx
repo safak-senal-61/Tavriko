@@ -175,9 +175,11 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
   const img = featuredImg[pId] || storeImageFor(pId, product.category);
   if (img) {
     const tint = RARITY_COLORS[product.rarity || 'common'];
+    // Rozetlerin arkasında daire/parıltı olmaz; görsel doğrudan kartın üzerinde durur
+    const isBadgeArt = product.category === 'badges' || pId.includes('badge');
     return (
-      <View style={styles.visualBox}>
-        <View style={[styles.visualGlow, { backgroundColor: tint }]} />
+      <View style={[styles.visualBox, isBadgeArt && { backgroundColor: 'transparent' }]}>
+        {!isBadgeArt && <View style={[styles.visualGlow, { backgroundColor: tint }]} />}
         <Image source={img} style={styles.visualImg} resizeMode="contain" />
       </View>
     );

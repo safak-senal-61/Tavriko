@@ -38,6 +38,8 @@ import {
   UserSettings,
   canonicalCategoryId,
   COSMETIC_RENTAL_MS,
+  FinalMatchSummary,
+  isRankedMatch,
 } from '@trivia/shared';
 import { ALL_CATEGORIES, QUESTION_BANK } from './questionsData';
 import { RICH_SEED_BANK } from '../ai/evrenLlmGenerator';
@@ -209,6 +211,9 @@ export interface AppliedMatchRewards {
   lp?: number;
   alreadyRecorded?: boolean;
 }
+
+/** Sezon ödülü iş kuralı hatası (kullanıcıya olduğu gibi gösterilir). */
+class SeasonClaimError extends Error {}
 
 export class PrismaService {
   public readonly rawClient: PrismaClient;
@@ -2352,6 +2357,68 @@ export class PrismaService {
     return { success: true, message: 'Şifreniz başarıyla değiştirildi!' };
   }
 
+  /** Kalıcı maç defteri: roomCode -> o maçta hesaba yazılan ödül (en fazla 40 kayıt). */
+  private readMatchLedger(record: UserRecord): Record<string, AppliedMatchRewards> {
+    const raw = (record.eventProgress as any)?.__matchLedger;
+    return raw && typeof raw === 'object' ? (raw as Record<string, AppliedMatchRewards>) : {};
+  }
+
+  private writeMatchLedger(record: UserRecord, roomCode: string, rewards: AppliedMatchRewards): void {
+    if (!record.eventProgress) record.eventProgress = {};
+    const ledger = { ...this.readMatchLedger(record), [roomCode]: { ...rewards, alreadyRecorded: undefined } };
+    const keys = Object.keys(ledger);
+    for (const k of keys.slice(0, Math.max(0, keys.length - 40))) delete ledger[k];
+    (record.eventProgress as any).__matchLedger = ledger;
+  }
+
+  /**
+   * Bir odadaki maçın bu kullanıcı için SUNUCUDA kaydedilmiş ödülünü döndürür.
+   * İstemci galibiyet / dereceli bilgisi bildiremez; yalnızca bu kaydı okuyabilir.
+   */
+  public async getRecordedMatchRewards(
+    userId: string,
+    roomCode: string
+  ): Promise<{ user: UserProfile; rewards: AppliedMatchRewards } | null> {
+    const record = await this.loadRecord(userId);
+    if (!record) return null;
+    const prev = this.readMatchLedger(record)[roomCode] || this.recordedMatchRewards.get(`${record.id}:${roomCode}`);
+    if (!prev) return null;
+    return { user: this.toProfile(record), rewards: { ...prev, alreadyRecorded: true } };
+  }
+
+  /**
+   * Gerçek zamanlı sunucunun (Cloudflare Durable Object veya yerel Socket.IO) bildirdiği
+   * NİHAİ maç özetinden tüm kayıtlı oyuncuların sonucunu yazar. Galibiyet, doğru sayısı ve
+   * dereceli olup olmadığı yalnızca bu özetten çıkarılır; istemci değerleri kullanılmaz.
+   */
+  public async recordFinalMatch(summary: FinalMatchSummary): Promise<void> {
+    const ranked = isRankedMatch({
+      mode: summary.mode,
+      roomCode: summary.roomCode,
+      playerIds: (summary.rankings || []).map((r) => r.playerId),
+    });
+    const totalRounds = Math.max(1, Number(summary.totalRounds) || 5);
+    for (const rankItem of summary.rankings || []) {
+      if (!rankItem.playerId || rankItem.playerId.startsWith('bot_') || rankItem.playerId.startsWith('guest_')) {
+        continue;
+      }
+      const rawCorrect =
+        typeof (rankItem as any).correctAnswersCount === 'number'
+          ? (rankItem as any).correctAnswersCount
+          : Math.min(totalRounds, Math.round((rankItem.score || 0) / 140));
+      const safeCorrect = Math.max(0, Math.min(totalRounds, rawCorrect));
+      await this.recordGameStats(rankItem.playerId, {
+        correctAnswers: safeCorrect,
+        totalAnswers: totalRounds,
+        bestStreak: Math.min(safeCorrect, rankItem.streak || 0),
+        won: rankItem.rank === 1,
+        roomCode: summary.roomCode,
+        ranked,
+        category: typeof (summary as any).category === 'string' ? (summary as any).category : undefined,
+      });
+    }
+  }
+
   public async recordGameStats(
     userId: string,
     delta: GameStatsDelta
@@ -2375,6 +2442,15 @@ export class PrismaService {
 
     if (delta.roomCode) {
       const matchKey = `${record.id}:${delta.roomCode}`;
+      // Kalıcı defter (veritabanındaki eventProgress.__matchLedger): sunucusuz ortamda
+      // başka bir örnek bu maçı zaten işlediyse ikinci kez ödül verilmez.
+      const persisted = this.readMatchLedger(record)[delta.roomCode];
+      if (persisted) {
+        return {
+          user: this.toProfile(record),
+          rewards: { ...persisted, alreadyRecorded: true },
+        };
+      }
       if (this.recordedMatchKeys.has(matchKey)) {
         // Aynı maç ikinci kez bildirilirse ilk kayıttaki ödülü aynen döndür
         const prev = this.recordedMatchRewards.get(matchKey);
@@ -2441,6 +2517,7 @@ export class PrismaService {
     }
     if (delta.roomCode) {
       this.recordedMatchRewards.set(`${record.id}:${delta.roomCode}`, appliedRewards);
+      this.writeMatchLedger(record, delta.roomCode, appliedRewards);
     }
 
     const progress = calculateLevelFromXp(record.xp);
@@ -4814,53 +4891,159 @@ export class PrismaService {
     return { user: this.toProfile(record), rewardText };
   }
 
+  /** Kullanıcı başına sıralı çalıştırma: aynı hesabın çifte tıklama / eşzamanlı istekleri tek tek işlenir. */
+  private userLocks: Map<string, Promise<unknown>> = new Map();
+
+  private async withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+    const prev = this.userLocks.get(userId) || Promise.resolve();
+    const run = prev.catch(() => undefined).then(fn);
+    const tail = run.catch(() => undefined);
+    this.userLocks.set(userId, tail);
+    try {
+      return await run;
+    } finally {
+      if (this.userLocks.get(userId) === tail) this.userLocks.delete(userId);
+    }
+  }
+
+  /** Sezon ödülü alınabilir mi? Hata mesajları kullanıcıya olduğu gibi gösterilir. */
+  private assertSeasonClaimable(
+    state: { seasonXp: number; hasPremiumPass: boolean; claimedFree: number[]; claimedPremium: number[] },
+    tier: number,
+    track: 'free' | 'premium'
+  ): void {
+    const tierData = SEASON_1_TIERS.find((t) => t.tier === tier);
+    if (!tierData) throw new SeasonClaimError(`${tier}. aşama verisi bulunamadı.`);
+    if (state.seasonXp < tierData.requiredSeasonXp) {
+      const missing = tierData.requiredSeasonXp - state.seasonXp;
+      throw new SeasonClaimError(
+        `Bu kademe kilitli! Açmak için ${tierData.requiredSeasonXp} Sezon XP gerekli (Mevcut: ${state.seasonXp}, Eksik: ${missing} Sezon XP).`
+      );
+    }
+    if (track === 'premium') {
+      if (!state.hasPremiumPass) {
+        throw new SeasonClaimError('Bu ödülü almak için Sezon 1 Premium Pass sahibi olmalısınız!');
+      }
+      if (state.claimedPremium.includes(tier)) {
+        throw new SeasonClaimError('Bu Premium kademe ödülü zaten hesabınıza tanımlandı.');
+      }
+    } else if (state.claimedFree.includes(tier)) {
+      throw new SeasonClaimError('Bu Ücretsiz kademe ödülü zaten hesabınıza tanımlandı.');
+    }
+  }
+
   public async claimSeasonTier(
     userId: string,
     tier: number,
     track: 'free' | 'premium' = 'free'
   ): Promise<{ user: UserProfile; reward: SeasonReward }> {
-    let record = await this.loadRecord(userId);
+    const safeTrack: 'free' | 'premium' = track === 'premium' ? 'premium' : 'free';
+    const safeTier = Math.floor(Number(tier));
+    return this.withUserLock(userId, () => this.claimSeasonTierLocked(userId, safeTier, safeTrack));
+  }
+
+  private async claimSeasonTierLocked(
+    userId: string,
+    tier: number,
+    track: 'free' | 'premium'
+  ): Promise<{ user: UserProfile; reward: SeasonReward }> {
+    // Her zaman veritabanından taze oku: bellek önbelleği başka örnekte bayat olabilir
+    const record = await this.loadRecord(userId);
     if (!record) throw new Error('Kullanıcı bulunamadı.');
 
-    if (tier < 1 || tier > 50) {
+    if (!Number.isFinite(tier) || tier < 1 || tier > 50) {
       throw new Error('Geçersiz sezon aşaması (1-50 arası olmalıdır).');
     }
-
     const tierData = SEASON_1_TIERS.find((t) => t.tier === tier);
     if (!tierData) throw new Error(`${tier}. aşama verisi bulunamadı.`);
 
-    const userSeasonXp = record.seasonXp || 0;
-    if (userSeasonXp < tierData.requiredSeasonXp) {
-      const missing = tierData.requiredSeasonXp - userSeasonXp;
-      throw new Error(`Bu kademe kilitli! Açmak için ${tierData.requiredSeasonXp} Sezon XP gerekli (Mevcut: ${userSeasonXp}, Eksik: ${missing} Sezon XP).`);
-    }
-
-    if (!record.claimedSeasonFreeTiers) record.claimedSeasonFreeTiers = [];
-    if (!record.claimedSeasonPremiumTiers) record.claimedSeasonPremiumTiers = [];
-
-    if (track === 'premium') {
-      if (!record.hasPremiumPass) {
-        throw new Error('Bu ödülü almak için Sezon 1 Premium Pass sahibi olmalısınız!');
-      }
-      if (record.claimedSeasonPremiumTiers.includes(tier)) {
-        throw new Error('Bu Premium kademe ödülü zaten hesabınıza tanımlandı.');
-      }
-    } else {
-      if (record.claimedSeasonFreeTiers.includes(tier)) {
-        throw new Error('Bu Ücretsiz kademe ödülü zaten hesabınıza tanımlandı.');
-      }
-    }
+    this.assertSeasonClaimable(
+      {
+        seasonXp: record.seasonXp || 0,
+        hasPremiumPass: !!record.hasPremiumPass,
+        claimedFree: record.claimedSeasonFreeTiers || [],
+        claimedPremium: record.claimedSeasonPremiumTiers || [],
+      },
+      tier,
+      track
+    );
 
     const reward = track === 'premium' ? tierData.premiumReward : tierData.freeReward;
+    const isItem = reward.type !== 'coin' && reward.type !== 'gem';
+    const itemId = reward.itemId || `${reward.type}_${tier}`;
+    const itemDesc = `Sezon 1 Kademe ${tier} ${track === 'premium' ? 'Premium' : 'Ücretsiz'} Ödülü`;
 
-    // Grant reward to user account/inventory
+    // Hangi slotlar boşsa ödül oraya takılır
+    const equipSlot: 'equippedFrame' | 'equippedBadge' | 'equippedNameEffect' | 'equippedBackground' | null =
+      reward.type === 'frame' ? 'equippedFrame'
+      : reward.type === 'badge' ? 'equippedBadge'
+      : reward.type === 'name_effect' ? 'equippedNameEffect'
+      : reward.type === 'background' ? 'equippedBackground'
+      : null;
+
+    let persisted = false;
+    if (!record.isGuest && !this.isJest) {
+      try {
+        await this.rawClient.$transaction(
+          async (tx) => {
+            // Eşzamanlı isteklerde (farklı sunucu örnekleri dahil) satırı kilitle
+            await tx.$queryRaw`SELECT id FROM public.users WHERE id = ${record.id} FOR UPDATE`;
+            const fresh = await tx.user.findUnique({ where: { id: record.id } });
+            if (!fresh) throw new Error('Kullanıcı bulunamadı.');
+            const freeNow = Array.isArray((fresh as any).claimedSeasonFreeTiers) ? ((fresh as any).claimedSeasonFreeTiers as number[]) : [];
+            const premNow = Array.isArray((fresh as any).claimedSeasonPremiumTiers) ? ((fresh as any).claimedSeasonPremiumTiers as number[]) : [];
+            this.assertSeasonClaimable(
+              {
+                seasonXp: (fresh as any).seasonXp ?? 0,
+                hasPremiumPass: !!(fresh as any).hasPremiumPass,
+                claimedFree: freeNow,
+                claimedPremium: premNow,
+              },
+              tier,
+              track
+            );
+            const data: any = { updatedAt: new Date() };
+            if (track === 'premium') data.claimedSeasonPremiumTiers = [...premNow, tier];
+            else data.claimedSeasonFreeTiers = [...freeNow, tier];
+            if (reward.type === 'coin') data.coins = { increment: reward.amount };
+            if (reward.type === 'gem') data.gems = { increment: reward.amount };
+            if (equipSlot && !(fresh as any)[equipSlot]) data[equipSlot] = itemId;
+            await tx.user.update({ where: { id: record.id }, data });
+            if (isItem) {
+              await tx.userInventoryItem.upsert({
+                where: { userId_itemId: { userId: record.id, itemId } },
+                update: { qty: { increment: reward.amount }, name: reward.title, desc: itemDesc },
+                create: { userId: record.id, itemId, name: reward.title, desc: itemDesc, qty: reward.amount },
+              });
+            }
+          },
+          { timeout: 15000 }
+        );
+        persisted = true;
+      } catch (err: any) {
+        if (err instanceof SeasonClaimError) throw err;
+        console.error('[claimSeasonTier] DB transaction error:', err);
+        if (process.env.NODE_ENV === 'production') {
+          throw new Error('Ödül şu anda kaydedilemedi, lütfen birkaç saniye sonra tekrar dene.');
+        }
+      }
+    }
+
+    if (persisted) {
+      // Veritabanı gerçek kaynaktır; önbelleği taze kayıtla yenile
+      const fresh = await this.loadRecord(userId);
+      return { user: this.toProfile(fresh || record), reward };
+    }
+
+    // Bellek / yerel dosya yolu (misafir, test ve veritabanı olmayan geliştirme ortamı)
+    if (!record.claimedSeasonFreeTiers) record.claimedSeasonFreeTiers = [];
+    if (!record.claimedSeasonPremiumTiers) record.claimedSeasonPremiumTiers = [];
     if (reward.type === 'coin') {
       record.coins += reward.amount;
     } else if (reward.type === 'gem') {
       record.gems = (record.gems || 0) + reward.amount;
     } else {
       if (!record.inventory) record.inventory = [];
-      const itemId = reward.itemId || `${reward.type}_${tier}`;
       const existing = record.inventory.find((i) => i.id === itemId);
       if (existing) {
         existing.qty += reward.amount;
@@ -4868,83 +5051,71 @@ export class PrismaService {
         record.inventory.push({
           id: itemId,
           name: reward.title,
-          desc: `Sezon 1 Kademe ${tier} ${track === 'premium' ? 'Premium' : 'Ücretsiz'} Ödülü`,
+          desc: itemDesc,
           qty: reward.amount,
           category: reward.type as any,
           rarity: reward.rarity || 'rare',
         });
       }
-      if (reward.type === 'frame' && !record.equippedFrame) record.equippedFrame = itemId;
-      if (reward.type === 'badge' && !record.equippedBadge) record.equippedBadge = itemId;
-      if (reward.type === 'name_effect' && !record.equippedNameEffect) record.equippedNameEffect = itemId;
-      if (reward.type === 'background' && !record.equippedBackground) record.equippedBackground = itemId;
+      if (equipSlot && !(record as any)[equipSlot]) (record as any)[equipSlot] = itemId;
     }
-
-    if (track === 'premium') {
-      record.claimedSeasonPremiumTiers.push(tier);
-    } else {
-      record.claimedSeasonFreeTiers.push(tier);
-    }
+    if (track === 'premium') record.claimedSeasonPremiumTiers.push(tier);
+    else record.claimedSeasonFreeTiers.push(tier);
 
     this.users.set(userId, record);
     this.users.set(record.id, record);
     if (record.username) this.users.set(record.username, record);
-    if (!record.isGuest) {
-      this.savePersistedUsers();
-      try {
-        await this.rawClient.user.update({
-          where: { id: record.id },
-          data: {
-            coins: record.coins,
-            gems: record.gems,
-            xp: record.xp,
-            level: record.level,
-            updatedAt: new Date(),
-          },
-        });
-      } catch (err) {
-        console.error('[openChest] DB update error:', err);
-      }
-    }
+    if (!record.isGuest) this.savePersistedUsers();
     return { user: this.toProfile(record), reward };
   }
 
   public async buyPremiumPass(userId: string): Promise<UserProfile> {
-    const record = this.users.get(userId);
-    if (!record) throw new Error('Kullanıcı bulunamadı.');
-    if (record.hasPremiumPass) {
-      throw new Error('Zaten Sezon 1 Premium Pass sahibisiniz!');
-    }
-
-    const costGems = 250;
-    if ((record.gems || 0) < costGems) {
-      throw new Error(`Yetersiz Elmas! Premium Pass için ${costGems} Elmas gerekli (Mevcut: ${record.gems || 0} Elmas).`);
-    }
-
-    record.gems = (record.gems || 0) - costGems;
-    record.hasPremiumPass = true;
-
-    this.users.set(userId, record);
-    this.users.set(record.id, record);
-    if (record.username) this.users.set(record.username, record);
-    if (!record.isGuest) {
-      this.savePersistedUsers();
-      try {
-        await this.rawClient.user.update({
-          where: { id: record.id },
-          data: {
-            coins: record.coins,
-            gems: record.gems,
-            xp: record.xp,
-            level: record.level,
-            updatedAt: new Date(),
-          },
-        });
-      } catch (err) {
-        console.error('[openChest] DB update error:', err);
+    return this.withUserLock(userId, async () => {
+      const record = await this.loadRecord(userId);
+      if (!record) throw new Error('Kullanıcı bulunamadı.');
+      if (record.hasPremiumPass) {
+        throw new Error('Zaten Sezon 1 Premium Pass sahibisiniz!');
       }
-    }
-    return this.toProfile(record);
+
+      const costGems = 250;
+      if ((record.gems || 0) < costGems) {
+        throw new Error(`Yetersiz Elmas! Premium Pass için ${costGems} Elmas gerekli (Mevcut: ${record.gems || 0} Elmas).`);
+      }
+
+      if (!record.isGuest && !this.isJest) {
+        try {
+          await this.rawClient.$transaction(async (tx) => {
+            await tx.$queryRaw`SELECT id FROM public.users WHERE id = ${record.id} FOR UPDATE`;
+            const fresh = await tx.user.findUnique({ where: { id: record.id } });
+            if (!fresh) throw new Error('Kullanıcı bulunamadı.');
+            if ((fresh as any).hasPremiumPass) throw new SeasonClaimError('Zaten Sezon 1 Premium Pass sahibisiniz!');
+            if ((fresh.gems || 0) < costGems) {
+              throw new SeasonClaimError(`Yetersiz Elmas! Premium Pass için ${costGems} Elmas gerekli (Mevcut: ${fresh.gems || 0} Elmas).`);
+            }
+            await tx.user.update({
+              where: { id: record.id },
+              data: { gems: { decrement: costGems }, hasPremiumPass: true, updatedAt: new Date() },
+            });
+          });
+          const fresh = await this.loadRecord(userId);
+          return this.toProfile(fresh || record);
+        } catch (err: any) {
+          if (err instanceof SeasonClaimError) throw new Error(err.message);
+          console.error('[buyPremiumPass] DB transaction error:', err);
+          if (process.env.NODE_ENV === 'production') {
+            throw new Error('Satın alma şu anda kaydedilemedi, lütfen birkaç saniye sonra tekrar dene.');
+          }
+        }
+      }
+
+      record.gems = (record.gems || 0) - costGems;
+      record.hasPremiumPass = true;
+      this.users.set(userId, record);
+      this.users.set(record.id, record);
+      if (record.username) this.users.set(record.username, record);
+      if (!record.isGuest) this.savePersistedUsers();
+      return this.toProfile(record);
+    });
   }
 
   public async purchaseShopProduct(
@@ -5564,7 +5735,10 @@ export class PrismaService {
       equippedBackgroundExpiresAt: record.equippedBackgroundExpiresAt,
       blockedUserIds: record.blockedUserIds || [],
       activeBoosterExpiresAt: record.activeBoosterExpiresAt,
-      eventProgress: record.eventProgress || {},
+      // İç defter (__matchLedger) istemciye gönderilmez
+      eventProgress: Object.fromEntries(
+        Object.entries(record.eventProgress || {}).filter(([k]) => k !== '__matchLedger')
+      ) as any,
       friendIds: record.friendIds || [],
       notifications: record.notifications,
       stats: record.stats,

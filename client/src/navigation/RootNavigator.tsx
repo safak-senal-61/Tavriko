@@ -29,7 +29,6 @@ import {
   CustomRoomSettings,
   MatchQuestionReviewItem,
   ALL_CATEGORIES,
-  isRankedMatch,
 } from '@trivia/shared';
 // Screens
 import { SplashScreen } from '../screens/SplashScreen';
@@ -652,46 +651,41 @@ export const RootNavigator: React.FC = () => {
       setFinalSummary(enrichedSummary);
       navigateTo('match_result');
       if (user && !isGuest) {
-        const myRankEntry = summary.rankings?.find((p) => p.playerId === user.id);
-        const won = myRankEntry?.rank === 1 || summary.podium?.first?.playerId === user.id;
-        const correctAnswers =
-          typeof myRankEntry?.correctAnswersCount === 'number'
-            ? myRankEntry.correctAnswersCount
-            : matchQuestionsReviewRef.current.filter((q) => q.isCorrect).length;
         setMatchRewards(null);
-        fetch(`${API_BASE}/auth/stats`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(useGameStore.getState().token ? { Authorization: `Bearer ${useGameStore.getState().token}` } : {}),
-          },
-          body: JSON.stringify({
-            userId: user.id,
-            won,
-            correctAnswers,
-            totalAnswers: summary.totalRounds || 5,
-            mode: 'multiplayer',
-            bestStreak: myRankEntry?.streak || 1,
-            roomCode: summary.roomCode,
-            ranked: isRankedMatch({
-              mode: summary.mode,
-              roomCode: summary.roomCode,
-              playerIds: (summary.rankings || []).map((p) => p.playerId),
-            }),
-            category: (summary as any).category || activeRoom?.category || selectedCategory || 'general_culture',
-          }),
-        })
-          .then((r) => r.json())
-          .then((data) => {
-            if (data?.user) {
-              setUser(data.user);
-            }
-            // Sunucunun hesaba GERÇEKTEN yazdığı ödül
-            if (data?.rewards && !(data.rewards.alreadyRecorded && !data.rewards.xp)) {
-              setMatchRewards({ xp: data.rewards.xp, coins: data.rewards.coins, boosted: !!data.rewards.boosted, lp: typeof data.rewards.lp === 'number' ? data.rewards.lp : undefined });
-            }
+        // Galibiyet, dereceli maç ve LP/XP sunucuda hesaplanır; istemci yalnızca oda kodunu
+        // söyler ve sunucunun yazdığı ödülü okur. Sunucu özeti işleyene kadar kısa aralıklarla sorar.
+        const fetchServerRewards = (attempt: number) => {
+          fetch(`${API_BASE}/auth/stats`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(useGameStore.getState().token ? { Authorization: `Bearer ${useGameStore.getState().token}` } : {}),
+            },
+            body: JSON.stringify({ mode: 'multiplayer', roomCode: summary.roomCode }),
           })
-          .catch(() => {});
+            .then((r) => r.json())
+            .then((data) => {
+              if (data?.pending) {
+                if (attempt < 8) setTimeout(() => fetchServerRewards(attempt + 1), 1500);
+                return;
+              }
+              if (data?.user) {
+                setUser(data.user);
+              }
+              if (data?.rewards && !(data.rewards.alreadyRecorded && !data.rewards.xp && !data.rewards.lp)) {
+                setMatchRewards({
+                  xp: data.rewards.xp,
+                  coins: data.rewards.coins,
+                  boosted: !!data.rewards.boosted,
+                  lp: typeof data.rewards.lp === 'number' ? data.rewards.lp : undefined,
+                });
+              }
+            })
+            .catch(() => {
+              if (attempt < 3) setTimeout(() => fetchServerRewards(attempt + 1), 2000);
+            });
+        };
+        fetchServerRewards(0);
       }
     });
     const unsubMatchFound = socketService.onMatchFound(
@@ -2255,6 +2249,7 @@ export const RootNavigator: React.FC = () => {
             user={user || undefined}
             apiBaseUrl={API_BASE}
             onUpdateUser={(u) => setUser(u)}
+            onRefreshUser={() => { void refreshUserProfile(); }}
             onBack={() => navigateTo('home')}
             onProfile={() => navigateTo('profile')}
           />

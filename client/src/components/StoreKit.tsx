@@ -43,10 +43,11 @@ export const STORE_IMG = {
   booster24h: require('../../assets/images/store/booster_24h.png'),
   badgeTrivia: require('../../assets/images/store/badge_trivia_master.png'),
   badgeSpeed: require('../../assets/images/store/badge_speed_demon.png'),
-  badgeChampion: require('../../assets/images/store/badge_champion.jpg'),
-  badgeNightOwl: require('../../assets/images/store/badge_night_owl.jpg'),
-  badgeVeteran: require('../../assets/images/store/badge_veteran.jpg'),
-  badgeGenius: require('../../assets/images/store/badge_genius.jpg'),
+  badgeChampion: require('../../assets/images/store/badge_champion.png'),
+  badgeNightOwl: require('../../assets/images/store/badge_night_owl.png'),
+  badgeVeteran: require('../../assets/images/store/badge_veteran.png'),
+  badgeSeasonChamp: require('../../assets/images/store/badge_season_1_champ.png'),
+  badgeGenius: require('../../assets/images/store/badge_genius.png'),
   gemsS: require('../../assets/images/store/gems_s.png'),
   gemsM: require('../../assets/images/store/gems_m.png'),
   gemsL: require('../../assets/images/store/gems_l.png'),
@@ -130,6 +131,7 @@ export const storeImageFor = (id: string, category?: string): ImageSourcePropTyp
   }
   if (c.startsWith('badge') || k.includes('badge')) {
     // Her rozet kendi görselini kullanır (aynı görselin tekrarı yok)
+    if (k.includes('season') && k.includes('champ')) return STORE_IMG.badgeSeasonChamp;
     if (k.includes('speed')) return STORE_IMG.badgeSpeed;
     if (k.includes('champion')) return STORE_IMG.badgeChampion;
     if (k.includes('night_owl')) return STORE_IMG.badgeNightOwl;

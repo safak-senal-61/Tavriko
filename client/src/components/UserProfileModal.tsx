@@ -7,14 +7,16 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
+  Image,
 } from 'react-native';
 import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { DEFAULT_API_BASE } from '../config';
-import { CharacterAvatar, TrophyIcon } from './TavrikoIcons';
+import { CharacterAvatar } from './TavrikoIcons';
 import { sound } from '../services/soundService';
 import { useGameStore } from '../store/gameStore';
 import { InfoHint } from './InfoHint';
+import { PROFILE_IMG } from './DiscoveryArtwork';
 
 interface UserProfileModalProps {
   visible: boolean;
@@ -167,7 +169,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     <InfoHint topic="lp" size={14} label="Lig Puanı (LP) nedir?" />
                   </View>
                   <View style={styles.trophyRow}>
-                    <TrophyIcon size={16} />
+                    <Image source={PROFILE_IMG.lpEmblem} style={{ width: 22, height: 22 }} resizeMode="contain" />
                     <Text style={[styles.rankLevelVal, { color: '#FFC43D' }]}>
                       {profile.rankPoints || 1000}
                     </Text>

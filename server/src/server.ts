@@ -20,7 +20,7 @@ import { cacheService } from './cache/redisClient';
 import { logger } from './utils/logger';
 import { ALL_CATEGORIES } from '@trivia/shared';
 import { logRouter, renderDashboardHtml } from './routes/logRoutes';
-import { FinalMatchSummary, canonicalCategoryId, isRankedMatch } from '@trivia/shared';
+import { FinalMatchSummary, canonicalCategoryId } from '@trivia/shared';
 import authRoutes from './routes/authRoutes';
 import { metricsMiddleware, metricsHandler, setSocketServer } from './utils/metrics';
 import { initErrorMonitor, captureError } from './utils/errorMonitor';
@@ -3631,37 +3631,9 @@ export function createApp() {
 
       db.removePublicRoom(summary.roomCode);
 
-      // Dereceli maç mı? (gerçek rakiple hızlı eşleşme; bot / arkadaş düellosu / özel oda hariç)
-      const ranked = isRankedMatch({
-        mode: summary.mode,
-        roomCode: summary.roomCode,
-        playerIds: summary.rankings.map((r) => r.playerId),
-      });
-
-      // Update XP and coins for participating registered users
-      for (const rankItem of summary.rankings) {
-        if (!rankItem.playerId || rankItem.playerId.startsWith('bot_') || rankItem.playerId.startsWith('guest_')) {
-          continue;
-        }
-
-        const isWinner = rankItem.rank === 1;
-        const totalRounds = Math.max(1, Number(summary.totalRounds) || 5);
-        const rawCorrect =
-          typeof (rankItem as any).correctAnswersCount === 'number'
-            ? (rankItem as any).correctAnswersCount
-            : Math.min(totalRounds, Math.round((rankItem.score || 0) / 140));
-        const safeCorrect = Math.max(0, Math.min(totalRounds, rawCorrect));
-
-        // XP/altın sunucuda recordMatchResult içinde paylaşılan formülle hesaplanır
-        await db.recordGameStats(rankItem.playerId, {
-          correctAnswers: safeCorrect,
-          totalAnswers: totalRounds,
-          bestStreak: Math.min(safeCorrect, rankItem.streak || 0),
-          won: isWinner,
-          roomCode: summary.roomCode,
-          ranked,
-        });
-      }
+      // Galibiyet / dereceli maç / doğru sayısı yalnızca bu yetkili özetten hesaplanır.
+      // XP, altın ve LP sunucuda recordMatchResult içinde paylaşılan formülle yazılır.
+      await db.recordFinalMatch(summary);
 
       logger.info('SOCKET', `Cloudflare Durable Objects maçı kaydedildi: ${summary.roomCode}`, {
         mode: summary.mode,
