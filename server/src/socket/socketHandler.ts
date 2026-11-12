@@ -57,6 +57,8 @@ export function setupSocketHandlers(
 
   roomManager.onGameOver = (roomCode: string, summary: FinalMatchSummary) => {
     io.to(roomCode).emit(SOCKET_EVENTS.GAME_OVER, summary);
+    // Yerel Socket.IO modunda da sonuç sunucuda (istemciden bağımsız) kaydedilir
+    void db.recordFinalMatch(summary).catch(() => {});
   };
 
   roomManager.onStateSync = (roomCode: string, room: GameRoom) => {

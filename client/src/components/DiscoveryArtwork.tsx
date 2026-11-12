@@ -24,6 +24,27 @@ export const DISCOVERY_IMG = {
   social: require('../../assets/images/discovery/social.webp'),
 };
 
+/** Profil ekranına özel üretilmiş, her konu için ayrı görseller (şeffaf arka planlı). */
+export const PROFILE_IMG = {
+  statMatches: require('../../assets/images/profile/stat_matches.png'),
+  statWinrate: require('../../assets/images/profile/stat_winrate.png'),
+  statCorrect: require('../../assets/images/profile/stat_correct.png'),
+  statAccuracy: require('../../assets/images/profile/stat_accuracy.png'),
+  metricTime: require('../../assets/images/profile/metric_time.png'),
+  metricStreak: require('../../assets/images/profile/metric_streak.png'),
+  metricXp: require('../../assets/images/profile/metric_xp.png'),
+  tabOverview: require('../../assets/images/profile/tab_overview.png'),
+  tabMastery: require('../../assets/images/profile/tab_mastery.png'),
+  tabTitles: require('../../assets/images/profile/tab_titles.png'),
+  achFirstWin: require('../../assets/images/profile/ach_first_win.png'),
+  achSpeed: require('../../assets/images/profile/ach_speed.png'),
+  achStreak: require('../../assets/images/profile/ach_streak.png'),
+  achHundred: require('../../assets/images/profile/ach_hundred.png'),
+  achExpert: require('../../assets/images/profile/ach_expert.png'),
+  achCollector: require('../../assets/images/profile/ach_collector.png'),
+  lpEmblem: require('../../assets/images/profile/lp_emblem.png'),
+};
+
 /** Follow the OS preference on native and web, including changes while mounted. */
 export function useReducedMotion() {
   const accountStill = useGameStore(state =>

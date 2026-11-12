@@ -659,17 +659,40 @@ router.post('/stats', requireUserAuth, async (req: Request, res: Response): Prom
       res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
       return;
     }
-    const { correctAnswers = 0, totalAnswers = 0, bestStreak = 0, won = false, roomCode, category, mode, difficulty, ranked } = req.body;
+    const { correctAnswers = 0, totalAnswers = 0, bestStreak = 0, roomCode, category, mode, difficulty } = req.body;
+
+    // ÇOK OYUNCULU maç: galibiyet, doğru sayısı ve dereceli olup olmadığı yalnızca
+    // gerçek zamanlı sunucunun bildirdiği nihai özetten gelir (recordFinalMatch).
+    // İstemci bu alanları bildiremez; yalnızca sunucudaki kaydı okuyabilir.
+    if (mode !== 'solo') {
+      const code = typeof roomCode === 'string' ? roomCode.trim() : '';
+      if (!code) {
+        res.status(400).json({ error: 'Çok oyunculu maç için oda kodu gereklidir.' });
+        return;
+      }
+      const recorded = await db.getRecordedMatchRewards(userId, code);
+      if (!recorded) {
+        // Sunucu henüz maç özetini işlemedi; istemci kısa süre sonra tekrar sorar
+        res.json({ success: true, pending: true, user: null, rewards: null });
+        return;
+      }
+      res.json({ success: true, user: recorded.user, rewards: recorded.rewards });
+      return;
+    }
+
+    // TEK KİŞİLİK pratik: galibiyet sunucuda kurala göre hesaplanır (doğruların en az yarısı);
+    // pratik hiçbir zaman dereceli değildir, dolayısıyla LP değişmez.
     const validDifficulty = ['easy', 'medium', 'hard', 'expert'].includes(difficulty) ? difficulty : undefined;
+    const soloTotal = Math.max(1, Math.min(20, Math.round(Number(totalAnswers) || 5)));
+    const soloCorrect = Math.max(0, Math.min(soloTotal, Math.round(Number(correctAnswers) || 0)));
     const result = await db.recordMatchResult(userId, {
-      correctAnswers,
-      totalAnswers,
+      correctAnswers: soloCorrect,
+      totalAnswers: soloTotal,
       bestStreak,
-      won,
-      mode: mode === 'solo' ? 'solo' : 'multiplayer',
+      won: soloCorrect >= Math.ceil(soloTotal / 2),
+      mode: 'solo',
       difficulty: validDifficulty,
-      ranked: ranked === true && mode !== 'solo',
-      roomCode: typeof roomCode === 'string' && roomCode.trim() ? roomCode.trim() : undefined,
+      ranked: false,
       category: typeof category === 'string' && category.trim() ? category.trim() : undefined,
     });
     // rewards: hesaba GERÇEKTEN yazılan XP/altın (istemci bunu aynen göstermelidir)
