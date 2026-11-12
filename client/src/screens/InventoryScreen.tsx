@@ -42,6 +42,7 @@ import {
   CosmeticPreviewModal,
   frameFor,
   backgroundFor,
+  BadgeVisual,
 } from '../components/StoreKit';
 
 interface InventoryScreenProps {
@@ -238,6 +239,40 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     return null;
   };
   const [previewItem, setPreviewItem] = useState<InventoryItem | null>(null);
+  const [equippingItemId, setEquippingItemId] = useState<string | null>(null);
+
+  /** Kozmetik kuşanma: envanterdeki çerçeve/arka plan/isim efekti/rozet profiline uygulanır. */
+  const handleEquipItem = async (item: InventoryItem) => {
+    if (!apiBaseUrl || equippingItemId) return;
+    setEquippingItemId(item.id);
+    try {
+      const res = await fetch(`${apiBaseUrl}/social/inventory/use`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ userId: user?.id, itemId: item.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setIsError(true);
+        setStatusMessage(data.error || 'Kozmetik uygulanamadı.');
+      } else {
+        sound.playSound('victory');
+        sound.triggerHaptic('success');
+        setIsError(false);
+        setStatusMessage(data.rewardText || `${item.name} profilinize uygulandı!`);
+        if (data.user && onUpdateUser) onUpdateUser(data.user);
+      }
+    } catch {
+      setIsError(true);
+      setStatusMessage('Sunucu bağlantı hatası oluştu.');
+    } finally {
+      setEquippingItemId(null);
+    }
+  };
+
+  /** Kozmetik mi? (kuşanılabilir) */
+  const isEquippable = (item: InventoryItem) =>
+    item.id.startsWith('frame_') || item.id.startsWith('bg_') || item.id.startsWith('name_') || item.id.startsWith('badge_');
 
   const renderItemVisual = (item: InventoryItem, size = 48) => {
     const pk = previewKindOf(item);
@@ -252,6 +287,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     }
     if (item.category === 'chest' || item.id.includes('chest')) return <ChestIcon size={size} />;
     if (item.category === 'key' || item.id.includes('key')) return <KeyIcon size={size} />;
+    if (item.id.startsWith('badge_')) return <BadgeVisual badgeId={item.id} size={Math.round(size * 1.4)} />;
     if (item.id.includes('bolt')) return <SpeedBoltIcon size={size} />;
     if (item.id.includes('crown')) return <CrownIcon size={size} />;
     if (item.id.includes('heart')) return <HeartIcon size={size} />;
@@ -333,6 +369,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                   activeOpacity={0.8}
                   onPress={() => {
                     if (isChest) handleOpenChestClick(item);
+                    else if (isEquippable(item)) handleEquipItem(item);
                     else if (previewKindOf(item)) {
                       sound.playSound('tap');
                       setPreviewItem(item);
@@ -351,6 +388,13 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                   {isChest && (
                     <View style={styles.openPill}>
                       <Text style={styles.openPillText}>Sandığı aç</Text>
+                    </View>
+                  )}
+                  {isEquippable(item) && (
+                    <View style={styles.openPill}>
+                      <Text style={styles.openPillText}>
+                        {equippingItemId === item.id ? 'Uygulanıyor...' : 'Kuşan'}
+                      </Text>
                     </View>
                   )}
                 </TouchableOpacity>

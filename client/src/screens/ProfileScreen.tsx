@@ -38,7 +38,7 @@ import {
   AVATAR_PRESETS,
   AvatarPreset,
 } from '../components/TavrikoIcons';
-import { UI_IMG, FloatingImage, ShimmerView, CATEGORY_IMG } from '../components/StoreKit';
+import { UI_IMG, FloatingImage, ShimmerView, CATEGORY_IMG, FramedAvatar, AnimatedFrame, AnimatedNameText, ANIMATED_FRAME_COLORS, backgroundFor, BackgroundScene } from '../components/StoreKit';
 import { DISCOVERY_IMG, DiscoveryArtwork, AchievementState } from '../components/DiscoveryArtwork';
 import { Settings, UserRound } from 'lucide-react-native';
 import { PreferenceSwitch } from '../components/PreferenceSwitch';
@@ -258,6 +258,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   const prog = calculateLevelFromXp(user.xp ?? 0);
   const equippedTitle = resolveProfileTitle(settings.equippedTitle, prog.level, prog.rankTitle);
+  // Kuşanılmış kozmetikler (süresi dolmamışsa): çerçeve, isim efekti, rozet, arka plan
+  const cosmeticActive = (id: string | undefined, expiresAt: number | undefined) =>
+    !id ? null : (!expiresAt || expiresAt > Date.now() ? id : null);
+  const activeFrame = cosmeticActive(user.equippedFrame, user.equippedFrameExpiresAt);
+  const activeNameEffect = cosmeticActive(user.equippedNameEffect, user.equippedNameEffectExpiresAt);
+  const activeBadge = cosmeticActive(user.equippedBadge, user.equippedBadgeExpiresAt);
+  const activeBg = cosmeticActive(user.equippedBackground, user.equippedBackgroundExpiresAt);
+  const activeBgIsImage = activeBg ? !!backgroundFor(activeBg) : false;
+  const badgeName = activeBadge
+    ? (user.inventory?.find((i) => i.id === activeBadge)?.name) || null
+    : null;
 
   // Live WebSocket connection polling & heartbeat
   useEffect(() => {
@@ -666,6 +677,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Unified Compact Hero Identity Card */}
         <View style={styles.heroCard}>
+          {/* Kuşanılmış arka plan: profil kartının içinde görünür */}
+          {activeBg && (
+            <View style={[StyleSheet.absoluteFill, { borderRadius: styles.heroCard.borderRadius, overflow: 'hidden' }]} pointerEvents="none">
+              {activeBgIsImage ? (
+                <Image source={backgroundFor(activeBg)!} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              ) : (
+                <BackgroundScene bgId={activeBg} width="100%" height="100%" />
+              )}
+            </View>
+          )}
           <View style={styles.heroTopRow}>
             {/* Left: Avatar + Online Dot + Edit Trigger */}
             <TouchableOpacity
@@ -676,9 +697,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               }}
               activeOpacity={0.85}
             >
-              <View style={styles.goldAvatarRing}>
-                <CharacterAvatar seed={user.avatarUrl || user.displayName} size={68} />
-              </View>
+              {activeFrame && ANIMATED_FRAME_COLORS[activeFrame] ? (
+                <AnimatedFrame frameId={activeFrame} seed={user.avatarUrl || user.displayName} size={76} />
+              ) : activeFrame ? (
+                <FramedAvatar frameId={activeFrame} seed={user.avatarUrl || user.displayName} size={76} />
+              ) : (
+                <View style={styles.goldAvatarRing}>
+                  <CharacterAvatar seed={user.avatarUrl || user.displayName} size={68} />
+                </View>
+              )}
               <View
                 style={[
                   styles.heroOnlineDot,
@@ -692,9 +719,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             {/* Right: Identity, Title, Level & XP */}
             <View style={styles.heroIdentityCol}>
               <View style={styles.heroNameRow}>
-                <Text style={styles.displayName} numberOfLines={1}>
-                  {user.fullName || user.displayName}
-                </Text>
+                {activeNameEffect ? (
+                  <AnimatedNameText effectId={activeNameEffect} style={styles.displayName} numberOfLines={1}>
+                    {user.fullName || user.displayName}
+                  </AnimatedNameText>
+                ) : (
+                  <Text style={styles.displayName} numberOfLines={1}>
+                    {user.fullName || user.displayName}
+                  </Text>
+                )}
                 <Image
                   source={TITLE_CATALOG.find(t => t.title === equippedTitle)?.icon}
                   accessibilityLabel={`${equippedTitle} ünvanı`}
@@ -708,6 +741,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </Text>
 
               <View style={styles.heroBadgesRow}>
+                {badgeName && (
+                  <View style={styles.titlePill}>
+                    <Text style={styles.titlePillText} numberOfLines={1}>
+                      🛡️ {badgeName}
+                    </Text>
+                  </View>
+                )}
                 <View style={styles.titlePill}>
                   <Text style={styles.titlePillText} numberOfLines={1}>
                     {equippedTitle}

@@ -27,6 +27,7 @@ import { CharacterAvatar, AVATAR_PRESETS, AvatarPreset } from './TavrikoAvatars'
 import { useGameStore } from '../store/gameStore';
 import { NotificationBell } from './NotificationUI';
 import { useUnreadCount } from '../store/notificationStore';
+import { BackgroundScene, backgroundFor } from './StoreKit';
 // Brand Assets
 export const BRAND_LOGO_MAIN = require('../../assets/images/logo_main.jpg');
 export const BRAND_LOGO_BANNER = require('../../assets/images/logo_banner.jpg');
@@ -1130,20 +1131,45 @@ export const NavIcon: React.FC<{
 export const TavrikoScreen: React.FC<{
   children: React.ReactNode;
   style?: ViewStyle;
-}> = ({ children, style }) => (
-  <View style={[styles.screenRoot, style]}>
-    {/* Radial Top Purple Glow */}
-    <View style={styles.topRadialGlow} pointerEvents="none" />
-    {/* Bottom Magenta/Cyan Ambient Glows */}
-    <View style={styles.bottomGlowOrb} pointerEvents="none" />
-    <View style={styles.sideCyanOrb} pointerEvents="none" />
-    {/* Subtle Diagonal Stripes */}
-    <View style={styles.stripe1} pointerEvents="none" />
-    <View style={styles.stripe2} pointerEvents="none" />
-    <View style={styles.stripe3} pointerEvents="none" />
-    {children}
-  </View>
-);
+}> = ({ children, style }) => {
+  // Kuşanılmış profil arka planı: süresi dolmamışsa tüm uygulamanın arka planını değiştirir.
+  const storeUser = useGameStore((s) => s.user);
+  const equippedBg = storeUser?.equippedBackground;
+  const bgExpires = storeUser?.equippedBackgroundExpiresAt;
+  const activeBg =
+    equippedBg && (!bgExpires || bgExpires > Date.now()) ? equippedBg : null;
+  const bgIsImage = activeBg ? !!backgroundFor(activeBg) : false;
+  return (
+    <View style={[styles.screenRoot, style]}>
+      {/* Kuşanılmış arka plan: uygulama geneli */}
+      {activeBg && (
+        <View style={styles.equippedBgLayer} pointerEvents="none">
+          {bgIsImage ? (
+            <Image
+              source={backgroundFor(activeBg)!}
+              style={styles.equippedBgImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <BackgroundScene bgId={activeBg} width="100%" height="100%" />
+          )}
+          {/* Okunabilirlik için hafif karartma */}
+          <View style={styles.equippedBgDim} pointerEvents="none" />
+        </View>
+      )}
+      {/* Radial Top Purple Glow */}
+      <View style={styles.topRadialGlow} pointerEvents="none" />
+      {/* Bottom Magenta/Cyan Ambient Glows */}
+      <View style={styles.bottomGlowOrb} pointerEvents="none" />
+      <View style={styles.sideCyanOrb} pointerEvents="none" />
+      {/* Subtle Diagonal Stripes */}
+      <View style={styles.stripe1} pointerEvents="none" />
+      <View style={styles.stripe2} pointerEvents="none" />
+      <View style={styles.stripe3} pointerEvents="none" />
+      {children}
+    </View>
+  );
+};
 export const BackChevronIcon: React.FC<{ size?: number; color?: string }> = ({
   size = 20,
   color = '#FFFFFF',
@@ -1471,6 +1497,26 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 620,
     alignSelf: 'center',
+  },
+  equippedBgLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 0,
+  },
+  equippedBgImage: {
+    width: '100%',
+    height: '100%',
+  },
+  equippedBgDim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(10, 4, 24, 0.55)',
   },
   topRadialGlow: {
     position: 'absolute',

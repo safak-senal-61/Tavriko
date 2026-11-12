@@ -58,6 +58,7 @@ import {
   CosmeticPreviewModal,
   frameFor,
   backgroundFor,
+  BadgeVisual,
 } from '../components/StoreKit';
 
 interface ShopScreenProps {
@@ -181,37 +182,74 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
     );
   }
 
-  // 1. Sandıklar
+  // 1. Sandıklar: her sandık kendi tasarımıyla (ahşap/gümüş/altın/efsanevi)
   if (product.category === 'chests' || pId.includes('chest')) {
-    let tint = '#8B5A2B'; // Wood
-    if (pId === 'chest_silver') tint = '#94A3B8';
-    if (pId === 'chest_gold') tint = '#F59E0B';
-    if (pId === 'chest_legendary') tint = '#A855F7';
-
+    const chestThemes: Record<string, { box: string; band: string; lock: string; glow: string; lid: string }> = {
+      chest_wood: { box: '#8B5A2B', band: '#6B4423', lock: '#D6A97C', glow: 'rgba(139, 90, 43, 0.45)', lid: '#A06B36' },
+      chest_silver: { box: '#94A3B8', band: '#64748B', lock: '#E2E8F0', glow: 'rgba(148, 163, 184, 0.5)', lid: '#B8C4D4' },
+      chest_gold: { box: '#F59E0B', band: '#B45309', lock: '#FFE27A', glow: 'rgba(245, 158, 11, 0.55)', lid: '#FBBF24' },
+      chest_legendary: { box: '#A855F7', band: '#7C3AED', lock: '#F0ABFC', glow: 'rgba(168, 85, 247, 0.6)', lid: '#C084FC' },
+      chest: { box: '#8B5A2B', band: '#6B4423', lock: '#D6A97C', glow: 'rgba(139, 90, 43, 0.45)', lid: '#A06B36' },
+    };
+    const t = chestThemes[pId] || (pId.includes('legendary') ? chestThemes.chest_legendary : pId.includes('gold') ? chestThemes.chest_gold : pId.includes('silver') ? chestThemes.chest_silver : chestThemes.chest_wood);
     return (
-      <View style={[styles.visualBox, { borderColor: tint }]}>
-        <ChestIcon size={56} />
+      <View style={[styles.visualBox, { borderColor: t.box }]}>
+        <View style={[styles.visualGlow, { backgroundColor: t.glow }]} />
+        <Svg width="64" height="52" viewBox="0 0 64 52" fill="none">
+          <Defs>
+            <LinearGradient id={`chest-${pId}`} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={t.lid} />
+              <Stop offset="1" stopColor={t.box} />
+            </LinearGradient>
+          </Defs>
+          {/* Sandık gövdesi */}
+          <Rect x="6" y="20" width="52" height="26" rx="4" fill={t.box} />
+          {/* Kapağın kavisli üstü */}
+          <Path d="M6 22 C6 10 22 6 32 6 C42 6 58 10 58 22 L58 24 L6 24 Z" fill={`url(#chest-${pId})`} />
+          {/* Metal bantlar */}
+          <Rect x="14" y="20" width="4" height="26" fill={t.band} />
+          <Rect x="46" y="20" width="4" height="26" fill={t.band} />
+          <Rect x="6" y="30" width="52" height="4" fill={t.band} />
+          {/* Kilit */}
+          <Circle cx="32" cy="30" r="6" fill={t.lock} />
+          <Rect x="30.5" y="32" width="3" height="7" rx="1.5" fill={t.band} />
+          {/* Parıltı */}
+          <Circle cx="50" cy="12" r="2.5" fill="#FFFFFF" opacity="0.8" />
+        </Svg>
       </View>
     );
   }
 
-  // 2. Anahtarlar
+  // 2. Anahtarlar: her anahtar türü kendi tasarımıyla (gümüş/altın/elmas)
   if (product.category === 'keys' || pId.includes('key')) {
-    let keyColor = '#94A3B8';
-    if (pId === 'key_gold') keyColor = '#F59E0B';
-    if (pId === 'key_diamond') keyColor = '#00F0FF';
-
+    const keyThemes: Record<string, { color: string; accent: string; crystal: boolean }> = {
+      key: { color: '#94A3B8', accent: '#CBD5E1', crystal: false },
+      key_silver: { color: '#94A3B8', accent: '#E2E8F0', crystal: false },
+      key_gold: { color: '#F59E0B', accent: '#FFE27A', crystal: false },
+      key_diamond: { color: '#00F0FF', accent: '#A5F3FC', crystal: true },
+    };
+    const t = keyThemes[pId] || (pId.includes('diamond') ? keyThemes.key_diamond : pId.includes('gold') ? keyThemes.key_gold : keyThemes.key);
     return (
-      <View style={[styles.visualBox, { borderColor: keyColor }]}>
-        <Svg width="54" height="54" viewBox="0 0 24 24" fill="none">
-          <Circle cx="8" cy="8" r="5" stroke={keyColor} strokeWidth="2.5" />
-          <Circle cx="8" cy="8" r="2" fill={keyColor} />
-          <Path
-            d="M12 12L20 20M17 17L19 15M15 19L17 17"
-            stroke={keyColor}
-            strokeWidth="2.5"
-            strokeLinecap="round"
-          />
+      <View style={[styles.visualBox, { borderColor: t.color }]}>
+        <View style={[styles.visualGlow, { backgroundColor: t.color }]} />
+        <Svg width="56" height="56" viewBox="0 0 24 24" fill="none">
+          {t.crystal ? (
+            <>
+              {/* Elmas anahtar: kristal kafa */}
+              <Path d="M12 2L20 8l-8 6-8-6z" fill={t.color} opacity="0.85" />
+              <Path d="M12 2L20 8l-8 6-8-6z" stroke={t.accent} strokeWidth="1" />
+              <Path d="M4 8l8 6 8-6M12 2v12" stroke={t.accent} strokeWidth="0.8" opacity="0.7" />
+              <Path d="M12 14l3 3M12 17l-2 2M15 17l2 2" stroke={t.color} strokeWidth="2.5" strokeLinecap="round" />
+            </>
+          ) : (
+            <>
+              <Circle cx="8" cy="8" r="5" stroke={t.color} strokeWidth="2.5" />
+              <Circle cx="8" cy="8" r="2" fill={t.accent} />
+              <Path d="M12 12L20 20M17 17L19 15M15 19L17 17" stroke={t.color} strokeWidth="2.5" strokeLinecap="round" />
+              <Circle cx="19" cy="15" r="1" fill={t.accent} />
+              <Circle cx="17" cy="17" r="1" fill={t.accent} />
+            </>
+          )}
         </Svg>
       </View>
     );
@@ -236,11 +274,12 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
     );
   }
 
-  // 4. Rozetler
+  // 4. Rozetler: her rozet kendi kalkan tasarımıyla (renk + iç simge)
   if (product.category === 'badges' || pId.includes('badge')) {
     return (
       <View style={styles.visualBox}>
-        <BadgeShieldIcon size={48} />
+        <View style={[styles.visualGlow, { backgroundColor: 'rgba(255, 200, 55, 0.25)' }]} />
+        <BadgeVisual badgeId={pId} size={52} />
       </View>
     );
   }
@@ -259,14 +298,24 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
     );
   }
 
-  // 6. Güçlendiriciler
+  // 6. Güçlendiriciler: 1 saatlik ve 24 saatlik farklı tasarımlar
   if (product.category === 'boosters' || pId.includes('booster')) {
+    const is24h = pId.includes('24h');
     return (
-      <View style={[styles.visualBox, { borderColor: '#5ADBB5' }]}>
-        <SpeedBoltIcon size={46} />
+      <View style={[styles.visualBox, { borderColor: is24h ? '#A855F7' : '#5ADBB5' }]}>
+        <View style={[styles.visualGlow, { backgroundColor: is24h ? 'rgba(168, 85, 247, 0.4)' : 'rgba(90, 219, 181, 0.4)' }]} />
+        <SpeedBoltIcon size={44} />
         <View style={styles.boosterTag}>
-          <Text style={styles.boosterTagText}>2X</Text>
+          <Text style={styles.boosterTagText}>{is24h ? '24H' : '2X'}</Text>
         </View>
+        {is24h && (
+          <View style={styles.boosterClockWrap}>
+            <Svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <Circle cx="12" cy="12" r="9" stroke="#C084FC" strokeWidth="2" />
+              <Path d="M12 7v5l3 2" stroke="#C084FC" strokeWidth="2" strokeLinecap="round" />
+            </Svg>
+          </View>
+        )}
       </View>
     );
   }
@@ -992,6 +1041,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 9,
     fontWeight: 'bold',
+  },
+  boosterClockWrap: {
+    position: 'absolute',
+    bottom: -4,
+    left: -4,
+    backgroundColor: '#2A0F63',
+    borderRadius: 9,
+    padding: 2,
   },
   boosterTimerWrap: {
     marginTop: 8,

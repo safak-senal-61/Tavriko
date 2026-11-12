@@ -22,6 +22,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
+import Svg, { Defs, LinearGradient, Stop, Path, Circle } from 'react-native-svg';
 import { THEME } from '../theme/tokens';
 import { GradientFill } from './TavrikoGradient';
 import { CharacterAvatar } from './TavrikoAvatars';
@@ -193,11 +194,91 @@ export const ANIMATED_FRAME_STYLES: Record<string, {
 /** Arka planlar: her birinin farklı sahne öğeleri */
 export const ANIMATED_BG_STYLES: Record<string, {
   layers: string[];
-  scene: 'sun' | 'leaves' | 'stars';
+  scene: 'sun' | 'leaves' | 'stars' | 'aurora' | 'volcano';
 }> = {
   bg_sunset: { layers: ['#7C2D12', '#C2410C', '#F59E0B'], scene: 'sun' },
   bg_forest: { layers: ['#14532D', '#166534', '#4D7C0F'], scene: 'leaves' },
   bg_night_city: { layers: ['#0F172A', '#1E293B', '#334155'], scene: 'stars' },
+  bg_aurora: { layers: ['#06283D', '#0B4F6C', '#0EA5A5'], scene: 'aurora' },
+  bg_volcano: { layers: ['#1A0505', '#450A0A', '#7F1D1D'], scene: 'volcano' },
+};
+
+/* Rozetler: her rozet kimliğine özgü kalkan tasarımı (renk şeması + iç simge) */
+export const BADGE_DESIGNS: Record<string, { c1: string; c2: string; glow: string; icon: string }> = {
+  badge_trivia_master: { c1: '#FFE27A', c2: '#B45309', glow: '#FFC837', icon: 'brain' },
+  badge_speed_demon: { c1: '#67E8F9', c2: '#0E7490', glow: '#22D3EE', icon: 'bolt' },
+  badge_champion: { c1: '#FCA5A5', c2: '#B91C1C', glow: '#EF4444', icon: 'trophy' },
+  badge_night_owl: { c1: '#A5B4FC', c2: '#3730A3', glow: '#818CF8', icon: 'moon' },
+  badge_veteran: { c1: '#D6A97C', c2: '#92400E', glow: '#C08552', icon: 'medal' },
+  badge_genius: { c1: '#99F6E4', c2: '#0F766E', glow: '#5EEAD4', icon: 'spark' },
+  badge_7day_legend: { c1: '#FDE68A', c2: '#9333EA', glow: '#F0ABFC', icon: 'star' },
+};
+
+/** Rozet görseli: kalkan konturu + rozete özgü iç simge (benzersiz tasarım) */
+export const BadgeVisual: React.FC<{ badgeId: string; size?: number }> = ({ badgeId, size = 48 }) => {
+  const d = BADGE_DESIGNS[(badgeId || '').toLowerCase()] || BADGE_DESIGNS.badge_trivia_master;
+  const s = size;
+  const inner = d.icon;
+  return (
+    <View style={{ width: s, height: s, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={s} height={s} viewBox="0 0 48 48" fill="none">
+        <Defs>
+          <LinearGradient id={`bdg-${badgeId}`} x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor={d.c1} />
+            <Stop offset="1" stopColor={d.c2} />
+          </LinearGradient>
+        </Defs>
+        {/* Kalkan gövdesi */}
+        <Path
+          d="M24 4 L40 10 V22 C40 34 32 41 24 44 C16 41 8 34 8 22 V10 Z"
+          fill={`url(#bdg-${badgeId})`}
+          stroke={d.glow}
+          strokeWidth="2"
+        />
+        <Path
+          d="M24 4 L40 10 V22 C40 34 32 41 24 44 C16 41 8 34 8 22 V10 Z"
+          fill="none"
+          stroke="rgba(255,255,255,0.35)"
+          strokeWidth="1"
+        />
+      </Svg>
+      {/* İç simge: rozete özgü */}
+      <View style={{ position: 'absolute', top: 0, left: 0, width: s, height: s, alignItems: 'center', justifyContent: 'center' }}>
+        <Svg width={s * 0.42} height={s * 0.42} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          {inner === 'brain' && (
+            <>
+              <Path d="M12 4a4 4 0 0 0-4 4 3 3 0 0 0-1 5.8A3 3 0 0 0 10 20h2z" fill="rgba(255,255,255,0.25)" />
+              <Path d="M12 4a4 4 0 0 1 4 4 3 3 0 0 1 1 5.8A3 3 0 0 1 14 20h-2z" fill="rgba(255,255,255,0.25)" />
+              <Path d="M12 4v16" />
+            </>
+          )}
+          {inner === 'bolt' && <Path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="#FFFFFF" stroke="none" />}
+          {inner === 'trophy' && (
+            <>
+              <Path d="M8 21h8M12 17v4M7 4h10v6a5 5 0 0 1-10 0z" />
+              <Path d="M7 6H4a3 3 0 0 0 3 5M17 6h3a3 3 0 0 1-3 5" />
+            </>
+          )}
+          {inner === 'moon' && <Path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" fill="#FFFFFF" stroke="none" />}
+          {inner === 'medal' && (
+            <>
+              <Circle cx="12" cy="14" r="5" fill="rgba(255,255,255,0.25)" />
+              <Path d="M9 10L6 3M15 10l3-7M10 3h4" />
+            </>
+          )}
+          {inner === 'spark' && (
+            <>
+              <Path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
+              <Path d="M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18" />
+            </>
+          )}
+          {inner === 'star' && (
+            <Path d="M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6-5.4-2.9-5.4 2.9 1.1-6L3.2 9.4l6.1-.8z" fill="#FFFFFF" stroke="none" />
+          )}
+        </Svg>
+      </View>
+    </View>
+  );
 };
 
 /** İsim efektleri: renk döngü hızı ve stili farklı */
@@ -499,6 +580,105 @@ const DriftingLeaf: React.FC<{ x: number; delay: number; size: number; drift: nu
   return <Animated.View style={style} pointerEvents="none" />;
 };
 
+/** Kutup ışığı şeridi: aurora arka planı için dalgalanan renk bandı */
+const AuroraRibbon: React.FC<{ top: number; height: number; delay: number; color: string }> = ({ top, height, delay, color }) => {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withRepeat(
+      withSequence(withDelay(delay, withTiming(0, { duration: 0 })), withTiming(1, { duration: 6000, easing: Easing.inOut(Easing.sin) })),
+      -1,
+      true,
+    );
+  }, [delay]);
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute',
+    left: -20,
+    right: -20,
+    top,
+    height,
+    backgroundColor: color,
+    opacity: 0.14 + 0.22 * Math.sin(p.value * Math.PI),
+    transform: [{ skewY: `${Math.sin(p.value * Math.PI * 2) * 8}deg` }, { translateX: Math.sin(p.value * Math.PI) * 14 }],
+    borderRadius: height,
+  }));
+  return <Animated.View style={style} pointerEvents="none" />;
+};
+
+/** Yükselen kor: volkan arka planı için yukarı süzülen kıvılcım */
+const VolcanoEmber: React.FC<{ x: number; delay: number; size: number; drift: number }> = ({ x, delay, size, drift }) => {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withRepeat(
+      withSequence(withDelay(delay, withTiming(0, { duration: 0 })), withTiming(1, { duration: 4200 + (delay % 2500), easing: Easing.inOut(Easing.sin) })),
+      -1,
+      true,
+    );
+  }, [delay]);
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute',
+    left: x,
+    top: 10 + (1 - p.value) * drift,
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    backgroundColor: '#FB923C',
+    opacity: 0.2 + 0.45 * Math.sin(p.value * Math.PI),
+    transform: [{ translateX: Math.sin(p.value * Math.PI * 3) * 8 }],
+  }));
+  return <Animated.View style={style} pointerEvents="none" />;
+};
+
+/** Arka plan sahnesi: katmanlar + sahneye özgü canlı öğeler (telefon çerçevesi olmadan).
+ *  Mağaza önizlemesinde, profil kartında ve uygulama genelinde kullanılır.
+ *  width/height sayı olabileceği gibi '100%' gibi yüzde değer de olabilir (kendi kendine ölçer). */
+export const BackgroundScene: React.FC<{ bgId: string; width: number | string; height: number | string; style?: any }> = ({ bgId, width, height, style }) => {
+  const def = ANIMATED_BG_STYLES[(bgId || '').toLowerCase()] || ANIMATED_BG_STYLES.bg_sunset;
+  const [dims, setDims] = useState<{ w: number; h: number } | null>(
+    typeof width === 'number' && typeof height === 'number' ? { w: width, h: height } : null,
+  );
+  return (
+    <View
+      style={[{ width, height, overflow: 'hidden' }, style]}
+      pointerEvents="none"
+      onLayout={(e) => {
+        const { width: w, height: h } = e.nativeEvent.layout;
+        if (!dims || Math.abs(w - dims.w) > 1 || Math.abs(h - dims.h) > 1) setDims({ w, h });
+      }}
+    >
+      {dims && (
+        <>
+          {def.layers.map((c, i) => (
+            <PulseBgLayer key={i} color={c} period={3600 + i * 1600} />
+          ))}
+          {def.scene === 'sun' && <PulsingSun size={dims.w * 0.5} />}
+          {def.scene === 'stars' &&
+            [
+              [0.08, 0.1], [0.3, 0.06], [0.55, 0.12], [0.75, 0.08], [0.18, 0.22],
+              [0.62, 0.26], [0.85, 0.2], [0.4, 0.34], [0.05, 0.4], [0.9, 0.36],
+            ].map(([fx, fy], i) => (
+              <TwinkleStar key={i} x={dims.w * fx} y={dims.h * fy} delay={i * 700} size={Math.max(3, dims.w * 0.045)} />
+            ))}
+          {def.scene === 'leaves' &&
+            [0.1, 0.3, 0.5, 0.7, 0.85].map((fx, i) => (
+              <DriftingLeaf key={i} x={dims.w * fx} delay={i * 900} size={Math.max(4, dims.w * 0.06)} drift={dims.h * 0.6} />
+            ))}
+          {def.scene === 'aurora' && (
+            <>
+              <AuroraRibbon top={dims.h * 0.08} height={dims.h * 0.1} delay={0} color="#34D399" />
+              <AuroraRibbon top={dims.h * 0.2} height={dims.h * 0.07} delay={1400} color="#22D3EE" />
+              <AuroraRibbon top={dims.h * 0.3} height={dims.h * 0.12} delay={2600} color="#A78BFA" />
+            </>
+          )}
+          {def.scene === 'volcano' &&
+            [0.15, 0.35, 0.55, 0.75, 0.9].map((fx, i) => (
+              <VolcanoEmber key={i} x={dims.w * fx} delay={i * 800} size={Math.max(4, dims.w * 0.05)} drift={dims.h * 0.8} />
+            ))}
+        </>
+      )}
+    </View>
+  );
+};
+
 /** Animasyonlu arka plan önizlemesi: her sahnenin kendine özgü canlı öğeleri */
 export const AnimatedBackgroundThumb: React.FC<{
   bgId: string;
@@ -511,21 +691,7 @@ export const AnimatedBackgroundThumb: React.FC<{
   const av = Math.round(width * 0.34);
   return (
     <View style={[kit.phone, { width, height: h, borderRadius: width * 0.16, overflow: 'hidden' }]}>
-      {def.layers.map((c, i) => (
-        <PulseBgLayer key={i} color={c} period={3600 + i * 1600} />
-      ))}
-      {def.scene === 'sun' && <PulsingSun size={width * 0.5} />}
-      {def.scene === 'stars' &&
-        [
-          [0.08, 0.1], [0.3, 0.06], [0.55, 0.12], [0.75, 0.08], [0.18, 0.22],
-          [0.62, 0.26], [0.85, 0.2], [0.4, 0.34], [0.05, 0.4], [0.9, 0.36],
-        ].map(([fx, fy], i) => (
-          <TwinkleStar key={i} x={width * fx} y={h * fy} delay={i * 700} size={Math.max(3, width * 0.045)} />
-        ))}
-      {def.scene === 'leaves' &&
-        [0.1, 0.3, 0.5, 0.7, 0.85].map((fx, i) => (
-          <DriftingLeaf key={i} x={width * fx} delay={i * 900} size={Math.max(4, width * 0.06)} drift={h * 0.6} />
-        ))}
+      <BackgroundScene bgId={bgId} width={width} height={h} />
       <View style={kit.phoneNotch as ViewStyle} />
       <View style={{ alignItems: 'center', marginTop: h * 0.14 }}>
         <View
@@ -698,12 +864,28 @@ export const CosmeticPreviewModal: React.FC<{
   const animNameDef = isNameEffect
     ? ANIMATED_NAME_STYLES[(itemId || '').toLowerCase()]
     : null;
+  const [pvW, setPvW] = useState(240);
+  const [pvH, setPvH] = useState(390);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={kit.pvBackdrop}>
-        <Animated.View entering={ZoomIn.duration(260)} style={kit.pvPhone}>
+        <Animated.View
+          entering={ZoomIn.duration(260)}
+          style={[kit.pvPhone, { overflow: 'hidden' }]}
+          onLayout={(e) => {
+            const { width: w, height: hgt } = e.nativeEvent.layout;
+            if (w > 0 && hgt > 0) {
+              setPvW(w);
+              setPvH(hgt);
+            }
+          }}
+        >
           {bg ? (
             <Image source={bg} style={kit.heroImg} resizeMode="cover" />
+          ) : isAnimBg ? (
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+              <BackgroundScene bgId={itemId} width={pvW} height={pvH} />
+            </View>
           ) : (
             <GradientFill colors={['#2A0F63', '#170733']} />
           )}

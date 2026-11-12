@@ -3928,9 +3928,33 @@ class PrismaService {
             }
             keyItem.qty -= 1;
         }
-        item.qty -= 1;
+        // Kozmetikler tüketilmez; kuşanılır ve envanterde kalır.
+        const isCosmetic = ['frame_', 'bg_', 'name_', 'badge_'].some((p) => itemId.startsWith(p));
+        if (!isCosmetic) {
+            item.qty -= 1;
+        }
         let rewardText = `${item.name} kullanıldı!`;
-        if (itemId === 'chest' || itemId === 'gift') {
+        if (itemId.startsWith('frame_')) {
+            record.equippedFrame = itemId;
+            record.equippedFrameExpiresAt = Date.now() + shared_1.COSMETIC_RENTAL_MS;
+            rewardText = `${item.name} profilinize uygulandı!`;
+        }
+        else if (itemId.startsWith('bg_')) {
+            record.equippedBackground = itemId;
+            record.equippedBackgroundExpiresAt = Date.now() + shared_1.COSMETIC_RENTAL_MS;
+            rewardText = `${item.name} profilinize ve uygulamaya uygulandı!`;
+        }
+        else if (itemId.startsWith('name_')) {
+            record.equippedNameEffect = itemId;
+            record.equippedNameEffectExpiresAt = Date.now() + shared_1.COSMETIC_RENTAL_MS;
+            rewardText = `${item.name} profilinize uygulandı!`;
+        }
+        else if (itemId.startsWith('badge_')) {
+            record.equippedBadge = itemId;
+            record.equippedBadgeExpiresAt = Date.now() + shared_1.COSMETIC_RENTAL_MS;
+            rewardText = `${item.name} profilinize uygulandı!`;
+        }
+        else if (itemId === 'chest' || itemId === 'gift') {
             record.coins += 200;
             record.gems = (record.gems || 0) + 10;
             record.xp += 150;
@@ -3976,6 +4000,14 @@ class PrismaService {
                         xp: record.xp,
                         level: record.level,
                         settings: (record.settings || {}),
+                        equippedFrame: record.equippedFrame ?? null,
+                        equippedBadge: record.equippedBadge ?? null,
+                        equippedNameEffect: record.equippedNameEffect ?? null,
+                        equippedBackground: record.equippedBackground ?? null,
+                        equippedFrameExpiresAt: this.toBigIntSafe(record.equippedFrameExpiresAt),
+                        equippedBadgeExpiresAt: this.toBigIntSafe(record.equippedBadgeExpiresAt),
+                        equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
+                        equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
                         updatedAt: new Date(),
                     },
                 });
@@ -4166,8 +4198,10 @@ class PrismaService {
                         rarity: item.rarity || this.getItemRarity(item.id),
                     });
                 }
-                // Süreli (rental) profil kozmetikleri ise expiresAt ata — 30 gün
-                const expiresAt = Date.now() + shared_1.COSMETIC_RENTAL_MS;
+                // Satın alınan kozmetik anında profile uygulanır (otomatik kuşanma).
+                // Süreli (rental) ürünlerde 30 günlük expiresAt atanır; kalıcı ürünlerde süre yoktur.
+                const isRental = product.badge === '30 GÜN';
+                const expiresAt = isRental ? Date.now() + shared_1.COSMETIC_RENTAL_MS : undefined;
                 if (item.category === 'frame' && item.id.startsWith('frame_')) {
                     record.equippedFrame = item.id;
                     record.equippedFrameExpiresAt = expiresAt;
