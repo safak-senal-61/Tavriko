@@ -124,18 +124,19 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
       </View>
     );
   }
+  // Arka planlar: önce gerçek üretilmiş görsel (varsa), yoksa animasyonlu sahne
+  if ((product.category === 'backgrounds' || pId.startsWith('bg_')) && backgroundFor(pId)) {
+    return (
+      <View style={styles.visualTall}>
+        <BackgroundThumb bgId={pId} seed={seed} name={name} width={64} />
+      </View>
+    );
+  }
   // Animasyonlu arka planlar: nefes alan renk katmanları
   if (ANIMATED_BG_LAYERS[pId]) {
     return (
       <View style={styles.visualTall}>
         <AnimatedBackgroundThumb bgId={pId} seed={seed} name={name} width={64} />
-      </View>
-    );
-  }
-  if ((product.category === 'backgrounds' || pId.startsWith('bg_')) && backgroundFor(pId)) {
-    return (
-      <View style={styles.visualTall}>
-        <BackgroundThumb bgId={pId} seed={seed} name={name} width={64} />
       </View>
     );
   }

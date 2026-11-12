@@ -43,6 +43,10 @@ export const STORE_IMG = {
   booster24h: require('../../assets/images/store/booster_24h.png'),
   badgeTrivia: require('../../assets/images/store/badge_trivia_master.png'),
   badgeSpeed: require('../../assets/images/store/badge_speed_demon.png'),
+  badgeChampion: require('../../assets/images/store/badge_champion.jpg'),
+  badgeNightOwl: require('../../assets/images/store/badge_night_owl.jpg'),
+  badgeVeteran: require('../../assets/images/store/badge_veteran.jpg'),
+  badgeGenius: require('../../assets/images/store/badge_genius.jpg'),
   gemsS: require('../../assets/images/store/gems_s.png'),
   gemsM: require('../../assets/images/store/gems_m.png'),
   gemsL: require('../../assets/images/store/gems_l.png'),
@@ -125,7 +129,14 @@ export const storeImageFor = (id: string, category?: string): ImageSourcePropTyp
     return k.includes('24h') ? STORE_IMG.booster24h : STORE_IMG.booster;
   }
   if (c.startsWith('badge') || k.includes('badge')) {
-    return k.includes('speed') ? STORE_IMG.badgeSpeed : STORE_IMG.badgeTrivia;
+    // Her rozet kendi görselini kullanır (aynı görselin tekrarı yok)
+    if (k.includes('speed')) return STORE_IMG.badgeSpeed;
+    if (k.includes('champion')) return STORE_IMG.badgeChampion;
+    if (k.includes('night_owl')) return STORE_IMG.badgeNightOwl;
+    if (k.includes('veteran')) return STORE_IMG.badgeVeteran;
+    if (k.includes('genius')) return STORE_IMG.badgeGenius;
+    if (k.includes('7day') || k.includes('legend')) return STORE_IMG.badgeChampion;
+    return STORE_IMG.badgeTrivia;
   }
   if (k.startsWith('gems_')) {
     const n = parseInt(k.slice(5), 10) || 0;
@@ -154,10 +165,15 @@ export const frameFor = (id: string) => {
   return null;
 };
 
-/* Profil arka planları */
+/* Profil arka planları: her tema kendi üretilmiş görseline sahip */
 export const BG_IMG: Record<string, ImageSourcePropType> = {
   bg_nebula: require('../../assets/images/store/bg_nebula.jpg'),
   bg_royal_purple: require('../../assets/images/store/bg_royal_purple.jpg'),
+  bg_sunset: require('../../assets/images/store/bg_sunset.jpg'),
+  bg_forest: require('../../assets/images/store/bg_forest.jpg'),
+  bg_night_city: require('../../assets/images/store/bg_night_city.jpg'),
+  bg_aurora: require('../../assets/images/store/bg_aurora.jpg'),
+  bg_volcano: require('../../assets/images/store/bg_volcano.jpg'),
 };
 
 export const backgroundFor = (id: string): ImageSourcePropType | null => {
@@ -165,6 +181,11 @@ export const backgroundFor = (id: string): ImageSourcePropType | null => {
   if (BG_IMG[k]) return BG_IMG[k];
   if (k.includes('nebula')) return BG_IMG.bg_nebula;
   if (k.includes('royal') || k.includes('purple')) return BG_IMG.bg_royal_purple;
+  if (k.includes('sunset')) return BG_IMG.bg_sunset;
+  if (k.includes('forest')) return BG_IMG.bg_forest;
+  if (k.includes('night') || k.includes('city')) return BG_IMG.bg_night_city;
+  if (k.includes('aurora')) return BG_IMG.bg_aurora;
+  if (k.includes('volcano')) return BG_IMG.bg_volcano;
   return null;
 };
 
