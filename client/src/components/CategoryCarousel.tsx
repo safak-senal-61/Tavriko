@@ -253,6 +253,9 @@ export const CategoryCarousel: React.FC<CategoryCarouselProps> = ({
       {selectedCategory && (
         <View style={styles.categoryInfoBox}>
           <Text style={styles.categoryTitle}>{selectedCategory.name}</Text>
+          {selectedCategory.questionCount !== undefined && (
+            <Text style={styles.categoryCount}>{selectedCategory.questionCount} soru</Text>
+          )}
           <Text style={styles.categorySub} numberOfLines={1}>
             {selectedCategory.badge ||
               (selectedCategory.type === 'special'
@@ -299,6 +302,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
     letterSpacing: 0.5,
+  },
+  categoryCount: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#FFC43D',
+    marginTop: 2,
+    textAlign: 'center',
   },
   categorySub: {
     fontSize: 12,

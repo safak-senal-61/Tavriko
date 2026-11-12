@@ -144,7 +144,8 @@ export class GameRoomDO extends DurableObject<Env> {
       const questions = await this.apiService.fetchRoomQuestions(
         this.room.category,
         this.room.difficulty,
-        this.room.totalRounds
+        this.room.totalRounds,
+        this.room.subCategory
       );
       this.questions = questions || [];
       if (this.questions.length < (this.room.totalRounds || 5) && this.questions.length > 0) {
@@ -230,6 +231,7 @@ export class GameRoomDO extends DurableObject<Env> {
         hostId: authUser.id,
         status: 'lobby',
         category,
+        subCategory: (url.searchParams.get('subCategory') || '').slice(0, 64) || undefined,
         difficulty,
         maxPlayers: qpMaxPlayers > 0 ? qpMaxPlayers : (mode === 'duel' ? 2 : 8),
         currentRound: 0,
@@ -636,7 +638,8 @@ export class GameRoomDO extends DurableObject<Env> {
     const questions = await this.apiService.fetchRoomQuestions(
       this.room.category,
       this.room.difficulty,
-      this.room.totalRounds || 5
+      this.room.totalRounds || 5,
+      this.room.subCategory
     );
 
     if (!questions || questions.length === 0) {
@@ -707,6 +710,7 @@ export class GameRoomDO extends DurableObject<Env> {
     if (s.questionTimeSec) this.room.questionTimeSec = Number(s.questionTimeSec);
     if (s.difficulty) this.room.difficulty = s.difficulty;
     if (s.category) this.room.category = s.category;
+    if (s.subCategory !== undefined) this.room.subCategory = s.subCategory ? String(s.subCategory).slice(0, 64) : undefined;
     if (s.categories) this.room.categories = s.categories;
     if (s.mixedCategories !== undefined) this.room.mixedCategories = !!s.mixedCategories;
     if (s.penaltyForWrong !== undefined) this.room.penaltyForWrong = !!s.penaltyForWrong;
@@ -856,7 +860,8 @@ export class GameRoomDO extends DurableObject<Env> {
       const questions = await this.apiService.fetchRoomQuestions(
         this.room.category,
         this.room.difficulty,
-        this.room.totalRounds || 5
+        this.room.totalRounds || 5,
+        this.room.subCategory
       );
       this.questions = questions || [];
       if (this.questions.length < (this.room.totalRounds || 5) && this.questions.length > 0) {

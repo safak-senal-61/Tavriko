@@ -448,7 +448,9 @@ export class SocketService {
       if (settings.difficulty) queryParts.push(`difficulty=${settings.difficulty}`);
       if (settings.privacy) queryParts.push(`privacy=${settings.privacy}`);
       if (settings.password) queryParts.push(`password=${encodeURIComponent(settings.password)}`);
-      if (settings.categories && settings.categories.length > 0) queryParts.push(`category=${settings.categories[0]}`);
+      if (settings.mixedCategories) queryParts.push('category=mixed');
+      else if (settings.categories && settings.categories.length > 0) queryParts.push(`category=${settings.categories[0]}`);
+      if (settings.subCategory) queryParts.push(`subCategory=${encodeURIComponent(settings.subCategory)}`);
     }
 
     const targetUrl = getRealtimeWsUrl(`/ws/room/${cleanCode}?${queryParts.join('&')}`);

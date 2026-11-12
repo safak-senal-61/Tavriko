@@ -187,8 +187,8 @@ export function createApp() {
   setSocketServer(io);
 
   // Wire up authoritative room manager with DB question provider
-  const roomManager = new GameRoomManager((category, difficulty, count) => {
-    return db.getQuestions(category, difficulty, count);
+  const roomManager = new GameRoomManager((category, difficulty, count, subCategory) => {
+    return db.getQuestions(category, difficulty, count, [], subCategory);
   });
 
   const matchmaker = new Matchmaker(roomManager);
@@ -3588,13 +3588,15 @@ export function createApp() {
     // Sunucusuz ortamda kalıcı soru havuzunun (Telegram soruları dahil) hazır olmasını bekle
     await db.ensureQuestionsRestored();
 
-    const { categoryId, difficulty, count = 5 } = req.body || {};
+    const { categoryId, difficulty, count = 5, subCategory } = req.body || {};
     const safeCount = Math.min(50, Math.max(1, Number(count) || 5));
     const resolvedCat = canonicalCategoryId(categoryId || 'general_culture');
     const questions = db.getQuestions(
       resolvedCat,
       difficulty || 'medium',
-      safeCount
+      safeCount,
+      [],
+      typeof subCategory === 'string' && subCategory.trim() ? subCategory.trim() : undefined
     );
 
     return res.json({ success: true, questions });

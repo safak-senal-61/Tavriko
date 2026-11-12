@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, Text, Image, StyleSheet, Platform } from 'react-native';
 import { CategorySquircleIcon, TavrikoCategoryKey } from './TavrikoIcons';
 import { ALL_CATEGORIES as SHARED_CATEGORIES } from '@trivia/shared';
+import { DISCOVER_CATEGORY_IMG } from './DiscoverArtwork';
 
 export interface CategoryData {
   id: string;
@@ -13,6 +14,8 @@ export interface CategoryData {
   neonBorder: string;
   accentGlow: string;
   iconName: TavrikoCategoryKey | string;
+  /** Canlı yayındaki soru sayısı (biliniyorsa kartın üstünde gösterilir) */
+  questionCount?: number;
 }
 
 /** Hex rengi rgba() dizgesine çevirir (accentGlow için). */
@@ -69,7 +72,22 @@ export const CategorySquircleCard: React.FC<CategorySquircleCardProps> = ({
         },
       ]}
     >
-      <CategorySquircleIcon category={category.iconName || category.id} size={size} />
+      {DISCOVER_CATEGORY_IMG[category.id] ? (
+        // Keşfet ekranındaki ile AYNI 3B kategori görseli
+        <Image
+          source={DISCOVER_CATEGORY_IMG[category.id]}
+          style={{ width: size, height: size }}
+          resizeMode="contain"
+        />
+      ) : (
+        <CategorySquircleIcon category={category.iconName || category.id} size={size} />
+      )}
+
+      {category.questionCount !== undefined && (
+        <View style={styles.countBadge} pointerEvents="none">
+          <Text style={styles.countBadgeText}>{category.questionCount}</Text>
+        </View>
+      )}
 
       {/* Seçili İken Parlayan Neon Çerçeve (UI Kit Screen 9) */}
       {isSelected && (
@@ -94,6 +112,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+  },
+  countBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 24,
+    paddingHorizontal: 6,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFC43D',
+    borderWidth: 2,
+    borderColor: '#1E0E3D',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countBadgeText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#3B1500',
   },
   selectedGlowRing: {
     position: 'absolute',

@@ -24,6 +24,7 @@ export interface CreateRoomOptions {
   avatarUrl?: string;
   mode?: GameMode;
   category?: CategoryId;
+  subCategory?: string;
   difficulty?: DifficultyLevel;
   maxPlayers?: number;
   totalRounds?: number;
@@ -47,7 +48,8 @@ export interface JoinRoomOptions {
 export type QuestionProvider = (
   category: CategoryId,
   difficulty: DifficultyLevel,
-  count: number
+  count: number,
+  subCategory?: string
 ) => Question[];
 
 export interface AnswerSubmissionResult {
@@ -146,6 +148,7 @@ export class GameRoomManager {
       hostId: options.hostId,
       status: 'lobby',
       category: options.category || (options.categories?.[0] || 'general_culture'),
+      subCategory: options.subCategory || undefined,
       difficulty: options.difficulty || 'medium',
       maxPlayers: options.maxPlayers || 8,
       currentRound: 0,
@@ -261,6 +264,7 @@ export class GameRoomManager {
     if (settings.questionTimeSec && typeof settings.questionTimeSec === 'number') room.questionTimeSec = settings.questionTimeSec;
     if (settings.difficulty) room.difficulty = settings.difficulty;
     if (settings.category) room.category = settings.category;
+    if (settings.subCategory !== undefined) room.subCategory = settings.subCategory || undefined;
     if (settings.categories) room.categories = settings.categories;
     if (settings.mixedCategories !== undefined) room.mixedCategories = !!settings.mixedCategories;
     if (settings.penaltyForWrong !== undefined) room.penaltyForWrong = !!settings.penaltyForWrong;
@@ -274,7 +278,7 @@ export class GameRoomManager {
     if (!room || room.hostId !== requesterId) return false;
 
     // Fetch questions for this match
-    const questions = this.questionProvider(room.category, room.difficulty, room.totalRounds);
+    const questions = this.questionProvider(room.category, room.difficulty, room.totalRounds, room.subCategory);
     if (questions.length === 0) return false;
 
     this.questionsByRoom.set(code, questions);

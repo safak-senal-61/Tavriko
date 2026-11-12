@@ -1,103 +1,138 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   Modal,
   TouchableOpacity,
+  ScrollView,
+  Image,
   StyleSheet,
-  Dimensions,
   Platform,
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
+import { ALL_CATEGORIES as SHARED_CATEGORIES } from '@trivia/shared';
 import { CategoryData, GENERAL_CATEGORIES } from './CategorySquircleCard';
-
-/**
- * "Genel" sekmesi: herkesin çözdüğü popüler ana kategoriler.
- */
-const POPULAR_CATEGORY_IDS = [
-  'general_culture',
-  'science_tech',
-  'history',
-  'geography',
-  'sports',
-  'cinema_tv',
-  'music',
-  'art_culture',
-  'animals_wildlife',
-  'space_astronomy',
-];
-
-const POPULAR_CATEGORIES = GENERAL_CATEGORIES.filter((c) =>
-  POPULAR_CATEGORY_IDS.includes(c.id)
-);
-
-/**
- * "Özel" sekmesi: Keşfet'teki TÜM kategoriler — tek doğruluk kaynağı
- * shared/src/categories.ts kataloğudur (GENERAL_CATEGORIES buradan türetilir).
- * Eskiden burada sunucuda var olmayan sahte "tematik paket" id'leri
- * (yesilcam, world_capitals vb.) listeleniyordu; Keşfet ile uyuşmuyordu.
- */
-const ALL_CATEGORIES: CategoryData[] = [...GENERAL_CATEGORIES];
+import { DISCOVER_CATEGORY_IMG, DISCOVER_SUBCATEGORY_IMG } from './DiscoverArtwork';
 import { SegmentedFilter } from './SegmentedFilter';
 import { CategoryCarousel } from './CategoryCarousel';
 import { sound } from '../services/soundService';
 import { THEME } from '../theme/tokens';
+import { DEFAULT_API_BASE } from '../config';
+import { CategoryCounts, fetchCategoryCounts, subCountKey } from '../utils/categoryCounts';
+
+/**
+ * Kategori listesinin TEK DOĞRULUK KAYNAĞI shared/src/categories.ts kataloğudur;
+ * Keşfet ekranı da aynı kataloğu, aynı görselleri ve aynı canlı soru sayılarını kullanır.
+ *
+ *  - "Genel" sekmesi: TÜM ana kategoriler. Seçilirse sorular o ana kategorinin
+ *    alt kategorilerinden karışık gelir.
+ *  - "Özel" sekmesi: seçilen ana kategorinin TÜM alt kategorileri (görselleriyle).
+ *    Seçilirse sorular yalnızca o alt kategoriden gelir.
+ */
+const MAIN_CATEGORIES: CategoryData[] = [...GENERAL_CATEGORIES];
+
+export interface SelectedSubCategory {
+  id: string;
+  name: string;
+  emoji?: string;
+  questionCount?: number;
+}
 
 interface CategorySelectModalProps {
   visible: boolean;
   initialCategoryId?: string;
+  initialSubCategoryId?: string;
+  apiBaseUrl?: string;
   onClose: () => void;
-  onSelectCategory: (category: CategoryData) => void;
+  onSelectCategory: (category: CategoryData, subCategory?: SelectedSubCategory) => void;
 }
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
   visible,
-  initialCategoryId = 'art_culture',
+  initialCategoryId = 'general_culture',
+  initialSubCategoryId,
+  apiBaseUrl,
   onClose,
   onSelectCategory,
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'special'>('general');
+  const [counts, setCounts] = useState<CategoryCounts | null>(null);
+  const [selectedMainId, setSelectedMainId] = useState<string>(initialCategoryId);
+  const [selectedSubId, setSelectedSubId] = useState<string | null>(initialSubCategoryId || null);
 
-  // Genel = popüler kategoriler, Özel = TÜM kategoriler
-  const currentCategoryList =
-    activeTab === 'general' ? POPULAR_CATEGORIES : ALL_CATEGORIES;
-
-  const [selectedCategory, setSelectedCategory] = useState<CategoryData>(() => {
-    return (
-      POPULAR_CATEGORIES.find((c) => c.id === initialCategoryId) ||
-      ALL_CATEGORIES.find((c) => c.id === initialCategoryId) ||
-      POPULAR_CATEGORIES[0]
-    );
-  });
-
+  // Canlı soru sayıları (Keşfet ile aynı uç nokta)
   useEffect(() => {
-    if (visible) {
-      const isPopular = POPULAR_CATEGORIES.some((c) => c.id === initialCategoryId);
-      if (isPopular) {
-        setActiveTab('general');
-        const found = POPULAR_CATEGORIES.find((c) => c.id === initialCategoryId);
-        if (found) setSelectedCategory(found);
-      } else {
-        // Diğer tüm kategoriler "Özel" (Tümü) sekmesinde
-        setActiveTab('special');
-        const found = ALL_CATEGORIES.find((c) => c.id === initialCategoryId);
-        if (found) setSelectedCategory(found);
-      }
-    }
-  }, [visible, initialCategoryId]);
+    if (!visible) return;
+    let alive = true;
+    fetchCategoryCounts(apiBaseUrl || DEFAULT_API_BASE)
+      .then((c) => alive && setCounts(c))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [visible, apiBaseUrl]);
+
+  // Açılışta mevcut seçimi geri yükle
+  useEffect(() => {
+    if (!visible) return;
+    setSelectedMainId(initialCategoryId);
+    setSelectedSubId(initialSubCategoryId || null);
+    setActiveTab(initialSubCategoryId ? 'special' : 'general');
+  }, [visible, initialCategoryId, initialSubCategoryId]);
+
+  const mainWithCounts: CategoryData[] = useMemo(
+    () =>
+      MAIN_CATEGORIES.map((c) => ({
+        ...c,
+        questionCount: counts ? counts.main[c.id] ?? 0 : undefined,
+      })),
+    [counts]
+  );
+
+  const selectedMain =
+    mainWithCounts.find((c) => c.id === selectedMainId) || mainWithCounts[0];
+
+  const subList = useMemo(() => {
+    const def = SHARED_CATEGORIES.find((c) => c.id === selectedMain.id);
+    return (def?.subCategories || []).map((sc) => ({
+      ...sc,
+      questionCount: counts ? counts.sub[subCountKey(selectedMain.id, sc.name)] ?? 0 : undefined,
+    }));
+  }, [selectedMain.id, counts]);
+
+  const selectedSub = subList.find((sc) => sc.id === selectedSubId) || null;
+  const selectedSubEmpty = !!selectedSub && selectedSub.questionCount === 0;
 
   const handleTabChange = (tab: 'general' | 'special') => {
     setActiveTab(tab);
-    const targetList = tab === 'general' ? POPULAR_CATEGORIES : ALL_CATEGORIES;
-    setSelectedCategory(targetList[0]);
+    if (tab === 'general') setSelectedSubId(null);
   };
 
+  const handlePickMain = (cat: CategoryData) => {
+    setSelectedMainId(cat.id);
+    setSelectedSubId(null);
+  };
+
+  const canConfirm =
+    activeTab === 'general' ? true : !!selectedSub && !selectedSubEmpty;
+
   const handleConfirm = () => {
+    if (!canConfirm) {
+      sound.playSound('wrong');
+      return;
+    }
     sound.playSound('tap');
     sound.triggerHaptic('medium');
-    onSelectCategory(selectedCategory);
+    if (activeTab === 'special' && selectedSub) {
+      onSelectCategory(selectedMain, {
+        id: selectedSub.id,
+        name: selectedSub.name,
+        emoji: selectedSub.emoji,
+        questionCount: selectedSub.questionCount,
+      });
+    } else {
+      onSelectCategory(selectedMain);
+    }
     onClose();
   };
 
@@ -134,22 +169,117 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
               />
               <Text style={styles.tabHint}>
                 {activeTab === 'general'
-                  ? `Herkesin çözdüğü ${POPULAR_CATEGORIES.length} popüler kategori`
-                  : `Oyundaki tüm ${ALL_CATEGORIES.length} kategori`}
+                  ? `${mainWithCounts.length} ana kategori · sorular alt kategorilerden karışık gelir`
+                  : 'Tek bir alt kategori seç · sorular yalnızca ondan gelir'}
               </Text>
             </View>
 
-            {/* 2. 3D Cyber-Squircle Kategori Karuseli */}
-            <CategoryCarousel
-              categories={currentCategoryList}
-              selectedCategoryId={selectedCategory.id}
-              onSelectCategory={setSelectedCategory}
-              cardSize={90}
-            />
+            {activeTab === 'general' ? (
+              <CategoryCarousel
+                categories={mainWithCounts}
+                selectedCategoryId={selectedMain.id}
+                onSelectCategory={handlePickMain}
+                cardSize={90}
+              />
+            ) : (
+              <View style={styles.specialWrap}>
+                {/* Ana kategori seçici (görselli) */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.mainRow}
+                >
+                  {mainWithCounts.map((cat) => {
+                    const active = cat.id === selectedMain.id;
+                    return (
+                      <TouchableOpacity
+                        key={cat.id}
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          sound.playSound('tap');
+                          handlePickMain(cat);
+                        }}
+                        style={[
+                          styles.mainChip,
+                          active && { borderColor: cat.primaryColor, backgroundColor: 'rgba(255,255,255,0.10)' },
+                        ]}
+                      >
+                        <Image
+                          source={DISCOVER_CATEGORY_IMG[cat.id]}
+                          style={styles.mainChipArt}
+                          resizeMode="contain"
+                        />
+                        <Text style={[styles.mainChipText, active && styles.mainChipTextActive]} numberOfLines={1}>
+                          {cat.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+
+                <Text style={styles.subHeader} numberOfLines={1}>
+                  {selectedMain.name} · {subList.length} alt kategori
+                  {selectedMain.questionCount !== undefined ? ` · ${selectedMain.questionCount} soru` : ''}
+                </Text>
+
+                {/* Alt kategori ızgarası: görsel + ad + soru sayısı */}
+                <ScrollView
+                  style={styles.subScroll}
+                  contentContainerStyle={styles.subGrid}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled
+                >
+                  {subList.map((sc) => {
+                    const active = sc.id === selectedSubId;
+                    const empty = sc.questionCount === 0;
+                    return (
+                      <View key={sc.id} style={styles.subCell}>
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={() => {
+                            sound.playSound(empty ? 'wrong' : 'tap');
+                            setSelectedSubId(sc.id);
+                          }}
+                          style={[
+                            styles.subCard,
+                            active && { borderColor: '#00F0FF', backgroundColor: 'rgba(0,240,255,0.10)' },
+                            empty && styles.subCardEmpty,
+                          ]}
+                        >
+                          <View style={styles.subCountPill}>
+                            <Text style={styles.subCountText}>
+                              {sc.questionCount === undefined ? '…' : sc.questionCount}
+                            </Text>
+                          </View>
+                          {DISCOVER_SUBCATEGORY_IMG[sc.id] ? (
+                            <Image
+                              source={DISCOVER_SUBCATEGORY_IMG[sc.id]}
+                              style={styles.subArt}
+                              resizeMode="contain"
+                            />
+                          ) : (
+                            <Text style={styles.subEmoji}>{sc.emoji}</Text>
+                          )}
+                          <Text style={styles.subName} numberOfLines={2}>
+                            {sc.name}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+
+                {selectedSubEmpty && (
+                  <Text style={styles.emptyWarn}>
+                    Bu alt kategoride henüz yayınlanmış soru yok. Başka bir alt kategori seç.
+                  </Text>
+                )}
+              </View>
+            )}
 
             {/* 3. Tavriko 3D Onay Butonu (Altın / Neon Mint Tavriko Stili) */}
             <TouchableOpacity
-              style={styles.confirm3DButton}
+              style={[styles.confirm3DButton, !canConfirm && { opacity: 0.45 }]}
               activeOpacity={0.88}
               onPress={handleConfirm}
             >
@@ -176,7 +306,9 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
                     fill="url(#tavrikoConfirmGrad)"
                   />
                 </Svg>
-                <Text style={styles.confirmButtonText}>SEÇİMİ ONAYLA</Text>
+                <Text style={styles.confirmButtonText}>
+                  {activeTab === 'special' && !selectedSub ? 'ALT KATEGORİ SEÇ' : 'SEÇİMİ ONAYLA'}
+                </Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -187,6 +319,81 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
 };
 
 const styles = StyleSheet.create({
+  specialWrap: { width: '100%', alignItems: 'center' },
+  mainRow: { paddingHorizontal: 4, gap: 8, paddingVertical: 4 },
+  mainChip: {
+    width: 74,
+    alignItems: 'center',
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+  },
+  mainChipArt: { width: 40, height: 40 },
+  mainChipText: {
+    marginTop: 3,
+    fontSize: 10,
+    fontWeight: '800',
+    color: 'rgba(233,225,255,0.7)',
+    paddingHorizontal: 3,
+    textAlign: 'center',
+  },
+  mainChipTextActive: { color: '#FFFFFF' },
+  subHeader: {
+    marginTop: 8,
+    marginBottom: 6,
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#5ADBB5',
+    textAlign: 'center',
+  },
+  subScroll: { width: '100%', maxHeight: 300 },
+  subGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingBottom: 4 },
+  subCell: { width: '33.333%', padding: 4 },
+  subCard: {
+    alignItems: 'center',
+    minHeight: 112,
+    paddingTop: 8,
+    paddingBottom: 6,
+    paddingHorizontal: 4,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.10)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  subCardEmpty: { opacity: 0.5 },
+  subArt: { width: 56, height: 56 },
+  subEmoji: { fontSize: 36, height: 56, lineHeight: 56 },
+  subName: {
+    marginTop: 4,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  subCountPill: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    zIndex: 2,
+    minWidth: 22,
+    paddingHorizontal: 5,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FFC43D',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subCountText: { fontSize: 10, fontWeight: '900', color: '#3B1500' },
+  emptyWarn: {
+    marginTop: 6,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFD2DC',
+    textAlign: 'center',
+  },
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(9, 4, 24, 0.88)',

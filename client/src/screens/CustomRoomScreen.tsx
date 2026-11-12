@@ -32,7 +32,9 @@ import {
 } from '../components/TavrikoIcons';
 import {
   CategorySelectModal,
+  SelectedSubCategory,
 } from '../components/CategorySelectModal';
+import { DISCOVER_CATEGORY_IMG, DISCOVER_SUBCATEGORY_IMG } from '../components/DiscoverArtwork';
 import {
   CategoryData,
   GENERAL_CATEGORIES,
@@ -136,6 +138,8 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 
   // Kategori Seçimi State
   const [selectedCategory, setSelectedCategory] = useState<CategoryData | 'mixed'>('mixed');
+  // Özel (tek alt kategori) seçildiyse dolu; sorular yalnızca bu alt kategoriden gelir
+  const [selectedSub, setSelectedSub] = useState<SelectedSubCategory | null>(null);
   const [isCategoryModalVisible, setCategoryModalVisible] = useState(false);
 
   // Canlı Veritabanı ve WebSocket Odaları (Sahte/mock odalar kaldırıldı)
@@ -266,6 +270,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
     const categories: CategoryId[] = isMixed
       ? ['science_tech', 'history', 'geography', 'sports', 'cinema_tv', 'art_culture']
       : [selectedCategory.id as CategoryId];
+    const subCategory = !isMixed && selectedSub ? selectedSub.id : undefined;
 
     const settings: CustomRoomSettings = {
       maxPlayers,
@@ -274,6 +279,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
       difficulty,
       penaltyForWrong,
       categories,
+      subCategory,
       mixedCategories: isMixed,
       privacy,
       password: hasRoomPassword ? roomPassword.trim() : undefined,
@@ -374,7 +380,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionHeader}>KATEGORİ</Text>
               <Text style={styles.sectionBadge}>
-                {selectedCategory === 'mixed' ? 'KARIŞIK MOD' : 'TEK BRANŞ'}
+                {selectedCategory === 'mixed' ? 'KARIŞIK MOD' : selectedSub ? 'ALT KATEGORİ' : 'TEK BRANŞ'}
               </Text>
             </View>
 
@@ -398,18 +404,26 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 >
                   {selectedCategory === 'mixed' ? (
                     <CategorySquircleIcon category="genel_kultur" size={26} />
+                  ) : selectedSub && DISCOVER_SUBCATEGORY_IMG[selectedSub.id] ? (
+                    <Image source={DISCOVER_SUBCATEGORY_IMG[selectedSub.id]} style={styles.dropdownArt} resizeMode="contain" />
+                  ) : DISCOVER_CATEGORY_IMG[selectedCategory.id] ? (
+                    <Image source={DISCOVER_CATEGORY_IMG[selectedCategory.id]} style={styles.dropdownArt} resizeMode="contain" />
                   ) : (
                     <CategorySquircleIcon category={selectedCategory.id} size={26} />
                   )}
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.categoryDropdownText}>
-                    {selectedCategory === 'mixed' ? 'Tüm Kategoriler (Karışık)' : selectedCategory.name}
+                    {selectedCategory === 'mixed'
+                      ? 'Tüm Kategoriler (Karışık)'
+                      : selectedSub ? selectedSub.name : selectedCategory.name}
                   </Text>
                   <Text style={styles.categoryDropdownSub}>
                     {selectedCategory === 'mixed'
                       ? 'Dengeli çoklu branş soruları'
-                      : selectedCategory.badge}
+                      : selectedSub
+                        ? `${selectedCategory.name} · Alt kategori${selectedSub.questionCount !== undefined ? ` · ${selectedSub.questionCount} soru` : ''}`
+                        : `${selectedCategory.questionCount !== undefined ? `${selectedCategory.questionCount} soru · ` : ''}${selectedCategory.badge}`}
                   </Text>
                 </View>
               </View>
@@ -430,6 +444,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               activeOpacity={0.8}
               onPress={() => {
                 sound.playSound('tap');
+                setSelectedSub(null);
                 setSelectedCategory(
                   selectedCategory === 'mixed'
                     ? GENERAL_CATEGORIES.find((c) => c.id === 'general_culture') || GENERAL_CATEGORIES[0]
@@ -886,10 +901,13 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
       {/* KATEGORİ SEÇİM MODALI */}
       <CategorySelectModal
         visible={isCategoryModalVisible}
-        initialCategoryId={selectedCategory === 'mixed' ? 'science_tech' : selectedCategory.id}
+        initialCategoryId={selectedCategory === 'mixed' ? 'general_culture' : selectedCategory.id}
+        initialSubCategoryId={selectedSub?.id}
+        apiBaseUrl={apiBaseUrl || getApiBaseUrl()}
         onClose={() => setCategoryModalVisible(false)}
-        onSelectCategory={(cat) => {
+        onSelectCategory={(cat, sub) => {
           setSelectedCategory(cat);
+          setSelectedSub(sub || null);
         }}
       />
     </TavrikoScreen>
@@ -1020,6 +1038,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  dropdownArt: { width: 38, height: 38 },
   categoryDropdownIconWrap: {
     width: 44,
     height: 44,

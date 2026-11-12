@@ -2669,10 +2669,18 @@ export class PrismaService {
     const published = this.questions.filter((q) => (q.reviewStatus || 'published') === 'published');
     const countsByCategory: Record<string, number> = {};
     const countsBySub: Record<string, number> = {};
+    // Alt kategori hem ada hem id'ye göre kayıtlı olabilir; sayımı ada normalize et
+    const subNameById: Record<string, string> = {};
+    for (const cat of this.categories) {
+      for (const sc of cat.subCategories || []) {
+        subNameById[cat.id + '::' + sc.id.trim().toLowerCase()] = sc.name.trim().toLowerCase();
+      }
+    }
     for (const q of published) {
       countsByCategory[q.categoryId] = (countsByCategory[q.categoryId] || 0) + 1;
       if (q.subCategory) {
-        const key = q.categoryId + '::' + q.subCategory.trim().toLowerCase();
+        const raw = q.subCategory.trim().toLowerCase();
+        const key = q.categoryId + '::' + (subNameById[q.categoryId + '::' + raw] || raw);
         countsBySub[key] = (countsBySub[key] || 0) + 1;
       }
     }

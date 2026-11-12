@@ -10,7 +10,8 @@ export class ApiService {
   public async fetchRoomQuestions(
     categoryId: CategoryId,
     difficulty: DifficultyLevel,
-    count: number = 5
+    count: number = 5,
+    subCategory?: string
   ): Promise<Question[]> {
     const cleanUrl = (this.backendUrl || 'https://tavriko-app.vercel.app').replace(/\/+$/, '');
     const endpoint = `${cleanUrl}/api/internal/room-questions`;
@@ -29,6 +30,7 @@ export class ApiService {
           categoryId,
           difficulty,
           count,
+          ...(subCategory ? { subCategory } : {}),
         }),
         signal: controller.signal,
       });
@@ -40,6 +42,9 @@ export class ApiService {
         if (Array.isArray(data.questions) && data.questions.length > 0) {
           return data.questions as Question[];
         }
+        // Alt kategori seçiliyse ve havuzda soru yoksa başka kategorinin sorularını
+        // uydurma; boş dön, oda sahibine "sorular yüklenemedi" hatası gösterilsin.
+        if (subCategory) return [];
       }
     } catch (err: any) {
       console.warn(`[ApiService] Question fetch failed from ${endpoint}, falling back to defaults:`, err?.message);

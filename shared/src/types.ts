@@ -145,6 +145,8 @@ export interface GameRoom {
   hostId: string;
   status: RoomStatus;
   category: CategoryId;
+  /** Seçiliyse sorular yalnızca bu alt kategoriden gelir (alt kategori id'si) */
+  subCategory?: string;
   difficulty: DifficultyLevel;
   maxPlayers: number;
   currentRound: number;
@@ -193,6 +195,8 @@ export interface CustomRoomSettings {
   difficulty: DifficultyLevel | 'mixed';
   questionTimeSec: number; // 10, 15, 20, 30
   categories?: CategoryId[];
+  /** Tek alt kategori seçildiyse alt kategori id'si; sorular yalnızca ondan gelir */
+  subCategory?: string;
   mixedCategories?: boolean;
   penaltyForWrong?: boolean;
   privacy?: 'public' | 'private';
