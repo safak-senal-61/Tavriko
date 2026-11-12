@@ -24,7 +24,9 @@
     "build:client:web": "npm --prefix client run build:web",
     "build:cloudflare": "npm --prefix cloudflare run build",
     "deploy:cloudflare": "npm --prefix cloudflare run deploy",
-    "postinstall": "npx prisma generate --schema=server/prisma/schema.prisma"
+    "postinstall": "npx prisma generate --schema=server/prisma/schema.prisma",
+    "cdn:manifest": "node cdn/generate-manifest.mjs",
+    "deploy:cdn": "node cdn/generate-manifest.mjs && npx wrangler@latest deploy --config cdn/wrangler.jsonc"
   },
   "dependencies": {
     "@google/genai": "^2.32.0",

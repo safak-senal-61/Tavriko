@@ -1,0 +1,17 @@
+{
+  "name": "Tavriko",
+  "short_name": "Tavriko",
+  "description": "Tavriko: bilgini yarıştır, kazan!",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1A0B4D",
+  "theme_color": "#1A0B4D",
+  "lang": "tr",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

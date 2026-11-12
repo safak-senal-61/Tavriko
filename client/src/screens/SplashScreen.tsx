@@ -48,7 +48,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
           transform: [{ scale: logoScale }],
         }}
       >
-        <TavrikoHeroLogo width={270} height={160} />
+        <TavrikoHeroLogo width={300} height={272} />
       </Animated.View>
       <View style={styles.loaderWrap}>
         <TavrikoProgressBar progress={progress} height={10} />
@@ -65,11 +65,11 @@ const styles = StyleSheet.create({
   },
   logoHalo: {
     position: 'absolute',
-    width: 260,
-    height: 150,
-    borderRadius: 130,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
     backgroundColor: '#7A3BFF',
-    opacity: 0.35,
+    opacity: 0.28,
   },
   loaderWrap: {
     width: 200,

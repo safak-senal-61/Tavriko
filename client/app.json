@@ -12,22 +12,42 @@
       "translucent": true,
       "backgroundColor": "#00000000"
     },
-    "splash": {
-      "backgroundColor": "#180B34"
-    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "icon": "./assets/icon.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#180B34"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#10029F"
       }
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "name": "Tavriko",
+      "shortName": "Tavriko",
+      "backgroundColor": "#1A0B4D",
+      "description": "Tavriko: bilgini yarıştır, kazan!"
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-logo.png",
+          "imageWidth": 260,
+          "resizeMode": "contain",
+          "backgroundColor": "#1A0B4D",
+          "dark": {
+            "image": "./assets/splash-logo.png",
+            "backgroundColor": "#10062F"
+          },
+          "android": {
+            "image": "./assets/splash-icon.png",
+            "imageWidth": 200
+          }
+        }
+      ],
       "expo-asset",
       "expo-font",
       "expo-audio",
@@ -42,6 +62,7 @@
           "disableAutoUpload": true
         }
       ]
-    ]
+    ],
+    "backgroundColor": "#1A0B4D"
   }
 }

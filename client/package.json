@@ -28,6 +28,7 @@
     "expo-font": "~58.0.11",
     "expo-haptics": "~58.0.7",
     "expo-image-picker": "~58.0.10",
+    "expo-splash-screen": "^58.0.14",
     "expo-web-browser": "~58.0.7",
     "lucide-react-native": "^0.475.0",
     "react": "19.3.0",

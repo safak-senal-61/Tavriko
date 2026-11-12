@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   },
   appIcon: {
     width: 110,
-    height: 100,
+    height: 110,
     borderRadius: 24,
     opacity: 0.85,
   },

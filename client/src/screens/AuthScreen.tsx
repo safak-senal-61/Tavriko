@@ -1,3 +1,4 @@
+import { cdnImage } from '../utils/cdn';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -54,7 +55,7 @@ import { GuestDiscoveryCard } from '../components/DiscoveryArtwork';
 import Reanimated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { sound } from '../services/soundService';
 
-const AUTH_CROWN = require('../../assets/images/ui/auth_crown.png');
+const AUTH_CROWN = cdnImage('images/ui/auth_crown.png');
 const GOOGLE_CLIENT_ID =
   '411578437442-gs1rck2124rgr516fe9dn9tuu15ge9ig.apps.googleusercontent.com';
 interface AuthScreenProps {
@@ -141,7 +142,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const [confirmResetPassword, setConfirmResetPassword] = useState('');
   const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Google'dan dönüşte (adres çubuğunda token/code varsa) giriş formu yerine "oturum açılıyor" göster
+  const [finishingOAuth, setFinishingOAuth] = useState(() =>
+    Platform.OS === 'web' && typeof window !== 'undefined' &&
+    (window.location.hash.includes('access_token') || window.location.search.includes('access_token') || window.location.search.includes('code=')));
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!finishingOAuth) return;
+    // Beklenmedik bir durumda ekranda takılı kalma: 20 sn sonra giriş formuna dön
+    const t = setTimeout(() => setFinishingOAuth(false), 20000);
+    return () => clearTimeout(t);
+  }, [finishingOAuth]);
   // Animations
   const floatAnim = useRef(new Animated.Value(0)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -752,6 +763,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const stepBonusCoins = regStep * 200;
   const stepBonusGems = regStep * 5;
   const stepProgressPct = regStep * 25;
+  if (finishingOAuth && !errorMsg) {
+    return (
+      <View style={[styles.authRoot, { alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color="#FFC43D" />
+        <Text style={{ color: '#D9CDF5', fontSize: 14, marginTop: 16, fontFamily: THEME.fonts.bold }}>
+          Google hesabınla oturum açılıyor...
+        </Text>
+      </View>
+    );
+  }
   return (
     <View style={styles.authRoot}>
       {/* Luxury Multi-Layered Cosmic Background */}

@@ -1,3 +1,4 @@
+import { cdnImage } from '../utils/cdn';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo, Animated, Easing, Image, ImageSourcePropType,
@@ -10,39 +11,39 @@ import { useGameStore } from '../store/gameStore';
 import { usePreferences } from '../store/appPrefs';
 
 export const DISCOVERY_IMG = {
-  explorer: require('../../assets/images/discovery/guest_explorer.png'),
-  arena: require('../../assets/images/discovery/duel_arena.webp'),
-  victory: require('../../assets/images/discovery/badge_victory.png'),
-  speed: require('../../assets/images/discovery/badge_speed.png'),
-  streak: require('../../assets/images/discovery/badge_streak.png'),
-  accuracy: require('../../assets/images/discovery/badge_accuracy.png'),
-  expert: require('../../assets/images/discovery/badge_expert.png'),
-  collector: require('../../assets/images/discovery/badge_collector.png'),
-  settings: require('../../assets/images/discovery/settings.webp'),
-  bell: require('../../assets/images/discovery/bell.webp'),
-  robot: require('../../assets/images/discovery/robot.webp'),
-  social: require('../../assets/images/discovery/social.webp'),
+  explorer: cdnImage('images/discovery/guest_explorer.png'),
+  arena: cdnImage('images/discovery/duel_arena.webp'),
+  victory: cdnImage('images/discovery/badge_victory.png'),
+  speed: cdnImage('images/discovery/badge_speed.png'),
+  streak: cdnImage('images/discovery/badge_streak.png'),
+  accuracy: cdnImage('images/discovery/badge_accuracy.png'),
+  expert: cdnImage('images/discovery/badge_expert.png'),
+  collector: cdnImage('images/discovery/badge_collector.png'),
+  settings: cdnImage('images/discovery/settings.webp'),
+  bell: cdnImage('images/discovery/bell.webp'),
+  robot: cdnImage('images/discovery/robot.webp'),
+  social: cdnImage('images/discovery/social.webp'),
 };
 
 /** Profil ekranına özel üretilmiş, her konu için ayrı görseller (şeffaf arka planlı). */
 export const PROFILE_IMG = {
-  statMatches: require('../../assets/images/profile/stat_matches.png'),
-  statWinrate: require('../../assets/images/profile/stat_winrate.png'),
-  statCorrect: require('../../assets/images/profile/stat_correct.png'),
-  statAccuracy: require('../../assets/images/profile/stat_accuracy.png'),
-  metricTime: require('../../assets/images/profile/metric_time.png'),
-  metricStreak: require('../../assets/images/profile/metric_streak.png'),
-  metricXp: require('../../assets/images/profile/metric_xp.png'),
-  tabOverview: require('../../assets/images/profile/tab_overview.png'),
-  tabMastery: require('../../assets/images/profile/tab_mastery.png'),
-  tabTitles: require('../../assets/images/profile/tab_titles.png'),
-  achFirstWin: require('../../assets/images/profile/ach_first_win.png'),
-  achSpeed: require('../../assets/images/profile/ach_speed.png'),
-  achStreak: require('../../assets/images/profile/ach_streak.png'),
-  achHundred: require('../../assets/images/profile/ach_hundred.png'),
-  achExpert: require('../../assets/images/profile/ach_expert.png'),
-  achCollector: require('../../assets/images/profile/ach_collector.png'),
-  lpEmblem: require('../../assets/images/profile/lp_emblem.png'),
+  statMatches: cdnImage('images/profile/stat_matches.png'),
+  statWinrate: cdnImage('images/profile/stat_winrate.png'),
+  statCorrect: cdnImage('images/profile/stat_correct.png'),
+  statAccuracy: cdnImage('images/profile/stat_accuracy.png'),
+  metricTime: cdnImage('images/profile/metric_time.png'),
+  metricStreak: cdnImage('images/profile/metric_streak.png'),
+  metricXp: cdnImage('images/profile/metric_xp.png'),
+  tabOverview: cdnImage('images/profile/tab_overview.png'),
+  tabMastery: cdnImage('images/profile/tab_mastery.png'),
+  tabTitles: cdnImage('images/profile/tab_titles.png'),
+  achFirstWin: cdnImage('images/profile/ach_first_win.png'),
+  achSpeed: cdnImage('images/profile/ach_speed.png'),
+  achStreak: cdnImage('images/profile/ach_streak.png'),
+  achHundred: cdnImage('images/profile/ach_hundred.png'),
+  achExpert: cdnImage('images/profile/ach_expert.png'),
+  achCollector: cdnImage('images/profile/ach_collector.png'),
+  lpEmblem: cdnImage('images/profile/lp_emblem.png'),
 };
 
 /** Follow the OS preference on native and web, including changes while mounted. */
@@ -119,7 +120,7 @@ export const GuestDiscoveryCard: React.FC<{ onPress: () => void; compact?: boole
           [DISCOVERY_IMG.speed, 'Canlı 1v1'],
           [DISCOVERY_IMG.victory, 'Özel odalar'],
           [DISCOVERY_IMG.expert, 'Pro Lig'],
-          [require('../../assets/images/store/coins_s.png'), '+800 altın'],
+          [cdnImage('images/store/coins_s.png'), '+800 altın'],
         ].map(([source, title]) => (
           <View key={String(title)} style={styles.perk}>
             <Image source={source as ImageSourcePropType} style={styles.perkImage} resizeMode="contain" />

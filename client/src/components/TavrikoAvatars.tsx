@@ -1,3 +1,4 @@
+import { cdnImage } from '../utils/cdn';
 import React from 'react';
 import { Image } from 'react-native';
 import Svg, {
@@ -26,16 +27,16 @@ export interface AvatarPreset {
  * Sıra AVATAR_PRESETS ile birebir aynıdır (av_0 … av_9).
  */
 export const AVATAR_ILLUSTRATIONS = [
-  require('../../assets/images/avatars/av_0.jpg'),
-  require('../../assets/images/avatars/av_1.jpg'),
-  require('../../assets/images/avatars/av_2.jpg'),
-  require('../../assets/images/avatars/av_3.jpg'),
-  require('../../assets/images/avatars/av_4.jpg'),
-  require('../../assets/images/avatars/av_5.jpg'),
-  require('../../assets/images/avatars/av_6.jpg'),
-  require('../../assets/images/avatars/av_7.jpg'),
-  require('../../assets/images/avatars/av_8.jpg'),
-  require('../../assets/images/avatars/av_9.jpg'),
+  cdnImage('images/avatars/av_0.jpg'),
+  cdnImage('images/avatars/av_1.jpg'),
+  cdnImage('images/avatars/av_2.jpg'),
+  cdnImage('images/avatars/av_3.jpg'),
+  cdnImage('images/avatars/av_4.jpg'),
+  cdnImage('images/avatars/av_5.jpg'),
+  cdnImage('images/avatars/av_6.jpg'),
+  cdnImage('images/avatars/av_7.jpg'),
+  cdnImage('images/avatars/av_8.jpg'),
+  cdnImage('images/avatars/av_9.jpg'),
 ];
 
 export const AVATAR_PRESETS: AvatarPreset[] = [

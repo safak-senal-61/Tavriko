@@ -1,3 +1,4 @@
+import { cdnImage } from '../utils/cdn';
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   Animated as RNAnimated,
@@ -146,15 +147,15 @@ const TITLE_CATALOG: Array<{
   rarity: string;
   icon: ImageSourcePropType;
 }> = [
-  { title: 'Acemi Kaşif', minLevel: 1, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: require('../../assets/images/ui/title_acemi.png') },
-  { title: 'Yükselen Yıldız', minLevel: 3, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: require('../../assets/images/ui/title_yildiz.png') },
-  { title: 'Usta Kaşif', minLevel: 6, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: require('../../assets/images/ui/title_usta_kasif.png') },
-  { title: 'Bilgi Şövalyesi', minLevel: 10, badgeColor: '#B388FF', rarity: 'Epik', icon: require('../../assets/images/ui/title_sovalye.png') },
-  { title: 'Stratejist', minLevel: 15, badgeColor: '#B388FF', rarity: 'Epik', icon: require('../../assets/images/ui/title_stratejist.png') },
-  { title: 'Usta Bilgin', minLevel: 20, badgeColor: '#B388FF', rarity: 'Epik', icon: require('../../assets/images/ui/title_bilgin.png') },
-  { title: 'Büyük Üstat', minLevel: 30, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: require('../../assets/images/ui/title_ustat.png') },
-  { title: 'Efsanevi Deha', minLevel: 40, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: require('../../assets/images/ui/title_deha.png') },
-  { title: 'Evrenin Hakimi', minLevel: 50, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: require('../../assets/images/ui/title_evren.png') },
+  { title: 'Acemi Kaşif', minLevel: 1, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: cdnImage('images/ui/title_acemi.png') },
+  { title: 'Yükselen Yıldız', minLevel: 3, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: cdnImage('images/ui/title_yildiz.png') },
+  { title: 'Usta Kaşif', minLevel: 6, badgeColor: '#4FC3F7', rarity: 'Nadir', icon: cdnImage('images/ui/title_usta_kasif.png') },
+  { title: 'Bilgi Şövalyesi', minLevel: 10, badgeColor: '#B388FF', rarity: 'Epik', icon: cdnImage('images/ui/title_sovalye.png') },
+  { title: 'Stratejist', minLevel: 15, badgeColor: '#B388FF', rarity: 'Epik', icon: cdnImage('images/ui/title_stratejist.png') },
+  { title: 'Usta Bilgin', minLevel: 20, badgeColor: '#B388FF', rarity: 'Epik', icon: cdnImage('images/ui/title_bilgin.png') },
+  { title: 'Büyük Üstat', minLevel: 30, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: cdnImage('images/ui/title_ustat.png') },
+  { title: 'Efsanevi Deha', minLevel: 40, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: cdnImage('images/ui/title_deha.png') },
+  { title: 'Evrenin Hakimi', minLevel: 50, badgeColor: '#FFC43D', rarity: 'Efsanevi', icon: cdnImage('images/ui/title_evren.png') },
 ];
 
 const TitleLockIcon: React.FC<{ size?: number; color?: string }> = ({ size = 18, color = '#8F84B5' }) => (
