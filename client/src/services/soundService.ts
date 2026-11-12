@@ -44,6 +44,7 @@ const SOUND_ASSETS: Record<SoundEffect, any> = {
 // Singleton Web AudioContext and user gesture tracking for modern browser autoplay policies
 let sharedWebAudioCtx: any = null;
 let hasUserGesture: boolean = false;
+const gestureListeners = new Set<() => void>();
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   const registerUserGesture = () => {
@@ -51,6 +52,12 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     if (sharedWebAudioCtx && sharedWebAudioCtx.state === 'suspended') {
       sharedWebAudioCtx.resume().catch(() => {});
     }
+    // Açılışta müzik tercihi açıksa tarayıcı ilk dokunuşa kadar izin vermez; şimdi başlat
+    gestureListeners.forEach((fn) => {
+      try {
+        fn();
+      } catch {}
+    });
   };
   window.addEventListener('pointerdown', registerUserGesture, { capture: true, passive: true });
   window.addEventListener('touchstart', registerUserGesture, { capture: true, passive: true });
@@ -122,6 +129,14 @@ class SoundService {
     this.musicEnabled = enabled;
     if (enabled) this.startMusic();
     else this.stopMusic();
+    // Müzik açık ama tarayıcı henüz kullanıcı etkileşimi görmediyse ilk dokunuşta başlat
+    if (enabled && !hasUserGesture) {
+      const retry = () => {
+        gestureListeners.delete(retry);
+        if (this.musicEnabled) this.startMusic();
+      };
+      gestureListeners.add(retry);
+    }
   }
 
   public isMusicEnabled(): boolean {
@@ -402,7 +417,27 @@ class SoundService {
       }
     }
 
-    // 2. React Native Vibration fallback (scaled by user's haptic intensity)
+    // 2. Web: Vibration API (Android Chrome / PWA). iOS Safari desteklemez, sessizce atlanır.
+    try {
+      if (
+        Platform.OS === 'web' &&
+        typeof navigator !== 'undefined' &&
+        typeof (navigator as any).vibrate === 'function' &&
+        hasUserGesture
+      ) {
+        const s = this.hapticIntensity === 'light' ? 0.6 : this.hapticIntensity === 'strong' ? 1.8 : 1;
+        if (type === 'success') (navigator as any).vibrate([Math.round(18 * s), 40, Math.round(26 * s)]);
+        else if (type === 'error') (navigator as any).vibrate([Math.round(40 * s), 40, Math.round(40 * s)]);
+        else if (type === 'warning') (navigator as any).vibrate(Math.round(30 * s));
+        else if (type === 'medium') (navigator as any).vibrate(Math.round(22 * s));
+        else (navigator as any).vibrate(Math.round(10 * s));
+        return;
+      }
+    } catch {
+      // Ignore web vibration errors
+    }
+
+    // 3. React Native Vibration fallback (scaled by user's haptic intensity)
     try {
       if (Platform.OS !== 'web') {
         const s = this.hapticIntensity === 'light' ? 0.6 : this.hapticIntensity === 'strong' ? 1.6 : 1;

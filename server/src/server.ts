@@ -20,7 +20,7 @@ import { cacheService } from './cache/redisClient';
 import { logger } from './utils/logger';
 import { ALL_CATEGORIES } from '@trivia/shared';
 import { logRouter, renderDashboardHtml } from './routes/logRoutes';
-import { FinalMatchSummary, canonicalCategoryId } from '@trivia/shared';
+import { FinalMatchSummary, canonicalCategoryId, isRankedMatch } from '@trivia/shared';
 import authRoutes from './routes/authRoutes';
 import { metricsMiddleware, metricsHandler, setSocketServer } from './utils/metrics';
 import { initErrorMonitor, captureError } from './utils/errorMonitor';
@@ -3631,6 +3631,13 @@ export function createApp() {
 
       db.removePublicRoom(summary.roomCode);
 
+      // Dereceli maç mı? (gerçek rakiple hızlı eşleşme; bot / arkadaş düellosu / özel oda hariç)
+      const ranked = isRankedMatch({
+        mode: summary.mode,
+        roomCode: summary.roomCode,
+        playerIds: summary.rankings.map((r) => r.playerId),
+      });
+
       // Update XP and coins for participating registered users
       for (const rankItem of summary.rankings) {
         if (!rankItem.playerId || rankItem.playerId.startsWith('bot_') || rankItem.playerId.startsWith('guest_')) {
@@ -3652,6 +3659,7 @@ export function createApp() {
           bestStreak: Math.min(safeCorrect, rankItem.streak || 0),
           won: isWinner,
           roomCode: summary.roomCode,
+          ranked,
         });
       }
 

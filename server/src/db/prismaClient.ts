@@ -25,6 +25,9 @@ import {
   NotificationItem,
   calculateLevelFromXp,
   calculateMatchRewards,
+  calculateLeagueChange,
+  applyLeagueChange,
+  LEAGUE_START_POINTS,
   getDailyChallengeConfig,
   SEASON_1_TIERS,
   SHOP_CATALOG,
@@ -192,6 +195,8 @@ export interface GameStatsDelta {
   /** 'solo': Keşfet/pratik, diğerleri çok oyunculu */
   mode?: 'solo' | 'multiplayer';
   difficulty?: DifficultyLevel;
+  /** Dereceli (gerçek rakiple hızlı eşleşme) maç mı? Yalnızca bu maçlar LP değiştirir. */
+  ranked?: boolean;
 }
 
 /** Hesaba gerçekten yazılan ödül (2x artırıcı dahil) */
@@ -200,6 +205,8 @@ export interface AppliedMatchRewards {
   coins: number;
   seasonXp: number;
   boosted: boolean;
+  /** Bu maçta hesaba yazılan Lig Puanı değişimi (negatif olabilir, dereceli değilse 0) */
+  lp?: number;
   alreadyRecorded?: boolean;
 }
 
@@ -2415,7 +2422,23 @@ export class PrismaService {
       coins: baseRewards.coins,
       seasonXp: baseRewards.seasonXp,
       boosted: boosterActive && baseRewards.xp > 0,
+      lp: 0,
     };
+
+    // Lig Puanı (LP): yalnızca dereceli maçlarda değişir. Yanlış cevap cezası,
+    // kullanıcının Ayarlar > "Yanlış Cevap Puan Kesintisi" tercihine bağlıdır.
+    if (delta.ranked && delta.mode !== 'solo') {
+      const lpDelta = calculateLeagueChange({
+        correct: safeCorrect,
+        total: safeTotal,
+        won: !!delta.won,
+        ranked: true,
+        penaltyForWrong: (record.settings as any)?.penaltyForWrong !== false,
+      });
+      const { points, applied } = applyLeagueChange(record.rankPoints ?? LEAGUE_START_POINTS, lpDelta);
+      record.rankPoints = points;
+      appliedRewards.lp = applied;
+    }
     if (delta.roomCode) {
       this.recordedMatchRewards.set(`${record.id}:${delta.roomCode}`, appliedRewards);
     }
@@ -2491,6 +2514,7 @@ export class PrismaService {
             level: record.level,
             seasonXp: record.seasonXp || 0,
             rankTitle: record.rankTitle,
+            rankPoints: record.rankPoints,
             totalMatches: record.stats.totalMatches,
             wins: record.stats.wins,
             correctAnswers: record.stats.correctAnswers,
@@ -3547,9 +3571,11 @@ export class PrismaService {
       const safeStats = this.sanitizeUserStats(u.stats);
 
       const presence = presenceManager.getUserPresence(u.id);
-      const isOnline = presence.online;
-      const inRoom = presence.inRoom;
-      const currentRoomCode = presence.currentRoomCode;
+      // Ayarlar > Gizlilik > "Çevrim İçi Durumu" kapalıysa arkadaşlar da onu çevrimdışı görür
+      const presenceHidden = (u.settings as any)?.onlineStatusVisible === false;
+      const isOnline = presenceHidden ? false : presence.online;
+      const inRoom = presenceHidden ? false : presence.inRoom;
+      const currentRoomCode = presenceHidden ? undefined : presence.currentRoomCode;
 
       let status = 'Arkadaşın · Çevrimdışı';
       if (inRoom && currentRoomCode) {
@@ -3710,9 +3736,11 @@ export class PrismaService {
 
       // REAL-TIME WEBSOCKET PRESENCE
       const presence = presenceManager.getUserPresence(u.id);
-      const isOnline = presence.online;
-      const inRoom = presence.inRoom;
-      const currentRoomCode = presence.currentRoomCode;
+      // Ayarlar > Gizlilik > "Çevrim İçi Durumu" kapalıysa arkadaşlar da onu çevrimdışı görür
+      const presenceHidden = (u.settings as any)?.onlineStatusVisible === false;
+      const isOnline = presenceHidden ? false : presence.online;
+      const inRoom = presenceHidden ? false : presence.inRoom;
+      const currentRoomCode = presenceHidden ? undefined : presence.currentRoomCode;
 
       let status = 'Arkadaşın · Çevrimdışı';
       if (inRoom && currentRoomCode) {
@@ -4063,6 +4091,10 @@ export class PrismaService {
     }
     if (target.blockedUserIds?.includes(me.id)) {
       return { success: false, error: 'Bu kullanıcı sizi engellemiş. Arkadaşlık isteği gönderemezsiniz.' };
+    }
+    // Ayarlar > Gizlilik > "Arkadaşlık İstekleri" kapalıysa istek kabul etmez
+    if ((target.settings as any)?.friendRequestsAllowed === false) {
+      return { success: false, error: `${target.displayName} şu anda arkadaşlık isteği kabul etmiyor.` };
     }
 
     if (!me.friendIds) me.friendIds = [];
@@ -4534,6 +4566,11 @@ export class PrismaService {
     }
     if (target.blockedUserIds?.includes(me.id)) {
       return { success: false, error: 'Bu kullanıcı sizi engellemiş. Düello daveti gönderilemez.', message: '' };
+    }
+    // Ayarlar > Gizlilik > "1v1 Düello Davetleri" kapalıysa davet göndermez
+    const targetSettings = (target.settings as any) || {};
+    if ((targetSettings.duelInvitesAllowed ?? targetSettings.allowDuelChallenges) === false) {
+      return { success: false, error: `${target.displayName} şu anda düello daveti kabul etmiyor.`, message: '' };
     }
 
     const roomCode = 'DUEL-' + Math.random().toString(36).substring(2, 6).toUpperCase();

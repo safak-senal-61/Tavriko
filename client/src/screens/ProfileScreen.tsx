@@ -42,6 +42,8 @@ import { UI_IMG, FloatingImage, ShimmerView, CATEGORY_IMG, FramedAvatar, Animate
 import { DISCOVERY_IMG, DiscoveryArtwork, AchievementState } from '../components/DiscoveryArtwork';
 import { Settings, UserRound } from 'lucide-react-native';
 import { PreferenceSwitch } from '../components/PreferenceSwitch';
+import { InfoHint } from '../components/InfoHint';
+import { savePreferences, loadStoredPreferences } from '../store/appPrefs';
 
 let ImagePickerModule: any = null;
 try {
@@ -395,6 +397,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     setSoundEnabled(val);
     sound.playSound('tap');
     sound.setSoundEnabled(val);
+    savePreferences({ ...loadStoredPreferences(), sfxEnabled: val, soundEnabled: val } as any);
     try {
       await fetch(`${base}/auth/settings`, {
         method: 'POST',
@@ -416,6 +419,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const handleToggleHaptics = async (val: boolean) => {
     setHapticsEnabled(val);
     sound.setHapticsEnabled(val);
+    savePreferences({ ...loadStoredPreferences(), hapticsEnabled: val });
     if (val) sound.triggerHaptic('medium');
     try {
       await fetch(`${base}/auth/settings`, {
@@ -736,9 +740,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 />
               </View>
 
-              <Text style={styles.levelSub} numberOfLines={1}>
-                @{user.username} · Sv. {prog.level} · {user.rankPoints ?? 1000} RP
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={[styles.levelSub, { flexShrink: 1 }]} numberOfLines={1}>
+                  @{user.username} · Sv. {prog.level} · {user.rankPoints ?? 1000} LP
+                </Text>
+                <InfoHint topic="lp" size={18} label="Lig Puanı (LP) nedir?" />
+              </View>
 
               <View style={styles.heroBadgesRow}>
                 {badgeName && (
@@ -784,7 +791,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           {/* Compact XP Progress Bar */}
           <View style={styles.heroXpWrap}>
             <View style={styles.heroXpHeader}>
-              <Text style={styles.heroXpLabel}>Seviye {prog.level} İlerlemesi</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.heroXpLabel}>Seviye {prog.level} İlerlemesi</Text>
+                <InfoHint topic="xp" size={18} color="#5ADBB5" label="XP nasıl kazanılır?" />
+              </View>
               <Text style={styles.heroXpVal}>
                 {prog.currentLevelXp} / {prog.nextLevelXpRequired} XP
               </Text>
@@ -1051,7 +1061,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <View style={styles.secondaryMetricDivider} />
               <View style={styles.secondaryMetricItem}>
                 <Text style={styles.secondaryMetricVal}>{user.xp ?? 0}</Text>
-                <Text style={styles.secondaryMetricLbl}>Toplam XP</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={styles.secondaryMetricLbl}>Toplam XP</Text>
+                  <InfoHint topic="xp" size={14} color="#5ADBB5" label="XP nasıl kazanılır?" />
+                </View>
               </View>
             </View>
 

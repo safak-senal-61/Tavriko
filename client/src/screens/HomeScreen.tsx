@@ -30,6 +30,7 @@ import {
 import { GradientFill, formatNumberTR } from '../components/TavrikoGradient';
 import { UI_IMG } from '../components/StoreKit';
 import { NotificationBell } from '../components/NotificationUI';
+import { InfoHint } from '../components/InfoHint';
 import { useUnreadCount } from '../store/notificationStore';
 
 const LOGO_MARK = require('../../assets/images/logo_mark.png');
@@ -324,6 +325,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={styles.xpText} numberOfLines={1}>
                   {formatNumberTR(prog.currentLevelXp)} / {formatNumberTR(prog.nextLevelXpRequired)} XP
                 </Text>
+                <InfoHint topic="xp" size={18} color="#5ADBB5" label="XP nasıl kazanılır?" />
               </View>
             </View>
           </TouchableOpacity>

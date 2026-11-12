@@ -13,6 +13,8 @@ import { THEME } from '../theme/tokens';
 import { DEFAULT_API_BASE } from '../config';
 import { CharacterAvatar, TrophyIcon } from './TavrikoIcons';
 import { sound } from '../services/soundService';
+import { useGameStore } from '../store/gameStore';
+import { InfoHint } from './InfoHint';
 
 interface UserProfileModalProps {
   visible: boolean;
@@ -45,7 +47,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setLoading(true);
     setError(null);
 
-    fetch(`${base}/social/profile/${encodeURIComponent(userId)}`)
+    const token = useGameStore.getState().token;
+    fetch(`${base}/social/profile/${encodeURIComponent(userId)}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
       .then(async (res) => {
         if (!res.ok) throw new Error('Profil yüklenemedi');
         return res.json();
@@ -143,6 +148,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </View>
               </View>
 
+              {(profile as any).isPrivate ? (
+                <View style={styles.errorWrap}>
+                  <Text style={styles.errorText}>Bu profil gizli. İstatistikler yalnızca arkadaşlara açık.</Text>
+                </View>
+              ) : (
+              <>
               {/* Rank & Level Bar */}
               <View style={styles.rankLevelRow}>
                 <View style={styles.rankLevelItem}>
@@ -151,7 +162,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </View>
                 <View style={styles.rankLevelDivider} />
                 <View style={styles.rankLevelItem}>
-                  <Text style={styles.rankLevelLabel}>LİG PUANI</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={styles.rankLevelLabel}>LİG PUANI</Text>
+                    <InfoHint topic="lp" size={14} label="Lig Puanı (LP) nedir?" />
+                  </View>
                   <View style={styles.trophyRow}>
                     <TrophyIcon size={16} />
                     <Text style={[styles.rankLevelVal, { color: '#FFC43D' }]}>
@@ -205,6 +219,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   <Text style={styles.accuracyDetail}>✕ {wrong} Yanlış</Text>
                 </View>
               </View>
+              </>
+              )}
             </ScrollView>
           )}
         </View>

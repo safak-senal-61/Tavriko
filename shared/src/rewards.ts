@@ -68,3 +68,62 @@ export function calculateMatchRewards(input: MatchRewardInput): MatchRewards {
     seasonXp: won ? 25 : 10,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Lig Puanı (LP) — TEK DOĞRULUK KAYNAĞI
+// ---------------------------------------------------------------------------
+// LP yalnızca "dereceli" maçlarda değişir: gerçek bir rakiple oynanan hızlı
+// eşleşme / 1v1 düello. Tek kişilik pratik, Keşfet, günlük görev, özel oda ve
+// arkadaş düellosu LP'yi DEĞİŞTİRMEZ. Herkes 1000 LP ile başlar, LP 0'ın altına inmez.
+export const LEAGUE_START_POINTS = 1000;
+export const LP_WIN_BASE = 20;
+export const LP_PER_CORRECT_ON_WIN = 2;
+export const LP_LOSS = 5;
+export const LP_WRONG_ANSWER_PENALTY = 10;
+export const LP_MIN_WIN_GAIN = 5;
+
+export interface LeagueChangeInput {
+  correct: number;
+  total: number;
+  won: boolean;
+  /** Dereceli maç mı? false ise LP değişmez. */
+  ranked?: boolean;
+  /** Ayarlar > "Yanlış Cevap Puan Kesintisi" açık mı? */
+  penaltyForWrong?: boolean;
+}
+
+/**
+ * Bir maç sonunda LP değişimini (negatif olabilir) döndürür.
+ * - Galibiyet: +20 LP, her doğru cevap için +2 LP
+ * - Mağlubiyet: -5 LP
+ * - Ceza açıksa her yanlış / boş cevap için -10 LP
+ * - Galibiyetin net kazancı hiçbir zaman +5 LP'nin altına düşmez
+ */
+export function calculateLeagueChange(input: LeagueChangeInput): number {
+  if (!input.ranked) return 0;
+  const total = Math.max(1, Math.round(Number(input.total) || 1));
+  const correct = Math.max(0, Math.min(total, Math.round(Number(input.correct) || 0)));
+  const wrong = total - correct;
+  const won = !!input.won;
+
+  let delta = won ? LP_WIN_BASE + correct * LP_PER_CORRECT_ON_WIN : -LP_LOSS;
+  if (input.penaltyForWrong !== false) delta -= wrong * LP_WRONG_ANSWER_PENALTY;
+  if (won) delta = Math.max(LP_MIN_WIN_GAIN, delta);
+  return delta;
+}
+
+/** LP'yi uygular; 0'ın altına inmez. Gerçekte uygulanan değişimi de döndürür. */
+export function applyLeagueChange(current: number, delta: number): { points: number; applied: number } {
+  const start = Number.isFinite(current) ? Math.max(0, Math.round(current)) : LEAGUE_START_POINTS;
+  const points = Math.max(0, start + delta);
+  return { points, applied: points - start };
+}
+
+/** Bir maçın dereceli sayılıp sayılmayacağı (sunucu ve istemci aynı kuralı kullanır). */
+export function isRankedMatch(input: { mode?: string; roomCode?: string; playerIds: string[] }): boolean {
+  const modeOk = input.mode === 'duel' || input.mode === 'quick_match' || input.mode === 'ranked_random';
+  const ids = input.playerIds || [];
+  const hasBot = ids.some((id) => String(id).startsWith('bot_'));
+  const friendDuel = String(input.roomCode || '').toUpperCase().startsWith('DUEL-');
+  return modeOk && ids.length >= 2 && !hasBot && !friendDuel;
+}

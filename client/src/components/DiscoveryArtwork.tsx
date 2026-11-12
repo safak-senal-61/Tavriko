@@ -7,6 +7,7 @@ import { ArrowRight, Check, LockKeyhole } from 'lucide-react-native';
 import { GradientFill } from './TavrikoGradient';
 import { THEME } from '../theme/tokens';
 import { useGameStore } from '../store/gameStore';
+import { usePreferences } from '../store/appPrefs';
 
 export const DISCOVERY_IMG = {
   explorer: require('../../assets/images/discovery/guest_explorer.png'),
@@ -25,8 +26,12 @@ export const DISCOVERY_IMG = {
 
 /** Follow the OS preference on native and web, including changes while mounted. */
 export function useReducedMotion() {
-  const preferStill = useGameStore(state =>
+  const accountStill = useGameStore(state =>
     state.user?.settings?.smoothAnimations === false || state.user?.settings?.batterySaver === true);
+  // Ayarlar ekranında değiştirilen tercih anında geçerli olur (misafir kullanıcılar dahil)
+  const prefs = usePreferences();
+  const preferStill = prefs.smoothAnimations === false || prefs.batterySaver === true ||
+    (prefs.smoothAnimations === undefined && prefs.batterySaver === undefined && accountStill);
   const [reduced, setReduced] = useState(true);
   useEffect(() => {
     let mounted = true;

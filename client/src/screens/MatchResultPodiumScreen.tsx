@@ -21,6 +21,7 @@ import {
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { loadStoredPreferences } from '../store/appPrefs';
+import { InfoHint } from '../components/InfoHint';
 import {
   TavrikoScreen,
   Button3D,
@@ -39,7 +40,7 @@ interface MatchResultPodiumScreenProps {
   /** Kullanıcının güncel toplam XP'si; verilirse gerçek seviye ilerlemesi gösterilir */
   userXp?: number;
   /** Sunucunun hesaba gerçekten yazdığı ödül; gelene kadar paylaşılan formülle hesaplanan değer gösterilir */
-  rewards?: { xp: number; coins: number; boosted?: boolean } | null;
+  rewards?: { xp: number; coins: number; boosted?: boolean; lp?: number } | null;
   onPlayAgain: () => void;
   onHome: () => void;
 }
@@ -257,6 +258,14 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
                   <CoinIcon size={16} />
                   <Text style={styles.coinChipText}>+{coinsEarned}</Text>
                 </Animated.View>
+                {typeof rewards?.lp === 'number' && rewards.lp !== 0 ? (
+                  <Animated.View entering={ZoomIn.delay(900).springify()} style={styles.rewardChip}>
+                    <Text style={[styles.xpChipText, { color: rewards.lp > 0 ? '#5ADBB5' : '#FF708F' }]}>
+                      {rewards.lp > 0 ? '+' : ''}{rewards.lp} LP
+                    </Text>
+                    <InfoHint topic="lp" size={16} label="Lig Puanı (LP) nedir?" />
+                  </Animated.View>
+                ) : null}
               </View>
             </View>
             {levelInfo ? (

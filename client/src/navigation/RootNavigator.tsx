@@ -29,6 +29,7 @@ import {
   CustomRoomSettings,
   MatchQuestionReviewItem,
   ALL_CATEGORIES,
+  isRankedMatch,
 } from '@trivia/shared';
 // Screens
 import { SplashScreen } from '../screens/SplashScreen';
@@ -64,7 +65,7 @@ import { EventsScreen } from '../screens/EventsScreen';
 import { InventoryScreen } from '../screens/InventoryScreen';
 import { ProLeagueScreen } from '../screens/ProLeagueScreen';
 import { sanitizeAvatarForUrl, compressAvatarImageAsync } from '../utils/avatarImage';
-import { applyStoredPreferencesOnBoot } from '../store/appPrefs';
+import { applyStoredPreferencesOnBoot, syncPreferencesFromAccount, loadStoredPreferences } from '../store/appPrefs';
 import { useNotificationStore } from '../store/notificationStore';
 import { NotificationToast } from '../components/NotificationUI';
 import { PaymentScreen, PaymentItem } from '../screens/PaymentScreen';
@@ -206,8 +207,8 @@ export const RootNavigator: React.FC = () => {
   const [multiplayerFeedback, setMultiplayerFeedback] = useState<RoundFeedback | null>(null);
   const [isPracticeSummaryVisible, setIsPracticeSummaryVisible] = useState<boolean>(false);
   // Sunucunun hesaba gerçekten yazdığı maç ödülleri (ekranda aynen gösterilir)
-  const [practiceRewards, setPracticeRewards] = useState<{ xp: number; coins: number; boosted: boolean } | null>(null);
-  const [matchRewards, setMatchRewards] = useState<{ xp: number; coins: number; boosted: boolean } | null>(null);
+  const [practiceRewards, setPracticeRewards] = useState<{ xp: number; coins: number; boosted: boolean; lp?: number } | null>(null);
+  const [matchRewards, setMatchRewards] = useState<{ xp: number; coins: number; boosted: boolean; lp?: number } | null>(null);
   const [activeDailyConfig, setActiveDailyConfig] = useState<DailyChallengeConfig | null>(null);
   const [dailyResultModal, setDailyResultModal] = useState<{
     visible: boolean;
@@ -486,6 +487,11 @@ export const RootNavigator: React.FC = () => {
   useEffect(() => {
     applyStoredPreferencesOnBoot();
   }, []);
+  // Hesaba giriş yapılınca (yeni cihaz dahil) hesaptaki tercihleri uygula
+  useEffect(() => {
+    if (user?.id && user.settings) syncPreferencesFromAccount(user.settings as any);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
   // Helper to gate non-Keşfet features when in Guest Mode
   const requireAuth = (action: () => void, featureName: string) => {
     if (isGuest || !user) {
@@ -667,6 +673,11 @@ export const RootNavigator: React.FC = () => {
             mode: 'multiplayer',
             bestStreak: myRankEntry?.streak || 1,
             roomCode: summary.roomCode,
+            ranked: isRankedMatch({
+              mode: summary.mode,
+              roomCode: summary.roomCode,
+              playerIds: (summary.rankings || []).map((p) => p.playerId),
+            }),
             category: (summary as any).category || activeRoom?.category || selectedCategory || 'general_culture',
           }),
         })
@@ -677,7 +688,7 @@ export const RootNavigator: React.FC = () => {
             }
             // Sunucunun hesaba GERÇEKTEN yazdığı ödül
             if (data?.rewards && !(data.rewards.alreadyRecorded && !data.rewards.xp)) {
-              setMatchRewards({ xp: data.rewards.xp, coins: data.rewards.coins, boosted: !!data.rewards.boosted });
+              setMatchRewards({ xp: data.rewards.xp, coins: data.rewards.coins, boosted: !!data.rewards.boosted, lp: typeof data.rewards.lp === 'number' ? data.rewards.lp : undefined });
             }
           })
           .catch(() => {});
@@ -1332,6 +1343,14 @@ export const RootNavigator: React.FC = () => {
     selectOption(null);
     navigateTo('quiz_arena');
   };
+  // "Otomatik sonraki soru" tercihi: açıksa 1.5 sn sonra geçer, kapalıysa
+  // oyuncu "Sonraki Soru" düğmesine basana kadar geri bildirim ekranda kalır.
+  const schedulePracticeAdvance = () => {
+    if (loadStoredPreferences().autoNextQuestion === false) return;
+    scheduleGameTimeout(() => {
+      advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
+    }, 1500);
+  };
   const advanceToNextPracticeQuestion = (
     nextIdx: number,
     questionsList: ClientQuestion[]
@@ -1523,9 +1542,7 @@ export const RootNavigator: React.FC = () => {
         };
         practiceStatsRef.current = updatedStats;
         setPracticeStats(updatedStats);
-        scheduleGameTimeout(() => {
-          advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
-        }, 1200);
+        schedulePracticeAdvance();
         return;
       }
     } catch {
@@ -1563,9 +1580,7 @@ export const RootNavigator: React.FC = () => {
     };
     practiceStatsRef.current = mockUpdatedStats;
     setPracticeStats(mockUpdatedStats);
-    scheduleGameTimeout(() => {
-      advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
-    }, 1200);
+    schedulePracticeAdvance();
   };
   const handleTimeExpired = async () => {
     if (activeRoom && user) {
@@ -1608,9 +1623,7 @@ export const RootNavigator: React.FC = () => {
         };
         practiceStatsRef.current = timeoutStats;
         setPracticeStats(timeoutStats);
-        scheduleGameTimeout(() => {
-          advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
-        }, 1200);
+        schedulePracticeAdvance();
         return;
       }
     } catch {
@@ -1632,9 +1645,7 @@ export const RootNavigator: React.FC = () => {
     };
     practiceStatsRef.current = mockTimeoutStats;
     setPracticeStats(mockTimeoutStats);
-    scheduleGameTimeout(() => {
-      advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
-    }, 1200);
+    schedulePracticeAdvance();
   };
   return (
     <View style={[styles.outerWrapper, isDesktop && styles.desktopOuter]}>
@@ -1908,6 +1919,11 @@ export const RootNavigator: React.FC = () => {
               onSelectOption={handleSubmitAnswer}
               onTimeExpired={handleTimeExpired}
               onExit={handleExitCurrentGame}
+              onNext={
+                !activeRoom && practiceFeedback && loadStoredPreferences().autoNextQuestion === false
+                  ? () => advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions)
+                  : undefined
+              }
               isDuelMode={
                 !!activeRoom &&
                 (activeRoom.mode === 'duel' ||
