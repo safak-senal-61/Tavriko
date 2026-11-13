@@ -272,6 +272,10 @@ export interface UserSettings {
      * Sunucu tarafından yazılır; istemci yalnızca okur (profildeki kalan süre barı için).
      */
     xpBoosterExpiresAt?: string;
+    /** 3x XP iksirinin (booster_xp_3x_1h) bitiş zamanı — sunucu yazılır, istemci okur. */
+    xp3BoosterExpiresAt?: string;
+    /** 2x Altın iksirinin (booster_coin_2x_1h / _24h) bitiş zamanı — sunucu yazılır, istemci okur. */
+    coinBoosterExpiresAt?: string;
     /** Yasal metin onayı (sunucu tarafından yazılır, istemci değiştiremez). */
     legalConsent?: {
         version: string;
@@ -326,6 +330,10 @@ export interface UserProfile {
     /** Kullanıcının engellediği oyuncular */
     blockedUserIds?: string[];
     activeBoosterExpiresAt?: number;
+    /** 3x XP iksiri (booster_xp_3x_1h) bitiş zamanı (ms) — sunucu yazar, istemci okur */
+    xp3BoosterExpiresAt?: number;
+    /** 2x Altın iksiri (booster_coin_2x_1h / 24h) bitiş zamanı (ms) — sunucu yazar, istemci okur */
+    coinBoosterExpiresAt?: number;
     friendIds?: string[];
     notifications?: NotificationItem[];
     eventProgress?: Record<string, {

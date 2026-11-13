@@ -29,6 +29,7 @@ import { useGameStore } from '../store/gameStore';
 import { NotificationBell } from './NotificationUI';
 import { useUnreadCount } from '../store/notificationStore';
 import { BackgroundScene, backgroundFor } from './StoreKit';
+import { getCosmeticDef } from '@trivia/shared';
 // Brand Assets
 export const BRAND_LOGO_MAIN = cdnImage('images/brand/logo_full.png');
 export const BRAND_LOGO_BANNER = cdnImage('images/brand/logo_full.png');
@@ -1027,6 +1028,24 @@ export const NavIcon: React.FC<{
 // ============================================================================
 // 6. REUSABLE UI PRIMITIVES FROM TAVRIKO UI KIT
 // ============================================================================
+/**
+ * PRO/VIP tema belirteçleri: kuşanılan arka planın tanımında `ui` belirteçleri
+ * varsa ve süresi dolmamışsa tema renklerini döndürür. Süre bitince otomatik
+ * null döner ve arayüz eski haline döner. Arka planla birlikte üst parlama,
+ * alt ışık küreleri ve üst çubuk vurgu renkleri de değişir.
+ */
+export const useProTheme = (): { accent: string; accent2: string; bgTint: string } | null => {
+  const storeUser = useGameStore((s) => s.user);
+  const equippedBg = storeUser?.equippedBackground;
+  const bgExpires = storeUser?.equippedBackgroundExpiresAt;
+  if (!equippedBg) return null;
+  if (bgExpires && bgExpires <= Date.now()) return null;
+  const ui = getCosmeticDef(equippedBg)?.visual?.ui as
+    | { accent: string; accent2: string; bgTint: string }
+    | undefined;
+  return ui ? { ...ui } : null;
+};
+
 export const TavrikoScreen: React.FC<{
   children: React.ReactNode;
   style?: ViewStyle;
@@ -1038,6 +1057,8 @@ export const TavrikoScreen: React.FC<{
   const activeBg =
     equippedBg && (!bgExpires || bgExpires > Date.now()) ? equippedBg : null;
   const bgIsImage = activeBg ? !!backgroundFor(activeBg) : false;
+  // PRO/VIP teması: arayüz vurgu renkleri de arka planla değişir
+  const proTheme = useProTheme();
   return (
     <View style={[styles.screenRoot, style]}>
       {/* Kuşanılmış arka plan: uygulama geneli */}
@@ -1057,10 +1078,27 @@ export const TavrikoScreen: React.FC<{
         </View>
       )}
       {/* Radial Top Purple Glow */}
-      <View style={styles.topRadialGlow} pointerEvents="none" />
+      <View
+        style={[styles.topRadialGlow, proTheme ? { backgroundColor: proTheme.accent } : null]}
+        pointerEvents="none"
+      />
       {/* Bottom Magenta/Cyan Ambient Glows */}
-      <View style={styles.bottomGlowOrb} pointerEvents="none" />
-      <View style={styles.sideCyanOrb} pointerEvents="none" />
+      <View
+        style={[styles.bottomGlowOrb, proTheme ? { backgroundColor: proTheme.accent2 } : null]}
+        pointerEvents="none"
+      />
+      <View
+        style={[styles.sideCyanOrb, proTheme ? { backgroundColor: proTheme.accent } : null]}
+        pointerEvents="none"
+      />
+      {/* PRO/VIP arayüz tonu: süre boyunca tüm ekran hafif tema rengine bürünür,
+          süre bitince otomatik kalkar */}
+      {proTheme && (
+        <View
+          style={[styles.proThemeTint, { backgroundColor: proTheme.bgTint }]}
+          pointerEvents="none"
+        />
+      )}
       {/* Subtle Diagonal Stripes */}
       <View style={styles.stripe1} pointerEvents="none" />
       <View style={styles.stripe2} pointerEvents="none" />
@@ -1122,6 +1160,8 @@ export const TavrikoTopBar: React.FC<{
 }) => {
   const storeUser = useGameStore((s) => s.user);
   const unread = useUnreadCount();
+  // PRO/VIP teması: üst çubuktaki para pill'i ve avatar halkası tema rengine döner
+  const proTheme = useProTheme();
   const displayCoins = coins !== undefined && coins !== null ? coins : storeUser?.coins ?? 0;
   const displayGems = gems !== undefined && gems !== null ? gems : storeUser?.gems ?? 0;
   const displayAvatar = avatarSeed || storeUser?.avatarUrl || storeUser?.displayName || 'av1';
@@ -1187,7 +1227,10 @@ export const TavrikoTopBar: React.FC<{
         <View style={{ width: 44 }} />
       )}
       <TouchableOpacity
-        style={styles.currencyPill}
+        style={[
+          styles.currencyPill,
+          proTheme ? { borderColor: proTheme.accent } : null,
+        ]}
         onPress={() => {
           if (onCurrencyPress) {
             sound.playSound('reward');
@@ -1212,7 +1255,12 @@ export const TavrikoTopBar: React.FC<{
           }
         }}
         activeOpacity={0.85}
-        style={styles.avatarCircleWrap}
+        style={[
+          styles.avatarCircleWrap,
+          proTheme
+            ? { borderWidth: 2, borderColor: proTheme.accent2, borderRadius: 20 }
+            : null,
+        ]}
       >
         <CharacterAvatar seed={displayAvatar} size={40} />
       </TouchableOpacity>
@@ -1532,6 +1580,14 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     overflow: 'hidden',
+  },
+  proThemeTint: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
   },
   guestBadgePill: {
     backgroundColor: 'rgba(10, 4, 24, 0.72)',

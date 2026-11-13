@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Animated,
   ActivityIndicator,
 } from 'react-native';
-import { UserProfile, InventoryItem, ItemCategory } from '@trivia/shared';
+import { UserProfile, InventoryItem, ItemCategory, COSMETIC_RENTAL_MS, getCosmeticDef } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
@@ -80,6 +80,79 @@ const RARITY_COLORS: Record<string, string> = {
   legendary: '#F59E0B',
   mythic: '#EF4444',
 };
+
+/** Aktif etki satırı: görsel + isim + kalan süre barı. Bar her saniye azalır,
+ *  bittiğinde satır otomatik kaybolur (kozmetik/iksir eski haline döner). */
+const ActiveEffectRow: React.FC<{
+  visual: React.ReactNode;
+  label: string;
+  expiresAt: number;
+  accent: string;
+}> = ({ visual, label, expiresAt, accent }) => {
+  const [left, setLeft] = useState(() => Math.max(0, expiresAt - Date.now()));
+  useEffect(() => {
+    const t = setInterval(() => setLeft(Math.max(0, expiresAt - Date.now())), 1000);
+    return () => clearInterval(t);
+  }, [expiresAt]);
+  if (left <= 0) return null;
+  // Toplam süre tahmini: kalan 1 saati aşarsa 24 saatlik iksirdir (yoksa 1 saat)
+  const total = left > COSMETIC_RENTAL_MS * 1.2 ? 24 * 60 * 60 * 1000 : COSMETIC_RENTAL_MS;
+  const pct = Math.max(0, Math.min(100, (left / total) * 100));
+  const totalSec = Math.floor(left / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const timeText = h > 0 ? `${h}s ${String(m).padStart(2, '0')}dk` : `${m}dk ${String(s).padStart(2, '0')}sn`;
+  return (
+    <View style={activeFxStyles.row}>
+      <View style={activeFxStyles.iconWrap}>{visual}</View>
+      <View style={activeFxStyles.info}>
+        <Text style={activeFxStyles.label} numberOfLines={1}>{label}</Text>
+        <View style={activeFxStyles.barTrack}>
+          <Animated.View
+            style={[activeFxStyles.barFill, { backgroundColor: accent, width: `${pct}%` }]}
+          />
+        </View>
+        <Text style={activeFxStyles.timeText}>⏳ {timeText} kaldı</Text>
+      </View>
+    </View>
+  );
+};
+
+const activeFxStyles = StyleSheet.create({
+  card: {
+    marginTop: 12,
+    backgroundColor: 'rgba(52, 34, 78, 0.55)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(197, 165, 245, 0.28)',
+    padding: 12,
+  },
+  cardTitle: {
+    color: '#E9DDFB',
+    fontSize: 13,
+    fontFamily: THEME.fonts.extraBold,
+    marginBottom: 8,
+    letterSpacing: 0.4,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 6,
+  },
+  iconWrap: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  info: { flex: 1 },
+  label: { color: '#F3EDFF', fontSize: 12, fontFamily: THEME.fonts.bold, marginBottom: 4 },
+  barTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    overflow: 'hidden',
+  },
+  barFill: { height: 6, borderRadius: 3 },
+  timeText: { color: '#CBB8E8', fontSize: 10, fontFamily: THEME.fonts.medium, marginTop: 3 },
+});
 
 export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   user,
@@ -324,6 +397,106 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
           onChange={(id, idx) => handleSelectInvTab(id, idx)}
           scrollRef={invTabScrollRef}
         />
+
+        {/* Aktif Etkiler: kuşanılmış kozmetikler + aktif iksirler; süre barı
+            bitince satırlar kaybolur, kozmetikler otomatik eski haline döner */}
+        {(() => {
+          const now = Date.now();
+          const activeRows: React.ReactNode[] = [];
+          const cos = (id: string | undefined, expiresAt: number | undefined) =>
+            id && expiresAt && expiresAt > now ? { id, expiresAt } : null;
+          const frame = cos(user?.equippedFrame, user?.equippedFrameExpiresAt);
+          const badge = cos(user?.equippedBadge, user?.equippedBadgeExpiresAt);
+          const nameFx = cos(user?.equippedNameEffect, user?.equippedNameEffectExpiresAt);
+          const bg = cos(user?.equippedBackground, user?.equippedBackgroundExpiresAt);
+          if (frame) {
+            activeRows.push(
+              <ActiveEffectRow
+                key="fx-frame"
+                visual={<FramedAvatar frameId={frame.id} seed={userSeed} size={40} />}
+                label={getCosmeticDef(frame.id)?.name || 'Çerçeve'}
+                expiresAt={frame.expiresAt}
+                accent="#38BDF8"
+              />
+            );
+          }
+          if (badge) {
+            const bImg = storeImageFor(badge.id);
+            activeRows.push(
+              <ActiveEffectRow
+                key="fx-badge"
+                visual={bImg
+                  ? <Image source={bImg} style={{ width: 36, height: 36 }} resizeMode="contain" />
+                  : <BadgeVisual badgeId={badge.id} size={36} />}
+                label={getCosmeticDef(badge.id)?.name || 'Rozet'}
+                expiresAt={badge.expiresAt}
+                accent="#F59E0B"
+              />
+            );
+          }
+          if (nameFx) {
+            activeRows.push(
+              <ActiveEffectRow
+                key="fx-name"
+                visual={<Text style={{ fontSize: 22 }}>✨</Text>}
+                label={getCosmeticDef(nameFx.id)?.name || 'İsim Efekti'}
+                expiresAt={nameFx.expiresAt}
+                accent="#D946EF"
+              />
+            );
+          }
+          if (bg) {
+            activeRows.push(
+              <ActiveEffectRow
+                key="fx-bg"
+                visual={<Text style={{ fontSize: 22 }}>🖼️</Text>}
+                label={getCosmeticDef(bg.id)?.name || 'Arka Plan'}
+                expiresAt={bg.expiresAt}
+                accent="#8B5CF6"
+              />
+            );
+          }
+          if (user?.activeBoosterExpiresAt && user.activeBoosterExpiresAt > now) {
+            activeRows.push(
+              <ActiveEffectRow
+                key="fx-xp2"
+                visual={<SpeedBoltIcon size={30} />}
+                label="⚡ 2x XP İksiri"
+                expiresAt={user.activeBoosterExpiresAt}
+                accent="#38BDF8"
+              />
+            );
+          }
+          if (user?.xp3BoosterExpiresAt && user.xp3BoosterExpiresAt > now) {
+            activeRows.push(
+              <ActiveEffectRow
+                key="fx-xp3"
+                visual={<SpeedBoltIcon size={30} />}
+                label="⚡ 3x XP İksiri"
+                expiresAt={user.xp3BoosterExpiresAt}
+                accent="#A855F7"
+              />
+            );
+          }
+          if (user?.coinBoosterExpiresAt && user.coinBoosterExpiresAt > now) {
+            activeRows.push(
+              <ActiveEffectRow
+                key="fx-coin"
+                visual={<CoinIcon size={30} />}
+                label="🪙 2x Altın İksiri"
+                expiresAt={user.coinBoosterExpiresAt}
+                accent="#F59E0B"
+              />
+            );
+          }
+          if (activeRows.length === 0) return null;
+          return (
+            <View style={activeFxStyles.card}>
+              <Text style={activeFxStyles.cardTitle}>Aktif Etkiler ({activeRows.length})</Text>
+              {activeRows}
+            </View>
+          );
+        })()}
 
         {/* Status Message */}
         {statusMessage && (

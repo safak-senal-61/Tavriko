@@ -128,6 +128,13 @@ export const storeImageFor = (id: string, category?: string): ImageSourcePropTyp
     return STORE_IMG.key;
   }
   if (c.startsWith('booster') || k.includes('booster') || k.includes('bolt')) {
+    // Altın iksirleri altın görseli, XP iksirleri yıldırım görseli kullanır
+    if (k.includes('coin')) {
+      return k.includes('24h') ? STORE_IMG.coinsL : STORE_IMG.coinsM;
+    }
+    if (k.includes('3x')) {
+      return STORE_IMG.booster24h; // 3x XP: büyük iksir görseli
+    }
     return k.includes('24h') ? STORE_IMG.booster24h : STORE_IMG.booster;
   }
   if (c.startsWith('badge') || k.includes('badge')) {
@@ -215,16 +222,20 @@ export const ANIMATED_FRAME_STYLES: Record<string, {
   frame_flame: { colors: ['#FFD08A', '#FF6B35', '#E11D48'], particle: 'ember', duration: 5000 },
 };
 
-/** Arka planlar: her birinin farklı sahne öğeleri */
+/** Arka planlar: her birinin farklı sahne öğeleri (PRO/VIP temaları dahil) */
 export const ANIMATED_BG_STYLES: Record<string, {
   layers: string[];
-  scene: 'sun' | 'leaves' | 'stars' | 'aurora' | 'volcano';
+  scene: 'sun' | 'leaves' | 'stars' | 'aurora' | 'volcano' | 'sparkle' | 'neon' | 'galaxy';
 }> = {
   bg_sunset: { layers: ['#7C2D12', '#C2410C', '#F59E0B'], scene: 'sun' },
   bg_forest: { layers: ['#14532D', '#166534', '#4D7C0F'], scene: 'leaves' },
   bg_night_city: { layers: ['#0F172A', '#1E293B', '#334155'], scene: 'stars' },
   bg_aurora: { layers: ['#06283D', '#0B4F6C', '#0EA5A5'], scene: 'aurora' },
   bg_volcano: { layers: ['#1A0505', '#450A0A', '#7F1D1D'], scene: 'volcano' },
+  // PRO/VIP arka planları: altın parıltı, neon ışık ve galaksi tozu sahneleri
+  bg_pro_gold: { layers: ['#1C1206', '#3B2105', '#B8860B'], scene: 'sparkle' },
+  bg_vip_neon: { layers: ['#0A0020', '#2E1065', '#7C3AED'], scene: 'neon' },
+  bg_galaxy_vip: { layers: ['#0B0330', '#2E1065', '#6D28D9'], scene: 'galaxy' },
 };
 
 /* Rozetler: her rozet kimliğine özgü kalkan tasarımı (renk şeması + iç simge) */
@@ -314,6 +325,12 @@ export const ANIMATED_NAME_STYLES: Record<string, {
   name_gradient_ice: { colors: ['#A5F3FC', '#38BDF8', '#E0F2FE', '#38BDF8'], duration: 5000, glow: 6 },
   name_gradient_rainbow: { colors: ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#B197FC', '#FF6B6B'], duration: 3500, glow: 10 },
   name_gradient_fire: { colors: ['#FFE27A', '#FF9B2F', '#E11D48', '#FF9B2F'], duration: 2800, glow: 12 },
+  // Yeni isim efektleri: farklı tarzda, her biri 1 saatlik
+  name_emerald_vine: { colors: ['#6EE7B7', '#34D399', '#A7F3D0', '#059669'], duration: 4200, glow: 8 },
+  name_toxic_slime: { colors: ['#A3E635', '#7C3AED', '#84CC16', '#7C3AED'], duration: 2600, glow: 14 },
+  name_candy_heart: { colors: ['#F9A8D4', '#EC4899', '#FBCFE8', '#EC4899'], duration: 3000, glow: 9 },
+  name_void_shadow: { colors: ['#A78BFA', '#1E1B4B', '#6D28D9', '#A78BFA'], duration: 6000, glow: 16 },
+  name_plasma_bolt: { colors: ['#67E8F9', '#D946EF', '#22D3EE', '#D946EF'], duration: 2000, glow: 18 },
 };
 
 const PARTICLE_EMOJI: Record<string, string> = {
@@ -652,6 +669,78 @@ const VolcanoEmber: React.FC<{ x: number; delay: number; size: number; drift: nu
   return <Animated.View style={style} pointerEvents="none" />;
 };
 
+/** Altın parıltısı: PRO altın temasında yükselen ışıltılar */
+const GoldSparkle: React.FC<{ x: number; delay: number; size: number; drift: number }> = ({ x, delay, size, drift }) => {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withRepeat(
+      withSequence(withDelay(delay, withTiming(0, { duration: 0 })), withTiming(1, { duration: 5000 + (delay % 2000), easing: Easing.inOut(Easing.sin) })),
+      -1,
+      true,
+    );
+  }, [delay]);
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute',
+    left: x,
+    top: 10 + (1 - p.value) * drift,
+    width: size,
+    height: size * 0.35,
+    borderRadius: size,
+    backgroundColor: '#FFE27A',
+    opacity: 0.25 + 0.5 * Math.sin(p.value * Math.PI),
+    transform: [{ translateX: Math.sin(p.value * Math.PI * 4) * 10 }, { rotate: `${Math.sin(p.value * Math.PI * 2) * 45}deg` }],
+  }));
+  return <Animated.View style={style} pointerEvents="none" />;
+};
+
+/** Neon ışık huzmesi: VIP neon temasında sallanan mor-cyan huzmeler */
+const NeonBeam: React.FC<{ x: number; delay: number; width: number; height: number; color: string }> = ({ x, delay, width, height, color }) => {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withRepeat(
+      withTiming(1, { duration: 3600 + delay, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    );
+  }, [delay]);
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute',
+    left: x,
+    bottom: 0,
+    width,
+    height,
+    borderRadius: width,
+    backgroundColor: color,
+    opacity: 0.12 + 0.18 * Math.sin(p.value * Math.PI),
+    transform: [{ rotate: `${-18 + 10 * Math.sin(p.value * Math.PI * 2)}deg` }, { translateY: height * 0.12 * Math.sin(p.value * Math.PI * 3) }],
+  }));
+  return <Animated.View style={style} pointerEvents="none" />;
+};
+
+/** Galaksi tozu: VIP galaksi temasında süzülen mor-kuvars yıldız zerreleri */
+const GalaxyDust: React.FC<{ x: number; delay: number; size: number; drift: number }> = ({ x, delay, size, drift }) => {
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withRepeat(
+      withSequence(withDelay(delay, withTiming(0, { duration: 0 })), withTiming(1, { duration: 6000 + (delay % 3000), easing: Easing.inOut(Easing.sin) })),
+      -1,
+      true,
+    );
+  }, [delay]);
+  const style = useAnimatedStyle(() => ({
+    position: 'absolute',
+    left: x,
+    top: 10 + (1 - p.value) * drift,
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    backgroundColor: Math.floor(delay / 700) % 2 === 0 ? '#A78BFA' : '#67E8F9',
+    opacity: 0.15 + 0.55 * Math.sin(p.value * Math.PI),
+    transform: [{ translateX: Math.sin(p.value * Math.PI * 2) * 14 }],
+  }));
+  return <Animated.View style={style} pointerEvents="none" />;
+};
+
 /** Arka plan sahnesi: katmanlar + sahneye özgü canlı öğeler (telefon çerçevesi olmadan).
  *  Mağaza önizlemesinde, profil kartında ve uygulama genelinde kullanılır.
  *  width/height sayı olabileceği gibi '100%' gibi yüzde değer de olabilir (kendi kendine ölçer). */
@@ -697,6 +786,36 @@ export const BackgroundScene: React.FC<{ bgId: string; width: number | string; h
             [0.15, 0.35, 0.55, 0.75, 0.9].map((fx, i) => (
               <VolcanoEmber key={i} x={dims.w * fx} delay={i * 800} size={Math.max(4, dims.w * 0.05)} drift={dims.h * 0.8} />
             ))}
+          {def.scene === 'sparkle' &&
+            [0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 0.95].map((fx, i) => (
+              <GoldSparkle key={i} x={dims.w * fx} delay={i * 700} size={Math.max(6, dims.w * 0.07)} drift={dims.h * 0.9} />
+            ))}
+          {def.scene === 'neon' && (
+            <>
+              <NeonBeam x={dims.w * 0.05} delay={0} width={Math.max(8, dims.w * 0.12)} height={dims.h * 0.7} color="#D946EF" />
+              <NeonBeam x={dims.w * 0.4} delay={900} width={Math.max(6, dims.w * 0.09)} height={dims.h * 0.8} color="#22D3EE" />
+              <NeonBeam x={dims.w * 0.72} delay={1700} width={Math.max(8, dims.w * 0.12)} height={dims.h * 0.65} color="#D946EF" />
+              {[
+                [0.12, 0.12], [0.38, 0.2], [0.62, 0.08], [0.85, 0.18], [0.22, 0.32],
+                [0.52, 0.38], [0.9, 0.3], [0.05, 0.45],
+              ].map(([fx, fy], i) => (
+                <TwinkleStar key={`s-${i}`} x={dims.w * fx} y={dims.h * fy} delay={i * 600} size={Math.max(3, dims.w * 0.04)} />
+              ))}
+            </>
+          )}
+          {def.scene === 'galaxy' && (
+            <>
+              {[
+                [0.06, 0.1], [0.28, 0.05], [0.5, 0.12], [0.7, 0.08], [0.88, 0.15],
+                [0.16, 0.24], [0.6, 0.28], [0.35, 0.36], [0.92, 0.4], [0.08, 0.42],
+              ].map(([fx, fy], i) => (
+                <TwinkleStar key={`gs-${i}`} x={dims.w * fx} y={dims.h * fy} delay={i * 500} size={Math.max(3, dims.w * 0.042)} />
+              ))}
+              {[0.12, 0.32, 0.52, 0.72, 0.9].map((fx, i) => (
+                <GalaxyDust key={`gd-${i}`} x={dims.w * fx} delay={i * 900} size={Math.max(5, dims.w * 0.06)} drift={dims.h * 0.85} />
+              ))}
+            </>
+          )}
         </>
       )}
     </View>

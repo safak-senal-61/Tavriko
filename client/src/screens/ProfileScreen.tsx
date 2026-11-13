@@ -16,7 +16,7 @@ import {
 import Animated, { FadeInRight, FadeInUp, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
-import { UserProfile, UserSettings, calculateLevelFromXp } from '@trivia/shared';
+import { UserProfile, UserSettings, calculateLevelFromXp, getBadgeDef } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
@@ -39,7 +39,7 @@ import {
   AVATAR_PRESETS,
   AvatarPreset,
 } from '../components/TavrikoIcons';
-import { UI_IMG, FloatingImage, ShimmerView, CATEGORY_IMG, FramedAvatar, AnimatedFrame, AnimatedNameText, ANIMATED_FRAME_COLORS, backgroundFor, BackgroundScene } from '../components/StoreKit';
+import { UI_IMG, FloatingImage, ShimmerView, CATEGORY_IMG, FramedAvatar, AnimatedFrame, AnimatedNameText, ANIMATED_FRAME_COLORS, backgroundFor, BackgroundScene, storeImageFor, BadgeVisual } from '../components/StoreKit';
 import { DISCOVERY_IMG, PROFILE_IMG, DiscoveryArtwork, AchievementState } from '../components/DiscoveryArtwork';
 import { Settings, UserRound } from 'lucide-react-native';
 import { PreferenceSwitch } from '../components/PreferenceSwitch';
@@ -52,6 +52,27 @@ try {
 } catch {
   ImagePickerModule = null;
 }
+
+/** Kuşanılı kozmetiğin kalan süresi: her saniye güncellenen canlı sayaç */
+const CosmeticCountdown: React.FC<{ expiresAt: number | undefined; style?: any }> = ({ expiresAt, style }) => {
+  const [left, setLeft] = useState<number>(() => Math.max(0, (expiresAt || 0) - Date.now()));
+  useEffect(() => {
+    if (!expiresAt) return;
+    const t = setInterval(() => setLeft(Math.max(0, expiresAt - Date.now())), 1000);
+    return () => clearInterval(t);
+  }, [expiresAt]);
+  if (!expiresAt || left <= 0) return null;
+  const totalSec = Math.floor(left / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const text = h > 0 ? `${h}s ${String(m).padStart(2, '0')}dk` : `${m}dk ${String(s).padStart(2, '0')}sn`;
+  return (
+    <Text style={[{ color: '#FFD98A', fontSize: 10, fontFamily: THEME.fonts.bold }, style]} numberOfLines={1}>
+      ⏳ {text}
+    </Text>
+  );
+};
 
 // Vector Icon Components (No cheap AI emojis)
 const EditPencilIcon: React.FC<{ size?: number; color?: string }> = ({ size = 16, color = '#FFC43D' }) => (
@@ -269,9 +290,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const activeBadge = cosmeticActive(user.equippedBadge, user.equippedBadgeExpiresAt);
   const activeBg = cosmeticActive(user.equippedBackground, user.equippedBackgroundExpiresAt);
   const activeBgIsImage = activeBg ? !!backgroundFor(activeBg) : false;
-  const badgeName = activeBadge
-    ? (user.inventory?.find((i) => i.id === activeBadge)?.name) || null
-    : null;
+  const badgeDef = activeBadge ? getBadgeDef(activeBadge) : null;
+  const badgeName = badgeDef?.name || (user.inventory?.find((i) => i.id === activeBadge)?.name) || null;
 
   // Live WebSocket connection polling & heartbeat
   useEffect(() => {
@@ -750,10 +770,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
               <View style={styles.heroBadgesRow}>
                 {badgeName && (
-                  <View style={styles.titlePill}>
-                    <Text style={styles.titlePillText} numberOfLines={1}>
-                      🛡️ {badgeName}
-                    </Text>
+                  <View style={[styles.titlePill, { gap: 6 }]}>
+                    {/* Rozet görseli: mağazadaki gerçek rozet ikonu */}
+                    {(() => {
+                      const img = activeBadge ? storeImageFor(activeBadge) : null;
+                      return img ? (
+                        <Image source={img} style={{ width: 26, height: 26, flexShrink: 0 }} resizeMode="contain" accessibilityLabel={`${badgeName} rozeti`} />
+                      ) : (
+                        <BadgeVisual badgeId={activeBadge || ''} size={24} />
+                      );
+                    })()}
+                    <View style={{ flexShrink: 1 }}>
+                      <Text style={styles.titlePillText} numberOfLines={1}>
+                        {badgeName}
+                      </Text>
+                      <CosmeticCountdown expiresAt={user.equippedBadgeExpiresAt} />
+                    </View>
                   </View>
                 )}
                 <View style={styles.titlePill}>

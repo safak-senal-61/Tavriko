@@ -1,13 +1,14 @@
 // ============================================================================
-// TAVRIKO — Cosmetic Definitions (Frame / Background / Name Effect)
+// TAVRIKO — Cosmetic Definitions (Frame / Background / Name Effect / Badge)
 // ============================================================================
-// Süreli (rental) profil kozmetikleri: her profil kozmetiği 30 gün geçerlidir.
-// Süre bitince sunucu ve istemci otomatik olarak eşyayı düşürür.
+// Süreli (rental) profil kozmetikleri: WePlay tarzı her kozmetik 1 SAAT
+// geçerlidir. Kuşanılınca süre başlar; süre bitince sunucu ve istemci
+// otomatik olarak eşyayı düşürür (envanter kartındaki bar da biter).
 // ----------------------------------------------------------------------------
 import type { ItemRarity } from './types';
 
-export const COSMETIC_RENTAL_DAYS = 30;
-export const COSMETIC_RENTAL_MS = COSMETIC_RENTAL_DAYS * 24 * 60 * 60 * 1000;
+export const COSMETIC_RENTAL_HOURS = 1;
+export const COSMETIC_RENTAL_MS = COSMETIC_RENTAL_HOURS * 60 * 60 * 1000;
 
 export type CosmeticKind = 'frame' | 'background' | 'name_effect' | 'badge';
 
@@ -70,10 +71,23 @@ export interface CosmeticDef {
     nameColor?: string;
     nameColor2?: string;
     /** İsim parıltı efektinin türü */
-    nameGlow?: 'gold' | 'fire' | 'ice' | 'rainbow' | 'none';
+    nameGlow?: 'gold' | 'fire' | 'ice' | 'rainbow' | 'emerald' | 'toxic' | 'candy' | 'shadow' | 'plasma' | 'none';
     /** Animasyon etiketi (CSS'e taşınmaz, sadece bilgi) */
     anim?: 'flame' | 'pulse' | 'shimmer' | 'none';
     icon?: string;
+    /**
+     * Pro/VIP temaları: yalnızca arka plan değil, uygulama arayüzünün bazı
+     * yerlerini (üst parlama, alt ışık küreleri, vurgu rengi) süresi boyunca
+     * değiştirir. Süre bitince arayüz otomatik eski haline döner.
+     */
+    ui?: {
+      /** Ana vurgu rengi (parlama halkaları, çerçeve parıltıları) */
+      accent: string;
+      /** İkincil vurgu rengi */
+      accent2: string;
+      /** Arka plan üst katman tonu */
+      bgTint: string;
+    };
   };
 }
 
@@ -200,6 +214,49 @@ export const BACKGROUND_DEFS: CosmeticDef[] = [
       icon: '🌃',
     },
   },
+  // --- YENİ: Pro/VIP Temaları (arayüzü de değiştirir) ---
+  {
+    id: 'bg_pro_gold',
+    kind: 'background',
+    name: 'Pro Altın Kraliyet Teması',
+    desc: 'Altın yağmuru ve kraliyet parıltısı: profilin ve uygulamanın tamamı 1 saat boyunca altın kraliyet temasına bürünür.',
+    rarity: 'mythic',
+    visual: {
+      bgColor: '#3B2105',
+      bgColor2: '#B8860B',
+      anim: 'shimmer',
+      icon: '👑',
+      ui: { accent: '#FFC43D', accent2: '#FFE27A', bgTint: 'rgba(255, 196, 61, 0.10)' },
+    },
+  },
+  {
+    id: 'bg_vip_neon',
+    kind: 'background',
+    name: 'VIP Neon Teması',
+    desc: 'Siberpunk neon şehir: mor-cyan neon ışıklarla profil ve uygulama arayüzü 1 saat boyunca VIP moduna geçer.',
+    rarity: 'legendary',
+    visual: {
+      bgColor: '#12002E',
+      bgColor2: '#7C3AED',
+      anim: 'pulse',
+      icon: '💜',
+      ui: { accent: '#D946EF', accent2: '#22D3EE', bgTint: 'rgba(217, 70, 239, 0.08)' },
+    },
+  },
+  {
+    id: 'bg_galaxy_vip',
+    kind: 'background',
+    name: 'Galaksi VIP Teması',
+    desc: 'Yıldız tozu ve nebula: tüm uygulama arayüzü 1 saat boyunca derin galaksi moru-kuvars VIP temasına döner.',
+    rarity: 'mythic',
+    visual: {
+      bgColor: '#0B0330',
+      bgColor2: '#6D28D9',
+      anim: 'shimmer',
+      icon: '🌌',
+      ui: { accent: '#8B5CF6', accent2: '#67E8F9', bgTint: 'rgba(139, 92, 246, 0.09)' },
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -244,12 +301,116 @@ export const NAME_EFFECT_DEFS: CosmeticDef[] = [
       icon: '🌈',
     },
   },
+  // --- YENİ: Farklı tarzlarda isim efektleri (hepsi 1 saatlik) ---
+  {
+    id: 'name_emerald_vine',
+    kind: 'name_effect',
+    name: 'Zümrüt Sarmaşık İsmi',
+    desc: 'Işıldayan zümrüt yeşili yapraklarla isminizi süsler.',
+    rarity: 'rare',
+    visual: { nameColor: '#6EE7B7', nameColor2: '#059669', nameGlow: 'emerald', anim: 'pulse', icon: '🌿' },
+  },
+  {
+    id: 'name_toxic_slime',
+    kind: 'name_effect',
+    name: 'Toksik Slime İsmi',
+    desc: 'Asit yeşili ve moru karışan radyoaktif slime parıltısı.',
+    rarity: 'epic',
+    visual: { nameColor: '#A3E635', nameColor2: '#7C3AED', nameGlow: 'toxic', anim: 'flame', icon: '☢️' },
+  },
+  {
+    id: 'name_candy_heart',
+    kind: 'name_effect',
+    name: 'Şeker Pembe İsmi',
+    desc: 'Pembe şeker kalp gradyanıyla tatlı bir parıltı.',
+    rarity: 'epic',
+    visual: { nameColor: '#F9A8D4', nameColor2: '#EC4899', nameGlow: 'candy', anim: 'shimmer', icon: '🍬' },
+  },
+  {
+    id: 'name_void_shadow',
+    kind: 'name_effect',
+    name: 'Boşluk Gölgesi İsmi',
+    desc: 'Karanlık evrenin derin mor gölgesiyle isminizi gizemli kılar.',
+    rarity: 'legendary',
+    visual: { nameColor: '#A78BFA', nameColor2: '#1E1B4B', nameGlow: 'shadow', anim: 'pulse', icon: '🌑' },
+  },
+  {
+    id: 'name_plasma_bolt',
+    kind: 'name_effect',
+    name: 'Plazma Yıldırımı İsmi',
+    desc: 'Elektrik mavisi plazma yıldırımlarıyla isminizi çarpar.',
+    rarity: 'mythic',
+    visual: { nameColor: '#67E8F9', nameColor2: '#D946EF', nameGlow: 'plasma', anim: 'flame', icon: '⚡' },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// ROZETLER (satın alınabilir, 1 saatlik)
+// ---------------------------------------------------------------------------
+export const BADGE_DEFS: CosmeticDef[] = [
+  {
+    id: 'badge_trivia_master',
+    kind: 'badge',
+    name: 'Bilgi Efendisi Rozeti',
+    desc: 'Prestijli altın bilgi şövalyesi mührü. 1 saat geçerlidir.',
+    rarity: 'epic',
+    visual: { icon: '🛡️' },
+  },
+  {
+    id: 'badge_speed_demon',
+    kind: 'badge',
+    name: 'Hız Canavarı Rozeti',
+    desc: 'Refleks ustalarına özel turkuaz hız mührü. 1 saat geçerlidir.',
+    rarity: 'epic',
+    visual: { icon: '⚡' },
+  },
+  {
+    id: 'badge_champion',
+    kind: 'badge',
+    name: 'Şampiyon Kupası Rozeti',
+    desc: 'Zirvedeki oyuncuların kızıl-altın şampiyonluk mührü. 1 saat geçerlidir.',
+    rarity: 'legendary',
+    visual: { icon: '🏆' },
+  },
+  {
+    id: 'badge_night_owl',
+    kind: 'badge',
+    name: 'Gece Kuşu Rozeti',
+    desc: 'Ay ve yıldızlı gece mavisi mühür. 1 saat geçerlidir.',
+    rarity: 'rare',
+    visual: { icon: '🌙' },
+  },
+  {
+    id: 'badge_veteran',
+    kind: 'badge',
+    name: 'Kıdemli Oyuncu Rozeti',
+    desc: 'Bronz-vintage kıdem madalyası. 1 saat geçerlidir.',
+    rarity: 'rare',
+    visual: { icon: '🎖️' },
+  },
+  {
+    id: 'badge_genius',
+    kind: 'badge',
+    name: 'Dahi Beyin Rozeti',
+    desc: 'Sinaps parıltılı turkuaz-beyaz dahi mührü. 1 saat geçerlidir.',
+    rarity: 'epic',
+    visual: { icon: '🧠' },
+  },
+  {
+    id: 'badge_season_1_champ',
+    kind: 'badge',
+    name: 'Sezon 1 Şampiyonu Rozeti',
+    desc: 'Sezon 1’i tamamlayanların efsanevi mührü. 1 saat geçerlidir.',
+    rarity: 'legendary',
+    visual: { icon: '👑' },
+  },
 ];
 
 export const COSMETIC_DEFS: CosmeticDef[] = [
   ...FRAME_DEFS,
   ...BACKGROUND_DEFS,
   ...NAME_EFFECT_DEFS,
+  ...BADGE_DEFS,
 ];
 
 export function getCosmeticDef(id: string | undefined | null): CosmeticDef | null {
@@ -270,6 +431,11 @@ export function getBackgroundDef(id: string | undefined | null): CosmeticDef | n
 export function getNameEffectDef(id: string | undefined | null): CosmeticDef | null {
   const d = getCosmeticDef(id);
   return d && d.kind === 'name_effect' ? d : null;
+}
+
+export function getBadgeDef(id: string | undefined | null): CosmeticDef | null {
+  const d = getCosmeticDef(id);
+  return d && d.kind === 'badge' ? d : null;
 }
 
 /**

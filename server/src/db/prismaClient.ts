@@ -115,6 +115,10 @@ export interface UserRecord {
   blockedUserIds?: string[];
   /** 2x XP artırıcı bitiş zamanı (ms epoch) — settings.xpBoosterExpiresAt ile kalıcı saklanır */
   activeBoosterExpiresAt?: number;
+  /** 3x XP iksiri bitiş zamanı (ms epoch) — settings.xp3BoosterExpiresAt ile kalıcı saklanır */
+  xp3BoosterExpiresAt?: number;
+  /** 2x Altın iksiri bitiş zamanı (ms epoch) — settings.coinBoosterExpiresAt ile kalıcı saklanır */
+  coinBoosterExpiresAt?: number;
   eventProgress?: Record<string, { started?: boolean; startedAt?: number; progress: number; completed: boolean; claimed: boolean }>;
   friendIds?: string[];
   notifications?: NotificationItem[];
@@ -672,6 +676,20 @@ export class PrismaService {
         if (raw === null || raw === undefined) return undefined;
         if (typeof raw === 'number') return raw; // Eski kayıtlar: epoch ms
         const parsed = new Date(raw).getTime(); // Yeni format: ISO string
+        return Number.isFinite(parsed) ? parsed : undefined;
+      })(),
+      xp3BoosterExpiresAt: (() => {
+        const raw = (u as any).settings?.xp3BoosterExpiresAt;
+        if (raw === null || raw === undefined) return undefined;
+        if (typeof raw === 'number') return raw;
+        const parsed = new Date(raw).getTime();
+        return Number.isFinite(parsed) ? parsed : undefined;
+      })(),
+      coinBoosterExpiresAt: (() => {
+        const raw = (u as any).settings?.coinBoosterExpiresAt;
+        if (raw === null || raw === undefined) return undefined;
+        if (typeof raw === 'number') return raw;
+        const parsed = new Date(raw).getTime();
         return Number.isFinite(parsed) ? parsed : undefined;
       })(),
       eventProgress: (u as any).eventProgress || {},
@@ -2486,18 +2504,27 @@ export class PrismaService {
       difficulty: delta.difficulty,
     });
 
-    // 2x XP artırıcı: aktifken maçtan kazanılan XP 2 katına çıkar (1v1, özel oda vb. tüm maçlar).
-    const boosterActive = (record.activeBoosterExpiresAt || 0) > Date.now();
-    const appliedXp = boosterActive ? baseRewards.xp * 2 : baseRewards.xp;
+    // Güçlendiriciler: aktifken kazançlar artar (tüm maçlar).
+    // - 2x XP iksiri (booster_xp_2x_1h) → XP x2
+    // - 3x XP iksiri (booster_xp_3x_1h) → XP x3
+    // - 2x Altın iksiri (booster_coin_2x_1h / _24h) → Altın x2
+    // İksirler envanterden kuşanıldığı anda süreleri başlar (1 saat / 24 saat).
+    const xp2Active = (record.activeBoosterExpiresAt || 0) > Date.now();
+    const xp3Active = (record.xp3BoosterExpiresAt || 0) > Date.now();
+    const coin2Active = (record.coinBoosterExpiresAt || 0) > Date.now();
+    const xpMultiplier = xp3Active ? 3 : xp2Active ? 2 : 1;
+    const coinMultiplier = coin2Active ? 2 : 1;
+    const appliedXp = baseRewards.xp * xpMultiplier;
+    const appliedCoins = baseRewards.coins * coinMultiplier;
     record.xp += appliedXp;
-    record.coins += baseRewards.coins;
+    record.coins += appliedCoins;
     record.seasonXp = (record.seasonXp || 0) + baseRewards.seasonXp;
 
     const appliedRewards: AppliedMatchRewards = {
       xp: appliedXp,
-      coins: baseRewards.coins,
+      coins: appliedCoins,
       seasonXp: baseRewards.seasonXp,
-      boosted: boosterActive && baseRewards.xp > 0,
+      boosted: (xpMultiplier > 1 && baseRewards.xp > 0) || (coinMultiplier > 1 && baseRewards.coins > 0),
       lp: 0,
     };
 
@@ -4807,29 +4834,29 @@ export class PrismaService {
       keyItem.qty -= 1;
     }
 
-    // Kozmetikler tüketilmez; kuşanılır ve envanterde kalır.
-    const isCosmetic = ['frame_', 'bg_', 'name_', 'badge_'].some((p) => itemId.startsWith(p));
-    if (!isCosmetic) {
-      item.qty -= 1;
-    }
+    // WePlay tarzı süreli model: kozmetikler de kuşanıldığında TÜKETİLİR (1 kopya
+    // harcanır) ve 1 saatlik süre başlar. Süre bitince eşya düşer; yeniden
+    // kullanmak için mağazadan tekrar alınmalıdır.
+    item.qty -= 1;
+
     let rewardText = `${item.name} kullanıldı!`;
 
     if (itemId.startsWith('frame_')) {
       record.equippedFrame = itemId;
       record.equippedFrameExpiresAt = Date.now() + COSMETIC_RENTAL_MS;
-      rewardText = `${item.name} profilinize uygulandı!`;
+      rewardText = `${item.name} profilinize uygulandı! 1 saat boyunca aktif.`;
     } else if (itemId.startsWith('bg_')) {
       record.equippedBackground = itemId;
       record.equippedBackgroundExpiresAt = Date.now() + COSMETIC_RENTAL_MS;
-      rewardText = `${item.name} profilinize ve uygulamaya uygulandı!`;
+      rewardText = `${item.name} profilinize ve uygulamaya uygulandı! 1 saat boyunca aktif.`;
     } else if (itemId.startsWith('name_')) {
       record.equippedNameEffect = itemId;
       record.equippedNameEffectExpiresAt = Date.now() + COSMETIC_RENTAL_MS;
-      rewardText = `${item.name} profilinize uygulandı!`;
+      rewardText = `${item.name} profilinize uygulandı! 1 saat boyunca aktif.`;
     } else if (itemId.startsWith('badge_')) {
       record.equippedBadge = itemId;
       record.equippedBadgeExpiresAt = Date.now() + COSMETIC_RENTAL_MS;
-      rewardText = `${item.name} profilinize uygulandı!`;
+      rewardText = `${item.name} profilinize uygulandı! 1 saat boyunca aktif.`;
     } else if (itemId === 'chest' || itemId === 'gift') {
       record.coins += 200;
       record.gems = (record.gems || 0) + 10;
@@ -4842,14 +4869,27 @@ export class PrismaService {
       record.coins += 100;
       rewardText = '+100 Altın hesabına eklendi!';
     } else if (itemId.startsWith('booster')) {
-      // 2x XP artırıcı: anında XP VERMEZ; süre boyunca maçlardan kazanılan XP 2 katına çıkar.
+      // İksirler anında XP vermez; süre boyunca maçlardan kazanılan ödülü çarparlar.
       const durationMs = itemId.includes('24h') ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000;
-      const base = Math.max(Date.now(), record.activeBoosterExpiresAt || 0);
-      record.activeBoosterExpiresAt = base + durationMs;
-      // Kalıcılık: serverless yeniden başlamalarda kaybolmaması için settings jsonb'ye yaz.
-      record.settings = { ...(record.settings || {}), xpBoosterExpiresAt: new Date(record.activeBoosterExpiresAt).toISOString() };
       const mins = Math.round(durationMs / 60000);
-      rewardText = `⚡ 2x XP artırıcı aktif! ${mins >= 60 ? `${Math.round(mins / 60)} saat` : `${mins} dakika`} boyunca maçlardan kazanacağın XP 2 katına çıkar.`;
+      const durText = mins >= 60 ? `${Math.round(mins / 60)} saat` : `${mins} dakika`;
+      if (itemId.startsWith('booster_xp_3x')) {
+        const base = Math.max(Date.now(), record.xp3BoosterExpiresAt || 0);
+        record.xp3BoosterExpiresAt = base + durationMs;
+        record.settings = { ...(record.settings || {}), xp3BoosterExpiresAt: new Date(record.xp3BoosterExpiresAt).toISOString() };
+        rewardText = `⚡ 3x XP iksiri aktif! ${durText} boyunca maçlardan kazanacağın XP 3 katına çıkar.`;
+      } else if (itemId.startsWith('booster_coin')) {
+        const base = Math.max(Date.now(), record.coinBoosterExpiresAt || 0);
+        record.coinBoosterExpiresAt = base + durationMs;
+        record.settings = { ...(record.settings || {}), coinBoosterExpiresAt: new Date(record.coinBoosterExpiresAt).toISOString() };
+        rewardText = `🪙 2x Altın iksiri aktif! ${durText} boyunca maçlardan kazanacağın Altın 2 katına çıkar.`;
+      } else {
+        // booster_xp_2x (mevcut): 2x XP
+        const base = Math.max(Date.now(), record.activeBoosterExpiresAt || 0);
+        record.activeBoosterExpiresAt = base + durationMs;
+        record.settings = { ...(record.settings || {}), xpBoosterExpiresAt: new Date(record.activeBoosterExpiresAt).toISOString() };
+        rewardText = `⚡ 2x XP artırıcı aktif! ${durText} boyunca maçlardan kazanacağın XP 2 katına çıkar.`;
+      }
     } else {
       record.xp += 30;
       rewardText = `${item.name} aktif edildi: +30 XP kazandın!`;
@@ -4858,6 +4898,9 @@ export class PrismaService {
     const prog = calculateLevelFromXp(record.xp);
     record.level = prog.level;
     record.rankTitle = prog.rankTitle;
+
+    // Tükenen eşyalar (kozmetik/iksir kuşanımları dahil) envanterden düşer:
+    record.inventory = (record.inventory || []).filter((inv) => inv.qty > 0);
 
     this.users.set(userId, record);
     this.users.set(record.id, record);
@@ -4884,8 +4927,19 @@ export class PrismaService {
             updatedAt: new Date(),
           },
         });
+        // Kuşanılan kozmetik/iksir envanterden düştü: PostgreSQL'e de yansıt
+        if (item.qty <= 0) {
+          await this.rawClient.userInventoryItem.deleteMany({
+            where: { userId: record.id, itemId },
+          }).catch(() => {});
+        } else {
+          await this.rawClient.userInventoryItem.update({
+            where: { userId_itemId: { userId: record.id, itemId } },
+            data: { qty: item.qty, updatedAt: new Date() },
+          }).catch(() => {});
+        }
       } catch (err) {
-        console.error('[openChest] DB update error:', err);
+        console.error('[useInventoryItem] DB update error:', err);
       }
     }
     return { user: this.toProfile(record), rewardText };
@@ -5168,10 +5222,22 @@ export class PrismaService {
           });
         }
 
-        // Satın alınan kozmetik anında profile uygulanır (otomatik kuşanma).
-        // Süreli (rental) ürünlerde 30 günlük expiresAt atanır; kalıcı ürünlerde süre yoktur.
-        const isRental = product.badge === '30 GÜN';
+        // Satın alınan kozmetik anında profile uygulanır (otomatik kuşanma) ve
+        // WePlay tarzı süreli modelde kuşanım 1 kopya harcar: envantere eklenir,
+        // hemen kuşanıldığı için 1 adet düşürülür. Süre 1 saattir (badge '1
+        // SAAT' / 'PRO' / 'VIP'); süre bitince kozmetik otomatik düşer.
+        const isRental = product.badge === '1 SAAT' || product.badge === 'PRO' || product.badge === 'VIP';
         const expiresAt = isRental ? Date.now() + COSMETIC_RENTAL_MS : undefined;
+        const isCosmetic = item.category === 'frame' || item.category === 'background' ||
+          item.category === 'name_effect' || item.category === 'badge';
+        if (isCosmetic) {
+          // Otomatik kuşanım 1 kopya tüketir
+          const cosItem = record.inventory.find((i) => i.id === item.id);
+          if (cosItem) {
+            cosItem.qty = Math.max(0, cosItem.qty - 1);
+          }
+          record.inventory = (record.inventory || []).filter((i) => i.qty > 0);
+        }
         if (item.category === 'frame' && item.id.startsWith('frame_')) {
           record.equippedFrame = item.id;
           record.equippedFrameExpiresAt = expiresAt;
@@ -5191,27 +5257,35 @@ export class PrismaService {
 
         if (!record.isGuest) {
           try {
-            await this.rawClient.userInventoryItem.upsert({
-              where: {
-                userId_itemId: {
+            // Envanterdeki güncel (tüketime göre düzeltilmiş) adetla senkronize et
+            const currentQty = record.inventory.find((i) => i.id === item.id)?.qty ?? 0;
+            if (currentQty <= 0) {
+              await this.rawClient.userInventoryItem.deleteMany({
+                where: { userId: record.id, itemId: item.id },
+              });
+            } else {
+              await this.rawClient.userInventoryItem.upsert({
+                where: {
+                  userId_itemId: {
+                    userId: record.id,
+                    itemId: item.id,
+                  },
+                },
+                update: {
+                  qty: currentQty,
+                  name: item.name,
+                  desc: item.desc,
+                  updatedAt: new Date(),
+                },
+                create: {
                   userId: record.id,
                   itemId: item.id,
+                  name: item.name,
+                  desc: item.desc,
+                  qty: currentQty,
                 },
-              },
-              update: {
-                qty: { increment: item.qty },
-                name: item.name,
-                desc: item.desc,
-                updatedAt: new Date(),
-              },
-              create: {
-                userId: record.id,
-                itemId: item.id,
-                name: item.name,
-                desc: item.desc,
-                qty: item.qty,
-              },
-            });
+              });
+            }
           } catch (itemErr) {
             console.error('[purchaseShopProduct] DB inventory upsert error:', itemErr);
           }
@@ -5735,6 +5809,8 @@ export class PrismaService {
       equippedBackgroundExpiresAt: record.equippedBackgroundExpiresAt,
       blockedUserIds: record.blockedUserIds || [],
       activeBoosterExpiresAt: record.activeBoosterExpiresAt,
+      xp3BoosterExpiresAt: record.xp3BoosterExpiresAt,
+      coinBoosterExpiresAt: record.coinBoosterExpiresAt,
       // İç defter (__matchLedger) istemciye gönderilmez
       eventProgress: Object.fromEntries(
         Object.entries(record.eventProgress || {}).filter(([k]) => k !== '__matchLedger')
