@@ -180,6 +180,20 @@ export class SocketService {
     return !!(this.presenceWs && this.presenceWs.readyState === (typeof WebSocket !== 'undefined' ? WebSocket.OPEN : 1));
   }
 
+  /**
+   * İnternet geri döndüğünde güvenli yeniden bağlanma: manuel kapatılmadıysa ve
+   * son URL biliniyorsa aynı oturuma (oda / matchmaking / presence) döner.
+   * `connect()` çağırmak yerine bu kullanılır ki hedef URL bozulmasın.
+   */
+  public ensureConnected(): void {
+    if (this.isManuallyClosed || !this.currentUrl) return;
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    this.reconnectAttempts = 0;
+    this.initWebSocket(this.currentUrl);
+  }
+
   public connect(url?: string): any {
     this.isManuallyClosed = false;
     const targetUrl = url || getRealtimeWsUrl('/ws');

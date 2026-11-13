@@ -4,3 +4,8 @@ client/assets/images
 client/assets/sounds
 client/assets/music
 cdn
+
+# Web derlemesi (client/dist) Vercel build sırasında `expo export` ile baştan
+# üretilir; depodaki eski derleme çıktısındaki kalıntı assetlerin yüklenmesi
+# engellenir (taze derleme çıktısı bu filtreden etkilenmez).
+client/dist/assets/assets

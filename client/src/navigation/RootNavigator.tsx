@@ -73,6 +73,9 @@ import { captureProfileLink, clearPendingProfileCode, getPendingProfileCode } fr
 import { captureRoomLink, clearPendingRoomCode } from '../utils/roomLink';
 import { ProfileInspectModal, PublicProfileCard } from '../components/ProfileInspectModal';
 import { DeveloperScreen } from '../screens/DeveloperScreen';
+import { ConnectionStatusOverlay } from '../components/ConnectionStatusOverlay';
+import { useNetStatus, OFFLINE_GAME_GRACE_MS } from '../store/netStatus';
+import { netMonitor } from '../services/netMonitor';
 export type ScreenName =
   | 'splash'
   | 'auth'
@@ -120,6 +123,15 @@ const API_BASE = DEFAULT_API_BASE;
 const DUEL_CATEGORY: CategoryId = 'mixed';
 const DUEL_DIFFICULTY = 'mixed';
 const DUEL_TOTAL_ROUNDS = 15;
+// İnternet kopunca oyuncunun oyunda tutulduğu koruma süresi (OFFLINE_GAME_GRACE_MS,
+// store/netStatus'tan) ve bu sürenin geçerli olduğu oyun ekranları.
+const GAME_SESSION_SCREENS: ScreenName[] = [
+  'quiz_arena',
+  'lobby',
+  'intermission',
+  'duel_versus',
+  'matchmaking',
+];
 export const RootNavigator: React.FC = () => {
   const [pendingReferral, setPendingReferral] = useState(() => captureReferralLink());
   const { width: windowWidth } = useWindowDimensions();
@@ -151,6 +163,8 @@ export const RootNavigator: React.FC = () => {
     : 'splash';
 
   const [currentScreen, setCurrentScreen] = useState<ScreenName>(initialScreen);
+  // İnternet bağlantısı durumu (netMonitor besler; overlay + oyun koruma süresi)
+  const netOnline = useNetStatus((s) => s.online);
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('general_culture');
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>('medium');
@@ -998,6 +1012,45 @@ export const RootNavigator: React.FC = () => {
 
     navigateTo(isGuest ? 'categories' : 'home');
   }, [user, isGuest, clearAllGameTimers, resetGame]);
+
+  // -------------------------------------------------------------
+  // İnternet kopması: uygulama genelinde bildirim + oyun koruma süresi
+  // -------------------------------------------------------------
+  // İnternet koptuğunda oyuncu hemen düşürülmez: oyun ekranlarında
+  // OFFLINE_GAME_GRACE_MS boyunca oyunda kalır (üstteki şık kapsül geri sayar).
+  // Süre dolarsa ve bağlantı hâlâ yoksa oyundan çıkarılır ve Yeniden Bağlan
+  // ekranına yönlendirilir. Bağlantı dönerse süre iptal edilir ve socket
+  // otomatik olarak aynı oturuma geri bağlanır.
+  useEffect(() => {
+    netMonitor.start();
+  }, []);
+
+  useEffect(() => {
+    const netStore = useNetStatus.getState();
+    if (netOnline) {
+      netStore.setGraceEndsAt(null);
+      socketService.ensureConnected();
+      return;
+    }
+    if (!GAME_SESSION_SCREENS.includes(currentScreen)) {
+      netStore.setGraceEndsAt(null);
+      return;
+    }
+    netStore.setGraceEndsAt(Date.now() + OFFLINE_GAME_GRACE_MS);
+    const kickTimer = setTimeout(() => {
+      if (useNetStatus.getState().online) return;
+      // Bu sürede oyuncu oyundan manuel ayrıldıysa düşürme
+      if (!GAME_SESSION_SCREENS.includes(currentScreenRef.current)) {
+        useNetStatus.getState().setGraceEndsAt(null);
+        return;
+      }
+      sound.triggerHaptic('warning');
+      handleExitCurrentGame();
+      navigateTo('reconnect');
+    }, OFFLINE_GAME_GRACE_MS + 250);
+    return () => clearTimeout(kickTimer);
+  }, [netOnline, currentScreen, handleExitCurrentGame]);
+
 
   const handleStartQuickMatch = () => {
     requireAuth(() => {
@@ -2359,6 +2412,9 @@ export const RootNavigator: React.FC = () => {
         {currentScreen !== 'notifications' && user && !isGuest && (
           <NotificationToast onOpen={() => navigateTo('notifications')} />
         )}
+
+        {/* İnternet durumu kapsülü: her ekranda görünür, akışı engellemez */}
+        <ConnectionStatusOverlay suppress={currentScreen === 'reconnect'} />
       </View>
 
       {/* Modern oyun uyarı modalı (alt kategoride soru yok vb.)
