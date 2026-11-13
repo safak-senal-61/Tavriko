@@ -38,6 +38,10 @@ import {
   UserSettings,
   canonicalCategoryId,
   COSMETIC_RENTAL_MS,
+  getShopDuration,
+  isCosmeticProduct,
+  shopPriceForDuration,
+  SEASON_REWARD_HOURS,
   FinalMatchSummary,
   isRankedMatch,
 } from '@trivia/shared';
@@ -599,6 +603,7 @@ export class PrismaService {
         qty: item.qty,
         category: this.getItemCategory(item.itemId),
         rarity: this.getItemRarity(item.itemId),
+        durationHours: item.durationHours ?? undefined,
       }));
     }
 
@@ -4835,28 +4840,33 @@ export class PrismaService {
     }
 
     // WePlay tarzı süreli model: kozmetikler de kuşanıldığında TÜKETİLİR (1 kopya
-    // harcanır) ve 1 saatlik süre başlar. Süre bitince eşya düşer; yeniden
-    // kullanmak için mağazadan tekrar alınmalıdır.
+    // harcanır) ve kopyanın süresi başlar (satın alırken seçilen süreye göre 1
+    // saatten 1 aya kadar). Süre bitince eşya düşer; yeniden kullanmak için
+    // mağazadan tekrar alınmalıdır.
     item.qty -= 1;
+    const rentalMs = (item.durationHours && item.durationHours > 0 ? item.durationHours : 1) * 60 * 60 * 1000;
+    const rentalLabel = rentalMs >= 24 * 60 * 60 * 1000
+      ? `${Math.round(rentalMs / (24 * 60 * 60 * 1000))} gün`
+      : `${Math.round(rentalMs / (60 * 60 * 1000))} saat`;
 
     let rewardText = `${item.name} kullanıldı!`;
 
     if (itemId.startsWith('frame_')) {
       record.equippedFrame = itemId;
-      record.equippedFrameExpiresAt = Date.now() + COSMETIC_RENTAL_MS;
-      rewardText = `${item.name} profilinize uygulandı! 1 saat boyunca aktif.`;
+      record.equippedFrameExpiresAt = Date.now() + rentalMs;
+      rewardText = `${item.name} profilinize uygulandı! ${rentalLabel} boyunca aktif.`;
     } else if (itemId.startsWith('bg_')) {
       record.equippedBackground = itemId;
-      record.equippedBackgroundExpiresAt = Date.now() + COSMETIC_RENTAL_MS;
-      rewardText = `${item.name} profilinize ve uygulamaya uygulandı! 1 saat boyunca aktif.`;
+      record.equippedBackgroundExpiresAt = Date.now() + rentalMs;
+      rewardText = `${item.name} profilinize ve uygulamaya uygulandı! ${rentalLabel} boyunca aktif.`;
     } else if (itemId.startsWith('name_')) {
       record.equippedNameEffect = itemId;
-      record.equippedNameEffectExpiresAt = Date.now() + COSMETIC_RENTAL_MS;
-      rewardText = `${item.name} profilinize uygulandı! 1 saat boyunca aktif.`;
+      record.equippedNameEffectExpiresAt = Date.now() + rentalMs;
+      rewardText = `${item.name} profilinize uygulandı! ${rentalLabel} boyunca aktif.`;
     } else if (itemId.startsWith('badge_')) {
       record.equippedBadge = itemId;
-      record.equippedBadgeExpiresAt = Date.now() + COSMETIC_RENTAL_MS;
-      rewardText = `${item.name} profilinize uygulandı! 1 saat boyunca aktif.`;
+      record.equippedBadgeExpiresAt = Date.now() + rentalMs;
+      rewardText = `${item.name} profilinize uygulandı! ${rentalLabel} boyunca aktif.`;
     } else if (itemId === 'chest' || itemId === 'gift') {
       record.coins += 200;
       record.gems = (record.gems || 0) + 10;
@@ -5061,13 +5071,33 @@ export class PrismaService {
             else data.claimedSeasonFreeTiers = [...freeNow, tier];
             if (reward.type === 'coin') data.coins = { increment: reward.amount };
             if (reward.type === 'gem') data.gems = { increment: reward.amount };
-            if (equipSlot && !(fresh as any)[equipSlot]) data[equipSlot] = itemId;
+            // Sezon kozmetikleri en fazla 1 ay geçerlidir: boş slota takılırken
+            // 30 günlük süre atanır; süre bitince kozmetik otomatik düşer.
+            if (equipSlot && !(fresh as any)[equipSlot]) {
+              data[equipSlot] = itemId;
+              data[`${equipSlot}ExpiresAt`] = new Date(Date.now() + SEASON_REWARD_HOURS * 60 * 60 * 1000);
+            }
             await tx.user.update({ where: { id: record.id }, data });
             if (isItem) {
+              const seasonCosmetic =
+                reward.type === 'frame' || reward.type === 'badge' ||
+                reward.type === 'name_effect' || reward.type === 'background';
               await tx.userInventoryItem.upsert({
                 where: { userId_itemId: { userId: record.id, itemId } },
-                update: { qty: { increment: reward.amount }, name: reward.title, desc: itemDesc },
-                create: { userId: record.id, itemId, name: reward.title, desc: itemDesc, qty: reward.amount },
+                update: {
+                  qty: { increment: reward.amount },
+                  name: reward.title,
+                  desc: itemDesc,
+                  ...(seasonCosmetic ? { durationHours: SEASON_REWARD_HOURS } : {}),
+                },
+                create: {
+                  userId: record.id,
+                  itemId,
+                  name: reward.title,
+                  desc: itemDesc,
+                  qty: reward.amount,
+                  ...(seasonCosmetic ? { durationHours: SEASON_REWARD_HOURS } : {}),
+                },
               });
             }
           },
@@ -5099,8 +5129,12 @@ export class PrismaService {
     } else {
       if (!record.inventory) record.inventory = [];
       const existing = record.inventory.find((i) => i.id === itemId);
+      const seasonCosmetic =
+        reward.type === 'frame' || reward.type === 'badge' ||
+        reward.type === 'name_effect' || reward.type === 'background';
       if (existing) {
         existing.qty += reward.amount;
+        if (seasonCosmetic) existing.durationHours = SEASON_REWARD_HOURS;
       } else {
         record.inventory.push({
           id: itemId,
@@ -5109,9 +5143,14 @@ export class PrismaService {
           qty: reward.amount,
           category: reward.type as any,
           rarity: reward.rarity || 'rare',
+          ...(seasonCosmetic ? { durationHours: SEASON_REWARD_HOURS } : {}),
         });
       }
-      if (equipSlot && !(record as any)[equipSlot]) (record as any)[equipSlot] = itemId;
+      // Sezon kozmetiği boş slota takılırken 30 günlük süre başlar
+      if (equipSlot && !(record as any)[equipSlot]) {
+        (record as any)[equipSlot] = itemId;
+        (record as any)[`${equipSlot}ExpiresAt`] = Date.now() + SEASON_REWARD_HOURS * 60 * 60 * 1000;
+      }
     }
     if (track === 'premium') record.claimedSeasonPremiumTiers.push(tier);
     else record.claimedSeasonFreeTiers.push(tier);
@@ -5175,7 +5214,8 @@ export class PrismaService {
   public async purchaseShopProduct(
     userId: string,
     productId: string,
-    paymentMethod: 'coins' | 'gems' | 'try' = 'coins'
+    paymentMethod: 'coins' | 'gems' | 'try' = 'coins',
+    durationId?: string
   ): Promise<{ user: UserProfile; message: string }> {
     let record = await this.loadRecord(userId);
     if (!record) throw new Error('Kullanıcı bulunamadı.');
@@ -5183,16 +5223,21 @@ export class PrismaService {
     const product = SHOP_CATALOG.find((p) => p.id === productId);
     if (!product) throw new Error('Ürün mağazada bulunamadı.');
 
+    // Süreli kozmetiklerde süre seçimi: 1 saatten en fazla 1 aya kadar.
+    // Fiyat, temel fiyat x süre çarpanıyla ölçeklenir.
+    const duration = isCosmeticProduct(product) ? getShopDuration(durationId) : null;
+    const effectivePrice = shopPriceForDuration(product, durationId);
+
     if (product.currency === 'coins') {
-      if (record.coins < product.price) {
-        throw new Error(`Yetersiz Altın! Bu ürün için ${product.price} Altın gereklidir (Mevcut: ${record.coins} Altın).`);
+      if (record.coins < effectivePrice) {
+        throw new Error(`Yetersiz Altın! Bu ürün için ${effectivePrice} Altın gereklidir (Mevcut: ${record.coins} Altın).`);
       }
-      record.coins -= product.price;
+      record.coins -= effectivePrice;
     } else if (product.currency === 'gems') {
-      if ((record.gems || 0) < product.price) {
-        throw new Error(`Yetersiz Elmas! Bu ürün için ${product.price} Elmas gereklidir (Mevcut: ${record.gems || 0} Elmas).`);
+      if ((record.gems || 0) < effectivePrice) {
+        throw new Error(`Yetersiz Elmas! Bu ürün için ${effectivePrice} Elmas gereklidir (Mevcut: ${record.gems || 0} Elmas).`);
       }
-      record.gems = (record.gems || 0) - product.price;
+      record.gems = (record.gems || 0) - effectivePrice;
     }
 
     if (product.grantPremiumPass) {
@@ -5208,9 +5253,14 @@ export class PrismaService {
     if (product.grantItems) {
       if (!record.inventory) record.inventory = [];
       for (const item of product.grantItems) {
+        const isCosmeticItem =
+          item.category === 'frame' || item.category === 'badge' ||
+          item.category === 'name_effect' || item.category === 'background';
         const existing = record.inventory.find((i) => i.id === item.id);
         if (existing) {
           existing.qty += item.qty;
+          // Yeni süre seçildiyse bu kopyanın süresi güncellenir
+          if (isCosmeticItem && duration) existing.durationHours = duration.hours;
         } else {
           record.inventory.push({
             id: item.id,
@@ -5219,15 +5269,16 @@ export class PrismaService {
             qty: item.qty,
             category: item.category || this.getItemCategory(item.id),
             rarity: item.rarity || this.getItemRarity(item.id),
+            durationHours: isCosmeticItem && duration ? duration.hours : undefined,
           });
         }
 
         // Satın alınan kozmetik anında profile uygulanır (otomatik kuşanma) ve
         // WePlay tarzı süreli modelde kuşanım 1 kopya harcar: envantere eklenir,
-        // hemen kuşanıldığı için 1 adet düşürülür. Süre 1 saattir (badge '1
-        // SAAT' / 'PRO' / 'VIP'); süre bitince kozmetik otomatik düşer.
-        const isRental = product.badge === '1 SAAT' || product.badge === 'PRO' || product.badge === 'VIP';
-        const expiresAt = isRental ? Date.now() + COSMETIC_RENTAL_MS : undefined;
+        // hemen kuşanıldığı için 1 adet düşürülür. Süre seçime göre 1 saatten
+        // 1 aya kadardır; süre bitince kozmetik otomatik düşer.
+        const isRental = !!duration;
+        const expiresAt = duration ? Date.now() + duration.hours * 60 * 60 * 1000 : undefined;
         const isCosmetic = item.category === 'frame' || item.category === 'background' ||
           item.category === 'name_effect' || item.category === 'badge';
         if (isCosmetic) {
@@ -5258,7 +5309,9 @@ export class PrismaService {
         if (!record.isGuest) {
           try {
             // Envanterdeki güncel (tüketime göre düzeltilmiş) adetla senkronize et
-            const currentQty = record.inventory.find((i) => i.id === item.id)?.qty ?? 0;
+            const invItem = record.inventory.find((i) => i.id === item.id);
+            const currentQty = invItem?.qty ?? 0;
+            const invDuration = invItem?.durationHours;
             if (currentQty <= 0) {
               await this.rawClient.userInventoryItem.deleteMany({
                 where: { userId: record.id, itemId: item.id },
@@ -5275,6 +5328,7 @@ export class PrismaService {
                   qty: currentQty,
                   name: item.name,
                   desc: item.desc,
+                  durationHours: invDuration,
                   updatedAt: new Date(),
                 },
                 create: {
@@ -5283,6 +5337,7 @@ export class PrismaService {
                   name: item.name,
                   desc: item.desc,
                   qty: currentQty,
+                  durationHours: invDuration,
                 },
               });
             }

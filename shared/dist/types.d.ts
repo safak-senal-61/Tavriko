@@ -221,6 +221,8 @@ export interface InventoryItem {
     rarity?: ItemRarity;
     icon?: string;
     equipped?: boolean;
+    /** Kozmetiğin bu kopyası kuşanıldığında başlayacak süre (saat). Varsayılan 1. */
+    durationHours?: number;
 }
 export interface NotificationItem {
     id: string;
@@ -437,6 +439,29 @@ export interface ShopProduct {
     grantGems?: number;
     grantPremiumPass?: boolean;
 }
+/**
+ * Süreli kozmetik mağaza ürünleri için süre seçenekleri: 1 saatten en fazla 1
+ * aya kadar. Fiyat, ürünün temel fiyatı süre çarpanıyla ölçeklenir.
+ */
+export declare const SHOP_DURATIONS: {
+    id: string;
+    label: string;
+    hours: number;
+    mult: number;
+}[];
+/** Süre kimliğine göre tanım (bulunamazsa 1 saat) */
+export declare function getShopDuration(durationId?: string | null): {
+    id: string;
+    label: string;
+    hours: number;
+    mult: number;
+};
+/** Ürün süreli bir kozmetik mi? (çerçeve, rozet, isim efekti, arka plan) */
+export declare function isCosmeticProduct(p: ShopProduct): boolean;
+/** Ürünün seçilen süredeki fiyatı: temel fiyat x süre çarpanı (5'e yuvarlanır) */
+export declare function shopPriceForDuration(p: ShopProduct, durationId?: string | null): number;
+/** Sezon kozmetik ödülleri en fazla 1 ay geçerlidir */
+export declare const SEASON_REWARD_HOURS: number;
 export declare const SHOP_CATALOG: ShopProduct[];
 export interface GameEvent {
     id: string;

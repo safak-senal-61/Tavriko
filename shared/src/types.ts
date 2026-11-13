@@ -298,6 +298,8 @@ export interface InventoryItem {
   rarity?: ItemRarity;
   icon?: string;
   equipped?: boolean;
+  /** Kozmetiğin bu kopyası kuşanıldığında başlayacak süre (saat). Varsayılan 1. */
+  durationHours?: number;
 }
 
 export interface NotificationItem {
@@ -675,6 +677,41 @@ export interface ShopProduct {
   grantPremiumPass?: boolean;
 }
 
+/**
+ * Süreli kozmetik mağaza ürünleri için süre seçenekleri: 1 saatten en fazla 1
+ * aya kadar. Fiyat, ürünün temel fiyatı süre çarpanıyla ölçeklenir.
+ */
+export const SHOP_DURATIONS: { id: string; label: string; hours: number; mult: number }[] = [
+  { id: '1h', label: '1 Saat', hours: 1, mult: 1 },
+  { id: '1d', label: '1 Gün', hours: 24, mult: 3 },
+  { id: '3d', label: '3 Gün', hours: 72, mult: 5 },
+  { id: '1w', label: '1 Hafta', hours: 168, mult: 8 },
+  { id: '30d', label: '30 Gün', hours: 720, mult: 15 },
+];
+
+/** Süre kimliğine göre tanım (bulunamazsa 1 saat) */
+export function getShopDuration(durationId?: string | null): { id: string; label: string; hours: number; mult: number } {
+  return SHOP_DURATIONS.find((d) => d.id === durationId) || SHOP_DURATIONS[0];
+}
+
+/** Ürün süreli bir kozmetik mi? (çerçeve, rozet, isim efekti, arka plan) */
+export function isCosmeticProduct(p: ShopProduct): boolean {
+  return (p.grantItems || []).some(
+    (g) => g.category === 'frame' || g.category === 'badge' || g.category === 'name_effect' || g.category === 'background'
+  );
+}
+
+/** Ürünün seçilen süredeki fiyatı: temel fiyat x süre çarpanı (5'e yuvarlanır) */
+export function shopPriceForDuration(p: ShopProduct, durationId?: string | null): number {
+  if (!isCosmeticProduct(p)) return p.price;
+  const d = getShopDuration(durationId);
+  if (d.mult <= 1) return p.price;
+  return Math.max(p.price, Math.round((p.price * d.mult) / 5) * 5);
+}
+
+/** Sezon kozmetik ödülleri en fazla 1 ay geçerlidir */
+export const SEASON_REWARD_HOURS = 24 * 30;
+
 export const SHOP_CATALOG: ShopProduct[] = [
   // --- Featured ---
   {
@@ -929,7 +966,7 @@ export const SHOP_CATALOG: ShopProduct[] = [
     price: 50,
     currency: 'gems',
     rarity: 'epic',
-    badge: '1 SAAT',
+    badge: 'SÜRELİ',
     grantItems: [{ id: 'badge_trivia_master', name: 'Bilgi Efendisi Rozeti', desc: 'Prestijli bilgi rozeti', qty: 1, category: 'badge', rarity: 'epic' }],
   },
   {
@@ -940,7 +977,7 @@ export const SHOP_CATALOG: ShopProduct[] = [
     price: 50,
     currency: 'gems',
     rarity: 'epic',
-    badge: '1 SAAT',
+    badge: 'SÜRELİ',
     grantItems: [{ id: 'badge_speed_demon', name: 'Hız Canavarı Rozeti', desc: 'Hızlı refleks rozeti', qty: 1, category: 'badge', rarity: 'epic' }],
   },
   {
@@ -951,7 +988,7 @@ export const SHOP_CATALOG: ShopProduct[] = [
     price: 65,
     currency: 'gems',
     rarity: 'legendary',
-    badge: '1 SAAT',
+    badge: 'SÜRELİ',
     grantItems: [{ id: 'badge_champion', name: 'Şampiyon Kupası Rozeti', desc: 'Şampiyonluk rozeti', qty: 1, category: 'badge', rarity: 'legendary' }],
   },
   {
@@ -962,7 +999,7 @@ export const SHOP_CATALOG: ShopProduct[] = [
     price: 40,
     currency: 'gems',
     rarity: 'rare',
-    badge: '1 SAAT',
+    badge: 'SÜRELİ',
     grantItems: [{ id: 'badge_night_owl', name: 'Gece Kuşu Rozeti', desc: 'Gece kuşu rozeti', qty: 1, category: 'badge', rarity: 'rare' }],
   },
   {
@@ -973,7 +1010,7 @@ export const SHOP_CATALOG: ShopProduct[] = [
     price: 35,
     currency: 'gems',
     rarity: 'rare',
-    badge: '1 SAAT',
+    badge: 'SÜRELİ',
     grantItems: [{ id: 'badge_veteran', name: 'Kıdemli Oyuncu Rozeti', desc: 'Kıdemli oyuncu rozeti', qty: 1, category: 'badge', rarity: 'rare' }],
   },
   {
@@ -984,7 +1021,7 @@ export const SHOP_CATALOG: ShopProduct[] = [
     price: 55,
     currency: 'gems',
     rarity: 'epic',
-    badge: '1 SAAT',
+    badge: 'SÜRELİ',
     grantItems: [{ id: 'badge_genius', name: 'Dahi Beyin Rozeti', desc: 'Dahi beyin rozeti', qty: 1, category: 'badge', rarity: 'epic' }],
   },
 
@@ -1060,169 +1097,169 @@ export const SHOP_CATALOG: ShopProduct[] = [
   {
     id: 'frame_ice',
     name: 'Buz Kristal Çerçeve',
-    desc: 'Kutup soğuğunda parlayan buz mavisi kristal halka. 1 saat geçerlidir.',
+    desc: 'Kutup soğuğunda parlayan buz mavisi kristal halka. Seçtiğin süre boyunca aktif.',
     category: 'frames',
     price: 55,
     currency: 'gems',
     rarity: 'epic',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'frame_ice', name: 'Buz Kristal Çerçeve', desc: '1 saat süreli buz çerçevesi', qty: 1, category: 'frame', rarity: 'epic' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'frame_ice', name: 'Buz Kristal Çerçeve', desc: 'Seçtiğin süre boyunca aktif buz çerçevesi', qty: 1, category: 'frame', rarity: 'epic' }],
   },
   {
     id: 'frame_emerald',
     name: 'Zümrüt Orman Çerçevesi',
-    desc: 'Tropik ormandan ilham alan zümrüt yeşili halka. 1 saat geçerlidir.',
+    desc: 'Tropik ormandan ilham alan zümrüt yeşili halka. Seçtiğin süre boyunca aktif.',
     category: 'frames',
     price: 40,
     currency: 'gems',
     rarity: 'rare',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'frame_emerald', name: 'Zümrüt Orman Çerçevesi', desc: '1 saat süreli zümrüt çerçevesi', qty: 1, category: 'frame', rarity: 'rare' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'frame_emerald', name: 'Zümrüt Orman Çerçevesi', desc: 'Seçtiğin süre boyunca aktif zümrüt çerçevesi', qty: 1, category: 'frame', rarity: 'rare' }],
   },
   {
     id: 'frame_violet',
     name: 'Menekşe Astral Çerçeve',
-    desc: 'Gece gökyüzünü andıran mor-menekşe astral ışık. 1 saat geçerlidir.',
+    desc: 'Gece gökyüzünü andıran mor-menekşe astral ışık. Seçtiğin süre boyunca aktif.',
     category: 'frames',
     price: 60,
     currency: 'gems',
     rarity: 'epic',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'frame_violet', name: 'Menekşe Astral Çerçeve', desc: '1 saat süreli menekşe çerçevesi', qty: 1, category: 'frame', rarity: 'epic' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'frame_violet', name: 'Menekşe Astral Çerçeve', desc: 'Seçtiğin süre boyunca aktif menekşe çerçevesi', qty: 1, category: 'frame', rarity: 'epic' }],
   },
   {
     id: 'bg_sunset',
     name: 'Gün Batımı Teması',
-    desc: 'Sıcak turuncu-mor gün batımı profil arka planı. 1 saat geçerlidir.',
+    desc: 'Sıcak turuncu-mor gün batımı profil arka planı. Seçtiğin süre boyunca aktif.',
     category: 'backgrounds',
     price: 65,
     currency: 'gems',
     rarity: 'epic',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'bg_sunset', name: 'Gün Batımı Teması', desc: '1 saat süreli gün batımı arka planı', qty: 1, category: 'background', rarity: 'epic' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'bg_sunset', name: 'Gün Batımı Teması', desc: 'Seçtiğin süre boyunca aktif gün batımı arka planı', qty: 1, category: 'background', rarity: 'epic' }],
   },
   {
     id: 'bg_forest',
     name: 'Orman Sabahı Teması',
-    desc: 'Yeşil ve amber orman sabahı profil arka planı. 1 saat geçerlidir.',
+    desc: 'Yeşil ve amber orman sabahı profil arka planı. Seçtiğin süre boyunca aktif.',
     category: 'backgrounds',
     price: 50,
     currency: 'gems',
     rarity: 'rare',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'bg_forest', name: 'Orman Sabahı Teması', desc: '1 saat süreli orman arka planı', qty: 1, category: 'background', rarity: 'rare' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'bg_forest', name: 'Orman Sabahı Teması', desc: 'Seçtiğin süre boyunca aktif orman arka planı', qty: 1, category: 'background', rarity: 'rare' }],
   },
   {
     id: 'bg_night_city',
     name: 'Gece Şehri Teması',
-    desc: 'Neon panelli gece şehri profil arka planı. 1 saat geçerlidir.',
+    desc: 'Neon panelli gece şehri profil arka planı. Seçtiğin süre boyunca aktif.',
     category: 'backgrounds',
     price: 70,
     currency: 'gems',
     rarity: 'epic',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'bg_night_city', name: 'Gece Şehri Teması', desc: '1 saat süreli gece şehri arka planı', qty: 1, category: 'background', rarity: 'epic' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'bg_night_city', name: 'Gece Şehri Teması', desc: 'Seçtiğin süre boyunca aktif gece şehri arka planı', qty: 1, category: 'background', rarity: 'epic' }],
   },
   {
     id: 'bg_aurora',
     name: 'Kutup Işıkları Teması',
-    desc: 'Gökyüzünde dans eden yeşil-mavi kutup ışıkları arka planı. 1 saat geçerlidir.',
+    desc: 'Gökyüzünde dans eden yeşil-mavi kutup ışıkları arka planı. Seçtiğin süre boyunca aktif.',
     category: 'backgrounds',
     price: 80,
     currency: 'gems',
     rarity: 'legendary',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'bg_aurora', name: 'Kutup Işıkları Teması', desc: '1 saat süreli kutup ışıkları arka planı', qty: 1, category: 'background', rarity: 'legendary' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'bg_aurora', name: 'Kutup Işıkları Teması', desc: 'Seçtiğin süre boyunca aktif kutup ışıkları arka planı', qty: 1, category: 'background', rarity: 'legendary' }],
   },
   {
     id: 'bg_volcano',
     name: 'Volkan Gecesi Teması',
-    desc: 'Kızıl lav akışları ve kor parçacıklarıyla volkanik gece arka planı. 1 saat geçerlidir.',
+    desc: 'Kızıl lav akışları ve kor parçacıklarıyla volkanik gece arka planı. Seçtiğin süre boyunca aktif.',
     category: 'backgrounds',
     price: 85,
     currency: 'gems',
     rarity: 'legendary',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'bg_volcano', name: 'Volkan Gecesi Teması', desc: '1 saat süreli volkan arka planı', qty: 1, category: 'background', rarity: 'legendary' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'bg_volcano', name: 'Volkan Gecesi Teması', desc: 'Seçtiğin süre boyunca aktif volkan arka planı', qty: 1, category: 'background', rarity: 'legendary' }],
   },
   {
     id: 'name_gradient_ice',
     name: 'Buz Gradyan İsmi',
-    desc: 'Buz mavisi kristal gradyanı ile isminizi serinletir. 1 saat geçerlidir.',
+    desc: 'Buz mavisi kristal gradyanı ile isminizi serinletir. Seçtiğin süre boyunca aktif.',
     category: 'name_effects',
     price: 50,
     currency: 'gems',
     rarity: 'epic',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'name_gradient_ice', name: 'Buz Gradyan İsmi', desc: '1 saat süreli buz isim efekti', qty: 1, category: 'name_effect', rarity: 'epic' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'name_gradient_ice', name: 'Buz Gradyan İsmi', desc: 'Seçtiğin süre boyunca aktif buz isim efekti', qty: 1, category: 'name_effect', rarity: 'epic' }],
   },
   {
     id: 'name_gradient_rainbow',
     name: 'Gökkuşağı Gradyan İsmi',
-    desc: 'Yedi renk gökkuşağı gradyanıyla isminizi süsler. 1 saat geçerlidir.',
+    desc: 'Yedi renk gökkuşağı gradyanıyla isminizi süsler. Seçtiğin süre boyunca aktif.',
     category: 'name_effects',
     price: 90,
     currency: 'gems',
     rarity: 'mythic',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'name_gradient_rainbow', name: 'Gökkuşağı Gradyan İsmi', desc: '1 saat süreli gökkuşağı isim efekti', qty: 1, category: 'name_effect', rarity: 'mythic' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'name_gradient_rainbow', name: 'Gökkuşağı Gradyan İsmi', desc: 'Seçtiğin süre boyunca aktif gökkuşağı isim efekti', qty: 1, category: 'name_effect', rarity: 'mythic' }],
   },
 
-  // --- YENİ: Farklı tarzlarda isim efektleri (1 saatlik) ---
+  // --- YENİ: Farklı tarzlarda isim efektleri (süreli) ---
   {
     id: 'name_emerald_vine',
     name: 'Zümrüt Sarmaşık İsmi',
-    desc: 'Işıldayan zümrüt yeşili yapraklarla isminizi süsler. 1 saat geçerlidir.',
+    desc: 'Işıldayan zümrüt yeşili yapraklarla isminizi süsler. Seçtiğin süre boyunca aktif.',
     category: 'name_effects',
     price: 30,
     currency: 'gems',
     rarity: 'rare',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'name_emerald_vine', name: 'Zümrüt Sarmaşık İsmi', desc: '1 saat süreli zümrüt isim efekti', qty: 1, category: 'name_effect', rarity: 'rare' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'name_emerald_vine', name: 'Zümrüt Sarmaşık İsmi', desc: 'Seçtiğin süre boyunca aktif zümrüt isim efekti', qty: 1, category: 'name_effect', rarity: 'rare' }],
   },
   {
     id: 'name_toxic_slime',
     name: 'Toksik Slime İsmi',
-    desc: 'Asit yeşili ve moru karışan radyoaktif slime parıltısı. 1 saat geçerlidir.',
+    desc: 'Asit yeşili ve moru karışan radyoaktif slime parıltısı. Seçtiğin süre boyunca aktif.',
     category: 'name_effects',
     price: 55,
     currency: 'gems',
     rarity: 'epic',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'name_toxic_slime', name: 'Toksik Slime İsmi', desc: '1 saat süreli toksik isim efekti', qty: 1, category: 'name_effect', rarity: 'epic' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'name_toxic_slime', name: 'Toksik Slime İsmi', desc: 'Seçtiğin süre boyunca aktif toksik isim efekti', qty: 1, category: 'name_effect', rarity: 'epic' }],
   },
   {
     id: 'name_candy_heart',
     name: 'Şeker Pembe İsmi',
-    desc: 'Pembe şeker kalp gradyanıyla tatlı bir parıltı. 1 saat geçerlidir.',
+    desc: 'Pembe şeker kalp gradyanıyla tatlı bir parıltı. Seçtiğin süre boyunca aktif.',
     category: 'name_effects',
     price: 55,
     currency: 'gems',
     rarity: 'epic',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'name_candy_heart', name: 'Şeker Pembe İsmi', desc: '1 saat süreli şeker isim efekti', qty: 1, category: 'name_effect', rarity: 'epic' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'name_candy_heart', name: 'Şeker Pembe İsmi', desc: 'Seçtiğin süre boyunca aktif şeker isim efekti', qty: 1, category: 'name_effect', rarity: 'epic' }],
   },
   {
     id: 'name_void_shadow',
     name: 'Boşluk Gölgesi İsmi',
-    desc: 'Karanlık evrenin derin mor gölgesiyle isminizi gizemli kılar. 1 saat geçerlidir.',
+    desc: 'Karanlık evrenin derin mor gölgesiyle isminizi gizemli kılar. Seçtiğin süre boyunca aktif.',
     category: 'name_effects',
     price: 70,
     currency: 'gems',
     rarity: 'legendary',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'name_void_shadow', name: 'Boşluk Gölgesi İsmi', desc: '1 saat süreli boşluk isim efekti', qty: 1, category: 'name_effect', rarity: 'legendary' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'name_void_shadow', name: 'Boşluk Gölgesi İsmi', desc: 'Seçtiğin süre boyunca aktif boşluk isim efekti', qty: 1, category: 'name_effect', rarity: 'legendary' }],
   },
   {
     id: 'name_plasma_bolt',
     name: 'Plazma Yıldırımı İsmi',
-    desc: 'Elektrik mavisi plazma yıldırımlarıyla isminizi çarpar. 1 saat geçerlidir.',
+    desc: 'Elektrik mavisi plazma yıldırımlarıyla isminizi çarpar. Seçtiğin süre boyunca aktif.',
     category: 'name_effects',
     price: 90,
     currency: 'gems',
     rarity: 'mythic',
-    badge: '1 SAAT',
-    grantItems: [{ id: 'name_plasma_bolt', name: 'Plazma Yıldırımı İsmi', desc: '1 saat süreli plazma isim efekti', qty: 1, category: 'name_effect', rarity: 'mythic' }],
+    badge: 'SÜRELİ',
+    grantItems: [{ id: 'name_plasma_bolt', name: 'Plazma Yıldırımı İsmi', desc: 'Seçtiğin süre boyunca aktif plazma isim efekti', qty: 1, category: 'name_effect', rarity: 'mythic' }],
   },
 
   // --- YENİ: Çalışan farklı güçlendirici iksirler ---
@@ -1260,39 +1297,39 @@ export const SHOP_CATALOG: ShopProduct[] = [
     grantItems: [{ id: 'booster_coin_2x_24h', name: '2x Altın İksiri (24 Saat)', desc: '24 saat 2x Altın', qty: 1, category: 'booster', rarity: 'legendary' }],
   },
 
-  // --- YENİ: Pro/VIP arayüz temaları (uygulamanın tamamını değiştirir, 1 saatlik) ---
+  // --- YENİ: Pro/VIP arayüz temaları (uygulamanın tamamını değiştirir, süreli) ---
   {
     id: 'bg_pro_gold',
     name: 'Pro Altın Kraliyet Teması',
-    desc: 'Altın yağmuru ve kraliyet parıltısı: profilin ve uygulamanın tamamı 1 saat boyunca altın kraliyet temasına bürünür.',
+    desc: 'Altın yağmuru ve kraliyet parıltısı: profilin ve uygulamanın tamamı seçtiğin süre boyunca altın kraliyet temasına bürünür.',
     category: 'backgrounds',
     price: 130,
     currency: 'gems',
     rarity: 'mythic',
     badge: 'PRO',
-    grantItems: [{ id: 'bg_pro_gold', name: 'Pro Altın Kraliyet Teması', desc: '1 saat süreli altın kraliyet arayüz teması', qty: 1, category: 'background', rarity: 'mythic' }],
+    grantItems: [{ id: 'bg_pro_gold', name: 'Pro Altın Kraliyet Teması', desc: 'Seçtiğin süre boyunca aktif altın kraliyet arayüz teması', qty: 1, category: 'background', rarity: 'mythic' }],
   },
   {
     id: 'bg_vip_neon',
     name: 'VIP Neon Teması',
-    desc: 'Siberpunk neon şehir: mor-cyan neon ışıklarla profil ve uygulama arayüzü 1 saat boyunca VIP moduna geçer.',
+    desc: 'Siberpunk neon şehir: mor-cyan neon ışıklarla profil ve uygulama arayüzü seçtiğin süre boyunca VIP moduna geçer.',
     category: 'backgrounds',
     price: 100,
     currency: 'gems',
     rarity: 'legendary',
     badge: 'VIP',
-    grantItems: [{ id: 'bg_vip_neon', name: 'VIP Neon Teması', desc: '1 saat süreli neon VIP arayüz teması', qty: 1, category: 'background', rarity: 'legendary' }],
+    grantItems: [{ id: 'bg_vip_neon', name: 'VIP Neon Teması', desc: 'Seçtiğin süre boyunca aktif neon VIP arayüz teması', qty: 1, category: 'background', rarity: 'legendary' }],
   },
   {
     id: 'bg_galaxy_vip',
     name: 'Galaksi VIP Teması',
-    desc: 'Yıldız tozu ve nebula: tüm uygulama arayüzü 1 saat boyunca derin galaksi moru-kuvars VIP temasına döner.',
+    desc: 'Yıldız tozu ve nebula: tüm uygulama arayüzü seçtiğin süre boyunca derin galaksi moru-kuvars VIP temasına döner.',
     category: 'backgrounds',
     price: 120,
     currency: 'gems',
     rarity: 'mythic',
     badge: 'VIP',
-    grantItems: [{ id: 'bg_galaxy_vip', name: 'Galaksi VIP Teması', desc: '1 saat süreli galaksi VIP arayüz teması', qty: 1, category: 'background', rarity: 'mythic' }],
+    grantItems: [{ id: 'bg_galaxy_vip', name: 'Galaksi VIP Teması', desc: 'Seçtiğin süre boyunca aktif galaksi VIP arayüz teması', qty: 1, category: 'background', rarity: 'mythic' }],
   },
 ];
 

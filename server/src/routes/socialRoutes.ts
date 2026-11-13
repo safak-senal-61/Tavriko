@@ -216,7 +216,7 @@ router.get('/shop/catalog', (req: Request, res: Response): void => {
 router.post('/shop/purchase', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.authUserId;
-    const { productId, packId, paymentMethod = 'coins' } = req.body;
+    const { productId, packId, paymentMethod = 'coins', durationId } = req.body;
     if (!userId) {
       res.status(400).json({ error: 'userId gerekli' });
       return;
@@ -224,7 +224,14 @@ router.post('/shop/purchase', requireUserAuth, async (req: Request, res: Respons
 
     const itemToBuy = productId || packId;
     if (itemToBuy && SHOP_CATALOG.some((p) => p.id === itemToBuy)) {
-      const result = await db.purchaseShopProduct(userId, itemToBuy, paymentMethod);
+      // Süreli kozmetiklerde durationId ('1h' | '1d' | '3d' | '1w' | '30d')
+      // seçilen süreyi belirler; fiyat sunucuda ölçeklenir.
+      const result = await db.purchaseShopProduct(
+        userId,
+        itemToBuy,
+        paymentMethod,
+        typeof durationId === 'string' ? durationId : undefined
+      );
       res.json({ success: true, user: result.user, message: result.message });
       return;
     }

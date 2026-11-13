@@ -30,7 +30,23 @@ import {
 import Reanimated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { Image } from 'react-native';
 import { Check, LockKeyhole, Gift } from 'lucide-react-native';
-import { KitHero, STORE_IMG, KIT, FloatingElement, FloatingImage, ShimmerView, UI_IMG, storeImageFor } from '../components/StoreKit';
+import {
+  KitHero,
+  STORE_IMG,
+  KIT,
+  FloatingElement,
+  FloatingImage,
+  ShimmerView,
+  UI_IMG,
+  storeImageFor,
+  FramedAvatar,
+  AnimatedFrame,
+  AnimatedBackgroundThumb,
+  AnimatedNameText,
+  BackgroundThumb,
+  backgroundFor,
+  frameFor,
+} from '../components/StoreKit';
 import { GradientFill } from '../components/TavrikoGradient';
 
 interface SeasonScreenProps {
@@ -266,6 +282,8 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
 
   const renderRewardIcon = (reward: SeasonReward, size: number = 32) => {
     const { type } = reward;
+    const seed = user?.avatarUrl || user?.displayName || 'av1';
+    const displayName = user?.displayName || 'Oyuncu';
     let img: any = null;
     if (type === 'coin') img = storeImageFor(`coins_${reward.amount}`);
     else if (type === 'gem') img = storeImageFor(`gems_${reward.amount}`);
@@ -277,13 +295,41 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
       return <Image source={img} style={{ width: s2, height: s2 }} resizeMode="contain" />;
     }
     switch (type) {
-      case 'frame':
-        return <CrownIcon size={size} />;
+      /* Sezon kartlarında kozmetikler artık kendi gerçek görsellerini
+         kullanıyor: çerçeveler için avatar + çerçeve, isim efektleri için
+         animasyonlu yazı, arka planlar için animasyonlu önizleme. */
+      case 'frame': {
+        const rid = reward.itemId || 'frame_neon';
+        if (frameFor(rid)) {
+          return <FramedAvatar frameId={rid} seed={seed} size={Math.round(size * 1.6)} />;
+        }
+        return <AnimatedFrame frameId={rid} seed={seed} size={Math.round(size * 1.6)} />;
+      }
       case 'badge':
         return <BadgeShieldIcon size={size} />;
-      case 'name_effect':
-      case 'background':
-        return <SpeedBoltIcon size={size} />;
+      case 'name_effect': {
+        const rid = reward.itemId || 'name_glow_gold';
+        return (
+          <View style={{ width: Math.round(size * 1.6), alignItems: 'center' }}>
+            <AnimatedNameText
+              effectId={rid}
+              numberOfLines={1}
+              style={{ fontSize: Math.round(size * 0.55), fontWeight: '800' }}
+            >
+              Örnek
+            </AnimatedNameText>
+          </View>
+        );
+      }
+      case 'background': {
+        const rid = reward.itemId || 'bg_nebula';
+        if (backgroundFor(rid)) {
+          return <BackgroundThumb bgId={rid} seed={seed} name={displayName} width={Math.round(size * 1.4)} />;
+        }
+        return (
+          <AnimatedBackgroundThumb bgId={rid} seed={seed} name={displayName} width={Math.round(size * 1.4)} />
+        );
+      }
       default:
         return <XpStarIcon size={size} />;
     }

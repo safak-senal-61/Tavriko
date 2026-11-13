@@ -19,7 +19,7 @@ import Svg, {
   Circle,
   Path,
 } from 'react-native-svg';
-import { UserProfile, SHOP_CATALOG, ShopProduct, ShopProductCategory } from '@trivia/shared';
+import { UserProfile, SHOP_CATALOG, ShopProduct, ShopProductCategory, SHOP_DURATIONS, isCosmeticProduct, shopPriceForDuration } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { getApiBaseUrl } from '../config';
@@ -381,6 +381,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const [isError, setIsError] = useState<boolean>(false);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const [confirmProduct, setConfirmProduct] = useState<ShopProduct | null>(null);
+  // Süreli kozmetikler için seçilen süre (1 saat - 30 gün); fiyatı ölçekler
+  const [durationId, setDurationId] = useState<string>('1h');
   const [previewProduct, setPreviewProduct] = useState<ShopProduct | null>(null);
   const previewKind = (p: ShopProduct | null): 'frame' | 'background' | 'name' | null => {
     if (!p) return null;
@@ -471,20 +473,21 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       return;
     }
 
-    // Para bakiyesi kontrolü
-    if (product.currency === 'coins' && (user.coins ?? 0) < product.price) {
+    // Para bakiyesi kontrolü (süreli kozmetiklerde seçilen sürenin fiyatı)
+    const price = shopPriceForDuration(product, durationId);
+    if (product.currency === 'coins' && (user.coins ?? 0) < price) {
       sound.playSound('wrong');
       sound.triggerHaptic('error');
       setIsError(true);
-      setStatusMessage(`⚠️ Yetersiz Altın! ${product.price} Altın gerekli (Mevcut: ${user.coins ?? 0}).`);
+      setStatusMessage(`⚠️ Yetersiz Altın! ${price} Altın gerekli (Mevcut: ${user.coins ?? 0}).`);
       return;
     }
 
-    if (product.currency === 'gems' && (user.gems ?? 0) < product.price) {
+    if (product.currency === 'gems' && (user.gems ?? 0) < price) {
       sound.playSound('wrong');
       sound.triggerHaptic('error');
       setIsError(true);
-      setStatusMessage(`⚠️ Yetersiz Elmas! ${product.price} Elmas gerekli (Mevcut: ${user.gems ?? 0}).`);
+      setStatusMessage(`⚠️ Yetersiz Elmas! ${price} Elmas gerekli (Mevcut: ${user.gems ?? 0}).`);
       return;
     }
 
@@ -507,6 +510,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           userId: user.id,
           productId: product.id,
           paymentMethod: product.currency === 'gems' ? 'gems' : product.currency === 'coins' ? 'coins' : 'credit_card',
+          // Süreli kozmetiklerde seçilen süre sunucuya gönderilir
+          durationId: isCosmeticProduct(product) ? durationId : undefined,
         }),
       });
 
@@ -736,13 +741,43 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               <>
                 <Text style={styles.modalProduct}>{confirmProduct.name}</Text>
                 <Text style={styles.modalDesc}>{confirmProduct.desc}</Text>
+
+                {/* Süre seçimi: kozmetiklerde 1 saatten 1 aya kadar seçilir,
+                    fiyat seçilen süreye göre ölçeklenir */}
+                {isCosmeticProduct(confirmProduct) && (
+                  <View style={styles.durationWrap}>
+                    <Text style={styles.durationTitle}>SÜRE SEÇ</Text>
+                    <View style={styles.durationChips}>
+                      {SHOP_DURATIONS.map((d) => {
+                        const active = durationId === d.id;
+                        return (
+                          <TouchableOpacity
+                            key={d.id}
+                            style={[styles.durationChip, active && styles.durationChipActive]}
+                            onPress={() => {
+                              sound.playSound('tap');
+                              sound.triggerHaptic('light');
+                              setDurationId(d.id);
+                            }}
+                            activeOpacity={0.85}
+                          >
+                            <Text style={[styles.durationChipText, active && styles.durationChipTextActive]}>
+                              {d.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+
                 <View style={styles.modalCostRow}>
                   <Text style={styles.modalCostLabel}>Fiyat:</Text>
                   <View style={styles.priceContentRow}>
                     <Text style={styles.modalCostVal}>
                       {confirmProduct.currency === 'try'
                         ? `₺${confirmProduct.price.toFixed(2)}`
-                        : `${confirmProduct.price} ${confirmProduct.currency === 'coins' ? 'Altın' : 'Elmas'}`}
+                        : `${shopPriceForDuration(confirmProduct, durationId)} ${confirmProduct.currency === 'coins' ? 'Altın' : 'Elmas'}`}
                     </Text>
                     {confirmProduct.currency === 'coins' && <CoinIcon size={18} />}
                     {confirmProduct.currency === 'gems' && <GemIcon size={18} />}
@@ -1160,6 +1195,43 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     marginBottom: 14,
+  },
+  durationWrap: {
+    marginBottom: 12,
+  },
+  durationTitle: {
+    color: '#CBB8E8',
+    fontSize: 11,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 1,
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  durationChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  durationChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(197, 165, 245, 0.35)',
+    backgroundColor: 'rgba(52, 34, 78, 0.6)',
+  },
+  durationChipActive: {
+    borderColor: '#FFC837',
+    backgroundColor: 'rgba(255, 200, 55, 0.18)',
+  },
+  durationChipText: {
+    color: '#E9DDFB',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
+  },
+  durationChipTextActive: {
+    color: '#FFC837',
   },
   modalCostRow: {
     flexDirection: 'row',

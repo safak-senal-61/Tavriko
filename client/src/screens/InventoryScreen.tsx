@@ -39,6 +39,9 @@ import {
   KIT,
   FramedAvatar,
   BackgroundThumb,
+  AnimatedFrame,
+  AnimatedBackgroundThumb,
+  AnimatedNameText,
   CosmeticPreviewModal,
   frameFor,
   backgroundFor,
@@ -305,10 +308,11 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   };
 
   const userSeed = user?.avatarUrl || user?.displayName;
-  const previewKindOf = (item: InventoryItem | null): 'frame' | 'background' | null => {
+  const previewKindOf = (item: InventoryItem | null): 'frame' | 'background' | 'name_effect' | null => {
     if (!item) return null;
-    if ((item.category === 'frame' || item.id.includes('frame')) && frameFor(item.id)) return 'frame';
-    if ((item.category === 'background' || item.id.startsWith('bg_')) && backgroundFor(item.id)) return 'background';
+    if (item.category === 'frame' || item.id.startsWith('frame_')) return 'frame';
+    if (item.category === 'background' || item.id.startsWith('bg_')) return 'background';
+    if (item.category === 'name_effect' || item.id.startsWith('name_')) return 'name_effect';
     return null;
   };
   const [previewItem, setPreviewItem] = useState<InventoryItem | null>(null);
@@ -347,11 +351,39 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   const isEquippable = (item: InventoryItem) =>
     item.id.startsWith('frame_') || item.id.startsWith('bg_') || item.id.startsWith('name_') || item.id.startsWith('badge_');
 
+  /* İkinci görseldeki hata: yeni kozmetikler (animasyonlu çerçeveler,
+     isim efektleri, pro arka planlar) görsel zincirine takılmıyor ve
+     ateş ikonuna düşüyordu. Her ürün artık kendi türünün görselini
+     kullanıyor. */
   const renderItemVisual = (item: InventoryItem, size = 48) => {
     const pk = previewKindOf(item);
-    if (pk === 'frame') return <FramedAvatar frameId={item.id} seed={userSeed} size={Math.round(size * 1.8)} />;
+    if (pk === 'frame') {
+      if (frameFor(item.id)) {
+        return <FramedAvatar frameId={item.id} seed={userSeed} size={Math.round(size * 1.8)} />;
+      }
+      return <AnimatedFrame frameId={item.id} seed={userSeed} size={Math.round(size * 1.8)} />;
+    }
+    if (pk === 'name_effect') {
+      return (
+        <View style={{ width: Math.round(size * 2), alignItems: 'center' }}>
+          <AnimatedNameText effectId={item.id} numberOfLines={1} style={{ fontSize: Math.round(size * 0.62), fontWeight: '800' }}>
+            Örnek İsim
+          </AnimatedNameText>
+        </View>
+      );
+    }
     if (pk === 'background') {
-      return <BackgroundThumb bgId={item.id} seed={userSeed} name={user?.displayName} width={Math.round(size * 1.05)} />;
+      if (backgroundFor(item.id)) {
+        return <BackgroundThumb bgId={item.id} seed={userSeed} name={user?.displayName} width={Math.round(size * 1.05)} />;
+      }
+      return (
+        <AnimatedBackgroundThumb
+          bgId={item.id}
+          seed={userSeed}
+          name={user?.displayName || 'Oyuncu'}
+          width={Math.round(size * 1.05)}
+        />
+      );
     }
     const img = storeImageFor(item.id, item.category);
     if (img) {
@@ -580,7 +612,17 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 
       <CosmeticPreviewModal
         visible={!!previewItem}
-        kind={previewKindOf(previewItem)}
+        kind={
+          previewItem
+            ? ({
+                frame: 'frame',
+                background: 'background',
+                name_effect: 'name',
+              } as Record<string, 'frame' | 'background' | 'name'>)[
+                previewKindOf(previewItem) ?? 'frame'
+              ]
+            : null
+        }
         itemId={previewItem?.id || ''}
         title={previewItem?.name || ''}
         seed={userSeed}
