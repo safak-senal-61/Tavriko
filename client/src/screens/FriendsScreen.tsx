@@ -45,6 +45,9 @@ interface FriendsScreenProps {
   onJoinFriendRoom?: (roomCode: string) => void;
   onNavigateTab?: (tab: 'play' | 'explore' | 'leaders' | 'friends' | 'profile') => void;
   onNotifications?: () => void;
+  /* KVKK: arkadaş profili, tam profil sayfası gibi görüntülenir;
+     sağlananrsa profil modal yerine bu ekran açılır (salt okunur). */
+  onOpenFullProfile?: (profile: UserProfile) => void;
 }
 interface FriendRowItem {
   id: string;
@@ -81,6 +84,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   onJoinFriendRoom,
   onNavigateTab,
   onNotifications,
+  onOpenFullProfile,
 }) => {
   const [activeTab, setActiveTab] = useState<'friends' | 'add' | 'requests'>('friends');
   const [copied, setCopied] = useState(false);
@@ -335,6 +339,13 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       const res = await fetch(`${base}/social/profile/${player.id}`);
       if (res.ok) {
         const fullProfile = await res.json();
+        // KVKK: tam profil sayfası (salt okunur) tercih edilirse modal açılmaz
+        if (onOpenFullProfile && fullProfile?.id) {
+          setInspectPlayer(null);
+          setInspectLoading(false);
+          onOpenFullProfile(fullProfile);
+          return;
+        }
         setInspectDetails(fullProfile);
       }
     } catch {

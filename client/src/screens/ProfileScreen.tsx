@@ -12,6 +12,7 @@ import {
   Platform,
   Image,
   ImageSourcePropType,
+  Modal,
 } from 'react-native';
 import Animated, { FadeInRight, FadeInUp, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
@@ -156,6 +157,9 @@ interface ProfileScreenProps {
   onUpdateUser?: (updated: UserProfile) => void;
   onNavigateTab?: (tab: 'play' | 'explore' | 'leaders' | 'friends' | 'profile') => void;
   onSettings?: () => void;
+  /* KVKK: başka bir oyuncunun profili bu ekranla görüntülenirken
+     düzenleme, ayarlar ve hesap bölümleri gizlenir. */
+  viewOnly?: boolean;
 }
 
 type ProfileTab = 'overview' | 'mastery' | 'titles' | 'settings' | 'account';
@@ -235,6 +239,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onUpdateUser,
   onNavigateTab,
   onSettings,
+  viewOnly,
 }) => {
   const base = apiBaseUrl || DEFAULT_API_BASE;
   const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
@@ -276,6 +281,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const settings: UserSettings & { soundEnabled?: boolean; allowDuelChallenges?: boolean } =
     (user.settings as any) || {};
   const [onlineStatusVisible, setOnlineStatusVisible] = useState(settings.onlineStatusVisible !== false);
+  /* Rozet bilgi penceresi: profilde yalnızca logo görünür, detaylar burada */
+  const [badgeInfoVisible, setBadgeInfoVisible] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState((settings.sfxEnabled ?? settings.soundEnabled) !== false);
   const [hapticsEnabled, setHapticsEnabled] = useState(settings.hapticsEnabled !== false);
   const [allowDuelChallenges, setAllowDuelChallenges] = useState((settings.duelInvitesAllowed ?? settings.allowDuelChallenges) !== false);
@@ -650,17 +657,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     }
   };
 
-  const renderTabs = () => (
-    <View style={styles.tabRow}>
-      {(
-        [
+  const renderTabs = () => {
+    /* KVKK: başkasının profili görüntülenirken Ayar ve Hesap sekmeleri gizli */
+    const tabs: Array<[ProfileTab, string]> = viewOnly
+      ? [
+          ['overview', 'Özet'],
+          ['mastery', 'Ustalık'],
+          ['titles', 'Unvan'],
+        ]
+      : [
           ['overview', 'Özet'],
           ['mastery', 'Ustalık'],
           ['titles', 'Unvan'],
           ['settings', 'Ayar'],
           ['account', 'Hesap'],
-        ] as const
-      ).map(([tKey, label]) => {
+        ];
+    return (
+    <View style={styles.tabRow}>
+      {tabs.map(([tKey, label]) => {
         const isActive = activeTab === tKey;
         return (
           <TouchableOpacity
@@ -687,7 +701,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         );
       })}
     </View>
-  );
+    );
+  };
 
   return (
     <TavrikoScreen style={styles.profileScreenRoot}>
@@ -697,7 +712,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         coins={user.coins ?? 0}
         gems={user.gems ?? 0}
         avatarSeed={user.avatarUrl || user.displayName}
-        onAvatarPress={onEditProfile}
+        onAvatarPress={viewOnly ? undefined : onEditProfile}
       />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Unified Compact Hero Identity Card */}
@@ -770,23 +785,26 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
               <View style={styles.heroBadgesRow}>
                 {badgeName && (
-                  <View style={[styles.titlePill, { gap: 6 }]}>
-                    {/* Rozet görseli: mağazadaki gerçek rozet ikonu */}
+                  /* Rozet: profilde yalnızca logo görünür; isim ve süre bilgisi
+                     rozete basınca açılan pencerede gösterilir (KVKK/düzen). */
+                  <TouchableOpacity
+                    style={[styles.titlePill, { paddingHorizontal: 6 }]}
+                    activeOpacity={0.75}
+                    onPress={() => {
+                      sound.playSound('tap');
+                      setBadgeInfoVisible(true);
+                    }}
+                    accessibilityLabel={`${badgeName} rozeti, detaylar için bas`}
+                  >
                     {(() => {
                       const img = activeBadge ? storeImageFor(activeBadge) : null;
                       return img ? (
-                        <Image source={img} style={{ width: 26, height: 26, flexShrink: 0 }} resizeMode="contain" accessibilityLabel={`${badgeName} rozeti`} />
+                        <Image source={img} style={{ width: 30, height: 30, flexShrink: 0 }} resizeMode="contain" accessibilityLabel={`${badgeName} rozeti`} />
                       ) : (
-                        <BadgeVisual badgeId={activeBadge || ''} size={24} />
+                        <BadgeVisual badgeId={activeBadge || ''} size={28} />
                       );
                     })()}
-                    <View style={{ flexShrink: 1 }}>
-                      <Text style={styles.titlePillText} numberOfLines={1}>
-                        {badgeName}
-                      </Text>
-                      <CosmeticCountdown expiresAt={user.equippedBadgeExpiresAt} />
-                    </View>
-                  </View>
+                  </TouchableOpacity>
                 )}
                 <View style={styles.titlePill}>
                   <Text style={styles.titlePillText} numberOfLines={1}>
@@ -866,6 +884,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           {/* Integrated Friend Code & Quick Action Strip */}
           <View style={styles.heroBottomContainer}>
             {/* Row 1: Friend Code Pill + Share Button */}
+            {/* KVKK: başkasının profili görüntülenirken arkadaş kodu,
+                karakter seçimi ve düzenleme butonları gösterilmez. */}
+            {!viewOnly && (
+            <>
             <View style={styles.heroCodeRow}>
               <TouchableOpacity
                 style={styles.inlineFriendCodeBtn}
@@ -932,10 +954,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </Text>
               </TouchableOpacity>
             </View>
+            </>
+            )}
           </View>
 
           {/* Collapsible Avatar & Photo Drawer inside Hero Card */}
-          {showAvatarDrawer && (
+          {showAvatarDrawer && !viewOnly && (
             <View style={styles.avatarDrawerBox}>
               <View style={styles.avatarPickerHeaderRow}>
                 <View style={styles.avatarPickerTitleWrap}>
@@ -1255,7 +1279,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   entering={FadeInRight.delay(70 + idx * 45).duration(380).springify().damping(18)}
                 >
                   <TouchableOpacity
-                    disabled={!unlocked || equipped || !!savingTitle}
+                    disabled={!unlocked || equipped || !!savingTitle || !!viewOnly}
                     onPress={() => handleEquipTitle(t.title)}
                     style={[
                       styles.titleRow,
@@ -1291,8 +1315,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                       <View style={styles.titleEquippedPill}>
                         <Text style={styles.titleEquippedPillText}>✓ KUŞANILDI</Text>
                       </View>
-                    ) : unlocked ? (
+                    ) : unlocked && !viewOnly ? (
                       <Text style={styles.titleAction}>Kuşan ›</Text>
+                    ) : unlocked && viewOnly ? (
+                      <Text style={styles.titleReq}>Kuşanılabilir</Text>
                     ) : (
                       <TitleLockIcon />
                     )}
@@ -1474,6 +1500,40 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           else if (onNavigateTab) onNavigateTab(tab);
         }}
       />
+
+      {/* Rozet bilgi penceresi: profile kartında yalnızca logo görünür;
+          isim, açıklama ve kalan süre rozete basınca burada gösterilir. */}
+      <Modal
+        visible={badgeInfoVisible && !!activeBadge}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBadgeInfoVisible(false)}
+      >
+        <TouchableOpacity
+          style={badgeInfoStyles.overlay}
+          activeOpacity={1}
+          onPress={() => setBadgeInfoVisible(false)}
+        >
+          <TouchableOpacity style={badgeInfoStyles.card} activeOpacity={1} onPress={() => undefined}>
+            <Text style={badgeInfoStyles.title}>{badgeName || 'Rozet'}</Text>
+            {(() => {
+              const img = activeBadge ? storeImageFor(activeBadge) : null;
+              return img ? (
+                <Image source={img} style={badgeInfoStyles.image} resizeMode="contain" />
+              ) : (
+                <BadgeVisual badgeId={activeBadge || ''} size={96} />
+              );
+            })()}
+            {(() => {
+              const inv = user.inventory?.find((i) => i.id === activeBadge);
+              const desc = badgeDef?.desc || inv?.desc;
+              return desc ? <Text style={badgeInfoStyles.desc}>{desc}</Text> : null;
+            })()}
+            <CosmeticCountdown expiresAt={user.equippedBadgeExpiresAt} style={badgeInfoStyles.countdown} />
+            <Text style={badgeInfoStyles.hint}>Kapatmak için dışına dokun</Text>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </TavrikoScreen>
   );
 };
@@ -2424,4 +2484,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
   },
+});
+
+/* Rozet bilgi penceresi stilleri (profile kartında yalnızca logo görünür) */
+const badgeInfoStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(10, 6, 24, 0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 28,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 196, 61, 0.45)',
+    backgroundColor: '#221741',
+    alignItems: 'center',
+    paddingTop: 22,
+    paddingBottom: 18,
+    paddingHorizontal: 22,
+  },
+  title: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontFamily: THEME.fonts.extraBold,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  image: { width: 96, height: 96, marginBottom: 12 },
+  desc: {
+    color: '#D9CDF5',
+    fontSize: 12.5,
+    fontFamily: THEME.fonts.medium,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  countdown: { marginBottom: 10 },
+  hint: { color: '#8F84B0', fontSize: 10.5, fontFamily: THEME.fonts.medium },
 });

@@ -308,9 +308,20 @@ router.get('/google/callback', (req, res) => {
       }
 
       const activeHost = window.location.hostname || '${currentHost}';
-      const webTarget = '/app#' + payload;
+      let webTarget = '/app#' + payload;
       const isExpoClient = /Expo/i.test(navigator.userAgent);
       const btn = document.getElementById('appBtn');
+
+      // Oturum zaten sunucuda tamamlandı: kullanıcıyı ve belirteci doğrudan kaydet.
+      // Böylece uygulama açılışta giriş yapılmış olarak başlar; ikinci bir doğrulama turu
+      // ve giriş ekranının görünmesi gerekmez.
+      if (user && token && !isExpoClient) {
+        try {
+          window.localStorage.setItem('tavriko_auth_user', JSON.stringify(user));
+          window.localStorage.setItem('tavriko_auth_token', token);
+          webTarget = '/app';
+        } catch (e) {}
+      }
 
       if (btn) {
         btn.href = isExpoClient ? 'exp://' + activeHost + ':8081/--/auth-callback?' + payload : webTarget;
@@ -323,7 +334,7 @@ router.get('/google/callback', (req, res) => {
         }, 1000);
       } else {
         // Web browser: Redirect straight to Tavriko web application!
-        window.location.href = webTarget;
+        window.location.replace(webTarget);
       }
     }
 
@@ -338,9 +349,7 @@ router.get('/google/callback', (req, res) => {
       .then(function(d) {
         if (d && d.user) {
           document.getElementById('msg').innerText = 'Hoş geldin ' + d.user.displayName + '! Tavriko açılıyor...';
-          setTimeout(function() {
-            navigateToApp(d.user, d.token);
-          }, 350);
+          navigateToApp(d.user, d.token);
         } else {
           navigateToApp(null, null);
         }
@@ -462,6 +471,33 @@ router.post('/delete-account', auth_1.requireUserAuth, async (req, res) => {
             return;
         }
         const result = await prismaClient_1.db.deleteAccount(userId);
+        res.json(result);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// KVKK: /remove-account web sayfasının e-posta ile hesap silme akışı.
+// E-posta altyapısı olmadığından doğrulama kodu yanıtta gösterilir (şifre
+// sıfırlamadaki demoResetCode deseniyle aynı).
+router.post('/request-delete-code', async (req, res) => {
+    try {
+        const { email } = req.body || {};
+        const result = await prismaClient_1.db.requestAccountDeletionCode(String(email || ''));
+        res.json(result);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+router.post('/confirm-delete', async (req, res) => {
+    try {
+        const { email, code } = req.body || {};
+        const result = await prismaClient_1.db.confirmAccountDeletion(String(email || ''), String(code || ''));
+        if (!result.success) {
+            res.status(400).json(result);
+            return;
+        }
         res.json(result);
     }
     catch (err) {
@@ -601,18 +637,42 @@ router.post('/stats', auth_1.requireUserAuth, async (req, res) => {
             res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
             return;
         }
-        const { correctAnswers = 0, totalAnswers = 0, xpEarned = 0, coinsEarned = 0, bestStreak = 0, won = false, roomCode, category } = req.body;
-        const updated = await prismaClient_1.db.recordGameStats(userId, {
-            correctAnswers,
-            totalAnswers,
-            xpEarned,
-            coinsEarned,
+        const { correctAnswers = 0, totalAnswers = 0, bestStreak = 0, roomCode, category, mode, difficulty } = req.body;
+        // ÇOK OYUNCULU maç: galibiyet, doğru sayısı ve dereceli olup olmadığı yalnızca
+        // gerçek zamanlı sunucunun bildirdiği nihai özetten gelir (recordFinalMatch).
+        // İstemci bu alanları bildiremez; yalnızca sunucudaki kaydı okuyabilir.
+        if (mode !== 'solo') {
+            const code = typeof roomCode === 'string' ? roomCode.trim() : '';
+            if (!code) {
+                res.status(400).json({ error: 'Çok oyunculu maç için oda kodu gereklidir.' });
+                return;
+            }
+            const recorded = await prismaClient_1.db.getRecordedMatchRewards(userId, code);
+            if (!recorded) {
+                // Sunucu henüz maç özetini işlemedi; istemci kısa süre sonra tekrar sorar
+                res.json({ success: true, pending: true, user: null, rewards: null });
+                return;
+            }
+            res.json({ success: true, user: recorded.user, rewards: recorded.rewards });
+            return;
+        }
+        // TEK KİŞİLİK pratik: galibiyet sunucuda kurala göre hesaplanır (doğruların en az yarısı);
+        // pratik hiçbir zaman dereceli değildir, dolayısıyla LP değişmez.
+        const validDifficulty = ['easy', 'medium', 'hard', 'expert'].includes(difficulty) ? difficulty : undefined;
+        const soloTotal = Math.max(1, Math.min(20, Math.round(Number(totalAnswers) || 5)));
+        const soloCorrect = Math.max(0, Math.min(soloTotal, Math.round(Number(correctAnswers) || 0)));
+        const result = await prismaClient_1.db.recordMatchResult(userId, {
+            correctAnswers: soloCorrect,
+            totalAnswers: soloTotal,
             bestStreak,
-            won,
-            roomCode: typeof roomCode === 'string' && roomCode.trim() ? roomCode.trim() : undefined,
+            won: soloCorrect >= Math.ceil(soloTotal / 2),
+            mode: 'solo',
+            difficulty: validDifficulty,
+            ranked: false,
             category: typeof category === 'string' && category.trim() ? category.trim() : undefined,
         });
-        res.json({ success: true, user: updated });
+        // rewards: hesaba GERÇEKTEN yazılan XP/altın (istemci bunu aynen göstermelidir)
+        res.json({ success: true, user: result?.user ?? null, rewards: result?.rewards ?? null });
     }
     catch (err) {
         res.status(400).json({ error: err.message });

@@ -176,8 +176,8 @@ function createApp() {
     // Prometheus'a canli istemci sayisini bildir
     (0, metrics_1.setSocketServer)(io);
     // Wire up authoritative room manager with DB question provider
-    const roomManager = new GameRoomManager_1.GameRoomManager((category, difficulty, count) => {
-        return prismaClient_1.db.getQuestions(category, difficulty, count);
+    const roomManager = new GameRoomManager_1.GameRoomManager((category, difficulty, count, subCategory) => {
+        return prismaClient_1.db.getQuestions(category, difficulty, count, [], subCategory);
     });
     const matchmaker = new Matchmaker_1.Matchmaker(roomManager);
     (0, socketHandler_1.setupSocketHandlers)(io, roomManager, matchmaker);
@@ -428,6 +428,24 @@ function createApp() {
         app.use('/assets', express_1.default.static(path_1.default.join(clientDistDir, 'assets')));
         app.get('/favicon.ico', (req, res) => {
             res.sendFile(path_1.default.join(clientDistDir, 'favicon.ico'));
+        });
+        // Marka ikonları, manifest ve paylaşım görseli (client/public -> client/dist)
+        const brandStaticFiles = [
+            'favicon-16.png',
+            'favicon-32.png',
+            'apple-touch-icon.png',
+            'icon-192.png',
+            'icon-512.png',
+            'icon-maskable-512.png',
+            'og-image.png',
+            'manifest.json',
+        ];
+        app.get(brandStaticFiles.map((name) => `/${name}`), (req, res, next) => {
+            const filePath = path_1.default.join(clientDistDir, path_1.default.basename(req.path));
+            if (!fs_1.default.existsSync(filePath))
+                return next();
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            return res.sendFile(filePath);
         });
         // 4. Playable Web App at /app
         app.get(['/app', '/app/'], (req, res) => {
@@ -3534,10 +3552,10 @@ function createApp() {
         }
         // Sunucusuz ortamda kalıcı soru havuzunun (Telegram soruları dahil) hazır olmasını bekle
         await prismaClient_1.db.ensureQuestionsRestored();
-        const { categoryId, difficulty, count = 5 } = req.body || {};
+        const { categoryId, difficulty, count = 5, subCategory } = req.body || {};
         const safeCount = Math.min(50, Math.max(1, Number(count) || 5));
         const resolvedCat = (0, shared_2.canonicalCategoryId)(categoryId || 'general_culture');
-        const questions = prismaClient_1.db.getQuestions(resolvedCat, difficulty || 'medium', safeCount);
+        const questions = prismaClient_1.db.getQuestions(resolvedCat, difficulty || 'medium', safeCount, [], typeof subCategory === 'string' && subCategory.trim() ? subCategory.trim() : undefined);
         return res.json({ success: true, questions });
     });
     app.post('/api/internal/match-results', async (req, res) => {
@@ -3565,39 +3583,9 @@ function createApp() {
                 },
             });
             prismaClient_1.db.removePublicRoom(summary.roomCode);
-            // Update XP and coins for participating registered users
-            for (const rankItem of summary.rankings) {
-                if (!rankItem.playerId || rankItem.playerId.startsWith('bot_') || rankItem.playerId.startsWith('guest_')) {
-                    continue;
-                }
-                const isWinner = rankItem.rank === 1;
-                const totalRounds = Math.max(1, Number(summary.totalRounds) || 5);
-                const rawCorrect = typeof rankItem.correctAnswersCount === 'number'
-                    ? rankItem.correctAnswersCount
-                    : Math.min(totalRounds, Math.round((rankItem.score || 0) / 140));
-                const safeCorrect = Math.max(0, Math.min(totalRounds, rawCorrect));
-                // Sıfır doğru cevap veya oyundan erken ayrılmada 0 coin ve 0 xp
-                const isZero = safeCorrect === 0;
-                const coinsEarned = isZero
-                    ? 0
-                    : isWinner
-                        ? Math.min(15, safeCorrect * 2 + 5)
-                        : Math.min(6, safeCorrect * 1);
-                const xpEarned = isZero
-                    ? 0
-                    : isWinner
-                        ? Math.min(35, safeCorrect * 5 + 10)
-                        : Math.min(15, safeCorrect * 3);
-                await prismaClient_1.db.recordGameStats(rankItem.playerId, {
-                    correctAnswers: safeCorrect,
-                    totalAnswers: totalRounds,
-                    xpEarned,
-                    coinsEarned,
-                    bestStreak: Math.min(safeCorrect, rankItem.streak || 0),
-                    won: isWinner,
-                    roomCode: summary.roomCode,
-                });
-            }
+            // Galibiyet / dereceli maç / doğru sayısı yalnızca bu yetkili özetten hesaplanır.
+            // XP, altın ve LP sunucuda recordMatchResult içinde paylaşılan formülle yazılır.
+            await prismaClient_1.db.recordFinalMatch(summary);
             logger_1.logger.info('SOCKET', `Cloudflare Durable Objects maçı kaydedildi: ${summary.roomCode}`, {
                 mode: summary.mode,
                 playersCount: summary.rankings.length,

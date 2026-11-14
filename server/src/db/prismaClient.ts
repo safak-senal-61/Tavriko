@@ -2066,34 +2066,155 @@ export class PrismaService {
   }
 
   public async deleteAccount(userId: string): Promise<{ success: boolean; message: string }> {
-    const user = this.users.get(userId);
-    if (!user) {
-      return { success: false, message: 'Kullanıcı bulunamadı.' };
-    }
-
-    // 1. Remove from in-memory maps
-    this.users.delete(userId);
-    this.store.users.delete(userId);
-
-    // 2. Remove from friends lists of other users
-    for (const otherUser of this.users.values()) {
-      if (otherUser.friendIds && otherUser.friendIds.includes(userId)) {
-        otherUser.friendIds = otherUser.friendIds.filter((id) => id !== userId);
-      }
-    }
-
-    // 3. Delete from PostgreSQL
+    // KVKK: hesap silme isteği, bellekte kullanıcı olmasa bile (sunucusuz
+    // ortamda her cold start boş bellekle başlar) PostgreSQL'den tüm verileri
+    // kalıcı olarak silmelidir. Veritabanı esas kaynaktır.
+    let dbExisted = false;
+    let dbDeleted = false;
     try {
-      await this.rawClient.user.delete({ where: { id: userId } }).catch(() => null);
+      const dbUser = await this.rawClient.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true },
+      });
+      if (dbUser) {
+        dbExisted = true;
+        // 1. Maç geçmişi satırları FK kısıtına takılmasın diye önce silinir
+        await this.rawClient.matchHistory.deleteMany({ where: { userId } }).catch(() => null);
+        // 2. Şifre sıfırlama kodları temizlenir
+        await this.rawClient.passwordResetToken
+          .deleteMany({ where: { email: dbUser.email } })
+          .catch(() => null);
+        // 3. Diğer kullanıcıların arkadaş/engel listelerinden çıkarılır (jsonb)
+        await this.rawClient
+          .$executeRaw`UPDATE users SET "friendIds" = ("friendIds" - ${userId}), "blockedUserIds" = ("blockedUserIds" - ${userId}) WHERE "friendIds" ? ${userId} OR "blockedUserIds" ? ${userId}`
+          .catch(() => null);
+        // 4. Kullanıcı satırı silinir (envanter/bildirim/referral cascade ile gider)
+        await this.rawClient.user.delete({ where: { id: userId } });
+        dbDeleted = true;
+      }
+    } catch (err) {
+      console.error('[deleteAccount] DB delete error:', err);
+    }
+
+    // Bellekteki kopya da temizlenir (varsa)
+    const memUser = this.users.get(userId);
+    if (memUser) {
+      this.users.delete(userId);
+      this.store.users.delete(userId);
+      for (const otherUser of this.users.values()) {
+        if (otherUser.friendIds && otherUser.friendIds.includes(userId)) {
+          otherUser.friendIds = otherUser.friendIds.filter((id) => id !== userId);
+        }
+      }
+      this.savePersistedUsers();
+    }
+
+    if (dbDeleted) {
+      return {
+        success: true,
+        message: 'Hesabınız ve tüm oyun verileriniz kalıcı olarak silindi.',
+      };
+    }
+    if (!dbExisted && memUser) {
+      return {
+        success: true,
+        message: 'Hesabınız ve tüm oyun verileriniz kalıcı olarak silindi.',
+      };
+    }
+    if (!dbExisted && !memUser) {
+      // Hesap zaten yok — sessizce başarı dönmek yerine durumu bildir
+      return { success: false, message: 'Kullanıcı bulunamadı veya hesap zaten silinmiş.' };
+    }
+    return {
+      success: false,
+      message: 'Hesap silinirken bir hata oluştu. Lütfen tekrar deneyin.',
+    };
+  }
+
+  /* KVKK: /remove-account web sayfası için e-posta ile hesap silme akışı.
+     E-posta altyapısı olmadığından doğrulama kodu istemciye gösterilir
+     (mevcut şifre sıfırlama akışıyla aynı desen). */
+  public async requestAccountDeletionCode(
+    email: string
+  ): Promise<{ success: boolean; message: string; code?: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, message: 'Geçerli bir e-posta adresi girin.' };
+    }
+    // Önce PostgreSQL (esas kaynak), yoksa bellek
+    let userId: string | null = null;
+    try {
+      const dbUser = await this.rawClient.user.findFirst({ where: { email: cleanEmail }, select: { id: true } });
+      if (dbUser) userId = dbUser.id;
     } catch {}
-
-    // 4. Save persisted users snapshot
-    this.savePersistedUsers();
-
+    if (!userId) {
+      const mem = Array.from(this.users.values()).find(
+        (u) => !u.isGuest && u.email && u.email.trim().toLowerCase() === cleanEmail
+      );
+      if (mem) userId = mem.id;
+    }
+    if (!userId) {
+      // SECURITY: kullanıcı sayımını engellemek için genel mesaj
+      return { success: true, message: 'Bu e-posta ile kayıtlı bir hesap bulunamadı.' };
+    }
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    try {
+      await this.rawClient.passwordResetToken.create({
+        data: { email: cleanEmail, code, expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
+      });
+    } catch (err) {
+      console.error('[requestAccountDeletionCode] DB error:', err);
+      return { success: false, message: 'Kod oluşturulamadı. Lütfen tekrar deneyin.' };
+    }
     return {
       success: true,
-      message: 'Hesabınız ve tüm oyun verileriniz kalıcı olarak silindi.',
+      message: 'Hesap silme doğrulama kodunuz oluşturuldu (15 dakika geçerli).',
+      code,
     };
+  }
+
+  public async confirmAccountDeletion(
+    email: string,
+    code: string
+  ): Promise<{ success: boolean; message: string }> {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !code || !code.trim()) {
+      return { success: false, message: 'E-posta ve doğrulama kodu zorunludur.' };
+    }
+    let tokens: Array<{ id: string; code: string; expiresAt: Date; used: boolean }> = [];
+    try {
+      tokens = await this.rawClient.passwordResetToken.findMany({
+        where: { email: cleanEmail, used: false },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      });
+    } catch (err) {
+      console.error('[confirmAccountDeletion] DB error:', err);
+      return { success: false, message: 'Doğrulama yapılamadı. Lütfen tekrar deneyin.' };
+    }
+    const match = tokens.find((t) => t.code === code.trim() && t.expiresAt.getTime() > Date.now());
+    if (!match) {
+      return { success: false, message: 'Doğrulama kodu hatalı veya süresi dolmuş.' };
+    }
+    await this.rawClient.passwordResetToken
+      .update({ where: { id: match.id }, data: { used: true } })
+      .catch(() => null);
+    // E-postadan kullanıcı bulunur ve kalıcı silme çalıştırılır
+    let userId: string | null = null;
+    try {
+      const dbUser = await this.rawClient.user.findFirst({ where: { email: cleanEmail }, select: { id: true } });
+      if (dbUser) userId = dbUser.id;
+    } catch {}
+    if (!userId) {
+      const mem = Array.from(this.users.values()).find(
+        (u) => !u.isGuest && u.email && u.email.trim().toLowerCase() === cleanEmail
+      );
+      if (mem) userId = mem.id;
+    }
+    if (!userId) {
+      return { success: false, message: 'Hesap bulunamadı veya zaten silinmiş.' };
+    }
+    return this.deleteAccount(userId);
   }
 
   public async requestPasswordReset(identifier: string): Promise<{

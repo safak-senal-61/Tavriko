@@ -81,6 +81,7 @@ class GameRoomManager {
             hostId: options.hostId,
             status: 'lobby',
             category: options.category || (options.categories?.[0] || 'general_culture'),
+            subCategory: options.subCategory || undefined,
             difficulty: options.difficulty || 'medium',
             maxPlayers: options.maxPlayers || 8,
             currentRound: 0,
@@ -189,6 +190,8 @@ class GameRoomManager {
             room.difficulty = settings.difficulty;
         if (settings.category)
             room.category = settings.category;
+        if (settings.subCategory !== undefined)
+            room.subCategory = settings.subCategory || undefined;
         if (settings.categories)
             room.categories = settings.categories;
         if (settings.mixedCategories !== undefined)
@@ -204,7 +207,7 @@ class GameRoomManager {
         if (!room || room.hostId !== requesterId)
             return false;
         // Fetch questions for this match
-        const questions = this.questionProvider(room.category, room.difficulty, room.totalRounds);
+        const questions = this.questionProvider(room.category, room.difficulty, room.totalRounds, room.subCategory);
         if (questions.length === 0)
             return false;
         this.questionsByRoom.set(code, questions);

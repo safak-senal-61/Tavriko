@@ -9,8 +9,11 @@ import {
   Modal,
   ActivityIndicator,
   TextInput,
+  Linking,
 } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import { ExternalLink } from 'lucide-react-native';
+import { CLOUD_BASE_URL } from '../config';
 import { UserProfile, UserSettings } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -792,6 +795,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </View>
         <View style={styles.groupCard}>
           <LegalDocumentList onOpen={setOpenLegalDoc} acceptedAt={getLegalConsent(user)?.acceptedAt ?? null} />
+          {/* KVKK: web üzerinden hesap silme sayfası */}
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, marginTop: 4 }}
+            onPress={() => {
+              const url = `${CLOUD_BASE_URL}/remove-account`;
+              if (Platform.OS === 'web' && typeof window !== 'undefined') window.open(url, '_blank', 'noopener');
+              else Linking.openURL(url).catch(() => {});
+            }}
+            accessibilityRole="link"
+          >
+            <ExternalLink size={14} color="#F87171" />
+            <Text style={{ color: '#FCA5A5', fontSize: 13, fontFamily: THEME.fonts.bold }}>
+              Hesabımı ve tüm verilerimi sil (web)
+            </Text>
+          </TouchableOpacity>
         </View>
         </>}
         <LegalDocumentModal documentId={openLegalDoc} onClose={() => setOpenLegalDoc(null)} />

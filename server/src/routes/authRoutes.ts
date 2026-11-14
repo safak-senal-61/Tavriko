@@ -529,6 +529,33 @@ router.post('/delete-account', requireUserAuth, async (req: Request, res: Respon
   }
 });
 
+// KVKK: /remove-account web sayfasının e-posta ile hesap silme akışı.
+// E-posta altyapısı olmadığından doğrulama kodu yanıtta gösterilir (şifre
+// sıfırlamadaki demoResetCode deseniyle aynı).
+router.post('/request-delete-code', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body || {};
+    const result = await db.requestAccountDeletionCode(String(email || ''));
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/confirm-delete', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email, code } = req.body || {};
+    const result = await db.confirmAccountDeletion(String(email || ''), String(code || ''));
+    if (!result.success) {
+      res.status(400).json(result);
+      return;
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
   try {
     const { identifier, email } = req.body;

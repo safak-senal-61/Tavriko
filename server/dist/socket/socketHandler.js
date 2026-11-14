@@ -45,6 +45,8 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
     };
     roomManager.onGameOver = (roomCode, summary) => {
         io.to(roomCode).emit(shared_1.SOCKET_EVENTS.GAME_OVER, summary);
+        // Yerel Socket.IO modunda da sonuç sunucuda (istemciden bağımsız) kaydedilir
+        void prismaClient_1.db.recordFinalMatch(summary).catch(() => { });
     };
     roomManager.onStateSync = (roomCode, room) => {
         io.to(roomCode).emit(shared_1.SOCKET_EVENTS.ROOM_STATE_SYNC, room);
@@ -243,7 +245,8 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
                 hostId: playerId,
                 hostName: displayName,
                 avatarUrl,
-                category: settings?.categories?.[0] || 'general_culture',
+                category: settings?.mixedCategories ? 'mixed' : (settings?.categories?.[0] || 'general_culture'),
+                subCategory: typeof settings?.subCategory === 'string' ? settings.subCategory : undefined,
                 difficulty: settings?.difficulty || 'medium',
                 maxPlayers: settings?.maxPlayers || 4,
                 totalRounds: settings?.totalRounds || 7,

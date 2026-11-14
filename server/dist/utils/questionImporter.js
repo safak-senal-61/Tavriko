@@ -1,8 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SAMPLE_QUESTION_JSON = exports.POOL_NAMES_TR = exports.DIFFICULTY_NAMES_TR = exports.CATEGORY_NAMES_TR = void 0;
+exports.resolveSubCategoryName = resolveSubCategoryName;
 exports.parseAndNormalizeQuestions = parseAndNormalizeQuestions;
 exports.importQuestionsFromJson = importQuestionsFromJson;
+const shared_1 = require("@trivia/shared");
 exports.CATEGORY_NAMES_TR = {
     science_tech: { name: 'Bilim', icon: '⚛️' },
     history: { name: 'Tarih', icon: '🏛️' },
@@ -203,7 +205,32 @@ const DIFFICULTY_MAP_TR = {
     hard: 'hard',
     uzman: 'expert',
     expert: 'expert',
+    // Şablon dosyasındaki Türkçe etiketler: Kolay / Standart / Zor / Çok Zor
+    standart: 'medium',
+    standard: 'medium',
+    'çok zor': 'expert',
+    'cok zor': 'expert',
+    cok_zor: 'expert',
+    çok_zor: 'expert',
+    very_hard: 'expert',
 };
+/**
+ * Alt kategori değerini (id veya ad) kategorinin kanonik adına çevirir.
+ * Sayaçlar ve soru seçimi alt kategori ADI üzerinden çalıştığı için id ile
+ * yüklenen sorular da (ör. "capitals_currencies") doğru gruba düşer.
+ */
+function resolveSubCategoryName(categoryId, rawSub) {
+    if (rawSub === undefined || rawSub === null)
+        return undefined;
+    const value = String(rawSub).trim();
+    if (!value)
+        return undefined;
+    const key = value.toLowerCase().replace(/[’`´]/g, "'");
+    const norm = (t) => t.trim().toLowerCase().replace(/[’`´]/g, "'");
+    const cat = shared_1.ALL_CATEGORIES.find((c) => c.id === categoryId);
+    const match = cat?.subCategories?.find((sc) => sc.id.toLowerCase() === key || norm(sc.name) === key);
+    return match ? match.name : value;
+}
 function parseAndNormalizeQuestions(rawInput) {
     console.log('🔍 [questionImporter] parseAndNormalizeQuestions çağrıldı, girdi tipi:', typeof rawInput);
     if (rawInput === undefined || rawInput === null || rawInput === '') {
@@ -373,6 +400,7 @@ function importQuestionsFromJson(rawInput, db, addedBy = 'Telegram Admin', publi
         totalProcessed: 0,
         importedCount: 0,
         duplicateCount: 0,
+        templateSkippedCount: 0,
         errorCount: 0,
         questions: [],
         errors: [],
@@ -406,6 +434,12 @@ function importQuestionsFromJson(rawInput, db, addedBy = 'Telegram Admin', publi
         if (!text || text.length < 5) {
             result.errorCount++;
             result.errors.push(`${indexLabel}: Soru metni çok kısa veya eksik.`);
+            continue;
+        }
+        // Şablon dosyasındaki henüz doldurulmamış satırlar ("DOLDUR: ...") sessizce atlanır;
+        // böylece şablon olduğu gibi yüklense bile veritabanına yer tutucu soru girmez.
+        if (/^doldur\s*:/i.test(text)) {
+            result.templateSkippedCount++;
             continue;
         }
         const textSig = text.toLowerCase().replace(/[^a-z0-9ğüşıöç]/gi, '').trim();
@@ -497,7 +531,7 @@ function importQuestionsFromJson(rawInput, db, addedBy = 'Telegram Admin', publi
         try {
             const created = db.createQuestion({
                 categoryId,
-                subCategory: raw.subCategory || raw.altKategori || undefined,
+                subCategory: resolveSubCategoryName(categoryId, raw.subCategoryId || raw.subCategory || raw.altKategori || raw.altKategoriId),
                 difficulty,
                 text,
                 options,

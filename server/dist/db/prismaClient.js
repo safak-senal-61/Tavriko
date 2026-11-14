@@ -77,6 +77,11 @@ function computeQuestionHash(text, options) {
  * UserNotification, MatchHistory, PasswordResetToken) doğrudan yönetir ve
  * Supabase (rjvbgofzsfescnfohzgu.supabase.co) ile çift yönlü senkronize eder.
  */
+// Eski sürümlerde yeni kullanıcılara otomatik eklenen sahte bildirimler.
+const MOCK_NOTIFICATION_IDS = new Set(['notif_welcome', 'notif_duel_1', 'notif_season']);
+/** Sezon ödülü iş kuralı hatası (kullanıcıya olduğu gibi gösterilir). */
+class SeasonClaimError extends Error {
+}
 class PrismaService {
     rawClient;
     store = {
@@ -102,6 +107,7 @@ class PrismaService {
     isJest = Boolean(process.env.JEST_WORKER_ID) || Boolean(process.env.VITEST);
     activeUserRooms = new Map();
     recordedMatchKeys = new Set();
+    recordedMatchRewards = new Map();
     activePublicRooms = new Map();
     constructor() {
         const dbUrl = process.env.DATABASE_URL ||
@@ -404,6 +410,7 @@ class PrismaService {
                 qty: item.qty,
                 category: this.getItemCategory(item.itemId),
                 rarity: this.getItemRarity(item.itemId),
+                durationHours: item.durationHours ?? undefined,
             }));
         }
         const sanitizedStats = this.sanitizeUserStats({
@@ -478,6 +485,24 @@ class PrismaService {
                 if (typeof raw === 'number')
                     return raw; // Eski kayıtlar: epoch ms
                 const parsed = new Date(raw).getTime(); // Yeni format: ISO string
+                return Number.isFinite(parsed) ? parsed : undefined;
+            })(),
+            xp3BoosterExpiresAt: (() => {
+                const raw = u.settings?.xp3BoosterExpiresAt;
+                if (raw === null || raw === undefined)
+                    return undefined;
+                if (typeof raw === 'number')
+                    return raw;
+                const parsed = new Date(raw).getTime();
+                return Number.isFinite(parsed) ? parsed : undefined;
+            })(),
+            coinBoosterExpiresAt: (() => {
+                const raw = u.settings?.coinBoosterExpiresAt;
+                if (raw === null || raw === undefined)
+                    return undefined;
+                if (typeof raw === 'number')
+                    return raw;
+                const parsed = new Date(raw).getTime();
                 return Number.isFinite(parsed) ? parsed : undefined;
             })(),
             eventProgress: u.eventProgress || {},
@@ -731,6 +756,7 @@ class PrismaService {
                     name: args.create.name,
                     desc: args.create.desc,
                     qty: args.create.qty ?? 1,
+                    durationHours: args.create.durationHours ?? null,
                     createdAt: now,
                     updatedAt: now,
                 };
@@ -1271,6 +1297,7 @@ class PrismaService {
                         senderName: notif.senderName ?? null,
                         senderAvatar: notif.senderAvatar ?? null,
                         roomCode: notif.roomCode ?? null,
+                        createdAt: notif.createdAt ? new Date(notif.createdAt) : undefined,
                     },
                 }).catch(() => { });
             }
@@ -1730,30 +1757,151 @@ class PrismaService {
         return { token, user: this.toProfile(existingRecord), isNewUser };
     }
     async deleteAccount(userId) {
-        const user = this.users.get(userId);
-        if (!user) {
-            return { success: false, message: 'Kullanıcı bulunamadı.' };
-        }
-        // 1. Remove from in-memory maps
-        this.users.delete(userId);
-        this.store.users.delete(userId);
-        // 2. Remove from friends lists of other users
-        for (const otherUser of this.users.values()) {
-            if (otherUser.friendIds && otherUser.friendIds.includes(userId)) {
-                otherUser.friendIds = otherUser.friendIds.filter((id) => id !== userId);
+        // KVKK: hesap silme isteği, bellekte kullanıcı olmasa bile (sunucusuz
+        // ortamda her cold start boş bellekle başlar) PostgreSQL'den tüm verileri
+        // kalıcı olarak silmelidir. Veritabanı esas kaynaktır.
+        let dbExisted = false;
+        let dbDeleted = false;
+        try {
+            const dbUser = await this.rawClient.user.findUnique({
+                where: { id: userId },
+                select: { id: true, email: true },
+            });
+            if (dbUser) {
+                dbExisted = true;
+                // 1. Maç geçmişi satırları FK kısıtına takılmasın diye önce silinir
+                await this.rawClient.matchHistory.deleteMany({ where: { userId } }).catch(() => null);
+                // 2. Şifre sıfırlama kodları temizlenir
+                await this.rawClient.passwordResetToken
+                    .deleteMany({ where: { email: dbUser.email } })
+                    .catch(() => null);
+                // 3. Diğer kullanıcıların arkadaş/engel listelerinden çıkarılır (jsonb)
+                await this.rawClient
+                    .$executeRaw `UPDATE users SET "friendIds" = ("friendIds" - ${userId}), "blockedUserIds" = ("blockedUserIds" - ${userId}) WHERE "friendIds" ? ${userId} OR "blockedUserIds" ? ${userId}`
+                    .catch(() => null);
+                // 4. Kullanıcı satırı silinir (envanter/bildirim/referral cascade ile gider)
+                await this.rawClient.user.delete({ where: { id: userId } });
+                dbDeleted = true;
             }
         }
-        // 3. Delete from PostgreSQL
+        catch (err) {
+            console.error('[deleteAccount] DB delete error:', err);
+        }
+        // Bellekteki kopya da temizlenir (varsa)
+        const memUser = this.users.get(userId);
+        if (memUser) {
+            this.users.delete(userId);
+            this.store.users.delete(userId);
+            for (const otherUser of this.users.values()) {
+                if (otherUser.friendIds && otherUser.friendIds.includes(userId)) {
+                    otherUser.friendIds = otherUser.friendIds.filter((id) => id !== userId);
+                }
+            }
+            this.savePersistedUsers();
+        }
+        if (dbDeleted) {
+            return {
+                success: true,
+                message: 'Hesabınız ve tüm oyun verileriniz kalıcı olarak silindi.',
+            };
+        }
+        if (!dbExisted && memUser) {
+            return {
+                success: true,
+                message: 'Hesabınız ve tüm oyun verileriniz kalıcı olarak silindi.',
+            };
+        }
+        if (!dbExisted && !memUser) {
+            // Hesap zaten yok — sessizce başarı dönmek yerine durumu bildir
+            return { success: false, message: 'Kullanıcı bulunamadı veya hesap zaten silinmiş.' };
+        }
+        return {
+            success: false,
+            message: 'Hesap silinirken bir hata oluştu. Lütfen tekrar deneyin.',
+        };
+    }
+    /* KVKK: /remove-account web sayfası için e-posta ile hesap silme akışı.
+       E-posta altyapısı olmadığından doğrulama kodu istemciye gösterilir
+       (mevcut şifre sıfırlama akışıyla aynı desen). */
+    async requestAccountDeletionCode(email) {
+        const cleanEmail = email.trim().toLowerCase();
+        if (!cleanEmail || !cleanEmail.includes('@')) {
+            return { success: false, message: 'Geçerli bir e-posta adresi girin.' };
+        }
+        // Önce PostgreSQL (esas kaynak), yoksa bellek
+        let userId = null;
         try {
-            await this.rawClient.user.delete({ where: { id: userId } }).catch(() => null);
+            const dbUser = await this.rawClient.user.findFirst({ where: { email: cleanEmail }, select: { id: true } });
+            if (dbUser)
+                userId = dbUser.id;
         }
         catch { }
-        // 4. Save persisted users snapshot
-        this.savePersistedUsers();
+        if (!userId) {
+            const mem = Array.from(this.users.values()).find((u) => !u.isGuest && u.email && u.email.trim().toLowerCase() === cleanEmail);
+            if (mem)
+                userId = mem.id;
+        }
+        if (!userId) {
+            // SECURITY: kullanıcı sayımını engellemek için genel mesaj
+            return { success: true, message: 'Bu e-posta ile kayıtlı bir hesap bulunamadı.' };
+        }
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        try {
+            await this.rawClient.passwordResetToken.create({
+                data: { email: cleanEmail, code, expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
+            });
+        }
+        catch (err) {
+            console.error('[requestAccountDeletionCode] DB error:', err);
+            return { success: false, message: 'Kod oluşturulamadı. Lütfen tekrar deneyin.' };
+        }
         return {
             success: true,
-            message: 'Hesabınız ve tüm oyun verileriniz kalıcı olarak silindi.',
+            message: 'Hesap silme doğrulama kodunuz oluşturuldu (15 dakika geçerli).',
+            code,
         };
+    }
+    async confirmAccountDeletion(email, code) {
+        const cleanEmail = email.trim().toLowerCase();
+        if (!cleanEmail || !code || !code.trim()) {
+            return { success: false, message: 'E-posta ve doğrulama kodu zorunludur.' };
+        }
+        let tokens = [];
+        try {
+            tokens = await this.rawClient.passwordResetToken.findMany({
+                where: { email: cleanEmail, used: false },
+                orderBy: { createdAt: 'desc' },
+                take: 5,
+            });
+        }
+        catch (err) {
+            console.error('[confirmAccountDeletion] DB error:', err);
+            return { success: false, message: 'Doğrulama yapılamadı. Lütfen tekrar deneyin.' };
+        }
+        const match = tokens.find((t) => t.code === code.trim() && t.expiresAt.getTime() > Date.now());
+        if (!match) {
+            return { success: false, message: 'Doğrulama kodu hatalı veya süresi dolmuş.' };
+        }
+        await this.rawClient.passwordResetToken
+            .update({ where: { id: match.id }, data: { used: true } })
+            .catch(() => null);
+        // E-postadan kullanıcı bulunur ve kalıcı silme çalıştırılır
+        let userId = null;
+        try {
+            const dbUser = await this.rawClient.user.findFirst({ where: { email: cleanEmail }, select: { id: true } });
+            if (dbUser)
+                userId = dbUser.id;
+        }
+        catch { }
+        if (!userId) {
+            const mem = Array.from(this.users.values()).find((u) => !u.isGuest && u.email && u.email.trim().toLowerCase() === cleanEmail);
+            if (mem)
+                userId = mem.id;
+        }
+        if (!userId) {
+            return { success: false, message: 'Hesap bulunamadı veya zaten silinmiş.' };
+        }
+        return this.deleteAccount(userId);
     }
     async requestPasswordReset(identifier) {
         const cleanId = identifier.trim().toLowerCase();
@@ -1990,20 +2138,104 @@ class PrismaService {
         }
         return { success: true, message: 'Şifreniz başarıyla değiştirildi!' };
     }
+    /** Kalıcı maç defteri: roomCode -> o maçta hesaba yazılan ödül (en fazla 40 kayıt). */
+    readMatchLedger(record) {
+        const raw = record.eventProgress?.__matchLedger;
+        return raw && typeof raw === 'object' ? raw : {};
+    }
+    writeMatchLedger(record, roomCode, rewards) {
+        if (!record.eventProgress)
+            record.eventProgress = {};
+        const ledger = { ...this.readMatchLedger(record), [roomCode]: { ...rewards, alreadyRecorded: undefined } };
+        const keys = Object.keys(ledger);
+        for (const k of keys.slice(0, Math.max(0, keys.length - 40)))
+            delete ledger[k];
+        record.eventProgress.__matchLedger = ledger;
+    }
+    /**
+     * Bir odadaki maçın bu kullanıcı için SUNUCUDA kaydedilmiş ödülünü döndürür.
+     * İstemci galibiyet / dereceli bilgisi bildiremez; yalnızca bu kaydı okuyabilir.
+     */
+    async getRecordedMatchRewards(userId, roomCode) {
+        const record = await this.loadRecord(userId);
+        if (!record)
+            return null;
+        const prev = this.readMatchLedger(record)[roomCode] || this.recordedMatchRewards.get(`${record.id}:${roomCode}`);
+        if (!prev)
+            return null;
+        return { user: this.toProfile(record), rewards: { ...prev, alreadyRecorded: true } };
+    }
+    /**
+     * Gerçek zamanlı sunucunun (Cloudflare Durable Object veya yerel Socket.IO) bildirdiği
+     * NİHAİ maç özetinden tüm kayıtlı oyuncuların sonucunu yazar. Galibiyet, doğru sayısı ve
+     * dereceli olup olmadığı yalnızca bu özetten çıkarılır; istemci değerleri kullanılmaz.
+     */
+    async recordFinalMatch(summary) {
+        const ranked = (0, shared_1.isRankedMatch)({
+            mode: summary.mode,
+            roomCode: summary.roomCode,
+            playerIds: (summary.rankings || []).map((r) => r.playerId),
+        });
+        const totalRounds = Math.max(1, Number(summary.totalRounds) || 5);
+        for (const rankItem of summary.rankings || []) {
+            if (!rankItem.playerId || rankItem.playerId.startsWith('bot_') || rankItem.playerId.startsWith('guest_')) {
+                continue;
+            }
+            const rawCorrect = typeof rankItem.correctAnswersCount === 'number'
+                ? rankItem.correctAnswersCount
+                : Math.min(totalRounds, Math.round((rankItem.score || 0) / 140));
+            const safeCorrect = Math.max(0, Math.min(totalRounds, rawCorrect));
+            await this.recordGameStats(rankItem.playerId, {
+                correctAnswers: safeCorrect,
+                totalAnswers: totalRounds,
+                bestStreak: Math.min(safeCorrect, rankItem.streak || 0),
+                won: rankItem.rank === 1,
+                roomCode: summary.roomCode,
+                ranked,
+                category: typeof summary.category === 'string' ? summary.category : undefined,
+            });
+        }
+    }
     async recordGameStats(userId, delta) {
+        const res = await this.recordMatchResult(userId, delta);
+        return res ? res.user : null;
+    }
+    /**
+     * Maç sonucunu kaydeder ve GERÇEKTEN hesaba yazılan ödülü döndürür.
+     * Ödül sunucuda calculateMatchRewards ile hesaplanır; istemcinin gönderdiği
+     * xpEarned/coinsEarned değerleri artık yok sayılır. Böylece ekranda gösterilen
+     * XP ile çubuğa yansıyan XP her zaman aynıdır.
+     */
+    async recordMatchResult(userId, delta) {
         let record = await this.loadRecord(userId);
         if (!record)
             return null;
         if (delta.roomCode) {
             const matchKey = `${record.id}:${delta.roomCode}`;
+            // Kalıcı defter (veritabanındaki eventProgress.__matchLedger): sunucusuz ortamda
+            // başka bir örnek bu maçı zaten işlediyse ikinci kez ödül verilmez.
+            const persisted = this.readMatchLedger(record)[delta.roomCode];
+            if (persisted) {
+                return {
+                    user: this.toProfile(record),
+                    rewards: { ...persisted, alreadyRecorded: true },
+                };
+            }
             if (this.recordedMatchKeys.has(matchKey)) {
-                return this.toProfile(record);
+                // Aynı maç ikinci kez bildirilirse ilk kayıttaki ödülü aynen döndür
+                const prev = this.recordedMatchRewards.get(matchKey);
+                return {
+                    user: this.toProfile(record),
+                    rewards: prev || { xp: 0, coins: 0, seasonXp: 0, boosted: false, alreadyRecorded: true },
+                };
             }
             this.recordedMatchKeys.add(matchKey);
             if (this.recordedMatchKeys.size > 2000) {
                 const firstKey = this.recordedMatchKeys.values().next().value;
-                if (firstKey)
+                if (firstKey) {
                     this.recordedMatchKeys.delete(firstKey);
+                    this.recordedMatchRewards.delete(firstKey);
+                }
             }
         }
         const safeTotal = Math.max(1, Math.min(20, Math.round(Number(delta.totalAnswers) || 5)));
@@ -2012,21 +2244,54 @@ class PrismaService {
         // Ensure existing stats are sanitized before adding delta
         record.stats = this.sanitizeUserStats(record.stats);
         // KURAL: Soru çözmeyen / 0 doğru yapan oyuncuya kesinlikle para (coin) ve XP verilmez!
-        const isZeroPerformance = safeCorrect === 0;
-        // Zorlaştırılmış ekonomi: Tek maçtan kazanılan XP ve Altın sınırlandırıldı
-        const cappedXp = isZeroPerformance
-            ? 0
-            : Math.max(0, Math.min(Number(delta.xpEarned) || 0, delta.won ? 35 : 15));
-        const cappedCoins = isZeroPerformance
-            ? 0
-            : Math.max(0, Math.min(Math.round(Number(delta.coinsEarned) || 0), delta.won ? 15 : 6));
-        // 2x XP artırıcı: aktifken maçtan kazanılan XP 2 katına çıkar (1v1, özel oda vb. tüm maçlar).
-        const boosterActive = (record.activeBoosterExpiresAt || 0) > Date.now();
-        record.xp += boosterActive ? cappedXp * 2 : cappedXp;
-        record.coins += cappedCoins;
-        // Season 1 Pass XP progression (0 doğru için sezon XP verilmez)
-        const seasonXpGain = isZeroPerformance ? 0 : delta.won ? 25 : 10;
-        record.seasonXp = (record.seasonXp || 0) + seasonXpGain;
+        // Ödül TAMAMEN sunucuda hesaplanır (paylaşılan tek formül)
+        const baseRewards = (0, shared_1.calculateMatchRewards)({
+            correct: safeCorrect,
+            total: safeTotal,
+            won: !!delta.won,
+            mode: delta.mode === 'solo' ? 'solo' : 'multiplayer',
+            difficulty: delta.difficulty,
+        });
+        // Güçlendiriciler: aktifken kazançlar artar (tüm maçlar).
+        // - 2x XP iksiri (booster_xp_2x_1h) → XP x2
+        // - 3x XP iksiri (booster_xp_3x_1h) → XP x3
+        // - 2x Altın iksiri (booster_coin_2x_1h / _24h) → Altın x2
+        // İksirler envanterden kuşanıldığı anda süreleri başlar (1 saat / 24 saat).
+        const xp2Active = (record.activeBoosterExpiresAt || 0) > Date.now();
+        const xp3Active = (record.xp3BoosterExpiresAt || 0) > Date.now();
+        const coin2Active = (record.coinBoosterExpiresAt || 0) > Date.now();
+        const xpMultiplier = xp3Active ? 3 : xp2Active ? 2 : 1;
+        const coinMultiplier = coin2Active ? 2 : 1;
+        const appliedXp = baseRewards.xp * xpMultiplier;
+        const appliedCoins = baseRewards.coins * coinMultiplier;
+        record.xp += appliedXp;
+        record.coins += appliedCoins;
+        record.seasonXp = (record.seasonXp || 0) + baseRewards.seasonXp;
+        const appliedRewards = {
+            xp: appliedXp,
+            coins: appliedCoins,
+            seasonXp: baseRewards.seasonXp,
+            boosted: (xpMultiplier > 1 && baseRewards.xp > 0) || (coinMultiplier > 1 && baseRewards.coins > 0),
+            lp: 0,
+        };
+        // Lig Puanı (LP): yalnızca dereceli maçlarda değişir. Yanlış cevap cezası,
+        // kullanıcının Ayarlar > "Yanlış Cevap Puan Kesintisi" tercihine bağlıdır.
+        if (delta.ranked && delta.mode !== 'solo') {
+            const lpDelta = (0, shared_1.calculateLeagueChange)({
+                correct: safeCorrect,
+                total: safeTotal,
+                won: !!delta.won,
+                ranked: true,
+                penaltyForWrong: record.settings?.penaltyForWrong !== false,
+            });
+            const { points, applied } = (0, shared_1.applyLeagueChange)(record.rankPoints ?? shared_1.LEAGUE_START_POINTS, lpDelta);
+            record.rankPoints = points;
+            appliedRewards.lp = applied;
+        }
+        if (delta.roomCode) {
+            this.recordedMatchRewards.set(`${record.id}:${delta.roomCode}`, appliedRewards);
+            this.writeMatchLedger(record, delta.roomCode, appliedRewards);
+        }
         const progress = (0, shared_1.calculateLevelFromXp)(record.xp);
         record.level = progress.level;
         record.rankTitle = progress.rankTitle;
@@ -2095,12 +2360,14 @@ class PrismaService {
                         level: record.level,
                         seasonXp: record.seasonXp || 0,
                         rankTitle: record.rankTitle,
+                        rankPoints: record.rankPoints,
                         totalMatches: record.stats.totalMatches,
                         wins: record.stats.wins,
                         correctAnswers: record.stats.correctAnswers,
                         totalAnswers: record.stats.totalAnswers,
                         bestStreak: record.stats.bestStreak,
                         categoryMastery: record.categoryMastery,
+                        eventProgress: (record.eventProgress || {}),
                         updatedAt: new Date(),
                     },
                 });
@@ -2109,7 +2376,7 @@ class PrismaService {
                 console.error('[recordGameStats] PostgreSQL update error:', err);
             }
         }
-        return this.toProfile(record);
+        return { user: this.toProfile(record), rewards: appliedRewards };
     }
     /**
      * Cüzdan eşitleme artık SALT OKUNURDUR: istemciden gelen coins/gems/xp/level
@@ -2122,6 +2389,21 @@ class PrismaService {
         if (!record)
             return null;
         return this.toProfile(record);
+    }
+    /** Etkinlik ilerlemesini veritabanına yazar (sunucusuz ortamda bellek kaybolduğu için şart). */
+    async persistEventProgress(record, extra = {}) {
+        if (record.isGuest)
+            return;
+        this.savePersistedUsers();
+        try {
+            await this.rawClient.user.update({
+                where: { id: record.id },
+                data: { eventProgress: (record.eventProgress || {}), ...extra, updatedAt: new Date() },
+            });
+        }
+        catch (err) {
+            console.error('[persistEventProgress] DB update error:', err);
+        }
     }
     updateStartedEvents(record, delta) {
         if (!record.eventProgress)
@@ -2282,7 +2564,9 @@ class PrismaService {
         this.users.set(record.id, record);
         if (!record.isGuest) {
             this.savePersistedUsers();
-            this.syncUserToPrisma(record).catch(() => { });
+            this.syncUserToPrisma(record)
+                .catch(() => { })
+                .finally(() => { void this.persistEventProgress(record); });
         }
         return {
             success: true,
@@ -2301,10 +2585,18 @@ class PrismaService {
         const published = this.questions.filter((q) => (q.reviewStatus || 'published') === 'published');
         const countsByCategory = {};
         const countsBySub = {};
+        // Alt kategori hem ada hem id'ye göre kayıtlı olabilir; sayımı ada normalize et
+        const subNameById = {};
+        for (const cat of this.categories) {
+            for (const sc of cat.subCategories || []) {
+                subNameById[cat.id + '::' + sc.id.trim().toLowerCase()] = sc.name.trim().toLowerCase();
+            }
+        }
         for (const q of published) {
             countsByCategory[q.categoryId] = (countsByCategory[q.categoryId] || 0) + 1;
             if (q.subCategory) {
-                const key = q.categoryId + '::' + q.subCategory.trim().toLowerCase();
+                const raw = q.subCategory.trim().toLowerCase();
+                const key = q.categoryId + '::' + (subNameById[q.categoryId + '::' + raw] || raw);
                 countsBySub[key] = (countsBySub[key] || 0) + 1;
             }
         }
@@ -2560,6 +2852,62 @@ class PrismaService {
         });
         return stats;
     }
+    /**
+     * Karışık mod için: sorular önce kategoriler arasında, sonra her kategorinin
+     * alt kategorileri arasında dönüşümlü (round-robin) dağıtılır. Böylece ilk N soru
+     * mümkün olduğunca N farklı ana kategoriden ve farklı alt kategorilerden gelir.
+     */
+    spreadAcrossCategories(pool) {
+        const shuffle = (arr) => [...arr].sort(() => 0.5 - Math.random());
+        const byCat = new Map();
+        for (const q of pool) {
+            const key = (0, shared_1.canonicalCategoryId)(q.categoryId);
+            const list = byCat.get(key);
+            if (list)
+                list.push(q);
+            else
+                byCat.set(key, [q]);
+        }
+        const interleaveSubs = (qs) => {
+            const bySub = new Map();
+            for (const q of shuffle(qs)) {
+                const k = (q.subCategory || '').trim().toLowerCase();
+                const l = bySub.get(k);
+                if (l)
+                    l.push(q);
+                else
+                    bySub.set(k, [q]);
+            }
+            const queues = shuffle(Array.from(bySub.values()));
+            const out = [];
+            let more = true;
+            while (more) {
+                more = false;
+                for (const queue of queues) {
+                    const next = queue.shift();
+                    if (next) {
+                        out.push(next);
+                        more = true;
+                    }
+                }
+            }
+            return out;
+        };
+        const catQueues = shuffle(Array.from(byCat.values())).map(interleaveSubs);
+        const result = [];
+        let more = true;
+        while (more) {
+            more = false;
+            for (const queue of shuffle(catQueues)) {
+                const next = queue.shift();
+                if (next) {
+                    result.push(next);
+                    more = true;
+                }
+            }
+        }
+        return result;
+    }
     getQuestions(category = 'mixed', difficulty, count = 10, seenIds = [], subCategory) {
         const canonCat = (0, shared_1.canonicalCategoryId)(category);
         const allPublished = this.questions.filter((q) => q.reviewStatus === 'published');
@@ -2600,7 +2948,9 @@ class PrismaService {
                 primaryPool = withDiff;
             }
         }
-        const shuffledPrimary = [...primaryPool].sort(() => 0.5 - Math.random());
+        const shuffledPrimary = canonCat === 'mixed'
+            ? this.spreadAcrossCategories(primaryPool)
+            : [...primaryPool].sort(() => 0.5 - Math.random());
         for (const q of shuffledPrimary) {
             if (pickedMap.size >= count)
                 break;
@@ -2703,33 +3053,15 @@ class PrismaService {
     defaultInventory() {
         return [];
     }
-    defaultNotifications(displayName) {
-        return [
-            {
-                id: 'notif_welcome',
-                type: 'reward',
-                title: `Hoş geldin ${displayName}!`,
-                sub: 'Başlangıç ödüllerin hesabına tanımlandı',
-                timeText: 'Az önce',
-                handled: null,
-            },
-            {
-                id: 'notif_duel_1',
-                type: 'duel',
-                title: 'Bilgi Avcısı seni düelloya davet etti',
-                sub: 'Genel Kültür · 5 soru',
-                timeText: '5dk',
-                handled: null,
-            },
-            {
-                id: 'notif_season',
-                type: 'league',
-                title: 'Sezon 1 Pass aktif!',
-                sub: 'Maç kazanarak sezon kademelerini aç',
-                timeText: '1sa',
-                handled: null,
-            },
-        ];
+    // Mock/demo bildirimler kaldırıldı: yeni kullanıcılar boş gelen kutusuyla başlar.
+    defaultNotifications(_displayName) {
+        return [];
+    }
+    isMockNotification(n) {
+        return (MOCK_NOTIFICATION_IDS.has(n.id) ||
+            n.id.startsWith('notif_fr_sample') ||
+            n.id.startsWith('notif_duel_sample') ||
+            n.id.startsWith('notif_rew_sample'));
     }
     generateFriendCode(id) {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -2917,9 +3249,11 @@ class PrismaService {
             const prog = (0, shared_1.calculateLevelFromXp)(u.xp || 0);
             const safeStats = this.sanitizeUserStats(u.stats);
             const presence = presenceManager_1.presenceManager.getUserPresence(u.id);
-            const isOnline = presence.online;
-            const inRoom = presence.inRoom;
-            const currentRoomCode = presence.currentRoomCode;
+            // Ayarlar > Gizlilik > "Çevrim İçi Durumu" kapalıysa arkadaşlar da onu çevrimdışı görür
+            const presenceHidden = u.settings?.onlineStatusVisible === false;
+            const isOnline = presenceHidden ? false : presence.online;
+            const inRoom = presenceHidden ? false : presence.inRoom;
+            const currentRoomCode = presenceHidden ? undefined : presence.currentRoomCode;
             let status = 'Arkadaşın · Çevrimdışı';
             if (inRoom && currentRoomCode) {
                 status = `Oda: #${currentRoomCode} · Lobide`;
@@ -3046,9 +3380,11 @@ class PrismaService {
             const safeStats = this.sanitizeUserStats(u.stats);
             // REAL-TIME WEBSOCKET PRESENCE
             const presence = presenceManager_1.presenceManager.getUserPresence(u.id);
-            const isOnline = presence.online;
-            const inRoom = presence.inRoom;
-            const currentRoomCode = presence.currentRoomCode;
+            // Ayarlar > Gizlilik > "Çevrim İçi Durumu" kapalıysa arkadaşlar da onu çevrimdışı görür
+            const presenceHidden = u.settings?.onlineStatusVisible === false;
+            const isOnline = presenceHidden ? false : presence.online;
+            const inRoom = presenceHidden ? false : presence.inRoom;
+            const currentRoomCode = presenceHidden ? undefined : presence.currentRoomCode;
             let status = 'Arkadaşın · Çevrimdışı';
             if (inRoom && currentRoomCode) {
                 status = `Oda: #${currentRoomCode} · Lobide`;
@@ -3138,6 +3474,7 @@ class PrismaService {
                     title: n.title,
                     sub: n.sub,
                     timeText: n.timeText || 'Az önce',
+                    createdAt: n.createdAt ? new Date(n.createdAt).getTime() : undefined,
                     handled: n.handled || null,
                     senderId: n.senderId || undefined,
                     senderName: n.senderName || undefined,
@@ -3287,6 +3624,7 @@ class PrismaService {
             title: payload.title,
             sub: payload.sub || '',
             timeText: 'Az önce',
+            createdAt: Date.now(),
             senderId: sender.id,
             senderName: sender.displayName,
             senderAvatar: sender.avatarUrl || 'av1',
@@ -3375,6 +3713,10 @@ class PrismaService {
         if (target.blockedUserIds?.includes(me.id)) {
             return { success: false, error: 'Bu kullanıcı sizi engellemiş. Arkadaşlık isteği gönderemezsiniz.' };
         }
+        // Ayarlar > Gizlilik > "Arkadaşlık İstekleri" kapalıysa istek kabul etmez
+        if (target.settings?.friendRequestsAllowed === false) {
+            return { success: false, error: `${target.displayName} şu anda arkadaşlık isteği kabul etmiyor.` };
+        }
         if (!me.friendIds)
             me.friendIds = [];
         if (!target.friendIds)
@@ -3408,6 +3750,7 @@ class PrismaService {
             title: `${me.displayName} sana arkadaşlık isteği gönderdi!`,
             sub: 'Arkadaş olarak eklemek ve birlikte yarışmak için isteği kabul et.',
             timeText: 'Az önce',
+            createdAt: Date.now(),
             senderId: me.id,
             senderName: me.displayName,
             senderAvatar: me.avatarUrl || 'av1',
@@ -3558,11 +3901,9 @@ class PrismaService {
         const user = this.users.get(userId);
         if (!user)
             return [];
-        // Filter out old mock sample items
+        // Eski mock/örnek bildirimleri ele
         if (user.notifications) {
-            return user.notifications.filter((n) => !n.id.startsWith('notif_fr_sample') &&
-                !n.id.startsWith('notif_duel_sample') &&
-                !n.id.startsWith('notif_rew_sample'));
+            return user.notifications.filter((n) => !this.isMockNotification(n));
         }
         return [];
     }
@@ -3573,7 +3914,7 @@ class PrismaService {
                 orderBy: { createdAt: 'desc' },
                 take: 50,
             });
-            if (dbNotifs.length === 0) {
+            if (dbNotifs.filter((n) => !this.isMockNotification(n)).length === 0) {
                 const memNotifs = this.getUserNotifications(userId);
                 if (memNotifs.length > 0)
                     return memNotifs;
@@ -3584,6 +3925,7 @@ class PrismaService {
                     title: 'Tavriko Bilgi Dünyasına Hoş Geldin! 🦉',
                     sub: 'Profilini tamamla, 1v1 düellolara katıl ve arkadaşlarınla yarış!',
                     timeText: 'Bugün',
+                    createdAt: Date.now(),
                     handled: null,
                 };
                 try {
@@ -3608,12 +3950,13 @@ class PrismaService {
                 }
                 return [welcomeNotif];
             }
-            return dbNotifs.map((n) => ({
+            return dbNotifs.filter((n) => !this.isMockNotification(n)).map((n) => ({
                 id: n.id,
                 type: n.type,
                 title: n.title,
                 sub: n.sub,
                 timeText: n.timeText || 'Az önce',
+                createdAt: n.createdAt ? new Date(n.createdAt).getTime() : undefined,
                 handled: n.handled || null,
                 senderId: n.senderId || undefined,
                 senderName: n.senderName || undefined,
@@ -3710,6 +4053,7 @@ class PrismaService {
                         title: `${user.displayName} arkadaşlık isteğini kabul etti!`,
                         sub: 'Artık Arkadaşlarım listesinde görebilir ve 1v1 düelloya davet edebilirsin.',
                         timeText: 'Az önce',
+                        createdAt: Date.now(),
                         handled: 'accepted',
                     };
                     createdSenderNotif = senderNotif;
@@ -3793,6 +4137,11 @@ class PrismaService {
         if (target.blockedUserIds?.includes(me.id)) {
             return { success: false, error: 'Bu kullanıcı sizi engellemiş. Düello daveti gönderilemez.', message: '' };
         }
+        // Ayarlar > Gizlilik > "1v1 Düello Davetleri" kapalıysa davet göndermez
+        const targetSettings = target.settings || {};
+        if ((targetSettings.duelInvitesAllowed ?? targetSettings.allowDuelChallenges) === false) {
+            return { success: false, error: `${target.displayName} şu anda düello daveti kabul etmiyor.`, message: '' };
+        }
         const roomCode = 'DUEL-' + Math.random().toString(36).substring(2, 6).toUpperCase();
         this.setUserActiveRoom(userId, roomCode);
         presenceManager_1.presenceManager.setUserRoom(userId, roomCode);
@@ -3802,6 +4151,7 @@ class PrismaService {
             title: `${me.displayName} sana 1v1 Düello Meydan Okudu!`,
             sub: 'Özel 1v1 düello odası hazır. Kabul et ve hemen yarışmaya başla!',
             timeText: 'Az önce',
+            createdAt: Date.now(),
             senderId: me.id,
             senderName: me.displayName,
             senderAvatar: me.avatarUrl || 'av1',
@@ -3928,37 +4278,41 @@ class PrismaService {
             }
             keyItem.qty -= 1;
         }
-        // Kozmetikler tüketilmez; kuşanılır ve envanterde kalır.
-        const isCosmetic = ['frame_', 'bg_', 'name_', 'badge_'].some((p) => itemId.startsWith(p));
-        if (!isCosmetic) {
-            item.qty -= 1;
-        }
+        // WePlay tarzı süreli model: kozmetikler de kuşanıldığında TÜKETİLİR (1 kopya
+        // harcanır) ve kopyanın süresi başlar (satın alırken seçilen süreye göre 1
+        // saatten 1 aya kadar). Süre bitince eşya düşer; yeniden kullanmak için
+        // mağazadan tekrar alınmalıdır.
+        item.qty -= 1;
+        const rentalMs = (item.durationHours && item.durationHours > 0 ? item.durationHours : 1) * 60 * 60 * 1000;
+        const rentalLabel = rentalMs >= 24 * 60 * 60 * 1000
+            ? `${Math.round(rentalMs / (24 * 60 * 60 * 1000))} gün`
+            : `${Math.round(rentalMs / (60 * 60 * 1000))} saat`;
         let rewardText = `${item.name} kullanıldı!`;
         if (itemId.startsWith('frame_')) {
             record.equippedFrame = itemId;
-            record.equippedFrameExpiresAt = Date.now() + shared_1.COSMETIC_RENTAL_MS;
-            rewardText = `${item.name} profilinize uygulandı!`;
+            record.equippedFrameExpiresAt = Date.now() + rentalMs;
+            rewardText = `${item.name} profilinize uygulandı! ${rentalLabel} boyunca aktif.`;
         }
         else if (itemId.startsWith('bg_')) {
             record.equippedBackground = itemId;
-            record.equippedBackgroundExpiresAt = Date.now() + shared_1.COSMETIC_RENTAL_MS;
-            rewardText = `${item.name} profilinize ve uygulamaya uygulandı!`;
+            record.equippedBackgroundExpiresAt = Date.now() + rentalMs;
+            rewardText = `${item.name} profilinize ve uygulamaya uygulandı! ${rentalLabel} boyunca aktif.`;
         }
         else if (itemId.startsWith('name_')) {
             record.equippedNameEffect = itemId;
-            record.equippedNameEffectExpiresAt = Date.now() + shared_1.COSMETIC_RENTAL_MS;
-            rewardText = `${item.name} profilinize uygulandı!`;
+            record.equippedNameEffectExpiresAt = Date.now() + rentalMs;
+            rewardText = `${item.name} profilinize uygulandı! ${rentalLabel} boyunca aktif.`;
         }
         else if (itemId.startsWith('badge_')) {
             record.equippedBadge = itemId;
-            record.equippedBadgeExpiresAt = Date.now() + shared_1.COSMETIC_RENTAL_MS;
-            rewardText = `${item.name} profilinize uygulandı!`;
+            record.equippedBadgeExpiresAt = Date.now() + rentalMs;
+            rewardText = `${item.name} profilinize uygulandı! ${rentalLabel} boyunca aktif.`;
         }
         else if (itemId === 'chest' || itemId === 'gift') {
             record.coins += 200;
             record.gems = (record.gems || 0) + 10;
-            record.xp += 150;
-            rewardText = 'Sandık açıldı: +200 Altın, +10 Elmas ve +150 XP kazandın!';
+            record.xp += 50;
+            rewardText = 'Sandık açıldı: +200 Altın, +10 Elmas ve +50 XP kazandın!';
         }
         else if (itemId === 'gem') {
             record.gems = (record.gems || 0) + 10;
@@ -3969,22 +4323,39 @@ class PrismaService {
             rewardText = '+100 Altın hesabına eklendi!';
         }
         else if (itemId.startsWith('booster')) {
-            // 2x XP artırıcı: anında XP VERMEZ; süre boyunca maçlardan kazanılan XP 2 katına çıkar.
+            // İksirler anında XP vermez; süre boyunca maçlardan kazanılan ödülü çarparlar.
             const durationMs = itemId.includes('24h') ? 24 * 60 * 60 * 1000 : 60 * 60 * 1000;
-            const base = Math.max(Date.now(), record.activeBoosterExpiresAt || 0);
-            record.activeBoosterExpiresAt = base + durationMs;
-            // Kalıcılık: serverless yeniden başlamalarda kaybolmaması için settings jsonb'ye yaz.
-            record.settings = { ...(record.settings || {}), xpBoosterExpiresAt: new Date(record.activeBoosterExpiresAt).toISOString() };
             const mins = Math.round(durationMs / 60000);
-            rewardText = `⚡ 2x XP artırıcı aktif! ${mins >= 60 ? `${Math.round(mins / 60)} saat` : `${mins} dakika`} boyunca maçlardan kazanacağın XP 2 katına çıkar.`;
+            const durText = mins >= 60 ? `${Math.round(mins / 60)} saat` : `${mins} dakika`;
+            if (itemId.startsWith('booster_xp_3x')) {
+                const base = Math.max(Date.now(), record.xp3BoosterExpiresAt || 0);
+                record.xp3BoosterExpiresAt = base + durationMs;
+                record.settings = { ...(record.settings || {}), xp3BoosterExpiresAt: new Date(record.xp3BoosterExpiresAt).toISOString() };
+                rewardText = `⚡ 3x XP iksiri aktif! ${durText} boyunca maçlardan kazanacağın XP 3 katına çıkar.`;
+            }
+            else if (itemId.startsWith('booster_coin')) {
+                const base = Math.max(Date.now(), record.coinBoosterExpiresAt || 0);
+                record.coinBoosterExpiresAt = base + durationMs;
+                record.settings = { ...(record.settings || {}), coinBoosterExpiresAt: new Date(record.coinBoosterExpiresAt).toISOString() };
+                rewardText = `🪙 2x Altın iksiri aktif! ${durText} boyunca maçlardan kazanacağın Altın 2 katına çıkar.`;
+            }
+            else {
+                // booster_xp_2x (mevcut): 2x XP
+                const base = Math.max(Date.now(), record.activeBoosterExpiresAt || 0);
+                record.activeBoosterExpiresAt = base + durationMs;
+                record.settings = { ...(record.settings || {}), xpBoosterExpiresAt: new Date(record.activeBoosterExpiresAt).toISOString() };
+                rewardText = `⚡ 2x XP artırıcı aktif! ${durText} boyunca maçlardan kazanacağın XP 2 katına çıkar.`;
+            }
         }
         else {
-            record.xp += 100;
-            rewardText = `${item.name} aktif edildi: +100 XP kazandın!`;
+            record.xp += 30;
+            rewardText = `${item.name} aktif edildi: +30 XP kazandın!`;
         }
         const prog = (0, shared_1.calculateLevelFromXp)(record.xp);
         record.level = prog.level;
         record.rankTitle = prog.rankTitle;
+        // Tükenen eşyalar (kozmetik/iksir kuşanımları dahil) envanterden düşer:
+        record.inventory = (record.inventory || []).filter((inv) => inv.qty > 0);
         this.users.set(userId, record);
         this.users.set(record.id, record);
         if (record.username)
@@ -4011,47 +4382,169 @@ class PrismaService {
                         updatedAt: new Date(),
                     },
                 });
+                // Kuşanılan kozmetik/iksir envanterden düştü: PostgreSQL'e de yansıt
+                if (item.qty <= 0) {
+                    await this.rawClient.userInventoryItem.deleteMany({
+                        where: { userId: record.id, itemId },
+                    }).catch(() => { });
+                }
+                else {
+                    await this.rawClient.userInventoryItem.update({
+                        where: { userId_itemId: { userId: record.id, itemId } },
+                        data: { qty: item.qty, updatedAt: new Date() },
+                    }).catch(() => { });
+                }
             }
             catch (err) {
-                console.error('[openChest] DB update error:', err);
+                console.error('[useInventoryItem] DB update error:', err);
             }
         }
         return { user: this.toProfile(record), rewardText };
     }
+    /** Kullanıcı başına sıralı çalıştırma: aynı hesabın çifte tıklama / eşzamanlı istekleri tek tek işlenir. */
+    userLocks = new Map();
+    async withUserLock(userId, fn) {
+        const prev = this.userLocks.get(userId) || Promise.resolve();
+        const run = prev.catch(() => undefined).then(fn);
+        const tail = run.catch(() => undefined);
+        this.userLocks.set(userId, tail);
+        try {
+            return await run;
+        }
+        finally {
+            if (this.userLocks.get(userId) === tail)
+                this.userLocks.delete(userId);
+        }
+    }
+    /** Sezon ödülü alınabilir mi? Hata mesajları kullanıcıya olduğu gibi gösterilir. */
+    assertSeasonClaimable(state, tier, track) {
+        const tierData = shared_1.SEASON_1_TIERS.find((t) => t.tier === tier);
+        if (!tierData)
+            throw new SeasonClaimError(`${tier}. aşama verisi bulunamadı.`);
+        if (state.seasonXp < tierData.requiredSeasonXp) {
+            const missing = tierData.requiredSeasonXp - state.seasonXp;
+            throw new SeasonClaimError(`Bu kademe kilitli! Açmak için ${tierData.requiredSeasonXp} Sezon XP gerekli (Mevcut: ${state.seasonXp}, Eksik: ${missing} Sezon XP).`);
+        }
+        if (track === 'premium') {
+            if (!state.hasPremiumPass) {
+                throw new SeasonClaimError('Bu ödülü almak için Sezon 1 Premium Pass sahibi olmalısınız!');
+            }
+            if (state.claimedPremium.includes(tier)) {
+                throw new SeasonClaimError('Bu Premium kademe ödülü zaten hesabınıza tanımlandı.');
+            }
+        }
+        else if (state.claimedFree.includes(tier)) {
+            throw new SeasonClaimError('Bu Ücretsiz kademe ödülü zaten hesabınıza tanımlandı.');
+        }
+    }
     async claimSeasonTier(userId, tier, track = 'free') {
-        let record = await this.loadRecord(userId);
+        const safeTrack = track === 'premium' ? 'premium' : 'free';
+        const safeTier = Math.floor(Number(tier));
+        return this.withUserLock(userId, () => this.claimSeasonTierLocked(userId, safeTier, safeTrack));
+    }
+    async claimSeasonTierLocked(userId, tier, track) {
+        // Her zaman veritabanından taze oku: bellek önbelleği başka örnekte bayat olabilir
+        const record = await this.loadRecord(userId);
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
-        if (tier < 1 || tier > 50) {
+        if (!Number.isFinite(tier) || tier < 1 || tier > 50) {
             throw new Error('Geçersiz sezon aşaması (1-50 arası olmalıdır).');
         }
         const tierData = shared_1.SEASON_1_TIERS.find((t) => t.tier === tier);
         if (!tierData)
             throw new Error(`${tier}. aşama verisi bulunamadı.`);
-        const userSeasonXp = record.seasonXp || 0;
-        if (userSeasonXp < tierData.requiredSeasonXp) {
-            const missing = tierData.requiredSeasonXp - userSeasonXp;
-            throw new Error(`Bu kademe kilitli! Açmak için ${tierData.requiredSeasonXp} Sezon XP gerekli (Mevcut: ${userSeasonXp}, Eksik: ${missing} Sezon XP).`);
+        this.assertSeasonClaimable({
+            seasonXp: record.seasonXp || 0,
+            hasPremiumPass: !!record.hasPremiumPass,
+            claimedFree: record.claimedSeasonFreeTiers || [],
+            claimedPremium: record.claimedSeasonPremiumTiers || [],
+        }, tier, track);
+        const reward = track === 'premium' ? tierData.premiumReward : tierData.freeReward;
+        const isItem = reward.type !== 'coin' && reward.type !== 'gem';
+        const itemId = reward.itemId || `${reward.type}_${tier}`;
+        const itemDesc = `Sezon 1 Kademe ${tier} ${track === 'premium' ? 'Premium' : 'Ücretsiz'} Ödülü`;
+        // Hangi slotlar boşsa ödül oraya takılır
+        const equipSlot = reward.type === 'frame' ? 'equippedFrame'
+            : reward.type === 'badge' ? 'equippedBadge'
+                : reward.type === 'name_effect' ? 'equippedNameEffect'
+                    : reward.type === 'background' ? 'equippedBackground'
+                        : null;
+        let persisted = false;
+        if (!record.isGuest && !this.isJest) {
+            try {
+                await this.rawClient.$transaction(async (tx) => {
+                    // Eşzamanlı isteklerde (farklı sunucu örnekleri dahil) satırı kilitle
+                    await tx.$queryRaw `SELECT id FROM public.users WHERE id = ${record.id} FOR UPDATE`;
+                    const fresh = await tx.user.findUnique({ where: { id: record.id } });
+                    if (!fresh)
+                        throw new Error('Kullanıcı bulunamadı.');
+                    const freeNow = Array.isArray(fresh.claimedSeasonFreeTiers) ? fresh.claimedSeasonFreeTiers : [];
+                    const premNow = Array.isArray(fresh.claimedSeasonPremiumTiers) ? fresh.claimedSeasonPremiumTiers : [];
+                    this.assertSeasonClaimable({
+                        seasonXp: fresh.seasonXp ?? 0,
+                        hasPremiumPass: !!fresh.hasPremiumPass,
+                        claimedFree: freeNow,
+                        claimedPremium: premNow,
+                    }, tier, track);
+                    const data = { updatedAt: new Date() };
+                    if (track === 'premium')
+                        data.claimedSeasonPremiumTiers = [...premNow, tier];
+                    else
+                        data.claimedSeasonFreeTiers = [...freeNow, tier];
+                    if (reward.type === 'coin')
+                        data.coins = { increment: reward.amount };
+                    if (reward.type === 'gem')
+                        data.gems = { increment: reward.amount };
+                    // Sezon kozmetikleri en fazla 1 ay geçerlidir: boş slota takılırken
+                    // 30 günlük süre atanır; süre bitince kozmetik otomatik düşer.
+                    if (equipSlot && !fresh[equipSlot]) {
+                        data[equipSlot] = itemId;
+                        data[`${equipSlot}ExpiresAt`] = new Date(Date.now() + shared_1.SEASON_REWARD_HOURS * 60 * 60 * 1000);
+                    }
+                    await tx.user.update({ where: { id: record.id }, data });
+                    if (isItem) {
+                        const seasonCosmetic = reward.type === 'frame' || reward.type === 'badge' ||
+                            reward.type === 'name_effect' || reward.type === 'background';
+                        await tx.userInventoryItem.upsert({
+                            where: { userId_itemId: { userId: record.id, itemId } },
+                            update: {
+                                qty: { increment: reward.amount },
+                                name: reward.title,
+                                desc: itemDesc,
+                                ...(seasonCosmetic ? { durationHours: shared_1.SEASON_REWARD_HOURS } : {}),
+                            },
+                            create: {
+                                userId: record.id,
+                                itemId,
+                                name: reward.title,
+                                desc: itemDesc,
+                                qty: reward.amount,
+                                ...(seasonCosmetic ? { durationHours: shared_1.SEASON_REWARD_HOURS } : {}),
+                            },
+                        });
+                    }
+                }, { timeout: 15000 });
+                persisted = true;
+            }
+            catch (err) {
+                if (err instanceof SeasonClaimError)
+                    throw err;
+                console.error('[claimSeasonTier] DB transaction error:', err);
+                if (process.env.NODE_ENV === 'production') {
+                    throw new Error('Ödül şu anda kaydedilemedi, lütfen birkaç saniye sonra tekrar dene.');
+                }
+            }
         }
+        if (persisted) {
+            // Veritabanı gerçek kaynaktır; önbelleği taze kayıtla yenile
+            const fresh = await this.loadRecord(userId);
+            return { user: this.toProfile(fresh || record), reward };
+        }
+        // Bellek / yerel dosya yolu (misafir, test ve veritabanı olmayan geliştirme ortamı)
         if (!record.claimedSeasonFreeTiers)
             record.claimedSeasonFreeTiers = [];
         if (!record.claimedSeasonPremiumTiers)
             record.claimedSeasonPremiumTiers = [];
-        if (track === 'premium') {
-            if (!record.hasPremiumPass) {
-                throw new Error('Bu ödülü almak için Sezon 1 Premium Pass sahibi olmalısınız!');
-            }
-            if (record.claimedSeasonPremiumTiers.includes(tier)) {
-                throw new Error('Bu Premium kademe ödülü zaten hesabınıza tanımlandı.');
-            }
-        }
-        else {
-            if (record.claimedSeasonFreeTiers.includes(tier)) {
-                throw new Error('Bu Ücretsiz kademe ödülü zaten hesabınıza tanımlandı.');
-            }
-        }
-        const reward = track === 'premium' ? tierData.premiumReward : tierData.freeReward;
-        // Grant reward to user account/inventory
         if (reward.type === 'coin') {
             record.coins += reward.amount;
         }
@@ -4061,115 +4554,117 @@ class PrismaService {
         else {
             if (!record.inventory)
                 record.inventory = [];
-            const itemId = reward.itemId || `${reward.type}_${tier}`;
             const existing = record.inventory.find((i) => i.id === itemId);
+            const seasonCosmetic = reward.type === 'frame' || reward.type === 'badge' ||
+                reward.type === 'name_effect' || reward.type === 'background';
             if (existing) {
                 existing.qty += reward.amount;
+                if (seasonCosmetic)
+                    existing.durationHours = shared_1.SEASON_REWARD_HOURS;
             }
             else {
                 record.inventory.push({
                     id: itemId,
                     name: reward.title,
-                    desc: `Sezon 1 Kademe ${tier} ${track === 'premium' ? 'Premium' : 'Ücretsiz'} Ödülü`,
+                    desc: itemDesc,
                     qty: reward.amount,
                     category: reward.type,
                     rarity: reward.rarity || 'rare',
+                    ...(seasonCosmetic ? { durationHours: shared_1.SEASON_REWARD_HOURS } : {}),
                 });
             }
-            if (reward.type === 'frame' && !record.equippedFrame)
-                record.equippedFrame = itemId;
-            if (reward.type === 'badge' && !record.equippedBadge)
-                record.equippedBadge = itemId;
-            if (reward.type === 'name_effect' && !record.equippedNameEffect)
-                record.equippedNameEffect = itemId;
-            if (reward.type === 'background' && !record.equippedBackground)
-                record.equippedBackground = itemId;
+            // Sezon kozmetiği boş slota takılırken 30 günlük süre başlar
+            if (equipSlot && !record[equipSlot]) {
+                record[equipSlot] = itemId;
+                record[`${equipSlot}ExpiresAt`] = Date.now() + shared_1.SEASON_REWARD_HOURS * 60 * 60 * 1000;
+            }
         }
-        if (track === 'premium') {
+        if (track === 'premium')
             record.claimedSeasonPremiumTiers.push(tier);
-        }
-        else {
+        else
             record.claimedSeasonFreeTiers.push(tier);
-        }
         this.users.set(userId, record);
         this.users.set(record.id, record);
         if (record.username)
             this.users.set(record.username, record);
-        if (!record.isGuest) {
+        if (!record.isGuest)
             this.savePersistedUsers();
-            try {
-                await this.rawClient.user.update({
-                    where: { id: record.id },
-                    data: {
-                        coins: record.coins,
-                        gems: record.gems,
-                        xp: record.xp,
-                        level: record.level,
-                        updatedAt: new Date(),
-                    },
-                });
-            }
-            catch (err) {
-                console.error('[openChest] DB update error:', err);
-            }
-        }
         return { user: this.toProfile(record), reward };
     }
     async buyPremiumPass(userId) {
-        const record = this.users.get(userId);
-        if (!record)
-            throw new Error('Kullanıcı bulunamadı.');
-        if (record.hasPremiumPass) {
-            throw new Error('Zaten Sezon 1 Premium Pass sahibisiniz!');
-        }
-        const costGems = 250;
-        if ((record.gems || 0) < costGems) {
-            throw new Error(`Yetersiz Elmas! Premium Pass için ${costGems} Elmas gerekli (Mevcut: ${record.gems || 0} Elmas).`);
-        }
-        record.gems = (record.gems || 0) - costGems;
-        record.hasPremiumPass = true;
-        this.users.set(userId, record);
-        this.users.set(record.id, record);
-        if (record.username)
-            this.users.set(record.username, record);
-        if (!record.isGuest) {
-            this.savePersistedUsers();
-            try {
-                await this.rawClient.user.update({
-                    where: { id: record.id },
-                    data: {
-                        coins: record.coins,
-                        gems: record.gems,
-                        xp: record.xp,
-                        level: record.level,
-                        updatedAt: new Date(),
-                    },
-                });
+        return this.withUserLock(userId, async () => {
+            const record = await this.loadRecord(userId);
+            if (!record)
+                throw new Error('Kullanıcı bulunamadı.');
+            if (record.hasPremiumPass) {
+                throw new Error('Zaten Sezon 1 Premium Pass sahibisiniz!');
             }
-            catch (err) {
-                console.error('[openChest] DB update error:', err);
+            const costGems = 250;
+            if ((record.gems || 0) < costGems) {
+                throw new Error(`Yetersiz Elmas! Premium Pass için ${costGems} Elmas gerekli (Mevcut: ${record.gems || 0} Elmas).`);
             }
-        }
-        return this.toProfile(record);
+            if (!record.isGuest && !this.isJest) {
+                try {
+                    await this.rawClient.$transaction(async (tx) => {
+                        await tx.$queryRaw `SELECT id FROM public.users WHERE id = ${record.id} FOR UPDATE`;
+                        const fresh = await tx.user.findUnique({ where: { id: record.id } });
+                        if (!fresh)
+                            throw new Error('Kullanıcı bulunamadı.');
+                        if (fresh.hasPremiumPass)
+                            throw new SeasonClaimError('Zaten Sezon 1 Premium Pass sahibisiniz!');
+                        if ((fresh.gems || 0) < costGems) {
+                            throw new SeasonClaimError(`Yetersiz Elmas! Premium Pass için ${costGems} Elmas gerekli (Mevcut: ${fresh.gems || 0} Elmas).`);
+                        }
+                        await tx.user.update({
+                            where: { id: record.id },
+                            data: { gems: { decrement: costGems }, hasPremiumPass: true, updatedAt: new Date() },
+                        });
+                    });
+                    const fresh = await this.loadRecord(userId);
+                    return this.toProfile(fresh || record);
+                }
+                catch (err) {
+                    if (err instanceof SeasonClaimError)
+                        throw new Error(err.message);
+                    console.error('[buyPremiumPass] DB transaction error:', err);
+                    if (process.env.NODE_ENV === 'production') {
+                        throw new Error('Satın alma şu anda kaydedilemedi, lütfen birkaç saniye sonra tekrar dene.');
+                    }
+                }
+            }
+            record.gems = (record.gems || 0) - costGems;
+            record.hasPremiumPass = true;
+            this.users.set(userId, record);
+            this.users.set(record.id, record);
+            if (record.username)
+                this.users.set(record.username, record);
+            if (!record.isGuest)
+                this.savePersistedUsers();
+            return this.toProfile(record);
+        });
     }
-    async purchaseShopProduct(userId, productId, paymentMethod = 'coins') {
+    async purchaseShopProduct(userId, productId, paymentMethod = 'coins', durationId) {
         let record = await this.loadRecord(userId);
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
         const product = shared_1.SHOP_CATALOG.find((p) => p.id === productId);
         if (!product)
             throw new Error('Ürün mağazada bulunamadı.');
+        // Süreli kozmetiklerde süre seçimi: 1 saatten en fazla 1 aya kadar.
+        // Fiyat, temel fiyat x süre çarpanıyla ölçeklenir.
+        const duration = (0, shared_1.isCosmeticProduct)(product) ? (0, shared_1.getShopDuration)(durationId) : null;
+        const effectivePrice = (0, shared_1.shopPriceForDuration)(product, durationId);
         if (product.currency === 'coins') {
-            if (record.coins < product.price) {
-                throw new Error(`Yetersiz Altın! Bu ürün için ${product.price} Altın gereklidir (Mevcut: ${record.coins} Altın).`);
+            if (record.coins < effectivePrice) {
+                throw new Error(`Yetersiz Altın! Bu ürün için ${effectivePrice} Altın gereklidir (Mevcut: ${record.coins} Altın).`);
             }
-            record.coins -= product.price;
+            record.coins -= effectivePrice;
         }
         else if (product.currency === 'gems') {
-            if ((record.gems || 0) < product.price) {
-                throw new Error(`Yetersiz Elmas! Bu ürün için ${product.price} Elmas gereklidir (Mevcut: ${record.gems || 0} Elmas).`);
+            if ((record.gems || 0) < effectivePrice) {
+                throw new Error(`Yetersiz Elmas! Bu ürün için ${effectivePrice} Elmas gereklidir (Mevcut: ${record.gems || 0} Elmas).`);
             }
-            record.gems = (record.gems || 0) - product.price;
+            record.gems = (record.gems || 0) - effectivePrice;
         }
         if (product.grantPremiumPass) {
             record.hasPremiumPass = true;
@@ -4184,9 +4679,14 @@ class PrismaService {
             if (!record.inventory)
                 record.inventory = [];
             for (const item of product.grantItems) {
+                const isCosmeticItem = item.category === 'frame' || item.category === 'badge' ||
+                    item.category === 'name_effect' || item.category === 'background';
                 const existing = record.inventory.find((i) => i.id === item.id);
                 if (existing) {
                     existing.qty += item.qty;
+                    // Yeni süre seçildiyse bu kopyanın süresi güncellenir
+                    if (isCosmeticItem && duration)
+                        existing.durationHours = duration.hours;
                 }
                 else {
                     record.inventory.push({
@@ -4196,12 +4696,25 @@ class PrismaService {
                         qty: item.qty,
                         category: item.category || this.getItemCategory(item.id),
                         rarity: item.rarity || this.getItemRarity(item.id),
+                        durationHours: isCosmeticItem && duration ? duration.hours : undefined,
                     });
                 }
-                // Satın alınan kozmetik anında profile uygulanır (otomatik kuşanma).
-                // Süreli (rental) ürünlerde 30 günlük expiresAt atanır; kalıcı ürünlerde süre yoktur.
-                const isRental = product.badge === '30 GÜN';
-                const expiresAt = isRental ? Date.now() + shared_1.COSMETIC_RENTAL_MS : undefined;
+                // Satın alınan kozmetik anında profile uygulanır (otomatik kuşanma) ve
+                // WePlay tarzı süreli modelde kuşanım 1 kopya harcar: envantere eklenir,
+                // hemen kuşanıldığı için 1 adet düşürülür. Süre seçime göre 1 saatten
+                // 1 aya kadardır; süre bitince kozmetik otomatik düşer.
+                const isRental = !!duration;
+                const expiresAt = duration ? Date.now() + duration.hours * 60 * 60 * 1000 : undefined;
+                const isCosmetic = item.category === 'frame' || item.category === 'background' ||
+                    item.category === 'name_effect' || item.category === 'badge';
+                if (isCosmetic) {
+                    // Otomatik kuşanım 1 kopya tüketir
+                    const cosItem = record.inventory.find((i) => i.id === item.id);
+                    if (cosItem) {
+                        cosItem.qty = Math.max(0, cosItem.qty - 1);
+                    }
+                    record.inventory = (record.inventory || []).filter((i) => i.qty > 0);
+                }
                 if (item.category === 'frame' && item.id.startsWith('frame_')) {
                     record.equippedFrame = item.id;
                     record.equippedFrameExpiresAt = expiresAt;
@@ -4220,27 +4733,40 @@ class PrismaService {
                 }
                 if (!record.isGuest) {
                     try {
-                        await this.rawClient.userInventoryItem.upsert({
-                            where: {
-                                userId_itemId: {
+                        // Envanterdeki güncel (tüketime göre düzeltilmiş) adetla senkronize et
+                        const invItem = record.inventory.find((i) => i.id === item.id);
+                        const currentQty = invItem?.qty ?? 0;
+                        const invDuration = invItem?.durationHours;
+                        if (currentQty <= 0) {
+                            await this.rawClient.userInventoryItem.deleteMany({
+                                where: { userId: record.id, itemId: item.id },
+                            });
+                        }
+                        else {
+                            await this.rawClient.userInventoryItem.upsert({
+                                where: {
+                                    userId_itemId: {
+                                        userId: record.id,
+                                        itemId: item.id,
+                                    },
+                                },
+                                update: {
+                                    qty: currentQty,
+                                    name: item.name,
+                                    desc: item.desc,
+                                    durationHours: invDuration,
+                                    updatedAt: new Date(),
+                                },
+                                create: {
                                     userId: record.id,
                                     itemId: item.id,
+                                    name: item.name,
+                                    desc: item.desc,
+                                    qty: currentQty,
+                                    durationHours: invDuration,
                                 },
-                            },
-                            update: {
-                                qty: { increment: item.qty },
-                                name: item.name,
-                                desc: item.desc,
-                                updatedAt: new Date(),
-                            },
-                            create: {
-                                userId: record.id,
-                                itemId: item.id,
-                                name: item.name,
-                                desc: item.desc,
-                                qty: item.qty,
-                            },
-                        });
+                            });
+                        }
                     }
                     catch (itemErr) {
                         console.error('[purchaseShopProduct] DB inventory upsert error:', itemErr);
@@ -4344,7 +4870,7 @@ class PrismaService {
             const t = rollTier(0.5, 0.35);
             coins = bracket(t, [800, 1500], [1500, 2800], [2800, 4500]);
             gems = Math.random() < 0.5 ? randInt(30, 70) : 0;
-            xp = bracket(t, [200, 400], [400, 600], [600, 800]);
+            xp = bracket(t, [100, 150], [150, 200], [200, 250]);
             const giftBonusPool = [
                 {
                     id: 'booster_xp_2x_1h',
@@ -4369,7 +4895,7 @@ class PrismaService {
             const t = rollTier(0.45, 0.38);
             coins = bracket(t, [1000, 2000], [2000, 4000], [4000, 6500]);
             gems = Math.random() < 0.45 ? randInt(50, 110) : 0;
-            xp = bracket(t, [400, 600], [600, 900], [900, 1300]);
+            xp = bracket(t, [80, 120], [120, 180], [180, 250]);
             bonusItem = {
                 id: 'frame_flame',
                 name: 'Alev Çerçevesi',
@@ -4383,7 +4909,7 @@ class PrismaService {
             const t = rollTier(0.5, 0.35);
             coins = bracket(t, [500, 900], [900, 1800], [1800, 2800]);
             gems = Math.random() < 0.4 ? randInt(20, 45) : 0;
-            xp = bracket(t, [200, 320], [320, 480], [480, 650]);
+            xp = bracket(t, [50, 80], [80, 120], [120, 160]);
             bonusItem = {
                 id: 'booster_xp_2x_1h',
                 name: '2x XP (1 Saat)',
@@ -4397,14 +4923,14 @@ class PrismaService {
             const t = rollTier(0.55, 0.32);
             coins = bracket(t, [250, 500], [500, 900], [900, 1400]);
             gems = Math.random() < 0.35 ? randInt(8, 20) : 0;
-            xp = bracket(t, [100, 180], [180, 280], [280, 400]);
+            xp = bracket(t, [25, 45], [45, 70], [70, 100]);
         }
         else {
             // Ahşap sandık: çoğunlukla mütevazı ödül
             const t = rollTier(0.6, 0.3);
             coins = bracket(t, [80, 180], [180, 350], [350, 500]);
             gems = Math.random() < 0.35 ? randInt(3, 8) : 0;
-            xp = bracket(t, [40, 90], [90, 150], [150, 220]);
+            xp = bracket(t, [10, 20], [20, 35], [35, 50]);
         }
         record.coins += coins;
         record.gems = (record.gems || 0) + gems;
@@ -4508,8 +5034,8 @@ class PrismaService {
             },
         };
     }
-    getUserEvents(userId) {
-        const record = this.users.get(userId);
+    async getUserEvents(userId) {
+        const record = userId ? await this.loadRecord(userId) : null;
         const progressMap = record?.eventProgress || {};
         const events = shared_1.EVENT_DEFINITIONS.map((ev) => {
             const state = progressMap[ev.id];
@@ -4530,8 +5056,8 @@ class PrismaService {
         });
         return { events };
     }
-    startEvent(userId, eventId) {
-        const record = this.users.get(userId);
+    async startEvent(userId, eventId) {
+        const record = await this.loadRecord(userId);
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
         const event = shared_1.EVENT_DEFINITIONS.find((e) => e.id === eventId);
@@ -4562,9 +5088,7 @@ class PrismaService {
             completed: progress >= event.targetCount,
             claimed: !!state.claimed,
         };
-        if (!record.isGuest) {
-            this.savePersistedUsers();
-        }
+        await this.persistEventProgress(record);
         return {
             user: this.toProfile(record),
             event: eventData,
@@ -4572,7 +5096,7 @@ class PrismaService {
         };
     }
     async claimEventReward(userId, eventId) {
-        const record = this.users.get(userId);
+        const record = await this.loadRecord(userId);
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
         const event = shared_1.EVENT_DEFINITIONS.find((e) => e.id === eventId);
@@ -4621,12 +5145,14 @@ class PrismaService {
                         gems: record.gems,
                         xp: record.xp,
                         level: record.level,
+                        seasonXp: record.seasonXp || 0,
+                        eventProgress: (record.eventProgress || {}),
                         updatedAt: new Date(),
                     },
                 });
             }
             catch (err) {
-                console.error('[openChest] DB update error:', err);
+                console.error('[claimEventReward] DB update error:', err);
             }
         }
         return {
@@ -4735,7 +5261,10 @@ class PrismaService {
             equippedBackgroundExpiresAt: record.equippedBackgroundExpiresAt,
             blockedUserIds: record.blockedUserIds || [],
             activeBoosterExpiresAt: record.activeBoosterExpiresAt,
-            eventProgress: record.eventProgress || {},
+            xp3BoosterExpiresAt: record.xp3BoosterExpiresAt,
+            coinBoosterExpiresAt: record.coinBoosterExpiresAt,
+            // İç defter (__matchLedger) istemciye gönderilmez
+            eventProgress: Object.fromEntries(Object.entries(record.eventProgress || {}).filter(([k]) => k !== '__matchLedger')),
             friendIds: record.friendIds || [],
             notifications: record.notifications,
             stats: record.stats,

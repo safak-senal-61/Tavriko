@@ -198,14 +198,16 @@ router.get('/shop/catalog', (req, res) => {
 router.post('/shop/purchase', auth_1.requireUserAuth, async (req, res) => {
     try {
         const userId = req.authUserId;
-        const { productId, packId, paymentMethod = 'coins' } = req.body;
+        const { productId, packId, paymentMethod = 'coins', durationId } = req.body;
         if (!userId) {
             res.status(400).json({ error: 'userId gerekli' });
             return;
         }
         const itemToBuy = productId || packId;
         if (itemToBuy && shared_1.SHOP_CATALOG.some((p) => p.id === itemToBuy)) {
-            const result = await prismaClient_1.db.purchaseShopProduct(userId, itemToBuy, paymentMethod);
+            // Süreli kozmetiklerde durationId ('1h' | '1d' | '3d' | '1w' | '30d')
+            // seçilen süreyi belirler; fiyat sunucuda ölçeklenir.
+            const result = await prismaClient_1.db.purchaseShopProduct(userId, itemToBuy, paymentMethod, typeof durationId === 'string' ? durationId : undefined);
             res.json({ success: true, user: result.user, message: result.message });
             return;
         }
@@ -314,10 +316,10 @@ router.post('/season/premium-pass', auth_1.requireUserAuth, async (req, res) => 
     }
 });
 // --- Live Events ---
-router.get('/events', (req, res) => {
+router.get('/events', async (req, res) => {
     try {
         const userId = req.query.userId || '';
-        const result = prismaClient_1.db.getUserEvents(userId);
+        const result = await prismaClient_1.db.getUserEvents(userId);
         res.json({
             success: true,
             events: result.events,
@@ -342,7 +344,7 @@ router.post('/events/claim', auth_1.requireUserAuth, async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
-router.post('/events/start', auth_1.requireUserAuth, (req, res) => {
+router.post('/events/start', auth_1.requireUserAuth, async (req, res) => {
     try {
         const userId = req.authUserId;
         const { eventId } = req.body;
@@ -350,7 +352,7 @@ router.post('/events/start', auth_1.requireUserAuth, (req, res) => {
             res.status(400).json({ error: 'userId ve eventId gereklidir' });
             return;
         }
-        const result = prismaClient_1.db.startEvent(userId, eventId);
+        const result = await prismaClient_1.db.startEvent(userId, eventId);
         res.json({ success: true, ...result });
     }
     catch (err) {
@@ -364,6 +366,31 @@ router.get('/profile/:userId', async (req, res) => {
     if (!profile) {
         res.status(404).json({ error: 'Profil bulunamadı' });
         return;
+    }
+    // Ayarlar > Gizlilik > "Herkese Açık Profil" kapalıysa yalnızca temel kimlik bilgileri görünür.
+    // Sahibi ve arkadaşları tam profili görmeye devam eder.
+    if (profile.settings?.profilePublic === false) {
+        let viewerId;
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            const payload = prismaClient_1.db.verifyToken(authHeader.split(' ')[1]);
+            if (payload)
+                viewerId = payload.userId;
+        }
+        const isOwner = !!viewerId && viewerId === profile.id;
+        const isFriend = !!viewerId && (profile.friendIds || []).includes(viewerId);
+        if (!isOwner && !isFriend) {
+            res.json({
+                id: profile.id,
+                displayName: profile.displayName,
+                username: profile.username,
+                avatarUrl: profile.avatarUrl,
+                level: profile.level,
+                rankTitle: profile.rankTitle,
+                isPrivate: true,
+            });
+            return;
+        }
     }
     res.json(profile);
 });

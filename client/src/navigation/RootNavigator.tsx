@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   Image,
   Linking,
+  Alert,
 } from 'react-native';
 import { useGameStore, clearAllAccountStorage, getStoredAuth } from '../store/gameStore';
 import { authHeaders } from '../utils/apiAuth';
@@ -93,6 +94,7 @@ export type ScreenName =
   | 'friends'
   | 'profile'
   | 'profile_edit'
+  | 'friend_profile'
   | 'leaderboard'
   | 'daily_challenge'
   | 'practice'
@@ -163,6 +165,8 @@ export const RootNavigator: React.FC = () => {
     : 'splash';
 
   const [currentScreen, setCurrentScreen] = useState<ScreenName>(initialScreen);
+  /* KVKK: arkadaşın tam profili (salt okunur) — ayarlar/hesap bölümleri gizli */
+  const [viewingProfile, setViewingProfile] = useState<UserProfile | null>(null);
   // İnternet bağlantısı durumu (netMonitor besler; overlay + oyun koruma süresi)
   const netOnline = useNetStatus((s) => s.online);
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>('general_culture');
@@ -2149,6 +2153,23 @@ export const RootNavigator: React.FC = () => {
               else if (tab === 'leaders') navigateTo('leaderboard');
               else if (tab === 'profile') navigateTo('profile');
             }}
+            onOpenFullProfile={(profile) => {
+              setViewingProfile(profile);
+              navigateTo('friend_profile');
+            }}
+          />
+        )}
+        {currentScreen === 'friend_profile' && viewingProfile && (
+          <ProfileScreen
+            user={viewingProfile}
+            token={null}
+            apiBaseUrl={API_BASE}
+            onBack={() => {
+              setViewingProfile(null);
+              navigateTo('friends');
+            }}
+            onEditProfile={() => {}}
+            viewOnly
           />
         )}
         {currentScreen === 'profile' && user && (
@@ -2267,7 +2288,7 @@ export const RootNavigator: React.FC = () => {
             onDeleteAccount={async () => {
               if (user) {
                 try {
-                  await fetch(`${API_BASE}/auth/delete-account`, {
+                  const res = await fetch(`${API_BASE}/auth/delete-account`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
@@ -2275,8 +2296,19 @@ export const RootNavigator: React.FC = () => {
                     },
                     body: JSON.stringify({ userId: user.id }),
                   });
+                  const data = await res.json().catch(() => null);
+                  if (!res.ok || !data?.success) {
+                    // Silme başarısızsa veriler korunur ve kullanıcı bilgilendirilir
+                    Alert.alert(
+                      'Hesap Silinemedi',
+                      data?.message || 'Hesabınız silinirken bir hata oluştu. Lütfen tekrar deneyin.'
+                    );
+                    return;
+                  }
                 } catch (err) {
                   console.error('Delete account failed:', err);
+                  Alert.alert('Hesap Silinemedi', 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.');
+                  return;
                 }
               }
               clearAllAccountStorage();
