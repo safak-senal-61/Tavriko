@@ -381,6 +381,43 @@ cd client && npm run web
 
 ---
 
+## 📱 Mobil Uygulama Derleme (EAS Build)
+
+iOS ve Android uygulama paketleri **Expo Application Services (EAS)** ile bulutta derlenir — bilgisayarında Android Studio veya Xcode kurulu olmasına gerek yok.
+
+### Hazırlık (bir kez)
+```bash
+# 1. Expo hesabı oluştur (ücretsiz): https://expo.dev/signup
+cd client
+npx eas login          # Expo hesabınla giriş yap
+npx eas init           # Projeyi EAS'a kaydet (app.json'e proje kimliği yazar)
+```
+
+### Android
+```bash
+# Telefona direkt kurulabilir APK (test / paylaşım için):
+npm run build:android:apk        # → eas build -p android --profile preview
+# Kurulum: indirilen APK'yı telefona aç, "Bilinmeyen kaynaklardan kurulum" izni ver
+
+# Google Play için AAB (mağaza paketi):
+npm run build:android:store      # → eas build -p android --profile production
+```
+
+### iOS
+```bash
+npm run build:ios                # → eas build -p ios --profile production
+# Not: iOS derlemesi Apple Developer hesabı ($99/yıl) ister; simulator için
+# "internal" dağıtımıyla TestFlight'a gerek kalmadan cihazda test edebilirsin.
+```
+
+### Önemli Notlar
+- Uygulama, API ve gerçek zamanlı bağlantı için `https://tavriko-app.vercel.app` ve Cloudflare WebSocket adresini kullanır — mobil derleme ek yapılandırma istemez.
+- Görsel ve ses dosyaları Cloudflare CDN'den yüklendiği için uygulama paketi küçük kalır.
+- Build profilleri `client/eas.json` dosyasında tanımlıdır (`preview` = APK, `production` = mağaza paketi, otomatik sürüm artışı açık).
+- Derleme durumu ve indirilebilir dosyalar [expo.dev/accounts/.../projects/tavriko](https://expo.dev) panelinden takip edilir; tamamlanınca QR kod veya indirme bağlantısı verilir.
+
+---
+
 ## 📄 Lisans
 
 Bu proje özel olarak geliştirilmiştir. Tüm hakları saklıdır.

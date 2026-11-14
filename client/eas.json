@@ -1,0 +1,29 @@
+{
+  "cli": {
+    "version": ">= 13.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "description": "Test amaçlı Android APK — telefona direkt kurulur, mağazaya gönderilmez",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "internal": true,
+        "buildConfiguration": "Release"
+      }
+    },
+    "production": {
+      "description": "Mağaza sürümü — Android AAB (Play Store) ve iOS (App Store)",
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
