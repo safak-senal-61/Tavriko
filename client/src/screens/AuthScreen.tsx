@@ -50,12 +50,12 @@ import {
   EyeOpenIcon,
   EyeOffIcon,
 } from '../components/TavrikoIcons';
-import { FloatingImage } from '../components/StoreKit';
 import { GuestDiscoveryCard } from '../components/DiscoveryArtwork';
 import Reanimated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { sound } from '../services/soundService';
 
-const AUTH_CROWN = cdnImage('images/ui/auth_crown.png');
+// Tavriko marka logosu (şeffaf arka planlı, CDN yerine paket içinden — hızlı ve garantili)
+const AUTH_LOGO = require('../assets/images/brand/emblem_tight.png');
 const GOOGLE_CLIENT_ID =
   '411578437442-gs1rck2124rgr516fe9dn9tuu15ge9ig.apps.googleusercontent.com';
 interface AuthScreenProps {
@@ -531,15 +531,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       clearInterval(googlePollInterval.current);
       googlePollInterval.current = null;
     }
-    // Safety timeout: Never stay stuck on loading for more than 18 seconds
+    // Safety timeout: Only release the button after 20 seconds; polling continues in background
     const safetyTimer = setTimeout(() => {
-      if (googlePollInterval.current) {
-        clearInterval(googlePollInterval.current);
-        googlePollInterval.current = null;
-      }
       setLoading(false);
-      sendClientLog('WARN', 'Google giriş süresi zaman aşımına uğradı, buton normale döndü.');
-    }, 18000);
+      sendClientLog('WARN', 'Google giriş butonu serbest bırakıldı (oturum arka planda bekleniyor).');
+    }, 20000);
     try {
       // 1. Initialize server pending session with a short 3-second timeout
       let sessionId = '';
@@ -565,12 +561,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         WebBrowser.dismissAuthSession();
       } catch {}
       lastProcessedAuthUrl.current = null;
-      // 3. Start background polling if sessionId exists
+      // 3. Start background polling if sessionId exists (up to 3 minutes:
+      // kullanıcı Google hesap seçiminde uzun süre kalabilir)
       if (sessionId) {
         let attempts = 0;
         googlePollInterval.current = setInterval(async () => {
           attempts++;
-          if (attempts > 30) { // 15 seconds max polling
+          if (attempts > 180) { // 3 minutes max polling (1s interval)
             if (googlePollInterval.current) clearInterval(googlePollInterval.current);
             googlePollInterval.current = null;
             clearTimeout(safetyTimer);
@@ -607,21 +604,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               }
             }
           } catch {}
-        }, 500);
+        }, 1000);
       }
       // 4. Request OAuth URL from Supabase with prompt: 'select_account' (Preserve Supabase OAuth state)
       const queryParams: Record<string, string> = {
         prompt: 'select_account',
       };
-      if (sessionId) {
-        queryParams.sessionId = sessionId;
-      }
+      // Mobil kaynak işareti + oturum kimliği callback sayfasına taşınır;
+      // sayfa uygulamaya derin bağlantıyla döner ve sunucu oturumunu eşler.
+      const oauthRedirectTo = sessionId
+        ? `${redirectUri}?src=mobile&sessionId=${sessionId}`
+        : `${redirectUri}?src=mobile`;
 
-      sendClientLog('INFO', 'Supabase OAuth URL isteniyor...', { redirectUri });
+      sendClientLog('INFO', 'Supabase OAuth URL isteniyor...', { redirectUri: oauthRedirectTo });
       const { data, error } = await clientSupabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUri,
+          redirectTo: oauthRedirectTo,
           queryParams,
           skipBrowserRedirect: true,
         },
@@ -643,16 +642,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         clearTimeout(safetyTimer);
         await handleAuthRedirectUrl(result.url);
       } else if (result.type === 'dismiss' || result.type === 'cancel') {
-        // Wait 2.5s for poller to catch immediate success, otherwise release loading
+        // Tarayıcı kapatıldı: butonu serbest bırak ama arka plan yoklaması sürsün —
+        // kullanıcı Google akışını tamamladığında oturum hazır olur ve giriş otomatik gerçekleşir.
         setTimeout(() => {
           if (!lastProcessedAuthUrl.current) {
-            if (googlePollInterval.current) {
-              clearInterval(googlePollInterval.current);
-              googlePollInterval.current = null;
-            }
-            clearTimeout(safetyTimer);
             setLoading(false);
-            sendClientLog('INFO', 'Tarayıcı kapatıldı, buton normale döndü.');
+            sendClientLog('INFO', 'Tarayıcı kapatıldı, oturum arka planda izleniyor.');
           }
         }, 2500);
       }
@@ -804,7 +799,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         >
           <Reanimated.View entering={FadeInDown.delay(60).duration(500).springify().damping(14)} style={styles.heroCrownWrap}>
             <View style={styles.heroCrownGlow} />
-            <FloatingImage source={AUTH_CROWN} size={92} />
+            <Image
+              source={AUTH_LOGO}
+              style={styles.heroLogo}
+              resizeMode="contain"
+              accessibilityLabel="Tavriko logosu"
+            />
           </Reanimated.View>
           <Reanimated.View entering={FadeInUp.delay(140).duration(500)}>
             <Text style={styles.cleanBrandTitle}>Tavriko</Text>
@@ -1478,16 +1478,20 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 110,
+    width: 132,
     height: 110,
     marginBottom: 4,
   },
   heroCrownGlow: {
     position: 'absolute',
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: 'rgba(255, 196, 61, 0.22)',
+    width: 104,
+    height: 104,
+    borderRadius: 52,
+    backgroundColor: 'rgba(122, 59, 255, 0.28)',
+  },
+  heroLogo: {
+    width: 126,
+    height: 97,
   },
   brandSubtitle: {
     color: '#D9CDF5',

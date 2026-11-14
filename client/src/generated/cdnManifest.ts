@@ -16,6 +16,7 @@ export const CDN_MANIFEST: Record<string, [number, number, string]> = {
   "images/avatars/av_8.jpg": [256, 256, "32fee87e"],
   "images/avatars/av_9.jpg": [256, 256, "83f64edd"],
   "images/brand/emblem.png": [640, 491, "b8965ec4"],
+  "images/brand/emblem_tight.png": [636, 488, "92e07afd"],
   "images/brand/logo_full.png": [900, 815, "11b671b8"],
   "images/categories/cat_animals.png": [288, 288, "bb01ca5a"],
   "images/categories/cat_anime.png": [288, 288, "32ff1311"],
@@ -575,6 +576,6 @@ export const CDN_MANIFEST: Record<string, [number, number, string]> = {
   "sounds/timer_tick.wav": [0, 0, "6fc40371"],
   "sounds/victory.wav": [0, 0, "363f4d8e"],
   "sounds/wrong.wav": [0, 0, "8a283909"],
-  "splash-icon.png": [1024, 1024, "c1e7535b"],
+  "splash-icon.png": [1024, 1024, "a717423e"],
   "splash-logo.png": [900, 815, "11b671b8"],
 };
