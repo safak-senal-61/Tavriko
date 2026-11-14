@@ -947,7 +947,7 @@ export class PrismaService {
     upsert: async (args: {
       where: { userId_itemId: { userId: string; itemId: string } };
       update: Partial<PrismaUserInventoryItem>;
-      create: { id?: string; userId: string; itemId: string; name: string; desc: string; qty?: number };
+      create: { id?: string; userId: string; itemId: string; name: string; desc: string; qty?: number; durationHours?: number | null };
     }): Promise<PrismaUserInventoryItem> => {
       const compositeKey = `${args.where.userId_itemId.userId}::${args.where.userId_itemId.itemId}`;
       const existing = this.store.userInventoryItems.get(compositeKey);
@@ -961,6 +961,7 @@ export class PrismaService {
             name: args.create.name,
             desc: args.create.desc,
             qty: args.create.qty ?? 1,
+            durationHours: args.create.durationHours ?? null,
             createdAt: now,
             updatedAt: now,
           };
