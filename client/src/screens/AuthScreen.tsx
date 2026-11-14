@@ -55,7 +55,7 @@ import Reanimated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimate
 import { sound } from '../services/soundService';
 
 // Tavriko marka logosu (şeffaf arka planlı, CDN yerine paket içinden — hızlı ve garantili)
-const AUTH_LOGO = require('../assets/images/brand/emblem_tight.png');
+const AUTH_LOGO = require('../../assets/images/brand/emblem_tight.png');
 const GOOGLE_CLIENT_ID =
   '411578437442-gs1rck2124rgr516fe9dn9tuu15ge9ig.apps.googleusercontent.com';
 interface AuthScreenProps {
