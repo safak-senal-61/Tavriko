@@ -1,79 +1,67 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { THEME } from '../theme/tokens';
-import { sound } from '../services/soundService';
-import {
-  TavrikoScreen,
-  TavrikoProgressBar,
-  TavrikoHeroLogo,
-} from '../components/TavrikoIcons';
+import { TavrikoScreen, TavrikoProgressBar, TavrikoHeroLogo } from '../components/TavrikoIcons';
+
 interface SplashScreenProps {
   onFinish: () => void;
 }
+
+/**
+ * Uygulama içi açılış ekranı.
+ *
+ * Tasarım: logo ve yazı tamamen sabittir (ölçek/bükülme animasyonu yoktur),
+ * her ekran boyunda kenarlarına taşmadan ortalanır. Yükleme çubuğu ve
+ * slogan alt bölgede dengeli boşlukla yer alır.
+ */
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
-  const [progress, setProgress] = useState(25);
-  const logoScale = useRef(new Animated.Value(0.82)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const [progress, setProgress] = useState(30);
+
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(logoScale, {
-        toValue: 1,
-        friction: 5,
-        tension: 80,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      Animated.timing(logoOpacity, {
-        toValue: 1,
-        duration: 450,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-    ]).start();
-    const t1 = setTimeout(() => setProgress(78), 120);
-    const t2 = setTimeout(() => {
-      setProgress(100);
-    }, 280);
-    const t3 = setTimeout(() => onFinish(), 400);
+    const t1 = setTimeout(() => setProgress(72), 120);
+    const t2 = setTimeout(() => setProgress(100), 260);
+    const t3 = setTimeout(() => onFinish(), 420);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [onFinish, logoScale, logoOpacity]);
+  }, [onFinish]);
+
   return (
     <TavrikoScreen style={styles.centerAll}>
-      <View style={styles.logoHalo} pointerEvents="none" />
-      <Animated.View
-        style={{
-          opacity: logoOpacity,
-          transform: [{ scale: logoScale }],
-        }}
-      >
-        <TavrikoHeroLogo width={300} height={272} />
-      </Animated.View>
+      {/* Sabit, yumuşak marka parlaması (animasyonsuz) */}
+      <View style={styles.logoGlow} pointerEvents="none" />
+
+      {/* Logo + marka yazısı: sabit, ölçeklenmez, taşmaz */}
+      <TavrikoHeroLogo width={232} height={210} />
+
       <View style={styles.loaderWrap}>
-        <TavrikoProgressBar progress={progress} height={10} />
+        <TavrikoProgressBar progress={progress} height={8} />
         <Text style={styles.loadingText}>Yükleniyor...</Text>
       </View>
+
       <Text style={styles.tagline}>Bilgini yarıştır, kazan!</Text>
     </TavrikoScreen>
   );
 };
+
 const styles = StyleSheet.create({
   centerAll: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoHalo: {
+  logoGlow: {
     position: 'absolute',
-    width: 320,
-    height: 320,
-    borderRadius: 160,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
     backgroundColor: '#7A3BFF',
-    opacity: 0.28,
+    opacity: 0.16,
   },
   loaderWrap: {
-    width: 200,
-    marginTop: 24,
+    width: 180,
+    marginTop: 20,
   },
   loadingText: {
     color: '#D9CDF5',
@@ -86,6 +74,6 @@ const styles = StyleSheet.create({
     color: '#FFC43D',
     fontSize: 13,
     fontFamily: THEME.fonts.extraBold,
-    marginTop: 12,
+    marginTop: 10,
   },
 });

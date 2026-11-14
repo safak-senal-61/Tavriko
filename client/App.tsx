@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import * as Sentry from '@sentry/react-native';
 import { useFonts } from 'expo-font';
 import {
@@ -10,6 +10,8 @@ import {
 } from '@expo-google-fonts/nunito';
 import { View, ActivityIndicator, Platform } from 'react-native';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { hydrateAuthStorage, getStoredAuth } from './src/utils/authStorage';
+import { useGameStore } from './src/store/gameStore';
 
 // Sentry hata izleme: EXPO_PUBLIC_SENTRY_DSN tanımlı değilse sessizce kapalı kalır.
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
@@ -82,7 +84,27 @@ function AppInner() {
     Nunito_900Black,
   });
 
-  if (!fontsLoaded) {
+  // Mobilde kalıcı oturum: güvenli depodan (Keystore/Keychain) yükle.
+  // RootNavigator ilk render'ından ÖNCE tamamlanmalı; aksi halde açılışta
+  // kullanıcı çıkış yapılmamış olsa bile giriş ekranına düşer.
+  const [authReady, setAuthReady] = useState(Platform.OS === 'web');
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let cancelled = false;
+    hydrateAuthStorage().then(() => {
+      if (cancelled) return;
+      const { user, token } = getStoredAuth();
+      if (user && !useGameStore.getState().user) {
+        useGameStore.getState().setUser(user, token ?? undefined);
+      }
+      setAuthReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!fontsLoaded || !authReady) {
     return (
       <View style={{ flex: 1, backgroundColor: '#180B34', justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#FFC43D" />

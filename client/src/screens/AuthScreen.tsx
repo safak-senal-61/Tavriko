@@ -537,84 +537,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       sendClientLog('WARN', 'Google giriş butonu serbest bırakıldı (oturum arka planda bekleniyor).');
     }, 20000);
     try {
-      // 1. Initialize server pending session with a short 3-second timeout
-      let sessionId = '';
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
-        const initRes = await fetch(`${apiBaseUrl}/auth/google/init-session`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        if (initRes.ok) {
-          const initData = await initRes.json();
-          sessionId = initData.sessionId;
-          sendClientLog('INFO', 'Sunucu oturumu oluşturuldu', { sessionId });
-        }
-      } catch (initErr: any) {
-        sendClientLog('WARN', 'Sunucu init-session çağrısı atlandı veya zaman aşımına uğradı', { err: initErr.message });
-      }
-      // 2. Clear any prior browser session state
+      // 1. Clear any prior browser session state
       try {
         WebBrowser.dismissAuthSession();
       } catch {}
       lastProcessedAuthUrl.current = null;
-      // 3. Start background polling if sessionId exists (up to 3 minutes:
-      // kullanıcı Google hesap seçiminde uzun süre kalabilir)
-      if (sessionId) {
-        let attempts = 0;
-        googlePollInterval.current = setInterval(async () => {
-          attempts++;
-          if (attempts > 180) { // 3 minutes max polling (1s interval)
-            if (googlePollInterval.current) clearInterval(googlePollInterval.current);
-            googlePollInterval.current = null;
-            clearTimeout(safetyTimer);
-            setLoading(false);
-            return;
-          }
-          try {
-            const statusRes = await fetch(`${apiBaseUrl}/auth/google/session-status?sessionId=${sessionId}`);
-            if (statusRes.ok) {
-              const statusData = await statusRes.json();
-              if (statusData.status === 'ready' && statusData.user && statusData.token) {
-                if (googlePollInterval.current) {
-                  clearInterval(googlePollInterval.current);
-                  googlePollInterval.current = null;
-                }
-                clearTimeout(safetyTimer);
-                try {
-                  WebBrowser.dismissAuthSession();
-                } catch {}
-                sendClientLog('SUCCESS', 'Oturum hazır! Ana sayfaya yönlendiriliyor', { user: statusData.user.email });
-                sound.playSound('victory');
-                sound.triggerHaptic('success');
-                setLoading(false);
-                onSuccess(statusData.user, statusData.token);
-              } else if (statusData.status === 'error') {
-                if (googlePollInterval.current) {
-                  clearInterval(googlePollInterval.current);
-                  googlePollInterval.current = null;
-                }
-                clearTimeout(safetyTimer);
-                sendClientLog('ERROR', 'Sunucu oturum hatası bildirdi', { error: statusData.error });
-                setErrorMsg(statusData.error || 'Google yetkilendirme hatası oluştu.');
-                setLoading(false);
-              }
-            }
-          } catch {}
-        }, 1000);
-      }
-      // 4. Request OAuth URL from Supabase with prompt: 'select_account' (Preserve Supabase OAuth state)
+      // 2. Request OAuth URL from Supabase with prompt: 'select_account' (Preserve Supabase OAuth state)
       const queryParams: Record<string, string> = {
         prompt: 'select_account',
       };
-      // Mobil kaynak işareti + oturum kimliği callback sayfasına taşınır;
-      // sayfa uygulamaya derin bağlantıyla döner ve sunucu oturumunu eşler.
-      const oauthRedirectTo = sessionId
-        ? `${redirectUri}?src=mobile&sessionId=${sessionId}`
-        : `${redirectUri}?src=mobile`;
+      // Mobilde artık web sayfası yok: Supabase doğrudan uygulamanın derin
+      // bağlantısına (tavriko://auth-callback) yönlendirir. Google hesabı
+      // tarayıcıda seçilir, akışın geri kalanı uygulama içinde tamamlanır.
+      // Not: bu adresin Supabase Authentication -> URL Configuration ->
+      // Redirect URLs listesinde tanımlı olması gerekir.
+      const oauthRedirectTo = 'tavriko://auth-callback';
 
       sendClientLog('INFO', 'Supabase OAuth URL isteniyor...', { redirectUri: oauthRedirectTo });
       const { data, error } = await clientSupabase.auth.signInWithOAuth({
@@ -635,8 +572,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         throw new Error(error?.message || 'Google yetkilendirme linki oluşturulamadı.');
       }
       sendClientLog('INFO', 'WebBrowser açılıyor...', { oauthUrl: data.url });
-      // 5. Open authentic Google account selector in system browser sheet (Mobile Native)
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+      // 5. Open authentic Google account selector in system browser sheet (Mobile Native).
+      // Dönüş adresi uygulamanın şeması: tarayıcı tavriko://auth-callback'e
+      // ulaşınca oturum kapanır ve uygulama token ile devam eder.
+      const result = await WebBrowser.openAuthSessionAsync(data.url, oauthRedirectTo);
       sendClientLog('INFO', 'WebBrowser kapandı/döndü', { resultType: result.type });
       if (result.type === 'success' && result.url) {
         clearTimeout(safetyTimer);
@@ -1461,7 +1400,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    paddingVertical: 20,
+    paddingVertical: 14,
     paddingHorizontal: 18,
     width: '100%',
     maxWidth: 480,
@@ -1478,20 +1417,20 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 132,
-    height: 110,
-    marginBottom: 4,
+    width: 112,
+    height: 94,
+    marginBottom: 2,
   },
   heroCrownGlow: {
     position: 'absolute',
-    width: 104,
-    height: 104,
-    borderRadius: 52,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: 'rgba(122, 59, 255, 0.28)',
   },
   heroLogo: {
-    width: 126,
-    height: 97,
+    width: 106,
+    height: 81,
   },
   brandSubtitle: {
     color: '#D9CDF5',
@@ -1503,19 +1442,19 @@ const styles = StyleSheet.create({
   },
   cleanBrandTitle: {
     fontFamily: THEME.fonts.display,
-    fontSize: 44,
+    fontSize: 38,
     color: '#FFFFFF',
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
     textShadowColor: 'rgba(168, 85, 247, 0.85)',
     textShadowOffset: { width: 0, height: 4 },
     textShadowRadius: 18,
     textAlign: 'center',
-    marginVertical: 4,
+    marginVertical: 2,
   },
   card: {
     backgroundColor: 'rgba(28, 12, 62, 0.86)',
     borderRadius: 28,
-    padding: 20,
+    padding: 16,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.16)',
     width: '100%',

@@ -70,7 +70,8 @@
           "disableAutoUpload": true
         }
       ],
-      "@sentry/react-native"
+      "@sentry/react-native",
+      "expo-secure-store"
     ],
     "backgroundColor": "#1A0B4D",
     "extra": {

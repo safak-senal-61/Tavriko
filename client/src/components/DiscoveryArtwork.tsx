@@ -54,7 +54,11 @@ export function useReducedMotion() {
   const prefs = usePreferences();
   const preferStill = prefs.smoothAnimations === false || prefs.batterySaver === true ||
     (prefs.smoothAnimations === undefined && prefs.batterySaver === undefined && accountStill);
-  const [reduced, setReduced] = useState(true);
+  // Varsayılan: animasyonlar AÇIK. Mobilde erişilebilirlik kontrolü asenkron
+  // çözüldüğü için önceki varsayılan (true) ilk karelerde tüm giriş
+  // animasyonlarını sessizce kapatıyordu; şimdi yalnızca OS tercihi
+  // "hareketi azalt" ise kapanır.
+  const [reduced, setReduced] = useState(false);
   useEffect(() => {
     let mounted = true;
     const media = Platform.OS === 'web' && typeof window !== 'undefined'
@@ -112,7 +116,7 @@ export const GuestDiscoveryCard: React.FC<{ onPress: () => void; compact?: boole
           ? 'Kategorileri keşfet, tek kişilik pratikle kendini dene.'
           : 'Arkadaşlarına meydan oku. Kendi başarı hikâyeni başlat.'}</Text>
       </View>
-      <DiscoveryArtwork source={DISCOVERY_IMG.explorer} size={narrow ? 72 : compact ? 92 : 112} />
+      <DiscoveryArtwork source={DISCOVERY_IMG.explorer} size={narrow ? 64 : compact ? 76 : 112} />
     </View>
     {!compact && (
       <View style={styles.perks}>
@@ -148,7 +152,7 @@ export const AchievementState: React.FC<{ done: boolean }> = ({ done }) => (
 
 const styles = StyleSheet.create({
   card: { backgroundColor: '#21123F', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(230,195,255,0.24)', overflow: 'hidden', padding: 16, marginTop: 8, marginBottom: 16, gap: 12 },
-  compact: { marginTop: 16 },
+  compact: { marginTop: 10, padding: 12 },
   hero: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   copy: { flex: 1, minWidth: 0 },
   eyebrow: { color: '#B7F5E1', fontFamily: THEME.fonts.extraBold, fontSize: 12, letterSpacing: 1, marginBottom: 8 },
