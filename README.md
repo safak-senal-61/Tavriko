@@ -1,54 +1,245 @@
-# ⚡ TAVRİKO — Yeni Nesil Gerçek Zamanlı Multiplayer Bilgi Yarışması
+<div align="center">
+
+# ⚡ TAVRİKO
+
+### Yeni Nesil Gerçek Zamanlı Multiplayer Bilgi Yarışması
 
 Modern, rekabetçi, stüdyo kalitesinde ve yapay zekâ destekli çok oyunculu (multiplayer) mobil & web bilgi yarışması platformu.
 
-iOS, Android ve Mobil Web üzerinde eş zamanlı çalışacak şekilde **React Native & Expo**, **TypeScript**, **Cloudflare Workers & Durable Objects**, **Node.js (Socket.IO + Express)**, **Supabase PostgreSQL & Prisma**, **Upstash Redis**, **Google Gemini / SSB EVREN GLM-5.3** ve **Telegram Bot** mimarisiyle geliştirilmiştir.
+**iOS, Android ve Mobil Web** üzerinde eş zamanlı çalışır.
 
-Canlı Web Sürümü: **[https://tavriko-app.vercel.app/](https://tavriko-app.vercel.app/)**  
-Cloudflare Realtime Ağ: **`wss://tavriko-realtime.uncertainidentity8.workers.dev/ws`**
+[![React Native + Expo](https://img.shields.io/badge/React_Native-Expo-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://expo.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Durable_Objects-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://workers.cloudflare.com)
+[![Supabase PostgreSQL](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
+[![Vercel](https://img.shields.io/badge/Vercel-Serverless-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
+
+🎮 **[Canlı Web Sürümünü Oyna](https://tavriko-app.vercel.app/)** ·
+🤖 **[Telegram Botu](https://tavriko-app.vercel.app/api/telegram/webhook)** ·
+⚡ Realtime: `wss://tavriko-realtime.uncertainidentity8.workers.dev/ws`
+
+</div>
 
 ---
 
-## 🌟 Öne Çıkan Sistemler & Özellikler
+## 🌐 Erişilebilir Sayfalar
 
-### 1. ⚔️ Gerçek Zamanlı Multiplayer & Eşleşme (Matchmaking)
-- **Cloudflare Durable Objects & Native WebSockets**: Düşük gecikmeli, küresel dağıtık gerçek zamanlı oda ve eşleşme motoru (`GAME_ROOMS` ve `MATCHMAKER` Durable Objects).
+### Oyun
+
+| Sayfa | Adres | Açıklama |
+|---|---|---|
+| 🎮 **Web Oyun** | [tavriko-app.vercel.app](https://tavriko-app.vercel.app/) | Tarayıcıdan direkt oynanabilir sürüm |
+| 📱 **Oyun (/app)** | [tavriko-app.vercel.app/app](https://tavriko-app.vercel.app/app) | Aynı oyun, kalıcı bağlantı |
+| ⚡ **Kısa Yol** | [/play](https://tavriko-app.vercel.app/play) · [/game](https://tavriko-app.vercel.app/game) | Oyuna yönlendiren kısa adresler |
+| 🤝 **Odaya Hızlı Katılım** | `?joinRoom=KOD` | `https://tavriko-app.vercel.app/?joinRoom=KOD` ile tek tıkla özel odaya giriş |
+
+### Yasal Metinler ve KVKK
+
+| Sayfa | Adres |
+|---|---|
+| 📚 Tüm Yasal Metinler | [tavriko-app.vercel.app/legal](https://tavriko-app.vercel.app/legal) |
+| 🔔 KVKK Aydınlatma Metni | [/aydinlatma-metni](https://tavriko-app.vercel.app/aydinlatma-metni) |
+| 🔒 Gizlilik Politikası | [/gizlilik-politikasi](https://tavriko-app.vercel.app/gizlilik-politikasi) |
+| 📜 Kullanım Koşulları | [/kullanim-kosullari](https://tavriko-app.vercel.app/kullanim-kosullari) |
+| 💳 Satış Sözleşmesi | [/satis-sozlesmesi](https://tavriko-app.vercel.app/satis-sozlesmesi) |
+| 🍪 Çerez Politikası | [/cerez-politikasi](https://tavriko-app.vercel.app/cerez-politikasi) |
+| 🛡️ Topluluk Kuralları | [/topluluk-kurallari](https://tavriko-app.vercel.app/topluluk-kurallari) |
+| 🗑️ **Hesabımı Sil** | [/remove-account](https://tavriko-app.vercel.app/remove-account) |
+
+> `/remove-account` sayfasından e-posta + doğrulama kodu ile tüm verilerinizi (profil, cüzdan, kozmetikler, maç geçmişi, arkadaş listesi) kalıcı olarak silebilirsiniz — KVKK uyumlu.
+
+### Yönetim ve API
+
+| Sayfa | Adres |
+|---|---|
+| 🔐 Yönetim Portalı | [tavriko-app.vercel.app/admin/login](https://tavriko-app.vercel.app/admin/login) |
+| 📡 Yasal Metinler API (JSON) | [tavriko-app.vercel.app/api/legal](https://tavriko-app.vercel.app/api/legal) |
+
+---
+
+## 🌟 Öne Çıkan Sistemler ve Özellikler
+
+### 1. ⚔️ Gerçek Zamanlı Multiplayer ve Eşleşme
+- **Cloudflare Durable Objects ve Native WebSockets**: Düşük gecikmeli, küresel dağıtık gerçek zamanlı oda ve eşleşme motoru (`GAME_ROOMS` ve `MATCHMAKER` Durable Objects).
 - **Hızlı Eşleşme (1v1 Quick Match)**: Tek dokunuşla radar animasyonlu 2 oyunculu eşleşme.
-- **Yapay Zekâ Bot Rakip Desteği**: Gerçek oyuncu bulunamadığında otomatik devreye giren, insansı gecikmeyle cevap veren bilgisayar rakip ve kesintisiz soru akışı.
-- **Arkadaşlarla Özel Oda (Custom Room)**: 6 haneli oda koduyla anında özel lobi açma, doğrudan katılım bağlantısı paylaşımı (`https://tavriko-app.vercel.app/?joinRoom=KOD`).
-- **Güvenli Oyun Çıkışı (X Butonu)**: Çarpı butonuna basıldığında tüm aktif sayaçlar, arka plan zamanlayıcıları ve ağ bağlantıları hafıza sızıntısı bırakmadan temizlenir.
+- **Yapay Zekâ Bot Rakip Desteği**: Gerçek oyuncu bulunamadığında otomatik devreye giren, insansı gecikmeyle cevap veren bilgisayar rakip.
+- **Arkadaşlarla Özel Oda (Custom Room)**: 6 haneli oda koduyla anında özel lobi, doğrudan katılım bağlantısı paylaşımı.
+- **Kesintisiz Bağlantı Deneyimi**: İnternet kesildiğinde şık bir animasyon belirir, oyuna kısa bir koruma süresi tanınır; süre dolarsa oyuncu nazikçe maça alınır — akış bozulmadan geri dönüş sağlanır.
 
-### 2. 🏆 Pro Lig & Sezon 1: Bilgi Çağı
-- **7 Aşamalı Lig Sistemi**: Bronz, Gümüş, Altın, Platin, Elmas, Şampiyon ve Efsane ligleri.
+### 2. 🏆 Pro Lig ve Sezon 1: Bilgi Çağı
+- **7 Aşamalı Lig Sistemi**: Bronz, Gümüş, Altın, Platin, Elmas, Şampiyon ve Efsane.
 - **Yükselme ve Düşme Potası**: Haftalık puanlama, ilk 3 için podyum (`🥇 🥈 🥉`) ve sezon sonu ödülleri.
-- **50 Kademeli Savaş Bileti (Season Pass)**: Ücretsiz ve Premium Pass kulvarları, Sezon XP (S-XP) ile açılan mitolojik kozmetikler, altın, elmas ve sandıklar.
+- **50 Kademeli Savaş Bileti (Season Pass)**: Ücretsiz ve Premium kulvarlar, Sezon XP ile açılan mitolojik kozmetikler, altın, elmas ve sandıklar. Sezon kozmetikleri 30 gün süreyle kuşanılır.
 
-### 3. 📅 Canlı Etkinlikler & Görev Takibi (Events)
+### 3. 💎 WePlay Tarzı Süreli Kozmetikler ve Temalar
+- **Çalışan Rozetler**: Mağazadan alınan rozetler profil kartında gerçek görselleriyle görünür; süre sayaçlarıyla birlikte kuşanılır.
+- **İsim Efektleri**: Parıltı, ateş gradyanı, zümrüt, şeker, void, plazma dahil 8+ animasyonlu isim efekti.
+- **Güçlendirici İksirler**: 2x/3x XP ve 2x Altın iksirleri — kullanınca süresi başlar, maç ödüllerine uygulanır, üst üste kullanım süreyi uzatır.
+- **PRO/VIP Arka Planlar**: Kuşanılan arka plan yalnızca duvar değil — tüm arayüzün vurgu renkleri (butonlar, parlamalar, çubuklar) arka plan temasına bürünür; süre bitince otomatik eski haline döner.
+- **Esnek Süre Seçimi**: Kozmetikler 1 saat, 1 gün, 3 gün, 1 hafta veya 1 aylık alınabilir; fiyat süreye göre ölçeklenir.
+- **Envanterden Kuşanma**: Kuşanınca süre başlar, altındaki bar dolunca kozmetik otomatik düşer.
+
+### 4. 📅 Canlı Etkinlikler ve Görev Takibi
 - **3 Dinamik Görev Kategorisi**: Günlük Görevler, Haftalık Hedefler ve Özel Turnuvalar.
-- **Gerçek Zamanlı İlerleme Takibi**: Görevler kullanıcı "BAŞLA / OYNA" dedikten sonra aktifleşir; eski maçlar veya kümülatif sorular karışmadan sadece oturumdaki ilerleme kaydedilir.
-- **Tek Tıkla Ödül Toplama (`TOPLA`)**: Görev tamamlandığında naneli yeşil butonla ses ve haptik eşliğinde anında ödül teslimi.
+- **Gerçek Zamanlı İlerleme**: Görevler "BAŞLA" dendikten sonra aktifleşir; yalnızca oturumdaki ilerleme kaydedilir.
+- **Tek Tıkla Ödül Toplama**: `TOPLA` butonuyla ses ve haptik eşliğinde anında ödül.
 
-### 4. 🛒 Tavriko Mağazası & Envanter (Shop & Inventory)
-- **11 Ürün Kategorisi**: Öne Çıkanlar, Elmas Paketleri, Altın Keseleri, Sandıklar (Bronz/Gümüş/Altın), Anahtarlar, Avatarlar, Çerçeveler, Rozetler, İsim Efektleri, Güçlendiriciler ve Arka Planlar.
-- **Sandık Açma & Ödül Sistemi**: Gümüş ve altın anahtarlarla açılan sandıklar, parıltı animasyonları ve rastgele kozmetik düşürme mekanizması.
+### 5. 🛒 Tavriko Mağazası, Envanter ve Sandıklar
+- **11 Ürün Kategorisi**: Öne Çıkanlar, Elmas Paketleri, Altın Keseleri, Sandıklar, Anahtarlar, Avatarlar, Çerçeveler, Rozetler, İsim Efektleri, Güçlendiriciler ve Arka Planlar.
+- **Sandık Açma Sistemi**: Anahtarlarla açılan sandıklar, parıltı animasyonları ve rastgele kozmetik düşürme.
+- **Her Ürünün Gerçek Görseli**: Envanter ve sezon ödüllerinde her ürün türü kendi görselini kullanır (animasyonlu çerçeveler, isim efektleri, arka plan önizlemeleri).
 
-### 5. 🤖 SSB EVREN GLM-5.3 & Gemini Yapay Zekâ Soru Motoru
+### 6. 👥 Arkadaşlık ve Profil Sistemi (KVKK Uyumlu)
+- **Arkadaş Kodu ve Davet**: `TV-XXXXX` koduyla arkadaş ekleme, düello istekleri, canlı çevrimiçi durumu.
+- **Tam Ekran Arkadaş Profili**: Arkadaşının profili kendi profil sayfan gibi görünür; ancak Ayar ve Hesap bölümleri, düzenleme butonları KVKK gereği gizlidir.
+- **Arkadaşın Teması**: Görüntülediğin kişinin kuşandığı arka plan ve tema renkleri profilinde aynen yansır.
+- **Rozet ve Kozmetik Önizleme**: Rozete basınca isim, açıklama ve kalan süre pencerede açılır.
+- **Kalıcı Hesap Silme**: `/remove-account` sayfasından veya ayarlardan tüm veriler veritabanından kalıcı olarak silinir.
+
+### 7. 🤖 SSB EVREN GLM-5.3 ve Gemini Yapay Zekâ Soru Motoru
 - T.C. SSB EVREN platformu **GLM-5.3** ve **Google Gemini** LLM modelleriyle 16 kategoride dinamik soru üretimi.
 - Otomatik içerik karmaşıklığı analizi, 4 seçenekli şık dengelemesi, açıklama ve doğrulama kaynağı kontrolü.
 
-### 6. 📱 Telegram Yönetim & Topluluk Botu (Vercel Webhook Entegre)
-- **Vercel Serverless Uyumlu Webhook**: Serverless mimaride kesintisiz çalışan `POST /api/telegram/webhook` entegrasyonu.
-- **Hedef Soru Havuzları**:
-  - `[✅ Normal Kategoriye Al]`: Standart 1v1 ve lobi maçları havuzu.
-  - `[📅 Günlük Meydan Okuma]`: Günün Meydan Okuması havuzu.
-  - `[⚔️ Özel Oda / Arkadaş]`: Özel düellolara özel eğlenceli/zor soru havuzu.
-- **Topluluk Komutları**:
-  - `/profil <kullanıcı_adı>`: Seviye, LP, galibiyet oranı, en yüksek seri ve unvan kartı.
-  - `/lig` veya `/siralama`: Pro Lig canlı ilk 10 lider tablosu.
-  - `/oda_kur [kategori]`: Telegram grubunda tek komutla özel oda açıp bağlantı paylaşma.
-  - `/gunun_sorusu` veya `/quiz`: Telegram içi anlık oylanabilen Quiz/Poll yarışması.
-  - `/soru_uret`, `/gunluk_soru_uret`, `/ozel_soru_uret`: Hedef havuzlu soru üretimi.
-  - `/ara_soru <kelime>`: Soru havuzunda arama.
+### 8. 📱 Telegram Yönetim ve Topluluk Botu
+- **Vercel Serverless Uyumlu Webhook**: `POST /api/telegram/webhook`.
+- **Hedef Soru Havuzları**: `[✅ Normal Kategoriye Al]`, `[📅 Günlük Meydan Okuma]`, `[⚔️ Özel Oda / Arkadaş]`.
+- **Topluluk Komutları**: `/profil`, `/lig`, `/siralama`, `/oda_kur`, `/gunun_sorusu`, `/quiz`, `/soru_uret`, `/ara_soru` ve daha fazlası.
+
+---
+
+## 🗺️ Yol Haritası (Roadmap)
+
+### ✅ Tamamlananlar
+
+<details open>
+<summary><b>🚀 Çekirdek Sistem</b></summary>
+
+- [x] Gerçek zamanlı multiplayer altyapısı (Cloudflare Durable Objects + WebSockets)
+- [x] 1v1 hızlı eşleşme + radar animasyonu
+- [x] Yapay zekâ bot rakip desteği (insansı gecikme)
+- [x] Özel odalar (6 haneli kod + hızlı katılım bağlantısı)
+- [x] 7 aşamalı Pro Lig sistemi (Bronz → Efsane)
+- [x] 50 kademeli Sezon Bileti (ücretsiz + premium kulvar)
+- [x] Canlı etkinlikler: günlük görevler, haftalık hedefler, turnuvalar
+- [x] 16 kategori + karma mod, AI soru üretim motoru
+- [x] Telegram yönetim ve topluluk botu
+- [x] Günlük meydan okuma sistemi
+- [x] Skor matematiği: hız bonusu, seri çarpanı, eşitlik çözümü
+
+</details>
+
+<details open>
+<summary><b>💎 Ekonomi ve Kozmetikler</b></summary>
+
+- [x] 11 kategorili mağaza (elmas, altın, sandık, anahtar, avatar, çerçeve, rozet, isim efekti, iksir, arka plan)
+- [x] Sandık açma ve rastgele kozmetik düşürme sistemi
+- [x] WePlay tarzı süreli kozmetikler (rozetler, isim efektleri, iksirler)
+- [x] Çalışan rozetler: gerçek görseller + profil kartında süre sayacı
+- [x] 8+ animasyonlu isim efekti (parıltı, ateş, zümrüt, şeker, void, plaza…)
+- [x] Güçlendirici iksirler: 2x/3x XP, 2x Altın (1 saat / 24 saat)
+- [x] PRO/VIP arka planlar: tüm arayüzün vurgu renklerini değiştirir
+- [x] Esnek süre seçimi: 1 saat / 1 gün / 3 gün / 1 hafta / 1 ay
+- [x] Envanterden kuşanma + süre barı + otomatik düşme
+- [x] Her ürün türü için gerçek önizleme görselleri (envanter + sezon)
+
+</details>
+
+<details open>
+<summary><b>🛡️ Güvenlik, KVKK ve Deneyim</b></summary>
+
+- [x] Kayıt sırasında zorunlu yasal metin onayı (sunucu tarafında doğrulanır)
+- [x] Tüm yasal metinler için herkese açık web sayfaları (`/legal`, `/aydinlatma-metni`…)
+- [x] `/remove-account` web sayfası: e-posta + doğrulama kodu ile tüm verilerin kalıcı silinmesi
+- [x] Veritabanı öncelikli hesap silme (maç geçmişi, arkadaş listeleri, kodlar dahil)
+- [x] Salt-okunur arkadaş profili görünümü (ayarlar/hesap bölümleri gizli)
+- [x] Arkadaşın kuşandığı arka plan ve temanın profilinde yansıması
+- [x] İnternet kesintisinde şık animasyon + koruma süresi + nazik çıkış
+- [x] Cüzdan sahteciliğine karşı sunucu-otoriter ekonomi modeli
+- [x] Kullanıcı sayımını (enumeration) engelleyen güvenli kimlik doğrulama
+
+</details>
+
+### 🚀 Eklenebilecek Yeni Özellikler
+
+<details open>
+<summary><b>🎮 Oynanış</b></summary>
+
+- [ ] **2v2 ve Takım Modları (3v3)**: Arkadaşınla aynı takımda lig maçları
+- [ ] **Turnuva Modu**: Eleme usulü (bracket) 8/16/32 kişilik turnuvalar, ödül havuzları
+- [ ] **İzleyici (Spectator) Modu**: Canlı maçları izleme + yorum satırı
+- [ ] **Maç Tekrarları (Replay)**: Podyum sonrası maçın özet kaydı
+- [ ] **Günlük Çark (Spin Wheel)**: Ücretsiz günlük ödül çarkı
+- [ ] **Mini Oyunlar**: Kelime avı, hızlı yazma düellosu, hafıza eşleştirme
+- [ ] **Dinamik Zorluk (Adaptif AI)**: Yapay zekânın oyuncu seviyesine göre soru seçmesi
+- [ ] **Sorulan Zaman Modu**: 60 saniyede kaç doğru? Blitz modu
+- [ ] **Topluluk Soru Havuzu**: Oyuncuların soru önermesi + moderasyon akışı
+- [ ] **Revans (Rövanş) Sistemi**: Kaybedilen maçtan sonra tek tıkla rövanş
+- [ ] **Dostluk Maçı Kazanımları**: Arkadaş maçlarında küçük ödüller
+- [ ] **Bilgi Maratonu (Endless)**: Seri bozulana kadar süren tek kişilik mod
+
+</details>
+
+<details open>
+<summary><b>👥 Sosyal</b></summary>
+
+- [ ] **Klan / Lonca Sistemi**: Klan kurma, klan savaşları, klan ligleri
+- [ ] **Klan Savaşları**: Haftalık klan vs klan toplam puan yarışı
+- [ ] **Sesli Sohbet / Hızlı Mesajlar**: Maç içi önceden tanımlı hızlı mesajlar
+- [ ] **Arkadaş Karşılaştırma**: İstatistiklerini arkadaşınla yan yana karşılaştırma
+- [ ] **Düello Geçmişi**: Arkadaşınla olan tüm maçların kaydı ve skor tablosu
+- [ ] **Profil Bannerları ve Galeri**: Kazanılan anlara ayrılmış vitrin bölümü
+- [ ] **Emote / Tepki Sistemi**: Maç içi emoji ve tepkiler
+- [ ] **Günün Oyuncusu**: Toplulukta günün en iyisi vitrini
+
+</details>
+
+<details open>
+<summary><b>💎 Ekonomi ve Kozmetik</b></summary>
+
+- [ ] **Oyuncu Pazarı**: Kozmetik takası ve satış (kırılmaz eşya modeli)
+- [ ] **Kozmetik Setleri**: Aynı setin parçalarını toplayınca koleksiyon bonusu
+- [ ] **Kozmetik Üretimi (Crafting)**: Fazla kozmetikleri birleştirip yeni kozmetik üretme
+- [ ] **Sezon Mirası (Legacy) Kozmetikleri**: Eski sezon kozmetiklerini açma anahtarı
+- [ ] **Avatar Animasyonları**: Maç başında oynatan giriş animasyonları
+- [ ] **Profil Müzikleri**: Profile girenlerde çalan tema müzikleri
+- [ ] **Sınırlı Üretim (Limited Edition) Kozmetikler**: Sezonla birlikte yok olan nadir eşyalar
+- [ ] **Ödül Sandığı Serileri**: Temalı sandık setleri (mitoloji, uzay, korsan…)
+
+</details>
+
+<details open>
+<summary><b>🛡️ Güvenlik ve Platform</b></summary>
+
+- [ ] **PWA Desteği**: Telefona kurulabilir web uygulaması + offline maç modu
+- [ ] **Push Bildirimleri**: Düello istekleri, görev hatırlatmaları, sezon duyuruları
+- [ ] **Çoklu Dil (i18n)**: İngilizce ve diğer diller
+- [ ] **Erişilebilirlik**: Sesli okuma, renk körlüğü modu, büyük yazı tipi
+- [ ] **Anti-Cheat Geliştirmeleri**: Cevap süresi anomalisi tespiti, davranış analizi
+- [ ] **Hesap Bağlama**: E-posta ↔ Google hesap birleştirme
+- [ ] **İki Adımlı Doğrulama (2FA)**: Hesap güvenliği
+- [ ] **Doğrulanmış Rozetler**: Gerçek kimlik doğrulaması
+
+</details>
+
+<details open>
+<summary><b>🤖 Yapay Zekâ</b></summary>
+
+- [ ] **AI Maç Analizi**: Güçlü ve zayıf kategorilerinin AI analizi
+- [ ] **Kişisel Soru Tavsiyeleri**: Eksik kategorilere göre çalışma önerileri
+- [ ] **AI Maç Özeti**: Maç sonrası otomatik yazılan renkli özet
+- [ ] **Daha Zeki Botlar**: Oyuncu seviyesine uyum sağlayan bot rakipler
+
+</details>
+
+<details open>
+<summary><b>📡 Dağıtım</b></summary>
+
+- [ ] **App Store (iOS) ve Google Play** yayını
+- [ ] **Discord Botu**: Sunucu içi lig tablosu ve quiz entegrasyonu
+- [ ] **Canlı Quiz Şovları**: Toplulukla aynı anda oynanan canlı etkinlikler
+- [ ] **Ekip/Destek Sistemi**: Oyun içi bildirim ve destek talebi
+
+</details>
 
 ---
 
@@ -59,6 +250,8 @@ Tavriko/
 ├── shared/                         # Ortak TypeScript tipleri, kontratlar ve formüller
 │   ├── src/
 │   │   ├── types.ts                # Soru, Oyuncu, Lig, Mağaza, Etkinlik, Pass tipleri
+│   │   ├── legal.ts                # KVKK ve yasal metin içerikleri
+│   │   ├── cosmetics.ts            # Kozmetik tanımları (rozet, çerçeve, isim efekti…)
 │   │   ├── events.ts               # Socket.IO & WebSocket mesaj sabitleri
 │   │   ├── scoring.ts              # Hız bonusu, seri çarpanı ve sıralama matematiği
 │   │   └── categories.ts           # 16 kategori metadata ve renk paleti
@@ -75,7 +268,7 @@ Tavriko/
 │   │   ├── telegram/telegramBot.ts # Telegraf Vercel Webhook bot servisi
 │   │   ├── db/prismaClient.ts      # Dual Persistence: Supabase PostgreSQL + Bellek İçi Cache
 │   │   ├── engine/                 # GameRoomManager, GameStateMachine, Matchmaker
-│   │   ├── routes/                 # Auth, Social, Trivia, Telegram, QR REST API
+│   │   ├── routes/                 # Auth, Social, Trivia, Telegram, QR, Legal REST API
 │   │   └── server.ts               # Express bootstrap, Webhook rotaları ve CORS
 │   └── test/                       # Birim, entegrasyon ve Telegram bot testleri
 ├── client/                         # Expo / React Native Çok Platformlu İstemci
@@ -83,9 +276,8 @@ Tavriko/
 │   │   ├── theme/tokens.ts         # Mor, lacivert, altın & nane koyu oyun teması
 │   │   ├── services/               # Realtime WebSocket, ses (SoundService) ve API
 │   │   ├── store/gameStore.ts      # Zustand merkezi durum yönetimi
-│   │   ├── components/             # TavrikoIcons, Button3D, TopBar, BottomNav
-│   │   ├── screens/                # EventsScreen, ShopScreen, ProLeagueScreen,
-│   │   │                           # SeasonScreen, CustomRoomScreen, GameScreen vb.
+│   │   ├── components/             # TavrikoIcons, Button3D, TopBar, BottomNav, StoreKit
+│   │   ├── screens/                # Events, Shop, ProLeague, Season, Profile, Friends…
 │   │   └── navigation/             # RootNavigator & sayfa geçişleri
 │   └── App.tsx                     # Mobil/Web giriş noktası
 ├── api/                            # Vercel Serverless Function Giriş Noktası
@@ -183,15 +375,16 @@ cd client && npm run web
 
 ## 🌐 Canlı Dağıtım (Production Deployment)
 
-* **Vercel (Client Web & Serverless API)**:
-  `git push origin main` komutu ile Vercel otomatik olarak `vercel.json` derleme komutunu çalıştırır ve `https://tavriko-app.vercel.app/` üzerinde yayına alır.
-* **Cloudflare Workers (Realtime DO)**:
-  `cloudflare/` dizini altından `npx wrangler deploy` ile `GAME_ROOMS` ve `MATCHMAKER` Durable Objects içeren iş parçacığı canlıya alınır.
-* **Telegram Webhook**:
-  Canlı dağıtımda `https://tavriko-app.vercel.app/api/telegram/webhook` adresine bağlanır; bot `/start` veya diğer komutları milisaniyeler içinde sunucusuz olarak yanıtlar.
+- **Vercel (Client Web & Serverless API)**: `git push origin main` komutuyla Vercel otomatik olarak `vercel.json` derleme komutunu çalıştırır ve `https://tavriko-app.vercel.app/` üzerinde yayına alır.
+- **Cloudflare Workers (Realtime DO)**: `cloudflare/` dizini altından `npx wrangler deploy` ile `GAME_ROOMS` ve `MATCHMAKER` Durable Objects içeren iş parçacığı canlıya alınır.
+- **Telegram Webhook**: Canlı dağıtımda `https://tavriko-app.vercel.app/api/telegram/webhook` adresine bağlanır; bot `/start` veya diğer komutları milisaniyeler içinde sunucusuz olarak yanıtlar.
 
 ---
 
 ## 📄 Lisans
 
 Bu proje özel olarak geliştirilmiştir. Tüm hakları saklıdır.
+
+<div align="center">
+  <sub>Built with ⚡ by <b>Tavriko Team</b></sub>
+</div>
