@@ -22,7 +22,13 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#10029F"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -65,6 +71,12 @@
         }
       ]
     ],
-    "backgroundColor": "#1A0B4D"
+    "backgroundColor": "#1A0B4D",
+    "extra": {
+      "eas": {
+        "projectId": "3eee7ba8-7dc6-4590-bb87-88214d6bfc7d"
+      }
+    },
+    "owner": "safak610"
   }
 }
