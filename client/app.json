@@ -69,7 +69,8 @@
           "project": "react-native",
           "disableAutoUpload": true
         }
-      ]
+      ],
+      "@sentry/react-native"
     ],
     "backgroundColor": "#1A0B4D",
     "extra": {
