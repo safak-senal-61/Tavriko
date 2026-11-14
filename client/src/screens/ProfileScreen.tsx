@@ -705,7 +705,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   };
 
   return (
-    <TavrikoScreen style={styles.profileScreenRoot}>
+    /* profileUser: ekran arka planı ve tema, görüntülenen kişinin kuşandığı
+       arka plandan alınır (arkadaş profili görüntüleme). */
+    <TavrikoScreen style={styles.profileScreenRoot} profileUser={user}>
       <TavrikoTopBar
         leftType="back"
         onLeftPress={onBack}

@@ -332,20 +332,36 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     sound.playSound('tap');
     sound.triggerHaptic('light');
     setConfirmRemoveId(null);
+    /* Tam profil sayfası kullanılıyorsa küçük modal hiç açılmaz:
+       profil arkadan çekilip doğrudan tam ekran görüntülenir. */
+    if (onOpenFullProfile) {
+      setInspectLoading(true);
+      try {
+        const res = await fetch(`${base}/social/profile/${player.id}`, {
+          headers: authHeaders(),
+        });
+        if (res.ok) {
+          const fullProfile = await res.json();
+          if (fullProfile?.id) {
+            setInspectLoading(false);
+            onOpenFullProfile(fullProfile);
+            return;
+          }
+        }
+      } catch {
+        // offline: eski modal temel bilgilerle açılır
+      }
+      setInspectLoading(false);
+    }
     setInspectPlayer(player);
     setInspectDetails(null);
     setInspectLoading(true);
     try {
-      const res = await fetch(`${base}/social/profile/${player.id}`);
+      const res = await fetch(`${base}/social/profile/${player.id}`, {
+        headers: authHeaders(),
+      });
       if (res.ok) {
         const fullProfile = await res.json();
-        // KVKK: tam profil sayfası (salt okunur) tercih edilirse modal açılmaz
-        if (onOpenFullProfile && fullProfile?.id) {
-          setInspectPlayer(null);
-          setInspectLoading(false);
-          onOpenFullProfile(fullProfile);
-          return;
-        }
         setInspectDetails(fullProfile);
       }
     } catch {

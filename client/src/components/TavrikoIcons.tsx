@@ -29,7 +29,7 @@ import { useGameStore } from '../store/gameStore';
 import { NotificationBell } from './NotificationUI';
 import { useUnreadCount } from '../store/notificationStore';
 import { BackgroundScene, backgroundFor } from './StoreKit';
-import { getCosmeticDef } from '@trivia/shared';
+import { getCosmeticDef, UserProfile } from '@trivia/shared';
 // Brand Assets
 export const BRAND_LOGO_MAIN = cdnImage('images/brand/logo_full.png');
 export const BRAND_LOGO_BANNER = cdnImage('images/brand/logo_full.png');
@@ -1034,10 +1034,15 @@ export const NavIcon: React.FC<{
  * null döner ve arayüz eski haline döner. Arka planla birlikte üst parlama,
  * alt ışık küreleri ve üst çubuk vurgu renkleri de değişir.
  */
-export const useProTheme = (): { accent: string; accent2: string; bgTint: string } | null => {
+export const useProTheme = (
+  /* Görüntülenen kullanıcının profili verilirse tema onun arka planından
+     okunur (arkadaş profili görüntüleme); verilmezse giriş yapan kullanıcı. */
+  profileUser?: UserProfile | null
+): { accent: string; accent2: string; bgTint: string } | null => {
   const storeUser = useGameStore((s) => s.user);
-  const equippedBg = storeUser?.equippedBackground;
-  const bgExpires = storeUser?.equippedBackgroundExpiresAt;
+  const source = profileUser ?? storeUser;
+  const equippedBg = source?.equippedBackground;
+  const bgExpires = source?.equippedBackgroundExpiresAt;
   if (!equippedBg) return null;
   if (bgExpires && bgExpires <= Date.now()) return null;
   const ui = getCosmeticDef(equippedBg)?.visual?.ui as
@@ -1049,16 +1054,20 @@ export const useProTheme = (): { accent: string; accent2: string; bgTint: string
 export const TavrikoScreen: React.FC<{
   children: React.ReactNode;
   style?: ViewStyle;
-}> = ({ children, style }) => {
+  /* Görüntülenen kullanıcının profili (arkadaş profili gibi): verilirse
+     ekran arka planı ve tema o kullanıcının kuşandığı arka plandan alınır. */
+  profileUser?: UserProfile | null;
+}> = ({ children, style, profileUser }) => {
   // Kuşanılmış profil arka planı: süresi dolmamışsa tüm uygulamanın arka planını değiştirir.
   const storeUser = useGameStore((s) => s.user);
-  const equippedBg = storeUser?.equippedBackground;
-  const bgExpires = storeUser?.equippedBackgroundExpiresAt;
+  const bgSource = profileUser ?? storeUser;
+  const equippedBg = bgSource?.equippedBackground;
+  const bgExpires = bgSource?.equippedBackgroundExpiresAt;
   const activeBg =
     equippedBg && (!bgExpires || bgExpires > Date.now()) ? equippedBg : null;
   const bgIsImage = activeBg ? !!backgroundFor(activeBg) : false;
   // PRO/VIP teması: arayüz vurgu renkleri de arka planla değişir
-  const proTheme = useProTheme();
+  const proTheme = useProTheme(profileUser);
   return (
     <View style={[styles.screenRoot, style]}>
       {/* Kuşanılmış arka plan: uygulama geneli */}
