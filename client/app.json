@@ -30,6 +30,11 @@
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
+    "splash": {
+      "image": "./assets/splash-icon-transparent.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#01025B"
+    },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro",
@@ -42,17 +47,17 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/splash-screen.png",
-          "imageWidth": 340,
+          "image": "./assets/splash-icon-transparent.png",
+          "imageWidth": 260,
           "resizeMode": "contain",
           "backgroundColor": "#01025B",
           "dark": {
-            "image": "./assets/splash-screen.png",
+            "image": "./assets/splash-icon-transparent.png",
             "backgroundColor": "#01025B"
           },
           "android": {
-            "image": "./assets/splash-screen.png",
-            "imageWidth": 340
+            "image": "./assets/splash-icon-transparent.png",
+            "imageWidth": 260
           }
         }
       ],

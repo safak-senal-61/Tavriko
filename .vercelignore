@@ -1,8 +1,37 @@
 # Görseller, ses efektleri ve müzik Cloudflare CDN'inden (tavriko-cdn) sunulur;
-# Vercel'e yüklenmeleri gerekmez. Uygulama ikonu/splash dosyaları (client/assets/*.png) derleme için kalır.
-client/assets/images
+# Vercel'e yüklenmeleri gerekmez. ANCAK koda gömülü (require ile paketlenen)
+# görseller derleme için MUTLAKA kalması gerekir:
+#   - images/brand/emblem_tight.png  (AuthScreen)
+#   - images/duel_banner.png         (HomeScreen)
+#   - images/duel_robot.png          (DuelVersusScreen)
+#   - images/radar_arena.png         (DuelVersusScreen + MatchmakingRadarScreen)
+# Bunlar hariç tutulursa Metro "Unable to resolve" hatası verir (bkz. build logu).
+
+# CDN'den sunulan klasörler (uzak URL ile yüklenir, derlemeye gerek yok)
+client/assets/images/avatars
+client/assets/images/categories
+client/assets/images/discovery
+client/assets/images/lobby
+client/assets/images/modes
+client/assets/images/profile
+client/assets/images/store
+client/assets/images/ui
+
+# CDN'den sunulan tekil dosyalar
+client/assets/images/app_icon.png
+client/assets/images/logo_mark.png
+client/assets/images/custom_room_3d.jpg
+client/assets/images/daily_challenge_3d.jpg
+client/assets/images/duel_arena_banner.jpg
+client/assets/images/friends_3d.jpg
+client/assets/images/quick_match_banner.jpg
+client/assets/images/single_player_3d.jpg
+
+# Ses ve müzik CDN'den sunulur
 client/assets/sounds
 client/assets/music
+
+# Cloudflare CDN worker kaynağı (Vercel'e gerekmez)
 cdn
 
 # Web derlemesi (client/dist) Vercel build sırasında `expo export` ile baştan

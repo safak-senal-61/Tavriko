@@ -12,6 +12,12 @@ interface SplashScreenProps {
  * (assets/splash-screen.png). Görselde logo, slogan, yükleme halkası ve
  * "Yükleniyor..." metni zaten içeride; ekran yalnızca bu görseli gösterir
  * ve kısa süre sonra uygulamaya geçer.
+ *
+ * resizeMode "cover": görsel ekranı kenarına kadar doldurur (contain
+ * modunda farklı en-boy oranlı ekranlarda kenarlarda boş bantlar
+ * kalıyordu). Tasarımın ana içeriği (logo, slogan, yükleme halkası)
+ * ortada olduğundan farklı ekranlarda yalnızca atmosferik kenarlar
+ * kırpılır; telefonlarda oran zaten neredeyse birebir uyumludur.
  */
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   useEffect(() => {
@@ -24,7 +30,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       <Image
         source={require('../../assets/splash-screen.png')}
         style={StyleSheet.absoluteFill}
-        resizeMode="contain"
+        resizeMode="cover"
       />
     </View>
   );

@@ -579,6 +579,7 @@ export const CDN_MANIFEST: Record<string, [number, number, string]> = {
   "sounds/timer_tick.wav": [0, 0, "6fc40371"],
   "sounds/victory.wav": [0, 0, "363f4d8e"],
   "sounds/wrong.wav": [0, 0, "8a283909"],
+  "splash-icon-transparent.png": [1024, 1024, "05741a0a"],
   "splash-icon.png": [1024, 1024, "a717423e"],
   "splash-logo.png": [900, 815, "11b671b8"],
   "splash-screen.png": [852, 1846, "95475149"],
