@@ -14,6 +14,7 @@ import {
   Platform,
   Modal,
   Linking,
+  useWindowDimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { compressAvatarImageAsync } from '../utils/avatarImage';
@@ -142,6 +143,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const [confirmResetPassword, setConfirmResetPassword] = useState('');
   const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Mobilde giriş/kayıt ekranı sayfaya tam sığmalı (kaydırma olmamalı).
+  // Küçük ekranlarda yerleşim kompaktlaştırılır; web ve büyük ekranlarda
+  // mevcut ferah yerleşim korunur.
+  const { height: winH } = useWindowDimensions();
+  const compact = Platform.OS !== 'web' && winH < 820;
   // Google'dan dönüşte (adres çubuğunda token/code varsa) giriş formu yerine "oturum açılıyor" göster
   const [finishingOAuth, setFinishingOAuth] = useState(() =>
     Platform.OS === 'web' && typeof window !== 'undefined' &&
@@ -725,7 +731,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       </Svg>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, compact && styles.scrollContentCompact]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -733,25 +739,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         <Animated.View
           style={[
             styles.heroWrap,
+            compact && styles.heroWrapCompact,
             { transform: [{ translateY }] },
           ]}
         >
-          <Reanimated.View entering={FadeInDown.delay(60).duration(500).springify().damping(14)} style={styles.heroCrownWrap}>
-            <View style={styles.heroCrownGlow} />
+          <Reanimated.View entering={FadeInDown.delay(60).duration(500).springify().damping(14)} style={[styles.heroCrownWrap, compact && styles.heroCrownWrapCompact]}>
+            <View style={[styles.heroCrownGlow, compact && styles.heroCrownGlowCompact]} />
             <Image
               source={AUTH_LOGO}
-              style={styles.heroLogo}
+              style={[styles.heroLogo, compact && styles.heroLogoCompact]}
               resizeMode="contain"
               accessibilityLabel="Tavriko logosu"
             />
           </Reanimated.View>
           <Reanimated.View entering={FadeInUp.delay(140).duration(500)}>
-            <Text style={styles.cleanBrandTitle}>Tavriko</Text>
-            <Text style={styles.brandSubtitle}>CANLI BİLGİ & DÜELLO</Text>
+            <Text style={[styles.cleanBrandTitle, compact && styles.cleanBrandTitleCompact]}>Tavriko</Text>
+            <Text style={[styles.brandSubtitle, compact && styles.brandSubtitleCompact]}>CANLI BİLGİ & DÜELLO</Text>
           </Reanimated.View>
         </Animated.View>
         {/* Main Glass Auth Card */}
-        <Reanimated.View entering={FadeInDown.delay(220).duration(500).springify().damping(16)} style={styles.card}>
+        <Reanimated.View entering={FadeInDown.delay(220).duration(500).springify().damping(16)} style={[styles.card, compact && styles.cardCompact]}>
           {redirectNotice ? (
             <View style={styles.redirectNoticeBanner}>
               <Text style={styles.errorText}>🔒 {redirectNotice}</Text>
@@ -759,9 +766,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           ) : null}
           {/* Top Tabs: ONLY Giriş Yap & Kayıt Ol */}
           {mode !== 'forgot' && (
-            <View style={styles.tabRow}>
+            <View style={[styles.tabRow, compact && styles.tabRowCompact]}>
               <TouchableOpacity
-                style={[styles.tabBtn, mode === 'login' && styles.tabBtnActive]}
+                style={[styles.tabBtn, compact && styles.tabBtnCompact, mode === 'login' && styles.tabBtnActive]}
                 onPress={() => {
                   sound.playSound('nav');
                   setMode('login');
@@ -773,7 +780,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.tabBtn, mode === 'register' && styles.tabBtnActive]}
+                style={[styles.tabBtn, compact && styles.tabBtnCompact, mode === 'register' && styles.tabBtnActive]}
                 onPress={() => {
                   sound.playSound('nav');
                   setMode('register');
@@ -795,9 +802,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           {/* ==================== LOGIN FORM ==================== */}
           {mode === 'login' && (
             <Reanimated.View key="login-form" entering={FadeInDown.delay(80).duration(420).springify().damping(16)}>
-              <Text style={styles.label}>E-POSTA VEYA KULLANICI ADI</Text>
+              <Text style={[styles.label, compact && styles.labelCompact]}>E-POSTA VEYA KULLANICI ADI</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, compact && styles.inputCompact]}
                 placeholder="ornek@gmail.com veya kullaniciadi"
                 placeholderTextColor={THEME.colors.textMuted}
                 autoCapitalize="none"
@@ -805,10 +812,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 value={email}
                 onChangeText={setEmail}
               />
-              <Text style={styles.label}>ŞİFRE</Text>
+              <Text style={[styles.label, compact && styles.labelCompact]}>ŞİFRE</Text>
               <View style={styles.passwordInputWrap}>
                 <TextInput
-                  style={styles.passwordInput}
+                  style={[styles.passwordInput, compact && styles.inputCompact]}
                   placeholder="••••••••"
                   placeholderTextColor={THEME.colors.textMuted}
                   secureTextEntry={!showPassword}
@@ -851,7 +858,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   title="GİRİŞ YAP"
                   variant="gold"
                   onPress={handleSubmit}
-                  style={{ marginTop: 12 }}
+                  style={[{ marginTop: compact ? 8 : 12 }, compact && styles.btnCompact]}
                 />
               )}
             </Reanimated.View>
@@ -906,9 +913,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               {/* STEP 1: Account Credentials */}
               {regStep === 1 && (
                 <View>
-                  <Text style={styles.label}>E-POSTA ADRESİ *</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact]}>E-POSTA ADRESİ *</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, compact && styles.inputCompact]}
                     placeholder="ornek@gmail.com"
                     placeholderTextColor={THEME.colors.textMuted}
                     autoCapitalize="none"
@@ -916,19 +923,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     value={email}
                     onChangeText={setEmail}
                   />
-                  <Text style={styles.label}>KULLANICI ADI *</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact]}>KULLANICI ADI *</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, compact && styles.inputCompact]}
                     placeholder="Örn: DenizPro"
                     placeholderTextColor={THEME.colors.textMuted}
                     autoCapitalize="none"
                     value={displayName}
                     onChangeText={setDisplayName}
                   />
-                  <Text style={styles.label}>ŞİFRE (EN AZ 6 KARAKTER) *</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact]}>ŞİFRE (EN AZ 6 KARAKTER) *</Text>
                   <View style={styles.passwordInputWrap}>
                     <TextInput
-                      style={styles.passwordInput}
+                      style={[styles.passwordInput, compact && styles.inputCompact]}
                       placeholder="••••••••"
                       placeholderTextColor={THEME.colors.textMuted}
                       secureTextEntry={!showPassword}
@@ -945,10 +952,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       {showPassword ? <EyeOpenIcon size={20} /> : <EyeOffIcon size={20} />}
                     </TouchableOpacity>
                   </View>
-                  <Text style={styles.label}>ŞİFRE TEKRAR *</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact]}>ŞİFRE TEKRAR *</Text>
                   <View style={styles.passwordInputWrap}>
                     <TextInput
-                      style={styles.passwordInput}
+                      style={[styles.passwordInput, compact && styles.inputCompact]}
                       placeholder="••••••••"
                       placeholderTextColor={THEME.colors.textMuted}
                       secureTextEntry={!showConfirmPassword}
@@ -978,30 +985,30 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     title="DEVAM ET (ADIM 2/4) →"
                     variant="gold"
                     onPress={handleNextRegStep}
-                    style={{ marginTop: 14 }}
+                    style={[{ marginTop: compact ? 10 : 14 }, compact && styles.btnCompact]}
                   />
                 </View>
               )}
               {/* STEP 2: Personal Details */}
               {regStep === 2 && (
                 <View>
-                  <Text style={styles.label}>AD SOYAD</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact]}>AD SOYAD</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, compact && styles.inputCompact]}
                     placeholder="Örn: Ömer Faruk Şener"
                     placeholderTextColor={THEME.colors.textMuted}
                     value={fullName}
                     onChangeText={setFullName}
                   />
-                  <Text style={styles.label}>DOĞUM TARİHİ</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact]}>DOĞUM TARİHİ</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, compact && styles.inputCompact]}
                     placeholder="GG.AA.YYYY (Örn: 15.06.2000)"
                     placeholderTextColor={THEME.colors.textMuted}
                     value={birthDate}
                     onChangeText={setBirthDate}
                   />
-                  <Text style={styles.label}>CİNSİYET SEÇİMİ</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact]}>CİNSİYET SEÇİMİ</Text>
                   <View style={styles.genderRow}>
                     {(['Erkek', 'Kadın', 'Belirtmek İstemiyorum'] as const).map((g) => {
                       const active = gender === g;
@@ -1045,7 +1052,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               {/* STEP 3: Country & Phone */}
               {regStep === 3 && (
                 <View>
-                  <Text style={styles.label}>ÜLKE SEÇİCİ</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact]}>ÜLKE SEÇİCİ</Text>
                   <TouchableOpacity
                     style={styles.countryPickerBtn}
                     onPress={() => {
@@ -1059,7 +1066,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     </Text>
                     <Text style={styles.countryPickerArrow}>▼</Text>
                   </TouchableOpacity>
-                  <Text style={styles.label}>TELEFON NUMARASI</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact]}>TELEFON NUMARASI</Text>
                   <View style={styles.phoneRow}>
                     <View style={styles.dialBadge}>
                       <Text style={styles.dialBadgeText}>{selectedCountry.dial}</Text>
@@ -1095,7 +1102,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               {/* STEP 4: Avatar, Bio & Final Submit */}
               {regStep === 4 && (
                 <View>
-                  <Text style={styles.label}>PROFİL FOTOĞRAFI VEYA AVATAR SEÇİN</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact]}>PROFİL FOTOĞRAFI VEYA AVATAR SEÇİN</Text>
                   <View style={styles.photoPickerSection}>
                     <TouchableOpacity
                       style={styles.uploadPhotoBtn}
@@ -1135,9 +1142,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       })}
                     </View>
                   </View>
-                  <Text style={styles.label}>KISA BİYOGRAFİ / SLOGAN</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact]}>KISA BİYOGRAFİ / SLOGAN</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, compact && styles.inputCompact]}
                     placeholder="Örn: Tarih ve Bilim kategorisinde rakip tanımam!"
                     placeholderTextColor={THEME.colors.textMuted}
                     value={bio}
@@ -1199,9 +1206,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     : 'Gönderilen 6 haneli doğrulama kodunu ve yeni şifrenizi girin.'}
                 </Text>
               </View>
-              <Text style={styles.label}>KAYITLI E-POSTA ADRESİNİZ</Text>
+              <Text style={[styles.label, compact && styles.labelCompact]}>KAYITLI E-POSTA ADRESİNİZ</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, compact && styles.inputCompact]}
                 placeholder="ornek@gmail.com"
                 placeholderTextColor={THEME.colors.textMuted}
                 autoCapitalize="none"
@@ -1217,7 +1224,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       <Text style={styles.codeHintValue}>{demoResetCodeHint}</Text>
                     </View>
                   )}
-                  <Text style={styles.label}>6 HANELİ DOĞRULAMA KODU</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact]}>6 HANELİ DOĞRULAMA KODU</Text>
                   <TextInput
                     style={[styles.input, styles.codeInput]}
                     placeholder="123456"
@@ -1227,10 +1234,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     value={resetCode}
                     onChangeText={setResetCode}
                   />
-                  <Text style={styles.label}>YENİ ŞİFRE (EN AZ 6 KARAKTER)</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact]}>YENİ ŞİFRE (EN AZ 6 KARAKTER)</Text>
                   <View style={styles.passwordInputWrap}>
                     <TextInput
-                      style={styles.passwordInput}
+                      style={[styles.passwordInput, compact && styles.inputCompact]}
                       placeholder="••••••••"
                       placeholderTextColor={THEME.colors.textMuted}
                       secureTextEntry={!showResetPassword}
@@ -1244,10 +1251,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       {showResetPassword ? <EyeOpenIcon size={20} /> : <EyeOffIcon size={20} />}
                     </TouchableOpacity>
                   </View>
-                  <Text style={styles.label}>YENİ ŞİFRE TEKRAR</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact]}>YENİ ŞİFRE TEKRAR</Text>
                   <View style={styles.passwordInputWrap}>
                     <TextInput
-                      style={styles.passwordInput}
+                      style={[styles.passwordInput, compact && styles.inputCompact]}
                       placeholder="••••••••"
                       placeholderTextColor={THEME.colors.textMuted}
                       secureTextEntry={!showResetPassword}
@@ -1273,14 +1280,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   title="SIFIRLAMA KODU GÖNDER"
                   variant="gold"
                   onPress={handleRequestResetCode}
-                  style={{ marginTop: 14 }}
+                  style={[{ marginTop: compact ? 10 : 14 }, compact && styles.btnCompact]}
                 />
               ) : (
                 <Button3D
                   title="ŞİFREMİ YENİLE"
                   variant="mint"
                   onPress={handleConfirmResetPassword}
-                  style={{ marginTop: 14 }}
+                  style={[{ marginTop: compact ? 10 : 14 }, compact && styles.btnCompact]}
                 />
               )}
               <TouchableOpacity
@@ -1300,14 +1307,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           {mode === 'login' && (
             <>
               {/* Divider */}
-              <View style={styles.dividerRow}>
+              <View style={[styles.dividerRow, compact && styles.dividerRowCompact]}>
                 <View style={styles.dividerLine} />
                 <Text style={styles.dividerText}>VEYA</Text>
                 <View style={styles.dividerLine} />
               </View>
               {/* Google Sign-In Button -> Directly Opens Official Google Accounts Chooser */}
               <TouchableOpacity
-                style={styles.googleBtn}
+                style={[styles.googleBtn, compact && styles.googleBtnCompact]}
                 onPress={handleRealGoogleSignIn}
                 disabled={loading}
                 activeOpacity={0.85}
@@ -1323,7 +1330,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 prefix="Google ile devam ederek "
                 suffix=" okuduğunu ve kabul ettiğini onaylamış olursun."
                 onOpen={setOpenLegalDoc}
-                style={{ marginTop: 12, textAlign: 'center', fontSize: 12, lineHeight: 18 }}
+                style={{ marginTop: compact ? 8 : 12, textAlign: 'center', fontSize: 12, lineHeight: 18 }}
               />
             </>
           )}
@@ -1375,7 +1382,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               title="KAPAT"
               variant="glass"
               onPress={() => setCountryPickerOpen(false)}
-              style={{ marginTop: 12 }}
+              style={[{ marginTop: compact ? 8 : 12 }, compact && styles.btnCompact]}
             />
           </View>
         </View>
@@ -1406,6 +1413,25 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     alignSelf: 'center',
   },
+  // ---- Mobil kompakt yerleşim: küçük ekranlarda kaydırmasız sığdırma ----
+  scrollContentCompact: {
+    paddingVertical: 8,
+    justifyContent: 'flex-start',
+  },
+  heroWrapCompact: { marginBottom: 8 },
+  heroCrownWrapCompact: { width: 84, height: 70 },
+  heroCrownGlowCompact: { width: 68, height: 68, borderRadius: 34 },
+  heroLogoCompact: { width: 80, height: 61 },
+  cleanBrandTitleCompact: { fontSize: 28 },
+  brandSubtitleCompact: { fontSize: 11, letterSpacing: 2 },
+  cardCompact: { padding: 12, borderRadius: 22 },
+  tabRowCompact: { marginBottom: 10 },
+  tabBtnCompact: { paddingVertical: 8 },
+  labelCompact: { marginTop: 6, marginBottom: 4, fontSize: 10 },
+  inputCompact: { paddingVertical: 9, fontSize: 13.5 },
+  btnCompact: { minHeight: 44 },
+  dividerRowCompact: { marginVertical: 10 },
+  googleBtnCompact: { paddingVertical: 11 },
   heroWrap: {
     alignItems: 'center',
     marginBottom: 16,

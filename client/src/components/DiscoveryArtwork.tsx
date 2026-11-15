@@ -103,20 +103,22 @@ export const DiscoveryArtwork: React.FC<{
 };
 
 export const GuestDiscoveryCard: React.FC<{ onPress: () => void; compact?: boolean }> = ({ onPress, compact = false }) => {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const narrow = width < 360;
+  // Alçak ekranlarda kart da küçülür; giriş ekranı kaydırmaya düşmez.
+  const small = height < 780;
   return (
-  <View style={[styles.card, compact && styles.compact]}>
+  <View style={[styles.card, compact && styles.compact, small && styles.small]}>
     <GradientFill colors={['#382064', '#21123F', '#172D3D']} direction="diagonal" />
-    <View style={styles.hero}>
+    <View style={[styles.hero, small && styles.heroSmall]}>
       <View style={styles.copy}>
-        <Text style={styles.eyebrow}>{compact ? 'HESAPSIZ KEŞFET' : 'MİSAFİR MODUNDASIN'}</Text>
-        <Text style={[styles.title, narrow && styles.narrowTitle]}>{compact ? 'Önce bir göz at.' : 'Giriş yap,\ntüm özellikleri aç.'}</Text>
-        <Text style={styles.description}>{compact
+        <Text style={[styles.eyebrow, small && { fontSize: 11 }]}>{compact ? 'HESAPSIZ KEŞFET' : 'MİSAFİR MODUNDASIN'}</Text>
+        <Text style={[styles.title, narrow && styles.narrowTitle, small && styles.smallTitle]}>{compact ? 'Önce bir göz at.' : 'Giriş yap,\ntüm özellikleri aç.'}</Text>
+        <Text style={[styles.description, small && styles.smallDescription]}>{compact
           ? 'Kategorileri keşfet, tek kişilik pratikle kendini dene.'
           : 'Arkadaşlarına meydan oku. Kendi başarı hikâyeni başlat.'}</Text>
       </View>
-      <DiscoveryArtwork source={DISCOVERY_IMG.explorer} size={narrow ? 64 : compact ? 76 : 112} />
+      <DiscoveryArtwork source={DISCOVERY_IMG.explorer} size={small ? (narrow ? 52 : 58) : narrow ? 64 : compact ? 76 : 112} />
     </View>
     {!compact && (
       <View style={styles.perks}>
@@ -134,7 +136,7 @@ export const GuestDiscoveryCard: React.FC<{ onPress: () => void; compact?: boole
       </View>
     )}
     <TouchableOpacity onPress={onPress} activeOpacity={0.82} accessibilityRole="button"
-      style={[styles.action, compact && styles.guestAction]}>
+      style={[styles.action, compact && styles.guestAction, small && { minHeight: 42 }]}>
       <Text style={[styles.actionText, compact && styles.guestActionText]}>{compact ? 'Misafir olarak göz at' : 'Giriş yap / Ücretsiz kayıt ol'}</Text>
       <ArrowRight size={18} color={compact ? '#B7F5E1' : '#281543'} />
     </TouchableOpacity>
@@ -153,6 +155,10 @@ export const AchievementState: React.FC<{ done: boolean }> = ({ done }) => (
 const styles = StyleSheet.create({
   card: { backgroundColor: '#21123F', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(230,195,255,0.24)', overflow: 'hidden', padding: 16, marginTop: 8, marginBottom: 16, gap: 12 },
   compact: { marginTop: 10, padding: 12 },
+  small: { marginTop: 6, padding: 10 },
+  heroSmall: { gap: 8 },
+  smallTitle: { fontSize: 17, lineHeight: 21 },
+  smallDescription: { fontSize: 11, lineHeight: 15, marginTop: 5, paddingRight: 4 },
   hero: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   copy: { flex: 1, minWidth: 0 },
   eyebrow: { color: '#B7F5E1', fontFamily: THEME.fonts.extraBold, fontSize: 12, letterSpacing: 1, marginBottom: 8 },

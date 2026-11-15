@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ViewStyle,
   TextStyle,
+  StyleProp,
   Image,
   Platform,
 } from 'react-native';
@@ -1281,8 +1282,8 @@ export const Button3D: React.FC<{
   variant?: 'gold' | 'mint' | 'red' | 'glass' | 'purple';
   onPress?: () => void;
   disabled?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
 }> = ({ title, variant = 'gold', onPress, disabled, style, textStyle }) => {
   const variantContainer =
     variant === 'mint'

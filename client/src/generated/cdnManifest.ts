@@ -468,6 +468,8 @@ export const CDN_MANIFEST: Record<string, [number, number, string]> = {
   "images/discovery/subs/yesilcam_legends.png": [128, 128, "340263df"],
   "images/discovery/subs/young_adult.png": [128, 128, "f19f5532"],
   "images/duel_arena_banner.jpg": [1376, 768, "4f2ac980"],
+  "images/duel_banner.png": [1100, 614, "c2d802b3"],
+  "images/duel_robot.png": [384, 384, "8172ce61"],
   "images/friends_3d.jpg": [1024, 1024, "52afc390"],
   "images/lobby/empty_slot.png": [1254, 1254, "2197a99f"],
   "images/lobby/lobby_hero.png": [1672, 940, "0a7341b5"],
@@ -495,6 +497,7 @@ export const CDN_MANIFEST: Record<string, [number, number, string]> = {
   "images/profile/tab_overview.png": [192, 192, "27dbe576"],
   "images/profile/tab_titles.png": [192, 192, "71c08474"],
   "images/quick_match_banner.jpg": [1200, 896, "970f80c7"],
+  "images/radar_arena.png": [640, 640, "9aff0b7b"],
   "images/single_player_3d.jpg": [1024, 1024, "6633848e"],
   "images/store/badge_champion.png": [320, 320, "7213fed6"],
   "images/store/badge_genius.png": [320, 320, "913a7f1e"],
@@ -578,4 +581,5 @@ export const CDN_MANIFEST: Record<string, [number, number, string]> = {
   "sounds/wrong.wav": [0, 0, "8a283909"],
   "splash-icon.png": [1024, 1024, "a717423e"],
   "splash-logo.png": [900, 815, "11b671b8"],
+  "splash-screen.png": [852, 1846, "95475149"],
 };

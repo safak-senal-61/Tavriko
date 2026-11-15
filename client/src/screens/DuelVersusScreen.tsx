@@ -3,9 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform, Image, Sc
 import { Bot, Check, Radio, ShieldCheck, Swords, Volume2, VolumeX, X } from 'lucide-react-native';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
-import { DISCOVERY_IMG, DiscoveryArtwork, useReducedMotion } from '../components/DiscoveryArtwork';
+import { DiscoveryArtwork, useReducedMotion } from '../components/DiscoveryArtwork';
 import { GradientFill } from '../components/TavrikoGradient';
 import { TavrikoScreen, CharacterAvatar } from '../components/TavrikoIcons';
+// Arena ve robot görselleri paket içinden yüklenir (CDN webp bazı
+// cihazlarda boş/siyah kalıyordu); yerel require her zaman çalışır.
+const ARENA_IMG = require('../../assets/images/radar_arena.png');
+const ROBOT_IMG = require('../../assets/images/duel_robot.png');
 
 interface DuelVersusScreenProps {
   myProfile: { displayName: string; avatarUrl?: string; rankTitle?: string };
@@ -78,13 +82,13 @@ export const DuelVersusScreen: React.FC<DuelVersusScreenProps> = ({
         </View>
 
         <View style={[styles.stage, compact && { height: 140 }]}>
-          <Image source={DISCOVERY_IMG.arena} style={styles.stageBackground} resizeMode="cover" />
+          <Image source={ARENA_IMG} style={styles.stageBackground} resizeMode="cover" />
           <GradientFill colors={['#21113C00', '#21113CAA', '#21113C']} />
           <Animated.View pointerEvents="none" style={[styles.orbit, {
             opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.7] }),
             transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1.04] }) }],
           }]} />
-          {isBot ? <DiscoveryArtwork source={DISCOVERY_IMG.robot} size={compact ? 104 : 128} />
+          {isBot ? <DiscoveryArtwork source={ROBOT_IMG} size={compact ? 104 : 128} />
             : <Swords size={104} color="#B7F5E1" strokeWidth={1.1} />}
           <View style={styles.stageCaption}>
             {isBot ? <Bot size={14} color="#FFE2A4" /> : <Radio size={14} color="#ADF0D8" />}
@@ -105,7 +109,7 @@ export const DuelVersusScreen: React.FC<DuelVersusScreenProps> = ({
           <Animated.View style={[styles.playerCard, styles.opponentCard, { transform: [{ translateX: entrance.interpolate({ inputRange: [0, 1], outputRange: [38, 0] }) }] }]}>
             <GradientFill colors={isBot ? ['#493122', '#2E1D3A'] : ['#1F4944', '#1C2C3B']} direction="diagonal" />
             <View style={[styles.avatarRing, isBot ? styles.botRing : styles.liveRing]}>
-              {isBot ? <Image source={DISCOVERY_IMG.robot} style={styles.botAvatar} resizeMode="contain" />
+              {isBot ? <Image source={ROBOT_IMG} style={styles.botAvatar} resizeMode="contain" />
                 : <CharacterAvatar seed={opponentProfile.avatarUrl || opponentProfile.displayName} size={62} />}
             </View>
             <Text style={[styles.playerLabel, { color: isBot ? '#FFE2A4' : '#ADF0D8' }]}>{isBot ? 'BİLGİSAYAR RAKİP' : 'CANLI RAKİP'}</Text>

@@ -4,7 +4,10 @@ import { ShieldCheck, Swords } from 'lucide-react-native';
 import { CategoryId, DifficultyLevel, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
-import { DISCOVERY_IMG, useReducedMotion } from '../components/DiscoveryArtwork';
+import { useReducedMotion } from '../components/DiscoveryArtwork';
+// Radar arenası paket içinden yüklenir (CDN jpg/webp bazı cihazlarda siyah
+// kalıyordu); yerel require her zaman çalışır.
+const RADAR_ARENA = require('../../assets/images/radar_arena.png');
 import { GradientFill } from '../components/TavrikoGradient';
 import {
   TavrikoScreen,
@@ -391,8 +394,12 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
 
       {/* Dairesel Radar Ekranı */}
       <View style={[styles.radarContainer, { width: radarSize, height: radarSize, marginVertical: 4 }]}>
-        <Image source={DISCOVERY_IMG.arena} style={[styles.arenaImage, { width: radarSize, height: radarSize, borderRadius: radarRadius }]} resizeMode="cover" />
-        <GradientFill colors={['rgba(22,12,48,0)', 'rgba(22,12,48,0.55)']} style={{ borderRadius: radarRadius }} />
+        {/* Arena görseli + karartma katmanı: Android'de köşeli kare görünüm
+            olmaması için taşan bir kapsayıcıda dairesel kırpılıyor. */}
+        <View style={[styles.radarClip, { width: radarSize, height: radarSize, borderRadius: radarRadius }]}>
+          <Image source={RADAR_ARENA} style={{ width: radarSize, height: radarSize }} resizeMode="cover" />
+          <GradientFill colors={['rgba(22,12,48,0)', 'rgba(22,12,48,0.55)']} />
+        </View>
         {/* Genişleyen Sonar Dalgası */}
         <Animated.View
           style={[
@@ -548,7 +555,6 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: { paddingTop: 8, paddingBottom: 24, width: '100%', maxWidth: 580, alignSelf: 'center' },
-  arenaImage: { position: 'absolute', top: 0, left: 0, width: 270, height: 270, borderRadius: 135, opacity: 0.85 },
   searchSteps: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginTop: 6, marginBottom: 8 },
   searchStep: { alignItems: 'center', gap: 6, flex: 1 },
   stepDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#6C5C83' },
@@ -690,6 +696,16 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
+    // Arka planla yumuşak geçiş: ince dairesel çerçeve
+    borderWidth: 2,
+    borderColor: 'rgba(111, 227, 193, 0.22)',
+    borderRadius: 999,
+  },
+  radarClip: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    overflow: 'hidden',
   },
   sonarWaveRing: {
     position: 'absolute',

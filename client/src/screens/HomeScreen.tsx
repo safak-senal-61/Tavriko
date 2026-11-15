@@ -35,7 +35,9 @@ import { InfoHint } from '../components/InfoHint';
 import { useUnreadCount } from '../store/notificationStore';
 
 const LOGO_MARK = cdnImage('images/logo_mark.png');
-const DUEL_BANNER = cdnImage('images/duel_arena_banner.jpg');
+// Hızlı eşleşme bannerı paket içinden yüklenir (CDN jpg bazı cihazlarda
+// siyah görünüp kartı boş bırakıyordu); yerel require her zaman çalışır.
+const DUEL_BANNER = require('../../assets/images/duel_banner.png');
 const MODE_IMAGES = {
   customRoom: cdnImage('images/modes/custom_room.png'),
   singlePlayer: cdnImage('images/modes/single_player.png'),
@@ -563,27 +565,27 @@ const styles = StyleSheet.create({
   brandGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    flexShrink: 1,
-    minWidth: 0,
+    gap: 5,
+    flexShrink: 0,
   },
   brandMark: {
     width: 44,
     height: 44,
   },
   brandMarkNarrow: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
   },
   brandTextNarrow: {
-    fontSize: 20,
+    fontSize: 17,
+    letterSpacing: 0.1,
   },
   brandText: {
     fontFamily: THEME.fonts.display,
     fontSize: 24,
     color: '#FFFFFF',
     letterSpacing: 0.3,
-    flexShrink: 1,
+    flexShrink: 0,
     textShadowColor: 'rgba(107, 60, 255, 0.9)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
@@ -592,6 +594,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexShrink: 1,
   },
   currencyPill: {
     flexDirection: 'row',
