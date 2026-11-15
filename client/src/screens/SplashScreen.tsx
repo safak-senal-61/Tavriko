@@ -18,6 +18,12 @@ interface SplashScreenProps {
  * kalıyordu). Tasarımın ana içeriği (logo, slogan, yükleme halkası)
  * ortada olduğundan farklı ekranlarda yalnızca atmosferik kenarlar
  * kırpılır; telefonlarda oran zaten neredeyse birebir uyumludur.
+ *
+ * ÖNEMLİ: Görsel stiline açıkça width/height %100 verilir. Web'de
+ * (react-native-web) absoluteFill + intrinsic boyutlu Image, görseli
+ * doğal piksel boyutunda (852x1846) render edip ekrandan taşıyordu —
+ * splash'in yalnızca bir kısmı görünüyordu. Açık yüzde boyutlar hem
+ * native hem web'de tam ekran dolgu garantiler.
  */
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   useEffect(() => {
@@ -29,7 +35,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
     <View style={styles.root}>
       <Image
         source={require('../../assets/splash-screen.png')}
-        style={StyleSheet.absoluteFill}
+        style={styles.image}
         resizeMode="cover"
       />
     </View>
@@ -40,5 +46,11 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#01025B',
+  },
+  image: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
 });
