@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Image } from 'react-native';
+import { View, StyleSheet, Image, useWindowDimensions } from 'react-native';
 
 interface SplashScreenProps {
   onFinish: () => void;
@@ -24,8 +24,18 @@ interface SplashScreenProps {
  * doğal piksel boyutunda (852x1846) render edip ekrandan taşıyordu —
  * splash'in yalnızca bir kısmı görünüyordu. Açık yüzde boyutlar hem
  * native hem web'de tam ekran dolgu garantiler.
+ *
+ * CİHAZ UYUMU: Telefonlar için "cover" (kenarına kadar dolgu, görsel
+ * oranı telefonlarla neredeyse birebir). Tablet / yatay / masaüstü gibi
+ * geniş ekranlarda cover, yükleme halkası ve alt sahneyi kırpar; bu
+ * yüzden geniş ekranlarda "contain" kullanılır — tüm tasarım görünür,
+ * kenarlarda zemin rengiyle uyumlu bantlar kalır.
  */
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
+  const { width, height } = useWindowDimensions();
+  // Telefon: ~0.45-0.56 oran; tablet/yatay: >= 0.62
+  const isWideScreen = height > 0 && width / height >= 0.62;
+
   useEffect(() => {
     const t = setTimeout(onFinish, 1400);
     return () => clearTimeout(t);
@@ -36,7 +46,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       <Image
         source={require('../../assets/splash-screen.png')}
         style={styles.image}
-        resizeMode="cover"
+        resizeMode={isWideScreen ? 'contain' : 'cover'}
       />
     </View>
   );
@@ -51,6 +61,5 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
-    resizeMode: 'cover',
   },
 });

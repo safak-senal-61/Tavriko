@@ -138,7 +138,11 @@ export const RootNavigator: React.FC = () => {
   const [pendingReferral, setPendingReferral] = useState(() => captureReferralLink());
   const { width: windowWidth } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
-  const isDesktop = isWeb && windowWidth > 540;
+  // Genis ekran (tablet, yatay, masaüstu): ortalanmis 520px telefon cercevesi.
+  // Artik yalnizca web'de degil, native tabletlerde de aktif — telefon
+  // arayuzu tablete yayilip bos/gerilimli gorunmesin diye.
+  const isDesktop = windowWidth > 540;
+  // Yan menu (sidebar) yalnizca cok genis web ekranlarinda.
   const isWide = isWeb && windowWidth >= 1180;
 
   const isWebOAuthReturn =
