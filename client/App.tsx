@@ -13,13 +13,12 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { hydrateAuthStorage, getStoredAuth } from './src/utils/authStorage';
 import { useGameStore } from './src/store/gameStore';
 
-// Sentry hata izleme: DSN ortam değişkeninden ya da sabit değerden gelir.
-// Client DSN'leri gizli değildir (her tarayıcı/mobil bundle'ında görünür),
-// yalnızca olay GÖNDERME izni verir. Sabit değer tüm derlemelerde (Vercel
-// web build + EAS APK) ortam değişkeni olmadan çalışır.
-const SENTRY_DSN_FALLBACK =
-  'https://c6d56d79f23514abcbd85504d7ae44bb@o4512379947778048.ingest.us.sentry.io/4512379953086464';
-const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN || SENTRY_DSN_FALLBACK;
+// Sentry hata izleme: DSN doğrudan koda gömülüdür. Client DSN'leri gizli
+// değildir (her tarayıcı/mobil bundle'ında görünür), yalnızca olay GÖNDERME
+// izni verir. Not: Vercel'deki eski EXPO_PUBLIC_SENTRY_DSN ortam değişkeni
+// eski bir Sentry projesine işaret ediyordu; ortam değişkeni önceliği bu
+// yüzden kaldırıldı — derlemeler tek, güncel DSN kullanır.
+const SENTRY_DSN = 'https://c6d56d79f23514abcbd85504d7ae44bb@o4512379947778048.ingest.us.sentry.io/4512379953086464';
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
