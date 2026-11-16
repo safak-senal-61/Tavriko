@@ -14,6 +14,9 @@ Modern, rekabetçi, stüdyo kalitesinde ve yapay zekâ destekli çok oyunculu (m
 [![Supabase PostgreSQL](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![Vercel](https://img.shields.io/badge/Vercel-Serverless-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com)
 
+[![Uptime](https://img.shields.io/uptimerobot/ratio/m804699286-323356092af4c666101fc89a?style=for-the-badge)](https://stats.uptimerobot.com/5TKKlcUCpU)
+[![Durum](https://img.shields.io/uptimerobot/status/m804699286-323356092af4c666101fc89a?style=for-the-badge)](https://stats.uptimerobot.com/5TKKlcUCpU)
+
 🎮 **[Canlı Web Sürümünü Oyna](https://tavriko-app.vercel.app/)** ·
 🤖 **[Telegram Botu](https://tavriko-app.vercel.app/api/telegram/webhook)** ·
 🟢 **[Canlılık Durumu](https://stats.uptimerobot.com/5TKKlcUCpU)** ·
