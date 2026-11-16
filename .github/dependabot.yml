@@ -1,0 +1,67 @@
+# Bağımlılık güncellemeleri (ücretsiz).
+# Public repoda Actions dakikaları ücretsiz olduğu için Dependabot PR'ları ek maliyet oluşturmaz.
+version: 2
+updates:
+  # Kök workspace (npm)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Alt paketler (monorepo workspaces)
+  - package-ecosystem: "npm"
+    directory: "/shared"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "npm"
+    directory: "/server"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "npm"
+    directory: "/client"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "npm"
+    directory: "/cloudflare"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # GitHub Actions sürümleri (ci.yml, codeql.yml)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3

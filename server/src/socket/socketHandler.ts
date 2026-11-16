@@ -4,6 +4,7 @@ import { GameRoomManager } from '../engine/GameRoomManager';
 import { Matchmaker } from '../engine/Matchmaker';
 import { db } from '../db/prismaClient';
 import { presenceManager } from '../services/presenceManager';
+import { addBreadcrumb } from '../utils/errorMonitor';
 
 export function setupSocketHandlers(
   io: SocketIOServer,
@@ -66,6 +67,12 @@ export function setupSocketHandlers(
   };
 
   matchmaker.onMatchFound = (roomCode: string, players) => {
+    addBreadcrumb(`Eşleşme bulundu: ${roomCode}`, 'matchmaking', {
+      roomCode,
+      playerCount: players.length,
+      matchedWith: players[1]?.playerId?.startsWith('bot_') || players[1]?.playerId?.startsWith('rival_bot_') ? 'bot' : 'human',
+      queueSeconds: players[0]?.queuedAt ? Number(((Date.now() - players[0].queuedAt) / 1000).toFixed(1)) : undefined,
+    });
     if (players.length >= 2) {
       const p1 = players[0];
       const p2 = players[1];
@@ -99,6 +106,10 @@ export function setupSocketHandlers(
 
   io.on('connection', (socket: Socket) => {
     const initialPlayerId = socket.handshake.query.playerId as string;
+    addBreadcrumb('WS bağlandı (Socket.IO)', 'ws', {
+      socketId: socket.id,
+      playerId: initialPlayerId || undefined,
+    });
     if (initialPlayerId) {
       socketMeta.set(socket.id, { playerId: initialPlayerId });
       presenceManager.registerSocket(initialPlayerId, socket);
@@ -141,6 +152,11 @@ export function setupSocketHandlers(
 
       if (existingRoom && existingRoom.players[playerId]) {
         // Reconnecting existing player
+        addBreadcrumb(`Odaya yeniden bağlandı: ${roomCode}`, 'ws', {
+          roomCode,
+          playerId,
+          status: existingRoom.status,
+        });
         const recovery = roomManager.reconnectPlayer(roomCode, playerId);
         io.to(roomCode).emit(SOCKET_EVENTS.PLAYER_RECONNECTED, { playerId, displayName });
         io.to(roomCode).emit(SOCKET_EVENTS.ROOM_STATE_SYNC, existingRoom);
@@ -264,6 +280,12 @@ export function setupSocketHandlers(
     }) => {
       // Eşleşme başlamadan kalıcı soru havuzunu (Supabase/Telegram soruları) geri yükle
       db.ensureQuestionsRestored().catch(() => {});
+      addBreadcrumb('Eşleşme kuyruğuna girdi', 'matchmaking', {
+        playerId: data.playerId,
+        mode: data.mode || 'duel',
+        category: data.category || 'mixed',
+        difficulty: data.difficulty || 'medium',
+      });
       matchmaker.enqueue({
         socketId: socket.id,
         playerId: data.playerId,
@@ -351,6 +373,11 @@ export function setupSocketHandlers(
 
     socket.on('disconnect', () => {
       const meta = socketMeta.get(socket.id);
+      addBreadcrumb('WS koptu (Socket.IO)', 'ws', {
+        socketId: socket.id,
+        playerId: meta?.playerId,
+        roomCode: meta?.roomCode,
+      });
       if (meta) {
         if (meta.playerId) {
           presenceManager.unregisterSocket(meta.playerId, socket);
