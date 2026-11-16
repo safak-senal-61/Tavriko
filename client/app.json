@@ -76,7 +76,8 @@
         }
       ],
       "@sentry/react-native",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-localization"
     ],
     "backgroundColor": "#1A0B4D",
     "extra": {

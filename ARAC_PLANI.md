@@ -253,6 +253,11 @@ Kategori arama şu an istemci tarafında; sunucu tarafına taşınırsa **Meilis
 
 ## Öncelikli Yol Haritası (güncel)
 
+### Durum (16 Kasım 2026)
+- **1. Hafta — tamamlandı:** Sentry (Expo + web) · WS breadcrumb'ları (istemci + sunucu) · robots.txt/sitemap.xml + GSC doğrulama etiketi · CodeQL iş akışı · Dependabot. *Kalan (kod dışı):* GSC/Bing mülk doğrulaması ve sitemap gönderimi; GitHub hesap fatura kilidi (CI/CodeQL işleri başlamıyor — kartı Billing → Payment information'dan yeniden kaydetmek çözer).
+- **2. Hafta — kod tarafı tamamlandı:** PostHog entegrasyonu (event şeması: session_start, match_started/completed, question_answered, matchmaking_time, store_purchase, referral_signup, daily_streak_claimed, settings_changed) · bot'a düşme süresi feature flag'i (`matchmaking-bot-fallback-sec`, 3–30sn, varsayılan 7sn) · Helicone proxy (env: `HELICONE_API_KEY`). *Kalan (kod dışı):* PostHog projesi açıp `EXPO_PUBLIC_POSTHOG_KEY` tanımlamak; Checkly/UptimeRobot uptime izleme kaydı.
+- **Not:** PostHog ve Helicone anahtarları tanımsızken ilgili kodlar sessizce no-op çalışır; anahtar tanımlandığı anda etkinleşir.
+
 | Faz | Ne yapılır | Neden |
 |---|---|---|
 | **1. Hafta** | Sentry (Expo + web + WS breadcrumb'lar) · GSC + robots/sitemap · GitHub CodeQL/Dependabot aç | Hataları ilk günden görünür kılmak + güvenlik temeli |

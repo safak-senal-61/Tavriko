@@ -10,6 +10,7 @@ import {
 import * as Sentry from '@sentry/react-native';
 import { getRealtimeWsUrl } from '../config';
 import { sanitizeAvatarForUrl } from '../utils/avatarImage';
+import { getBotFallbackMs } from './analytics';
 
 type EventCallback = (data: any) => void;
 
@@ -598,8 +599,11 @@ export class SocketService {
       isMatchmaking: true,
     };
 
+    // PostHog feature flag: bot'a düşme süresi (varsayılan 7sn) — canlıda A/B test edilebilir
+    const botFallbackMs = getBotFallbackMs();
+
     const targetUrl = getRealtimeWsUrl(
-      `/ws/matchmaking?intent=matchmaking&${this.buildPlayerQuery(playerId, displayName, avatarUrl)}&mode=${mode}&category=${category}&difficulty=${difficulty}`
+      `/ws/matchmaking?intent=matchmaking&${this.buildPlayerQuery(playerId, displayName, avatarUrl)}&mode=${mode}&category=${category}&difficulty=${difficulty}&botFallbackMs=${botFallbackMs}`
     );
 
     this.connect(targetUrl);
@@ -612,6 +616,7 @@ export class SocketService {
       mode,
       category,
       difficulty,
+      botFallbackMs,
     });
   }
 

@@ -18,6 +18,7 @@ import { authHeaders } from '../utils/apiAuth';
 import { shuffleOptionsForPlayer } from '../utils/optionShuffle';
 import { socketService } from '../services/socketService';
 import { sound } from '../services/soundService';
+import { identifyPlayer, trackEvent, markMatchmakingStart, trackMatchFound } from '../services/analytics';
 import { THEME } from '../theme/tokens';
 import {
   CategoryId,
@@ -270,6 +271,17 @@ export const RootNavigator: React.FC = () => {
     setFinalSummary,
     resetGame,
   } = useGameStore();
+
+  // PostHog: kullanıcı kimliği netleştiğinde analitik tarafında tanımla
+  useEffect(() => {
+    if (user?.id) {
+      identifyPlayer(user.id, {
+        displayName: user.displayName,
+        username: user.username,
+        isGuest: !!user.isGuest,
+      });
+    }
+  }, [user?.id]);
 
   // Merge a fresh server-side user profile into the current store (keeps token)
   const syncWithFreshUser = useCallback(
@@ -682,6 +694,14 @@ export const RootNavigator: React.FC = () => {
         questionReviews: matchQuestionsReviewRef.current,
       };
       setFinalSummary(enrichedSummary);
+      // PostHog: maç tamamlandı — tamamlama oranı ve sonuç dağılımı
+      const myRanking = summary.rankings.find((r) => r.playerId === user?.id);
+      trackEvent('match_completed', {
+        mode: summary.mode,
+        result: myRanking ? (summary.podium.first?.playerId === user?.id ? 'win' : 'loss') : 'abandoned',
+        question_count: summary.totalRounds,
+        my_score: myRanking?.score ?? 0,
+      });
       navigateTo('match_result');
       if (user && !isGuest) {
         setMatchRewards(null);
@@ -787,6 +807,14 @@ export const RootNavigator: React.FC = () => {
           };
           setActiveRoom(duelRoom);
           activeRoomRef.current = duelRoom;
+          // PostHog: eşleşme süresi + maç başladı event'i
+          trackMatchFound(opp?.isBot ? 'bot' : 'human');
+          trackEvent('match_started', {
+            mode: 'duel',
+            category: DUEL_CATEGORY,
+            source: 'quick_match',
+            matchedWith: opp?.isBot ? 'bot' : 'human',
+          });
           socketService.joinRoom(
             data.roomCode,
             user.id,
@@ -1077,6 +1105,7 @@ export const RootNavigator: React.FC = () => {
       isGameActiveRef.current = true;
       setDuelOpponent(null);
       setOpponentHasAnswered(false);
+      markMatchmakingStart();
       socketService.findMatch(
         user.id,
         user.displayName,

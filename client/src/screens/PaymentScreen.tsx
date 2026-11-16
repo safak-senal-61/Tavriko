@@ -15,6 +15,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
+import { trackEvent } from '../services/analytics';
 import { DEFAULT_API_BASE } from '../config';
 import { authHeaders } from '../utils/apiAuth';
 import {
@@ -135,6 +136,12 @@ export const PaymentScreen: React.FC<PaymentScreenProps> = ({
       }
       sound.playSound('victory');
       sound.triggerHaptic('success');
+      // PostHog: ekonomi akışı — mağaza satın alma
+      trackEvent('store_purchase', {
+        item: item.id,
+        item_title: item.title,
+        price: item.price,
+      });
       setUpdatedUserResult(data.user);
       setSuccessModalVisible(true);
     } catch (err: any) {

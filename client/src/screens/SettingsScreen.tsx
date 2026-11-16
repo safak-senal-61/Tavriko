@@ -17,6 +17,7 @@ import { CLOUD_BASE_URL } from '../config';
 import { UserProfile, UserSettings } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
+import { trackEvent } from '../services/analytics';
 import { socketService } from '../services/socketService';
 import { DISCOVERY_IMG, DiscoveryArtwork } from '../components/DiscoveryArtwork';
 import { PreferenceSwitch } from '../components/PreferenceSwitch';
@@ -322,6 +323,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     <PreferenceSwitch value={value} label={label} onValueChange={() => {
       sound.playSound('tap');
       sound.triggerHaptic('light');
+      // PostHog: ayar etkileşimi (ör. Pil Tasarrufu vakası)
+      trackEvent('settings_changed', { key: label, value: !value });
       onToggle();
     }} />
   );

@@ -23,6 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
+import { trackEvent } from '../services/analytics';
 import { loadStoredPreferences } from '../store/appPrefs';
 import { ClientQuestion, ALL_CATEGORIES } from '@trivia/shared';
 import {
@@ -650,6 +651,15 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       } else {
         setAnswerState('incorrect');
       }
+      // PostHog: soru bazlı başarı — zorluk dengesinin ana veri kaynağı
+      trackEvent('question_answered', {
+        question_id: question.id,
+        category: question.categoryId,
+        correct: feedback.isCorrect,
+        timeout: feedback.isTimeout,
+        streak: feedback.streak,
+        points_awarded: feedback.pointsAwarded,
+      });
     }
   }, [feedback]);
   // When question changes, reset time, answer state, and timer cleanly
