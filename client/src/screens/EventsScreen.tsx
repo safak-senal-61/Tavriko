@@ -12,6 +12,7 @@ import {
 import { UserProfile, GameEvent } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
+import { trackEvent } from '../services/analytics';
 import { DEFAULT_API_BASE } from '../config';
 import { authHeaders } from '../utils/apiAuth';
 import {
@@ -148,6 +149,12 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
         sound.triggerHaptic('success');
         setIsError(false);
         setStatusMessage(data.message || 'Ödül başarıyla toplandı!');
+        // PostHog: günlük seri / görev ödülü toplandı
+        trackEvent('daily_streak_claimed', {
+          event_id: event.id,
+          event_type: event.type,
+          day_count: event.currentCount ?? undefined,
+        });
         if (data.user && onUpdateUser) {
           onUpdateUser(data.user);
         }

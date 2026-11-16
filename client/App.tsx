@@ -12,6 +12,7 @@ import { View, ActivityIndicator, Platform } from 'react-native';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { hydrateAuthStorage, getStoredAuth } from './src/utils/authStorage';
 import { useGameStore } from './src/store/gameStore';
+import { initAnalytics, trackSessionStart } from './src/services/analytics';
 
 // Sentry hata izleme: DSN doğrudan koda gömülüdür. Client DSN'leri gizli
 // değildir (her tarayıcı/mobil bundle'ında görünür), yalnızca olay GÖNDERME
@@ -87,6 +88,14 @@ function AppInner() {
     Nunito_800ExtraBold,
     Nunito_900Black,
   });
+
+  // Ürün analitiği (PostHog): anahtar yoksa sessizce kapalı kalır.
+  // session_start event'i — D1/D7 retention ölçümünün temeli.
+  useEffect(() => {
+    void initAnalytics().then(() => {
+      trackSessionStart();
+    });
+  }, []);
 
   // Mobilde kalıcı oturum: güvenli depodan (Keystore/Keychain) yükle.
   // RootNavigator ilk render'ından ÖNCE tamamlanmalı; aksi halde açılışta

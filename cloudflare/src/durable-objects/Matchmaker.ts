@@ -21,6 +21,22 @@ interface QueueEntry {
   difficulty: DifficultyLevel;
   queuedAt: number;
   status: 'searching' | 'matched' | 'cancelled';
+  /** İstemciden gelen (PostHog flag) bot'a düşme süresi; yoksa varsayılan 7sn */
+  botFallbackMs?: number;
+}
+
+/** Bot'a düşme süresi: istemci değerini güvenli aralıkta tut (3–30sn) */
+function clampBotFallbackMs(raw: unknown): number | undefined {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return undefined;
+  return Math.round(Math.min(30000, Math.max(3000, value)));
+}
+
+/** Varsayılan insan arama penceresi */
+const DEFAULT_MATCH_TIMEOUT_MS = 7000;
+
+function entryTimeoutMs(entry: QueueEntry): number {
+  return entry.botFallbackMs ?? DEFAULT_MATCH_TIMEOUT_MS;
 }
 
 interface PresenceEntry {
@@ -326,6 +342,7 @@ export class MatchmakerDO extends DurableObject<Env> {
     const mode = (url.searchParams.get('mode') as GameMode) || 'duel';
     const category = (url.searchParams.get('category') as CategoryId) || 'general_culture';
     const difficulty = (url.searchParams.get('difficulty') as DifficultyLevel) || 'medium';
+    const botFallbackMs = clampBotFallbackMs(url.searchParams.get('botFallbackMs'));
     const isMatchmakingIntent =
       url.pathname.startsWith('/ws/matchmaking') ||
       url.searchParams.get('intent') === 'matchmaking';
@@ -371,6 +388,7 @@ export class MatchmakerDO extends DurableObject<Env> {
       difficulty,
       queuedAt: Date.now(),
       status: isMatchmakingIntent ? 'searching' : 'cancelled',
+      botFallbackMs,
       inRoom: false,
     };
     server.serializeAttachment(attachment);
@@ -439,6 +457,7 @@ export class MatchmakerDO extends DurableObject<Env> {
           difficulty: payload.difficulty || attachment.difficulty || 'medium',
           queuedAt: Date.now(),
           status: 'searching',
+          botFallbackMs: clampBotFallbackMs(payload.botFallbackMs) ?? attachment.botFallbackMs,
         };
         ws.serializeAttachment(updatedEntry);
         await this.enqueuePlayer(updatedEntry);
@@ -533,10 +552,10 @@ export class MatchmakerDO extends DurableObject<Env> {
     console.warn('[MatchmakerDO] WebSocket error:', error);
   }
 
-  // Periodic alarm: strictly 7 seconds real human player search window, then fallback to bot
+  // Periodic alarm: real human player search window (default 7s, per-player
+  // PostHog flag ile özelleştirilebilir), then fallback to bot
   async alarm(): Promise<void> {
     const now = Date.now();
-    const MATCH_TIMEOUT_MS = 7000; // Exact 7-second search window
 
     for (const [playerId, entry] of Array.from(this.queue.entries())) {
       if (entry.status !== 'searching') continue;
@@ -548,8 +567,8 @@ export class MatchmakerDO extends DurableObject<Env> {
         continue;
       }
 
-      // 2. If 7 seconds have elapsed and still no human player, create a bot match
-      if (now - entry.queuedAt >= MATCH_TIMEOUT_MS) {
+      // 2. If the search window has elapsed and still no human player, create a bot match
+      if (now - entry.queuedAt >= entryTimeoutMs(entry)) {
         await this.createBotMatch(entry);
       }
     }
@@ -559,7 +578,7 @@ export class MatchmakerDO extends DurableObject<Env> {
       let nextWakeupMs = 1500;
       for (const entry of this.queue.values()) {
         if (entry.status === 'searching') {
-          const remaining = Math.max(200, MATCH_TIMEOUT_MS - (now - entry.queuedAt));
+          const remaining = Math.max(200, entryTimeoutMs(entry) - (now - entry.queuedAt));
           if (remaining < nextWakeupMs) nextWakeupMs = remaining;
         }
       }
@@ -587,8 +606,8 @@ export class MatchmakerDO extends DurableObject<Env> {
     this.queue.set(entry.playerId, entry);
     await this.persistQueue();
 
-    // Schedule alarm to wake up at exactly 7 seconds
-    await this.ctx.storage.setAlarm(Date.now() + 7000);
+    // Schedule alarm to wake up at this player's search window (default 7s)
+    await this.ctx.storage.setAlarm(Date.now() + entryTimeoutMs(entry));
   }
 
   private async dequeuePlayer(playerId: string): Promise<void> {

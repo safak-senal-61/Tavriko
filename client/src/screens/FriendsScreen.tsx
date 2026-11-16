@@ -18,6 +18,7 @@ import * as Clipboard from 'expo-clipboard';
 import { UserProfile, calculateLevelFromXp, extractProfileCosmetics } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
+import { trackEvent } from '../services/analytics';
 import { authHeaders } from '../utils/apiAuth';
 import { DEFAULT_API_BASE } from '../config';
 import { socketService } from '../services/socketService';
@@ -551,7 +552,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         <Text style={styles.title}>ARKADAŞLAR</Text>
         {!isGuest && user && <ReferralCards key={user.id} base={base} token={token} userId={user.id}
           pendingToken={pendingReferral} onClear={() => onClearReferral?.()}
-          onConnected={() => { fetchFriends(); onReferralConnected?.(); }} />}
+          onConnected={() => { fetchFriends(); trackEvent('referral_signup'); onReferralConnected?.(); }} />}
         {/* Compact Friend Code Card */}
         <View style={styles.codeCard}>
           <View style={styles.codeTopRow}>
