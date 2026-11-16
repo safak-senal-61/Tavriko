@@ -13,6 +13,7 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { hydrateAuthStorage, getStoredAuth } from './src/utils/authStorage';
 import { useGameStore } from './src/store/gameStore';
 import { initAnalytics, trackSessionStart } from './src/services/analytics';
+import { initPushNotifications, registerForPushNotifications } from './src/services/pushNotifications';
 
 // Sentry hata izleme: DSN doğrudan koda gömülüdür. Client DSN'leri gizli
 // değildir (her tarayıcı/mobil bundle'ında görünür), yalnızca olay GÖNDERME
@@ -95,6 +96,18 @@ function AppInner() {
     void initAnalytics().then(() => {
       trackSessionStart();
     });
+  }, []);
+
+  // Push bildirimleri: ön planda banner gösterimi + kanal kurulumu (mobil).
+  // Oturum açan kullanıcıların cihaz token'ı sunucuya kaydolunur; kullanıcı
+  // değişirse (giriş/çıkış) yeni kullanıcı için yeniden denenir.
+  useEffect(() => {
+    initPushNotifications();
+    const register = (userId: string | undefined) => {
+      if (userId) void registerForPushNotifications(userId);
+    };
+    register(useGameStore.getState().user?.id);
+    return useGameStore.subscribe((state) => register(state.user?.id));
   }, []);
 
   // Mobilde kalıcı oturum: güvenli depodan (Keystore/Keychain) yükle.

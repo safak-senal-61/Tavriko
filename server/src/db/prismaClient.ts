@@ -50,6 +50,7 @@ import { RICH_SEED_BANK } from '../ai/evrenLlmGenerator';
 import { supabaseService } from './supabaseClient';
 import { mergeQuestionStores } from '../utils/questionStoreMerge';
 import { presenceManager } from '../services/presenceManager';
+import { queuePushForNotification } from '../services/pushService';
 
 // SECURITY: no hardcoded fallback secret. If the environment does not provide a
 // secret, token signing/verification fails loudly instead of silently using a
@@ -235,6 +236,8 @@ export class PrismaService {
     passwordResetTokens: new Map(),
   };
   private users: Map<string, UserRecord> = new Map();
+  // Expo push token bellekta yedeği (DB erişilemezken): userId -> token seti
+  private pushTokensByUser: Map<string, Set<string>> = new Map();
   private questions: Question[] = [];
   // Bu örneğin yerel olarak değiştirdiği / sildiği soru id'leri. Bulut yazımı
   // sırasında yalnızca bu sorular yerel sürümle yazılır; diğer sorularda
@@ -4247,8 +4250,79 @@ export class PrismaService {
     this.savePersistedUsers();
 
     presenceManager.notifyUser(target.id, 'notification:new', notifItem);
+    queuePushForNotification(target.id, notifItem);
 
     return { success: true, message: `Bildirim ${target.displayName} adlı kullanıcıya gönderildi.` };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Expo Push token kayıtları (push_tokens tablosu; DB erişilemezse bellekta
+  // çalışır — bildirim gönderimi test ortamında sessizce no-op olur).
+  // ---------------------------------------------------------------------------
+
+  /** Kullanıcının kayıtlı Expo push token'larını döndürür. */
+  public async getPushTokensAsync(userId: string): Promise<string[]> {
+    if (!userId) return [];
+    try {
+      const rows = await this.rawClient.pushToken.findMany({
+        where: { userId },
+        select: { token: true },
+      });
+      return rows.map((r: { token: string }) => r.token);
+    } catch (e: any) {
+      console.warn('[getPushTokensAsync] DB fallback:', e.message);
+      const fallback = this.pushTokensByUser.get(userId);
+      return fallback ? Array.from(fallback) : [];
+    }
+  }
+
+  /** Push token'ı kullanıcıya bağlar (upsert). Aynı token başka kullanıcıya
+   *  aitse sahipliği yeni kullanıcıya geçirir (yeniden giriş senaryosu). */
+  public async savePushTokenAsync(
+    userId: string,
+    token: string,
+    platform?: string
+  ): Promise<{ success: boolean }> {
+    if (!userId || !token) return { success: false };
+    try {
+      await this.rawClient.pushToken.upsert({
+        where: { token },
+        create: { token, userId, platform: platform || null },
+        update: { userId, platform: platform || null },
+      });
+      return { success: true };
+    } catch (e: any) {
+      console.warn('[savePushTokenAsync] DB fallback:', e.message);
+      let set = this.pushTokensByUser.get(userId);
+      if (!set) {
+        set = new Set<string>();
+        this.pushTokensByUser.set(userId, set);
+      }
+      set.add(token);
+      return { success: true };
+    }
+  }
+
+  /** Token'ı kayıtlardan siler (DeviceNotRegistered temizliği / çıkış). */
+  public async removePushTokenAsync(token: string): Promise<void> {
+    if (!token) return;
+    try {
+      await this.rawClient.pushToken.deleteMany({ where: { token } });
+    } catch (e: any) {
+      console.warn('[removePushTokenAsync] DB fallback:', e.message);
+      for (const set of this.pushTokensByUser.values()) set.delete(token);
+    }
+  }
+
+  /** Kullanıcının tüm token'larını siler (hesap silme / tam çıkış). */
+  public async removeAllPushTokensAsync(userId: string): Promise<void> {
+    if (!userId) return;
+    try {
+      await this.rawClient.pushToken.deleteMany({ where: { userId } });
+    } catch (e: any) {
+      console.warn('[removeAllPushTokensAsync] DB fallback:', e.message);
+      this.pushTokensByUser.delete(userId);
+    }
   }
 
   public async addFriend(
@@ -4394,6 +4468,7 @@ export class PrismaService {
 
     // REAL-TIME WEBSOCKET PUSH TO TARGET
     presenceManager.notifyUser(target.id, 'notification:new', notifItem);
+    queuePushForNotification(target.id, notifItem);
 
     const progress = calculateLevelFromXp(target.xp || 0);
     const targetPresence = presenceManager.getUserPresence(target.id);
@@ -4723,6 +4798,7 @@ export class PrismaService {
 
           // WebSocket notify sender & self
           presenceManager.notifyUser(sender.id, 'notification:new', senderNotif);
+          queuePushForNotification(sender.id, senderNotif);
           presenceManager.notifyUser(sender.id, 'friends:update', { friendId: user.id });
           presenceManager.notifyUser(user.id, 'friends:update', { friendId: sender.id });
         }
@@ -4850,6 +4926,7 @@ export class PrismaService {
 
     // 2. REAL-TIME WEBSOCKET NOTIFICATION TO TARGET
     presenceManager.notifyUser(target.id, 'notification:new', notifItem);
+    queuePushForNotification(target.id, notifItem);
 
     // 3. BROADCAST SENDER PRESENCE (Now in room)
     presenceManager.broadcast('presence:update', presenceManager.getUserPresence(userId));

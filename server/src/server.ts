@@ -27,6 +27,7 @@ import { initErrorMonitor, captureError } from './utils/errorMonitor';
 import triviaRoutes from './routes/triviaRoutes';
 import socialRoutes from './routes/socialRoutes';
 import referralRoutes from './routes/referralRoutes';
+import pushRoutes from './routes/pushRoutes';
 import { requireAdminAuth, getAdminSessionFromRequest, setTelegramAdminVerifier } from './middleware/auth';
 import { renderAdminLoginHtml, sanitizeNextPath } from './routes/adminLoginPage';
 import { legalRouter } from './routes/legalRoutes';
@@ -3592,6 +3593,7 @@ export function createApp() {
   app.use('/api', triviaRoutes);
   app.use('/api/social', socialRoutes);
   app.use('/api/referrals', referralRoutes);
+  app.use('/api/push', pushRoutes);
   app.use(legalRouter);
 
   // --- Cloudflare Durable Objects Internal Endpoints ---

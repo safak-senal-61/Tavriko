@@ -103,6 +103,7 @@ model User {
   matches                   MatchHistory[]
   inventoryItems            UserInventoryItem[]
   notifications             UserNotification[]
+  pushTokens                PushToken[]
   referralLink              ReferralLink?
   referralReceived          ReferralRedemption? @relation("ReferralInvitee")
   referralsSent             ReferralRedemption[] @relation("ReferralInviter")
@@ -146,6 +147,21 @@ model UserNotification {
 
   @@index([userId])
   @@map("user_notifications")
+}
+
+model PushToken {
+  id        String   @id @default(cuid())
+  /// Expo Push token (ExponentPushToken[...]); kullanıcı başına birden fazla cihaz olabilir.
+  token     String   @unique
+  userId    String
+  /// ios | android | web (tanım için; gönderim tarafında kullanılmaz)
+  platform  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_tokens")
 }
 
 model MatchHistory {

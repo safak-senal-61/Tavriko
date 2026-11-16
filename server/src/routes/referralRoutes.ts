@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../db/prismaClient';
 import { ReferralError, ReferralService } from '../services/referralService';
 import { presenceManager } from '../services/presenceManager';
+import { queuePushForNotification } from '../services/pushService';
 
 const router = Router();
 const service = new ReferralService(db.rawClient);
@@ -36,7 +37,11 @@ router.post('/confirm', signedIn, async (req, res) => {
     ]);
     presenceManager.notifyUser(result.inviterId, 'friends:update', { friendId: res.locals.userId });
     presenceManager.notifyUser(res.locals.userId, 'friends:update', { friendId: result.inviterId });
-    if (result.notification) presenceManager.notifyUser(result.inviterId, 'notification:new', result.notification);
+    if (result.notification) {
+      presenceManager.notifyUser(result.inviterId, 'notification:new', result.notification);
+      // Davet ödülü bildirimi push ile de gitsin (kullanıcı çevrimdışıysa).
+      queuePushForNotification(result.inviterId, result.notification);
+    }
     const { notification, ...safeResult } = result;
     res.json(safeResult);
   } catch (e) { fail(res, e); }
