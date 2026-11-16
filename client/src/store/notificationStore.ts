@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import type { NotificationItem } from '@trivia/shared';
 import { authHeaders } from '../utils/apiAuth';
 
@@ -25,16 +27,57 @@ export const isUnread = (item: NotificationItem, readIds: string[]) =>
 export const unreadCount = (items: NotificationItem[], readIds: string[]) =>
   cleanNotifications(items).filter(item => isUnread(item, readIds)).length;
 
-function readReceipts(userId: string): string[] {
+function parseIds(raw: string | null | undefined): string[] {
   try {
-    const value = JSON.parse(localStorage.getItem(STORAGE_PREFIX + userId) || '[]');
+    const value = JSON.parse(raw || '[]');
     return Array.isArray(value) ? value.filter(id => typeof id === 'string') : [];
   } catch { return []; }
 }
 
+/**
+ * Okundu bilgisi kalıcıdır — hem web'de hem mobil uygulamada.
+ * Web: localStorage (önceki davranışla aynı).
+ * Mobil: expo-secure-store. Okuma asenkron olduğu için açılışta bellek
+ * önbelleği doldurulur ve gelince mağazaya uygulanır; böylece uygulama
+ * kapatılıp açıldığında görülmüş bildirimler YENİ sayılmaz (rozet 0 kalır).
+ */
+const nativeReceiptCache = new Map<string, string[]>();
+
+function readReceipts(userId: string): string[] {
+  if (Platform.OS === 'web') {
+    try {
+      return parseIds(localStorage.getItem(STORAGE_PREFIX + userId));
+    } catch { return []; }
+  }
+  return nativeReceiptCache.get(userId) ?? [];
+}
+
 function saveReceipts(userId: string | null, ids: string[]) {
   if (!userId) return;
-  try { localStorage.setItem(STORAGE_PREFIX + userId, JSON.stringify(ids)); } catch {}
+  if (Platform.OS === 'web') {
+    try { localStorage.setItem(STORAGE_PREFIX + userId, JSON.stringify(ids)); } catch {}
+    return;
+  }
+  nativeReceiptCache.set(userId, ids);
+  void SecureStore.setItemAsync(STORAGE_PREFIX + userId, JSON.stringify(ids)).catch(() => {});
+}
+
+/** Mobilde güvenli depodan okundu bilgilerini yükleyip mağazaya uygular. */
+async function hydrateReceipts(userId: string): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    const stored = parseIds(await SecureStore.getItemAsync(STORAGE_PREFIX + userId));
+    if (!stored.length) return;
+    const merged = Array.from(new Set([...(nativeReceiptCache.get(userId) ?? []), ...stored]));
+    nativeReceiptCache.set(userId, merged);
+    const state = useNotificationStore.getState();
+    if (state.userId !== userId) return;
+    const readIds = Array.from(new Set([...state.readIds, ...merged])).slice(-1000);
+    useNotificationStore.setState({
+      readIds,
+      toast: state.toast && readIds.includes(state.toast.id) ? null : state.toast,
+    });
+  } catch {}
 }
 
 interface NotificationState {
@@ -62,6 +105,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       readIds: userId ? readReceipts(userId) : [],
       loading: false, error: null, toast: null,
     });
+    // Mobilde kalıcı okundu bilgileri asenkron yüklenir ve gelince uygulanır.
+    if (userId) void hydrateReceipts(userId);
   },
   receive: item => {
     const clean = cleanNotifications([item])[0];

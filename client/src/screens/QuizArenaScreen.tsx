@@ -258,18 +258,28 @@ export const getHillCurveNormY = (uRaw: number): number => {
 };
 
 const RACE_LANE_COLORS = ['#38BDF8', '#B26BFF', '#FF6BC4', '#5ADBB5', '#FF9B2F', '#FFC43D'];
-const RACE_MAX_LANES = 4;
 const RACE_MARKER = 24;
+
+/**
+ * Zirve Yarışı şerit göstergesi: oyuncu sayısı arttıkça şeritler küçülür ki
+ * 8 kişilik odada bile TÜM oyuncuların barı ekrana sığsın (4 şeritle kesilmez).
+ */
+const raceMarkerSize = (playerCount: number, compact: boolean): number => {
+  if (playerCount >= 7) return 14;
+  if (playerCount >= 5) return 16;
+  return compact ? 20 : RACE_MARKER;
+};
 
 /** Tek şerit: doğru sayısı arttığında avatar yay animasyonuyla ileri kayar ve "+1" belirir */
 const RaceLane: React.FC<{
   racer: RacerInfo;
   color: string;
   marker: number;
+  trackHeight: number;
   laneWidth: number;
   x: number;
   correct: number;
-}> = ({ racer, color, marker, laneWidth, x, correct }) => {
+}> = ({ racer, color, marker, trackHeight, laneWidth, x, correct }) => {
   const pos = useSharedValue(x);
   const pop = useSharedValue(1);
   const bubble = useSharedValue(0);
@@ -307,8 +317,14 @@ const RaceLane: React.FC<{
 
   return (
     <View style={[styles.raceLane, { height: marker }]}>
-      <View style={styles.raceLaneTrack} />
-      <Animated.View style={[styles.raceLaneFill, { backgroundColor: color, shadowColor: color }, fillStyle]} />
+      <View style={[styles.raceLaneTrack, { height: trackHeight, borderRadius: trackHeight / 2 }]} />
+      <Animated.View
+        style={[
+          styles.raceLaneFill,
+          { backgroundColor: color, shadowColor: color, height: trackHeight, borderRadius: trackHeight / 2 },
+          fillStyle,
+        ]}
+      />
       {laneWidth > 0 && (
         <>
           <Animated.View
@@ -335,8 +351,12 @@ const SummitRaceTrack: React.FC<{
   racers: RacerInfo[];
   totalQuestions: number;
   compact?: boolean;
-}> = ({ racers, totalQuestions, compact = false }) => {
-  const marker = compact ? 20 : RACE_MARKER;
+  /** 5+ oyuncu: kart içi boşluklar ve şerit aralıkları sıkılaştırılır */
+  dense?: boolean;
+}> = ({ racers, totalQuestions, compact = false, dense = false }) => {
+  const marker = raceMarkerSize(racers.length, compact);
+  // Şerit kalınlığı göstergelerle birlikte küçülür; 8 kişilik odada bile sığar.
+  const trackHeight = Math.max(5, Math.min(8, Math.round(marker * 0.42)));
   const [laneWidth, setLaneWidth] = useState(0);
   const maxRacerCorrect = racers.reduce(
     (acc, r) => Math.max(acc, Math.floor(Number.isFinite(r.correctAnswers) ? r.correctAnswers : 0)),
@@ -359,15 +379,20 @@ const SummitRaceTrack: React.FC<{
   const lanes = useMemo(() => {
     const me = sorted.find((r) => r.isMe);
     const others = sorted.filter((r) => !r.isMe);
-    const list = me ? [me, ...others] : others;
-    return list.slice(0, RACE_MAX_LANES);
+    // Tüm oyuncular kendi şeridinde gösterilir (sınır yok)
+    return me ? [me, ...others] : others;
   }, [sorted]);
-  const hiddenCount = Math.max(0, sorted.length - lanes.length);
   const me = sorted.find((r) => r.isMe);
   const myCorrect = me ? clampCorrect(me.correctAnswers, total) : 0;
 
   return (
-    <View style={[styles.raceCard, compact && { paddingTop: 4, paddingBottom: 6 }]}>
+    <View
+      style={[
+        styles.raceCard,
+        compact && { paddingTop: 4, paddingBottom: 6 },
+        dense && { paddingTop: 3, paddingBottom: 4, gap: 2 },
+      ]}
+    >
       <View style={styles.raceTitleRow}>
         <Text style={styles.raceTitle}>ZİRVE YARIŞI</Text>
         <View style={styles.raceStepChip}>
@@ -378,7 +403,7 @@ const SummitRaceTrack: React.FC<{
       </View>
       <View style={styles.raceBody}>
         <View
-          style={styles.raceLanes}
+          style={[styles.raceLanes, dense && { gap: 1 }]}
           onLayout={(e) => {
             const w = e.nativeEvent.layout.width;
             if (w > 0 && Math.abs(w - laneWidth) > 0.5) setLaneWidth(w);
@@ -395,6 +420,7 @@ const SummitRaceTrack: React.FC<{
                 racer={racer}
                 color={color}
                 marker={marker}
+                trackHeight={trackHeight}
                 laneWidth={laneWidth}
                 x={x}
                 correct={clampCorrect(racer.correctAnswers, total)}
@@ -404,7 +430,6 @@ const SummitRaceTrack: React.FC<{
         </View>
         <View style={styles.raceFlag}>
           <Text style={styles.raceFlagText}>🚩</Text>
-          {hiddenCount > 0 && <Text style={styles.raceMoreText}>+{hiddenCount}</Text>}
         </View>
       </View>
     </View>
@@ -456,6 +481,104 @@ const DuelPlayerBlock: React.FC<{
       >
         {score}
       </Text>
+      {badge ? (
+        <View style={styles.playerBadge}>
+          <Text style={styles.playerBadgeText}>{badge}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+};
+
+/**
+ * 3+ kişilik odaların skor tablosu: TÜM oyuncuların profili (avatar + isim +
+ * puan) ekrana sığacak şekilde küçültülerek gösterilir. İsim ve puan tek
+ * satırlık hapta birleşir; blok boyutları ringSize ile ölçeklenir.
+ */
+const MiniPlayerBlock: React.FC<{
+  name: string;
+  avatarSeed: string;
+  score: number;
+  isMe: boolean;
+  ringSize: number;
+  showCrown?: boolean;
+  hasAnswered?: boolean;
+  badge?: string | null;
+}> = ({ name, avatarSeed, score, isMe, ringSize, showCrown, hasAnswered, badge }) => {
+  const color = isMe ? '#38BDF8' : '#C06BFF';
+  const dot = Math.max(13, Math.round(ringSize * 0.3));
+  const ringBorder = Math.max(2, Math.round(ringSize * 0.07));
+  const nameSize = Math.max(9, Math.round(ringSize * 0.22));
+  const scoreSize = Math.max(11, Math.round(ringSize * 0.28));
+  return (
+    <View style={[styles.miniPlayerBlock, { width: ringSize + 26 }]}>
+      <View
+        style={[
+          styles.playerAvatarRing,
+          {
+            width: ringSize,
+            height: ringSize,
+            borderRadius: ringSize / 2,
+            borderWidth: ringBorder,
+            borderColor: color,
+            shadowColor: color,
+            shadowRadius: 8,
+            elevation: 5,
+          },
+        ]}
+      >
+        <CharacterAvatar seed={avatarSeed} size={Math.max(16, ringSize - ringBorder * 2 - 2)} />
+        {hasAnswered && (
+          <View
+            style={[
+              styles.playerAnsweredDot,
+              { width: dot, height: dot, borderRadius: dot / 2, borderWidth: 1.5 },
+            ]}
+          >
+            <CheckMarkSvg size={Math.max(9, Math.round(dot * 0.6))} color="#FFFFFF" />
+          </View>
+        )}
+      </View>
+      {showCrown && (
+        <View
+          style={[
+            styles.playerCrown,
+            { top: -Math.round(ringSize * 0.26), left: Math.round(ringSize * 0.08) },
+          ]}
+          pointerEvents="none"
+        >
+          <CrownIcon size={Math.max(14, Math.round(ringSize * 0.34))} />
+        </View>
+      )}
+      <View
+        style={[
+          styles.miniNamePill,
+          {
+            borderColor: `${color}AA`,
+            marginTop: -Math.round(ringSize * 0.1),
+            maxWidth: ringSize + 26,
+          },
+        ]}
+      >
+        <Text
+          style={[styles.playerNameText, { fontSize: nameSize }]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {name}
+        </Text>
+        <Text style={{ color: color, fontSize: nameSize }}> · </Text>
+        <Text
+          style={{
+            color: isMe ? '#5FE1FF' : '#D9B8FF',
+            fontSize: scoreSize,
+            fontFamily: THEME.fonts.display,
+          }}
+          numberOfLines={1}
+        >
+          {score}
+        </Text>
+      </View>
       {badge ? (
         <View style={styles.playerBadge}>
           <Text style={styles.playerBadgeText}>{badge}</Text>
@@ -663,6 +786,33 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     };
   }, [opponent, activeRacers, totalRounds]);
   const myAnswered = !!(selectedOptionId || localSelectedOptionId);
+  // 3+ kişilik özel odalarda TÜM oyuncuların profili tek alanda gösterilir;
+  // oyuncu sayısı arttıkça bloklar küçültülerek ekrana sığdırılır.
+  const multiPlayers = useMemo(() => {
+    if (activeRacers.length <= 2) return [];
+    const me = activeRacers.find((r) => r.isMe);
+    const others = activeRacers
+      .filter((r) => !r.isMe)
+      .slice()
+      .sort(
+        (a, b) => (b.score || 0) - (a.score || 0) || b.correctAnswers - a.correctAnswers
+      );
+    return me ? [me, ...others] : others;
+  }, [activeRacers]);
+  const playerCount = activeRacers.length;
+  // Bloklar oyuncu sayısına göre küçültülür: 3-4 kişi tek satırda sığar,
+  // 5+ kişide satır sarılır ama yükseklik dar kalır (geri bildirim kartı
+  // açıldığında bile ekran taşmaz).
+  const multiRing =
+    playerCount <= 3 ? 46 : playerCount === 4 ? 40 : playerCount <= 6 ? 38 : 34;
+  const multiTimerSize = playerCount <= 4 ? 58 : playerCount <= 6 ? 52 : 46;
+  // 5+ kişi: soru kartı, şıklar ve yarış kartı sıkışık modda render edilir.
+  const denseLayout = playerCount >= 5;
+  const multiLeaderScore = multiPlayers.reduce(
+    (acc, p) =>
+      Math.max(acc, formatCleanScore(p.score || 0, p.correctAnswers, totalRounds)),
+    0
+  );
   const meLeads = !!rightPlayer && myScore > rightPlayer.score;
   const opponentLeads = !!rightPlayer && rightPlayer.score > myScore;
   const categoryName = categoryObj?.name || 'Genel Kültür';
@@ -725,7 +875,46 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         </View>
       )}
 
-      {/* 2. Skor Tablosu: Ben · Geri Sayım · Rakip */}
+      {/* 2. Skor Tablosu: 3+ kişi → TÜM oyuncular; 1-2 kişi → Ben · Geri Sayım · Rakip */}
+      {multiPlayers.length > 0 ? (
+        <View style={styles.multiScoreboard}>
+          {multiPlayers.map((p, idx) => {
+            const normalized = formatCleanScore(p.score || 0, p.correctAnswers, totalRounds);
+            const block = (
+              <MiniPlayerBlock
+                key={p.id}
+                name={p.isMe ? myDisplayName || p.displayName : p.displayName}
+                avatarSeed={p.avatarUrl || p.displayName}
+                score={normalized}
+                isMe={!!p.isMe}
+                ringSize={multiRing}
+                showCrown={multiLeaderScore > 0 && normalized === multiLeaderScore}
+                hasAnswered={p.isMe ? myAnswered : Boolean(p.hasAnswered)}
+                badge={p.isMe && streak >= 2 ? `🔥 x${streak}` : null}
+              />
+            );
+            // Geri sayım halkası "ben"in hemen yanında, ilk satırda durur.
+            return idx === 0 ? (
+              <React.Fragment key={p.id}>
+                {block}
+                <View style={styles.multiTimerWrap}>
+                  <CircularTimer
+                    totalMs={totalMs}
+                    endTime={endTime}
+                    isActive={answerState === 'answerable'}
+                    secondsLeft={secondsLeft}
+                    onTimeExpired={handleTimeExpiredInternal}
+                    onSecondChange={handleSecondChange}
+                    size={multiTimerSize}
+                  />
+                </View>
+              </React.Fragment>
+            ) : (
+              block
+            );
+          })}
+        </View>
+      ) : (
       <View style={styles.scoreboard}>
         <DuelPlayerBlock
           side="me"
@@ -776,24 +965,34 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           </View>
         )}
       </View>
+      )}
 
       {/* 3. Zirve Yarışı (yalnızca çok oyunculu modlarda) */}
       {activeRacers.length > 0 && (
-        <SummitRaceTrack racers={activeRacers} totalQuestions={totalRounds} compact={compact} />
+        <SummitRaceTrack
+          racers={activeRacers}
+          totalQuestions={totalRounds}
+          compact={compact}
+          dense={denseLayout}
+        />
       )}
 
       {/* 4. Soru Kartı */}
       <Animated.View
         key={`q-${question.id}-${question.roundNumber}`}
         entering={FadeIn.duration(320)}
-        style={[styles.questionCard, compact && styles.questionCardCompact, tiny && styles.questionCardTiny]}
+        style={[
+          styles.questionCard,
+          compact && styles.questionCardCompact,
+          (tiny || denseLayout) && styles.questionCardTiny,
+        ]}
       >
         <GradientFill
           colors={['rgba(107, 60, 255, 0.55)', 'rgba(52, 22, 128, 0.75)', 'rgba(30, 12, 74, 0.85)']}
           direction="diagonal"
         />
         <View style={styles.questionCardInner} pointerEvents="none" />
-        {!tiny && (
+        {!tiny && !denseLayout && (
           <View style={styles.difficultyRow}>
             <View
               style={[styles.difficultyBadge, { borderColor: difficultyColor, backgroundColor: `${difficultyColor}26` }]}
@@ -818,7 +1017,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       </Animated.View>
 
       {/* 5. Şıklar */}
-      <View style={[styles.optionsContainer, compact && { gap: 7 }]}>
+      <View style={[styles.optionsContainer, compact && { gap: 7 }, denseLayout && { gap: 5 }]}>
         {question.options.map((opt, index) => {
           const activeSelectedId = selectedOptionId || localSelectedOptionId;
           const isMyChoice = activeSelectedId === opt.id;
@@ -836,7 +1035,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                 style={[
                   styles.optCard,
                   compact && styles.optCardCompact,
-                  tiny && styles.optCardTiny,
+                  (tiny || denseLayout) && styles.optCardTiny,
                   !feedback && isMyChoice && styles.optCardSelected,
                   feedback && isCorrectChoice && styles.optCardCorrect,
                   feedback && isWrongChoice && styles.optCardWrong,
@@ -1109,6 +1308,33 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
   },
+  // 3+ kişilik odalarda tüm oyuncu profilleri sığan satırlar
+  multiScoreboard: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    columnGap: 6,
+    rowGap: 2,
+  },
+  multiTimerWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miniPlayerBlock: {
+    alignItems: 'center',
+  },
+  // Mini profil bloğunun tek satırlık "isim · puan" hapı
+  miniNamePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 10,
+    backgroundColor: 'rgba(24, 10, 56, 0.96)',
+    borderWidth: 1,
+  },
   playerBlock: {
     width: 108,
     alignItems: 'center',
@@ -1315,14 +1541,10 @@ const styles = StyleSheet.create({
   raceFlagText: {
     fontSize: 22,
   },
-  raceMoreText: {
-    color: '#D9CDF5',
-    fontSize: 10,
-    fontFamily: THEME.fonts.extraBold,
-  },
   // ---- Soru Kartı ----
   questionCard: {
     minHeight: 132,
+    flexShrink: 1,
     borderRadius: 22,
     overflow: 'hidden',
     borderWidth: 2,

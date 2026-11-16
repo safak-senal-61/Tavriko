@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useGameStore, clearAllAccountStorage, getStoredAuth } from '../store/gameStore';
 import { authHeaders } from '../utils/apiAuth';
+import { shuffleOptionsForPlayer } from '../utils/optionShuffle';
 import { socketService } from '../services/socketService';
 import { sound } from '../services/soundService';
 import { THEME } from '../theme/tokens';
@@ -602,7 +603,17 @@ export const RootNavigator: React.FC = () => {
     const unsubQuestion = socketService.onQuestionStart((question: ClientQuestion) => {
       if (isSinglePlayerActiveRef.current) return;
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
-      setCurrentQuestion(question);
+      // Her oyuncunun şıkları kendi ekranında farklı sırada görünür. Cevaplar
+      // şık ID'si ile gönderilip ID ile değerlendirildiği için bu güvenlidir;
+      // tohum oyuncu+soru olduğundan yeniden bağlanınca sıra değişmez.
+      setCurrentQuestion({
+        ...question,
+        options: shuffleOptionsForPlayer(
+          question.options,
+          user?.id || 'guest',
+          `${question.id}-${question.roundNumber}`
+        ),
+      });
       setRoundResult(null);
       setMultiplayerFeedback(null);
       selectOption(null);
