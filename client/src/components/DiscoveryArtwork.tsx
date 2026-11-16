@@ -12,17 +12,17 @@ import { usePreferences } from '../store/appPrefs';
 
 export const DISCOVERY_IMG = {
   explorer: cdnImage('images/discovery/guest_explorer.png'),
-  arena: cdnImage('images/discovery/duel_arena.webp'),
+  arena: cdnImage('images/discovery/duel_arena.png'),
   victory: cdnImage('images/discovery/badge_victory.png'),
   speed: cdnImage('images/discovery/badge_speed.png'),
   streak: cdnImage('images/discovery/badge_streak.png'),
   accuracy: cdnImage('images/discovery/badge_accuracy.png'),
   expert: cdnImage('images/discovery/badge_expert.png'),
   collector: cdnImage('images/discovery/badge_collector.png'),
-  settings: cdnImage('images/discovery/settings.webp'),
-  bell: cdnImage('images/discovery/bell.webp'),
-  robot: cdnImage('images/discovery/robot.webp'),
-  social: cdnImage('images/discovery/social.webp'),
+  settings: cdnImage('images/discovery/settings.png'),
+  bell: cdnImage('images/discovery/bell.png'),
+  robot: cdnImage('images/discovery/robot.png'),
+  social: cdnImage('images/discovery/social.png'),
 };
 
 /** Profil ekranına özel üretilmiş, her konu için ayrı görseller (şeffaf arka planlı). */

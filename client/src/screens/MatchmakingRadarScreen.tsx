@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, Platform, Image, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Platform, Image, ScrollView, useWindowDimensions, ImageSourcePropType } from 'react-native';
 import { ShieldCheck, Swords } from 'lucide-react-native';
 import { CategoryId, DifficultyLevel, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { useReducedMotion } from '../components/DiscoveryArtwork';
-// Radar arenası paket içinden yüklenir (CDN jpg/webp bazı cihazlarda siyah
-// kalıyordu); yerel require her zaman çalışır.
-const RADAR_ARENA = require('../../assets/images/radar_arena.png');
+import { cdnImage } from '../utils/cdn';
+// Radar arenası Cloudflare CDN'den PNG olarak çekilir (webp bazı cihazlarda
+// boş kalıyordu; PNG her yerde sorunsuz render edilir).
+const RADAR_ARENA: ImageSourcePropType = cdnImage('images/radar_arena.png');
 import { GradientFill } from '../components/TavrikoGradient';
 import {
   TavrikoScreen,

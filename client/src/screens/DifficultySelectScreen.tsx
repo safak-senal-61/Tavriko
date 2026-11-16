@@ -232,7 +232,7 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
           style={styles.heroBanner}
         >
           <Image
-            source={cdnImage('images/discovery/duel_arena.webp')}
+            source={cdnImage('images/discovery/duel_arena.png')}
             style={styles.heroBackdrop}
             resizeMode="cover"
           />

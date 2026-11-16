@@ -1,15 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform, Image, ScrollView, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform, Image, ScrollView, ActivityIndicator, useWindowDimensions, ImageSourcePropType } from 'react-native';
 import { Bot, Check, Radio, ShieldCheck, Swords, Volume2, VolumeX, X } from 'lucide-react-native';
+import { cdnImage } from '../utils/cdn';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DiscoveryArtwork, useReducedMotion } from '../components/DiscoveryArtwork';
 import { GradientFill } from '../components/TavrikoGradient';
 import { TavrikoScreen, CharacterAvatar } from '../components/TavrikoIcons';
-// Arena ve robot görselleri paket içinden yüklenir (CDN webp bazı
-// cihazlarda boş/siyah kalıyordu); yerel require her zaman çalışır.
-const ARENA_IMG = require('../../assets/images/radar_arena.png');
-const ROBOT_IMG = require('../../assets/images/duel_robot.png');
+// Arena ve robot görselleri Cloudflare CDN'den PNG olarak çekilir (webp bazı
+// cihazlarda boş kalıyordu; PNG her yerde sorunsuz render edilir).
+const ARENA_IMG: ImageSourcePropType = cdnImage('images/radar_arena.png');
+const ROBOT_IMG: ImageSourcePropType = cdnImage('images/duel_robot.png');
 
 interface DuelVersusScreenProps {
   myProfile: { displayName: string; avatarUrl?: string; rankTitle?: string };

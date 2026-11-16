@@ -37,7 +37,10 @@ import { useUnreadCount } from '../store/notificationStore';
 const LOGO_MARK = cdnImage('images/logo_mark.png');
 // Hızlı eşleşme bannerı paket içinden yüklenir (CDN jpg bazı cihazlarda
 // siyah görünüp kartı boş bırakıyordu); yerel require her zaman çalışır.
-const DUEL_BANNER = require('../../assets/images/duel_banner.png');
+// 1v1 hızlı eşleşme banneri: Cloudflare CDN'den PNG olarak çekilir
+// (webp bazı Android cihazlarda boş/siyah kalıyordu; CDN png + ?v= içerik
+// özeti ile önbellek doğru çalışır).
+const DUEL_BANNER: ImageSourcePropType = cdnImage('images/duel_banner.png');
 const MODE_IMAGES = {
   customRoom: cdnImage('images/modes/custom_room.png'),
   singlePlayer: cdnImage('images/modes/single_player.png'),
