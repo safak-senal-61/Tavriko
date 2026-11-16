@@ -355,9 +355,12 @@ router.get('/google/callback', (req: Request, res: Response): void => {
       const activeHost = window.location.hostname || '${currentHost}';
       let webTarget = '/app#' + payload;
       const isExpoClient = /Expo/i.test(navigator.userAgent);
-      const isMobileUA = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      // Mobil akış: Expo Go, bağımsız APK (?src=mobile) veya mobil tarayıcı kullanıcı aracısı
-      const isMobileApp = isExpoClient || isMobileSrc || isMobileUA;
+      // Mobil uygulama akışı: YALNIZCA gerçekten uygulamadan gelen isteklerde
+      // (Expo Go kullanıcı aracısı veya bağımsız APK'nın ?src=mobile parametresi)
+      // derin bağlantı kullanılır. Telefonda web tarayıcısından (Chrome vb.)
+      // giriş yapan kullanıcı artık uygulamaya yönlendirilmez; oturum
+      // tarayıcıda tamamlanıp /app sayfasına geri dönülür.
+      const isMobileApp = isExpoClient || isMobileSrc;
       const btn = document.getElementById('appBtn');
       const appDeepLink = 'tavriko://auth-callback?' + payload;
 

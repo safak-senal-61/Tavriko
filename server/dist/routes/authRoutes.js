@@ -297,6 +297,8 @@ router.get('/google/callback', (req, res) => {
     const searchParams = new URLSearchParams(search);
     const accessToken = hashParams.get('access_token') || searchParams.get('access_token');
     const sessionId = searchParams.get('sessionId') || hashParams.get('sessionId') || searchParams.get('state') || hashParams.get('state');
+    // Mobil uygulamadan gelen istekler ?src=mobile taşır (bağımsız APK derin bağlantısı için)
+    const isMobileSrc = searchParams.get('src') === 'mobile';
 
     function navigateToApp(user, token) {
       if (window.opener && window.opener !== window) {
@@ -310,12 +312,35 @@ router.get('/google/callback', (req, res) => {
       const activeHost = window.location.hostname || '${currentHost}';
       let webTarget = '/app#' + payload;
       const isExpoClient = /Expo/i.test(navigator.userAgent);
+      // Mobil uygulama akışı: YALNIZCA gerçekten uygulamadan gelen isteklerde
+      // (Expo Go kullanıcı aracısı veya bağımsız APK'nın ?src=mobile parametresi)
+      // derin bağlantı kullanılır. Telefonda web tarayıcısından (Chrome vb.)
+      // giriş yapan kullanıcı artık uygulamaya yönlendirilmez; oturum
+      // tarayıcıda tamamlanıp /app sayfasına geri dönülür.
+      const isMobileApp = isExpoClient || isMobileSrc;
       const btn = document.getElementById('appBtn');
+      const appDeepLink = 'tavriko://auth-callback?' + payload;
+
+      if (isMobileApp) {
+        // Mobil: uygulamaya derin bağlantıyla dön. Bağlantı kurulamazsa
+        // "Uygulamaya Dön" butonu görünür kalır; masaüstü web yönlendirmesi yapılmaz.
+        if (btn) {
+          btn.href = isExpoClient ? 'exp://' + activeHost + ':8081/--/auth-callback?' + payload : appDeepLink;
+          btn.style.display = 'block';
+        }
+        if (isExpoClient) {
+          try { window.location.href = 'exp://' + activeHost + ':8081/--/auth-callback?' + payload; } catch(e) {}
+        }
+        setTimeout(function() {
+          try { window.location.href = appDeepLink; } catch(e) {}
+        }, 1200);
+        return;
+      }
 
       // Oturum zaten sunucuda tamamlandı: kullanıcıyı ve belirteci doğrudan kaydet.
       // Böylece uygulama açılışta giriş yapılmış olarak başlar; ikinci bir doğrulama turu
       // ve giriş ekranının görünmesi gerekmez.
-      if (user && token && !isExpoClient) {
+      if (user && token) {
         try {
           window.localStorage.setItem('tavriko_auth_user', JSON.stringify(user));
           window.localStorage.setItem('tavriko_auth_token', token);
@@ -324,18 +349,11 @@ router.get('/google/callback', (req, res) => {
       }
 
       if (btn) {
-        btn.href = isExpoClient ? 'exp://' + activeHost + ':8081/--/auth-callback?' + payload : webTarget;
+        btn.href = webTarget;
       }
 
-      if (isExpoClient) {
-        try { window.location.href = 'exp://' + activeHost + ':8081/--/auth-callback?' + payload; } catch(e) {}
-        setTimeout(function() {
-          try { window.location.href = 'tavriko://auth-callback?' + payload; } catch(e) {}
-        }, 1000);
-      } else {
-        // Web browser: Redirect straight to Tavriko web application!
-        window.location.replace(webTarget);
-      }
+      // Masaüstü web tarayıcısı: doğrudan Tavriko web uygulamasına yönlendir!
+      window.location.replace(webTarget);
     }
 
     // Automatically complete server session and persist to Supabase PostgreSQL public.users
