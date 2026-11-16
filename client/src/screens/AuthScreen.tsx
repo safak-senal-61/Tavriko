@@ -8,8 +8,6 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  Animated,
-  Easing,
   Image,
   Platform,
   Modal,
@@ -144,10 +142,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   // Mobilde giriş/kayıt ekranı sayfaya tam sığmalı (kaydırma olmamalı).
-  // Küçük ekranlarda yerleşim kompaktlaştırılır; web ve büyük ekranlarda
-  // mevcut ferah yerleşim korunur.
-  const { height: winH } = useWindowDimensions();
-  const compact = Platform.OS !== 'web' && winH < 820;
+  // Küçük ekranlarda yerleşim kompaktlaştırılır; web'de dar görünümlü
+  // (telefon) pencerelerde de kompakt mod devreye girer; masaüstündeki
+  // ferah yerleşim korunur.
+  const { height: winH, width: winW } = useWindowDimensions();
+  const compact = winH < 820 && (Platform.OS !== 'web' || winW < 520);
   // Google'dan dönüşte (adres çubuğunda token/code varsa) giriş formu yerine "oturum açılıyor" göster
   const [finishingOAuth, setFinishingOAuth] = useState(() =>
     Platform.OS === 'web' && typeof window !== 'undefined' &&
@@ -159,43 +158,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     const t = setTimeout(() => setFinishingOAuth(false), 20000);
     return () => clearTimeout(t);
   }, [finishingOAuth]);
-  // Animations
-  const floatAnim = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: 1,
-          duration: 2400,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 0,
-          duration: 2400,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-      ])
-    ).start();
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: 1,
-          duration: 3200,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-        Animated.timing(glowAnim, {
-          toValue: 0,
-          duration: 3200,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: Platform.OS !== 'web',
-        }),
-      ])
-    ).start();
-  }, [floatAnim, glowAnim]);
+  // Not: Logo ve "Tavriko" başlığı artık sabittir (yüzen/parlayan animasyon
+  // kaldırıldı) — küçük ekranlarda da ekran kullanımı daha verimli.
   const handlePickImage = async () => {
     sound.playSound('tap');
     sound.triggerHaptic('light');
@@ -691,14 +655,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       setLoading(false);
     }
   };
-  const translateY = floatAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, -7],
-  });
-  const haloScale = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.95, 1.08],
-  });
   // Step bonus calculation
   const stepBonusCoins = regStep * 200;
   const stepBonusGems = regStep * 5;
@@ -735,15 +691,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Clean Modern Brand Header (3D Crown + Floating) */}
-        <Animated.View
-          style={[
-            styles.heroWrap,
-            compact && styles.heroWrapCompact,
-            { transform: [{ translateY }] },
-          ]}
-        >
-          <Reanimated.View entering={FadeInDown.delay(60).duration(500).springify().damping(14)} style={[styles.heroCrownWrap, compact && styles.heroCrownWrapCompact]}>
+        {/* Clean Modern Brand Header (3D Crown) — sabit, animasyonsuz */}
+        <View style={[styles.heroWrap, compact && styles.heroWrapCompact]}>
+          <View style={[styles.heroCrownWrap, compact && styles.heroCrownWrapCompact]}>
             <View style={[styles.heroCrownGlow, compact && styles.heroCrownGlowCompact]} />
             <Image
               source={AUTH_LOGO}
@@ -751,12 +701,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               resizeMode="contain"
               accessibilityLabel="Tavriko logosu"
             />
-          </Reanimated.View>
-          <Reanimated.View entering={FadeInUp.delay(140).duration(500)}>
+          </View>
+          <View>
             <Text style={[styles.cleanBrandTitle, compact && styles.cleanBrandTitleCompact]}>Tavriko</Text>
             <Text style={[styles.brandSubtitle, compact && styles.brandSubtitleCompact]}>CANLI BİLGİ & DÜELLO</Text>
-          </Reanimated.View>
-        </Animated.View>
+          </View>
+        </View>
         {/* Main Glass Auth Card */}
         <Reanimated.View entering={FadeInDown.delay(220).duration(500).springify().damping(16)} style={[styles.card, compact && styles.cardCompact]}>
           {redirectNotice ? (
@@ -867,8 +817,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           {mode === 'register' && (
             <Reanimated.View key={'register-form-' + regStep} entering={FadeInDown.delay(80).duration(420).springify().damping(16)}>
               {/* Step Progress Header */}
-              <View style={styles.stepWizardBox}>
-                <View style={styles.stepWizardHeader}>
+              <View style={[styles.stepWizardBox, compact && styles.stepWizardBoxCompact]}>
+                <View style={[styles.stepWizardHeader, compact && styles.stepWizardHeaderCompact]}>
                   <View style={styles.stepBadgeRow}>
                     <Text style={styles.stepTitleText}>
                       ADIM {regStep} / 4 ·{' '}
@@ -1015,7 +965,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       return (
                         <TouchableOpacity
                           key={g}
-                          style={[styles.genderChip, active && styles.genderChipActive]}
+                          style={[styles.genderChip, compact && styles.genderChipCompact, active && styles.genderChipActive]}
                           onPress={() => {
                             sound.playSound('tap');
                             setGender(g);
@@ -1035,8 +985,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
                     </View>
                   )}
-                  <View style={styles.stepNavButtonsRow}>
-                    <TouchableOpacity style={styles.backStepBtn} onPress={handlePrevRegStep}>
+                  <View style={[styles.stepNavButtonsRow, compact && styles.stepNavButtonsRowCompact]}>
+                    <TouchableOpacity style={[styles.backStepBtn, compact && styles.backStepBtnCompact]} onPress={handlePrevRegStep}>
                       <Text style={styles.backStepBtnText}>← GERİ</Text>
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
@@ -1054,7 +1004,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <View>
                   <Text style={[styles.label, compact && styles.labelCompact]}>ÜLKE SEÇİCİ</Text>
                   <TouchableOpacity
-                    style={styles.countryPickerBtn}
+                    style={[styles.countryPickerBtn, compact && styles.countryPickerBtnCompact]}
                     onPress={() => {
                       sound.playSound('tap');
                       setCountryPickerOpen(true);
@@ -1068,11 +1018,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   </TouchableOpacity>
                   <Text style={[styles.label, compact && styles.labelCompact]}>TELEFON NUMARASI</Text>
                   <View style={styles.phoneRow}>
-                    <View style={styles.dialBadge}>
+                    <View style={[styles.dialBadge, compact && styles.dialBadgeCompact]}>
                       <Text style={styles.dialBadgeText}>{selectedCountry.dial}</Text>
                     </View>
                     <TextInput
-                      style={[styles.input, { flex: 1 }]}
+                      style={[styles.input, compact && styles.inputCompact, { flex: 1 }]}
                       placeholder="5XX XXX XX XX"
                       placeholderTextColor={THEME.colors.textMuted}
                       keyboardType="phone-pad"
@@ -1085,8 +1035,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
                     </View>
                   )}
-                  <View style={styles.stepNavButtonsRow}>
-                    <TouchableOpacity style={styles.backStepBtn} onPress={handlePrevRegStep}>
+                  <View style={[styles.stepNavButtonsRow, compact && styles.stepNavButtonsRowCompact]}>
+                    <TouchableOpacity style={[styles.backStepBtn, compact && styles.backStepBtnCompact]} onPress={handlePrevRegStep}>
                       <Text style={styles.backStepBtnText}>← GERİ</Text>
                     </TouchableOpacity>
                     <View style={{ flex: 1 }}>
@@ -1103,9 +1053,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               {regStep === 4 && (
                 <View>
                   <Text style={[styles.label, compact && styles.labelCompact]}>PROFİL FOTOĞRAFI VEYA AVATAR SEÇİN</Text>
-                  <View style={styles.photoPickerSection}>
+                  <View style={[styles.photoPickerSection, compact && styles.photoPickerSectionCompact]}>
                     <TouchableOpacity
-                      style={styles.uploadPhotoBtn}
+                      style={[styles.uploadPhotoBtn, compact && styles.uploadPhotoBtnCompact]}
                       onPress={handlePickImage}
                       activeOpacity={0.85}
                     >
@@ -1123,20 +1073,20 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         </Text>
                       </View>
                     </TouchableOpacity>
-                    <View style={styles.avatarGrid}>
+                    <View style={[styles.avatarGrid, compact && styles.avatarGridCompact]}>
                       {AVATAR_OPTIONS.map((av) => {
                         const isSelected = !customPhotoUri && selectedAvatar === av;
                         return (
                           <TouchableOpacity
                             key={av}
-                            style={[styles.avatarOption, isSelected && styles.avatarOptionActive]}
+                            style={[styles.avatarOption, compact && styles.avatarOptionCompact, isSelected && styles.avatarOptionActive]}
                             onPress={() => {
                               sound.playSound('tap');
                               setCustomPhotoUri(null);
                               setSelectedAvatar(av);
                             }}
                           >
-                            <CharacterAvatar seed={av} size={42} />
+                            <CharacterAvatar seed={av} size={compact ? 32 : 42} />
                           </TouchableOpacity>
                         );
                       })}
@@ -1150,7 +1100,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     value={bio}
                     onChangeText={setBio}
                   />
-                  <View style={styles.rewardSummaryBox}>
+                  <View style={[styles.rewardSummaryBox, compact && styles.rewardSummaryBoxCompact]}>
                     <CoinIcon size={20} />
                     <Text style={styles.rewardSummaryText}>
                       Kayıt Başlangıç Paketi: +{stepBonusCoins} Altın & +{stepBonusGems} Elmas hesabınıza tanımlanır!
@@ -1178,8 +1128,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       style={{ marginVertical: 14 }}
                     />
                   ) : (
-                    <View style={styles.stepNavButtonsRow}>
-                      <TouchableOpacity style={styles.backStepBtn} onPress={handlePrevRegStep}>
+                    <View style={[styles.stepNavButtonsRow, compact && styles.stepNavButtonsRowCompact]}>
+                      <TouchableOpacity style={[styles.backStepBtn, compact && styles.backStepBtnCompact]} onPress={handlePrevRegStep}>
                         <Text style={styles.backStepBtnText}>← GERİ</Text>
                       </TouchableOpacity>
                       <View style={{ flex: 1 }}>
@@ -1418,20 +1368,32 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     justifyContent: 'flex-start',
   },
-  heroWrapCompact: { marginBottom: 8 },
-  heroCrownWrapCompact: { width: 84, height: 70 },
-  heroCrownGlowCompact: { width: 68, height: 68, borderRadius: 34 },
-  heroLogoCompact: { width: 80, height: 61 },
-  cleanBrandTitleCompact: { fontSize: 28 },
-  brandSubtitleCompact: { fontSize: 11, letterSpacing: 2 },
-  cardCompact: { padding: 12, borderRadius: 22 },
-  tabRowCompact: { marginBottom: 10 },
-  tabBtnCompact: { paddingVertical: 8 },
-  labelCompact: { marginTop: 6, marginBottom: 4, fontSize: 10 },
-  inputCompact: { paddingVertical: 9, fontSize: 13.5 },
-  btnCompact: { minHeight: 44 },
-  dividerRowCompact: { marginVertical: 10 },
-  googleBtnCompact: { paddingVertical: 11 },
+  heroWrapCompact: { marginBottom: 6 },
+  heroCrownWrapCompact: { width: 72, height: 60 },
+  heroCrownGlowCompact: { width: 58, height: 58, borderRadius: 29 },
+  heroLogoCompact: { width: 68, height: 52 },
+  cleanBrandTitleCompact: { fontSize: 26 },
+  brandSubtitleCompact: { fontSize: 10, letterSpacing: 2 },
+  cardCompact: { padding: 10, borderRadius: 20 },
+  tabRowCompact: { marginBottom: 8 },
+  tabBtnCompact: { paddingVertical: 7 },
+  labelCompact: { marginTop: 5, marginBottom: 3, fontSize: 10 },
+  inputCompact: { paddingVertical: 8, fontSize: 13.5 },
+  btnCompact: { minHeight: 42 },
+  dividerRowCompact: { marginVertical: 8 },
+  googleBtnCompact: { paddingVertical: 10 },
+  stepWizardBoxCompact: { padding: 8, marginBottom: 6 },
+  stepWizardHeaderCompact: { marginBottom: 5 },
+  genderChipCompact: { paddingVertical: 7 },
+  countryPickerBtnCompact: { paddingVertical: 9 },
+  dialBadgeCompact: { paddingVertical: 9, paddingHorizontal: 10 },
+  uploadPhotoBtnCompact: { padding: 7, gap: 8, borderRadius: 14 },
+  avatarOptionCompact: { padding: 1, borderRadius: 18 },
+  avatarGridCompact: { gap: 3 },
+  rewardSummaryBoxCompact: { marginTop: 7, padding: 7, gap: 6 },
+  stepNavButtonsRowCompact: { marginTop: 8, gap: 8 },
+  backStepBtnCompact: { height: 42, paddingHorizontal: 12 },
+  photoPickerSectionCompact: { gap: 6 },
   heroWrap: {
     alignItems: 'center',
     marginBottom: 16,
