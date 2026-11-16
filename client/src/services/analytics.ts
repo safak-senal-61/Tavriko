@@ -11,8 +11,13 @@
 import { Platform } from 'react-native';
 import PostHog from 'posthog-react-native';
 
-const POSTHOG_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY;
-const POSTHOG_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://eu.i.posthog.com';
+// PostHog istemci anahtarı gizli değildir (Sentry DSN gibi her bundle'da
+// görünür), yalnızca olay GÖNDERME izni verir. Ortam değişkeni
+// EXPO_PUBLIC_POSTHOG_KEY tanımlıysa o önceliklidir.
+const DEFAULT_POSTHOG_KEY = 'phc_qvhJD5HHkCcyteqSLoKaidHPiJ5jgKRpWmvZhp5o7dPE';
+const POSTHOG_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY || DEFAULT_POSTHOG_KEY;
+// Proje US PostHog bulutunda; istenirse EXPO_PUBLIC_POSTHOG_HOST ile değiştirilebilir
+const POSTHOG_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
 
 let client: PostHog | null = null;
 let initPromise: Promise<void> | null = null;
