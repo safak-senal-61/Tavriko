@@ -7,10 +7,24 @@ import {
   GameRoom,
   CustomRoomSettings,
 } from '@trivia/shared';
+import * as Sentry from '@sentry/react-native';
 import { getRealtimeWsUrl } from '../config';
 import { sanitizeAvatarForUrl } from '../utils/avatarImage';
 
 type EventCallback = (data: any) => void;
+
+/**
+ * Sentry breadcrumb'ları: WS bağlanma/kopma/yeniden bağlanma anları hata
+ * izlerinin yanında görünür — "oyundan atılıyorum" şikayetlerinde bağlantı
+ * geçmişi kritik ipucu. SDK kapalıysa çağrılar sessizce yok sayılır.
+ */
+function leaveWsBreadcrumb(message: string, level: 'info' | 'error' | 'warning' = 'info'): void {
+  try {
+    Sentry.addBreadcrumb({ category: 'ws', message, level });
+  } catch {
+    // Sentry erişilemiyorsa oyun akışını etkileme
+  }
+}
 
 interface WsMessageEnvelope<T = any> {
   event: string;
@@ -216,8 +230,10 @@ export class SocketService {
       this.ws = new WebSocket(url);
 
       this.ws.onopen = () => {
+        const wasReconnect = this.reconnectAttempts > 0;
         this.reconnectAttempts = 0;
         this.startPingInterval();
+        leaveWsBreadcrumb(wasReconnect ? 'WS yeniden bağlandı' : 'WS bağlandı');
         this.emitLocal('connect', {});
 
         // If reconnecting to a room, automatically send room:join
@@ -241,11 +257,16 @@ export class SocketService {
 
       this.ws.onclose = (event: CloseEvent) => {
         this.stopPingInterval();
+        leaveWsBreadcrumb(
+          `WS koptu (kod: ${event.code}${event.reason ? ', neden: ' + event.reason : ''}${this.isManuallyClosed ? ', manuel' : ''})`,
+          this.isManuallyClosed ? 'info' : 'error',
+        );
         this.emitLocal('disconnect', { reason: event.reason, code: event.code });
 
         if (!this.isManuallyClosed && this.reconnectAttempts < this.maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(1.5, this.reconnectAttempts), 8000);
           this.reconnectAttempts += 1;
+          leaveWsBreadcrumb(`WS yeniden bağlanıyor (deneme: ${this.reconnectAttempts}, bekleme: ${delay}ms)`, 'warning');
           clearTimeout(this.reconnectTimer);
           this.reconnectTimer = setTimeout(() => {
             if (!this.isManuallyClosed && this.currentUrl) {
