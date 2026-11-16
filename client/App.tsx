@@ -13,8 +13,12 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import { hydrateAuthStorage, getStoredAuth } from './src/utils/authStorage';
 import { useGameStore } from './src/store/gameStore';
 
-// Sentry hata izleme: EXPO_PUBLIC_SENTRY_DSN tanımlı değilse sessizce kapalı kalır.
-const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
+// Sentry hata izleme: DSN doğrudan koda gömülüdür. Client DSN'leri gizli
+// değildir (her tarayıcı/mobil bundle'ında görünür), yalnızca olay GÖNDERME
+// izni verir. Not: Vercel'deki eski EXPO_PUBLIC_SENTRY_DSN ortam değişkeni
+// eski bir Sentry projesine işaret ediyordu; ortam değişkeni önceliği bu
+// yüzden kaldırıldı — derlemeler tek, güncel DSN kullanır.
+const SENTRY_DSN = 'https://c6d56d79f23514abcbd85504d7ae44bb@o4512379947778048.ingest.us.sentry.io/4512379953086464';
 if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,

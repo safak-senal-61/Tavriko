@@ -462,7 +462,7 @@ export function createApp() {
     app.get('/favicon.ico', (req, res) => {
       res.sendFile(path.join(clientDistDir!, 'favicon.ico'));
     });
-    // Marka ikonları, manifest ve paylaşım görseli (client/public -> client/dist)
+    // Marka ikonları, manifest, paylaşım görseli ve SEO dosyaları (client/public -> client/dist)
     const brandStaticFiles = [
       'favicon-16.png',
       'favicon-32.png',
@@ -472,6 +472,8 @@ export function createApp() {
       'icon-maskable-512.png',
       'og-image.png',
       'manifest.json',
+      'robots.txt',
+      'sitemap.xml',
     ];
     app.get(brandStaticFiles.map((name) => `/${name}`), (req, res, next) => {
       const filePath = path.join(clientDistDir!, path.basename(req.path));

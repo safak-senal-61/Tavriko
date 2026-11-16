@@ -1,6 +1,20 @@
 import { AppState, Platform } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import { useNetStatus } from '../store/netStatus';
 import { CDN_BASE } from '../utils/cdn';
+
+/**
+ * Sentry breadcrumb'ları: çevrimdışı/çevrimiçi geçişler hata izlerinin
+ * yanında görünür ("oyundan atılıyorum" vakalarında bağlantı geçmişi).
+ * SDK kapalıysa çağrılar sessizce yok sayılır.
+ */
+function leaveNetBreadcrumb(message: string, level: 'info' | 'error' | 'warning' = 'info'): void {
+  try {
+    Sentry.addBreadcrumb({ category: 'net', message, level });
+  } catch {
+    // Sentry erişilemiyorsa izleme akışını etkileme
+  }
+}
 
 /**
  * İnternet bağlantısı izleyici (Web + iOS + Android).
@@ -49,7 +63,10 @@ async function runProbe(): Promise<void> {
   try {
     const reachable = await probeNetwork();
     const store = useNetStatus.getState();
-    if (reachable !== store.online) store.setOnline(reachable);
+    if (reachable !== store.online) {
+      leaveNetBreadcrumb(reachable ? 'Ağ yoklaması: çevrimiçi' : 'Ağ yoklaması: çevrimdışı');
+      store.setOnline(reachable);
+    }
   } finally {
     probing = false;
   }
@@ -75,8 +92,14 @@ export const netMonitor = {
       typeof window.addEventListener === 'function' &&
       typeof navigator !== 'undefined'
     ) {
-      window.addEventListener('online', () => useNetStatus.getState().setOnline(true));
-      window.addEventListener('offline', () => useNetStatus.getState().setOnline(false));
+      window.addEventListener('online', () => {
+        leaveNetBreadcrumb('Tarayıcı: çevrimiçi');
+        useNetStatus.getState().setOnline(true);
+      });
+      window.addEventListener('offline', () => {
+        leaveNetBreadcrumb('Tarayıcı: çevrimdışı', 'warning');
+        useNetStatus.getState().setOnline(false);
+      });
       useNetStatus.getState().setOnline(navigator.onLine !== false);
     }
 

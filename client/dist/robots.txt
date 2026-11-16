@@ -1,0 +1,7 @@
+# Tavriko — arama motoru kuralları
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+
+Sitemap: https://tavriko-app.vercel.app/sitemap.xml
