@@ -16,6 +16,7 @@ import {
   PublicRoomSummary,
 } from '@trivia/shared';
 import { GameStateMachine } from './GameStateMachine';
+import { addBreadcrumb } from '../utils/errorMonitor';
 
 export interface CreateRoomOptions {
   code?: string;
@@ -285,6 +286,15 @@ export class GameRoomManager {
     room.totalRounds = questions.length;
     room.currentRound = 0;
 
+    addBreadcrumb(`Maç başladı: ${code}`, 'game', {
+      roomCode: code,
+      mode: room.mode,
+      category: room.category,
+      difficulty: room.difficulty,
+      totalRounds: questions.length,
+      playerCount: Object.keys(room.players).length,
+    });
+
     this.advanceToNextRound(code);
     return true;
   }
@@ -369,6 +379,15 @@ export class GameRoomManager {
     const scoreResult = applyPlayerRoundAnswer(room, playerId, selectedOptionId, elapsedMs);
     const isCorrect = scoreResult.isCorrect;
 
+    addBreadcrumb(`Cevap: ${code} tur ${room.currentRound}/${room.totalRounds}`, 'game', {
+      roomCode: code,
+      playerId,
+      round: room.currentRound,
+      isCorrect,
+      pointsAwarded: scoreResult.pointsAwarded,
+      streak: scoreResult.streak,
+    });
+
     // Check if all connected players have answered
     const connectedPlayers = Object.values(room.players).filter((p) => p.isConnected);
     const allAnswered = connectedPlayers.every((p) => p.hasAnsweredCurrentRound);
@@ -419,6 +438,13 @@ export class GameRoomManager {
     if (!room) return;
 
     const summary = buildFinalMatchSummary(room);
+
+    addBreadcrumb(`Maç bitti: ${code}`, 'game', {
+      roomCode: code,
+      winnerId: summary.podium.first?.playerId,
+      finalScores: summary.rankings.map((r) => ({ playerId: r.playerId, score: r.score })),
+      totalRounds: room.totalRounds,
+    });
 
     if (this.onGameOver) {
       this.onGameOver(code, summary);

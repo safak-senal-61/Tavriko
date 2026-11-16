@@ -43,4 +43,27 @@ export function captureError(err: unknown) {
   }
 }
 
-export default { initErrorMonitor, captureError };
+/**
+ * Sentry breadcrumb: hata izlerinin yanında bağlantı / maç geçmişini gösterir.
+ * Sentry kapalıyken veya erişilemezken sessizce no-op çalışır.
+ */
+export function addBreadcrumb(
+  message: string,
+  category: string,
+  data?: Record<string, unknown>
+) {
+  if (!initialized || !Sentry) return;
+  try {
+    Sentry.addBreadcrumb({
+      category,
+      message,
+      level: 'info',
+      data,
+      timestamp: Date.now() / 1000,
+    });
+  } catch {
+    // ignore
+  }
+}
+
+export default { initErrorMonitor, captureError, addBreadcrumb };
