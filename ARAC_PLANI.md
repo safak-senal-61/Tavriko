@@ -209,7 +209,7 @@ Postgres Supabase'de:
 - **pganalyze:** Uzun süren sorgu uyarıları, index önerileri (ücretsiz deneme; Supabase panelindeki sorgu görüntüleyicisi de başlangıç için yeterli).
 
 ### Durum sayfası — oyuncular için şeffaflık
-- **Better Stack Status Pages / UptimeRobot Status Page:** "Sunucu çevrimiçi mi?" sorusuna oyuncuların kendilerinin bakabildiği kamu sayfası; WS ve API olaylarında Twitter/Telegram yerine tek adres.
+- **Better Stack Status Pages / UptimeRobot Status Page:** "Sunucu çevrimiçi mi?" sorusuna oyuncuların kendilerinin bakabildiği kamu sayfası; WS ve API olaylarında Twitter/Telegram yerine tek adres. *Kuruldu:* [stats.uptimerobot.com/5TKKlcUCpU](https://stats.uptimerobot.com/5TKKlcUCpU) — Web + WS worker monitörlerini içerir.
 
 ### Kullanıcı desteği ve geri bildirim
 - **Crisp (ücretsiz katman):** Web'e canlı destek sohbeti penceresi — "oyun içinde takıldım" anında yardım.
@@ -255,7 +255,7 @@ Kategori arama şu an istemci tarafında; sunucu tarafına taşınırsa **Meilis
 
 ### Durum (16 Kasım 2026)
 - **1. Hafta — tamamlandı:** Sentry (Expo + web) · WS breadcrumb'ları (istemci + sunucu) · robots.txt/sitemap.xml + GSC doğrulama etiketi · CodeQL iş akışı · Dependabot. *Kalan (kod dışı):* GSC/Bing mülk doğrulaması ve sitemap gönderimi; GitHub hesap fatura kilidi (CI/CodeQL işleri başlamıyor — kartı Billing → Payment information'dan yeniden kaydetmek çözer).
-- **2. Hafta — kod tarafı tamamlandı:** PostHog entegrasyonu (event şeması: session_start, match_started/completed, question_answered, matchmaking_time, store_purchase, referral_signup, daily_streak_claimed, settings_changed) · bot'a düşme süresi feature flag'i (`matchmaking-bot-fallback-sec`, 3–30sn, varsayılan 7sn) · Helicone proxy (env: `HELICONE_API_KEY`). *Kalan (kod dışı):* PostHog projesi açıp `EXPO_PUBLIC_POSTHOG_KEY` tanımlamak; Checkly/UptimeRobot uptime izleme kaydı.
+- **2. Hafta — kod tarafı tamamlandı:** PostHog entegrasyonu (event şeması: session_start, match_started/completed, question_answered, matchmaking_time, store_purchase, referral_signup, daily_streak_claimed, settings_changed) · bot'a düşme süresi feature flag'i (`matchmaking-bot-fallback-sec`, 3–30sn, varsayılan 7sn) · Helicone proxy (env: `HELICONE_API_KEY`). *Kalan (kod dışı):* PostHog projesi açıp `EXPO_PUBLIC_POSTHOG_KEY` tanımlamak. *Tamamlandı (17 Kasım 2026):* UptimeRobot uptime izleme kaydı — Web (`tavriko-app.vercel.app`, monitör `804699286`) ve WS worker (`tavriko-realtime.uncertainidentity8.workers.dev`, monitör `804699287`) 5 dk aralıkla izleniyor; kamu durum sayfası: [stats.uptimerobot.com/5TKKlcUCpU](https://stats.uptimerobot.com/5TKKlcUCpU) (README'de bağlantılı).
 - **Not:** PostHog ve Helicone anahtarları tanımsızken ilgili kodlar sessizce no-op çalışır; anahtar tanımlandığı anda etkinleşir.
 
 | Faz | Ne yapılır | Neden |

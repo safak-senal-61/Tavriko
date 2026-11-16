@@ -16,6 +16,7 @@ Modern, rekabetçi, stüdyo kalitesinde ve yapay zekâ destekli çok oyunculu (m
 
 🎮 **[Canlı Web Sürümünü Oyna](https://tavriko-app.vercel.app/)** ·
 🤖 **[Telegram Botu](https://tavriko-app.vercel.app/api/telegram/webhook)** ·
+🟢 **[Canlılık Durumu](https://stats.uptimerobot.com/5TKKlcUCpU)** ·
 ⚡ Realtime: `wss://tavriko-realtime.uncertainidentity8.workers.dev/ws`
 
 </div>
