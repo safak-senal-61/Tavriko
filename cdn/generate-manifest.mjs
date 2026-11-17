@@ -76,8 +76,12 @@ console.log(`${Object.keys(manifest).length} dosya yazıldı -> ${relative(root,
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
 const localOutFile = join(root, 'client', 'src', 'generated', 'localAssets.ts');
 const imageEntries = Object.keys(manifest).filter((k) => IMAGE_EXTS.has(extname(k).toLowerCase()));
+// require() kullanılır (import yerine): TS görsel modül bildirimleri
+// içermediğinden ESM import 571 TS2307 hatası üretir; require ise
+// Metro için aynı şeydir (paket içi varlık) ve tip hatası vermez.
+// Uygulamanın geri kalanındaki görsel yüklemeleri de require kullanır.
 const localImports = imageEntries
-  .map((k, i) => `import __localImg${i} from '../../assets/${k}';`)
+  .map((k, i) => `const __localImg${i} = require('../../assets/${k}');`)
   .join('\n');
 const localBody = imageEntries
   .map((k, i) => `  ${JSON.stringify(k)}: __localImg${i},`)

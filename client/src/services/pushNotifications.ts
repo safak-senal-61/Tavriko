@@ -120,6 +120,8 @@ export function initPushNotifications(): void {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#FFC43D',
+      // Özel bildirim sesi: res/raw/notification.wav (config plugin kopyalar).
+      sound: 'notification.wav',
     }).catch(() => {});
     // Davetler (arkadaşlık isteği / düello) ayrı kanalda: farklı ses,
     // yüksek öncelik. Sunucu data.channelId ile bu kanalı hedefler.
@@ -129,6 +131,7 @@ export function initPushNotifications(): void {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 300, 150, 300],
       lightColor: '#FFC43D',
+      sound: 'notification.wav',
     }).catch(() => {});
     // Yönetim duyuruları (tüm oyunculara toplu bildirim).
     void Notifications.setNotificationChannelAsync('announcements', {
@@ -136,6 +139,7 @@ export function initPushNotifications(): void {
       description: 'Tavriko duyuruları ve etkinlik haberleri',
       importance: Notifications.AndroidImportance.HIGH,
       lightColor: '#FFC43D',
+      sound: 'notification.wav',
     }).catch(() => {});
   }
 }
