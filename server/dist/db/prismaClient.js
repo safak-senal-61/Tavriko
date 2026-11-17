@@ -50,6 +50,7 @@ const evrenLlmGenerator_1 = require("../ai/evrenLlmGenerator");
 const supabaseClient_1 = require("./supabaseClient");
 const questionStoreMerge_1 = require("../utils/questionStoreMerge");
 const presenceManager_1 = require("../services/presenceManager");
+const pushService_1 = require("../services/pushService");
 // SECURITY: no hardcoded fallback secret. If the environment does not provide a
 // secret, token signing/verification fails loudly instead of silently using a
 // publicly known key.
@@ -94,6 +95,8 @@ class PrismaService {
         passwordResetTokens: new Map(),
     };
     users = new Map();
+    // Expo push token bellekta yedeği (DB erişilemezken): userId -> token seti
+    pushTokensByUser = new Map();
     questions = [];
     // Bu örneğin yerel olarak değiştirdiği / sildiği soru id'leri. Bulut yazımı
     // sırasında yalnızca bu sorular yerel sürümle yazılır; diğer sorularda
@@ -1458,8 +1461,8 @@ class PrismaService {
         if (!cleanEmail || !cleanEmail.includes('@')) {
             throw new Error('Geçerli bir e-posta adresi giriniz.');
         }
-        if (!payload.password || payload.password.length < 6) {
-            throw new Error('Şifreniz en az 6 karakter olmalıdır.');
+        if (!payload.password || payload.password.length < 8) {
+            throw new Error('Şifreniz en az 8 karakter olmalıdır.');
         }
         const existingUser = await this.rawClient.user.findFirst({
             where: {
@@ -1951,8 +1954,8 @@ class PrismaService {
         if (record.resetOtpExpiresAt && Date.now() > record.resetOtpExpiresAt) {
             throw new Error('Doğrulama kodunun süresi dolmuş. Lütfen yeni kod isteyin.');
         }
-        if (!newPassword || newPassword.length < 6) {
-            throw new Error('Yeni şifreniz en az 6 karakter olmalıdır.');
+        if (!newPassword || newPassword.length < 8) {
+            throw new Error('Yeni şifreniz en az 8 karakter olmalıdır.');
         }
         record.passwordHash = await bcryptjs_1.default.hash(newPassword, 10);
         record.resetOtpCode = undefined;
@@ -2115,8 +2118,8 @@ class PrismaService {
                 throw new Error('Mevcut şifreniz hatalı. Lütfen tekrar deneyin.');
             }
         }
-        if (newPass.length < 6) {
-            throw new Error('Yeni şifre en az 6 karakter olmalıdır.');
+        if (newPass.length < 8) {
+            throw new Error('Yeni şifre en az 8 karakter olmalıdır.');
         }
         const newHash = bcryptjs_1.default.hashSync(newPass, 10);
         record.passwordHash = newHash;
@@ -3655,7 +3658,78 @@ class PrismaService {
         this.users.set(target.id, target);
         this.savePersistedUsers();
         presenceManager_1.presenceManager.notifyUser(target.id, 'notification:new', notifItem);
+        (0, pushService_1.queuePushForNotification)(target.id, notifItem);
         return { success: true, message: `Bildirim ${target.displayName} adlı kullanıcıya gönderildi.` };
+    }
+    // ---------------------------------------------------------------------------
+    // Expo Push token kayıtları (push_tokens tablosu; DB erişilemezse bellekta
+    // çalışır — bildirim gönderimi test ortamında sessizce no-op olur).
+    // ---------------------------------------------------------------------------
+    /** Kullanıcının kayıtlı Expo push token'larını döndürür. */
+    async getPushTokensAsync(userId) {
+        if (!userId)
+            return [];
+        try {
+            const rows = await this.rawClient.pushToken.findMany({
+                where: { userId },
+                select: { token: true },
+            });
+            return rows.map((r) => r.token);
+        }
+        catch (e) {
+            console.warn('[getPushTokensAsync] DB fallback:', e.message);
+            const fallback = this.pushTokensByUser.get(userId);
+            return fallback ? Array.from(fallback) : [];
+        }
+    }
+    /** Push token'ı kullanıcıya bağlar (upsert). Aynı token başka kullanıcıya
+     *  aitse sahipliği yeni kullanıcıya geçirir (yeniden giriş senaryosu). */
+    async savePushTokenAsync(userId, token, platform) {
+        if (!userId || !token)
+            return { success: false };
+        try {
+            await this.rawClient.pushToken.upsert({
+                where: { token },
+                create: { token, userId, platform: platform || null },
+                update: { userId, platform: platform || null },
+            });
+            return { success: true };
+        }
+        catch (e) {
+            console.warn('[savePushTokenAsync] DB fallback:', e.message);
+            let set = this.pushTokensByUser.get(userId);
+            if (!set) {
+                set = new Set();
+                this.pushTokensByUser.set(userId, set);
+            }
+            set.add(token);
+            return { success: true };
+        }
+    }
+    /** Token'ı kayıtlardan siler (DeviceNotRegistered temizliği / çıkış). */
+    async removePushTokenAsync(token) {
+        if (!token)
+            return;
+        try {
+            await this.rawClient.pushToken.deleteMany({ where: { token } });
+        }
+        catch (e) {
+            console.warn('[removePushTokenAsync] DB fallback:', e.message);
+            for (const set of this.pushTokensByUser.values())
+                set.delete(token);
+        }
+    }
+    /** Kullanıcının tüm token'larını siler (hesap silme / tam çıkış). */
+    async removeAllPushTokensAsync(userId) {
+        if (!userId)
+            return;
+        try {
+            await this.rawClient.pushToken.deleteMany({ where: { userId } });
+        }
+        catch (e) {
+            console.warn('[removeAllPushTokensAsync] DB fallback:', e.message);
+            this.pushTokensByUser.delete(userId);
+        }
     }
     async addFriend(userId, targetCodeOrUsername) {
         let me = this.users.get(userId);
@@ -3782,6 +3856,7 @@ class PrismaService {
         this.savePersistedUsers();
         // REAL-TIME WEBSOCKET PUSH TO TARGET
         presenceManager_1.presenceManager.notifyUser(target.id, 'notification:new', notifItem);
+        (0, pushService_1.queuePushForNotification)(target.id, notifItem);
         const progress = (0, shared_1.calculateLevelFromXp)(target.xp || 0);
         const targetPresence = presenceManager_1.presenceManager.getUserPresence(target.id);
         return {
@@ -4073,6 +4148,7 @@ class PrismaService {
                     catch { }
                     // WebSocket notify sender & self
                     presenceManager_1.presenceManager.notifyUser(sender.id, 'notification:new', senderNotif);
+                    (0, pushService_1.queuePushForNotification)(sender.id, senderNotif);
                     presenceManager_1.presenceManager.notifyUser(sender.id, 'friends:update', { friendId: user.id });
                     presenceManager_1.presenceManager.notifyUser(user.id, 'friends:update', { friendId: sender.id });
                 }
@@ -4186,6 +4262,7 @@ class PrismaService {
         this.savePersistedUsers();
         // 2. REAL-TIME WEBSOCKET NOTIFICATION TO TARGET
         presenceManager_1.presenceManager.notifyUser(target.id, 'notification:new', notifItem);
+        (0, pushService_1.queuePushForNotification)(target.id, notifItem);
         // 3. BROADCAST SENDER PRESENCE (Now in room)
         presenceManager_1.presenceManager.broadcast('presence:update', presenceManager_1.presenceManager.getUserPresence(userId));
         return {

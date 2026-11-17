@@ -33,6 +33,7 @@ const errorMonitor_1 = require("./utils/errorMonitor");
 const triviaRoutes_1 = __importDefault(require("./routes/triviaRoutes"));
 const socialRoutes_1 = __importDefault(require("./routes/socialRoutes"));
 const referralRoutes_1 = __importDefault(require("./routes/referralRoutes"));
+const pushRoutes_1 = __importDefault(require("./routes/pushRoutes"));
 const auth_1 = require("./middleware/auth");
 const adminLoginPage_1 = require("./routes/adminLoginPage");
 const legalRoutes_1 = require("./routes/legalRoutes");
@@ -91,7 +92,22 @@ function redactSensitiveQuery(query) {
 function createApp() {
     (0, errorMonitor_1.initErrorMonitor)();
     const app = (0, express_1.default)();
-    app.use((0, cors_1.default)());
+    // SECURITY: CORS yalnızca Tavriko kaynaklarına açık. Origin göndermeyen
+    // istekler (mobil uygulama, sunucudan sunucuya) tarayıcı kısıtına takılmaz.
+    const CORS_ALLOWED_ORIGINS = new Set([
+        'https://tavriko-app.vercel.app',
+        'http://localhost:8080',
+        'http://localhost:8081',
+        'http://localhost:19006',
+        'http://localhost:3000',
+    ]);
+    app.use((0, cors_1.default)({
+        origin: (origin, callback) => {
+            if (!origin || CORS_ALLOWED_ORIGINS.has(origin))
+                return callback(null, true);
+            return callback(null, false);
+        },
+    }));
     app.use(express_1.default.json({ limit: '15mb' }));
     app.use(express_1.default.urlencoded({ extended: true, limit: '15mb' }));
     // SECURITY: baseline security headers on every response
@@ -429,7 +445,7 @@ function createApp() {
         app.get('/favicon.ico', (req, res) => {
             res.sendFile(path_1.default.join(clientDistDir, 'favicon.ico'));
         });
-        // Marka ikonları, manifest ve paylaşım görseli (client/public -> client/dist)
+        // Marka ikonları, manifest, paylaşım görseli ve SEO dosyaları (client/public -> client/dist)
         const brandStaticFiles = [
             'favicon-16.png',
             'favicon-32.png',
@@ -439,6 +455,8 @@ function createApp() {
             'icon-maskable-512.png',
             'og-image.png',
             'manifest.json',
+            'robots.txt',
+            'sitemap.xml',
         ];
         app.get(brandStaticFiles.map((name) => `/${name}`), (req, res, next) => {
             const filePath = path_1.default.join(clientDistDir, path_1.default.basename(req.path));
@@ -3540,6 +3558,7 @@ function createApp() {
     app.use('/api', triviaRoutes_1.default);
     app.use('/api/social', socialRoutes_1.default);
     app.use('/api/referrals', referralRoutes_1.default);
+    app.use('/api/push', pushRoutes_1.default);
     app.use(legalRoutes_1.legalRouter);
     // --- Cloudflare Durable Objects Internal Endpoints ---
     app.post('/api/internal/room-questions', async (req, res) => {

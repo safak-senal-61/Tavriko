@@ -33,7 +33,18 @@ async function generateQuestionsWithAI(options) {
     let candidates = [];
     if (apiKey) {
         try {
-            const ai = new genai_1.GoogleGenAI({ apiKey });
+            // Helicone proxy (LLM gözlemlenebilirliği): HELICONE_API_KEY tanımlıysa
+            // Gemini istekleri Helicone üzerinden geçer; tanımsızsa doğrudan Google API'sine gider.
+            const heliconeKey = process.env.HELICONE_API_KEY;
+            const ai = new genai_1.GoogleGenAI(heliconeKey
+                ? {
+                    apiKey,
+                    httpOptions: {
+                        baseUrl: 'https://generativelanguage.helicone.ai/v1beta',
+                        headers: { 'Helicone-Auth': `Bearer ${heliconeKey}` },
+                    },
+                }
+                : { apiKey });
             const prompt = `Sen uzman bir bilgi yarışması soru yazarı ve editörüsün.
 Aşağıdaki kriterlere göre tam olarak ${count} adet çoktan seçmeli Türkçe soru üret:
 - Kategori: ${categoryId} (${CATEGORY_PROMPTS[categoryId] || 'Genel bilgi'})

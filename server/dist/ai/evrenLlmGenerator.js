@@ -126,10 +126,17 @@ function normalizeTextSignature(text) {
 }
 async function generateQuestionsWithEvrenGLM(options) {
     const { categoryId, subCategory, difficulty, count, db } = options;
-    const rawBaseUrl = process.env.EVREN_LLM_BASE_URL || 'https://evren-llmapi.ssyz.org.tr/v1';
-    const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
     const apiKey = process.env.EVREN_LLM_API_KEY;
     const modelName = process.env.EVREN_LLM_MODEL || 'glm-5.3';
+    // Helicone proxy (LLM gözlemlenebilirliği): HELICONE_API_KEY tanımlıysa
+    // istekler Helicone üzerinden geçer; tanımsızsa doğrudan Evren API'sine gider.
+    const useHelicone = !!process.env.HELICONE_API_KEY && !process.env.EVREN_LLM_BASE_URL;
+    const baseUrl = useHelicone
+        ? 'https://oai.helicone.ai/v1'
+        : (() => {
+            const rawBaseUrl = process.env.EVREN_LLM_BASE_URL || 'https://evren-llmapi.ssyz.org.tr/v1';
+            return rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+        })();
     const friendlyCategory = CATEGORY_NAMES_TR[categoryId] || categoryId;
     const friendlyDiff = DIFFICULTY_NAMES_TR[difficulty] || difficulty;
     const formattedSubCategory = subCategory || `${friendlyCategory} - ${friendlyDiff}`;
@@ -191,6 +198,7 @@ JSON FORMATI:
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${apiKey}`,
+                    ...(useHelicone ? { 'Helicone-Auth': `Bearer ${process.env.HELICONE_API_KEY}` } : {}),
                 },
                 body: JSON.stringify({
                     model: modelName,

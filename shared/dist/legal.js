@@ -19,9 +19,9 @@ exports.hasAcceptedCurrentLegal = hasAcceptedCurrentLegal;
 exports.LEGAL_VERSION = '2026-11-11';
 exports.LEGAL_OPERATOR = {
     appName: 'Tavriko',
-    controllerName: '[VERİ SORUMLUSU AD SOYAD / ŞİRKET UNVANI]',
-    address: '[AÇIK ADRES]',
-    contactEmail: '[İLETİŞİM E-POSTASI]',
+    controllerName: 'Tavriko Developer',
+    address: 'Pelitli Mahallesi, Kızılcık Sokak, Ortahisar, Trabzon, Türkiye',
+    contactEmail: 'tavriko@gmail.com',
     websiteUrl: 'https://tavriko-app.vercel.app',
 };
 /** Kayıt ve girişte onaylanması zorunlu metinler. */

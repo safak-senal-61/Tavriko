@@ -4,6 +4,7 @@ exports.setupSocketHandlers = setupSocketHandlers;
 const shared_1 = require("@trivia/shared");
 const prismaClient_1 = require("../db/prismaClient");
 const presenceManager_1 = require("../services/presenceManager");
+const errorMonitor_1 = require("../utils/errorMonitor");
 function setupSocketHandlers(io, roomManager, matchmaker) {
     // Wire up room manager callbacks to broadcast to rooms
     roomManager.onRoundStart = (roomCode, question) => {
@@ -52,6 +53,12 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
         io.to(roomCode).emit(shared_1.SOCKET_EVENTS.ROOM_STATE_SYNC, room);
     };
     matchmaker.onMatchFound = (roomCode, players) => {
+        (0, errorMonitor_1.addBreadcrumb)(`Eşleşme bulundu: ${roomCode}`, 'matchmaking', {
+            roomCode,
+            playerCount: players.length,
+            matchedWith: players[1]?.playerId?.startsWith('bot_') || players[1]?.playerId?.startsWith('rival_bot_') ? 'bot' : 'human',
+            queueSeconds: players[0]?.queuedAt ? Number(((Date.now() - players[0].queuedAt) / 1000).toFixed(1)) : undefined,
+        });
         if (players.length >= 2) {
             const p1 = players[0];
             const p2 = players[1];
@@ -81,6 +88,10 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
     const socketMeta = new Map();
     io.on('connection', (socket) => {
         const initialPlayerId = socket.handshake.query.playerId;
+        (0, errorMonitor_1.addBreadcrumb)('WS bağlandı (Socket.IO)', 'ws', {
+            socketId: socket.id,
+            playerId: initialPlayerId || undefined,
+        });
         if (initialPlayerId) {
             socketMeta.set(socket.id, { playerId: initialPlayerId });
             presenceManager_1.presenceManager.registerSocket(initialPlayerId, socket);
@@ -118,6 +129,11 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
             }
             if (existingRoom && existingRoom.players[playerId]) {
                 // Reconnecting existing player
+                (0, errorMonitor_1.addBreadcrumb)(`Odaya yeniden bağlandı: ${roomCode}`, 'ws', {
+                    roomCode,
+                    playerId,
+                    status: existingRoom.status,
+                });
                 const recovery = roomManager.reconnectPlayer(roomCode, playerId);
                 io.to(roomCode).emit(shared_1.SOCKET_EVENTS.PLAYER_RECONNECTED, { playerId, displayName });
                 io.to(roomCode).emit(shared_1.SOCKET_EVENTS.ROOM_STATE_SYNC, existingRoom);
@@ -220,6 +236,12 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
         socket.on(shared_1.SOCKET_EVENTS.FIND_MATCH, (data) => {
             // Eşleşme başlamadan kalıcı soru havuzunu (Supabase/Telegram soruları) geri yükle
             prismaClient_1.db.ensureQuestionsRestored().catch(() => { });
+            (0, errorMonitor_1.addBreadcrumb)('Eşleşme kuyruğuna girdi', 'matchmaking', {
+                playerId: data.playerId,
+                mode: data.mode || 'duel',
+                category: data.category || 'mixed',
+                difficulty: data.difficulty || 'medium',
+            });
             matchmaker.enqueue({
                 socketId: socket.id,
                 playerId: data.playerId,
@@ -286,6 +308,11 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
         });
         socket.on('disconnect', () => {
             const meta = socketMeta.get(socket.id);
+            (0, errorMonitor_1.addBreadcrumb)('WS koptu (Socket.IO)', 'ws', {
+                socketId: socket.id,
+                playerId: meta?.playerId,
+                roomCode: meta?.roomCode,
+            });
             if (meta) {
                 if (meta.playerId) {
                     presenceManager_1.presenceManager.unregisterSocket(meta.playerId, socket);

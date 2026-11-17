@@ -4,6 +4,7 @@ const express_1 = require("express");
 const prismaClient_1 = require("../db/prismaClient");
 const referralService_1 = require("../services/referralService");
 const presenceManager_1 = require("../services/presenceManager");
+const pushService_1 = require("../services/pushService");
 const router = (0, express_1.Router)();
 const service = new referralService_1.ReferralService(prismaClient_1.db.rawClient);
 const signedIn = (req, res, next) => {
@@ -49,8 +50,11 @@ router.post('/confirm', signedIn, async (req, res) => {
         ]);
         presenceManager_1.presenceManager.notifyUser(result.inviterId, 'friends:update', { friendId: res.locals.userId });
         presenceManager_1.presenceManager.notifyUser(res.locals.userId, 'friends:update', { friendId: result.inviterId });
-        if (result.notification)
+        if (result.notification) {
             presenceManager_1.presenceManager.notifyUser(result.inviterId, 'notification:new', result.notification);
+            // Davet ödülü bildirimi push ile de gitsin (kullanıcı çevrimdışıysa).
+            (0, pushService_1.queuePushForNotification)(result.inviterId, result.notification);
+        }
         const { notification, ...safeResult } = result;
         res.json(safeResult);
     }

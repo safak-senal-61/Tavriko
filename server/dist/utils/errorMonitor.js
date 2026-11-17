@@ -6,6 +6,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initErrorMonitor = initErrorMonitor;
 exports.captureError = captureError;
+exports.addBreadcrumb = addBreadcrumb;
 let Sentry = null;
 try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -45,4 +46,24 @@ function captureError(err) {
         }
     }
 }
-exports.default = { initErrorMonitor, captureError };
+/**
+ * Sentry breadcrumb: hata izlerinin yanında bağlantı / maç geçmişini gösterir.
+ * Sentry kapalıyken veya erişilemezken sessizce no-op çalışır.
+ */
+function addBreadcrumb(message, category, data) {
+    if (!initialized || !Sentry)
+        return;
+    try {
+        Sentry.addBreadcrumb({
+            category,
+            message,
+            level: 'info',
+            data,
+            timestamp: Date.now() / 1000,
+        });
+    }
+    catch {
+        // ignore
+    }
+}
+exports.default = { initErrorMonitor, captureError, addBreadcrumb };
