@@ -158,7 +158,7 @@ export function handleNotificationResponse(response: {
     void acceptFriendRequestFromNotification(data);
     return;
   }
-  if (action === 'join_duel') {
+  if (action === 'join_duel' || action === 'join_room') {
     void acceptDuelFromNotification(data);
     return;
   }

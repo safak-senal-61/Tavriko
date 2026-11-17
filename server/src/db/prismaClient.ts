@@ -4921,6 +4921,101 @@ export class PrismaService {
     };
   }
 
+  /**
+   * Özel oda daveti: mevcut bir özel oyun odasına arkadaş çağırır.
+   * Düello davetinden farklı olarak oda kodu gönderen tarafından verilir
+   * (kullanıcı zaten lobide bekler); yeni oda oluşturulmaz.
+   * Bildirim 'match_invite' türünde gider — istemci roomCode ile doğrudan
+   * odaya katılır (push butonu: "Odaya Katıl").
+   */
+  public async sendRoomInvite(
+    userId: string,
+    targetUserId: string,
+    roomCode: string,
+    roomName?: string
+  ): Promise<{ success: boolean; message: string; error?: string }> {
+    const cleanCode = (roomCode || '').trim().toUpperCase();
+    if (!cleanCode) return { success: false, error: 'Oda kodu gerekli.', message: '' };
+
+    let me = this.users.get(userId);
+    if (!me) {
+      try {
+        const dbMe = await this.rawClient.user.findFirst({
+          where: { OR: [{ id: userId }, { username: userId }] },
+        });
+        if (dbMe) me = this.prismaUserToRecord(dbMe);
+      } catch {}
+    }
+    if (!me) return { success: false, error: 'Kullanıcı oturumu bulunamadı.', message: '' };
+
+    let target = this.users.get(targetUserId);
+    if (!target) {
+      try {
+        const dbTarget = await this.rawClient.user.findFirst({
+          where: { OR: [{ id: targetUserId }, { username: targetUserId }] },
+        });
+        if (dbTarget) target = this.prismaUserToRecord(dbTarget);
+      } catch {}
+    }
+    if (!target) return { success: false, error: 'Hedef oyuncu bulunamadı.', message: '' };
+
+    if (me.blockedUserIds?.includes(target.id)) {
+      return { success: false, error: 'Bu kullanıcıyı engellediniz. Önce engeli kaldırın.', message: '' };
+    }
+    if (target.blockedUserIds?.includes(me.id)) {
+      return { success: false, error: 'Bu kullanıcı sizi engellemiş. Oda daveti gönderilemez.', message: '' };
+    }
+
+    const notifItem: NotificationItem = {
+      id: 'notif_room_' + Date.now(),
+      type: 'match_invite',
+      title: `${me.displayName} seni bir oyun odasına davet etti!`,
+      sub: roomName
+        ? `"${roomName}" odasına katıl ve birlikte oynayın. Oda kodu: ${cleanCode}`
+        : `Özel odaya katıl ve birlikte oynayın. Oda kodu: ${cleanCode}`,
+      timeText: 'Az önce',
+      createdAt: Date.now(),
+      senderId: me.id,
+      senderName: me.displayName,
+      senderAvatar: me.avatarUrl || 'av1',
+      roomCode: cleanCode,
+      handled: null,
+    };
+
+    try {
+      await this.rawClient.userNotification.create({
+        data: {
+          id: notifItem.id,
+          userId: target.id,
+          type: notifItem.type,
+          title: notifItem.title,
+          sub: notifItem.sub,
+          timeText: notifItem.timeText,
+          handled: null,
+          senderId: notifItem.senderId,
+          senderName: notifItem.senderName,
+          senderAvatar: notifItem.senderAvatar,
+          roomCode: notifItem.roomCode,
+        },
+      });
+    } catch (e: any) {
+      console.warn('[sendRoomInvite] DB notification error:', e.message);
+    }
+
+    if (!target.notifications) target.notifications = [];
+    target.notifications.unshift(notifItem);
+    this.users.set(target.id, target);
+    this.savePersistedUsers();
+
+    presenceManager.notifyUser(target.id, 'notification:new', notifItem);
+    queuePushForNotification(target.id, notifItem);
+
+    return {
+      success: true,
+      message: `${target.displayName} odaya davet edildi!`,
+    };
+  }
+
   public async sendDuelChallenge(
     userId: string,
     targetUserId: string,

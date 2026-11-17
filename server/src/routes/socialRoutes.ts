@@ -89,6 +89,26 @@ router.post('/friends/challenge', requireUserAuth, async (req: Request, res: Res
   }
 });
 
+// --- Özel Oda Daveti (oyun içi arkadaş çağırma) ---
+router.post('/rooms/invite', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.authUserId;
+    const { targetUserId, roomCode, roomName } = req.body;
+    if (!userId || !targetUserId || !roomCode) {
+      res.status(400).json({ error: 'targetUserId ve roomCode zorunludur.' });
+      return;
+    }
+    const result = await db.sendRoomInvite(userId, targetUserId, roomCode, roomName);
+    if (!result.success) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Real Notifications API ---
 // SECURITY: notifications are private; the identity comes from the verified token.
 router.get('/notifications/:userId', requireUserAuth, async (req: Request, res: Response): Promise<void> => {

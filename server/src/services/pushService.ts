@@ -195,7 +195,9 @@ export function notificationToPushPayload(item: NotificationItem): PushPayload {
     categoryId = 'friend_request';
   } else if (isDuel) {
     channelId = 'invites';
-    categoryId = 'duel_invite';
+    // Özel oda davetleri (DUEL- öneki olmayan kodlar) ayrı kategoriyle
+    // gider: buton "Odaya Katıl" olur, davet bağlamı netleşir.
+    categoryId = item.roomCode && !item.roomCode.startsWith('DUEL-') ? 'room_invite' : 'duel_invite';
   }
 
   return {

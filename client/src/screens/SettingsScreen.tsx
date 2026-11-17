@@ -28,6 +28,7 @@ import { Volume2, Gamepad2, ShieldCheck, UserRound, Sparkles, FileText } from 'l
 import type { LegalDocumentId } from '@trivia/shared';
 import { LegalDocumentList, LegalDocumentModal } from '../components/LegalDocuments';
 import { getLegalConsent } from '../utils/legalConsent';
+import Constants from 'expo-constants';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -820,7 +821,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         {/* System & Build Footer */}
         <View style={styles.footerWrap}>
           <Sparkles size={14} color="#CDB9E4" />
-          <Text style={styles.footerVersion}>Tavriko · Sana göre ayarlandı</Text>
+          <Text style={styles.footerVersion}>
+            Tavriko v{Constants.expoConfig?.version ?? '?'} · Sana göre ayarlandı
+          </Text>
         </View>
       </ScrollView>
 

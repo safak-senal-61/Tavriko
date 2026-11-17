@@ -11,7 +11,12 @@ import {
   Animated,
   Platform,
   Image,
+  Modal,
+  FlatList,
+  ActivityIndicator,
 } from 'react-native';
+import { DEFAULT_API_BASE } from '../config';
+import { authHeaders } from '../utils/apiAuth';
 import Reanimated, {
   FadeInDown,
   ZoomIn,
@@ -36,6 +41,17 @@ import {
   CoinIcon,
   GemIcon,
 } from '../components/TavrikoIcons';
+
+/** Arkadaş davet modalındaki satır (FriendsScreen tipinin sade hali). */
+interface LobbyFriendItem {
+  id: string;
+  name: string;
+  displayName?: string;
+  avatarUrl?: string;
+  level?: number;
+  online: boolean;
+  isFriend?: boolean;
+}
 
 interface LobbyScreenProps {
   room: GameRoom;
@@ -285,6 +301,55 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   const [linkCopied, setLinkCopied] = useState(false);
   const [chatText, setChatText] = useState('');
   const [floatingItems, setFloatingItems] = useState<FloatingItemData[]>([]);
+
+  // --- Oyun içi arkadaş daveti ---
+  const [friendInviteVisible, setFriendInviteVisible] = useState(false);
+  const [friendsList, setFriendsList] = useState<LobbyFriendItem[]>([]);
+  const [friendsLoading, setFriendsLoading] = useState(false);
+  const [invitedFriendIds, setInvitedFriendIds] = useState<Set<string>>(new Set());
+
+  const loadFriends = () => {
+    if (!currentUserId || friendsLoading) return;
+    setFriendsLoading(true);
+    fetch(`${DEFAULT_API_BASE}/social/friends/${currentUserId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data.friends)) {
+          // Sadece kabul edilmiş arkadaşlar; lobideki oyuncular hariç.
+          setFriendsList(
+            (data.friends as LobbyFriendItem[])
+              .filter((f) => f && f.isFriend !== false && !room.players[f.id])
+              .map((f) => ({
+                ...f,
+                online: Boolean(f.online || socketService.getUserPresence(f.id)?.online),
+              }))
+          );
+        }
+      })
+      .catch(() => {})
+      .finally(() => setFriendsLoading(false));
+  };
+
+  const inviteFriend = (friendId: string) => {
+    if (invitedFriendIds.has(friendId)) return;
+    sound.playSound('tap');
+    fetch(`${DEFAULT_API_BASE}/social/rooms/invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({
+        targetUserId: friendId,
+        roomCode: room.code,
+      }),
+    })
+      .then(async (res) => {
+        const result = await res.json().catch(() => ({} as { success?: boolean; error?: string }));
+        if (res.ok && result.success) {
+          setInvitedFriendIds((prev) => new Set(prev).add(friendId));
+        }
+        // Hedefin bildirim ayarları kapalıysa vb. — sessizce yok sayılır.
+      })
+      .catch(() => {});
+  };
 
   // İki katmanlı tekillik (deduplication) önbelleği: Ali'de ve tüm oyuncularda çift mesaj/reaksiyonu %100 engeller!
   const processedKeysRef = useRef<Set<string>>(new Set());
@@ -598,6 +663,29 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </TouchableOpacity>
         </Reanimated.View>
 
+        {/* 1.6. OYUN İÇİ ARKADAŞ DAVETİ (bildirimle odaya çağırır) */}
+        <Reanimated.View entering={FadeInDown.delay(140).duration(400)} style={styles.inviteLinkWrap}>
+          <TouchableOpacity
+            style={styles.friendInviteCard}
+            onPress={() => {
+              sound.playSound('tap');
+              loadFriends();
+              setFriendInviteVisible(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={styles.friendInviteBadge}>
+              <Text style={styles.friendInviteBadgeText}>👥</Text>
+            </View>
+            <View style={styles.inviteLinkInfo}>
+              <Text style={styles.inviteLinkLabel}>ARKADAŞ DAVET ET</Text>
+              <Text style={styles.inviteLinkSub}>
+                Arkadaşlarına bildirim gider — tek dokunuşla odaya katılır
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </Reanimated.View>
+
         {/* 2. ODA PARAMETRELERİ (Kademeli girişli çipler) */}
         <View style={styles.chipsRow}>
           <Reanimated.View entering={FadeInDown.delay(140).duration(380)} style={styles.specChip}>
@@ -798,6 +886,84 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           )}
         </View>
       </ScrollView>
+
+      {/* OYUN İÇİ ARKADAŞ DAVETİ MODALI */}
+      <Modal
+        visible={friendInviteVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFriendInviteVisible(false)}
+      >
+        <View style={styles.friendModalOverlay}>
+          <View style={styles.friendModalCard}>
+            <View style={styles.friendModalHeader}>
+              <Text style={styles.friendModalTitle}>👥 Arkadaş Davet Et</Text>
+              <TouchableOpacity
+                style={styles.friendModalCloseBtn}
+                onPress={() => {
+                  sound.playSound('tap');
+                  setFriendInviteVisible(false);
+                }}
+              >
+                <Text style={styles.friendModalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.friendModalSub}>
+              Davet ettiğin arkadaşına bildirim gider; bildirimdeki "Odaya Katıl"
+              butonuyla doğrudan bu odaya girer.
+            </Text>
+            {friendsLoading ? (
+              <View style={styles.friendModalEmpty}>
+                <ActivityIndicator color="#9B8CFF" />
+              </View>
+            ) : friendsList.length === 0 ? (
+              <View style={styles.friendModalEmpty}>
+                <Text style={styles.friendModalEmptyText}>
+                  Davet edilecek arkadaşın yok. Önce arkadaş ekleyebilirsin.
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={friendsList}
+                keyExtractor={(f) => f.id}
+                style={styles.friendModalList}
+                ItemSeparatorComponent={() => <View style={styles.friendModalDivider} />}
+                renderItem={({ item }) => {
+                  const invited = invitedFriendIds.has(item.id);
+                  return (
+                    <View style={styles.friendRow}>
+                      <View style={[styles.friendAvatar, item.online && styles.friendAvatarOnline]}>
+                        <Text style={styles.friendAvatarText}>
+                          {(item.displayName || item.name || '?').charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.friendRowInfo}>
+                        <Text style={styles.friendRowName} numberOfLines={1}>
+                          {item.displayName || item.name}
+                        </Text>
+                        <Text style={styles.friendRowStatus}>
+                          {item.online ? 'Çevrimiçi' : 'Çevrimdışı'}
+                          {item.level ? ` · Seviye ${item.level}` : ''}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.friendInviteBtn, invited && styles.friendInviteBtnDone]}
+                        onPress={() => inviteFriend(item.id)}
+                        disabled={invited}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.friendInviteBtnText}>
+                          {invited ? '✓ Davet Edildi' : 'Davet Et'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                }}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
     </TavrikoScreen>
   );
 };
@@ -1100,6 +1266,147 @@ const styles = StyleSheet.create({
   inviteLinkWrap: {
     width: '100%',
     marginBottom: 12,
+  },
+  friendInviteCard: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 12,
+    backgroundColor: 'rgba(124, 92, 255, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(155, 140, 255, 0.35)',
+  },
+  friendInviteBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(155, 140, 255, 0.22)',
+  },
+  friendInviteBadgeText: {
+    fontSize: 18,
+  },
+  friendModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(3, 1, 16, 0.82)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  friendModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '80%',
+    borderRadius: 20,
+    backgroundColor: '#150B3B',
+    borderWidth: 1,
+    borderColor: 'rgba(155, 140, 255, 0.35)',
+    padding: 18,
+  },
+  friendModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  friendModalTitle: {
+    fontSize: 16,
+    fontFamily: THEME.fonts.extraBold,
+    color: '#FFFFFF',
+  },
+  friendModalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  friendModalCloseText: {
+    color: '#CDB9E4',
+    fontSize: 14,
+  },
+  friendModalSub: {
+    fontSize: 12,
+    color: '#CDB9E4',
+    marginBottom: 12,
+    lineHeight: 17,
+  },
+  friendModalList: {
+    flexGrow: 0,
+  },
+  friendModalEmpty: {
+    paddingVertical: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  friendModalEmptyText: {
+    color: '#CDB9E4',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+  friendModalDivider: {
+    height: 1,
+    backgroundColor: 'rgba(155, 140, 255, 0.14)',
+  },
+  friendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    gap: 12,
+  },
+  friendAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(155, 140, 255, 0.18)',
+    borderWidth: 2,
+    borderColor: 'rgba(155, 140, 255, 0.3)',
+  },
+  friendAvatarOnline: {
+    borderColor: '#5ADBB5',
+  },
+  friendAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  friendRowInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  friendRowName: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: THEME.fonts.medium,
+  },
+  friendRowStatus: {
+    color: '#9B8CE0',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  friendInviteBtn: {
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    backgroundColor: '#7C5CFF',
+  },
+  friendInviteBtnDone: {
+    backgroundColor: 'rgba(90, 219, 181, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(90, 219, 181, 0.5)',
+  },
+  friendInviteBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: THEME.fonts.bold,
   },
   inviteLinkCard: {
     width: '100%',

@@ -89,6 +89,26 @@ router.post('/friends/challenge', auth_1.requireUserAuth, async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+// --- Özel Oda Daveti (oyun içi arkadaş çağırma) ---
+router.post('/rooms/invite', auth_1.requireUserAuth, async (req, res) => {
+    try {
+        const userId = req.authUserId;
+        const { targetUserId, roomCode, roomName } = req.body;
+        if (!userId || !targetUserId || !roomCode) {
+            res.status(400).json({ error: 'targetUserId ve roomCode zorunludur.' });
+            return;
+        }
+        const result = await prismaClient_1.db.sendRoomInvite(userId, targetUserId, roomCode, roomName);
+        if (!result.success) {
+            res.status(400).json({ error: result.error });
+            return;
+        }
+        res.json(result);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 // --- Real Notifications API ---
 // SECURITY: notifications are private; the identity comes from the verified token.
 router.get('/notifications/:userId', auth_1.requireUserAuth, async (req, res) => {

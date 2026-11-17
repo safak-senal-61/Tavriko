@@ -73,6 +73,18 @@ async function registerNotificationCategories(): Promise<void> {
         options: { opensAppToForeground: false, isDestructive: true },
       },
     ]);
+    await Notifications.setNotificationCategoryAsync('room_invite', [
+      {
+        identifier: 'join_room',
+        buttonTitle: 'Odaya Katıl',
+        options: { opensAppToForeground: true },
+      },
+      {
+        identifier: 'decline_room',
+        buttonTitle: 'Şimdi Değil',
+        options: { opensAppToForeground: false, isDestructive: true },
+      },
+    ]);
   } catch {
     // Kategori kaydı başarısızsa bildirimler butonsuz çalışmaya devam eder.
   }
