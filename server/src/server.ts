@@ -14,6 +14,7 @@ import { GameRoomManager } from './engine/GameRoomManager';
 import { Matchmaker } from './engine/Matchmaker';
 import { setupSocketHandlers } from './socket/socketHandler';
 import { presenceManager } from './services/presenceManager';
+import { getFcmStatus } from './services/fcmService';
 import { TelegramBotService, safeEqualStrings } from './telegram/telegramBot';
 import { supabaseService } from './db/supabaseClient';
 import { cacheService } from './cache/redisClient';
@@ -3502,6 +3503,7 @@ export function createApp() {
           configured: telegramBot.isRunning(),
           tokenSet: !!(process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_BOT_TOKEN.includes('placeholder')),
         },
+        fcm: getFcmStatus(),
       },
     });
   });

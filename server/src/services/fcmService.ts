@@ -128,6 +128,12 @@ export function isFcmEnabled(): boolean {
   return getMessagingInstance() !== null;
 }
 
+/** FCM durumu (health endpoint için): aktif mi, değilse kısa neden. */
+export function getFcmStatus(): { enabled: boolean; reason: string } {
+  const enabled = getMessagingInstance() !== null;
+  return { enabled, reason: enabled ? '' : disabledReason };
+}
+
 /** FCM data payload değerleri string olmalı; objeler JSON'a çevrilir. */
 function stringifyData(data?: Record<string, unknown>): Record<string, string> | undefined {
   if (!data) return undefined;
