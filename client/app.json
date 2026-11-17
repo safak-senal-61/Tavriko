@@ -28,6 +28,7 @@
     },
     "android": {
       "package": "com.tavriko.app",
+      "versionCode": 2,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
