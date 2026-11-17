@@ -70,6 +70,11 @@ import { ProLeagueScreen } from '../screens/ProLeagueScreen';
 import { sanitizeAvatarForUrl, compressAvatarImageAsync } from '../utils/avatarImage';
 import { applyStoredPreferencesOnBoot, syncPreferencesFromAccount, loadStoredPreferences } from '../store/appPrefs';
 import { useNotificationStore } from '../store/notificationStore';
+import {
+  subscribeNotificationNavigation,
+  consumePendingNotificationRoute,
+  type NotificationRoute,
+} from '../services/notificationRouter';
 import { NotificationToast } from '../components/NotificationUI';
 import { PaymentScreen, PaymentItem } from '../screens/PaymentScreen';
 import { captureReferralLink, clearPendingReferral, getPendingReferral } from '../utils/referralLink';
@@ -1235,6 +1240,32 @@ export const RootNavigator: React.FC = () => {
       navigateTo('lobby');
     }, 'Özel Odaya Katılma');
   };
+
+  // --- Push bildirimi yönlendirmesi (dokunuş / eylem butonu) ---
+  // Bildirime veya "Sende Ekle" / "Düelloya Katıl" butonuna dokununca
+  // ilgili sayfaya gidilir; düello davetinde doğrudan odaya katılım yapılır.
+  // Cold start (uygulama bildirimle açıldı) rotası, kullanıcı hazır olduğunda işlenir.
+  useEffect(() => {
+    const applyNotificationRoute = (route: NotificationRoute) => {
+      if (route.clearInboxBadge) {
+        const inbox = useNotificationStore.getState();
+        inbox.dismissToast();
+        inbox.markAllSeen();
+      }
+      if (route.roomCode && user && !user.isGuest) {
+        handleJoinCustomRoom(route.roomCode);
+        return;
+      }
+      navigateTo(route.screen);
+    };
+    if (user) {
+      const pending = consumePendingNotificationRoute();
+      if (pending) applyNotificationRoute(pending);
+    }
+    return subscribeNotificationNavigation(applyNotificationRoute);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.isGuest]);
+
   // --- Paylaşılan oda bağlantısından otomatik katılım (?oda=KOD) ---
   useEffect(() => {
     if (!sharedRoomCode || !user || isGuest || user.isGuest) return;

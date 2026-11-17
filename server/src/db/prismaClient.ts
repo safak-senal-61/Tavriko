@@ -4322,6 +4322,46 @@ export class PrismaService {
     }
   }
 
+  /**
+   * Tüm kayıtlı push token'larını döndürür (admin toplu duyuruları).
+   * `take` null ise sınırsız (tüm oyuncular); değilse en son güncellenenler.
+   */
+  public async getAllPushTokensAsync(take?: number): Promise<string[]> {
+    try {
+      const rows = await this.rawClient.pushToken.findMany({
+        ...(take ? { take } : {}),
+        orderBy: { updatedAt: 'desc' },
+        select: { token: true },
+      });
+      return rows.map((r: { token: string }) => r.token);
+    } catch (e: any) {
+      console.warn('[getAllPushTokensAsync] DB hatası:', e.message);
+      const all: string[] = [];
+      for (const set of this.pushTokensByUser.values()) all.push(...set);
+      return all;
+    }
+  }
+
+  /**
+   * Verilen tarihten önceye ait son etkinliği olan (updatedAt eski)
+   * kullanıcılara bağlı tüm push token'larını döndürür ("oyuna dön"
+   * bildirimleri). `take` ile üst sınır konur (serverless süre limiti).
+   */
+  public async getInactiveUsersPushTokensAsync(inactiveSince: Date, take?: number): Promise<string[]> {
+    try {
+      const rows = await this.rawClient.pushToken.findMany({
+        where: { user: { updatedAt: { lt: inactiveSince } } },
+        ...(take ? { take } : {}),
+        orderBy: { updatedAt: 'desc' },
+        select: { token: true },
+      });
+      return rows.map((r: { token: string }) => r.token);
+    } catch (e: any) {
+      console.warn('[getInactiveUsersPushTokensAsync] DB hatası:', e.message);
+      return [];
+    }
+  }
+
   /** Push token'ı kullanıcıya bağlar (upsert). Aynı token başka kullanıcıya
    *  aitse sahipliği yeni kullanıcıya geçirir (yeniden giriş senaryosu). */
   public async savePushTokenAsync(

@@ -39,6 +39,17 @@ export interface PushPayload {
   body: string;
   /** Derin bağlantı / rozet verisi; küçük tutulmalı (JSON < ~1KB). */
   data?: Record<string, unknown>;
+  /**
+   * Android bildirim kanalı (expo-notifications data anahtarı: channelId).
+   * İstemci bu kanalları açılışta oluşturur (bildirimler, davetler...).
+   */
+  channelId?: string;
+  /**
+   * Bildirim kategorisi — istemcide kayıtlı eylem butonlarını gösterir:
+   * 'friend_request' → "Sende Ekle" butonu, 'duel_invite' → "Düelloya Katıl"
+   * butonu. Android'de data.categoryId, iOS (Expo push) tarafında _category.
+   */
+  categoryId?: string;
 }
 
 interface ExpoPushTicket {
@@ -92,6 +103,8 @@ export async function sendPushToExpo(
             title: payload.title,
             body: payload.body,
             sound: 'default',
+            // iOS tarafında eylem butonları kayıtlı kategoriyle gösterilir.
+            ...(payload.categoryId ? { _category: payload.categoryId } : {}),
             ...(payload.data ? { data: payload.data } : {}),
           }))
         ),
@@ -118,7 +131,13 @@ export async function sendPushToExpo(
 
   // FCM device tokenlar (Android): firebase-admin ile doğrudan gönderim.
   if (fcmTokens.length) {
-    const fcmResult = await sendFcmToTokens(fcmTokens, payload);
+    const fcmResult = await sendFcmToTokens(fcmTokens, {
+      title: payload.title,
+      body: payload.body,
+      data: payload.data,
+      channelId: payload.channelId,
+      categoryId: payload.categoryId,
+    });
     sent += fcmResult.sent;
     invalidTokens.push(...fcmResult.invalidTokens);
   }
@@ -156,17 +175,40 @@ export async function sendPushToUser(
 
 /**
  * Uygulama içi bildirim (NotificationItem) push karşılığına çevirir.
- * Davet/kabak gibi eylem bildirimlerinde dokunulduğunda bildirim merkezine
- * gidilsin diye data.type taşınır.
+ *
+ * Eylem bildirimleri kategoriyle gönderilir — bildirim üzerinde doğrudan
+ * buton görünür ve dokunulduğunda ilgili sayfaya yönlendirme yapılır:
+ *  - friend / friend_request → 'friend_request' kategorisi: "Sende Ekle" butonu,
+ *    dokunuş → arkadaşlar ekranı.
+ *  - duel / match_invite → 'duel_invite' kategorisi: "Düelloya Katıl" butonu,
+ *    dokunuş → düello odasına katılım (data.roomCode ile).
+ * Diğer bildirim türleri 'general' kanalından, butonsuz gönderilir.
  */
 export function notificationToPushPayload(item: NotificationItem): PushPayload {
-  const isActionable = ['friend', 'friend_request', 'duel', 'match_invite', 'system', 'referral'].includes(item.type);
+  const isFriend = item.type === 'friend' || item.type === 'friend_request';
+  const isDuel = item.type === 'duel' || item.type === 'match_invite';
+
+  let channelId = 'general';
+  let categoryId: string | undefined;
+  if (isFriend) {
+    channelId = 'invites';
+    categoryId = 'friend_request';
+  } else if (isDuel) {
+    channelId = 'invites';
+    categoryId = 'duel_invite';
+  }
+
   return {
     title: item.title,
     body: item.sub || 'Tavriko\'da yeni bir bildirimin var.',
-    data: isActionable
-      ? { type: item.type, notificationId: item.id, ...(item.roomCode ? { roomCode: item.roomCode } : {}) }
-      : { type: item.type, notificationId: item.id },
+    channelId,
+    ...(categoryId ? { categoryId } : {}),
+    data: {
+      type: item.type,
+      notificationId: item.id,
+      ...(item.roomCode ? { roomCode: item.roomCode } : {}),
+      ...(item.senderId ? { senderId: item.senderId } : {}),
+    },
   };
 }
 
@@ -177,4 +219,54 @@ export function notificationToPushPayload(item: NotificationItem): PushPayload {
 export function queuePushForNotification(userId: string, item: NotificationItem): void {
   if (!userId || !item) return;
   void sendPushToUser(userId, notificationToPushPayload(item)).catch(() => {});
+}
+
+/**
+ * Tüm kayıtlı push tokenlarına toplu bildirim gönderir (admin paneli
+ * "tüm oyunculara duyuru" ve yeniden etkileşim (re-engagement) akışı).
+ * Parçalar halinde gönderilir; geçersiz tokenlar temizlenir.
+ * @returns gönderilen mesaj sayısı.
+ */
+export async function sendPushToAllTokens(payload: PushPayload): Promise<{ sent: number }> {
+  let tokens: string[] = [];
+  try {
+    tokens = await getDb().getAllPushTokensAsync();
+  } catch (e: any) {
+    logger.warn('SYSTEM', `Toplu push token okunamadı: ${e?.message || e}`);
+    return { sent: 0 };
+  }
+  if (!tokens.length) return { sent: 0 };
+  const { sent, invalidTokens } = await sendPushToExpo(tokens, payload);
+  for (const token of invalidTokens) {
+    try {
+      await getDb().removePushTokenAsync(token);
+    } catch {}
+  }
+  return { sent };
+}
+
+/**
+ * Uzun süredir aktif olmayan oyunculara "oyuna dön" bildirimi gönderir.
+ * Hedefleme: updatedAt (son oyun/profil etkinliği) verilen eşikten eski
+ * kullanıcılara ait tüm kayıtlı cihaz tokenları.
+ */
+export async function sendReengagementPush(
+  payload: PushPayload,
+  inactiveSince: Date
+): Promise<{ sent: number; targetUsers: number }> {
+  let tokens: string[] = [];
+  try {
+    tokens = await getDb().getInactiveUsersPushTokensAsync(inactiveSince, 1000);
+  } catch (e: any) {
+    logger.warn('SYSTEM', `Re-engagement token okunamadı: ${e?.message || e}`);
+    return { sent: 0, targetUsers: 0 };
+  }
+  if (!tokens.length) return { sent: 0, targetUsers: 0 };
+  const { sent, invalidTokens } = await sendPushToExpo(tokens, payload);
+  for (const token of invalidTokens) {
+    try {
+      await getDb().removePushTokenAsync(token);
+    } catch {}
+  }
+  return { sent, targetUsers: tokens.length };
 }

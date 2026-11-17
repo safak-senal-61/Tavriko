@@ -20,6 +20,17 @@ import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { createClient } from '@supabase/supabase-js';
 import Svg, { Path, Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
+// Doğum tarihi için şık takvim seçici (native). Web'de takvim girişi metin
+// alanıyla korunur; modül yalnızca native'de yüklenir (web'de import
+// edilmemesi bundle'ı ve platform uyumluluğunu korur).
+let DateTimePickerModule: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    DateTimePickerModule = require('@react-native-community/datetimepicker').default;
+  } catch {
+    DateTimePickerModule = null;
+  }
+}
 WebBrowser.maybeCompleteAuthSession();
 const clientSupabase = createClient(
   'https://rjvbgofzsfescnfohzgu.supabase.co',
@@ -55,6 +66,21 @@ import { sound } from '../services/soundService';
 
 // Tavriko marka logosu (şeffaf arka planlı, CDN yerine paket içinden — hızlı ve garantili)
 const AUTH_LOGO = require('../../assets/images/brand/emblem_tight.png');
+
+/** Doğum tarihi: Date → "GG.AA.YYYY" (sunucunun beklediği biçim). */
+function formatBirthDateTR(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}.${mm}.${d.getFullYear()}`;
+}
+
+/** "GG.AA.YYYY" → Date; ayrıştırılamazsa null (takvim seçicisi varsayılanı için). */
+function parseBirthDateTR(value: string): Date | null {
+  const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec((value || '').trim());
+  if (!m) return null;
+  const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 const GOOGLE_CLIENT_ID =
   '411578437442-gs1rck2124rgr516fe9dn9tuu15ge9ig.apps.googleusercontent.com';
 interface AuthScreenProps {
@@ -118,11 +144,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   // Step 2 & 3 & 4 Extended fields
-  const [fullName, setFullName] = useState('');
+  // Ad ve soyad ayrı alanlarda toplanır; sunucuya birleştirilerek gider.
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [selectedCountry, setSelectedCountry] = useState<CountryOption>(COUNTRIES[0]);
   const [countryPickerOpen, setCountryPickerOpen] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [birthDate, setBirthDate] = useState('');
+  // Doğum tarihi takvim seçicisi (native): açık/kapalı durumu.
+  const [birthDatePickerOpen, setBirthDatePickerOpen] = useState(false);
   const [gender, setGender] = useState<'Belirtmek İstemiyorum' | 'Erkek' | 'Kadın'>(
     'Belirtmek İstemiyorum'
   );
@@ -278,7 +308,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               email: email.trim(),
               password,
               displayName: displayName.trim(),
-              fullName: fullName.trim() || undefined,
+              // Ad + soyad ayrı alanlardan birleştirilir.
+              fullName: `${firstName.trim()} ${lastName.trim()}`.trim() || undefined,
               country: `${selectedCountry.flag} ${selectedCountry.name}`,
               phoneNumber: formattedPhone,
               birthDate: birthDate.trim() || undefined,
@@ -950,22 +981,66 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               {/* STEP 2: Personal Details */}
               {regStep === 2 && (
                 <View>
-                  <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>AD SOYAD</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>AD</Text>
                   <TextInput
                     style={[styles.input, compact && styles.inputCompact, tiny && styles.inputTiny]}
-                    placeholder="Örn: Ömer Faruk Şener"
+                    placeholder="Örn: Zeynep"
                     placeholderTextColor={THEME.colors.textMuted}
-                    value={fullName}
-                    onChangeText={setFullName}
+                    autoCapitalize="words"
+                    value={firstName}
+                    onChangeText={setFirstName}
                   />
+                  <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>SOYAD</Text>
+                  <TextInput
+                    style={[styles.input, compact && styles.inputCompact, tiny && styles.inputTiny]}
+                    placeholder="Örn: Demir"
+                    placeholderTextColor={THEME.colors.textMuted}
+                    autoCapitalize="words"
+                    value={lastName}
+                    onChangeText={setLastName}
+                  />
+                  <Text style={styles.fieldHintText}>Gerçek adın yalnızca profilinde görünür, kullanıcı adınla karıştırılmaz.</Text>
                   <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>DOĞUM TARİHİ</Text>
-                  <TextInput
-                    style={[styles.input, compact && styles.inputCompact, tiny && styles.inputTiny]}
-                    placeholder="GG.AA.YYYY (Örn: 15.06.2000)"
-                    placeholderTextColor={THEME.colors.textMuted}
-                    value={birthDate}
-                    onChangeText={setBirthDate}
-                  />
+                  {Platform.OS === 'web' || !DateTimePickerModule ? (
+                    <TextInput
+                      style={[styles.input, compact && styles.inputCompact, tiny && styles.inputTiny]}
+                      placeholder="GG.AA.YYYY (Örn: 15.06.2000)"
+                      placeholderTextColor={THEME.colors.textMuted}
+                      value={birthDate}
+                      onChangeText={setBirthDate}
+                    />
+                  ) : (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.datePickerBtn, compact && styles.datePickerBtnCompact]}
+                        onPress={() => {
+                          sound.playSound('tap');
+                          setBirthDatePickerOpen(true);
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.datePickerIcon}>📅</Text>
+                        <Text style={[styles.datePickerText, !birthDate && styles.datePickerPlaceholder]}>
+                          {birthDate || 'Takvimden doğum tarihini seç'}
+                        </Text>
+                        <Text style={styles.countryPickerArrow}>▼</Text>
+                      </TouchableOpacity>
+                      {birthDatePickerOpen && (
+                        <DateTimePickerModule
+                          value={parseBirthDateTR(birthDate) || new Date(2000, 0, 15)}
+                          mode="date"
+                          maximumDate={new Date()}
+                          minimumDate={new Date(1930, 0, 1)}
+                          display={Platform.OS === 'ios' ? 'inline' : 'default'}
+                          onChange={(event: any, date?: Date) => {
+                            // Android'de iptal de onChange üretir; dismiss durumunda seçim yapılmaz.
+                            setBirthDatePickerOpen(false);
+                            if (date) setBirthDate(formatBirthDateTR(date));
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
                   <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>CİNSİYET SEÇİMİ</Text>
                   <View style={styles.genderRow}>
                     {(['Erkek', 'Kadın', 'Belirtmek İstemiyorum'] as const).map((g) => {
@@ -1372,12 +1447,14 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   // ---- Mobil kompakt yerleşim: küçük ekranlarda kaydırmasız sığdırma ----
+  // Logo ekranın en tepesine yapışmasın: üstte nefes payı bırak (status bar).
   scrollContentCompact: {
-    paddingVertical: 8,
+    paddingTop: 30,
+    paddingBottom: 10,
     justifyContent: 'flex-start',
   },
   // ---- Çok küçük ekranlar (≤740dp): ekstra sıkı katman ----
-  scrollContentTiny: { paddingVertical: 4 },
+  scrollContentTiny: { paddingTop: 18, paddingBottom: 6 },
   heroWrapTiny: { marginBottom: 4 },
   heroCrownWrapTiny: { width: 58, height: 48 },
   heroLogoTiny: { width: 54, height: 42 },
@@ -1694,6 +1771,40 @@ const styles = StyleSheet.create({
   countryPickerArrow: {
     fontSize: 11,
     color: '#D9CDF5',
+  },
+  // Doğum tarihi takvim seçici butonu (ülke seçici görünümüyle uyumlu).
+  datePickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(10, 4, 24, 0.62)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    gap: 8,
+  },
+  datePickerBtnCompact: {
+    paddingVertical: 10,
+  },
+  datePickerIcon: {
+    fontSize: 17,
+  },
+  datePickerText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontFamily: THEME.fonts.medium,
+  },
+  datePickerPlaceholder: {
+    color: THEME.colors.textMuted,
+  },
+  // Alan altı kısa açıklama (daha hızlı, daha spesifik kayıt akışı için).
+  fieldHintText: {
+    fontSize: 11,
+    color: THEME.colors.textMuted,
+    marginBottom: 4,
+    lineHeight: 15,
   },
   phoneRow: {
     flexDirection: 'row',

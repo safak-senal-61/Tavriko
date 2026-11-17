@@ -1,5 +1,11 @@
 {
   "version": 2,
+  "crons": [
+    {
+      "path": "/api/cron/reengage-push",
+      "schedule": "0 15 * * *"
+    }
+  ],
   "buildCommand": "npx prisma generate --schema=server/prisma/schema.prisma && npm run build:shared && npm run build:server && npm run build:client:web",
   "builds": [
     {

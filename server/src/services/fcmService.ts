@@ -150,7 +150,7 @@ function stringifyData(data?: Record<string, unknown>): Record<string, string> |
  */
 export async function sendFcmToTokens(
   tokens: string[],
-  payload: { title: string; body: string; data?: Record<string, unknown> }
+  payload: { title: string; body: string; data?: Record<string, unknown>; channelId?: string; categoryId?: string }
 ): Promise<FcmSendResult> {
   const messagingInstance = getMessagingInstance();
   if (!messagingInstance) {
@@ -165,10 +165,23 @@ export async function sendFcmToTokens(
 
   for (let i = 0; i < tokens.length; i += FCM_CHUNK_SIZE) {
     const chunk = tokens.slice(i, i + FCM_CHUNK_SIZE);
+    // Android'de bildirimler "data-only" gönderilir (`notification` bloğu yok).
+    // expo-notifications bu mesajları kendisi sunar; böylece:
+    //  - categoryId ile eylem butonları ("Sende Ekle", "Düelloya Katıl")
+    //    bildirim üzerinde görünür,
+    //  - uygulama ön plandayken (oyun açıkken) bildirim gösterilmez,
+    //  - uygulama kapalıyken/arka planda bildirim normal gösterilir.
+    // Sunum tercihleri data anahtarlarından okunur (expo-notifications
+    // Android push payload spesifikasyonu): title, message, channelId, categoryId.
     const messages = chunk.map((token) => ({
       token,
-      notification: { title: payload.title, body: payload.body },
-      ...(payload.data ? { data: stringifyData(payload.data) } : {}),
+      data: {
+        title: payload.title,
+        message: payload.body,
+        ...(payload.channelId ? { channelId: payload.channelId } : {}),
+        ...(payload.categoryId ? { categoryId: payload.categoryId } : {}),
+        ...(payload.data ? stringifyData(payload.data) : {}),
+      },
       android: { priority: 'high' as const },
     }));
     try {

@@ -15,7 +15,7 @@ import { Matchmaker } from './engine/Matchmaker';
 import { setupSocketHandlers } from './socket/socketHandler';
 import { presenceManager } from './services/presenceManager';
 import { getFcmStatus } from './services/fcmService';
-import { sendPushToUser } from './services/pushService';
+import { sendPushToUser, sendPushToAllTokens, sendReengagementPush } from './services/pushService';
 import { TelegramBotService, safeEqualStrings } from './telegram/telegramBot';
 import { supabaseService } from './db/supabaseClient';
 import { cacheService } from './cache/redisClient';
@@ -336,6 +336,34 @@ export function createApp() {
     }
   });
 
+  // Admin: tüm oyunculara toplu push bildirimi (duyuru)
+  app.post('/api/admin/push/broadcast', requireAdminAuth, async (req, res) => {
+    try {
+      const { title, body, screen } = req.body || {};
+      const cleanTitle = typeof title === 'string' ? title.trim() : '';
+      const cleanBody = typeof body === 'string' ? body.trim() : '';
+      if (!cleanTitle || !cleanBody) {
+        return res.status(400).json({ success: false, error: 'Başlık ve metin zorunludur.' });
+      }
+      if (cleanTitle.length > 80 || cleanBody.length > 300) {
+        return res.status(400).json({ success: false, error: 'Başlık en fazla 80, metin en fazla 300 karakter olabilir.' });
+      }
+      // Dokunuşta açılacak ekran (yönlendirme). Genel duyurular bildirim merkezine düşer.
+      const allowedScreens = ['notifications', 'home', 'season', 'events', 'shop'];
+      const targetScreen = allowedScreens.includes(screen) ? screen : 'notifications';
+      const result = await sendPushToAllTokens({
+        title: cleanTitle,
+        body: cleanBody,
+        channelId: 'announcements',
+        data: { type: 'system', screen: targetScreen },
+      });
+      logger.success('SYSTEM', `Toplu duyuru gönderildi: "${cleanTitle}" (${result.sent} cihaz)`);
+      return res.json({ success: true, sent: result.sent });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Admin: kullanıcının tüm cihazlarına test push'u gönder
   app.post('/api/admin/push/test', requireAdminAuth, async (req, res) => {
     try {
@@ -353,6 +381,41 @@ export function createApp() {
       return res.status(500).json({ success: false, error: err.message });
     }
   });
+
+  // Cron (Vercel): "oyuna dön" bildirimleri — 3+ gündür aktif olmayan oyunculara
+  // aralıklarla (rotasyonlu mesajlarla) hatırlatma gönderir. CRON_SECRET ile
+  // korunur (Vercel cron istekleri Authorization: Bearer <CRON_SECRET> gönderir).
+  const REENGAGEMENT_VARIANTS: Array<{ title: string; body: string }> = [
+    { title: '⚔️ Rakipler seni bekliyor!', body: 'Tavriko\'da lig sıralaması değişiyor. 1v1 düelloyla yerini koru!' },
+    { title: '🏆 Sezon ödülleri senin', body: 'Seviye atlayıp sezon ödüllerini toplamaya devam et. Hemen bir maç yap!' },
+    { title: '🔥 Serin devam ediyor!', body: 'Günlük görevlerini tamamlayıp altın ve elmas kazanmayı unutma.' },
+    { title: '💎 Elmasların seni bekliyor', body: 'Arkadaşlarını düelloya davet et, davet ödüllerini kap!' },
+  ];
+
+  const handleReengagementCron = async (req: any, res: any) => {
+    const secret = process.env.CRON_SECRET || '';
+    const header = (req.headers['authorization'] || '').toString();
+    const queryToken = typeof req.query?.token === 'string' ? req.query.token : '';
+    if (!secret || (header !== `Bearer ${secret}` && queryToken !== secret)) {
+      return res.status(401).json({ success: false, error: 'Yetkisiz cron çağrısı.' });
+    }
+    try {
+      // 3+ gün önce son etkinliği olan oyuncular; rotasyonlu mesaj seçimi
+      const inactiveSince = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+      const variant = REENGAGEMENT_VARIANTS[new Date().getUTCDate() % REENGAGEMENT_VARIANTS.length];
+      const result = await sendReengagementPush(
+        { title: variant.title, body: variant.body, channelId: 'general', data: { type: 'system', screen: 'home' } },
+        inactiveSince
+      );
+      logger.success('SYSTEM', `Yeniden etkileşim (re-engagement) bildirimi: ${result.sent} cihaz (${variant.title})`);
+      return res.json({ success: true, sent: result.sent, targets: result.targetUsers });
+    } catch (err: any) {
+      logger.error('SYSTEM', `Re-engagement cron hatası: ${err?.message || err}`);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  };
+  app.get('/api/cron/reengage-push', handleReengagementCron);
+  app.post('/api/cron/reengage-push', handleReengagementCron);
 
   // Telegram set webhook endpoint
   app.get(['/api/admin/telegram/set-webhook', '/admin/telegram/set-webhook'], requireAdminAuth, async (req, res) => {

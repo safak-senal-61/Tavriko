@@ -3665,6 +3665,31 @@ class PrismaService {
     // Expo Push token kayıtları (push_tokens tablosu; DB erişilemezse bellekta
     // çalışır — bildirim gönderimi test ortamında sessizce no-op olur).
     // ---------------------------------------------------------------------------
+    /** Tüm kayıtlı push cihazlarını kullanıcı bilgisiyle listeler (admin paneli).
+     * Token'ın tamamı asla döndürülmez; yalnızca kısa önizleme verilir. */
+    async listPushTokensWithUsersAsync() {
+        try {
+            const rows = await this.rawClient.pushToken.findMany({
+                orderBy: { updatedAt: 'desc' },
+                take: 200,
+                include: { user: { select: { username: true, displayName: true } } },
+            });
+            return rows.map((r) => ({
+                id: r.id,
+                userId: r.userId,
+                username: r.user?.username ?? null,
+                displayName: r.user?.displayName ?? null,
+                platform: r.platform,
+                tokenPreview: r.token.length > 28 ? r.token.slice(0, 18) + '…' + r.token.slice(-8) : r.token,
+                createdAt: r.createdAt,
+                updatedAt: r.updatedAt,
+            }));
+        }
+        catch (e) {
+            console.warn('[listPushTokensWithUsersAsync] DB hatası:', e.message);
+            return [];
+        }
+    }
     /** Kullanıcının kayıtlı Expo push token'larını döndürür. */
     async getPushTokensAsync(userId) {
         if (!userId)
@@ -3680,6 +3705,47 @@ class PrismaService {
             console.warn('[getPushTokensAsync] DB fallback:', e.message);
             const fallback = this.pushTokensByUser.get(userId);
             return fallback ? Array.from(fallback) : [];
+        }
+    }
+    /**
+     * Tüm kayıtlı push token'larını döndürür (admin toplu duyuruları).
+     * `take` null ise sınırsız (tüm oyuncular); değilse en son güncellenenler.
+     */
+    async getAllPushTokensAsync(take) {
+        try {
+            const rows = await this.rawClient.pushToken.findMany({
+                ...(take ? { take } : {}),
+                orderBy: { updatedAt: 'desc' },
+                select: { token: true },
+            });
+            return rows.map((r) => r.token);
+        }
+        catch (e) {
+            console.warn('[getAllPushTokensAsync] DB hatası:', e.message);
+            const all = [];
+            for (const set of this.pushTokensByUser.values())
+                all.push(...set);
+            return all;
+        }
+    }
+    /**
+     * Verilen tarihten önceye ait son etkinliği olan (updatedAt eski)
+     * kullanıcılara bağlı tüm push token'larını döndürür ("oyuna dön"
+     * bildirimleri). `take` ile üst sınır konur (serverless süre limiti).
+     */
+    async getInactiveUsersPushTokensAsync(inactiveSince, take) {
+        try {
+            const rows = await this.rawClient.pushToken.findMany({
+                where: { user: { updatedAt: { lt: inactiveSince } } },
+                ...(take ? { take } : {}),
+                orderBy: { updatedAt: 'desc' },
+                select: { token: true },
+            });
+            return rows.map((r) => r.token);
+        }
+        catch (e) {
+            console.warn('[getInactiveUsersPushTokensAsync] DB hatası:', e.message);
+            return [];
         }
     }
     /** Push token'ı kullanıcıya bağlar (upsert). Aynı token başka kullanıcıya

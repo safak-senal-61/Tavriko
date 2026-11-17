@@ -670,6 +670,23 @@ function renderDashboardHtml() {
       font-weight: 700;
       display: none;
     }
+    .push-tpl {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      text-align: left;
+      background: rgba(13, 8, 29, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.1s;
+      font-family: inherit;
+    }
+    .push-tpl:hover { border-color: var(--gold); transform: translateY(-1px); }
+    .push-tpl-icon { font-size: 20px; }
+    .push-tpl-title { font-size: 13px; font-weight: 800; color: #FFFFFF; }
+    .push-tpl-body { font-size: 11.5px; color: var(--text-muted); line-height: 1.45; }
     .mod-status.success { background: rgba(16,185,129,0.15); color: #34D399; display: block; border: 1px solid rgba(16,185,129,0.3); }
     .mod-status.error { background: rgba(239,68,68,0.15); color: #FCA5A5; display: block; border: 1px solid rgba(239,68,68,0.3); }
     .mod-blocked-row {
@@ -1037,6 +1054,7 @@ function renderDashboardHtml() {
         <button class="nav-btn" onclick="switchTab('tab-logs', this)">📜 Canlı Loglar & Hatalar</button>
         <button class="nav-btn" onclick="switchTab('tab-db', this)">👥 Kullanıcılar & Veritabanı</button>
         <button class="nav-btn" onclick="switchTab('tab-mod', this)">🚫 Moderasyon & Engelleme</button>
+        <button class="nav-btn" onclick="switchTab('tab-push', this)">🔔 Push & Bildirimler</button>
       </div>
       <div class="header-actions">
         <a href="/app" target="_blank" class="btn btn-gold header-play-btn" style="text-decoration:none;">
@@ -1642,6 +1660,106 @@ function renderDashboardHtml() {
         </table>
       </div>
     </div>
+
+    <!-- TAB: PUSH BILDIRIMLERI -->
+    <div id="tab-push" class="tab-content">
+      <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <div>
+          <h2 style="font-size:20px; color:#FFFFFF;">🔔 Push Bildirimleri & Aktif Cihazlar</h2>
+          <p style="font-size:13px; color:var(--text-muted);">Kayıtlı cihazlar, FCM durumu ve yönetim test gönderimi</p>
+        </div>
+        <button class="btn btn-gold" onclick="loadPushDevices()">🔄 Cihazları Yenile</button>
+      </div>
+
+      <div id="pushFcmStatus" style="margin-bottom:16px; padding:14px 18px; border-radius:12px; font-size:14px; font-weight:700; background:var(--card); border:1px solid var(--card-border); color:var(--text-muted);">
+        FCM durumu yükleniyor…
+      </div>
+
+      <div style="background:var(--card); border:1px solid var(--card-border); border-radius:16px; overflow-x:auto; margin-bottom:20px;">
+        <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--card-border); background:rgba(0,0,0,0.25); color:var(--gold);">
+              <th style="padding:12px 16px;">Kullanıcı</th>
+              <th style="padding:12px 16px;">Kullanıcı ID</th>
+              <th style="padding:12px 16px;">Platform</th>
+              <th style="padding:12px 16px;">Token (önizleme)</th>
+              <th style="padding:12px 16px;">Son Güncelleme</th>
+              <th style="padding:12px 16px;">İşlem</th>
+            </tr>
+          </thead>
+          <tbody id="pushDevicesTableBody">
+            <!-- Injected here -->
+          </tbody>
+        </table>
+      </div>
+
+      <div style="background:var(--card); border:1px solid var(--card-border); border-radius:16px; padding:18px 20px; margin-bottom:20px;">
+        <h3 style="font-size:15px; color:var(--gold); margin-bottom:12px;">📤 Manuel Test Bildirimi Gönder</h3>
+        <div style="display:flex; flex-direction:column; gap:10px; max-width:520px;">
+          <input type="text" id="pushTestUserId" class="mod-input" placeholder="Kullanıcı ID (örn. guest_xxx veya google_xxx)" />
+          <input type="text" id="pushTestTitle" class="mod-input" placeholder="Bildirim başlığı (boş: varsayılan)" />
+          <input type="text" id="pushTestBody" class="mod-input" placeholder="Bildirim metni (boş: varsayılan)" />
+          <button class="btn btn-gold" style="justify-content:center;" onclick="handleAdminPushTestManual()">🔔 Test Bildirimini Gönder</button>
+          <div id="pushTestStatus" class="mod-status"></div>
+        </div>
+      </div>
+
+      <div style="background:var(--card); border:1px solid var(--card-border); border-radius:16px; padding:18px 20px;">
+        <h3 style="font-size:15px; color:var(--gold); margin-bottom:6px;">📣 Toplu Bildirim — Tüm Oyunculara Duyuru</h3>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Tüm kayıtlı push cihazlarına tek seferde gönderilir. Bildirime dokunan oyuncu, seçilen sayfaya yönlendirilir.</p>
+
+        <div style="margin-bottom:14px;">
+          <div style="font-size:12px; font-weight:700; color:var(--purple-light); letter-spacing:0.05em; margin-bottom:8px;">⚡ HAZIR BİLDİRİM KARTLARI (dokun → doldur)</div>
+          <div id="pushTemplateGrid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px;">
+            <button type="button" class="push-tpl" onclick="fillPushTemplate(0)">
+              <span class="push-tpl-icon">⚔️</span>
+              <span class="push-tpl-title">Rakipler Bekliyor</span>
+              <span class="push-tpl-body">Lig sıralaması değişiyor! 1v1 düelloyla yerini koru.</span>
+            </button>
+            <button type="button" class="push-tpl" onclick="fillPushTemplate(1)">
+              <span class="push-tpl-icon">🎁</span>
+              <span class="push-tpl-title">Günlük Ödülünü Al</span>
+              <span class="push-tpl-body">Günlük görevini tamamla, altın ve elmas kazanmayı unutma.</span>
+            </button>
+            <button type="button" class="push-tpl" onclick="fillPushTemplate(2)">
+              <span class="push-tpl-icon">🏆</span>
+              <span class="push-tpl-title">Sezon Bitiyor</span>
+              <span class="push-tpl-body">Sezon 1 ödüllerini toplamak için az zaman kaldı. Sezon sayfasına gel!</span>
+            </button>
+            <button type="button" class="push-tpl" onclick="fillPushTemplate(3)">
+              <span class="push-tpl-icon">🎉</span>
+              <span class="push-tpl-title">Yeni Etkinlik</span>
+              <span class="push-tpl-body">Yeni etkinlikler başladı! Hemen katıl, ödülleri kap.</span>
+            </button>
+            <button type="button" class="push-tpl" onclick="fillPushTemplate(4)">
+              <span class="push-tpl-icon">👥</span>
+              <span class="push-tpl-title">Arkadaşlarını Davet Et</span>
+              <span class="push-tpl-body">Arkadaşını Tavriko'ya getir, ikiz ödülleri kapın!</span>
+            </button>
+            <button type="button" class="push-tpl" onclick="fillPushTemplate(5)">
+              <span class="push-tpl-icon">🔥</span>
+              <span class="push-tpl-title">Serini Sürdür</span>
+              <span class="push-tpl-body">Giriş serin devam ediyor! Bugün oyna, ödülünü kap.</span>
+            </button>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:10px; max-width:520px;">
+          <input type="text" id="pushBroadcastTitle" class="mod-input" maxlength="80" placeholder="Duyuru başlığı (örn. ⚔️ Hafta Sonu Düellosu)" />
+          <textarea id="pushBroadcastBody" class="mod-input" rows="2" maxlength="300" placeholder="Duyuru metni (en fazla 300 karakter)"></textarea>
+          <label style="font-size:12px; color:var(--text-muted);">Dokununca açılacak sayfa:</label>
+          <select id="pushBroadcastScreen" class="mod-input">
+            <option value="notifications" selected>🔔 Bildirimler (varsayılan)</option>
+            <option value="home">🏠 Ana Sayfa</option>
+            <option value="season">🏆 Sezon</option>
+            <option value="events">🎉 Etkinlikler</option>
+            <option value="shop">🛒 Mağaza</option>
+          </select>
+          <button class="btn btn-gold" style="justify-content:center;" onclick="handleAdminBroadcast()">📣 TÜM OYUNCULARA GÖNDER</button>
+          <div id="pushBroadcastStatus" class="mod-status"></div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script>
@@ -1656,6 +1774,7 @@ function renderDashboardHtml() {
       document.getElementById(tabId).classList.add('active');
       const target = btn || (window.event && window.event.target);
       if (target && target.classList) target.classList.add('active');
+      if (tabId === 'tab-push') loadPushDevices();
     }
 
     function renderSingleLog(entry, prepend = false) {
@@ -1979,7 +2098,146 @@ function renderDashboardHtml() {
         showModStatus('modNotifStatus', '❌ Bağlantı hatası: ' + err.message, false);
       }
     }
-    // ===== END MODERATION FUNCTIONS =====
+    // ===== PUSH BILDIRIM FONKSIYONLARI =====
+    async function loadPushDevices() {
+      const statusEl = document.getElementById('pushFcmStatus');
+      const tbody = document.getElementById('pushDevicesTableBody');
+      tbody.innerHTML = '<tr><td colspan="6" style="padding:14px 16px; color:var(--text-muted);">Cihazlar yükleniyor…</td></tr>';
+      try {
+        const res = await fetch('/api/admin/push/devices', { credentials: 'same-origin' });
+        const data = await res.json();
+        if (data.success) {
+          const fcm = data.fcm || {};
+          if (fcm.enabled) {
+            statusEl.style.background = 'rgba(16,185,129,0.12)';
+            statusEl.style.border = '1px solid rgba(16,185,129,0.4)';
+            statusEl.style.color = 'var(--green)';
+            statusEl.innerText = '✅ FCM (Android bildirimleri) AKTİF — servis hesabı ile Google kimlik doğrulaması yapıldı.';
+          } else {
+            statusEl.style.background = 'rgba(239,68,68,0.12)';
+            statusEl.style.border = '1px solid rgba(239,68,68,0.4)';
+            statusEl.style.color = '#FCA5A5';
+            statusEl.innerText = '⚠️ FCM DEVRE DIŞI — ' + (fcm.reason || 'neden bilinmiyor');
+          }
+          const devices = data.devices || [];
+          tbody.innerHTML = '';
+          if (!devices.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:14px 16px; color:var(--text-muted);">Kayıtlı push cihazı bulunamadı.</td></tr>';
+            return;
+          }
+          devices.forEach(d => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+            const platformIcon = d.platform === 'android' ? '🤖 Android (FCM)' : (d.platform === 'ios' ? '🍎 iOS (Expo)' : (d.platform === 'web' ? '💻 Web' : '❔ ' + (d.platform || 'bilinmiyor')));
+            tr.innerHTML =
+              '<td style="padding:10px 16px; font-weight:700; color:#FFFFFF;">' + escapeHtml(d.displayName || d.username || d.userId) + '</td>' +
+              '<td style="padding:10px 16px; color:var(--purple-light); font-size:12px;">' + escapeHtml(d.userId) + '</td>' +
+              '<td style="padding:10px 16px;">' + platformIcon + '</td>' +
+              '<td style="padding:10px 16px; font-family:monospace; font-size:11px; color:var(--text-muted);">' + escapeHtml(d.tokenPreview || '') + '</td>' +
+              '<td style="padding:10px 16px; color:var(--text-muted); font-size:12px;">' + (d.updatedAt ? new Date(d.updatedAt).toLocaleString('tr-TR') : '-') + '</td>' +
+              '<td style="padding:8px 16px;"><button class="btn btn-gold" style="padding:7px 14px; font-size:12px;" onclick="handleAdminPushTestManual(\\'' + escapeHtml(d.userId) + '\\')">🔔 Test</button></td>';
+            tbody.appendChild(tr);
+          });
+        } else {
+          statusEl.innerText = '⚠️ Cihazlar yüklenemedi: ' + (data.error || 'bilinmeyen hata');
+          tbody.innerHTML = '';
+        }
+      } catch (err) {
+        statusEl.innerText = '❌ Bağlantı hatası: ' + err.message;
+      }
+    }
+
+    async function handleAdminPushTestManual(prefillUserId) {
+      const userIdEl = document.getElementById('pushTestUserId');
+      if (prefillUserId) userIdEl.value = prefillUserId;
+      const userId = userIdEl.value.trim();
+      const title = document.getElementById('pushTestTitle').value.trim();
+      const body = document.getElementById('pushTestBody').value.trim();
+      const statusEl = document.getElementById('pushTestStatus');
+      if (!userId) {
+        statusEl.className = 'mod-status mod-status-error';
+        statusEl.innerText = 'Kullanıcı ID zorunludur!';
+        return;
+      }
+      statusEl.className = 'mod-status';
+      statusEl.style.color = 'var(--text-muted)';
+      statusEl.innerText = 'Gönderiliyor…';
+      try {
+        const res = await fetch('/api/admin/push/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ userId, title, body })
+        });
+        const data = await res.json();
+        if (data.success) {
+          statusEl.style.color = 'var(--green)';
+          statusEl.innerText = '✅ Test bildirimi gönderildi! (' + (data.sent || 0) + ' cihaz)';
+          loadPushDevices();
+        } else {
+          statusEl.style.color = '#FCA5A5';
+          statusEl.innerText = '⚠️ ' + (data.error || 'Gönderim başarısız! Kayıtlı cihaz olmayabilir.');
+        }
+      } catch (err) {
+        statusEl.style.color = '#FCA5A5';
+        statusEl.innerText = '❌ Bağlantı hatası: ' + err.message;
+      }
+    }
+    // ===== TOPLU BILDIRIM (BROADCAST) FONKSIYONLARI =====
+    const PUSH_TEMPLATES = [
+      { title: '⚔️ Rakipler Bekliyor', body: 'Lig sıralaması değişiyor! 1v1 düelloyla yerini koru.', screen: 'home' },
+      { title: '🎁 Günlük Ödülünü Al', body: 'Günlük görevini tamamla, altın ve elmas kazanmayı unutma.', screen: 'home' },
+      { title: '🏆 Sezon Bitiyor', body: 'Sezon 1 ödüllerini toplamak için az zaman kaldı. Sezon sayfasına gel!', screen: 'season' },
+      { title: '🎉 Yeni Etkinlik', body: 'Yeni etkinlikler başladı! Hemen katıl, ödülleri kap.', screen: 'events' },
+      { title: '👥 Arkadaşlarını Davet Et', body: 'Arkadaşını Tavriko\\'ya getir, ikiz ödülleri kapın!', screen: 'notifications' },
+      { title: '🔥 Serini Sürdür', body: 'Giriş serin devam ediyor! Bugün oyna, ödülünü kap.', screen: 'home' },
+    ];
+
+    function fillPushTemplate(idx) {
+      const tpl = PUSH_TEMPLATES[idx];
+      if (!tpl) return;
+      document.getElementById('pushBroadcastTitle').value = tpl.title;
+      document.getElementById('pushBroadcastBody').value = tpl.body;
+      document.getElementById('pushBroadcastScreen').value = tpl.screen;
+    }
+
+    async function handleAdminBroadcast() {
+      const title = document.getElementById('pushBroadcastTitle').value.trim();
+      const body = document.getElementById('pushBroadcastBody').value.trim();
+      const screen = document.getElementById('pushBroadcastScreen').value;
+      const statusEl = document.getElementById('pushBroadcastStatus');
+      if (!title || !body) {
+        statusEl.className = 'mod-status error';
+        statusEl.innerText = 'Başlık ve duyuru metni zorunludur!';
+        return;
+      }
+      if (!confirm('Bu duyuru TÜM kayıtlı oyuncu cihazlarına gönderilecek. Onaylıyor musunuz?')) {
+        return;
+      }
+      statusEl.className = 'mod-status';
+      statusEl.style.color = 'var(--text-muted)';
+      statusEl.innerText = 'Gönderiliyor… Bu işlem cihaz sayısına göre birkaç saniye sürebilir.';
+      try {
+        const res = await fetch('/api/admin/push/broadcast', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ title, body, screen })
+        });
+        const data = await res.json();
+        if (data.success) {
+          statusEl.className = 'mod-status success';
+          statusEl.innerText = '✅ Duyuru ' + (data.sent || 0) + ' cihaza gönderildi!';
+        } else {
+          statusEl.className = 'mod-status error';
+          statusEl.innerText = '⚠️ ' + (data.error || 'Gönderim başarısız!');
+        }
+      } catch (err) {
+        statusEl.className = 'mod-status error';
+        statusEl.innerText = '❌ Bağlantı hatası: ' + err.message;
+      }
+    }
+    // ===== END TOPLU BILDIRIM FONKSIYONLARI =====
 
     let portalAuthToken = localStorage.getItem('tavriko_portal_token');
 
