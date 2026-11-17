@@ -68,6 +68,11 @@ async function acquirePermission(): Promise<boolean> {
 /**
  * Kullanıcının push token'ını sunucuya kaydeder. Aynı oturumda tekrar
  * çağrılırsa (ekran değişimi vb.) atlanır; token değişirse yeniden gönderilir.
+ *
+ * Android: FCM device token (backend firebase-admin ile doğrudan FCM'ye
+ * gönderir; Expo push servisine bağımlı değildir). Token alınamazsa
+ * (Expo Go vb.) Expo push token'a düşer.
+ * iOS: Expo push token (APNs teslimi Expo/EAS üzerinden).
  */
 export async function registerForPushNotifications(userId: string): Promise<void> {
   if (Platform.OS === 'web' || !userId) return;
@@ -77,10 +82,25 @@ export async function registerForPushNotifications(userId: string): Promise<void
     const granted = await acquirePermission();
     if (!granted) return;
 
-    const projectId = getEasProjectId();
-    if (!projectId) return; // EAS projectId tanımsızsa token alınamaz
+    let token: string | undefined;
 
-    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+    if (Platform.OS === 'android') {
+      // Android: doğrudan FCM device token (google-services.json build'e gömülü).
+      try {
+        const device = await Notifications.getDevicePushTokenAsync();
+        if (typeof device?.data === 'string' && device.data) token = device.data;
+      } catch {
+        // Expo Go / FCM kaydı yok — aşağıda Expo token denenir.
+      }
+    }
+
+    if (!token) {
+      const projectId = getEasProjectId();
+      if (!projectId) return; // EAS projectId tanımsızsa token alınamaz
+      const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
+      token = data;
+    }
+
     if (!token || (token === lastRegisteredToken && userId === lastRegisteredUserId)) return;
 
     const res = await fetch(`${DEFAULT_API_BASE}/push/register`, {

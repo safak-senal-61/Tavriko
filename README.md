@@ -351,6 +351,15 @@ EVREN_API_KEY=your_ssb_evren_token
 PUBLIC_APP_URL=https://tavriko-app.vercel.app
 ```
 
+### Push Bildirimleri (FCM) — Firebase Bağlantısı
+Android push bildirimleri Firebase Cloud Messaging (FCM) üzerinden **doğrudan backend'den** gönderilir (Expo push servisine bağımlı değildir):
+
+- **Server**: `FIREBASE_SERVICE_ACCOUNT` ortam değişkenine Firebase service account JSON'unun **tam içeriği** (düz JSON veya base64) verilir. Vercel'de Project → Settings → Environment Variables bölümüne ekleyin. Bu anahtar **asla** Git'e, istemci koduna veya loglara yazılmaz (Supabase `service_role` anahtarıyla aynı kural).
+- **Client**: `client/google-services.json` dosyası build sırasında Android paketine gömülür (`app.json` → `android.googleServicesFile`). Mobil uygulama açılışta FCM device token alır ve `POST /api/push/register` ile sunucuya kaydeder; iOS cihazlar Expo push token kullanmaya devam eder.
+- Anahtar sızarsa (sohbete yapıştırıldıysa dâhil) Firebase Console → Project Settings → Service Accounts bölümünden **rotate** edin.
+
+Akış: bildirim → `queuePushForNotification()` → token FCM ise `fcmService.sendFcmToTokens()` (firebase-admin), Expo token ise Expo push API. Kaydı düşen tokenlar her iki yolda da otomatik temizlenir.
+
 ### 3. Paketleri Derleme ve Testleri Çalıştırma
 ```bash
 # Shared paketini derleyin:

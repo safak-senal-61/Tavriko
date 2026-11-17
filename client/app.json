@@ -28,6 +28,7 @@
     },
     "android": {
       "package": "com.tavriko.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#10029F"
@@ -86,7 +87,8 @@
       ],
       "@sentry/react-native",
       "expo-secure-store",
-      "expo-localization"
+      "expo-localization",
+      "expo-notifications"
     ],
     "backgroundColor": "#1A0B4D",
     "extra": {

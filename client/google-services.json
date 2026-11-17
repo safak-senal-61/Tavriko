@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1076881379559",
+    "project_id": "tavriko-62c49",
+    "storage_bucket": "tavriko-62c49.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1076881379559:android:43cb344e05f7e5a77f1242",
+        "android_client_info": {
+          "package_name": "com.tavriko.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbvtg3GRkO8HaOzwDhHgvOdFC5pT5dsnE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,25 +1,38 @@
 /**
- * Expo Push gönderim servisi.
+ * Push gönderim servisi (Expo Push + doğrudan FCM).
  *
  * Kullanım akışı:
  *  1. İstemci (mobil) expo-notifications ile token alır, POST /api/push/register
- *     ile sunucuya kaydeder (push_tokens tablosu).
+ *     ile sunucuya kaydeder (push_tokens tablosu). Android cihazlar FCM device
+ *     token, iOS cihazlar Expo push token kaydeder.
  *  2. Sunucu tarafında uygulama içi bildirim oluştuğu her noktada
  *     `queuePushForNotification` çağrılır: kullanıcı çevrimdışıysa bile push
  *     bildirimi cihaza ulaşır (arkadaşlık isteği, düello daveti, sistem
  *     bildirimi, davet ödülü vb.).
  *  3. Expo push API'si (https://exp.host/--/api/v2/push/send) en fazla 100
  *     mesajlık parçalarla çağrılır; "DeviceNotRegistered" dönen tokenlar
- *     otomatik temizlenir.
+ *     otomatik temizlenir. FCM tokenlar firebase-admin üzerinden doğrudan
+ *     gönderilir (bkz. fcmService); kaydı düşen tokenlar temizlenir.
  *
  * Not: prismaClient, bu modülü statik olarak içe aktardığı için db'ye erişim
  * döngüsel içe aktarımı önlemek amacıyla geçici (lazy) require ile yapılır.
  */
 import type { NotificationItem } from '@trivia/shared';
 import { logger } from '../utils/logger';
+import { sendFcmToTokens } from './fcmService';
 
 const EXPO_PUSH_ENDPOINT = 'https://exp.host/--/api/v2/push/send';
 const EXPO_PUSH_CHUNK_SIZE = 100;
+
+/** Expo push token biçimi: "ExponentPushToken[...]" / "ExpoPushToken[...]". */
+function isExpoToken(token: string): boolean {
+  return token.startsWith('ExponentPushToken') || token.startsWith('ExpoPushToken');
+}
+
+/** FCM device token biçimi: uzun, ":" içeren (ör. "...:APA91b..."). */
+function isFcmToken(token: string): boolean {
+  return !isExpoToken(token) && token.includes(':');
+}
 
 export interface PushPayload {
   title: string;
@@ -49,22 +62,26 @@ function getDb(): DbModule['db'] {
 }
 
 /**
- * Token listesine Expo push gönderir. Saf fonksiyondur (db'ye dokunmaz);
- * test edilebilirlik için db bağlantısı gönderen tarafta tutulur.
+ * Token listesine push gönderir: Expo tokenlar Expo push API'sine, FCM
+ * device tokenlar firebase-admin üzerinden doğrudan FCM'ye gider.
+ * Saf fonksiyondur (db'ye dokunmaz); test edilebilirlik için db bağlantısı
+ * gönderen tarafta tutulur.
  * @returns gönderilen mesaj sayısı ve geçersiz (temizlenmesi gereken) tokenlar.
  */
 export async function sendPushToExpo(
   tokens: string[],
   payload: PushPayload
 ): Promise<{ sent: number; invalidTokens: string[] }> {
-  const valid = tokens.filter((t) => typeof t === 'string' && (t.startsWith('ExponentPushToken') || t.startsWith('ExpoPushToken')));
-  if (!valid.length) return { sent: 0, invalidTokens: [] };
+  const valid = tokens.filter((t) => typeof t === 'string' && t.trim());
+  const expoTokens = valid.filter(isExpoToken);
+  const fcmTokens = valid.filter(isFcmToken);
+  if (!expoTokens.length && !fcmTokens.length) return { sent: 0, invalidTokens: [] };
 
   const invalidTokens: string[] = [];
   let sent = 0;
 
-  for (let i = 0; i < valid.length; i += EXPO_PUSH_CHUNK_SIZE) {
-    const chunk = valid.slice(i, i + EXPO_PUSH_CHUNK_SIZE);
+  for (let i = 0; i < expoTokens.length; i += EXPO_PUSH_CHUNK_SIZE) {
+    const chunk = expoTokens.slice(i, i + EXPO_PUSH_CHUNK_SIZE);
     try {
       const res = await fetch(EXPO_PUSH_ENDPOINT, {
         method: 'POST',
@@ -97,6 +114,13 @@ export async function sendPushToExpo(
     } catch (e: any) {
       logger.warn('SYSTEM', `Expo push gönderimi başarısız: ${e?.message || e}`);
     }
+  }
+
+  // FCM device tokenlar (Android): firebase-admin ile doğrudan gönderim.
+  if (fcmTokens.length) {
+    const fcmResult = await sendFcmToTokens(fcmTokens, payload);
+    sent += fcmResult.sent;
+    invalidTokens.push(...fcmResult.invalidTokens);
   }
 
   return { sent, invalidTokens };

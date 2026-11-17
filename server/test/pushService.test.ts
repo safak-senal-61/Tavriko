@@ -85,6 +85,28 @@ describe('sendPushToExpo', () => {
     const result = await sendPushToExpo(['ExponentPushToken[x]'], { title: 'T', body: 'B' });
     expect(result.sent).toBe(0);
   });
+
+  it('FCM device tokenlar Expo API yerine FCM servisine gider (env yoksa sessiz no-op)', async () => {
+    let fetchCalled = false;
+    global.fetch = (async (_url: any, init: any) => {
+      fetchCalled = true;
+      const body = JSON.parse(init.body);
+      return new Response(JSON.stringify({
+        data: body.map(() => ({ status: 'ok' })),
+      }), { status: 200 });
+    }) as typeof fetch;
+
+    const fcmToken = 'dGVzdA:APA91bFcmDeviceTokenExampleValue1234567890';
+    const result = await sendPushToExpo(
+      [fcmToken, 'ExponentPushToken[expo]'],
+      { title: 'T', body: 'B' }
+    );
+
+    // Expo token Expo API'ye gitti, FCM token ise (FIREBASE_SERVICE_ACCOUNT
+    // tanımsız olduğundan) sessizce gönderilemedi — ama Expo gönderimi çalıştı.
+    expect(fetchCalled).toBe(true);
+    expect(result.sent).toBe(1);
+  });
 });
 
 describe('notificationToPushPayload', () => {
