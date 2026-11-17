@@ -1284,7 +1284,8 @@ export const Button3D: React.FC<{
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
-}> = ({ title, variant = 'gold', onPress, disabled, style, textStyle }) => {
+  testID?: string;
+}> = ({ title, variant = 'gold', onPress, disabled, style, textStyle, testID }) => {
   const variantContainer =
     variant === 'mint'
       ? styles.btn3DMint
@@ -1309,6 +1310,7 @@ export const Button3D: React.FC<{
         if (onPress) onPress();
       }}
       disabled={disabled}
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityState={{ disabled: Boolean(disabled) }}

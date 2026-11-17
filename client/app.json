@@ -7,6 +7,15 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "updates": {
+      "enabled": true,
+      "url": "https://u.expo.dev/3eee7ba8-7dc6-4590-bb87-88214d6bfc7d",
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "androidStatusBar": {
       "hidden": true,
       "translucent": true,

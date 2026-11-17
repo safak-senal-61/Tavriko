@@ -373,6 +373,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     onQuickMatch();
                   }}
                   activeOpacity={0.85}
+                  testID="home-play-button"
                   accessibilityRole="button"
                   accessibilityLabel="Hızlı eşleşme oyna"
                 >

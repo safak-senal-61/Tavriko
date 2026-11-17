@@ -14,6 +14,7 @@ import { hydrateAuthStorage, getStoredAuth } from './src/utils/authStorage';
 import { useGameStore } from './src/store/gameStore';
 import { initAnalytics, trackSessionStart } from './src/services/analytics';
 import { initPushNotifications, registerForPushNotifications } from './src/services/pushNotifications';
+import { checkAndApplyOtaUpdate } from './src/services/otaUpdates';
 
 // Sentry hata izleme: DSN doğrudan koda gömülüdür. Client DSN'leri gizli
 // değildir (her tarayıcı/mobil bundle'ında görünür), yalnızca olay GÖNDERME
@@ -96,6 +97,12 @@ function AppInner() {
     void initAnalytics().then(() => {
       trackSessionStart();
     });
+  }, []);
+
+  // EAS Update (OTA): üretim derlemelerinde açılışta güncelleme kontrolü;
+  // Expo Go / dev / web'de no-op. Hata durumunda sessizce susar.
+  useEffect(() => {
+    void checkAndApplyOtaUpdate();
   }, []);
 
   // Push bildirimleri: ön planda banner gösterimi + kanal kurulumu (mobil).

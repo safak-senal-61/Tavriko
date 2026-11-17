@@ -1,0 +1,40 @@
+# Tavriko E2E — Bot maçı: soru akışı (ilk 3 soru)
+#
+# Çalıştırma:
+#   maestro test -e APP_ID=<paket adı> -e EMAIL=<test e-postası> -e PASSWORD=<şifre> .maestro/bot-match.yaml
+#
+# Not: Bot'a düşme süresi feature flag'i (`matchmaking-bot-fallback-sec`)
+# varsayılan 7 sn — radar ekranından soru ekranına geçiş 30 sn tanık içinde
+# beklenir. Şıklara testID (quiz-option-0..3) üzerinden dokunulur.
+appId: ${APP_ID}
+name: Bot maçı — ilk 3 soru akışı
+tags:
+  - match
+  - critical
+---
+- launchApp
+- runFlow: login.yaml
+
+# OYNA → maç başlar (bot rakip ~7 sn içinde)
+- tapOn:
+    id: "home-play-button"
+
+# İlk soru ekranı (şık butonları) görünene kadar bekle
+- assertVisible:
+    id: "quiz-option-0"
+    timeout: 30000
+
+# 3 soru: şık seç → geri bildirim → (varsa) sonraki soru
+- repeat:
+    times: 3
+    commands:
+      - tapOn:
+          id: "quiz-option-0"
+      # Geri bildirim: SONRAKİ SORU butonu her modda çıkmayabilir (otomatik
+      # geçiş) — opsiyonel bırak
+      - tapOn:
+          text: "SONRAKİ SORU"
+          optional: true
+      - assertVisible:
+          id: "quiz-option-0"
+          optional: true

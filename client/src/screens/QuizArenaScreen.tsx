@@ -1054,6 +1054,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                 disabled={isOptionsDisabled}
                 activeOpacity={0.8}
                 onPress={() => handleSelect(opt.id)}
+                testID={`quiz-option-${index}`}
                 accessibilityRole="button"
                 accessibilityLabel={`${optionLabels[index]} ${opt.text}`}
               >

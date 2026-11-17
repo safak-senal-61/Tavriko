@@ -759,6 +759,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 placeholderTextColor={THEME.colors.textMuted}
                 autoCapitalize="none"
                 keyboardType="email-address"
+                testID="login-email-input"
                 value={email}
                 onChangeText={setEmail}
               />
@@ -769,6 +770,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   placeholder="••••••••"
                   placeholderTextColor={THEME.colors.textMuted}
                   secureTextEntry={!showPassword}
+                  testID="login-password-input"
                   value={password}
                   onChangeText={setPassword}
                 />
@@ -807,6 +809,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <Button3D
                   title="GİRİŞ YAP"
                   variant="gold"
+                  testID="login-submit"
                   onPress={handleSubmit}
                   style={[{ marginTop: compact ? 8 : 12 }, compact && styles.btnCompact]}
                 />

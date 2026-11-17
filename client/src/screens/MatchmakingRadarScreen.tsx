@@ -545,6 +545,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
         <Button3D
           title="ARAMAYI İPTAL ET"
           variant="glass"
+          testID="matchmaking-cancel-button"
           onPress={onCancel}
           style={{ width: '100%', maxWidth: 280 }}
         />

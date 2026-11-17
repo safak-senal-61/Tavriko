@@ -1,0 +1,33 @@
+# Tavriko E2E — Giriş (kayıtlı test hesabı)
+#
+# Çalıştırma:
+#   maestro test -e APP_ID=<paket adı> -e EMAIL=<test e-postası> -e PASSWORD=<şifre> .maestro/login.yaml
+#
+# Not: Oturum zaten açıksa giriş adımlarını atlar ve ana ekranı doğrular.
+appId: ${APP_ID}
+name: Giriş — kayıtlı test hesabı
+tags:
+  - auth
+  - critical
+---
+- launchApp
+
+# Giriş ekranı görünüyorsa doldur (giriş yapılmamış cihaz)
+- runFlow:
+    when:
+      visible: "GİRİŞ YAP"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "${EMAIL}"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "${PASSWORD}"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit"
+
+# Ana ekran (OYNA butonu) görünmeli
+- assertVisible:
+    id: "home-play-button"
+    timeout: 20000

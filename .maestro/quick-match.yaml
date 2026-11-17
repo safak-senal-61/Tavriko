@@ -1,0 +1,26 @@
+# Tavriko E2E — Hızlı eşleşme: arama başlat + iptal
+#
+# Çalıştırma:
+#   maestro test -e APP_ID=<paket adı> -e EMAIL=<test e-postası> -e PASSWORD=<şifre> .maestro/quick-match.yaml
+appId: ${APP_ID}
+name: Hızlı eşleşme — arama başlat ve iptal et
+tags:
+  - matchmaking
+  - critical
+---
+- launchApp
+- runFlow: login.yaml
+
+# OYNA → radar ekranı
+- tapOn:
+    id: "home-play-button"
+- assertVisible:
+    id: "matchmaking-cancel-button"
+    timeout: 10000
+
+# İptal → ana ekrana dön
+- tapOn:
+    id: "matchmaking-cancel-button"
+- assertVisible:
+    id: "home-play-button"
+    timeout: 10000
