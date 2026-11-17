@@ -43,5 +43,11 @@
     "qrcode": "^1.5.4",
     "socket.io": "^4.8.1",
     "telegraf": "^4.16.3"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.2",
+    "glob": "^14.0.2",
+    "minimatch": "^11.0.5",
+    "node-forge": "^1.4.3"
   }
 }
