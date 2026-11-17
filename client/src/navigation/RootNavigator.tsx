@@ -16,6 +16,7 @@ import {
 import { useGameStore, clearAllAccountStorage, getStoredAuth } from '../store/gameStore';
 import { authHeaders } from '../utils/apiAuth';
 import { shuffleOptionsForPlayer } from '../utils/optionShuffle';
+import { seenScopeKey, getSeenQuestionIds, markQuestionsSeen } from '../utils/seenQuestions';
 import { socketService } from '../services/socketService';
 import { sound } from '../services/soundService';
 import { identifyPlayer, trackEvent, markMatchmakingStart, trackMatchFound } from '../services/analytics';
@@ -1318,8 +1319,13 @@ export const RootNavigator: React.FC = () => {
     practiceSessionIdRef.current =
       'sess_' + Math.random().toString(36).substring(2, 9);
     try {
+      // Anti-tekrar: bu kapsamda (kategori/alt kategori) daha önce çözülen
+      // sorular sunucuya seenIds olarak gönderilir; havuz tükenirse sunucu
+      // bilinçli olarak tekrar döndürür. URL boyutu için en fazla 250 ID.
+      const scopeKey = seenScopeKey(category, subCategory);
+      const seenIds = (await getSeenQuestionIds(scopeKey)).slice(-250);
       const res = await fetch(
-        `${API_BASE}/questions/practice?category=${category}${subCategory ? `&subcategory=${encodeURIComponent(subCategory)}` : ''}&difficulty=${difficulty}&count=${questionCount}&sessionId=${practiceSessionIdRef.current}`
+        `${API_BASE}/questions/practice?category=${category}${subCategory ? `&subcategory=${encodeURIComponent(subCategory)}` : ''}&difficulty=${difficulty}&count=${questionCount}&sessionId=${practiceSessionIdRef.current}${seenIds.length ? `&seenIds=${encodeURIComponent(seenIds.join(','))}` : ''}`
       );
       if (res.ok) {
         const data = await res.json();
@@ -1335,6 +1341,7 @@ export const RootNavigator: React.FC = () => {
           return;
         }
         if (data.questions && data.questions.length > 0) {
+          void markQuestionsSeen(scopeKey, data.questions.map((q: ClientQuestion) => q.id));
           setPracticeQuestions(data.questions);
           setPracticeIndex(0);
           setPracticeStats((prev) => ({
