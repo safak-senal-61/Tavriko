@@ -4260,6 +4260,52 @@ export class PrismaService {
   // çalışır — bildirim gönderimi test ortamında sessizce no-op olur).
   // ---------------------------------------------------------------------------
 
+  /** Tüm kayıtlı push cihazlarını kullanıcı bilgisiyle listeler (admin paneli).
+   * Token'ın tamamı asla döndürülmez; yalnızca kısa önizleme verilir. */
+  public async listPushTokensWithUsersAsync(): Promise<
+    Array<{
+      id: string;
+      userId: string;
+      username: string | null;
+      displayName: string | null;
+      platform: string | null;
+      tokenPreview: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }>
+  > {
+    try {
+      const rows = await this.rawClient.pushToken.findMany({
+        orderBy: { updatedAt: 'desc' },
+        take: 200,
+        include: { user: { select: { username: true, displayName: true } } },
+      });
+      return rows.map(
+        (r: {
+          id: string;
+          userId: string;
+          platform: string | null;
+          token: string;
+          createdAt: Date;
+          updatedAt: Date;
+          user: { username: string | null; displayName: string | null } | null;
+        }) => ({
+          id: r.id,
+          userId: r.userId,
+          username: r.user?.username ?? null,
+          displayName: r.user?.displayName ?? null,
+          platform: r.platform,
+          tokenPreview: r.token.length > 28 ? r.token.slice(0, 18) + '…' + r.token.slice(-8) : r.token,
+          createdAt: r.createdAt,
+          updatedAt: r.updatedAt,
+        })
+      );
+    } catch (e: any) {
+      console.warn('[listPushTokensWithUsersAsync] DB hatası:', e.message);
+      return [];
+    }
+  }
+
   /** Kullanıcının kayıtlı Expo push token'larını döndürür. */
   public async getPushTokensAsync(userId: string): Promise<string[]> {
     if (!userId) return [];

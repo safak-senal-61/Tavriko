@@ -15,6 +15,7 @@ import { Matchmaker } from './engine/Matchmaker';
 import { setupSocketHandlers } from './socket/socketHandler';
 import { presenceManager } from './services/presenceManager';
 import { getFcmStatus } from './services/fcmService';
+import { sendPushToUser } from './services/pushService';
 import { TelegramBotService, safeEqualStrings } from './telegram/telegramBot';
 import { supabaseService } from './db/supabaseClient';
 import { cacheService } from './cache/redisClient';
@@ -322,6 +323,34 @@ export function createApp() {
       logger.error('TELEGRAM', `Telegram Webhook Hatası: ${err.message}`, { stack: err.stack });
       console.error('[Telegram Webhook Error]:', err.message);
       return res.status(200).send('OK');
+    }
+  });
+
+  // Admin: push cihazlarını listele (FCM durumuyla birlikte)
+  app.get('/api/admin/push/devices', requireAdminAuth, async (req, res) => {
+    try {
+      const devices = await db.listPushTokensWithUsersAsync();
+      return res.json({ success: true, fcm: getFcmStatus(), devices });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Admin: kullanıcının tüm cihazlarına test push'u gönder
+  app.post('/api/admin/push/test', requireAdminAuth, async (req, res) => {
+    try {
+      const { userId, title, body } = req.body || {};
+      if (!userId || typeof userId !== 'string' || !userId.trim()) {
+        return res.status(400).json({ success: false, error: 'Geçerli bir kullanıcı ID gereklidir.' });
+      }
+      const result = await sendPushToUser(userId.trim(), {
+        title: (typeof title === 'string' && title.trim()) || 'Tavriko Yönetim Testi',
+        body: (typeof body === 'string' && body.trim()) || 'Bu bildirim yönetim panelinden gönderilen test bildirimidir.',
+        data: { type: 'admin-test' },
+      });
+      return res.json({ success: true, sent: result.sent });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
     }
   });
 
