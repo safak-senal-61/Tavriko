@@ -11,14 +11,12 @@
 client/assets/images/avatars
 client/assets/images/categories
 client/assets/images/discovery
-client/assets/images/lobby
+client/assets/images/lobby/*
+!client/assets/images/lobby/invite_bg.png
 client/assets/images/modes
 client/assets/images/profile
 client/assets/images/store
 client/assets/images/ui
-
-# Kod içinde require edilen istisnalar (Metro derlemesi için gerekli)
-!client/assets/images/lobby/invite_bg.png
 
 # CDN'den sunulan tekil dosyalar
 client/assets/images/app_icon.png
