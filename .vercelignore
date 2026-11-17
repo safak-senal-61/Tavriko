@@ -17,6 +17,9 @@ client/assets/images/profile
 client/assets/images/store
 client/assets/images/ui
 
+# Kod içinde require edilen istisnalar (Metro derlemesi için gerekli)
+!client/assets/images/lobby/invite_bg.png
+
 # CDN'den sunulan tekil dosyalar
 client/assets/images/app_icon.png
 client/assets/images/logo_mark.png
