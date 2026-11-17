@@ -5,10 +5,10 @@ import { CategoryId, DifficultyLevel, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { useReducedMotion } from '../components/DiscoveryArtwork';
-import { cdnImage } from '../utils/cdn';
-// Radar arenası Cloudflare CDN'den PNG olarak çekilir (webp bazı cihazlarda
-// boş kalıyordu; PNG her yerde sorunsuz render edilir).
-const RADAR_ARENA: ImageSourcePropType = cdnImage('images/radar_arena.png');
+// Radar arenası PAKET İÇİNDEN yüklenir (require). CDN'den çekilen büyük PNG
+// bazı Android cihazlarda çözülemeyip boş kalıyordu; paket içi require ağ/codec
+// bağımlılığı olmadan her cihazda çalışır.
+const RADAR_ARENA: ImageSourcePropType = require('../../assets/images/radar_arena.png');
 import { GradientFill } from '../components/TavrikoGradient';
 import {
   TavrikoScreen,
