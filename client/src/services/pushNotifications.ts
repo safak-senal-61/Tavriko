@@ -9,11 +9,9 @@
  *     çağrılır: izin ister, Expo push token'ı alır ve sunucuya kaydeder
  *     (POST /api/push/register). Web'de tamamen no-op'tur.
  *
- * Oyun açıkken (ön planda) bildirim gösterilmez — kullanıcı rahatsız
- * edilmez. Bildirimler yalnızca uygulama kapalıyken / arka plandayken
- * cihazda gösterilir. Android'de sunucu data-only FCM mesajı gönderdiği
- * için ön planda bildirim zaten sunulmaz; iOS (ön plan) tarafında
- * handler banner'ı kapatır.
+ * Bildirimler uygulama ön plandayken de banner + ses ile gösterilir —
+ * arkadaş/oda davetleri karşı taraf oyundayken anında görünülsün diye.
+ * Uygulama arka plandayken/kapalıyken sistem tarafından normal gösterilir.
  *
  * Eylem butonları kategorilerle çalışır (sunucu data.categoryId / iOS
  * _category gönderir):
@@ -98,16 +96,16 @@ export function initPushNotifications(): void {
   if (initialized || Platform.OS === 'web') return;
   initialized = true;
 
-  // OYUN AÇIKKEN BİLDİRİM GELMESİN: ön planda gelen bildirimler
-  // gösterilmez (banner yok, ses yok, rozet yok). Uygulama arka plana
-  // alındığında/kapandığında bildirimler sistem tarafından normal
-  // gösterilir. Uygulama içi bildirim merkezi (zil ikonu) çalışmaya devam eder.
+  // ÖN PLANDA DA BİLDİRİM GÖRÜNÜR: arkadaş/oda davetleri çoğunlukla
+  // karşı taraf oyundayken gönderilir; banner gizlenince davet push'u
+  // hiç görünmüyordu ("davet gitmiyor" şikâyetinin sebebi). Artık
+  // uygulama açıkken de banner + ses + rozet gösterilir.
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowBanner: false,
-      shouldShowList: false,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
     }),
   });
 

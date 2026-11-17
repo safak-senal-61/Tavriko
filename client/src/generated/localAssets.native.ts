@@ -473,106 +473,107 @@ const __localImg467 = require('../../assets/images/duel_banner.png');
 const __localImg468 = require('../../assets/images/duel_robot.png');
 const __localImg469 = require('../../assets/images/friends_3d.jpg');
 const __localImg470 = require('../../assets/images/lobby/empty_slot.png');
-const __localImg471 = require('../../assets/images/lobby/lobby_hero.png');
-const __localImg472 = require('../../assets/images/lobby/question_mark.png');
-const __localImg473 = require('../../assets/images/logo_mark.png');
-const __localImg474 = require('../../assets/images/modes/custom_room.png');
-const __localImg475 = require('../../assets/images/modes/daily.png');
-const __localImg476 = require('../../assets/images/modes/friends.png');
-const __localImg477 = require('../../assets/images/modes/single_player.png');
-const __localImg478 = require('../../assets/images/profile/ach_collector.png');
-const __localImg479 = require('../../assets/images/profile/ach_expert.png');
-const __localImg480 = require('../../assets/images/profile/ach_first_win.png');
-const __localImg481 = require('../../assets/images/profile/ach_hundred.png');
-const __localImg482 = require('../../assets/images/profile/ach_speed.png');
-const __localImg483 = require('../../assets/images/profile/ach_streak.png');
-const __localImg484 = require('../../assets/images/profile/lp_emblem.png');
-const __localImg485 = require('../../assets/images/profile/metric_streak.png');
-const __localImg486 = require('../../assets/images/profile/metric_time.png');
-const __localImg487 = require('../../assets/images/profile/metric_xp.png');
-const __localImg488 = require('../../assets/images/profile/stat_accuracy.png');
-const __localImg489 = require('../../assets/images/profile/stat_correct.png');
-const __localImg490 = require('../../assets/images/profile/stat_matches.png');
-const __localImg491 = require('../../assets/images/profile/stat_winrate.png');
-const __localImg492 = require('../../assets/images/profile/tab_mastery.png');
-const __localImg493 = require('../../assets/images/profile/tab_overview.png');
-const __localImg494 = require('../../assets/images/profile/tab_titles.png');
-const __localImg495 = require('../../assets/images/quick_match_banner.jpg');
-const __localImg496 = require('../../assets/images/radar_arena.png');
-const __localImg497 = require('../../assets/images/single_player_3d.jpg');
-const __localImg498 = require('../../assets/images/store/badge_champion.png');
-const __localImg499 = require('../../assets/images/store/badge_genius.png');
-const __localImg500 = require('../../assets/images/store/badge_night_owl.png');
-const __localImg501 = require('../../assets/images/store/badge_season_1_champ.png');
-const __localImg502 = require('../../assets/images/store/badge_speed_demon.png');
-const __localImg503 = require('../../assets/images/store/badge_trivia_master.png');
-const __localImg504 = require('../../assets/images/store/badge_veteran.png');
-const __localImg505 = require('../../assets/images/store/bg_aurora.jpg');
-const __localImg506 = require('../../assets/images/store/bg_forest.jpg');
-const __localImg507 = require('../../assets/images/store/bg_nebula.jpg');
-const __localImg508 = require('../../assets/images/store/bg_night_city.jpg');
-const __localImg509 = require('../../assets/images/store/bg_royal_purple.jpg');
-const __localImg510 = require('../../assets/images/store/bg_sunset.jpg');
-const __localImg511 = require('../../assets/images/store/bg_volcano.jpg');
-const __localImg512 = require('../../assets/images/store/booster_24h.png');
-const __localImg513 = require('../../assets/images/store/booster_bolt.png');
-const __localImg514 = require('../../assets/images/store/chest_gold.png');
-const __localImg515 = require('../../assets/images/store/chest_legendary.png');
-const __localImg516 = require('../../assets/images/store/chest_silver.png');
-const __localImg517 = require('../../assets/images/store/chest_wood.png');
-const __localImg518 = require('../../assets/images/store/coins_l.png');
-const __localImg519 = require('../../assets/images/store/coins_m.png');
-const __localImg520 = require('../../assets/images/store/coins_s.png');
-const __localImg521 = require('../../assets/images/store/coins_xl.png');
-const __localImg522 = require('../../assets/images/store/events_empty.png');
-const __localImg523 = require('../../assets/images/store/events_hero.jpg');
-const __localImg524 = require('../../assets/images/store/frame_flame.png');
-const __localImg525 = require('../../assets/images/store/frame_gold.png');
-const __localImg526 = require('../../assets/images/store/frame_neon.png');
-const __localImg527 = require('../../assets/images/store/gems_l.png');
-const __localImg528 = require('../../assets/images/store/gems_m.png');
-const __localImg529 = require('../../assets/images/store/gems_s.png');
-const __localImg530 = require('../../assets/images/store/gems_xl.png');
-const __localImg531 = require('../../assets/images/store/inventory_empty.png');
-const __localImg532 = require('../../assets/images/store/key_diamond.png');
-const __localImg533 = require('../../assets/images/store/key_gold.png');
-const __localImg534 = require('../../assets/images/store/key_silver.png');
-const __localImg535 = require('../../assets/images/store/proleague_trophy.png');
-const __localImg536 = require('../../assets/images/store/season_hero.jpg');
-const __localImg537 = require('../../assets/images/store/titles_hero.jpg');
-const __localImg538 = require('../../assets/images/ui/auth_crown.png');
-const __localImg539 = require('../../assets/images/ui/event_correct.png');
-const __localImg540 = require('../../assets/images/ui/event_daily.png');
-const __localImg541 = require('../../assets/images/ui/event_special.png');
-const __localImg542 = require('../../assets/images/ui/event_streak.png');
-const __localImg543 = require('../../assets/images/ui/event_weekly.png');
-const __localImg544 = require('../../assets/images/ui/event_wins.png');
-const __localImg545 = require('../../assets/images/ui/icon_daily.png');
-const __localImg546 = require('../../assets/images/ui/icon_events.png');
-const __localImg547 = require('../../assets/images/ui/icon_inventory.png');
-const __localImg548 = require('../../assets/images/ui/icon_prolig.png');
-const __localImg549 = require('../../assets/images/ui/icon_season.png');
-const __localImg550 = require('../../assets/images/ui/icon_shop.png');
-const __localImg551 = require('../../assets/images/ui/icon_special.png');
-const __localImg552 = require('../../assets/images/ui/icon_weekly.png');
-const __localImg553 = require('../../assets/images/ui/level_badge.png');
-const __localImg554 = require('../../assets/images/ui/season_emblem.png');
-const __localImg555 = require('../../assets/images/ui/title_acemi.png');
-const __localImg556 = require('../../assets/images/ui/title_bilgin.png');
-const __localImg557 = require('../../assets/images/ui/title_deha.png');
-const __localImg558 = require('../../assets/images/ui/title_efsanevi.png');
-const __localImg559 = require('../../assets/images/ui/title_epik.png');
-const __localImg560 = require('../../assets/images/ui/title_evren.png');
-const __localImg561 = require('../../assets/images/ui/title_nadir.png');
-const __localImg562 = require('../../assets/images/ui/title_sovalye.png');
-const __localImg563 = require('../../assets/images/ui/title_stratejist.png');
-const __localImg564 = require('../../assets/images/ui/title_usta_kasif.png');
-const __localImg565 = require('../../assets/images/ui/title_ustat.png');
-const __localImg566 = require('../../assets/images/ui/title_yildiz.png');
-const __localImg567 = require('../../assets/splash-icon-transparent.png');
-const __localImg568 = require('../../assets/splash-icon.png');
-const __localImg569 = require('../../assets/splash-logo.png');
-const __localImg570 = require('../../assets/splash-screen.png');
+const __localImg471 = require('../../assets/images/lobby/invite_bg.png');
+const __localImg472 = require('../../assets/images/lobby/lobby_hero.png');
+const __localImg473 = require('../../assets/images/lobby/question_mark.png');
+const __localImg474 = require('../../assets/images/logo_mark.png');
+const __localImg475 = require('../../assets/images/modes/custom_room.png');
+const __localImg476 = require('../../assets/images/modes/daily.png');
+const __localImg477 = require('../../assets/images/modes/friends.png');
+const __localImg478 = require('../../assets/images/modes/single_player.png');
+const __localImg479 = require('../../assets/images/profile/ach_collector.png');
+const __localImg480 = require('../../assets/images/profile/ach_expert.png');
+const __localImg481 = require('../../assets/images/profile/ach_first_win.png');
+const __localImg482 = require('../../assets/images/profile/ach_hundred.png');
+const __localImg483 = require('../../assets/images/profile/ach_speed.png');
+const __localImg484 = require('../../assets/images/profile/ach_streak.png');
+const __localImg485 = require('../../assets/images/profile/lp_emblem.png');
+const __localImg486 = require('../../assets/images/profile/metric_streak.png');
+const __localImg487 = require('../../assets/images/profile/metric_time.png');
+const __localImg488 = require('../../assets/images/profile/metric_xp.png');
+const __localImg489 = require('../../assets/images/profile/stat_accuracy.png');
+const __localImg490 = require('../../assets/images/profile/stat_correct.png');
+const __localImg491 = require('../../assets/images/profile/stat_matches.png');
+const __localImg492 = require('../../assets/images/profile/stat_winrate.png');
+const __localImg493 = require('../../assets/images/profile/tab_mastery.png');
+const __localImg494 = require('../../assets/images/profile/tab_overview.png');
+const __localImg495 = require('../../assets/images/profile/tab_titles.png');
+const __localImg496 = require('../../assets/images/quick_match_banner.jpg');
+const __localImg497 = require('../../assets/images/radar_arena.png');
+const __localImg498 = require('../../assets/images/single_player_3d.jpg');
+const __localImg499 = require('../../assets/images/store/badge_champion.png');
+const __localImg500 = require('../../assets/images/store/badge_genius.png');
+const __localImg501 = require('../../assets/images/store/badge_night_owl.png');
+const __localImg502 = require('../../assets/images/store/badge_season_1_champ.png');
+const __localImg503 = require('../../assets/images/store/badge_speed_demon.png');
+const __localImg504 = require('../../assets/images/store/badge_trivia_master.png');
+const __localImg505 = require('../../assets/images/store/badge_veteran.png');
+const __localImg506 = require('../../assets/images/store/bg_aurora.jpg');
+const __localImg507 = require('../../assets/images/store/bg_forest.jpg');
+const __localImg508 = require('../../assets/images/store/bg_nebula.jpg');
+const __localImg509 = require('../../assets/images/store/bg_night_city.jpg');
+const __localImg510 = require('../../assets/images/store/bg_royal_purple.jpg');
+const __localImg511 = require('../../assets/images/store/bg_sunset.jpg');
+const __localImg512 = require('../../assets/images/store/bg_volcano.jpg');
+const __localImg513 = require('../../assets/images/store/booster_24h.png');
+const __localImg514 = require('../../assets/images/store/booster_bolt.png');
+const __localImg515 = require('../../assets/images/store/chest_gold.png');
+const __localImg516 = require('../../assets/images/store/chest_legendary.png');
+const __localImg517 = require('../../assets/images/store/chest_silver.png');
+const __localImg518 = require('../../assets/images/store/chest_wood.png');
+const __localImg519 = require('../../assets/images/store/coins_l.png');
+const __localImg520 = require('../../assets/images/store/coins_m.png');
+const __localImg521 = require('../../assets/images/store/coins_s.png');
+const __localImg522 = require('../../assets/images/store/coins_xl.png');
+const __localImg523 = require('../../assets/images/store/events_empty.png');
+const __localImg524 = require('../../assets/images/store/events_hero.jpg');
+const __localImg525 = require('../../assets/images/store/frame_flame.png');
+const __localImg526 = require('../../assets/images/store/frame_gold.png');
+const __localImg527 = require('../../assets/images/store/frame_neon.png');
+const __localImg528 = require('../../assets/images/store/gems_l.png');
+const __localImg529 = require('../../assets/images/store/gems_m.png');
+const __localImg530 = require('../../assets/images/store/gems_s.png');
+const __localImg531 = require('../../assets/images/store/gems_xl.png');
+const __localImg532 = require('../../assets/images/store/inventory_empty.png');
+const __localImg533 = require('../../assets/images/store/key_diamond.png');
+const __localImg534 = require('../../assets/images/store/key_gold.png');
+const __localImg535 = require('../../assets/images/store/key_silver.png');
+const __localImg536 = require('../../assets/images/store/proleague_trophy.png');
+const __localImg537 = require('../../assets/images/store/season_hero.jpg');
+const __localImg538 = require('../../assets/images/store/titles_hero.jpg');
+const __localImg539 = require('../../assets/images/ui/auth_crown.png');
+const __localImg540 = require('../../assets/images/ui/event_correct.png');
+const __localImg541 = require('../../assets/images/ui/event_daily.png');
+const __localImg542 = require('../../assets/images/ui/event_special.png');
+const __localImg543 = require('../../assets/images/ui/event_streak.png');
+const __localImg544 = require('../../assets/images/ui/event_weekly.png');
+const __localImg545 = require('../../assets/images/ui/event_wins.png');
+const __localImg546 = require('../../assets/images/ui/icon_daily.png');
+const __localImg547 = require('../../assets/images/ui/icon_events.png');
+const __localImg548 = require('../../assets/images/ui/icon_inventory.png');
+const __localImg549 = require('../../assets/images/ui/icon_prolig.png');
+const __localImg550 = require('../../assets/images/ui/icon_season.png');
+const __localImg551 = require('../../assets/images/ui/icon_shop.png');
+const __localImg552 = require('../../assets/images/ui/icon_special.png');
+const __localImg553 = require('../../assets/images/ui/icon_weekly.png');
+const __localImg554 = require('../../assets/images/ui/level_badge.png');
+const __localImg555 = require('../../assets/images/ui/season_emblem.png');
+const __localImg556 = require('../../assets/images/ui/title_acemi.png');
+const __localImg557 = require('../../assets/images/ui/title_bilgin.png');
+const __localImg558 = require('../../assets/images/ui/title_deha.png');
+const __localImg559 = require('../../assets/images/ui/title_efsanevi.png');
+const __localImg560 = require('../../assets/images/ui/title_epik.png');
+const __localImg561 = require('../../assets/images/ui/title_evren.png');
+const __localImg562 = require('../../assets/images/ui/title_nadir.png');
+const __localImg563 = require('../../assets/images/ui/title_sovalye.png');
+const __localImg564 = require('../../assets/images/ui/title_stratejist.png');
+const __localImg565 = require('../../assets/images/ui/title_usta_kasif.png');
+const __localImg566 = require('../../assets/images/ui/title_ustat.png');
+const __localImg567 = require('../../assets/images/ui/title_yildiz.png');
+const __localImg568 = require('../../assets/splash-icon-transparent.png');
+const __localImg569 = require('../../assets/splash-icon.png');
+const __localImg570 = require('../../assets/splash-logo.png');
+const __localImg571 = require('../../assets/splash-screen.png');
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const LOCAL_IMAGE_ASSETS: Record<string, any> = {
   "adaptive-icon.png": __localImg0,
@@ -1046,104 +1047,105 @@ export const LOCAL_IMAGE_ASSETS: Record<string, any> = {
   "images/duel_robot.png": __localImg468,
   "images/friends_3d.jpg": __localImg469,
   "images/lobby/empty_slot.png": __localImg470,
-  "images/lobby/lobby_hero.png": __localImg471,
-  "images/lobby/question_mark.png": __localImg472,
-  "images/logo_mark.png": __localImg473,
-  "images/modes/custom_room.png": __localImg474,
-  "images/modes/daily.png": __localImg475,
-  "images/modes/friends.png": __localImg476,
-  "images/modes/single_player.png": __localImg477,
-  "images/profile/ach_collector.png": __localImg478,
-  "images/profile/ach_expert.png": __localImg479,
-  "images/profile/ach_first_win.png": __localImg480,
-  "images/profile/ach_hundred.png": __localImg481,
-  "images/profile/ach_speed.png": __localImg482,
-  "images/profile/ach_streak.png": __localImg483,
-  "images/profile/lp_emblem.png": __localImg484,
-  "images/profile/metric_streak.png": __localImg485,
-  "images/profile/metric_time.png": __localImg486,
-  "images/profile/metric_xp.png": __localImg487,
-  "images/profile/stat_accuracy.png": __localImg488,
-  "images/profile/stat_correct.png": __localImg489,
-  "images/profile/stat_matches.png": __localImg490,
-  "images/profile/stat_winrate.png": __localImg491,
-  "images/profile/tab_mastery.png": __localImg492,
-  "images/profile/tab_overview.png": __localImg493,
-  "images/profile/tab_titles.png": __localImg494,
-  "images/quick_match_banner.jpg": __localImg495,
-  "images/radar_arena.png": __localImg496,
-  "images/single_player_3d.jpg": __localImg497,
-  "images/store/badge_champion.png": __localImg498,
-  "images/store/badge_genius.png": __localImg499,
-  "images/store/badge_night_owl.png": __localImg500,
-  "images/store/badge_season_1_champ.png": __localImg501,
-  "images/store/badge_speed_demon.png": __localImg502,
-  "images/store/badge_trivia_master.png": __localImg503,
-  "images/store/badge_veteran.png": __localImg504,
-  "images/store/bg_aurora.jpg": __localImg505,
-  "images/store/bg_forest.jpg": __localImg506,
-  "images/store/bg_nebula.jpg": __localImg507,
-  "images/store/bg_night_city.jpg": __localImg508,
-  "images/store/bg_royal_purple.jpg": __localImg509,
-  "images/store/bg_sunset.jpg": __localImg510,
-  "images/store/bg_volcano.jpg": __localImg511,
-  "images/store/booster_24h.png": __localImg512,
-  "images/store/booster_bolt.png": __localImg513,
-  "images/store/chest_gold.png": __localImg514,
-  "images/store/chest_legendary.png": __localImg515,
-  "images/store/chest_silver.png": __localImg516,
-  "images/store/chest_wood.png": __localImg517,
-  "images/store/coins_l.png": __localImg518,
-  "images/store/coins_m.png": __localImg519,
-  "images/store/coins_s.png": __localImg520,
-  "images/store/coins_xl.png": __localImg521,
-  "images/store/events_empty.png": __localImg522,
-  "images/store/events_hero.jpg": __localImg523,
-  "images/store/frame_flame.png": __localImg524,
-  "images/store/frame_gold.png": __localImg525,
-  "images/store/frame_neon.png": __localImg526,
-  "images/store/gems_l.png": __localImg527,
-  "images/store/gems_m.png": __localImg528,
-  "images/store/gems_s.png": __localImg529,
-  "images/store/gems_xl.png": __localImg530,
-  "images/store/inventory_empty.png": __localImg531,
-  "images/store/key_diamond.png": __localImg532,
-  "images/store/key_gold.png": __localImg533,
-  "images/store/key_silver.png": __localImg534,
-  "images/store/proleague_trophy.png": __localImg535,
-  "images/store/season_hero.jpg": __localImg536,
-  "images/store/titles_hero.jpg": __localImg537,
-  "images/ui/auth_crown.png": __localImg538,
-  "images/ui/event_correct.png": __localImg539,
-  "images/ui/event_daily.png": __localImg540,
-  "images/ui/event_special.png": __localImg541,
-  "images/ui/event_streak.png": __localImg542,
-  "images/ui/event_weekly.png": __localImg543,
-  "images/ui/event_wins.png": __localImg544,
-  "images/ui/icon_daily.png": __localImg545,
-  "images/ui/icon_events.png": __localImg546,
-  "images/ui/icon_inventory.png": __localImg547,
-  "images/ui/icon_prolig.png": __localImg548,
-  "images/ui/icon_season.png": __localImg549,
-  "images/ui/icon_shop.png": __localImg550,
-  "images/ui/icon_special.png": __localImg551,
-  "images/ui/icon_weekly.png": __localImg552,
-  "images/ui/level_badge.png": __localImg553,
-  "images/ui/season_emblem.png": __localImg554,
-  "images/ui/title_acemi.png": __localImg555,
-  "images/ui/title_bilgin.png": __localImg556,
-  "images/ui/title_deha.png": __localImg557,
-  "images/ui/title_efsanevi.png": __localImg558,
-  "images/ui/title_epik.png": __localImg559,
-  "images/ui/title_evren.png": __localImg560,
-  "images/ui/title_nadir.png": __localImg561,
-  "images/ui/title_sovalye.png": __localImg562,
-  "images/ui/title_stratejist.png": __localImg563,
-  "images/ui/title_usta_kasif.png": __localImg564,
-  "images/ui/title_ustat.png": __localImg565,
-  "images/ui/title_yildiz.png": __localImg566,
-  "splash-icon-transparent.png": __localImg567,
-  "splash-icon.png": __localImg568,
-  "splash-logo.png": __localImg569,
-  "splash-screen.png": __localImg570,
+  "images/lobby/invite_bg.png": __localImg471,
+  "images/lobby/lobby_hero.png": __localImg472,
+  "images/lobby/question_mark.png": __localImg473,
+  "images/logo_mark.png": __localImg474,
+  "images/modes/custom_room.png": __localImg475,
+  "images/modes/daily.png": __localImg476,
+  "images/modes/friends.png": __localImg477,
+  "images/modes/single_player.png": __localImg478,
+  "images/profile/ach_collector.png": __localImg479,
+  "images/profile/ach_expert.png": __localImg480,
+  "images/profile/ach_first_win.png": __localImg481,
+  "images/profile/ach_hundred.png": __localImg482,
+  "images/profile/ach_speed.png": __localImg483,
+  "images/profile/ach_streak.png": __localImg484,
+  "images/profile/lp_emblem.png": __localImg485,
+  "images/profile/metric_streak.png": __localImg486,
+  "images/profile/metric_time.png": __localImg487,
+  "images/profile/metric_xp.png": __localImg488,
+  "images/profile/stat_accuracy.png": __localImg489,
+  "images/profile/stat_correct.png": __localImg490,
+  "images/profile/stat_matches.png": __localImg491,
+  "images/profile/stat_winrate.png": __localImg492,
+  "images/profile/tab_mastery.png": __localImg493,
+  "images/profile/tab_overview.png": __localImg494,
+  "images/profile/tab_titles.png": __localImg495,
+  "images/quick_match_banner.jpg": __localImg496,
+  "images/radar_arena.png": __localImg497,
+  "images/single_player_3d.jpg": __localImg498,
+  "images/store/badge_champion.png": __localImg499,
+  "images/store/badge_genius.png": __localImg500,
+  "images/store/badge_night_owl.png": __localImg501,
+  "images/store/badge_season_1_champ.png": __localImg502,
+  "images/store/badge_speed_demon.png": __localImg503,
+  "images/store/badge_trivia_master.png": __localImg504,
+  "images/store/badge_veteran.png": __localImg505,
+  "images/store/bg_aurora.jpg": __localImg506,
+  "images/store/bg_forest.jpg": __localImg507,
+  "images/store/bg_nebula.jpg": __localImg508,
+  "images/store/bg_night_city.jpg": __localImg509,
+  "images/store/bg_royal_purple.jpg": __localImg510,
+  "images/store/bg_sunset.jpg": __localImg511,
+  "images/store/bg_volcano.jpg": __localImg512,
+  "images/store/booster_24h.png": __localImg513,
+  "images/store/booster_bolt.png": __localImg514,
+  "images/store/chest_gold.png": __localImg515,
+  "images/store/chest_legendary.png": __localImg516,
+  "images/store/chest_silver.png": __localImg517,
+  "images/store/chest_wood.png": __localImg518,
+  "images/store/coins_l.png": __localImg519,
+  "images/store/coins_m.png": __localImg520,
+  "images/store/coins_s.png": __localImg521,
+  "images/store/coins_xl.png": __localImg522,
+  "images/store/events_empty.png": __localImg523,
+  "images/store/events_hero.jpg": __localImg524,
+  "images/store/frame_flame.png": __localImg525,
+  "images/store/frame_gold.png": __localImg526,
+  "images/store/frame_neon.png": __localImg527,
+  "images/store/gems_l.png": __localImg528,
+  "images/store/gems_m.png": __localImg529,
+  "images/store/gems_s.png": __localImg530,
+  "images/store/gems_xl.png": __localImg531,
+  "images/store/inventory_empty.png": __localImg532,
+  "images/store/key_diamond.png": __localImg533,
+  "images/store/key_gold.png": __localImg534,
+  "images/store/key_silver.png": __localImg535,
+  "images/store/proleague_trophy.png": __localImg536,
+  "images/store/season_hero.jpg": __localImg537,
+  "images/store/titles_hero.jpg": __localImg538,
+  "images/ui/auth_crown.png": __localImg539,
+  "images/ui/event_correct.png": __localImg540,
+  "images/ui/event_daily.png": __localImg541,
+  "images/ui/event_special.png": __localImg542,
+  "images/ui/event_streak.png": __localImg543,
+  "images/ui/event_weekly.png": __localImg544,
+  "images/ui/event_wins.png": __localImg545,
+  "images/ui/icon_daily.png": __localImg546,
+  "images/ui/icon_events.png": __localImg547,
+  "images/ui/icon_inventory.png": __localImg548,
+  "images/ui/icon_prolig.png": __localImg549,
+  "images/ui/icon_season.png": __localImg550,
+  "images/ui/icon_shop.png": __localImg551,
+  "images/ui/icon_special.png": __localImg552,
+  "images/ui/icon_weekly.png": __localImg553,
+  "images/ui/level_badge.png": __localImg554,
+  "images/ui/season_emblem.png": __localImg555,
+  "images/ui/title_acemi.png": __localImg556,
+  "images/ui/title_bilgin.png": __localImg557,
+  "images/ui/title_deha.png": __localImg558,
+  "images/ui/title_efsanevi.png": __localImg559,
+  "images/ui/title_epik.png": __localImg560,
+  "images/ui/title_evren.png": __localImg561,
+  "images/ui/title_nadir.png": __localImg562,
+  "images/ui/title_sovalye.png": __localImg563,
+  "images/ui/title_stratejist.png": __localImg564,
+  "images/ui/title_usta_kasif.png": __localImg565,
+  "images/ui/title_ustat.png": __localImg566,
+  "images/ui/title_yildiz.png": __localImg567,
+  "splash-icon-transparent.png": __localImg568,
+  "splash-icon.png": __localImg569,
+  "splash-logo.png": __localImg570,
+  "splash-screen.png": __localImg571,
 };

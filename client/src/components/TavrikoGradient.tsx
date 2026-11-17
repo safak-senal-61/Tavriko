@@ -5,6 +5,32 @@ import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 let gradientSeq = 0;
 
 /**
+ * rgba(r,g,b,a) rengini SVG duraklarına uygun {color, opacity} çiftine çevirir.
+ *
+ * KRİTİK — react-native-svg (native): `stopColor` içindeki rgba alfa kanalı
+ * YOK SAYILIR (extractGradient, rengin alfasını maskeler ve `stopOpacity`
+ * varsayılanı olan 1 — tam opak — ile değiştirir). Yani `rgba(15,6,36,0)`
+ * native tarafta TAMAMEN OPAK koyu mor olarak çizilir ve altındaki görseli
+ * örter ("görsel bir an görünüp kayboluyor" sorununun kökü). Web'de CSS
+ * rgba'yı doğru işlediği için hata yalnızca Android/iOS'te görünür.
+ * Çözüm: alfa ayrı `stopOpacity` prop'u olarak verilir (resmî kullanım).
+ */
+const RGBA_RE = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i;
+
+function toHex(n: number): string {
+  const h = Math.max(0, Math.min(255, Math.round(n))).toString(16);
+  return h.length === 1 ? `0${h}` : h;
+}
+
+function parseStopColor(c: string): { color: string; opacity?: number } {
+  const m = typeof c === 'string' ? RGBA_RE.exec(c.trim()) : null;
+  if (!m) return { color: c };
+  const color = `#${toHex(+m[1])}${toHex(+m[2])}${toHex(+m[3])}`;
+  const alpha = m[4] !== undefined ? +m[4] : 1;
+  return { color, opacity: Math.max(0, Math.min(1, alpha)) };
+}
+
+/**
  * Ebeveyninin tamamını kaplayan SVG doğrusal gradyan katmanı.
  * Ebeveyn `overflow: 'hidden'` ve `borderRadius` ile köşeleri keser.
  * (Projede expo-linear-gradient olmadığı için react-native-svg kullanılır.)
@@ -31,15 +57,19 @@ export const GradientFill: React.FC<{
       <Svg width="100%" height="100%" preserveAspectRatio="none">
         <Defs>
           <LinearGradient id={id} x1="0" y1="0" x2={x2} y2={y2}>
-            {colors.map((c, i) => (
-              <Stop
-                key={`${c}-${i}`}
-                offset={String(
-                  stops?.[i] ?? (colors.length === 1 ? 0 : i / (colors.length - 1))
-                )}
-                stopColor={c}
-              />
-            ))}
+            {colors.map((c, i) => {
+              const { color, opacity } = parseStopColor(c);
+              return (
+                <Stop
+                  key={`${c}-${i}`}
+                  offset={String(
+                    stops?.[i] ?? (colors.length === 1 ? 0 : i / (colors.length - 1))
+                  )}
+                  stopColor={color}
+                  {...(opacity !== undefined ? { stopOpacity: opacity } : {})}
+                />
+              );
+            })}
           </LinearGradient>
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} opacity={opacity} />

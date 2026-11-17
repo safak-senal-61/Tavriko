@@ -1,4 +1,5 @@
 import { cdnImage } from '../utils/cdn';
+import { GradientFill } from '../components/TavrikoGradient';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -14,6 +15,7 @@ import {
   Modal,
   FlatList,
   ActivityIndicator,
+  ImageSourcePropType,
 } from 'react-native';
 import { DEFAULT_API_BASE } from '../config';
 import { authHeaders } from '../utils/apiAuth';
@@ -164,6 +166,75 @@ const BouncyReaction: React.FC<{ emoji: string; onPress: () => void }> = ({ emoj
     >
       <Reanimated.View style={style}>
         <Text style={styles.reactionEmojiText}>{emoji}</Text>
+      </Reanimated.View>
+    </TouchableOpacity>
+  );
+};
+
+/** Arkadaş davet kartı arka planı: mor nebula + teal parıltı (PIL ile üretildi) */
+const INVITE_BG: ImageSourcePropType = require('../../assets/images/lobby/invite_bg.png');
+
+/**
+ * OYUN İÇİ ARKADAŞ DAVETİ — şık, animasyonlu kart:
+ *  - Arka plan görseli (paket içi, ağ bağımsız)
+ *  - Nefes alan mor parıltılı kenarlık (KartPaylaş ile aynı desen, mor)
+ *  - Kart üzerinde sonsuz dönen ışık taraması (shine sweep)
+ *  - Nabız atan rozet + basınca hafif çökme
+ */
+const FriendInviteCard: React.FC<{ onPress: () => void }> = ({ onPress }) => {
+  const p = useSharedValue(0);
+  const sweep = useSharedValue(0);
+  const press = useSharedValue(1);
+  useEffect(() => {
+    p.value = withRepeat(withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) }), -1, true);
+    sweep.value = withRepeat(withTiming(1, { duration: 2800, easing: Easing.linear }), -1, false);
+  }, []);
+  const borderStyle = useAnimatedStyle(() => {
+    const t = 0.5 + 0.5 * Math.sin(p.value * Math.PI);
+    return {
+      borderColor: `rgba(155, 140, 255, ${0.45 + 0.45 * t})`,
+      shadowOpacity: 0.22 + 0.26 * t,
+    };
+  });
+  const badgeStyle = useAnimatedStyle(() => {
+    const t = 0.5 + 0.5 * Math.sin(p.value * Math.PI);
+    return { transform: [{ scale: 0.93 + 0.09 * t }] };
+  });
+  const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: press.value }] }));
+  const shineStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: `${-150 + sweep.value * 700}%` }, { rotate: '14deg' }],
+  }));
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={onPress}
+      onPressIn={() => {
+        press.value = withTiming(0.97, { duration: 120 });
+      }}
+      onPressOut={() => {
+        press.value = withTiming(1, { duration: 200 });
+      }}
+    >
+      <Reanimated.View style={[styles.friendInviteCard, borderStyle, pressStyle]}>
+        <Image source={INVITE_BG} style={styles.friendInviteBg} resizeMode="cover" />
+        {/* Alt kısım yazı okunurluğu için yumuşak karartma */}
+        <GradientFill colors={['rgba(15,6,36,0)', 'rgba(15,6,36,0.62)']} stops={[0.4, 1]} />
+        {/* Sonsuz ışık taraması */}
+        <Reanimated.View style={[styles.friendInviteShine, shineStyle]} pointerEvents="none">
+          <View style={styles.friendInviteShineCore} />
+        </Reanimated.View>
+        <View style={styles.friendInviteRow}>
+          <Reanimated.View style={[styles.friendInviteBadge, badgeStyle]}>
+            <Text style={styles.friendInviteBadgeText}>👥</Text>
+          </Reanimated.View>
+          <View style={styles.inviteLinkInfo}>
+            <Text style={styles.friendInviteTitle}>ARKADAŞ DAVET ET</Text>
+            <Text style={styles.inviteLinkSub} numberOfLines={2}>
+              Arkadaşlarına bildirim gider — tek dokunuşla odaya katılır
+            </Text>
+          </View>
+          <Text style={styles.friendInviteChevron}>›</Text>
+        </View>
       </Reanimated.View>
     </TouchableOpacity>
   );
@@ -665,25 +736,13 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
         {/* 1.6. OYUN İÇİ ARKADAŞ DAVETİ (bildirimle odaya çağırır) */}
         <Reanimated.View entering={FadeInDown.delay(140).duration(400)} style={styles.inviteLinkWrap}>
-          <TouchableOpacity
-            style={styles.friendInviteCard}
+          <FriendInviteCard
             onPress={() => {
               sound.playSound('tap');
               loadFriends();
               setFriendInviteVisible(true);
             }}
-            activeOpacity={0.8}
-          >
-            <View style={styles.friendInviteBadge}>
-              <Text style={styles.friendInviteBadgeText}>👥</Text>
-            </View>
-            <View style={styles.inviteLinkInfo}>
-              <Text style={styles.inviteLinkLabel}>ARKADAŞ DAVET ET</Text>
-              <Text style={styles.inviteLinkSub}>
-                Arkadaşlarına bildirim gider — tek dokunuşla odaya katılır
-              </Text>
-            </View>
-          </TouchableOpacity>
+          />
         </Reanimated.View>
 
         {/* 2. ODA PARAMETRELERİ (Kademeli girişli çipler) */}
@@ -1267,28 +1326,79 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: 12,
   },
+  // ---- Arkadaş Davet Kartı (animasyonlu, arka plan görselli) ----
   friendInviteCard: {
     width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    gap: 12,
-    backgroundColor: 'rgba(124, 92, 255, 0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(155, 140, 255, 0.35)',
+    borderRadius: 18,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    backgroundColor: '#150A38',
+    shadowColor: '#7C4DFF',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 14,
+    elevation: 8,
   },
-  friendInviteBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  friendInviteBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  friendInviteShine: {
+    position: 'absolute',
+    top: -36,
+    bottom: -36,
+    left: 0,
+    width: 76,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(155, 140, 255, 0.22)',
+  },
+  friendInviteShineCore: {
+    width: 26,
+    height: '100%',
+    borderRadius: 13,
+    backgroundColor: 'rgba(235, 225, 255, 0.14)',
+  },
+  friendInviteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  friendInviteBadge: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(124, 92, 255, 0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(186, 150, 255, 0.45)',
+    shadowColor: '#9B8CFF',
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 4,
   },
   friendInviteBadgeText: {
-    fontSize: 18,
+    fontSize: 20,
+  },
+  friendInviteTitle: {
+    fontSize: 15,
+    fontFamily: THEME.fonts.extraBold,
+    color: '#FFFFFF',
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  friendInviteChevron: {
+    fontSize: 28,
+    lineHeight: 30,
+    color: 'rgba(200, 185, 255, 0.9)',
+    fontFamily: THEME.fonts.black,
   },
   friendModalOverlay: {
     flex: 1,
