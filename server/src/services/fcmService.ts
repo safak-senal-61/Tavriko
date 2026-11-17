@@ -7,9 +7,11 @@
  * (Expo push servisine bağımlı değildir).
  *
  * Güvenlik:
- *  - Service account anahtarı YALNIZCA `FIREBASE_SERVICE_ACCOUNT` ortam
- *    değişkeninden okunur (düz JSON veya base64 JSON). Repoya, istemciye
- *    veya loglara asla yazılmaz — Supabase anahtarlarıyla aynı kural.
+ *  - Service account anahtarı YALNIZCA ortam değişkenlerinden okunur:
+ *    ya `FIREBASE_SERVICE_ACCOUNT` (düz JSON veya base64 JSON) ya da ayrı
+ *    ayrı `FIREBASE_PROJECT_ID` + `FIREBASE_CLIENT_EMAIL` +
+ *    `FIREBASE_PRIVATE_KEY` (Vercel'de tercih edilen yöntem). Repoya,
+ *    istemciye veya loglara asla yazılmaz — Supabase anahtarlarıyla aynı kural.
  *  - Değişken tanımsızsa modül sessizce devre dışı kalır; oyun akışı
  *    bildirim yüzünden asla bozulmaz.
  */
@@ -37,18 +39,59 @@ let disabledReason = '';
 /** FIREBASE_SERVICE_ACCOUNT değerini (düz JSON veya base64) çözer. */
 function decodeServiceAccount(): Record<string, unknown> | null {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!raw || !raw.trim()) return null;
-  const trimmed = raw.trim();
-  try {
-    return JSON.parse(trimmed) as Record<string, unknown>;
-  } catch {
+  if (raw && raw.trim()) {
+    const trimmed = raw.trim();
     try {
-      const decoded = Buffer.from(trimmed, 'base64').toString('utf8');
-      return JSON.parse(decoded) as Record<string, unknown>;
+      return JSON.parse(trimmed) as Record<string, unknown>;
     } catch {
-      return null;
+      try {
+        const decoded = Buffer.from(trimmed, 'base64').toString('utf8');
+        return JSON.parse(decoded) as Record<string, unknown>;
+      } catch {
+        // tek değişken bozuksa ayrı değişkenlere düş
+      }
     }
   }
+  return decodeServiceAccountFromParts();
+}
+
+/**
+ * Ayrı ortam değişkenlerinden service account oluşturur (Vercel'de JSON'un
+ * tamamını yapıştırmak satır sonu karakterlerinden dolayı bozulduğu için
+ * tercih edilen yöntem):
+ *   FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
+ * FIREBASE_PRIVATE_KEY içindeki literal "\n" dizileri gerçek satır sonuna
+ * çevrilir (Vercel paneline yapıştırılan tek satırlık anahtar için).
+ */
+function decodeServiceAccountFromParts(): Record<string, unknown> | null {
+  const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
+  let privateKey = process.env.FIREBASE_PRIVATE_KEY?.trim();
+  if (!projectId || !clientEmail || !privateKey) return null;
+  if (privateKey.includes('\\n')) {
+    privateKey = privateKey.replace(/\\n/g, '\n');
+  }
+  if (!privateKey.includes('\n')) {
+    // Tek satır halinde PEM (başlık/gövde/sonu bitişik): standart biçime çevir
+    const m = /^-----BEGIN PRIVATE KEY-----(.+)-----END PRIVATE KEY-----$/.exec(privateKey);
+    if (m) {
+      const body = m[1].replace(/(.{64})/g, '$1\n').trim();
+      privateKey = `-----BEGIN PRIVATE KEY-----\n${body}\n-----END PRIVATE KEY-----`;
+    }
+  }
+  if (privateKey.endsWith('-----END PRIVATE KEY-----')) {
+    privateKey += '\n';
+  }
+  const serviceAccount: Record<string, unknown> = {
+    type: 'service_account',
+    project_id: projectId,
+    private_key: privateKey,
+    client_email: clientEmail,
+    token_uri: 'https://oauth2.googleapis.com/token',
+  };
+  const privateKeyId = process.env.FIREBASE_PRIVATE_KEY_ID?.trim();
+  if (privateKeyId) serviceAccount.private_key_id = privateKeyId;
+  return serviceAccount;
 }
 
 /** firebase-admin'ı lazy yükleyip Messaging örneğini döndürür (veya null). */
@@ -58,7 +101,7 @@ function getMessagingInstance(): MessagingLike | null {
 
   const serviceAccount = decodeServiceAccount();
   if (!serviceAccount) {
-    disabledReason = 'FIREBASE_SERVICE_ACCOUNT tanımlı değil';
+    disabledReason = 'FIREBASE_SERVICE_ACCOUNT veya FIREBASE_PROJECT_ID/FIREBASE_CLIENT_EMAIL/FIREBASE_PRIVATE_KEY tanımlı değil';
     return null;
   }
   try {
