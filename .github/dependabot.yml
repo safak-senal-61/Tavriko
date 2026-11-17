@@ -1,67 +1,83 @@
-# Bağımlılık güncellemeleri (ücretsiz).
-# Public repoda Actions dakikaları ücretsiz olduğu için Dependabot PR'ları ek maliyet oluşturmaz.
+# Dependabot sürüm güncellemeleri — güvenlik açıklarını kaynakta tutmak için
+# bağımlılıkları haftalık güncel tutar (güvenlik yamaları zaten anında gelir).
 version: 2
 updates:
-  # Kök workspace (npm)
-  - package-ecosystem: "npm"
-    directory: "/"
+  # Ana monorepo (root package-lock.json)
+  - package-ecosystem: npm
+    directory: /
     schedule:
-      interval: "weekly"
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Istanbul
     open-pull-requests-limit: 5
     groups:
       minor-and-patch:
-        update-types:
-          - "minor"
-          - "patch"
+        update-types: ["minor", "patch"]
+    ignore:
+      # Expo / React Native major sürümleri elle planlanmalı
+      - dependency-name: "expo*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-native"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "prisma"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@prisma/client"
+        update-types: ["version-update:semver-major"]
 
-  # Alt paketler (monorepo workspaces)
-  - package-ecosystem: "npm"
-    directory: "/shared"
+  # Çalışma alanları (her birinin kendi kilit dosyası var)
+  - package-ecosystem: npm
+    directory: /server
     schedule:
-      interval: "weekly"
+      interval: weekly
     open-pull-requests-limit: 3
     groups:
       minor-and-patch:
-        update-types:
-          - "minor"
-          - "patch"
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "prisma"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@prisma/client"
+        update-types: ["version-update:semver-major"]
 
-  - package-ecosystem: "npm"
-    directory: "/server"
+  - package-ecosystem: npm
+    directory: /client
     schedule:
-      interval: "weekly"
+      interval: weekly
     open-pull-requests-limit: 3
     groups:
       minor-and-patch:
-        update-types:
-          - "minor"
-          - "patch"
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "expo*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-native"
+        update-types: ["version-update:semver-major"]
 
-  - package-ecosystem: "npm"
-    directory: "/client"
+  - package-ecosystem: npm
+    directory: /shared
     schedule:
-      interval: "weekly"
+      interval: weekly
     open-pull-requests-limit: 3
     groups:
       minor-and-patch:
-        update-types:
-          - "minor"
-          - "patch"
+        update-types: ["minor", "patch"]
 
-  - package-ecosystem: "npm"
-    directory: "/cloudflare"
+  - package-ecosystem: npm
+    directory: /cloudflare
     schedule:
-      interval: "weekly"
+      interval: weekly
     open-pull-requests-limit: 3
     groups:
       minor-and-patch:
-        update-types:
-          - "minor"
-          - "patch"
+        update-types: ["minor", "patch"]
 
-  # GitHub Actions sürümleri (ci.yml, codeql.yml)
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  # GitHub Actions sürümleri
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: "weekly"
+      interval: weekly
     open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns: ["*"]
