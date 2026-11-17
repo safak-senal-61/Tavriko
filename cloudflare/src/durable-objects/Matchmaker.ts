@@ -163,12 +163,13 @@ export class MatchmakerDO extends DurableObject<Env> {
     }
   }
 
-  private sendToUser(targetUserId: string, event: string, payload: unknown): number {
+  private sendToUser(targetUserId: string, event: string, payload: unknown, verifiedOnly = false): number {
     const msg = encodeWsMessage(event, payload);
     const sockets = this.ctx.getWebSockets(`player:${targetUserId}`);
     let sent = 0;
     for (const ws of sockets) {
       try {
+        if (verifiedOnly && !ws.deserializeAttachment()?.verifiedAccount) continue;
         ws.send(msg);
         sent++;
       } catch {}
@@ -278,11 +279,15 @@ export class MatchmakerDO extends DurableObject<Env> {
       (url.pathname === '/notify' || url.pathname === '/api/notify') &&
       request.method === 'POST'
     ) {
+      const secret = this.env.INTERNAL_API_SECRET;
+      if (!secret || request.headers.get('x-internal-secret') !== secret) {
+        return new Response(null, { status: 403 });
+      }
       try {
         const body: any = await request.json();
         const { targetUserId, event, data } = body || {};
-        if (targetUserId && event) {
-          const delivered = this.sendToUser(targetUserId, event, data);
+        if (typeof targetUserId === 'string' && targetUserId && event === 'notification:new' && data?.id) {
+          const delivered = this.sendToUser(targetUserId, event, data, true);
           return new Response(
             JSON.stringify({ success: true, delivered }),
             { headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } }
@@ -355,6 +360,7 @@ export class MatchmakerDO extends DurableObject<Env> {
       }
     }
 
+    const verifiedAccount = !!authUser && !authUser.isGuest;
     if (!authUser) {
       const pid = rawPlayerId || `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       const name = sanitizeString(rawDisplayName || `Oyuncu ${pid.slice(-4)}`, 30);
@@ -365,8 +371,8 @@ export class MatchmakerDO extends DurableObject<Env> {
         avatarUrl: rawAvatarUrl || 'av1',
         isGuest: true,
       };
-    } else if (rawPlayerId && authUser.id !== rawPlayerId) {
-      // Ensure client-side playerId is also tagged if different
+    } else if (!verifiedAccount && rawPlayerId && authUser.id !== rawPlayerId) {
+      // Local guest sessions keep their client-generated identifier.
       authUser.id = rawPlayerId;
     }
 
@@ -377,12 +383,12 @@ export class MatchmakerDO extends DurableObject<Env> {
     const tags = [`player:${authUser.id}`, isMatchmakingIntent ? 'matchmaker' : 'presence'];
     this.ctx.acceptWebSocket(server, tags);
 
-    const attachment: QueueEntry & { inRoom?: boolean; currentRoomCode?: string } = {
+    const attachment: QueueEntry & { inRoom?: boolean; currentRoomCode?: string; verifiedAccount: boolean } = {
       matchId: 'match_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
       playerId: authUser.id,
       username: authUser.username,
-      displayName: authUser.displayName || authUser.username,
-      avatarUrl: authUser.avatarUrl,
+      displayName: sanitizeString(rawDisplayName || authUser.displayName || authUser.username, 30),
+      avatarUrl: rawAvatarUrl && rawAvatarUrl.length <= 256 ? rawAvatarUrl : authUser.avatarUrl,
       mode,
       category,
       difficulty,
@@ -390,6 +396,7 @@ export class MatchmakerDO extends DurableObject<Env> {
       status: isMatchmakingIntent ? 'searching' : 'cancelled',
       botFallbackMs,
       inRoom: false,
+      verifiedAccount,
     };
     server.serializeAttachment(attachment);
 
@@ -397,8 +404,8 @@ export class MatchmakerDO extends DurableObject<Env> {
     const presenceEntry: PresenceEntry = {
       userId: authUser.id,
       username: authUser.username,
-      displayName: authUser.displayName || authUser.username,
-      avatarUrl: authUser.avatarUrl,
+      displayName: attachment.displayName,
+      avatarUrl: attachment.avatarUrl,
       online: true,
       inRoom: false,
       lastSeen: Date.now(),
@@ -472,10 +479,10 @@ export class MatchmakerDO extends DurableObject<Env> {
       case 'presence:ping':
       case 'presence:update': {
         const payload = envelope.payload || {};
-        const uid = payload.userId || attachment.playerId;
+        const uid = attachment.playerId;
         const isOnline = payload.online !== undefined ? Boolean(payload.online) : true;
         const inRoom = payload.inRoom !== undefined ? Boolean(payload.inRoom) : Boolean(attachment.inRoom);
-        const currentRoomCode = payload.currentRoomCode !== undefined ? payload.currentRoomCode : attachment.currentRoomCode;
+        const currentRoomCode = inRoom ? payload.currentRoomCode ?? attachment.currentRoomCode : undefined;
 
         attachment.inRoom = inRoom;
         attachment.currentRoomCode = currentRoomCode;
@@ -510,7 +517,8 @@ export class MatchmakerDO extends DurableObject<Env> {
       case 'social:notify': {
         const payload = envelope.payload || {};
         const { targetUserId, targetEvent, data } = payload;
-        if (targetUserId && targetEvent) {
+        if (targetUserId && targetEvent &&
+            !(targetEvent === 'notification:new' && ['match_invite', 'duel'].includes(data?.type))) {
           this.sendToUser(targetUserId, targetEvent, data);
         }
         break;
@@ -525,7 +533,9 @@ export class MatchmakerDO extends DurableObject<Env> {
   async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean): Promise<void> {
     const attachment = ws.deserializeAttachment() as QueueEntry | null;
     if (attachment && attachment.playerId) {
-      await this.dequeuePlayer(attachment.playerId);
+      if (this.queue.get(attachment.playerId)?.matchId === attachment.matchId) {
+        await this.dequeuePlayer(attachment.playerId);
+      }
 
       // Check if user still has another open WebSocket before marking offline
       const remainingSockets = this.ctx.getWebSockets(`player:${attachment.playerId}`).filter((s) => s !== ws);

@@ -39,7 +39,7 @@ const LOGO_MARK = cdnImage('images/logo_mark.png');
 // çekilen büyük PNG bazı Android cihazlarda çözülemeyip kartı boş
 // bırakıyordu; paket içi require ağ/codec bağımlılığı olmadan her
 // cihazda çalışır.
-const DUEL_BANNER: ImageSourcePropType = require('../../assets/images/duel_banner.png');
+const DUEL_BANNER: ImageSourcePropType = cdnImage('images/duel_banner.png');
 const MODE_IMAGES = {
   customRoom: cdnImage('images/modes/custom_room.png'),
   singlePlayer: cdnImage('images/modes/single_player.png'),

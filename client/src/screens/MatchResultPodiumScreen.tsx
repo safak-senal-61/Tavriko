@@ -148,15 +148,16 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
   const reviews = questionReviews || summary.questionReviews || [];
   const totalRounds = Math.max(1, summary.totalRounds || reviews.length || 5);
 
-  const first = summary.podium?.first || null;
-  const second = summary.podium?.second || null;
-  const third = summary.podium?.third || null;
-
-  const myRanking = summary.rankings?.find((r) => r.playerId === currentUserId);
+  const rankings = [...(summary.rankings || [])].sort((a, b) => a.rank - b.rank);
+  const [first, second, third] = rankings.length
+    ? rankings
+    : [summary.podium?.first, summary.podium?.second, summary.podium?.third];
+  const remaining = rankings.slice(3);
+  const myRanking = rankings.find((r) => r.playerId === currentUserId);
   const isWinner =
     (myRanking && myRanking.rank === 1) || first?.playerId === currentUserId;
   const myRank = myRanking?.rank ?? (isWinner ? 1 : undefined);
-  const playerCount = Math.max(summary.rankings?.length || 0, [first, second, third].filter(Boolean).length);
+  const playerCount = rankings.length || [first, second, third].filter(Boolean).length;
 
   const correctCount =
     typeof myRanking?.correctAnswersCount === 'number'
@@ -238,6 +239,39 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
               <PodiumColumn entry={third} place={3} totalRounds={totalRounds} isMe={third.playerId === currentUserId} delay={280} />
             ) : null}
           </View>
+
+          {remaining.length > 0 && (
+            <View style={styles.rankingPanel}>
+              <View style={styles.rankingHeader}>
+                <Text style={styles.rankingTitle}>SIRALAMA</Text>
+                <Text style={styles.rankingCaption}>{playerCount} oyuncu</Text>
+              </View>
+              {remaining.map(entry => {
+                const isMe = entry.playerId === currentUserId;
+                const points = formatNumberTR(normalizeDisplayScore(entry.score, totalRounds));
+                return (
+                  <View
+                    key={entry.playerId}
+                    style={[styles.rankingRow, isMe && styles.rankingRowMe]}
+                    accessible
+                    accessibilityLabel={`${entry.rank}. sıra, ${isMe ? 'Sen' : entry.displayName}, ${points} puan`}
+                  >
+                    <Text style={styles.rankingPlace}>{entry.rank}.</Text>
+                    <CharacterAvatar seed={entry.avatarUrl || entry.displayName} size={32} />
+                    <View style={styles.rankingNameWrap}>
+                      <Text style={[styles.rankingName, isMe && styles.rankingMeText]} numberOfLines={1}>
+                        {isMe ? 'Sen' : entry.displayName}
+                      </Text>
+                      {typeof entry.correctAnswersCount === 'number' && (
+                        <Text style={styles.rankingCaption}>{entry.correctAnswersCount}/{totalRounds} doğru</Text>
+                      )}
+                    </View>
+                    <Text style={styles.rankingScore} numberOfLines={1}>{points} puan</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
 
           {/* İstatistikler */}
           <View style={styles.statsRow}>
@@ -417,6 +451,42 @@ const styles = StyleSheet.create({
   podiumRowDuel: {
     paddingHorizontal: 36,
   },
+  rankingPanel: {
+    backgroundColor: 'rgba(24, 10, 56, 0.8)',
+    borderColor: 'rgba(154, 107, 255, 0.3)',
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 8,
+    gap: 4,
+    marginBottom: 12,
+  },
+  rankingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  rankingTitle: { color: '#FFFFFF', fontSize: 12, letterSpacing: 1, fontFamily: THEME.fonts.extraBold },
+  rankingCaption: { color: '#D9CDF5', fontSize: 11, fontFamily: THEME.fonts.medium },
+  rankingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  rankingRowMe: { borderColor: 'rgba(95, 225, 255, 0.5)', backgroundColor: 'rgba(95, 225, 255, 0.12)' },
+  rankingPlace: { color: '#D9CDF5', width: 22, fontSize: 13, fontFamily: THEME.fonts.extraBold },
+  rankingNameWrap: { flex: 1, minWidth: 0 },
+  rankingName: { color: '#FFFFFF', fontSize: 13, fontFamily: THEME.fonts.extraBold },
+  rankingMeText: { color: '#5FE1FF' },
+  rankingScore: { color: '#FFD66B', fontSize: 12, fontFamily: THEME.fonts.extraBold, fontVariant: ['tabular-nums'] },
   podiumCol: {
     flex: 1,
     alignItems: 'center',

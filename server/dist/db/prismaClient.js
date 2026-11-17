@@ -51,6 +51,7 @@ const supabaseClient_1 = require("./supabaseClient");
 const questionStoreMerge_1 = require("../utils/questionStoreMerge");
 const presenceManager_1 = require("../services/presenceManager");
 const pushService_1 = require("../services/pushService");
+const inviteDelivery_1 = require("../services/inviteDelivery");
 // SECURITY: no hardcoded fallback secret. If the environment does not provide a
 // secret, token signing/verification fails loudly instead of silently using a
 // publicly known key.
@@ -4254,9 +4255,10 @@ class PrismaService {
      * odaya katılır (push butonu: "Odaya Katıl").
      */
     async sendRoomInvite(userId, targetUserId, roomCode, roomName) {
-        const cleanCode = (roomCode || '').trim().toUpperCase();
-        if (!cleanCode)
-            return { success: false, error: 'Oda kodu gerekli.', message: '' };
+        const cleanCode = typeof roomCode === 'string' ? roomCode.trim().toUpperCase() : '';
+        if (!/^[A-Z0-9-]{4,32}$/.test(cleanCode) || cleanCode.startsWith('DUEL-')) {
+            return { success: false, error: 'Geçerli bir oda kodu gerekli.', message: '' };
+        }
         let me = this.users.get(userId);
         if (!me) {
             try {
@@ -4290,7 +4292,7 @@ class PrismaService {
             return { success: false, error: 'Bu kullanıcı sizi engellemiş. Oda daveti gönderilemez.', message: '' };
         }
         const notifItem = {
-            id: 'notif_room_' + Date.now(),
+            id: 'notif_room_' + crypto_1.default.randomUUID(),
             type: 'match_invite',
             title: `${me.displayName} seni bir oyun odasına davet etti!`,
             sub: roomName
@@ -4323,6 +4325,7 @@ class PrismaService {
         }
         catch (e) {
             console.warn('[sendRoomInvite] DB notification error:', e.message);
+            return { success: false, error: 'Davet kaydedilemedi. Tekrar deneyebilirsin.', message: '' };
         }
         if (!target.notifications)
             target.notifications = [];
@@ -4330,7 +4333,7 @@ class PrismaService {
         this.users.set(target.id, target);
         this.savePersistedUsers();
         presenceManager_1.presenceManager.notifyUser(target.id, 'notification:new', notifItem);
-        (0, pushService_1.queuePushForNotification)(target.id, notifItem);
+        await (0, inviteDelivery_1.deliverGameInvite)(target.id, notifItem);
         return {
             success: true,
             message: `${target.displayName} odaya davet edildi!`,
@@ -4375,10 +4378,8 @@ class PrismaService {
             return { success: false, error: `${target.displayName} şu anda düello daveti kabul etmiyor.`, message: '' };
         }
         const roomCode = 'DUEL-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-        this.setUserActiveRoom(userId, roomCode);
-        presenceManager_1.presenceManager.setUserRoom(userId, roomCode);
         const notifItem = {
-            id: 'notif_chal_' + Date.now(),
+            id: 'notif_chal_' + crypto_1.default.randomUUID(),
             type: 'match_invite',
             title: `${me.displayName} sana 1v1 Düello Meydan Okudu!`,
             sub: 'Özel 1v1 düello odası hazır. Kabul et ve hemen yarışmaya başla!',
@@ -4410,7 +4411,10 @@ class PrismaService {
         }
         catch (e) {
             console.warn('[sendDuelChallenge] DB notification error:', e.message);
+            return { success: false, error: 'Düello daveti kaydedilemedi. Tekrar deneyebilirsin.', message: '' };
         }
+        this.setUserActiveRoom(userId, roomCode);
+        presenceManager_1.presenceManager.setUserRoom(userId, roomCode);
         if (!target.notifications)
             target.notifications = [];
         target.notifications.unshift(notifItem);
@@ -4418,7 +4422,7 @@ class PrismaService {
         this.savePersistedUsers();
         // 2. REAL-TIME WEBSOCKET NOTIFICATION TO TARGET
         presenceManager_1.presenceManager.notifyUser(target.id, 'notification:new', notifItem);
-        (0, pushService_1.queuePushForNotification)(target.id, notifItem);
+        await (0, inviteDelivery_1.deliverGameInvite)(target.id, notifItem);
         // 3. BROADCAST SENDER PRESENCE (Now in room)
         presenceManager_1.presenceManager.broadcast('presence:update', presenceManager_1.presenceManager.getUserPresence(userId));
         return {

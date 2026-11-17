@@ -29,6 +29,7 @@ describe('CDN yardımcıları', () => {
     const used = new Set<string>();
     for (const file of files) {
       const text = readFileSync(file, 'utf8');
+      expect(text).not.toMatch(/(?:require\(\s*|from\s+)['"][^'"]*\/assets\/[^'"]+\.(?:png|jpe?g|webp|gif|svg)['"]/i);
       for (const m of text.matchAll(/(?:cdnImage|cdnUrl)\(\s*'([^']+)'/g)) used.add(m[1]);
       for (const m of text.matchAll(/'((?:sounds|music)\/[^']+)'/g)) used.add(m[1]);
     }

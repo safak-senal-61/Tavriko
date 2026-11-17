@@ -8,7 +8,7 @@ import {
   Nunito_800ExtraBold,
   Nunito_900Black,
 } from '@expo-google-fonts/nunito';
-import { View, ActivityIndicator, Platform } from 'react-native';
+import { View, ActivityIndicator, AppState, Platform } from 'react-native';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { hydrateAuthStorage, getStoredAuth } from './src/utils/authStorage';
 import { useGameStore } from './src/store/gameStore';
@@ -126,11 +126,22 @@ function AppInner() {
   // değişirse (giriş/çıkış) yeni kullanıcı için yeniden denenir.
   useEffect(() => {
     initPushNotifications();
-    const register = (userId: string | undefined) => {
-      if (userId) void registerForPushNotifications(userId);
+    const register = (state: ReturnType<typeof useGameStore.getState>) => {
+      if (state.user?.id && !state.user.isGuest && state.token && state.token !== 'mock_token') {
+        void registerForPushNotifications(state.user.id);
+      }
     };
-    register(useGameStore.getState().user?.id);
-    return useGameStore.subscribe((state) => register(state.user?.id));
+    register(useGameStore.getState());
+    const unsubscribe = useGameStore.subscribe((state, prev) => {
+      if (state.user?.id !== prev.user?.id || state.token !== prev.token) register(state);
+    });
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') register(useGameStore.getState());
+    });
+    return () => {
+      unsubscribe();
+      subscription.remove();
+    };
   }, []);
 
   // Mobilde kalıcı oturum: güvenli depodan (Keystore/Keychain) yükle.

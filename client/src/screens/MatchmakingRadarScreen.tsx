@@ -8,7 +8,9 @@ import { useReducedMotion } from '../components/DiscoveryArtwork';
 // Radar arenası PAKET İÇİNDEN yüklenir (require). CDN'den çekilen büyük PNG
 // bazı Android cihazlarda çözülemeyip boş kalıyordu; paket içi require ağ/codec
 // bağımlılığı olmadan her cihazda çalışır.
-const RADAR_ARENA: ImageSourcePropType = require('../../assets/images/radar_arena.png');
+import { cdnImage } from '../utils/cdn';
+
+const RADAR_ARENA: ImageSourcePropType = cdnImage('images/radar_arena.png');
 import { GradientFill } from '../components/TavrikoGradient';
 import {
   TavrikoScreen,

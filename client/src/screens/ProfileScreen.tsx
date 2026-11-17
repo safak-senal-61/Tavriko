@@ -374,12 +374,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     if (onUpdateUser) {
       onUpdateUser({ ...user, avatarUrl: preset.id });
     }
-    // Broadcast via WebSocket
-    socketService.connect(undefined, {
-      userId: user.id,
-      displayName: user.displayName,
-      avatarUrl: preset.id,
-    });
     // Persist to PostgreSQL database
     try {
       await fetch(`${base}/auth/profile`, {

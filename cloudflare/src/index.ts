@@ -67,6 +67,12 @@ const worker: ExportedHandler<Env> = {
               headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
             });
           }
+          if (!env.AVATAR_BUCKET) {
+            return new Response(JSON.stringify({ error: 'Avatar depolama geçici olarak kullanılamıyor' }), {
+              status: 503,
+              headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            });
+          }
           // The uploader identity comes from the verified token, never the body.
           const userId = auth.user.id || 'u';
 
@@ -108,11 +114,9 @@ const worker: ExportedHandler<Env> = {
           const binary = Uint8Array.from(atob(rawData), (c) => c.charCodeAt(0));
           const fileKey = `avatar_${userId.replace(/[^a-zA-Z0-9_-]/g, '')}_${Date.now()}.jpg`;
 
-          if (env.AVATAR_BUCKET) {
-            await env.AVATAR_BUCKET.put(fileKey, binary, {
-              httpMetadata: { contentType },
-            });
-          }
+          await env.AVATAR_BUCKET.put(fileKey, binary, {
+            httpMetadata: { contentType },
+          });
 
           const origin = url.origin;
           const publicUrl = `${origin}/api/avatar/${fileKey}`;
@@ -122,7 +126,7 @@ const worker: ExportedHandler<Env> = {
               success: true,
               url: publicUrl,
               key: fileKey,
-              storage: env.AVATAR_BUCKET ? 'cloudflare-r2' : 'edge-processed',
+              storage: 'cloudflare-r2',
             }),
             {
               status: 200,

@@ -8,6 +8,7 @@ import {
   AppStateStatus,
   useWindowDimensions,
   Image,
+  ScrollView,
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
 import Animated, {
@@ -492,9 +493,7 @@ const DuelPlayerBlock: React.FC<{
 };
 
 /**
- * 3+ kişilik odaların skor tablosu: TÜM oyuncuların profili (avatar + isim +
- * puan) ekrana sığacak şekilde küçültülerek gösterilir. İsim ve puan tek
- * satırlık hapta birleşir; blok boyutları ringSize ile ölçeklenir.
+ * Çok kişili odada avatar, isim ve puan dikey ve birbirinden bağımsız hizalanır.
  */
 const MiniPlayerBlock: React.FC<{
   name: string;
@@ -512,7 +511,7 @@ const MiniPlayerBlock: React.FC<{
   const nameSize = Math.max(9, Math.round(ringSize * 0.22));
   const scoreSize = Math.max(11, Math.round(ringSize * 0.28));
   return (
-    <View style={[styles.miniPlayerBlock, { width: ringSize + 26 }]}>
+    <View style={styles.miniPlayerBlock} accessible accessibilityLabel={`${name}, ${score} puan${hasAnswered ? ', cevapladı' : ''}`}>
       <View
         style={[
           styles.playerAvatarRing,
@@ -539,51 +538,28 @@ const MiniPlayerBlock: React.FC<{
             <CheckMarkSvg size={Math.max(9, Math.round(dot * 0.6))} color="#FFFFFF" />
           </View>
         )}
+        {showCrown && (
+          <View style={styles.miniCrown} pointerEvents="none"><CrownIcon size={14} /></View>
+        )}
       </View>
-      {showCrown && (
-        <View
-          style={[
-            styles.playerCrown,
-            { top: -Math.round(ringSize * 0.26), left: Math.round(ringSize * 0.08) },
-          ]}
-          pointerEvents="none"
-        >
-          <CrownIcon size={Math.max(14, Math.round(ringSize * 0.34))} />
-        </View>
-      )}
-      <View
-        style={[
-          styles.miniNamePill,
-          {
-            borderColor: `${color}AA`,
-            marginTop: -Math.round(ringSize * 0.1),
-            maxWidth: ringSize + 26,
-          },
-        ]}
-      >
         <Text
-          style={[styles.playerNameText, { fontSize: nameSize }]}
+          style={[styles.playerNameText, styles.miniPlayerName, { fontSize: nameSize }]}
           numberOfLines={1}
           ellipsizeMode="tail"
         >
           {name}
         </Text>
-        <Text style={{ color: color, fontSize: nameSize }}> · </Text>
         <Text
-          style={{
+          style={[styles.miniPlayerScore, {
             color: isMe ? '#5FE1FF' : '#D9B8FF',
             fontSize: scoreSize,
-            fontFamily: THEME.fonts.display,
-          }}
+          }]}
           numberOfLines={1}
         >
           {score}
         </Text>
-      </View>
       {badge ? (
-        <View style={styles.playerBadge}>
-          <Text style={styles.playerBadgeText}>{badge}</Text>
-        </View>
+        <Text style={styles.miniStreak} numberOfLines={1}>{badge}</Text>
       ) : null}
     </View>
   );
@@ -764,7 +740,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     hasExpiredRef.current ||
     secondsLeft <= 0;
   const totalRounds = question.totalRounds || 10;
-  const { height: windowHeight } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const compact = windowHeight < 800;
   const tiny = windowHeight < 690;
   const myRacer = activeRacers.find((r) => r.isMe);
@@ -801,26 +777,21 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const multiPlayers = useMemo(() => {
     if (activeRacers.length <= 2) return [];
     const me = activeRacers.find((r) => r.isMe);
-    const others = activeRacers
-      .filter((r) => !r.isMe)
-      .slice()
-      .sort(
-        (a, b) => (b.score || 0) - (a.score || 0) || b.correctAnswers - a.correctAnswers
-      );
+    // Keep player positions stable as scores change.
+    const others = activeRacers.filter((r) => !r.isMe);
     return me ? [me, ...others] : others;
   }, [activeRacers]);
   const playerCount = activeRacers.length;
-  // Bloklar oyuncu sayısına göre küçültülür: 3-4 kişi tek satırda sığar,
-  // 5+ kişide satır sarılır ama yükseklik dar kalır (geri bildirim kartı
-  // açıldığında bile ekran taşmaz).
-  const multiRing =
-    playerCount <= 3 ? 46 : playerCount === 4 ? 40 : playerCount <= 6 ? 38 : 34;
-  const multiTimerSize = playerCount <= 4 ? 58 : playerCount <= 6 ? 52 : 46;
+  const isGroup = multiPlayers.length > 0;
+  const rowSize = Math.ceil(playerCount / 2);
+  const playerRows = playerCount <= 4 ? [multiPlayers] : [multiPlayers.slice(0, rowSize), multiPlayers.slice(rowSize)];
+  const multiRing = playerCount <= 4 ? (tiny ? 35 : 41) : (tiny ? 28 : 34);
+  const narrowHeader = isGroup && windowWidth < 380;
   // 5+ kişi: soru kartı, şıklar ve yarış kartı sıkışık modda render edilir.
   const denseLayout = playerCount >= 5;
   const multiLeaderScore = multiPlayers.reduce(
     (acc, p) =>
-      Math.max(acc, formatCleanScore(p.score || 0, p.correctAnswers, totalRounds)),
+      Math.max(acc, p.isMe ? myScore : formatCleanScore(p.score || 0, p.correctAnswers, totalRounds)),
     0
   );
   const meLeads = !!rightPlayer && myScore > rightPlayer.score;
@@ -842,6 +813,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const subCategoryLabel = subCategoryObj?.name || subCategoryName;
   const difficultyLabel = (diffMap[question.difficulty] || 'Orta').toLocaleUpperCase('tr-TR');
   const difficultyColor = DIFFICULTY_COLORS[question.difficulty] || DIFFICULTY_COLORS.medium;
+  const ArenaBody = isGroup ? ScrollView : View;
 
   return (
     <TavrikoScreen style={styles.screenContainer}>
@@ -855,13 +827,13 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         >
           <CloseXIcon size={20} color="#FFFFFF" />
         </TouchableOpacity>
-        <View style={styles.roundPill}>
-          <Text style={styles.roundPillText}>
+        <View style={[styles.roundPill, narrowHeader && styles.roundPillNarrow]}>
+          <Text style={[styles.roundPillText, narrowHeader && styles.roundTextNarrow]} numberOfLines={1}>
             Soru {question.roundNumber} / {totalRounds}
           </Text>
         </View>
-        <View style={styles.categoryPill}>
-          <Image source={categoryArt} style={styles.categoryArt} resizeMode="contain" />
+        <View style={[styles.categoryPill, isGroup && styles.groupCategoryPill, narrowHeader && styles.categoryPillNarrow]}>
+          {!narrowHeader && <Image source={categoryArt} style={styles.categoryArt} resizeMode="contain" />}
           <View style={styles.categoryPillTexts}>
             <Text style={styles.categoryPillText} numberOfLines={1}>
               {categoryName}
@@ -873,8 +845,22 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
             ) : null}
           </View>
         </View>
+        {isGroup && (
+          <CircularTimer
+            totalMs={totalMs}
+            endTime={endTime}
+            isActive={answerState === 'answerable'}
+            secondsLeft={secondsLeft}
+            onTimeExpired={handleTimeExpiredInternal}
+            onSecondChange={handleSecondChange}
+            size={narrowHeader ? 42 : 48}
+          />
+        )}
       </View>
-
+      <ArenaBody
+        style={isGroup ? styles.groupArenaScroll : styles.arenaBody}
+        {...(isGroup ? { contentContainerStyle: styles.groupArenaBody, showsVerticalScrollIndicator: false } : {})}
+      >
       {/* Günlük Meydan Okuma bilgisi */}
       {dailyChallengeInfo && (
         <View style={styles.dailyStrip}>
@@ -886,43 +872,28 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       )}
 
       {/* 2. Skor Tablosu: 3+ kişi → TÜM oyuncular; 1-2 kişi → Ben · Geri Sayım · Rakip */}
-      {multiPlayers.length > 0 ? (
+      {isGroup ? (
         <View style={styles.multiScoreboard}>
-          {multiPlayers.map((p, idx) => {
-            const normalized = formatCleanScore(p.score || 0, p.correctAnswers, totalRounds);
-            const block = (
-              <MiniPlayerBlock
-                key={p.id}
-                name={p.isMe ? myDisplayName || p.displayName : p.displayName}
-                avatarSeed={p.avatarUrl || p.displayName}
-                score={normalized}
-                isMe={!!p.isMe}
-                ringSize={multiRing}
-                showCrown={multiLeaderScore > 0 && normalized === multiLeaderScore}
-                hasAnswered={p.isMe ? myAnswered : Boolean(p.hasAnswered)}
-                badge={p.isMe && streak >= 2 ? `🔥 x${streak}` : null}
-              />
-            );
-            // Geri sayım halkası "ben"in hemen yanında, ilk satırda durur.
-            return idx === 0 ? (
-              <React.Fragment key={p.id}>
-                {block}
-                <View style={styles.multiTimerWrap}>
-                  <CircularTimer
-                    totalMs={totalMs}
-                    endTime={endTime}
-                    isActive={answerState === 'answerable'}
-                    secondsLeft={secondsLeft}
-                    onTimeExpired={handleTimeExpiredInternal}
-                    onSecondChange={handleSecondChange}
-                    size={multiTimerSize}
+          {playerRows.map((row, i) => (
+            <View key={i} style={styles.multiPlayerRow}>
+              {row.map(p => {
+                const score = p.isMe ? myScore : formatCleanScore(p.score || 0, p.correctAnswers, totalRounds);
+                return (
+                  <MiniPlayerBlock
+                    key={p.id}
+                    name={p.isMe ? 'Sen' : p.displayName}
+                    avatarSeed={(p.isMe ? myAvatarUrl : undefined) || p.avatarUrl || p.displayName}
+                    score={score}
+                    isMe={!!p.isMe}
+                    ringSize={multiRing}
+                    showCrown={multiLeaderScore > 0 && score === multiLeaderScore}
+                    hasAnswered={p.isMe ? myAnswered : Boolean(p.hasAnswered)}
+                    badge={p.isMe && streak >= 2 ? `×${streak}` : null}
                   />
-                </View>
-              </React.Fragment>
-            ) : (
-              block
-            );
-          })}
+                );
+              })}
+            </View>
+          ))}
         </View>
       ) : (
       <View style={styles.scoreboard}>
@@ -1200,6 +1171,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           </Text>
         )}
       </View>
+      </ArenaBody>
     </TavrikoScreen>
   );
 };
@@ -1216,6 +1188,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: 12,
   },
+  arenaBody: { flex: 1, justifyContent: 'space-between' },
+  groupArenaScroll: { flex: 1 },
+  groupArenaBody: { flexGrow: 1, justifyContent: 'space-between', paddingVertical: 6, gap: 6 },
   // ---- Üst Bar ----
   topRow: {
     flexDirection: 'row',
@@ -1249,6 +1224,8 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.black,
     letterSpacing: 0.3,
   },
+  roundPillNarrow: { paddingHorizontal: 8 },
+  roundTextNarrow: { fontSize: 13 },
   categoryPill: {
     minHeight: 40,
     maxWidth: 210,
@@ -1267,6 +1244,8 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
   },
+  groupCategoryPill: { flex: 1, minWidth: 0, maxWidth: '100%' },
+  categoryPillNarrow: { paddingHorizontal: 8 },
   categoryPillTexts: {
     flexShrink: 1,
     justifyContent: 'center',
@@ -1321,30 +1300,33 @@ const styles = StyleSheet.create({
   },
   // 3+ kişilik odalarda tüm oyuncu profilleri sığan satırlar
   multiScoreboard: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    columnGap: 6,
-    rowGap: 2,
+    gap: 4,
   },
-  multiTimerWrap: {
-    alignItems: 'center',
+  multiPlayerRow: {
+    flexDirection: 'row',
     justifyContent: 'center',
+    gap: 5,
   },
   miniPlayerBlock: {
+    flex: 1,
+    minWidth: 0,
+    maxWidth: 104,
     alignItems: 'center',
-  },
-  // Mini profil bloğunun tek satırlık "isim · puan" hapı
-  miniNamePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+    paddingVertical: 3,
+    paddingHorizontal: 3,
     borderRadius: 10,
-    backgroundColor: 'rgba(24, 10, 56, 0.96)',
-    borderWidth: 1,
+    backgroundColor: 'rgba(24, 10, 56, 0.8)',
+  },
+  miniPlayerName: { width: '100%', marginTop: 2 },
+  miniPlayerScore: { fontFamily: THEME.fonts.display, fontVariant: ['tabular-nums'] },
+  miniCrown: { position: 'absolute', top: -5, right: -6 },
+  miniStreak: {
+    position: 'absolute',
+    left: 3,
+    top: 3,
+    color: '#FFD27A',
+    fontSize: 9,
+    fontFamily: THEME.fonts.black,
   },
   playerBlock: {
     width: 108,

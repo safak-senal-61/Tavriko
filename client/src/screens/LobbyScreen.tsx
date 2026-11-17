@@ -15,7 +15,6 @@ import {
   Modal,
   FlatList,
   ActivityIndicator,
-  ImageSourcePropType,
 } from 'react-native';
 import { DEFAULT_API_BASE } from '../config';
 import { authHeaders } from '../utils/apiAuth';
@@ -172,17 +171,36 @@ const BouncyReaction: React.FC<{ emoji: string; onPress: () => void }> = ({ emoj
 };
 
 /** Arkadaş davet görselleri: nebula kart arka planı, ikon ve popup arka planı */
-const INVITE_BG: ImageSourcePropType = require('../../assets/images/lobby/invite_bg.png');
-const INVITE_ICON: ImageSourcePropType = require('../../assets/images/lobby/invite_icon.png');
-const INVITE_MODAL_BG: ImageSourcePropType = require('../../assets/images/lobby/invite_modal_bg.png');
+const INVITE_BG = cdnImage('images/lobby/invite_bg.png');
+const INVITE_ICON = cdnImage('images/lobby/invite_icon.png');
+const INVITE_MODAL_BG = cdnImage('images/lobby/invite_modal_bg.png');
+const INVITE_FALLBACK = cdnImage('images/custom_room_3d.jpg');
+
+const InviteArtwork: React.FC<{ variant: 'card' | 'modal' | 'icon'; style: React.ComponentProps<typeof Image>['style'] }> = ({
+  variant, style,
+}) => {
+  const [failed, setFailed] = useState(false);
+  const source = variant === 'card' ? INVITE_BG : variant === 'modal' ? INVITE_MODAL_BG : INVITE_ICON;
+  if (failed && variant === 'icon') {
+    return (
+      <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+        <Circle cx={9} cy={7} r={3} stroke="#E6DFFF" strokeWidth={2} />
+        <Path d="M3 19v-2a4 4 0 0 1 4-4h4m7-2v8m-4-4h8" stroke="#E6DFFF" strokeWidth={2} strokeLinecap="round" />
+      </Svg>
+    );
+  }
+  return <Image source={failed ? INVITE_FALLBACK : source} style={style} resizeMode={variant === 'icon' ? 'contain' : 'cover'} accessible={false} onError={() => setFailed(true)} />;
+};
 
 /**
  * OYUN İÇİ ARKADAŞ DAVETİ — şık, animasyonlu kart:
- *  - Kart oranına göre üretilmiş nebula arka plan görseli (ağ bağımsız)
+ *  - Kart oranına göre üretilmiş nebula arka plan görseli (CDN)
  *  - Nefes alan mor parıltılı kenarlık
  *  - Nabız atan rozet + basınca hafif çökme
  */
-const FriendInviteCard: React.FC<{ onPress: () => void }> = ({ onPress }) => {
+const FriendInviteCard: React.FC<{ onPress: () => void; subtitle: string; disabled: boolean }> = ({
+  onPress, subtitle, disabled,
+}) => {
   const p = useSharedValue(0);
   const press = useSharedValue(1);
   useEffect(() => {
@@ -204,6 +222,9 @@ const FriendInviteCard: React.FC<{ onPress: () => void }> = ({ onPress }) => {
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
       onPressIn={() => {
         press.value = withTiming(0.97, { duration: 120 });
       }}
@@ -212,7 +233,7 @@ const FriendInviteCard: React.FC<{ onPress: () => void }> = ({ onPress }) => {
       }}
     >
       <Reanimated.View style={[styles.friendInviteCard, borderStyle, pressStyle]}>
-        <Image source={INVITE_BG} style={styles.friendInviteBg} resizeMode="cover" />
+        <InviteArtwork variant="card" style={styles.friendInviteBg} />
         {/* Yazı okunurluğu için yumuşak karartma — tam genişlik, kırpma yok */}
         <GradientFill
           colors={['rgba(14,6,32,0.18)', 'rgba(14,6,32,0.72)']}
@@ -220,14 +241,14 @@ const FriendInviteCard: React.FC<{ onPress: () => void }> = ({ onPress }) => {
         />
         <View style={styles.friendInviteRow}>
           <Reanimated.View style={[styles.friendInviteBadge, badgeStyle]}>
-            <Image source={INVITE_ICON} style={styles.friendInviteBadgeIcon} />
+            <InviteArtwork variant="icon" style={styles.friendInviteBadgeIcon} />
           </Reanimated.View>
           <View style={styles.friendInviteInfo}>
             <Text style={styles.friendInviteTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               ARKADAŞ DAVET ET
             </Text>
-            <Text style={styles.friendInviteSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              Bildirim gider — tek dokunuşla odaya katılır
+            <Text style={styles.friendInviteSub} numberOfLines={2}>
+              {subtitle}
             </Text>
           </View>
           <Text style={styles.friendInviteChevron}>›</Text>
@@ -374,49 +395,72 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   const [friendInviteVisible, setFriendInviteVisible] = useState(false);
   const [friendsList, setFriendsList] = useState<LobbyFriendItem[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(false);
+  const [friendsError, setFriendsError] = useState(false);
+  const [friendsReload, setFriendsReload] = useState(0);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [invitedFriendIds, setInvitedFriendIds] = useState<Set<string>>(new Set());
+  const pendingInvites = useRef(new Set<string>());
+  const [sendingIds, setSendingIds] = useState<Set<string>>(new Set());
+  const [, refreshPresence] = useState(0);
 
-  const loadFriends = () => {
-    if (!currentUserId || friendsLoading) return;
+  useEffect(() => {
+    if (!currentUserId || !user || user.isGuest) return;
+    const controller = new AbortController();
     setFriendsLoading(true);
-    fetch(`${DEFAULT_API_BASE}/social/friends/${currentUserId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data.friends)) {
-          // Sadece kabul edilmiş arkadaşlar; lobideki oyuncular hariç.
-          setFriendsList(
-            (data.friends as LobbyFriendItem[])
-              .filter((f) => f && f.isFriend !== false && !room.players[f.id])
-              .map((f) => ({
-                ...f,
-                online: Boolean(f.online || socketService.getUserPresence(f.id)?.online),
-              }))
-          );
-        }
-      })
-      .catch(() => {})
-      .finally(() => setFriendsLoading(false));
-  };
-
-  const inviteFriend = (friendId: string) => {
-    if (invitedFriendIds.has(friendId)) return;
-    sound.playSound('tap');
-    fetch(`${DEFAULT_API_BASE}/social/rooms/invite`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({
-        targetUserId: friendId,
-        roomCode: room.code,
-      }),
+    setFriendsError(false);
+    fetch(`${DEFAULT_API_BASE}/social/friends/${encodeURIComponent(currentUserId)}`, {
+      headers: authHeaders(),
+      signal: controller.signal,
     })
       .then(async (res) => {
-        const result = await res.json().catch(() => ({} as { success?: boolean; error?: string }));
-        if (res.ok && result.success) {
-          setInvitedFriendIds((prev) => new Set(prev).add(friendId));
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (!Array.isArray(data.friends)) throw new Error();
+        if (!controller.signal.aborted) {
+          setFriendsList((data.friends as LobbyFriendItem[]).filter(f => f?.isFriend === true));
         }
-        // Hedefin bildirim ayarları kapalıysa vb. — sessizce yok sayılır.
       })
-      .catch(() => {});
+      .catch(() => { if (!controller.signal.aborted) setFriendsError(true); })
+      .finally(() => { if (!controller.signal.aborted) setFriendsLoading(false); });
+    return () => controller.abort();
+  }, [currentUserId, user?.id, user?.isGuest, friendsReload]);
+
+  useEffect(() => {
+    const onPresence = () => refreshPresence(n => n + 1);
+    const bumpFriends = () => setFriendsReload(n => n + 1);
+    const unsub = [
+      socketService.on('presence:snapshot', onPresence),
+      socketService.on('presence:update', (presence: { userId?: string }) => {
+        if (friendsList.some(friend => friend.id === presence?.userId)) onPresence();
+      }),
+      socketService.on('friends:update', bumpFriends),
+    ];
+    return () => unsub.forEach(remove => remove());
+  }, [friendsList]);
+
+  const inviteFriend = async (friendId: string) => {
+    if (roomFull || room.players[friendId] || invitedFriendIds.has(friendId) || pendingInvites.current.has(friendId)) return;
+    pendingInvites.current.add(friendId);
+    setSendingIds(new Set(pendingInvites.current));
+    setInviteError(null);
+    sound.playSound('tap');
+    try {
+      const res = await fetch(`${DEFAULT_API_BASE}/social/rooms/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ targetUserId: friendId, roomCode: room.code }),
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok || !result?.success) throw new Error(result?.error || 'Davet gönderilemedi. Tekrar deneyebilirsin.');
+      setInvitedFriendIds(prev => new Set(prev).add(friendId));
+    } catch (error) {
+      setInviteError(error instanceof TypeError
+        ? 'Bağlantı kurulamadı. İnterneti kontrol edip tekrar dene.'
+        : error instanceof Error ? error.message : 'Davet gönderilemedi.');
+    } finally {
+      pendingInvites.current.delete(friendId);
+      setSendingIds(new Set(pendingInvites.current));
+    }
   };
 
   // İki katmanlı tekillik (deduplication) önbelleği: Ali'de ve tüm oyuncularda çift mesaj/reaksiyonu %100 engeller!
@@ -425,6 +469,12 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   const players = Object.values(room.players);
   const maxPlayers = room.maxPlayers || 4;
   const emptySlotCount = Math.max(0, maxPlayers - players.length);
+  const roomFull = emptySlotCount === 0;
+  const availableFriends = friendsList
+    .filter(f => !room.players[f.id])
+    .map(f => ({ ...f, online: socketService.getUserPresence(f.id)?.online ?? f.online }))
+    .sort((a, b) => Number(b.online) - Number(a.online));
+  const onlineFriendCount = availableFriends.filter(f => f.online).length;
   const isHost = currentUserId === room.hostId;
   const myPlayer = room.players[currentUserId];
   const isReady = myPlayer?.isReady ?? false;
@@ -734,9 +784,17 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         {/* 1.6. OYUN İÇİ ARKADAŞ DAVETİ (bildirimle odaya çağırır) */}
         <Reanimated.View entering={FadeInDown.delay(140).duration(400)} style={styles.inviteLinkWrap}>
           <FriendInviteCard
+            disabled={roomFull || !user || !!user.isGuest}
+            subtitle={roomFull ? 'Oda dolu'
+              : !user || user.isGuest ? 'Davet etmek için giriş yap'
+              : friendsLoading && friendsList.length === 0 ? 'Arkadaşlar yükleniyor…'
+              : friendsError ? 'Arkadaş listesini yeniden yükle'
+              : availableFriends.length ? `${availableFriends.length} arkadaş · ${onlineFriendCount} çevrimiçi`
+              : 'Davet edilebilecek arkadaş yok'}
             onPress={() => {
               sound.playSound('tap');
-              loadFriends();
+              setInviteError(null);
+              setFriendsReload(n => n + 1);
               setFriendInviteVisible(true);
             }}
           />
@@ -955,12 +1013,14 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             entering={ZoomIn.springify().damping(18)}
             style={styles.friendModalCard}
           >
-            <Image source={INVITE_MODAL_BG} style={styles.friendModalBg} resizeMode="cover" />
+            <InviteArtwork variant="modal" style={styles.friendModalBg} />
             <View style={styles.friendModalHeader}>
-              <Image source={INVITE_ICON} style={styles.friendModalHeaderIcon} />
+              <InviteArtwork variant="icon" style={styles.friendModalHeaderIcon} />
               <Text style={styles.friendModalTitle}>Arkadaş Davet Et</Text>
               <TouchableOpacity
                 style={styles.friendModalCloseBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Davet penceresini kapat"
                 onPress={() => {
                   sound.playSound('tap');
                   setFriendInviteVisible(false);
@@ -970,27 +1030,34 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
               </TouchableOpacity>
             </View>
             <Text style={styles.friendModalSub}>
-              Davet ettiğin arkadaşına bildirim gider; bildirimdeki "Odaya Katıl"
-              butonuyla doğrudan bu odaya girer.
+              Arkadaşların bildirimdeki “Odaya Katıl” düğmesiyle bu odaya girebilir.
             </Text>
-            {friendsLoading ? (
+            {inviteError && <Text accessibilityLiveRegion="polite" style={styles.friendInviteError}>{inviteError}</Text>}
+            {roomFull ? (
+              <Text style={styles.friendModalEmptyText}>Oda dolu. Yer açıldığında tekrar davet edebilirsin.</Text>
+            ) : friendsLoading && friendsList.length === 0 ? (
               <View style={styles.friendModalEmpty}>
                 <ActivityIndicator color="#9B8CFF" />
               </View>
-            ) : friendsList.length === 0 ? (
+            ) : friendsError && friendsList.length === 0 ? (
+              <TouchableOpacity accessibilityRole="button" onPress={() => setFriendsReload(n => n + 1)} style={styles.friendModalEmpty}>
+                <Text style={styles.friendModalEmptyText}>Arkadaşlar yüklenemedi. Yeniden dene.</Text>
+              </TouchableOpacity>
+            ) : availableFriends.length === 0 ? (
               <View style={styles.friendModalEmpty}>
                 <Text style={styles.friendModalEmptyText}>
-                  Davet edilecek arkadaşın yok. Önce arkadaş ekleyebilirsin.
+                  {friendsList.length ? 'Tüm arkadaşların bu odada.' : 'Davet etmek için önce arkadaş ekleyebilirsin.'}
                 </Text>
               </View>
             ) : (
               <FlatList
-                data={friendsList}
+                data={availableFriends}
                 keyExtractor={(f) => f.id}
                 style={styles.friendModalList}
                 ItemSeparatorComponent={() => <View style={styles.friendModalDivider} />}
                 renderItem={({ item }) => {
                   const invited = invitedFriendIds.has(item.id);
+                  const sending = sendingIds.has(item.id);
                   return (
                     <View style={styles.friendRow}>
                       <View style={styles.friendAvatarWrap}>
@@ -1004,19 +1071,21 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                         <Text style={styles.friendRowName} numberOfLines={1}>
                           {item.displayName || item.name}
                         </Text>
-                        <Text style={styles.friendRowStatus}>
+                        <Text style={styles.friendRowStatus} numberOfLines={1}>
                           {item.online ? 'Çevrimiçi' : 'Çevrimdışı'}
-                          {item.level ? ` · Seviye ${item.level}` : ''}
+                          {item.level ? ` · Sv. ${item.level}` : ''}
                         </Text>
                       </View>
                       <TouchableOpacity
                         style={[styles.friendInviteBtn, invited && styles.friendInviteBtnDone]}
                         onPress={() => inviteFriend(item.id)}
-                        disabled={invited}
+                        disabled={invited || sending}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: invited || sending, busy: sending }}
                         activeOpacity={0.85}
                       >
-                        <Text style={styles.friendInviteBtnText}>
-                          {invited ? '✓ Davet Edildi' : 'Davet Et'}
+                        <Text style={styles.friendInviteBtnText} numberOfLines={1} adjustsFontSizeToFit>
+                          {invited ? 'Gönderildi' : sending ? 'Gönderiliyor' : 'Davet Et'}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -1403,10 +1472,10 @@ const styles = StyleSheet.create({
   },
   friendModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(3, 1, 16, 0.82)',
+    backgroundColor: 'rgba(3, 1, 16, 0.72)',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: 16,
   },
   friendModalCard: {
     width: '100%',
@@ -1422,7 +1491,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 24,
     elevation: 14,
-    padding: 20,
+    padding: 16,
   },
   friendModalBg: {
     position: 'absolute',
@@ -1432,6 +1501,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     height: '100%',
+    opacity: 0.17,
   },
   friendModalHeader: {
     flexDirection: 'row',
@@ -1450,8 +1520,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   friendModalCloseBtn: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1469,6 +1539,12 @@ const styles = StyleSheet.create({
   },
   friendModalList: {
     flexGrow: 0,
+    flexShrink: 1,
+  },
+  friendInviteError: {
+    color: '#FFB5BF',
+    fontSize: 12,
+    marginBottom: 8,
   },
   friendModalEmpty: {
     paddingVertical: 28,
@@ -1489,7 +1565,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
-    gap: 12,
+    gap: 8,
   },
   friendAvatarWrap: {
     width: 48,
@@ -1532,8 +1608,11 @@ const styles = StyleSheet.create({
   },
   friendInviteBtn: {
     borderRadius: 12,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
+    width: 88,
+    minHeight: 44,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#7C5CFF',
     borderWidth: 1,
     borderColor: 'rgba(186, 150, 255, 0.6)',

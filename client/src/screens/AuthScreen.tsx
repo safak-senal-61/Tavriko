@@ -65,7 +65,7 @@ import Reanimated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimate
 import { sound } from '../services/soundService';
 
 // Tavriko marka logosu (şeffaf arka planlı, CDN yerine paket içinden — hızlı ve garantili)
-const AUTH_LOGO = require('../../assets/images/brand/emblem_tight.png');
+const AUTH_LOGO = cdnImage('images/brand/emblem_tight.png');
 
 /** Doğum tarihi: Date → "GG.AA.YYYY" (sunucunun beklediği biçim). */
 function formatBirthDateTR(d: Date): string {

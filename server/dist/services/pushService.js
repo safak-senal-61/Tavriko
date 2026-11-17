@@ -48,12 +48,15 @@ async function sendPushToExpo(tokens, payload) {
         try {
             const res = await fetch(EXPO_PUSH_ENDPOINT, {
                 method: 'POST',
+                signal: AbortSignal.timeout(5000),
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(chunk.map((token) => ({
                     to: token,
                     title: payload.title,
                     body: payload.body,
                     sound: 'default',
+                    ...(payload.channelId ? { channelId: payload.channelId === 'general' ? 'default' : payload.channelId } : {}),
+                    ...(payload.channelId === 'invites' ? { priority: 'high' } : {}),
                     // iOS tarafında eylem butonları kayıtlı kategoriyle gösterilir.
                     ...(payload.categoryId ? { _category: payload.categoryId } : {}),
                     ...(payload.data ? { data: payload.data } : {}),

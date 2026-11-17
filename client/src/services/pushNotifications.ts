@@ -27,6 +27,7 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { DEFAULT_API_BASE } from '../config';
 import { authHeaders } from '../utils/apiAuth';
+import { useGameStore } from '../store/gameStore';
 import { handleNotificationResponse } from './notificationRouter';
 
 const ANDROID_CHANNEL_ID = 'default';
@@ -177,6 +178,8 @@ async function acquirePermission(): Promise<boolean> {
  */
 export async function registerForPushNotifications(userId: string): Promise<void> {
   if (Platform.OS === 'web' || !userId) return;
+  const active = useGameStore.getState();
+  if (active.user?.id !== userId || !active.token) return;
   initPushNotifications();
 
   try {
@@ -203,6 +206,8 @@ export async function registerForPushNotifications(userId: string): Promise<void
     }
 
     if (!token || (token === lastRegisteredToken && userId === lastRegisteredUserId)) return;
+    const current = useGameStore.getState();
+    if (current.user?.id !== userId || current.token !== active.token) return;
 
     const res = await fetch(`${DEFAULT_API_BASE}/push/register`, {
       method: 'POST',

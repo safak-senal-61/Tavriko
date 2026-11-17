@@ -5,6 +5,19 @@ Tavriko contains two parallel implementations of the multiplayer state machine:
 1. **Production Edge (Active by Default)**: Cloudflare Workers + Durable Objects in [`cloudflare/src/`](file:///c:/Users/%C3%96mer%20faruk%20%C5%9Fener/.gemini/antigravity/scratch/gmae/cloudflare/src) (`wss://tavriko-realtime.uncertainidentity8.workers.dev`). Configured in [`client/src/config.ts`](file:///c:/Users/%C3%96mer%20faruk%20%C5%9Fener/.gemini/antigravity/scratch/gmae/client/src/config.ts) via `DEFAULT_REALTIME_URL`.
 2. **Local Node Engine (Dev & Unit Tests)**: [`server/src/engine/GameRoomManager.ts`](file:///c:/Users/%C3%96mer%20faruk%20%C5%9Fener/.gemini/antigravity/scratch/gmae/server/src/engine/GameRoomManager.ts) + [`server/src/engine/Matchmaker.ts`](file:///c:/Users/%C3%96mer%20faruk%20%C5%9Fener/.gemini/antigravity/scratch/gmae/server/src/engine/Matchmaker.ts) + [`server/src/socket/socketHandler.ts`](file:///c:/Users/%C3%96mer%20faruk%20%C5%9Fener/.gemini/antigravity/scratch/gmae/server/src/socket/socketHandler.ts).
 
+## Oda ve düello davetlerinin teslimi
+
+Backend daveti önce PostgreSQL'e kaydeder. Ardından Cloudflare `/api/notify` WebSocket
+aktarımı ve cihaz push'u (Expo/FCM) paralel başlar; Vercel yanıtı ikisi de denendikten
+sonra döner. Cloudflare yalnızca doğrulanmış alıcı bağlantılarına gönderir. İstemci,
+bağlantı yeniden açıldığında kaçan kayıtları bildirim kutusundan alır. Uygulama
+arka plandaysa veya kapalıysa WebSocket yerine işletim sistemi push'u kullanılır.
+
+Dağıtımda Vercel ve `tavriko-realtime` Worker'ında `INTERNAL_API_SECRET` aynı
+olmalıdır. Worker'ın `JWT_SECRET` değeri backend'in oturum imzalama anahtarıyla
+eşleşmelidir. Varsayılan Cloudflare adresini değiştirmek için backend'de
+`REALTIME_HTTP_URL`, istemcide `EXPO_PUBLIC_REALTIME_WS_URL` ayarlanabilir.
+
 ## 2. Wire Protocol (`cloudflare/src/websocket/protocol.ts`)
 All messages over native WebSockets use JSON envelopes:
 ```json

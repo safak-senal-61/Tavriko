@@ -41,6 +41,7 @@ export class SocketService {
   private presenceUrl: string = '';
   private presenceReconnectTimer: any = null;
   private presencePingInterval: any = null;
+  private presenceLastMessageAt = 0;
   private onlineUsers: Map<string, { online: boolean; inRoom?: boolean; currentRoomCode?: string }> = new Map();
   private listeners: Map<string, Set<EventCallback>> = new Map();
   private reconnectAttempts: number = 0;
@@ -80,7 +81,8 @@ export class SocketService {
 
     if (
       this.presenceWs &&
-      (this.presenceWs.readyState === WebSocket.OPEN || this.presenceWs.readyState === WebSocket.CONNECTING) &&
+      (this.presenceWs.readyState === WebSocket.CONNECTING ||
+        (this.presenceWs.readyState === WebSocket.OPEN && Date.now() - this.presenceLastMessageAt < 50_000)) &&
       this.presenceUrl === targetUrl
     ) {
       return;
@@ -93,45 +95,50 @@ export class SocketService {
 
   private initPresenceWebSocket(url: string): void {
     try {
-      this.presenceWs = new WebSocket(url);
+      const ws = new WebSocket(url);
+      this.presenceWs = ws;
 
-      this.presenceWs.onopen = () => {
-        if (this.presencePingInterval) clearInterval(this.presencePingInterval);
-        this.presencePingInterval = setInterval(() => {
-          if (this.presenceWs && this.presenceWs.readyState === WebSocket.OPEN) {
-            this.presenceWs.send(
-              JSON.stringify({
-                event: 'presence:ping',
-                payload: {
-                  inRoom: Boolean(this.lastSessionContext.roomCode),
-                  currentRoomCode: this.lastSessionContext.roomCode,
-                },
-                timestamp: Date.now(),
-              })
-            );
-          }
-        }, 20000);
+      const ping = () => {
+        if (ws !== this.presenceWs || ws.readyState !== WebSocket.OPEN) return;
+        if (Date.now() - this.presenceLastMessageAt >= 50_000) {
+          ws.close();
+          return;
+        }
+        this.sendPresenceEnvelope('presence:ping', {
+          inRoom: Boolean(this.lastSessionContext.roomCode),
+          currentRoomCode: this.lastSessionContext.roomCode,
+        });
       };
 
-      this.presenceWs.onmessage = (event: MessageEvent) => {
+      ws.onopen = () => {
+        if (ws !== this.presenceWs) return;
+        this.presenceLastMessageAt = Date.now();
+        ping();
+        this.presencePingInterval = setInterval(ping, 20_000);
+        this.emitLocal('presence:connected', undefined);
+      };
+
+      ws.onmessage = (event: MessageEvent) => {
+        if (ws !== this.presenceWs) return;
+        this.presenceLastMessageAt = Date.now();
         this.handleIncomingMessage(event.data);
       };
 
-      this.presenceWs.onclose = () => {
-        if (this.presencePingInterval) {
-          clearInterval(this.presencePingInterval);
-          this.presencePingInterval = null;
-        }
-        if (!this.isManuallyClosed && this.presenceUrl) {
-          clearTimeout(this.presenceReconnectTimer);
-          this.presenceReconnectTimer = setTimeout(() => {
-            if (!this.isManuallyClosed && this.presenceUrl) {
-              this.initPresenceWebSocket(this.presenceUrl);
-            }
-          }, 3500);
-        }
+      ws.onclose = () => {
+        if (ws !== this.presenceWs) return;
+        this.closePresenceInternal();
+        this.schedulePresenceReconnect(url);
       };
-    } catch {}
+    } catch {
+      this.schedulePresenceReconnect(url);
+    }
+  }
+
+  private schedulePresenceReconnect(url: string): void {
+    clearTimeout(this.presenceReconnectTimer);
+    this.presenceReconnectTimer = setTimeout(() => {
+      if (this.presenceUrl === url && !this.presenceWs) this.initPresenceWebSocket(url);
+    }, 3500);
   }
 
   private closePresenceInternal(): void {
@@ -141,10 +148,11 @@ export class SocketService {
     }
     clearTimeout(this.presenceReconnectTimer);
     if (this.presenceWs) {
-      try {
-        this.presenceWs.close();
-      } catch {}
+      const ws = this.presenceWs;
       this.presenceWs = null;
+      try {
+        ws.close();
+      } catch {}
     }
   }
 
@@ -178,13 +186,10 @@ export class SocketService {
     }
   }
 
-  /** Safe player query: token when authenticated, tiny avatar seed otherwise. */
+  /** Safe player query: bounded avatar (no local/base64 photos) and token if available. */
   private buildPlayerQuery(playerId: string, displayName: string, avatarUrl?: string): string {
-    const base = `playerId=${encodeURIComponent(playerId)}&displayName=${encodeURIComponent(displayName)}`;
-    if (this.authToken) {
-      return `${base}&token=${encodeURIComponent(this.authToken)}`;
-    }
-    return `${base}&avatarUrl=${encodeURIComponent(sanitizeAvatarForUrl(avatarUrl))}`;
+    const base = `playerId=${encodeURIComponent(playerId)}&displayName=${encodeURIComponent(displayName)}&avatarUrl=${encodeURIComponent(sanitizeAvatarForUrl(avatarUrl))}`;
+    return this.authToken ? `${base}&token=${encodeURIComponent(this.authToken)}` : base;
   }
 
   public isConnected(): boolean {
@@ -293,6 +298,7 @@ export class SocketService {
 
       // Update local presence cache from Cloudflare WebSocket
       if (event === 'presence:snapshot' && payload && Array.isArray(payload.presences)) {
+        this.onlineUsers.clear();
         for (const p of payload.presences) {
           if (p && p.userId) {
             this.onlineUsers.set(p.userId, {
@@ -417,6 +423,7 @@ export class SocketService {
     this.closePresenceInternal();
     this.currentUrl = '';
     this.presenceUrl = '';
+    this.onlineUsers.clear();
     this.lastSessionContext = {};
   }
 

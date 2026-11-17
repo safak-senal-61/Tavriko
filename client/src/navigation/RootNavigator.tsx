@@ -67,7 +67,7 @@ import { ShopScreen } from '../screens/ShopScreen';
 import { EventsScreen } from '../screens/EventsScreen';
 import { InventoryScreen } from '../screens/InventoryScreen';
 import { ProLeagueScreen } from '../screens/ProLeagueScreen';
-import { sanitizeAvatarForUrl, compressAvatarImageAsync } from '../utils/avatarImage';
+import { compressAvatarImageAsync } from '../utils/avatarImage';
 import { applyStoredPreferencesOnBoot, syncPreferencesFromAccount, loadStoredPreferences } from '../store/appPrefs';
 import { useNotificationStore } from '../store/notificationStore';
 import {
@@ -117,7 +117,7 @@ export type ScreenName =
   | 'pro_league'
   | 'payment'
   | 'developer';
-import { DEFAULT_API_BASE, getRealtimeWsUrl } from '../config';
+import { DEFAULT_API_BASE } from '../config';
 import { LegalConsentGate } from '../components/LegalDocuments';
 import {
   consumeGoogleLegalAck,
@@ -256,7 +256,7 @@ export const RootNavigator: React.FC = () => {
     avatarUrl?: string;
     isBot?: boolean;
   } | null>(null);
-  const [opponentHasAnswered, setOpponentHasAnswered] = useState<boolean>(false);
+  const [answeredOpponentIds, setAnsweredOpponentIds] = useState<Set<string>>(new Set());
   const [matchQuestionsReview, setMatchQuestionsReview] = useState<MatchQuestionReviewItem[]>([]);
   const matchQuestionsReviewRef = useRef<MatchQuestionReviewItem[]>([]);
   matchQuestionsReviewRef.current = matchQuestionsReview;
@@ -382,11 +382,13 @@ export const RootNavigator: React.FC = () => {
       }
     };
     refresh();
+    const unsubPresence = socketService.on('presence:connected', refresh);
     const interval = setInterval(refresh, 60000);
     const subscription = AppState.addEventListener('change', state => { if (state === 'active') refresh(); });
     if (Platform.OS === 'web' && typeof window !== 'undefined') window.addEventListener('focus', refresh);
     return () => {
       clearInterval(interval);
+      unsubPresence();
       subscription.remove();
       if (Platform.OS === 'web' && typeof window !== 'undefined') window.removeEventListener('focus', refresh);
     };
@@ -553,17 +555,10 @@ export const RootNavigator: React.FC = () => {
     }
 
     socketService.setAuthToken(token);
-    socketService.connectPresence(user.id, user.displayName, user.avatarUrl);
-    const playerQuery = `playerId=${encodeURIComponent(user.id)}&displayName=${encodeURIComponent(user.displayName)}`;
-    socketService.connect(
-      getRealtimeWsUrl(
-        `/ws?intent=presence&${playerQuery}${
-          token && !token.startsWith('mock') && !token.startsWith('guest_local')
-            ? `&token=${encodeURIComponent(token)}`
-            : `&avatarUrl=${encodeURIComponent(sanitizeAvatarForUrl(user.avatarUrl))}`
-        }`
-      )
-    );
+    const connectPresence = () => socketService.connectPresence(user.id, user.displayName, user.avatarUrl);
+    const presenceAppState = AppState.addEventListener('change', state => {
+      if (state === 'active') connectPresence();
+    });
 
     const sendBackendHeartbeat = () => {
       if (!user?.id) return;
@@ -635,7 +630,7 @@ export const RootNavigator: React.FC = () => {
       setRoundResult(null);
       setMultiplayerFeedback(null);
       selectOption(null);
-      setOpponentHasAnswered(false);
+      setAnsweredOpponentIds(new Set());
       if (currentScreenRef.current !== 'quiz_arena') {
         navigateTo('quiz_arena');
       }
@@ -759,7 +754,7 @@ export const RootNavigator: React.FC = () => {
           isGameActiveRef.current = true;
           setMatchQuestionsReview([]);
           setDuelOpponent(data.opponent || null);
-          setOpponentHasAnswered(false);
+          setAnsweredOpponentIds(new Set());
           const opp = data.opponent;
           const initialPlayers: Record<string, any> = {
             [user.id]: {
@@ -835,7 +830,7 @@ export const RootNavigator: React.FC = () => {
       (data: { playerId: string }) => {
         if (!isGameActiveRef.current && !activeRoomRef.current) return;
         if (data.playerId !== user?.id) {
-          setOpponentHasAnswered(true);
+          setAnsweredOpponentIds(prev => prev.has(data.playerId) ? prev : new Set(prev).add(data.playerId));
           sound.playSound('timer_tick');
         }
       }
@@ -862,16 +857,9 @@ export const RootNavigator: React.FC = () => {
     });
 
     const heartbeatInterval = setInterval(() => {
-      if (user?.id) {
-        socketService.sendPresenceEnvelope('presence:ping', {
-          userId: user.id,
-          online: true,
-          inRoom: Boolean(activeRoomRef.current?.code),
-          currentRoomCode: activeRoomRef.current?.code,
-        });
-        sendBackendHeartbeat();
-      }
+      sendBackendHeartbeat();
     }, 20000);
+    connectPresence();
 
     return () => {
       unsubSync();
@@ -883,6 +871,7 @@ export const RootNavigator: React.FC = () => {
       unsubNotif();
       unsubNotifUpdate();
       unsubFriendsSync();
+      presenceAppState.remove();
       clearInterval(heartbeatInterval);
     };
   }, [user?.id, user?.displayName, user?.avatarUrl, token, isGuest, scheduleGameTimeout]);
@@ -972,7 +961,7 @@ export const RootNavigator: React.FC = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.user) setUser({ ...data.user, avatarUrl: newAvatarUri });
+          if (data.user) setUser({ ...data.user, avatarUrl: avatarSeedOrUri });
         }
       } catch (err) {
         console.warn('Profile update error:', err);
@@ -985,10 +974,6 @@ export const RootNavigator: React.FC = () => {
     if (user) {
       setUser({
         ...user,
-        avatarUrl: newAvatarUri,
-      });
-      socketService.setSessionContext({
-        ...socketService.lastSessionContext,
         avatarUrl: newAvatarUri,
       });
       try {
@@ -1039,7 +1024,7 @@ export const RootNavigator: React.FC = () => {
     }
 
     setDuelOpponent(null);
-    setOpponentHasAnswered(false);
+    setAnsweredOpponentIds(new Set());
     setMultiplayerFeedback(null);
     setPracticeQuestions([]);
     setPracticeIndex(0);
@@ -1110,7 +1095,7 @@ export const RootNavigator: React.FC = () => {
       if (!user) return;
       isGameActiveRef.current = true;
       setDuelOpponent(null);
-      setOpponentHasAnswered(false);
+      setAnsweredOpponentIds(new Set());
       markMatchmakingStart();
       socketService.findMatch(
         user.id,
@@ -1133,12 +1118,12 @@ export const RootNavigator: React.FC = () => {
       const roomCode = (forcedCode || Math.random().toString(36).substring(2, 8)).toUpperCase();
       const initialRoom: GameRoom = {
         code: roomCode,
-        mode: 'custom',
+        mode: 'friends_private',
         hostId: user.id,
         status: 'lobby',
-        category: settings?.mixedCategories ? 'mixed' : (settings?.categories?.[0] || 'genel_kultur'),
+        category: settings?.mixedCategories ? 'mixed' : (settings?.categories?.[0] || 'general_culture'),
         subCategory: settings?.subCategory,
-        difficulty: settings?.difficulty || 'medium',
+        difficulty: settings?.difficulty && settings.difficulty !== 'mixed' ? settings.difficulty : 'medium',
         maxPlayers: settings?.maxPlayers || 4,
         currentRound: 0,
         totalRounds: settings?.totalRounds || 7,
@@ -1196,10 +1181,10 @@ export const RootNavigator: React.FC = () => {
       if (!activeRoom || activeRoom.code !== cleanCode) {
         const placeholderRoom: GameRoom = {
           code: cleanCode,
-          mode: 'custom',
+          mode: 'friends_private',
           hostId: 'host_pending',
           status: 'lobby',
-          category: 'genel_kultur',
+          category: 'general_culture',
           difficulty: 'medium',
           maxPlayers: 4,
           currentRound: 0,
@@ -1329,7 +1314,7 @@ export const RootNavigator: React.FC = () => {
     activeRoomRef.current = null;
     setActiveRoom(null);
     setDuelOpponent(null);
-    setOpponentHasAnswered(false);
+    setAnsweredOpponentIds(new Set());
     setMultiplayerFeedback(null);
     if (!isDaily) setActiveDailyConfig(null);
     setSelectedCategory(category);
@@ -2014,6 +1999,7 @@ export const RootNavigator: React.FC = () => {
         )}
         {currentScreen === 'lobby' && activeRoom && user && (
           <LobbyScreen
+            key={`${user.id}:${activeRoom.code}`}
             room={activeRoom}
             currentUserId={user.id}
             user={user}
@@ -2079,7 +2065,7 @@ export const RootNavigator: React.FC = () => {
                       ...duelOpponent,
                       score: activeRoom?.scores[duelOpponent.id] || 0,
                       hasAnswered:
-                        opponentHasAnswered ||
+                        answeredOpponentIds.has(duelOpponent.id) ||
                         activeRoom?.players[duelOpponent.id]
                           ?.hasAnsweredCurrentRound,
                     }
@@ -2101,7 +2087,7 @@ export const RootNavigator: React.FC = () => {
                       isHost: p.isHost,
                       hasAnswered: isMe
                         ? p.hasAnsweredCurrentRound || selectedOptionId !== null
-                        : p.hasAnsweredCurrentRound || opponentHasAnswered,
+                        : p.hasAnsweredCurrentRound || answeredOpponentIds.has(p.id),
                       lastAnswer: lastRoundResult?.playerAnswers?.[p.id],
                     };
                   });
@@ -2114,7 +2100,7 @@ export const RootNavigator: React.FC = () => {
                       correctAnswers: activeRoom.players[duelOpponent.id]?.correctAnswersCount ?? 0,
                       isMe: false,
                       isHost: false,
-                      hasAnswered: opponentHasAnswered,
+                      hasAnswered: answeredOpponentIds.has(duelOpponent.id),
                       lastAnswer: lastRoundResult?.playerAnswers?.[duelOpponent.id],
                     });
                   }

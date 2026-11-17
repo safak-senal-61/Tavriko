@@ -51,6 +51,7 @@ import { supabaseService } from './supabaseClient';
 import { mergeQuestionStores } from '../utils/questionStoreMerge';
 import { presenceManager } from '../services/presenceManager';
 import { queuePushForNotification } from '../services/pushService';
+import { deliverGameInvite } from '../services/inviteDelivery';
 
 // SECURITY: no hardcoded fallback secret. If the environment does not provide a
 // secret, token signing/verification fails loudly instead of silently using a
@@ -4934,8 +4935,10 @@ export class PrismaService {
     roomCode: string,
     roomName?: string
   ): Promise<{ success: boolean; message: string; error?: string }> {
-    const cleanCode = (roomCode || '').trim().toUpperCase();
-    if (!cleanCode) return { success: false, error: 'Oda kodu gerekli.', message: '' };
+    const cleanCode = typeof roomCode === 'string' ? roomCode.trim().toUpperCase() : '';
+    if (!/^[A-Z0-9-]{4,32}$/.test(cleanCode) || cleanCode.startsWith('DUEL-')) {
+      return { success: false, error: 'Geçerli bir oda kodu gerekli.', message: '' };
+    }
 
     let me = this.users.get(userId);
     if (!me) {
@@ -4967,7 +4970,7 @@ export class PrismaService {
     }
 
     const notifItem: NotificationItem = {
-      id: 'notif_room_' + Date.now(),
+      id: 'notif_room_' + crypto.randomUUID(),
       type: 'match_invite',
       title: `${me.displayName} seni bir oyun odasına davet etti!`,
       sub: roomName
@@ -5000,6 +5003,7 @@ export class PrismaService {
       });
     } catch (e: any) {
       console.warn('[sendRoomInvite] DB notification error:', e.message);
+      return { success: false, error: 'Davet kaydedilemedi. Tekrar deneyebilirsin.', message: '' };
     }
 
     if (!target.notifications) target.notifications = [];
@@ -5008,7 +5012,7 @@ export class PrismaService {
     this.savePersistedUsers();
 
     presenceManager.notifyUser(target.id, 'notification:new', notifItem);
-    queuePushForNotification(target.id, notifItem);
+    await deliverGameInvite(target.id, notifItem);
 
     return {
       success: true,
@@ -5062,11 +5066,9 @@ export class PrismaService {
     }
 
     const roomCode = 'DUEL-' + Math.random().toString(36).substring(2, 6).toUpperCase();
-    this.setUserActiveRoom(userId, roomCode);
-    presenceManager.setUserRoom(userId, roomCode);
 
     const notifItem: NotificationItem = {
-      id: 'notif_chal_' + Date.now(),
+      id: 'notif_chal_' + crypto.randomUUID(),
       type: 'match_invite',
       title: `${me.displayName} sana 1v1 Düello Meydan Okudu!`,
       sub: 'Özel 1v1 düello odası hazır. Kabul et ve hemen yarışmaya başla!',
@@ -5098,7 +5100,11 @@ export class PrismaService {
       });
     } catch (e: any) {
       console.warn('[sendDuelChallenge] DB notification error:', e.message);
+      return { success: false, error: 'Düello daveti kaydedilemedi. Tekrar deneyebilirsin.', message: '' };
     }
+
+    this.setUserActiveRoom(userId, roomCode);
+    presenceManager.setUserRoom(userId, roomCode);
 
     if (!target.notifications) target.notifications = [];
     target.notifications.unshift(notifItem);
@@ -5107,7 +5113,7 @@ export class PrismaService {
 
     // 2. REAL-TIME WEBSOCKET NOTIFICATION TO TARGET
     presenceManager.notifyUser(target.id, 'notification:new', notifItem);
-    queuePushForNotification(target.id, notifItem);
+    await deliverGameInvite(target.id, notifItem);
 
     // 3. BROADCAST SENDER PRESENCE (Now in room)
     presenceManager.broadcast('presence:update', presenceManager.getUserPresence(userId));

@@ -518,9 +518,6 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       if (res.ok && data.success) {
         sound.playSound('reward');
         sound.triggerHaptic('success');
-        if (data.notification) {
-          socketService.notifyUserRealtime(friend.id, 'notification:new', data.notification);
-        }
         setChallengeNotice(`⚔️ ${friend.displayName || friend.name} oyuncusuna 1v1 düello daveti gönderildi! Odaya aktarılıyorsunuz...`);
         setTimeout(() => {
           onInviteToMatch(friend.id, friend.displayName || friend.name, data.roomCode);

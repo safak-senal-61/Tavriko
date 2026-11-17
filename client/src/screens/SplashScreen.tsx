@@ -1,5 +1,8 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet, Image, useWindowDimensions } from 'react-native';
+import { cdnImage } from '../utils/cdn';
+
+const SPLASH_ART = cdnImage('splash-screen.png');
 
 interface SplashScreenProps {
   onFinish: () => void;
@@ -44,7 +47,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   return (
     <View style={styles.root}>
       <Image
-        source={require('../../assets/splash-screen.png')}
+        source={SPLASH_ART}
         style={styles.image}
         resizeMode={isWideScreen ? 'contain' : 'cover'}
       />
@@ -58,7 +61,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#01025B',
   },
   image: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     width: '100%',
     height: '100%',
   },

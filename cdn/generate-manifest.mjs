@@ -1,8 +1,5 @@
 // client/assets içindeki görsel/ses dosyaları için CDN manifestini üretir.
-// Çıktılar:
-//   client/src/generated/cdnManifest.ts  (yol -> [genişlik, yükseklik, içerik özeti])
-//   client/src/generated/localAssets.ts   (görsel yolu -> paket içi require; mobilde
-//                                          CDN yerine paket içinden yüklenir)
+// Çıktı: client/src/generated/cdnManifest.ts (yol -> [genişlik, yükseklik, içerik özeti])
 // Çalıştırma: node cdn/generate-manifest.mjs
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -69,34 +66,3 @@ writeFileSync(
   `// Otomatik üretilir: node cdn/generate-manifest.mjs\n// yol -> [genişlik, yükseklik, içerik özeti]\nexport const CDN_MANIFEST: Record<string, [number, number, string]> = {\n${body}\n};\n`
 );
 console.log(`${Object.keys(manifest).length} dosya yazıldı -> ${relative(root, outFile)}`);
-
-// Yerel görsel haritası: mobilde (native) görseller CDN yerine paket içinden
-// yüklenir. require çağrıları derleme sırasında çözümlenir; tüm görseller
-// APK içine girer. Web tarafı hafif kalsın diye CDN'de kalır (cdn.ts kararı verir).
-const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
-const localOutFile = join(root, 'client', 'src', 'generated', 'localAssets.ts');
-const imageEntries = Object.keys(manifest).filter((k) => IMAGE_EXTS.has(extname(k).toLowerCase()));
-// require() kullanılır (import yerine): TS görsel modül bildirimleri
-// içermediğinden ESM import 571 TS2307 hatası üretir; require ise
-// Metro için aynı şeydir (paket içi varlık) ve tip hatası vermez.
-// Uygulamanın geri kalanındaki görsel yüklemeleri de require kullanır.
-const localImports = imageEntries
-  .map((k, i) => `const __localImg${i} = require('../../assets/${k}');`)
-  .join('\n');
-const localBody = imageEntries
-  .map((k, i) => `  ${JSON.stringify(k)}: __localImg${i},`)
-  .join('\n');
-// Metro platform çözümlemesi: native derlemeler localAssets.native.ts'yi,
-// web derlemesi localAssets.ts'yi seçer. Böylece 49MB'lık görsel seti
-// yalnızca APK içine girer; web paketi küçük kalır (web'de görseller CDN'den).
-// Not: dosya adı localAssets.native.ts olmalı (localAssets.ts.native.ts değil)
-// — Metro uzantısız import'u '.android/.native/.js(ts)' sırasıyla çözer.
-writeFileSync(
-  localOutFile.replace(/\.ts$/, '.native.ts'),
-  `// Otomatik üretilir: node cdn/generate-manifest.mjs (NATIVE)\n// Görsel yolu -> paket içi varlık (statik import; Metro çözer).\n// Mobilde cdnImage() bu haritadan yükler; böylece görseller ağ/CDN\n// durumundan bağımsız olarak her zaman görünür.\n${localImports}\n// eslint-disable-next-line @typescript-eslint/no-explicit-any\nexport const LOCAL_IMAGE_ASSETS: Record<string, any> = {\n${localBody}\n};\n`
-);
-writeFileSync(
-  localOutFile,
-  `// Otomatik üretilir: node cdn/generate-manifest.mjs (WEB)\n// Web paketi görselleri içermez (CDN'den yüklenir); native taraf için\n// localAssets.native.ts üretilir (Metro platform çözümlemesi).\n// eslint-disable-next-line @typescript-eslint/no-explicit-any\nexport const LOCAL_IMAGE_ASSETS: Record<string, any> = {};\n`
-);
-console.log(`${imageEntries.length} görsel native haritaya yazıldı -> ${relative(root, localOutFile.replace(/\.ts$/, '.native.ts'))}`);
