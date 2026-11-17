@@ -10,6 +10,7 @@
  */
 import { Platform } from 'react-native';
 import PostHog from 'posthog-react-native';
+import { getAnalyticsConsent } from './analyticsConsent';
 
 // PostHog istemci anahtarı gizli değildir (Sentry DSN gibi her bundle'da
 // görünür), yalnızca olay GÖNDERME izni verir. Ortam değişkeni
@@ -26,6 +27,9 @@ let initPromise: Promise<void> | null = null;
 let matchmakingStartedAt: number | null = null;
 
 export function initAnalytics(): Promise<void> {
+  // KVKK uyumu: analitik yalnızca açık "Kabul Et" onayından sonra başlar.
+  // Red veya cevapsız durumda hiçbir olay gönderilmez (tam no-op).
+  if (getAnalyticsConsent() !== 'granted') return Promise.resolve();
   if (!POSTHOG_KEY || initPromise) return initPromise ?? Promise.resolve();
   initPromise = (async () => {
     try {

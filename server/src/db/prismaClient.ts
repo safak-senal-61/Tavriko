@@ -1728,8 +1728,8 @@ export class PrismaService {
     if (!cleanEmail || !cleanEmail.includes('@')) {
       throw new Error('Geçerli bir e-posta adresi giriniz.');
     }
-    if (!payload.password || payload.password.length < 6) {
-      throw new Error('Şifreniz en az 6 karakter olmalıdır.');
+    if (!payload.password || payload.password.length < 8) {
+      throw new Error('Şifreniz en az 8 karakter olmalıdır.');
     }
 
     const existingUser = await this.rawClient.user.findFirst({
@@ -2290,8 +2290,8 @@ export class PrismaService {
       throw new Error('Doğrulama kodunun süresi dolmuş. Lütfen yeni kod isteyin.');
     }
 
-    if (!newPassword || newPassword.length < 6) {
-      throw new Error('Yeni şifreniz en az 6 karakter olmalıdır.');
+    if (!newPassword || newPassword.length < 8) {
+      throw new Error('Yeni şifreniz en az 8 karakter olmalıdır.');
     }
 
     record.passwordHash = await bcrypt.hash(newPassword, 10);
@@ -2479,8 +2479,8 @@ export class PrismaService {
       }
     }
 
-    if (newPass.length < 6) {
-      throw new Error('Yeni şifre en az 6 karakter olmalıdır.');
+    if (newPass.length < 8) {
+      throw new Error('Yeni şifre en az 8 karakter olmalıdır.');
     }
 
     const newHash = bcrypt.hashSync(newPass, 10);

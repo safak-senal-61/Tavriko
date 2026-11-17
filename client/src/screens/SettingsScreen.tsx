@@ -267,8 +267,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   const handleChangePassword = async () => {
     setPwMessage(null);
-    if (newPw.length < 6) {
-      setPwMessage({ ok: false, text: 'Yeni şifre en az 6 karakter olmalıdır.' });
+    if (newPw.length < 8) {
+      setPwMessage({ ok: false, text: 'Yeni şifre en az 8 karakter olmalıdır.' });
       return;
     }
     if (newPw !== newPw2) {

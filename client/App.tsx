@@ -15,6 +15,12 @@ import { useGameStore } from './src/store/gameStore';
 import { initAnalytics, trackSessionStart } from './src/services/analytics';
 import { initPushNotifications, registerForPushNotifications } from './src/services/pushNotifications';
 import { checkAndApplyOtaUpdate } from './src/services/otaUpdates';
+import {
+  getAnalyticsConsent,
+  hydrateAnalyticsConsent,
+  type AnalyticsConsentValue,
+} from './src/services/analyticsConsent';
+import { AnalyticsConsentBanner } from './src/components/AnalyticsConsentBanner';
 
 // Sentry hata izleme: DSN doğrudan koda gömülüdür. Client DSN'leri gizli
 // değildir (her tarayıcı/mobil bundle'ında görünür), yalnızca olay GÖNDERME
@@ -91,13 +97,23 @@ function AppInner() {
     Nunito_900Black,
   });
 
-  // Ürün analitiği (PostHog): anahtar yoksa sessizce kapalı kalır.
-  // session_start event'i — D1/D7 retention ölçümünün temeli.
+  // Ürün analitiği (PostHog) — KVKK uyumu: yalnızca kullanıcı analitik onayı
+  // verdikten sonra başlar. session_start event'i D1/D7 retention ölçümünün temeli.
+  const [analyticsConsent, setAnalyticsConsentState] = useState<AnalyticsConsentValue | null>(null);
   useEffect(() => {
+    void hydrateAnalyticsConsent().then(() => {
+      setAnalyticsConsentState(getAnalyticsConsent());
+      void initAnalytics().then(() => {
+        trackSessionStart();
+      });
+    });
+  }, []);
+  useEffect(() => {
+    if (analyticsConsent !== 'granted') return;
     void initAnalytics().then(() => {
       trackSessionStart();
     });
-  }, []);
+  }, [analyticsConsent]);
 
   // EAS Update (OTA): üretim derlemelerinde açılışta güncelleme kontrolü;
   // Expo Go / dev / web'de no-op. Hata durumunda sessizce susar.
@@ -145,7 +161,13 @@ function AppInner() {
     );
   }
 
-  return <RootNavigator />;
+  return (
+    <>
+      <RootNavigator />
+      {/* KVKK: analitik yalnızca açık onayla başlar; karar yoksa bandı göster */}
+      <AnalyticsConsentBanner onDecide={setAnalyticsConsentState} />
+    </>
+  );
 }
 
 // Sentry.wrap, SDK kapalıyken bile bileşeni değiştirmeden geçirir.

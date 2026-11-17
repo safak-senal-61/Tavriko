@@ -1,0 +1,63 @@
+/**
+ * Analitik (çerez/PostHog) onayı — KVKK uyumu.
+ *
+ * PostHog analitiği yalnızca kullanıcı açıkça "Kabul Et" dedikten sonra
+ * başlatılır. Red veya cevapsız durumda hiçbir olay gönderilmez.
+ *
+ * Depolama:
+ * - Web: localStorage (çerez yerine yerel anahtar; paylaşılmaz)
+ * - Mobil: expo-secure-store (Keystore/Keychain)
+ * Değerler: 'granted' | 'denied' | null (null = henüz sorulmamış)
+ */
+import { Platform } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
+
+export type AnalyticsConsentValue = 'granted' | 'denied';
+
+const KEY = 'tavriko_analytics_consent';
+
+let cached: AnalyticsConsentValue | null = null;
+let hydrated = Platform.OS === 'web';
+
+const readWeb = (): AnalyticsConsentValue | null => {
+  try {
+    const v =
+      typeof window !== 'undefined' && window.localStorage
+        ? window.localStorage.getItem(KEY)
+        : null;
+    return v === 'granted' || v === 'denied' ? v : null;
+  } catch {
+    return null;
+  }
+};
+
+if (Platform.OS === 'web') cached = readWeb();
+
+/** Uygulama açılışında bir kez çağrılır: mobilde güvenli depodan onayı yükler. */
+export const hydrateAnalyticsConsent = async (): Promise<void> => {
+  if (hydrated) return;
+  hydrated = true;
+  try {
+    const v = await SecureStore.getItemAsync(KEY);
+    cached = v === 'granted' || v === 'denied' ? v : null;
+  } catch {
+    cached = null;
+  }
+};
+
+/** Mevcut onay durumu; null = henüz sorulmamış. */
+export const getAnalyticsConsent = (): AnalyticsConsentValue | null => cached;
+
+/** Kullanıcının kararını kaydeder ve önbelleği günceller. */
+export const setAnalyticsConsent = (value: AnalyticsConsentValue): void => {
+  cached = value;
+  if (Platform.OS === 'web') {
+    try {
+      window.localStorage.setItem(KEY, value);
+    } catch {
+      // localStorage kapalıysa yalnızca oturum boyunca hatırlanır
+    }
+  } else {
+    void SecureStore.setItemAsync(KEY, value);
+  }
+};

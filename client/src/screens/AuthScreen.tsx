@@ -197,9 +197,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         setErrorMsg('Kullanıcı adı en az 3 karakter olmalıdır.');
         return;
       }
-      if (!password || password.length < 6) {
+      if (!password || password.length < 8) {
         sound.playSound('wrong');
-        setErrorMsg('Şifreniz en az 6 karakter olmalıdır.');
+        setErrorMsg('Şifreniz en az 8 karakter olmalıdır.');
         return;
       }
       if (password !== confirmPassword) {
@@ -246,9 +246,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         setRegStep(1);
         return;
       }
-      if (!password || password.length < 6) {
+      if (!password || password.length < 8) {
         sound.playSound('wrong');
-        setErrorMsg('Şifre en az 6 karakter olmalıdır.');
+        setErrorMsg('Şifre en az 8 karakter olmalıdır.');
         setRegStep(1);
         return;
       }
@@ -618,9 +618,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       setErrorMsg('6 haneli doğrulama kodunu eksiksiz girin.');
       return;
     }
-    if (!newResetPassword || newResetPassword.length < 6) {
+    if (!newResetPassword || newResetPassword.length < 8) {
       sound.playSound('wrong');
-      setErrorMsg('Yeni şifreniz en az 6 karakter olmalıdır.');
+      setErrorMsg('Yeni şifreniz en az 8 karakter olmalıdır.');
       return;
     }
     if (newResetPassword !== confirmResetPassword) {
