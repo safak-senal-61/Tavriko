@@ -178,18 +178,15 @@ const INVITE_MODAL_BG: ImageSourcePropType = require('../../assets/images/lobby/
 
 /**
  * OYUN İÇİ ARKADAŞ DAVETİ — şık, animasyonlu kart:
- *  - Arka plan görseli (paket içi, ağ bağımsız)
- *  - Nefes alan mor parıltılı kenarlık (KartPaylaş ile aynı desen, mor)
- *  - Kart üzerinde sonsuz dönen ışık taraması (shine sweep)
+ *  - Kart oranına göre üretilmiş nebula arka plan görseli (ağ bağımsız)
+ *  - Nefes alan mor parıltılı kenarlık
  *  - Nabız atan rozet + basınca hafif çökme
  */
 const FriendInviteCard: React.FC<{ onPress: () => void }> = ({ onPress }) => {
   const p = useSharedValue(0);
-  const sweep = useSharedValue(0);
   const press = useSharedValue(1);
   useEffect(() => {
     p.value = withRepeat(withTiming(1, { duration: 2400, easing: Easing.inOut(Easing.sin) }), -1, true);
-    sweep.value = withRepeat(withTiming(1, { duration: 2800, easing: Easing.linear }), -1, false);
   }, []);
   const borderStyle = useAnimatedStyle(() => {
     const t = 0.5 + 0.5 * Math.sin(p.value * Math.PI);
@@ -203,9 +200,6 @@ const FriendInviteCard: React.FC<{ onPress: () => void }> = ({ onPress }) => {
     return { transform: [{ scale: 0.93 + 0.09 * t }] };
   });
   const pressStyle = useAnimatedStyle(() => ({ transform: [{ scale: press.value }] }));
-  const shineStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: `${-150 + sweep.value * 700}%` }, { rotate: '14deg' }],
-  }));
   return (
     <TouchableOpacity
       activeOpacity={0.9}
@@ -219,19 +213,20 @@ const FriendInviteCard: React.FC<{ onPress: () => void }> = ({ onPress }) => {
     >
       <Reanimated.View style={[styles.friendInviteCard, borderStyle, pressStyle]}>
         <Image source={INVITE_BG} style={styles.friendInviteBg} resizeMode="cover" />
-        {/* Alt kısım yazı okunurluğu için yumuşak karartma */}
-        <GradientFill colors={['rgba(15,6,36,0)', 'rgba(15,6,36,0.62)']} stops={[0.4, 1]} />
-        {/* Sonsuz ışık taraması */}
-        <Reanimated.View style={[styles.friendInviteShine, shineStyle]} pointerEvents="none">
-          <View style={styles.friendInviteShineCore} />
-        </Reanimated.View>
+        {/* Yazı okunurluğu için yumuşak karartma — tam genişlik, kırpma yok */}
+        <GradientFill
+          colors={['rgba(14,6,32,0.18)', 'rgba(14,6,32,0.72)']}
+          stops={[0, 1]}
+        />
         <View style={styles.friendInviteRow}>
           <Reanimated.View style={[styles.friendInviteBadge, badgeStyle]}>
             <Image source={INVITE_ICON} style={styles.friendInviteBadgeIcon} />
           </Reanimated.View>
-          <View style={styles.inviteLinkInfo}>
-            <Text style={styles.friendInviteTitle}>ARKADAŞ DAVET ET</Text>
-            <Text style={styles.inviteLinkSub} numberOfLines={1}>
+          <View style={styles.friendInviteInfo}>
+            <Text style={styles.friendInviteTitle} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              ARKADAŞ DAVET ET
+            </Text>
+            <Text style={styles.friendInviteSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               Bildirim gider — tek dokunuşla odaya katılır
             </Text>
           </View>
@@ -1357,32 +1352,22 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  friendInviteShine: {
-    position: 'absolute',
-    top: -26,
-    bottom: -26,
-    left: 0,
-    width: 62,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  friendInviteShineCore: {
-    width: 22,
-    height: '100%',
-    borderRadius: 11,
-    backgroundColor: 'rgba(235, 225, 255, 0.14)',
-  },
   friendInviteRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 9,
-    paddingHorizontal: 13,
+    gap: 11,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  friendInviteInfo: {
+    flex: 1,
+    minWidth: 0,
+    marginRight: 2,
   },
   friendInviteBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(124, 92, 255, 0.3)',
@@ -1394,19 +1379,25 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   friendInviteBadgeIcon: {
-    width: 27,
-    height: 27,
+    width: 30,
+    height: 30,
   },
   friendInviteTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: THEME.fonts.extraBold,
     color: '#FFFFFF',
     letterSpacing: 0.5,
     marginBottom: 1,
   },
+  friendInviteSub: {
+    color: '#B7A8DC',
+    fontSize: 11,
+    fontFamily: THEME.fonts.medium,
+    marginTop: 1,
+  },
   friendInviteChevron: {
-    fontSize: 24,
-    lineHeight: 26,
+    fontSize: 26,
+    lineHeight: 28,
     color: 'rgba(200, 185, 255, 0.9)',
     fontFamily: THEME.fonts.black,
   },
