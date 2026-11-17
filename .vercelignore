@@ -13,6 +13,8 @@ client/assets/images/categories
 client/assets/images/discovery
 client/assets/images/lobby/*
 !client/assets/images/lobby/invite_bg.png
+!client/assets/images/lobby/invite_icon.png
+!client/assets/images/lobby/invite_modal_bg.png
 client/assets/images/modes
 client/assets/images/profile
 client/assets/images/store

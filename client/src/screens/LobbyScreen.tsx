@@ -171,8 +171,10 @@ const BouncyReaction: React.FC<{ emoji: string; onPress: () => void }> = ({ emoj
   );
 };
 
-/** Arkadaş davet kartı arka planı: mor nebula + teal parıltı (PIL ile üretildi) */
+/** Arkadaş davet görselleri: nebula kart arka planı, ikon ve popup arka planı */
 const INVITE_BG: ImageSourcePropType = require('../../assets/images/lobby/invite_bg.png');
+const INVITE_ICON: ImageSourcePropType = require('../../assets/images/lobby/invite_icon.png');
+const INVITE_MODAL_BG: ImageSourcePropType = require('../../assets/images/lobby/invite_modal_bg.png');
 
 /**
  * OYUN İÇİ ARKADAŞ DAVETİ — şık, animasyonlu kart:
@@ -225,12 +227,12 @@ const FriendInviteCard: React.FC<{ onPress: () => void }> = ({ onPress }) => {
         </Reanimated.View>
         <View style={styles.friendInviteRow}>
           <Reanimated.View style={[styles.friendInviteBadge, badgeStyle]}>
-            <Text style={styles.friendInviteBadgeText}>👥</Text>
+            <Image source={INVITE_ICON} style={styles.friendInviteBadgeIcon} />
           </Reanimated.View>
           <View style={styles.inviteLinkInfo}>
             <Text style={styles.friendInviteTitle}>ARKADAŞ DAVET ET</Text>
-            <Text style={styles.inviteLinkSub} numberOfLines={2}>
-              Arkadaşlarına bildirim gider — tek dokunuşla odaya katılır
+            <Text style={styles.inviteLinkSub} numberOfLines={1}>
+              Bildirim gider — tek dokunuşla odaya katılır
             </Text>
           </View>
           <Text style={styles.friendInviteChevron}>›</Text>
@@ -954,9 +956,14 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         onRequestClose={() => setFriendInviteVisible(false)}
       >
         <View style={styles.friendModalOverlay}>
-          <View style={styles.friendModalCard}>
+          <Reanimated.View
+            entering={ZoomIn.springify().damping(18)}
+            style={styles.friendModalCard}
+          >
+            <Image source={INVITE_MODAL_BG} style={styles.friendModalBg} resizeMode="cover" />
             <View style={styles.friendModalHeader}>
-              <Text style={styles.friendModalTitle}>👥 Arkadaş Davet Et</Text>
+              <Image source={INVITE_ICON} style={styles.friendModalHeaderIcon} />
+              <Text style={styles.friendModalTitle}>Arkadaş Davet Et</Text>
               <TouchableOpacity
                 style={styles.friendModalCloseBtn}
                 onPress={() => {
@@ -991,10 +998,12 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                   const invited = invitedFriendIds.has(item.id);
                   return (
                     <View style={styles.friendRow}>
-                      <View style={[styles.friendAvatar, item.online && styles.friendAvatarOnline]}>
-                        <Text style={styles.friendAvatarText}>
-                          {(item.displayName || item.name || '?').charAt(0).toUpperCase()}
-                        </Text>
+                      <View style={styles.friendAvatarWrap}>
+                        <CharacterAvatar
+                          seed={item.avatarUrl || item.displayName || item.name || 'av2'}
+                          size={44}
+                        />
+                        {item.online ? <View style={styles.friendOnlineDot} /> : null}
                       </View>
                       <View style={styles.friendRowInfo}>
                         <Text style={styles.friendRowName} numberOfLines={1}>
@@ -1020,7 +1029,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 }}
               />
             )}
-          </View>
+          </Reanimated.View>
         </View>
       </Modal>
     </TavrikoScreen>
@@ -1350,30 +1359,30 @@ const styles = StyleSheet.create({
   },
   friendInviteShine: {
     position: 'absolute',
-    top: -36,
-    bottom: -36,
+    top: -26,
+    bottom: -26,
     left: 0,
-    width: 76,
+    width: 62,
     alignItems: 'center',
     justifyContent: 'center',
   },
   friendInviteShineCore: {
-    width: 26,
+    width: 22,
     height: '100%',
-    borderRadius: 13,
+    borderRadius: 11,
     backgroundColor: 'rgba(235, 225, 255, 0.14)',
   },
   friendInviteRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    gap: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 13,
   },
   friendInviteBadge: {
-    width: 46,
-    height: 46,
-    borderRadius: 15,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(124, 92, 255, 0.3)',
@@ -1384,19 +1393,20 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  friendInviteBadgeText: {
-    fontSize: 20,
+  friendInviteBadgeIcon: {
+    width: 27,
+    height: 27,
   },
   friendInviteTitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: THEME.fonts.extraBold,
     color: '#FFFFFF',
-    letterSpacing: 0.6,
-    marginBottom: 2,
+    letterSpacing: 0.5,
+    marginBottom: 1,
   },
   friendInviteChevron: {
-    fontSize: 28,
-    lineHeight: 30,
+    fontSize: 24,
+    lineHeight: 26,
     color: 'rgba(200, 185, 255, 0.9)',
     fontFamily: THEME.fonts.black,
   },
@@ -1410,23 +1420,43 @@ const styles = StyleSheet.create({
   friendModalCard: {
     width: '100%',
     maxWidth: 420,
-    maxHeight: '80%',
-    borderRadius: 20,
+    maxHeight: '82%',
+    borderRadius: 22,
+    overflow: 'hidden',
     backgroundColor: '#150B3B',
     borderWidth: 1,
     borderColor: 'rgba(155, 140, 255, 0.35)',
-    padding: 18,
+    shadowColor: '#6B3CFF',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+    elevation: 14,
+    padding: 20,
+  },
+  friendModalBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   friendModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
+    gap: 10,
+    marginBottom: 8,
+  },
+  friendModalHeaderIcon: {
+    width: 30,
+    height: 30,
   },
   friendModalTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontFamily: THEME.fonts.extraBold,
     color: '#FFFFFF',
+    flex: 1,
   },
   friendModalCloseBtn: {
     width: 32,
@@ -1470,23 +1500,30 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 12,
   },
-  friendAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  friendAvatarWrap: {
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(155, 140, 255, 0.18)',
+    backgroundColor: 'rgba(155, 140, 255, 0.14)',
+    borderRadius: 24,
     borderWidth: 2,
-    borderColor: 'rgba(155, 140, 255, 0.3)',
+    borderColor: 'rgba(155, 140, 255, 0.35)',
+    shadowColor: '#9B8CFF',
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  friendAvatarOnline: {
-    borderColor: '#5ADBB5',
-  },
-  friendAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: THEME.fonts.extraBold,
+  friendOnlineDot: {
+    position: 'absolute',
+    right: -1,
+    bottom: -1,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    backgroundColor: '#5ADBB5',
+    borderWidth: 2,
+    borderColor: '#1B0E45',
   },
   friendRowInfo: {
     flex: 1,
@@ -1507,11 +1544,19 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 14,
     backgroundColor: '#7C5CFF',
+    borderWidth: 1,
+    borderColor: 'rgba(186, 150, 255, 0.6)',
+    shadowColor: '#7C5CFF',
+    shadowOpacity: 0.45,
+    shadowRadius: 8,
+    elevation: 4,
   },
   friendInviteBtnDone: {
     backgroundColor: 'rgba(90, 219, 181, 0.2)',
     borderWidth: 1,
     borderColor: 'rgba(90, 219, 181, 0.5)',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   friendInviteBtnText: {
     color: '#FFFFFF',

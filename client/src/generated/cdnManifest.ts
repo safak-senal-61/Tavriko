@@ -473,6 +473,8 @@ export const CDN_MANIFEST: Record<string, [number, number, string]> = {
   "images/friends_3d.jpg": [1024, 1024, "52afc390"],
   "images/lobby/empty_slot.png": [1254, 1254, "2197a99f"],
   "images/lobby/invite_bg.png": [900, 260, "65db2651"],
+  "images/lobby/invite_icon.png": [220, 220, "fd9d84f7"],
+  "images/lobby/invite_modal_bg.png": [760, 1060, "166a5723"],
   "images/lobby/lobby_hero.png": [1672, 940, "0a7341b5"],
   "images/lobby/question_mark.png": [396, 512, "21073b8a"],
   "images/logo_mark.png": [256, 196, "78c9a10c"],
