@@ -1031,12 +1031,14 @@ function renderDashboardHtml(page = adminShell_1.adminPages[0]) {
     .admin-section-title{font-size:20px;letter-spacing:-.025em;margin:18px 0 10px}
     .admin-table{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
     .admin-table table{min-width:540px}
+    .admin-table th{white-space:nowrap}
+    .table-hint{display:none;color:var(--muted);font-size:12px;margin:0 0 5px}
     #tab-db>div:first-child{flex-wrap:wrap;gap:10px}
     #pushTemplateGrid{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))!important}
     .push-tpl,#tab-push :is(input,textarea,select){min-width:0;max-width:100%}
     #tab-push>div{min-width:0;overflow-wrap:anywhere}
     .filter-pills button{font:inherit;font-size:11px}
-    @media(max-width:700px){.admin-directory{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:700px){.admin-directory{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.table-hint{display:block}}
     @media(max-width:420px){.admin-directory{grid-template-columns:1fr;gap:8px}.admin-directory a{padding:12px}.tab-content>div{min-width:0}.tab-content :is(button,.btn){min-height:42px}}
     @media(prefers-reduced-motion:reduce){.admin-main *, .admin-main *:before,.admin-main *:after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
   </style>
@@ -1611,6 +1613,7 @@ function renderDashboardHtml(page = adminShell_1.adminPages[0]) {
         <button class="btn btn-gold" onclick="refreshStats()">🔄 Verileri Yenile</button>
       </div>
 
+      <p class="table-hint">Tüm sütunları görmek için tabloyu yana kaydırın.</p>
       <div class="admin-table" tabindex="0" role="region" aria-label="Kayıtlı kullanıcılar tablosu">
         <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
           <thead>
@@ -1639,10 +1642,11 @@ function renderDashboardHtml(page = adminShell_1.adminPages[0]) {
         <button class="btn btn-gold" onclick="loadPushDevices()">🔄 Cihazları Yenile</button>
       </div>
 
-      <div id="pushFcmStatus" style="margin-bottom:16px; padding:14px 18px; border-radius:12px; font-size:14px; font-weight:700; background:var(--card); border:1px solid var(--card-border); color:var(--text-muted);">
+      <div id="pushFcmStatus" role="status" style="margin-bottom:16px; padding:14px 18px; border-radius:12px; font-size:14px; font-weight:700; background:var(--card); border:1px solid var(--card-border); color:var(--text-muted);">
         FCM durumu yükleniyor…
       </div>
 
+      <p class="table-hint">Tüm sütunları görmek için tabloyu yana kaydırın.</p>
       <div class="admin-table" tabindex="0" role="region" aria-label="Kayıtlı cihazlar tablosu" style="margin-bottom:20px;">
         <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
           <thead>
@@ -2100,12 +2104,13 @@ function renderDashboardHtml(page = adminShell_1.adminPages[0]) {
             statusEl.style.background = 'rgba(16,185,129,0.12)';
             statusEl.style.border = '1px solid rgba(16,185,129,0.4)';
             statusEl.style.color = 'var(--green)';
-            statusEl.innerText = '✅ FCM (Android bildirimleri) AKTİF — servis hesabı ile Google kimlik doğrulaması yapıldı.';
+            statusEl.innerText = 'Android bildirimleri (FCM) yapılandırılmış. Cihaza teslimat bu ekranda doğrulanmaz.';
           } else {
             statusEl.style.background = 'rgba(239,68,68,0.12)';
             statusEl.style.border = '1px solid rgba(239,68,68,0.4)';
             statusEl.style.color = '#FCA5A5';
-            statusEl.innerText = '⚠️ FCM DEVRE DIŞI — ' + (fcm.reason || 'neden bilinmiyor');
+            statusEl.innerText = 'Android bildirimleri (FCM) devre dışı. Sunucu yapılandırmasını kontrol edin.';
+            if (fcm.reason) statusEl.title = String(fcm.reason);
           }
           const devices = data.devices || [];
           tbody.innerHTML = '';

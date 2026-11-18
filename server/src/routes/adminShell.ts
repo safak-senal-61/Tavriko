@@ -35,8 +35,8 @@ a{color:var(--gold)} :focus-visible{outline:2px solid var(--gold);outline-offset
 .admin-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 a.admin-command,button.admin-command{width:auto;display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:6px 11px;background:var(--card-hover);color:var(--text);border:1px solid var(--line);border-radius:8px;font:650 13px system-ui,sans-serif;cursor:pointer;text-decoration:none;white-space:nowrap}
 .admin-command:hover,.admin-nav a:hover{border-color:var(--gold);color:var(--gold)}
-.admin-nav{display:flex;align-items:stretch;gap:6px;flex-wrap:wrap;padding-bottom:11px;min-height:0;max-width:var(--admin-max)}
-.admin-nav a{display:flex;align-items:center;justify-content:center;text-align:center;min-height:37px;padding:5px 9px;color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:7px;font-size:13px;font-weight:650;line-height:1.2}
+.admin-nav{display:flex;align-items:stretch;gap:5px;flex-wrap:wrap;padding-bottom:11px;min-height:0;max-width:var(--admin-max)}
+.admin-nav a{display:flex;align-items:center;justify-content:center;text-align:center;min-height:37px;padding:5px 6px;color:var(--muted);text-decoration:none;border:1px solid var(--line);border-radius:7px;font-size:13px;font-weight:650;line-height:1.2}
 .admin-nav a[aria-current=page]{color:var(--gold);background:#2b271f;border-color:#806943}
 .admin-hero{padding:32px 0 20px}
 .admin-hero h1{margin:2px 0 0;color:var(--text);font-size:clamp(34px,6vw,52px);line-height:1.15;letter-spacing:-.04em;font-weight:750}
