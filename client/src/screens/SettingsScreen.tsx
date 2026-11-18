@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { ExternalLink } from 'lucide-react-native';
-import { CLOUD_BASE_URL } from '../config';
+import { CLOUD_BASE_URL, getApiBaseUrl } from '../config';
 import { UserProfile, UserSettings } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -28,6 +28,7 @@ import { Volume2, Gamepad2, ShieldCheck, UserRound, Sparkles, FileText } from 'l
 import type { LegalDocumentId } from '@trivia/shared';
 import { LegalDocumentList, LegalDocumentModal } from '../components/LegalDocuments';
 import { getLegalConsent } from '../utils/legalConsent';
+import { SupportCases } from '../components/SupportCases';
 import Constants from 'expo-constants';
 import {
   TavrikoScreen,
@@ -790,6 +791,8 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             <Text style={styles.deleteAccountBtnText}>Hesabımı Kalıcı Olarak Sil</Text>
           </TouchableOpacity>
         </View>
+        {user && !(user as any).isGuest && token &&
+          <SupportCases key={user.id + ':' + token} api={Platform.OS === 'web' ? getApiBaseUrl() : apiBaseUrl || getApiBaseUrl()} token={token} />}
         </>}
 
         {settingsTab === 'legal' && <>

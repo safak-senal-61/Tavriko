@@ -84,6 +84,7 @@ model User {
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
   restrictedUntil           DateTime?
+  supportCases              SupportCase[]
   claimedSeasonFreeTiers    Json                @default("[]")
   claimedSeasonPremiumTiers Json                @default("[]")
   equippedBackground        String?
@@ -216,7 +217,52 @@ model AdminCompensation {
 
   @@index([accountId, kind, status, decidedAt])
   @@index([status, expiresAt, createdAt])
+  @@index([requester, createdAt])
   @@map("admin_compensations")
+}
+
+model SupportCase {
+  id             String   @id @default(uuid()) @db.Uuid
+  accountId      String
+  account        User     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  kind           String
+  subject        String
+  message        String
+  moderationId   String?  @unique
+  assignee       String?
+  status         String   @default("open")
+  resolution     String?
+  revision       Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([accountId, createdAt])
+  @@index([kind, status, createdAt, id])
+  @@map("support_cases")
+}
+
+model AdminRiskAlert {
+  id          String   @id @default(uuid()) @db.Uuid
+  actor       String
+  count       Int
+  createdAt   DateTime @default(now())
+  reviewedAt  DateTime?
+  reviewer    String?
+  reason      String?
+
+  @@index([actor, createdAt])
+  @@index([reviewedAt, createdAt, id])
+  @@map("admin_risk_alerts")
+}
+
+model PortalOtpState {
+  email       String @id
+  factor      String
+  lastStep    Int    @default(-1)
+  window      Int
+  attempts    Int
+
+  @@map("portal_otp_states")
 }
 
 model PasswordResetToken {

@@ -43,6 +43,7 @@ const legalRoutes_1 = require("./routes/legalRoutes");
 const opsTelemetry_1 = require("./services/opsTelemetry");
 const opsRoutes_1 = require("./routes/opsRoutes");
 const adminAccountsRoutes_1 = require("./routes/adminAccountsRoutes");
+const supportRoutes_1 = require("./routes/supportRoutes");
 const fleetRoutes_1 = require("./routes/fleetRoutes");
 const fleetTelemetry_1 = require("./services/fleetTelemetry");
 const playerAccess_1 = require("./services/playerAccess");
@@ -187,6 +188,7 @@ function createApp() {
             if (/^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/(?:ops|accounts)(?:\/|$)/i.test(req.path) ||
                 req.path === '/favicon.ico' ||
                 req.path === '/api/logs' || req.path === '/api/internal/player-access' ||
+                /^\/api\/portal\/login\/?$/i.test(req.path) || /^\/api\/support(?:\/|$)/i.test(req.path) ||
                 req.path === '/api/logs/stream' ||
                 req.path.startsWith('/qr')) {
                 return;
@@ -628,6 +630,7 @@ function createApp() {
     }
     app.use((0, opsRoutes_1.createOpsRouter)(opsTelemetry));
     app.use((0, adminAccountsRoutes_1.createAdminAccountsRouter)());
+    app.use('/api/support', (0, supportRoutes_1.createSupportRouter)());
     // Yönetici giriş sayfası: tarayıcının yerel şifre penceresi yerine kalıcı oturum çerezi.
     app.get('/admin/login', adminShell_1.adminPageHeaders, (req, res) => {
         const nextPath = (0, adminLoginPage_1.sanitizeNextPath)(req.query.next);

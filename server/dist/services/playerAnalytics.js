@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.recordCompletedPlayers = recordCompletedPlayers;
+exports.readSignupCohorts = readSignupCohorts;
 exports.readPlayerAnalytics = readPlayerAnalytics;
 const node_crypto_1 = require("node:crypto");
 const adminAccountOperations_1 = require("./adminAccountOperations");
@@ -34,6 +35,43 @@ async function recordCompletedPlayers(client, summary) {
             skipDuplicates: true,
         });
     });
+}
+async function readSignupCohorts(client, now) {
+    const rows = await client.$queryRaw `
+    WITH span AS (
+      SELECT (${now}::timestamp + interval '3 hours')::date AS today,
+        (min("playedAt") + interval '3 hours')::date + 1 AS first_full
+      FROM "match_history" WHERE "id" LIKE 'tracked\\_%' AND "userId" IS NOT NULL AND "playedAt" <= ${now}
+    ), signups AS (
+      SELECT u."id", (u."createdAt" + interval '3 hours')::date AS cohort, span.today, u."createdAt"
+      FROM "users" u CROSS JOIN span
+      WHERE u."createdAt" >= greatest(span.first_full, span.today - 30)::timestamp - interval '3 hours'
+        AND u."createdAt" < span.today::timestamp - interval '3 hours'
+        AND span.first_full IS NOT NULL AND u."id" !~* '^guest[_:]'
+    ), plays AS (
+      SELECT s."id", s.cohort, s.today, COALESCE(bool_or(p.day < s.cohort + 7), false) AS first_match,
+        COALESCE(bool_or(p.day = s.cohort + 1), false) AS d1, COALESCE(bool_or(p.day = s.cohort + 7), false) AS d7
+      FROM signups s
+      LEFT JOIN LATERAL (
+        SELECT (m."playedAt" + interval '3 hours')::date AS day FROM "match_history" m
+        WHERE m."userId" = s."id" AND m."id" LIKE 'tracked\\_%' AND m."playedAt" >= s."createdAt"
+          AND m."playedAt" < (s.cohort + 8)::timestamp - interval '3 hours' AND m."playedAt" <= ${now}
+      ) p ON true GROUP BY s."id", s.cohort, s.today
+    )
+    SELECT cohort::text AS day, count(*) AS signups,
+      CASE WHEN cohort + 7 <= today THEN count(*) FILTER (WHERE first_match) END AS "firstMatch",
+      CASE WHEN cohort + 2 <= today THEN count(*) FILTER (WHERE d1) END AS d1,
+      CASE WHEN cohort + 8 <= today THEN count(*) FILTER (WHERE d7) END AS d7
+    FROM plays GROUP BY cohort, today ORDER BY cohort DESC`;
+    const cohorts = rows.map(row => ({ day: row.day, signups: Number(row.signups),
+        firstMatch: row.firstMatch === null ? null : Number(row.firstMatch),
+        d1: row.d1 === null ? null : Number(row.d1), d7: row.d7 === null ? null : Number(row.d7) }));
+    const summarize = (key) => {
+        const signedUp = cohorts.reduce((sum, row) => sum + (row[key] === null ? 0 : row.signups), 0);
+        const played = cohorts.reduce((sum, row) => sum + (row[key] ?? 0), 0);
+        return { signedUp, played, rate: signedUp ? played / signedUp : null };
+    };
+    return { cohorts, firstMatch: summarize('firstMatch'), d1: summarize('d1'), d7: summarize('d7') };
 }
 async function readPlayerAnalytics(client, days, first, now) {
     const rows = await client.$queryRaw `

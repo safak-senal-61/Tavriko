@@ -63,12 +63,16 @@ function renderAdminLoginHtml(nextPath, configured) {
   <main class="card">
     <div class="admin-kicker">TAVRİKO / YÖNETİM</div>
     <h1>Yönetici Girişi</h1>
-    <p class="sub">${configured ? 'Devam etmek için yönetici e-posta adresi ve şifresiyle giriş yapın. Oturumunuz bu cihazda 7 gün açık kalır.' : 'Yönetici girişi yapılandırılmamış. PORTAL_ADMIN_EMAIL, PORTAL_ADMIN_PASSWORD ve JWT_SECRET ortam değişkenlerini tanımlayın.'}</p>
+    <p class="sub">${configured ? 'Yönetici e-posta adresi ve şifrenizle başlayın. İstenirse doğrulayıcı uygulamanızdaki kodu girin.' : 'Yönetici girişi yapılandırılmamış. PORTAL_ADMIN_EMAIL, PORTAL_ADMIN_PASSWORD ve JWT_SECRET ortam değişkenlerini tanımlayın.'}</p>
     <form id="loginForm" autocomplete="on">
       <label for="email">E-POSTA</label>
       <input id="email" name="email" type="email" autocomplete="username" required />
       <label for="password">ŞİFRE</label>
       <input id="password" name="password" type="password" autocomplete="current-password" required />
+      <div id="otp-fields" hidden>
+        <label for="code">DOĞRULAMA KODU</label>
+        <input id="code" name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" />
+      </div>
       <button id="submitBtn" type="submit"${configured ? '' : ' disabled'}>Giriş Yap</button>
       <div id="err" class="err" role="alert"></div>
     </form>
@@ -92,9 +96,16 @@ function renderAdminLoginHtml(nextPath, configured) {
           body: JSON.stringify({
             email: document.getElementById('email').value.trim(),
             password: document.getElementById('password').value,
+            code: document.getElementById('code').value.trim(),
           }),
         });
         const data = await res.json().catch(() => ({}));
+        if (data.otpRequired) {
+          const code = document.getElementById('code');
+          document.getElementById('otp-fields').hidden = false;
+          code.required = true;
+          code.select();
+        }
         if (res.ok && data.success) {
           try { localStorage.removeItem('tavriko_portal_token'); } catch {}
           const oldTab = NEXT === '/admin' && /^#tab-(?:game|expo|cos|api|logs|db|mod|push)$/.test(location.hash) ? location.hash : '';

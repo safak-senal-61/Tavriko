@@ -28,8 +28,25 @@ Backend’de `PORTAL_STAFF_JSON` gizli ortam değişkeni, `{"email":"…","role"
 
 Hesap ve telafi türü başına son 24 saatte **1.000 altın, 50 elmas veya 1 kozmetik** doğrudan verilebilir. Toplam **10.000 altın, 500 elmas veya 5 kozmetik** üst sınırdır; doğrudan eşiği aşan her talebi başka bir görevli onaylar. Talep 48 saatte dolar ve hesap başına en çok beş etkin talep bekleyebilir. Aynı işlem kimliği tekrar gönderilirse bakiye iki kez artmaz; onay ve bakiye/envanter değişikliği birlikte kaydedilir. Eşya telafisi yalnız katalogdaki bir saatlik kozmetikleri içerir; farklı süreli mevcut kopya değiştirilmez. Para iadesi, bakiye düşme, sandık ve anahtar yoktur.
 
+## Destek ve moderasyon itirazı
+
+Oyuncu Ayarlar → Hesap → Destek talepleri ve itirazlar altında başvuru açar, durumunu ve sonuç yanıtını takip eder. Kayıtlı hesap gerekir; üç etkin ve son 24 saatte beş yeni başvuru sınırı vardır. Oyuncu son 30 gündeki kendi uyarı veya kısıtlamasına yalnız bir kez itiraz edebilir. İç moderasyon gerekçesi, iç işlem notu ve personel e-postası oyuncuya gönderilmez.
+
+- **Kuyruk:** Destek rolü genel talepleri, moderatör itirazları, sahip ikisini görür. Sahip uygun bir görevli atayabilir; personel kendi adına alır. Atama, durum ve iç gerekçe zaman çizelgesine kaydedilir. Görevli kendi moderasyon işlemine yönelik itirazı sonuçlandıramaz; ikinci bir moderatör veya sahip gerekir.
+- **Yanıt:** Sonuçlandırma oyuncuya ayrı bir yanıt ve uygulama içi bildirim verir. İtiraz kararı kısıtlamayı otomatik kaldırmaz. Bu sürüm karşılıklı mesajlaşma veya dosya eki içermez. Oyuncu hesabı silinirse talepler ve yanıtlar silinir; talep kimliği ve işlem metaverisi iç denetim defterinde kalır.
+
+## İki adımlı portal girişi ve risk kuyruğu
+
+- **Kurulum sırası:** Migration’ı uygulayın. Her portal hesabı için ayrı, güvenli rastgele (en az 20 bayt) Base32 TOTP anahtarı üretin, şifreli kanaldan doğrulayıcı uygulamada zaman tabanlı hesap olarak tanımlayın. 6 hane, SHA-1, 30 saniye kullanın. Backend gizli ayarı `PORTAL_TOTP_SECRETS_JSON`, küçük harf e-posta → büyük harf Base32 anahtarı içeren JSON nesnesidir. Anahtarları Git’e, sohbetlere veya loglara koymayın. Hazırlık ortamında sahip dahil her hesabı test etmeden `PORTAL_TOTP_REQUIRED=true` açmayın. Zorunluluk açıkken anahtarı eksik veya geçersiz hesap giriş yapamaz.
+- **Oturumlar:** Hesabın faktörü eklenir, kaldırılır veya değiştirilirse eski oturum geçersizdir. Aynı kod zaman adımında yeniden kabul edilmez; PostgreSQL her hesap için beş dakikalık dilimde sekiz kod denemesi sınırı uygular. Sahipte iki adımlı giriş etkinken HTTP Basic çalışmaz. Ayrı servis ve Telegram kimlikleri bu portal ayarıyla değiştirilmez; hesap çalışma alanı servis/Telegram kimliği kabul etmez. Kayıp cihazda yetkili operatör yeni anahtar üretip gizli ayarı değiştirir; otomatik kurtarma kodu yoktur.
+- **Risk incelemesi:** Bir görevli farklı hesaplar dahil son bir saatte beş farklı telafi kaydı oluşturursa uyarı açılır. Onay bekleyen kayıtlar sayılır; aynı işlem kimliğiyle tekrarlar sayılmaz. Sahip/onaycı ilgili kayıtları inceleyebilir ve gerekçe ekleyerek uyarıyı kapatabilir; kişi kendi uyarısını kapatamaz. Bu uyarı işlem limitlerinin yerine geçmez ve otomatik engelleme yapmaz.
+
+## Kayıt kohortları
+
+Son 30 kayıt günü, Türkiye saatine göre gösterilir. D0 kayıt günüdür. İlk maç dönüşümü, D0–D6 içinde en az bir doğrulanmış çevrimiçi maçı tamamlayanların oranıdır. D1 ve D7 tam olarak ilgili takvim gününde bir maç tamamlayanların oranıdır. Henüz bitmemiş gözlem süreleri oranın paydasına girmez. Maç ölçümünün başladığı kısmi gün ve öncesi, misafirler ve eski doğrulanmamış maç kayıtları dahil edilmez; uygun veri yoksa sıfır yerine bilgi mesajı görünür.
+
 ## Sıradaki geliştirmeler
 
-- **Destek talepleri ve itiraz:** Sorumlu atama, durum ve yanıt süresi; oyuncunun moderasyon itirazını aynı zaman çizelgesine bağlama.
-- **Personel güvenliği:** Tek oturum açma ve MFA; limit tekrarlarını veya olağandışı toplu işlemleri işaretleyen inceleme kuyruğu.
-- **Ürün analitiği:** Kayıt → ilk maç dönüşümü, D1/D7 geri dönüş kohortları ve kategori bazlı tamamlanma.
+- **Destek önceliği ve yanıt süresi:** İlk yanıt hedefi, süresi aşan talepler ve oyuncudan bilgi isteme.
+- **Operasyon güvenliği:** Yönetici oturumlarını cihaz bazında iptal etme, kurtarma kodları veya kurumsal SSO.
+- **Ürün analitiği:** İlk maç öncesi terk adımları, oyun modu ve kayıt kanalı bazında kohortlar.

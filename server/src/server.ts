@@ -37,6 +37,7 @@ import { legalRouter } from './routes/legalRoutes';
 import { makeOpsTelemetry } from './services/opsTelemetry';
 import { createOpsRouter } from './routes/opsRoutes';
 import { createAdminAccountsRouter } from './routes/adminAccountsRoutes';
+import { createSupportRouter } from './routes/supportRoutes';
 import { createFleetRouter } from './routes/fleetRoutes';
 import { createFleetStore, fleetMiddleware } from './services/fleetTelemetry';
 import { checkPlayerAccess, socketIdentity, validPlayerId } from './services/playerAccess';
@@ -190,6 +191,7 @@ export function createApp() {
         /^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/(?:ops|accounts)(?:\/|$)/i.test(req.path) ||
         req.path === '/favicon.ico' ||
         req.path === '/api/logs' || req.path === '/api/internal/player-access' ||
+        /^\/api\/portal\/login\/?$/i.test(req.path) || /^\/api\/support(?:\/|$)/i.test(req.path) ||
         req.path === '/api/logs/stream' ||
         req.path.startsWith('/qr')
       ) {
@@ -656,6 +658,7 @@ export function createApp() {
 
   app.use(createOpsRouter(opsTelemetry));
   app.use(createAdminAccountsRouter());
+  app.use('/api/support', createSupportRouter());
 
   // Yönetici giriş sayfası: tarayıcının yerel şifre penceresi yerine kalıcı oturum çerezi.
   app.get('/admin/login', adminPageHeaders, (req, res) => {

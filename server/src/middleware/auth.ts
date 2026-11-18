@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { createHash, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { db } from '../db/prismaClient';
+import { otpFingerprint, parseOtpSecret } from '../services/portalOtp';
 
 /**
  * Shared authentication middleware.
@@ -59,6 +60,23 @@ function staffDirectory(): Map<string, Staff> {
 
 const credentialVersion = (staff: Staff) => createHash('sha256').update(staff.passwordHash).digest('hex');
 export const isPortalConfigured = () => Boolean(getJwtSecret() && (getAdminCredentials() || staffDirectory().size));
+
+export function portalAssignees() {
+  const owner = getAdminCredentials()?.email.toLowerCase();
+  return [...(owner ? [{ email: owner, role: 'owner' as const }] : []), ...[...staffDirectory().values()].map(({ email, role }) => ({ email, role }))];
+}
+
+export function portalFactor(email: string): Buffer | null | 'unavailable' {
+  const raw = process.env.PORTAL_TOTP_SECRETS_JSON;
+  if (raw) {
+    try {
+      const entries: unknown = JSON.parse(raw);
+      if (!entries || typeof entries !== 'object' || Array.isArray(entries)) return 'unavailable';
+      if (Object.hasOwn(entries, email)) return parseOtpSecret((entries as Record<string, unknown>)[email]) ?? 'unavailable';
+    } catch { return 'unavailable'; }
+  }
+  return process.env.PORTAL_TOTP_REQUIRED === 'true' ? 'unavailable' : null;
+}
 
 export async function authenticatePortal(email: unknown, password: unknown): Promise<AdminSession | null> {
   if (typeof email !== 'string' || email.length > 160 || typeof password !== 'string' || password.length > 256) return null;
@@ -117,17 +135,20 @@ function readCookie(req: Request, name: string): string | null {
 }
 
 /** Portal yöneticisi için imzalı oturum tokeni üretir. */
-export function issueAdminSessionToken(email: string, role: AdminRole = 'owner'): string | null {
+export function issueAdminSessionToken(email: string, role: AdminRole = 'owner', otpVerified = false): string | null {
   const secret = getJwtSecret();
   if (!secret) return null;
+  const factor = portalFactor(email.toLowerCase());
+  if (factor === 'unavailable' || (factor && !otpVerified)) return null;
+  const mfa = factor ? { mfa: otpFingerprint(factor) } : {};
   if (role === 'owner') {
     const owner = getAdminCredentials();
     if (!owner || email.toLowerCase() !== owner.email.toLowerCase()) return null;
-    return jwt.sign({ email: owner.email, role: 'portal_super_admin' }, secret, { expiresIn: ADMIN_SESSION_MAX_AGE_SEC });
+    return jwt.sign({ email: owner.email, role: 'portal_super_admin', ...mfa }, secret, { expiresIn: ADMIN_SESSION_MAX_AGE_SEC });
   }
   const staff = staffDirectory().get(email);
   if (!staff || staff.role !== role) return null;
-  return jwt.sign({ email, role: 'portal_staff', staffRole: role, version: credentialVersion(staff) }, secret, { expiresIn: '8h' });
+  return jwt.sign({ email, role: 'portal_staff', staffRole: role, version: credentialVersion(staff), ...mfa }, secret, { expiresIn: '8h' });
 }
 
 /** Tarayıcıya HttpOnly yönetici oturum çerezini yazar. */
@@ -157,6 +178,8 @@ export function verifyAdminSessionToken(token: string | null | undefined): Admin
     const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] });
     if (typeof decoded === 'string' || typeof decoded.email !== 'string' || !decoded.email || !decoded.exp) return null;
     const email = decoded.email.toLowerCase();
+    const factor = portalFactor(email);
+    if (factor === 'unavailable' || (factor ? decoded.mfa !== otpFingerprint(factor) : decoded.mfa !== undefined)) return null;
     if (decoded.role === 'portal_super_admin') {
       return getAdminCredentials()?.email.toLowerCase() === email ? { email, role: 'owner' } : null;
     }
@@ -247,7 +270,8 @@ export async function requireAdminAuth(req: Request, res: Response, next: NextFu
 
     // 4) HTTP Basic auth (preemptive; for curl / Prometheus scrapers)
     const authHeader = req.headers.authorization || '';
-    if (authHeader.startsWith('Basic ')) {
+    const ownerEmail = getAdminCredentials()?.email.toLowerCase();
+    if (authHeader.startsWith('Basic ') && ownerEmail && portalFactor(ownerEmail) === null) {
       try {
         const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf-8');
         const idx = decoded.indexOf(':');

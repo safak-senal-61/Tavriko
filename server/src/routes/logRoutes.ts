@@ -12,19 +12,41 @@ import {
   setAdminSessionCookie,
   clearAdminSessionCookie,
   getAdminSessionFromRequest,
+  portalFactor,
 } from '../middleware/auth';
+import { consumeOtp } from '../services/portalOtp';
 
 export const logRouter = Router();
 
-logRouter.post('/portal/login', async (req: Request, res: Response) => {
-  const { email, password } = req.body || {};
+export const createPortalLoginHandler = (client = db.rawClient) => async (req: Request, res: Response) => {
+  const { email, password, code } = req.body || {};
+  res.set('Cache-Control', 'no-store');
+  if (!req.is('application/json')) {
+    res.status(415).json({ error: 'JSON gerekli.' }); return;
+  }
   if (!isPortalConfigured()) {
     res.status(503).json({ success: false, error: 'Yönetici portalı yapılandırılmamış.' });
     return;
   }
   const session = await authenticatePortal(email, password).catch(() => null);
   if (session) {
-    const token = issueAdminSessionToken(session.email, session.role);
+    const factor = portalFactor(session.email);
+    if (factor === 'unavailable') {
+      res.status(503).json({ error: 'İki adımlı giriş bu hesap için yapılandırılmamış. Sistem yöneticisine başvurun.' }); return;
+    }
+    if (factor) {
+      if (typeof code !== 'string' || !/^\d{6}$/.test(code)) {
+        res.status(401).json({ otpRequired: true, error: 'Doğrulayıcı uygulamadaki altı haneli kodu girin.' }); return;
+      }
+      const result = await consumeOtp(client, session.email, factor, code).catch(() => 'unavailable');
+      if (result !== 'ok') {
+        res.status(result === 'limited' ? 429 : result === 'unavailable' ? 503 : 401).json({
+          otpRequired: true, error: result === 'limited' ? 'Deneme sınırına ulaşıldı. Birkaç dakika bekleyin.'
+            : result === 'unavailable' ? 'Doğrulama şu anda kullanılamıyor.' : 'Kod geçersiz, süresi dolmuş veya daha önce kullanılmış.',
+        }); return;
+      }
+    }
+    const token = issueAdminSessionToken(session.email, session.role, !!factor);
     if (!token) {
       res.status(503).json({ success: false, error: 'Yönetici portalı yapılandırılmamış.' });
       return;
@@ -40,7 +62,8 @@ logRouter.post('/portal/login', async (req: Request, res: Response) => {
     logger.warn('AUTH', 'Başarısız portal giriş denemesi');
     res.status(401).json({ success: false, error: 'Hatalı e-posta adresi veya yönetici şifresi!' });
   }
-});
+};
+logRouter.post('/portal/login', createPortalLoginHandler());
 
 logRouter.post('/portal/logout', (_req: Request, res: Response) => {
   clearAdminSessionCookie(res);

@@ -1,12 +1,13 @@
 import { Router, type Request, type RequestHandler } from 'express';
 import type { Prisma } from '@prisma/client';
 import { db } from '../db/prismaClient';
-import { getAdminSessionFromRequest, requireAdminAuth } from '../middleware/auth';
+import { getAdminSessionFromRequest, portalAssignees, requireAdminAuth, type AdminSession } from '../middleware/auth';
 import { adminPageHeaders } from './adminShell';
 import { renderAdminAccounts } from './adminAccountsPage';
 import { addSupportNote, audit, compensationCatalog, grantInput, limits, moderateAccount, OperationError,
   permissions, reasonText, requestGrant, restrictionsEnabled, reviewGrant, uuidPattern, type Operation } from '../services/adminAccountOperations';
-import { readPlayerAnalytics } from '../services/playerAnalytics';
+import { readPlayerAnalytics, readSignupCohorts } from '../services/playerAnalytics';
+import { caseText, ticketKinds, updateCase } from '../services/supportCases';
 
 const prefix = '/api/admin/accounts';
 const size = 20;
@@ -56,8 +57,9 @@ export function createAdminAccountsRouter(client = db.rawClient) {
     void requireAdminAuth(req, res, () => res.status(403).json({ error: 'Bu işlem için portal oturumu gerekli.' }));
   });
 
-  const mutation = (operation: Operation, keys: string[]): RequestHandler => (req, res, next) => {
-    if (!permissions(res.locals.accountAdmin)[operation]) { res.status(403).json({ error: 'Bu işlem için rolünüz yetkili değil.' }); return; }
+  const mutation = (operation: Operation | 'cases', keys: string[]): RequestHandler => (req, res, next) => {
+    const admin: AdminSession = res.locals.accountAdmin;
+    if (!(operation === 'cases' ? ticketKinds(admin.role).length : permissions(admin)[operation])) { res.status(403).json({ error: 'Bu işlem için rolünüz yetkili değil.' }); return; }
     if (!sameOrigin(req)) { res.status(403).json({ error: 'İşlemi Tavriko yönetim panelinden başlatın.' }); return; }
     if (!req.is('application/json')) { res.status(415).json({ error: 'JSON gerekli.' }); return; }
     if (!req.body || Array.isArray(req.body) || typeof req.body !== 'object' || Object.keys(req.body).some(key => !keys.includes(key))) {
@@ -78,7 +80,7 @@ export function createAdminAccountsRouter(client = db.rawClient) {
   router.get(prefix + '/access', (_req, res) => {
     const admin = res.locals.accountAdmin;
     const roles = permissions(admin);
-    res.json({ role: admin.role, actor: admin.email, permissions: roles, restrictions: restrictionsEnabled(), limits,
+    res.json({ role: admin.role, actor: admin.email, permissions: roles, caseKinds: ticketKinds(admin.role), restrictions: restrictionsEnabled(), limits,
       ...(roles.grant ? { items: compensationCatalog.map(({ id, name }) => ({ id, name })) } : {}) });
   });
 
@@ -107,8 +109,9 @@ export function createAdminAccountsRouter(client = db.rawClient) {
       res.json(await pending);
     } catch { unavailable(res); }
   });
-  let playerCache: { value: Awaited<ReturnType<typeof readPlayerAnalytics>>; at: number } | undefined;
-  let loadingPlayers: Promise<Awaited<ReturnType<typeof readPlayerAnalytics>>> | undefined;
+  type Metrics = Awaited<ReturnType<typeof readPlayerAnalytics>> & { signup: Awaited<ReturnType<typeof readSignupCohorts>> | null };
+  let playerCache: { value: Metrics; at: number } | undefined;
+  let loadingPlayers: Promise<Metrics> | undefined;
   router.get(prefix + '/player-metrics', async (_req, res) => {
     try {
       const now = new Date();
@@ -116,11 +119,90 @@ export function createAdminAccountsRouter(client = db.rawClient) {
       if (playerCache && now.getTime() - playerCache.at < 30_000 && playerCache.value.days.at(-1)?.day === days.at(-1)) {
         res.json(playerCache.value); return;
       }
-      loadingPlayers ??= readPlayerAnalytics(client, days, first, now)
+      loadingPlayers ??= Promise.all([readPlayerAnalytics(client, days, first, now), readSignupCohorts(client, now).catch(() => null)])
+        .then(([value, signup]) => ({ ...value, signup }))
         .then(value => { playerCache = { value, at: now.getTime() }; return value; })
         .finally(() => { loadingPlayers = undefined; });
       res.json(await loadingPlayers);
     } catch { unavailable(res); }
+  });
+  router.get(prefix + '/cases', async (req, res) => {
+    const admin: AdminSession = res.locals.accountAdmin;
+    const kinds = ticketKinds(admin.role);
+    if (!kinds.length) return res.status(403).json({ error: 'Talep kuyruğu için yetki gerekli.' });
+    const { queue = 'active', owner = 'all', page = '1', account } = req.query;
+    if (typeof page !== 'string' || !/^[1-9]\d{0,2}$/.test(page) || !['active', 'resolved'].includes(String(queue)) ||
+        typeof queue !== 'string' || typeof owner !== 'string' || !['all', 'mine', 'unassigned'].includes(owner) ||
+        (account !== undefined && (typeof account !== 'string' || !accountId.test(account)))) {
+      return res.status(400).json({ error: 'Talep filtreleri geçersiz.' });
+    }
+    const directory = portalAssignees();
+    const where: Prisma.SupportCaseWhereInput = { kind: { in: kinds },
+      status: queue === 'resolved' ? 'resolved' : { in: ['open', 'in_progress'] }, ...(account ? { accountId: account as string } : {}),
+      ...(owner === 'mine' ? { assignee: admin.email } : owner === 'unassigned' ? { OR: [
+        { assignee: null }, ...kinds.map(kind => ({ kind, assignee: { notIn: directory.filter(person => ticketKinds(person.role).includes(kind)).map(person => person.email) } })),
+      ] } : {}) };
+    try {
+      const items = await client.supportCase.findMany({ where, take: 21, skip: (Number(page) - 1) * 20,
+        orderBy: [{ createdAt: queue === 'active' ? 'asc' : 'desc' }, { id: 'asc' }] });
+      res.json({ items: items.slice(0,20).map(item => ({ ...item, canEdit: admin.role === 'owner' || item.assignee === admin.email ||
+        !directory.some(person => person.email === item.assignee && ticketKinds(person.role).includes(item.kind)) })), more: items.length > 20 && Number(page) < 999,
+        staff: directory.filter(person => (admin.role === 'owner' || person.email === admin.email) && ticketKinds(person.role).some(kind => kinds.includes(kind))) });
+    } catch { unavailable(res); }
+  });
+  router.post(prefix + '/cases/:id', mutation('cases', ['revision','assignee','status','reason','resolution']), async (req, res) => {
+    const { revision, assignee, status } = req.body;
+    const reason = reasonText(req.body.reason);
+    const resolution = status === 'resolved' ? caseText(req.body.resolution, 8, 1000) : null;
+    if (!uuidPattern.test(String(req.params.id)) || !Number.isInteger(revision) || revision < 0 ||
+        (assignee !== null && (typeof assignee !== 'string' || assignee.length > 160)) ||
+        !['open','in_progress','resolved'].includes(status) || !reason || (status === 'resolved' && !resolution)) {
+      return res.status(400).json({ error: 'Talep durumunu, gerekçeyi ve varsa oyuncuya gönderilecek yanıtı kontrol edin.' });
+    }
+    try {
+      await updateCase(client, res.locals.accountAdmin, String(req.params.id), { revision, assignee, status, reason, resolution });
+      res.json({ success: true });
+    } catch (error) { failed(res, error); }
+  });
+  router.get(prefix + '/risk', async (req, res) => {
+    if (!permissions(res.locals.accountAdmin).review) return res.status(403).json({ error: 'İnceleme yetkisi gerekli.' });
+    const queue = req.query.queue ?? 'pending';
+    if (queue !== 'pending' && queue !== 'reviewed') return res.status(400).json({ error: 'Kuyruk geçersiz.' });
+    try {
+      const items = await client.adminRiskAlert.findMany({ where: { reviewedAt: queue === 'reviewed' ? { not: null } : null },
+        orderBy: [{ createdAt: queue === 'reviewed' ? 'desc' : 'asc' }, { id: 'asc' }], take: 51 });
+      res.json({ items: items.slice(0, 50), more: items.length > 50 });
+    } catch { unavailable(res); }
+  });
+  router.get(prefix + '/risk/:id/grants', async (req, res) => {
+    if (!permissions(res.locals.accountAdmin).review) return res.status(403).json({ error: 'İnceleme yetkisi gerekli.' });
+    const id = String(req.params.id);
+    if (!uuidPattern.test(id)) return res.status(400).json({ error: 'Uyarı kimliği geçersiz.' });
+    try {
+      const alert = await client.adminRiskAlert.findUnique({ where: { id } });
+      if (!alert) return res.status(404).json({ error: 'Uyarı bulunamadı.' });
+      const items = await client.adminCompensation.findMany({
+        where: { requester: alert.actor, createdAt: { gt: new Date(alert.createdAt.getTime()-3_600_000), lte: alert.createdAt } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], take: 25,
+        select: { id: true, accountId: true, amount: true, kind: true, status: true, createdAt: true },
+      });
+      res.json({ items });
+    } catch { unavailable(res); }
+  });
+  router.post(prefix + '/risk/:id', mutation('review', ['reason']), async (req, res) => {
+    const reason = reasonText(req.body.reason);
+    const id = String(req.params.id);
+    if (!reason || !uuidPattern.test(id)) return res.status(400).json({ error: 'İnceleme gerekçesi geçersiz.' });
+    const admin: AdminSession = res.locals.accountAdmin;
+    try {
+      const alert = await client.adminRiskAlert.findUnique({ where: { id } });
+      if (!alert) return res.status(404).json({ error: 'Uyarı bulunamadı.' });
+      if (alert.actor === admin.email) return res.status(403).json({ error: 'Kendi uyarınızı kapatamazsınız.' });
+      const changed = await client.adminRiskAlert.updateMany({ where: { id, reviewedAt: null },
+        data: { reviewer: admin.email, reason, reviewedAt: new Date() } });
+      if (!changed.count) return res.status(409).json({ error: 'Bu uyarı zaten incelendi.' });
+      res.json({ success: true });
+    } catch (error) { failed(res, error); }
   });
   router.get(prefix + '/compensations/pending', async (_req, res) => {
     if (!permissions(res.locals.accountAdmin).review) { res.status(403).json({ error: 'Onay yetkisi gerekli.' }); return; }

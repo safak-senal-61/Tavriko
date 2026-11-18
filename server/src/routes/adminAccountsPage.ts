@@ -1,4 +1,5 @@
 import { adminPages, adminSessionScript, adminTheme, renderAdminHeader, renderAdminHero } from './adminShell';
+import { adminCasesScript } from './adminCasesScript';
 
 export function renderAdminAccounts(accountsOnly = false) {
   const accountPage = adminPages.find(page => page.id === 'db')!;
@@ -33,6 +34,7 @@ dialog::backdrop{background:#070b13d9}body:has(dialog[open]){overflow:hidden}.di
 .ops-grid dd{font-size:1.3rem;font-weight:750}.ops-list{list-style:none;margin:8px 0;padding:0;display:grid;gap:8px}.ops-list>li{padding:10px;border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}
 .ops-list li p{margin-top:3px}.ops-list small{color:var(--muted)}.ops-form{margin-top:10px}.ops-form label{margin-top:6px}.ops-form button{margin-top:8px}
 .ops-pager{display:flex;gap:8px;flex-wrap:wrap}.ops-notice{margin-bottom:10px;color:var(--gold)}
+.case-copy{white-space:pre-wrap;overflow-wrap:anywhere}.queue-fields{margin:12px 0}.queue-fields label{min-width:0}
 @media(max-width:630px){.account-metrics{grid-template-columns:minmax(0,1fr)}.account-controls label:not(:first-child){flex:1 1 118px}.metric{padding:12px}}
 </style></head><body>${renderAdminHeader('db', accountsOnly)}
 <main class="admin-wrap account-main" id="admin-main" tabindex="-1">
@@ -56,6 +58,32 @@ ${renderAdminHero(accountPage)}
     <div class="axes muted"><span>Günlük tekil oyuncular</span><span>Bugün · kısmi</span></div>
     <details><summary>Günlük aktif oyuncu ve ilk kayıtlı maç sayıları</summary>
     <ol class="bin-list" id="player-values"></ol></details></figure>
+</section>
+<section class="account-panel ops-panel metric" aria-labelledby="cohort-title">
+  <header><h2 id="cohort-title">Kayıttan ilk maça ve geri dönüş</h2><span class="muted">Son 30 kayıt günü · Türkiye saati</span></header>
+  <p id="cohort-status" class="account-status" role="status">Kohortlar yükleniyor.</p>
+  <dl class="details-grid ops-grid" id="cohort-summary"></dl>
+  <details id="cohort-details" hidden><summary>Kayıt gününe göre dağılım</summary>
+    <div class="account-table" tabindex="0" role="region" aria-label="Kayıt günü kohortları"><table>
+      <thead><tr><th scope="col">Kayıt günü</th><th scope="col">Kayıt</th><th scope="col">İlk maç (0–6. gün)</th><th scope="col">D1</th><th scope="col">D7</th></tr></thead>
+      <tbody id="cohort-rows"></tbody></table></div>
+  </details>
+</section>
+<section class="account-panel ops-panel" id="cases-panel" aria-labelledby="cases-title" hidden>
+  <div class="dialog-head"><h2 id="cases-title">Destek ve itiraz kuyruğu</h2><button type="button" id="cases-refresh">Talepleri yenile</button></div>
+  <div class="account-controls queue-fields">
+    <label>Talep durumu<select id="cases-state"><option value="active">Açık ve inceleniyor</option><option value="resolved">Sonuçlanan</option></select></label>
+    <label>Sorumlu filtresi<select id="cases-owner"><option value="all">Tümü</option><option value="mine">Bana atananlar</option><option value="unassigned">Atanmamış</option></select></label>
+    <button type="button" id="cases-clear-account" hidden>Hesap filtresini kaldır</button>
+  </div>
+  <p class="account-status" id="cases-status" role="status"></p><ul class="ops-list" id="cases-list"></ul>
+  <div class="ops-pager"><button id="cases-prev" type="button" disabled>Önceki</button><button id="cases-next" type="button" disabled>Sonraki</button></div>
+</section>
+<section class="account-panel ops-panel" id="risk-panel" aria-labelledby="risk-title" hidden>
+  <div class="dialog-head"><h2 id="risk-title">Telafi risk incelemesi</h2><button type="button" id="risk-refresh">Uyarıları yenile</button></div>
+  <p class="muted">Bir görevli son bir saatte en az beş telafi oluşturduğunda inceleme kaydı açılır. Uyarı tek başına işlemleri durdurmaz.</p>
+  <label>İnceleme durumu <select id="risk-state"><option value="pending">Bekleyen</option><option value="reviewed">İncelenen</option></select></label>
+  <p class="account-status" id="risk-status" role="status"></p><ul class="ops-list" id="risk-list"></ul>
 </section>
 <section class="account-panel ops-panel" id="review-panel" aria-labelledby="review-title" hidden>
   <div class="dialog-head"><h2 id="review-title">Telafi onay kuyruğu</h2><button type="button" id="review-refresh">Kuyruğu yenile</button></div>
@@ -95,6 +123,7 @@ ${renderAdminHero(accountPage)}
     </details>
     <details class="dialog-block" id="timeline-section"><summary>İşlem ve destek geçmişi</summary>
       <p id="timeline-restriction" class="ops-notice"></p>
+      <button type="button" id="detail-cases" hidden>Bu hesabın taleplerini aç</button>
       <p class="account-status" id="timeline-status" role="status"></p><ul id="timeline-list" class="ops-list"></ul>
       <div class="ops-pager"><button id="timeline-prev" type="button" disabled>Yeni kayıtlar</button><button id="timeline-next" type="button" disabled>Eski kayıtlar</button></div>
       <form class="ops-form" id="support-form" hidden><h3>İç destek notu</h3>
@@ -194,6 +223,7 @@ async function refreshMetrics() {
       status('http-status','Trafik verisi alınamadı.',true);
     })),
     read(api+'/player-metrics').then(d => {
+      if (epoch === metricEpoch) showCohorts(d.signup);
       if (epoch !== metricEpoch) return;
       const metrics = [
         ['Bugün aktif',d.days.at(-1).active], ['7 günlük aktif',d.weeklyActive], ['7 günde geri dönen',d.weeklyReturning],
@@ -214,6 +244,7 @@ async function refreshMetrics() {
       if (epoch !== metricEpoch) return;
       by('player-facts').hidden = by('player-figure').hidden = true;
       status('player-status','Oyuncu ölçümü alınamadı.',true);
+      showCohorts(null);
     })
   ]);
 }
@@ -341,10 +372,11 @@ by('edit-save').addEventListener('click',async () => {
   }
 });
 const write = (path, body) => read(api+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-const roles = {owner:'Yönetici',support:'Destek',moderator:'Moderatör',approver:'Telafi onaylayıcısı'};
+const roles = {owner:'Yönetici',support:'Destek',moderator:'Moderatör',approver:'Telafi onaylayıcısı',player:'Oyuncu'};
 const kinds = {coins:'Altın',gems:'Elmas',item:'Kozmetik'};
 const actions = {profile:'Profil düzeltildi',note:'İç destek notu',warn:'Uyarı verildi',restrict:'Oyun kısıtlandı',
-  lift:'Kısıtlama kaldırıldı',grant_requested:'Telafi onay bekliyor',grant_applied:'Telafi uygulandı',grant_rejected:'Telafi reddedildi'};
+  lift:'Kısıtlama kaldırıldı',grant_requested:'Telafi onay bekliyor',grant_applied:'Telafi uygulandı',grant_rejected:'Telafi reddedildi',
+  case_opened:'Oyuncu talep açtı',case_updated:'Destek talebi güncellendi'};
 const instant = new Intl.DateTimeFormat('tr-TR',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Istanbul'});
 const timestamp = value => value ? instant.format(new Date(value)) : 'Yok';
 const accountPath = id => '/'+encodeURIComponent(id);
@@ -358,6 +390,8 @@ function describeEntry(entry) {
     d.avatar && 'Avatar varsayılana döndü'
   ].filter(Boolean).join(' · ');
   if (entry.action === 'restrict' || entry.action === 'lift') return 'Önce: '+timestamp(d.before)+' · Sonra: '+timestamp(d.after);
+  if (entry.action === 'case_opened' || entry.action === 'case_updated') return (d.kind === 'appeal' ? 'İtiraz' : 'Destek')+' · '+(d.caseId || '')+
+    (d.after ? ' · '+(caseStates[d.before] || d.before)+' → '+(caseStates[d.after] || d.after) : '')+(d.assignee ? ' · '+d.assignee : '');
   if (entry.action.startsWith('grant_')) return [
     num(d.amount)+' '+(d.itemName || d.itemId || kinds[d.kind]),
     d.after !== undefined && ('Önce: '+num(d.before)+' · Sonra: '+num(d.after)),
@@ -487,7 +521,9 @@ read(api+'/access').then(d=>{
   }
   grantForm.elements.itemId.replaceChildren(...(d.items || []).map(item=>{const option=el('option',item.name);option.value=item.id;return option;}));
   if (d.permissions.review) loadReviews();
+  if (d.permissions.review) {by('risk-panel').hidden=false;loadRisk();}
+  if (d.caseKinds?.length) {by('cases-panel').hidden=by('detail-cases').hidden=false;loadCases();}
   syncGrant();syncModeration();
 }).catch(()=>{by('ops-role').hidden=false;by('ops-role').textContent='Portal yetkileri alınamadı; değişiklik işlemleri kapalı.';});
 refreshMetrics(); loadList(1);
-`;
+` + adminCasesScript;

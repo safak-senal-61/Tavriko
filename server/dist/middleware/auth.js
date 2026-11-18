@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ADMIN_SESSION_MAX_AGE_SEC = exports.ADMIN_SESSION_COOKIE = exports.isPortalConfigured = void 0;
 exports.getJwtSecret = getJwtSecret;
 exports.getInternalSecret = getInternalSecret;
+exports.portalAssignees = portalAssignees;
+exports.portalFactor = portalFactor;
 exports.authenticatePortal = authenticatePortal;
 exports.requireUserAuth = requireUserAuth;
 exports.issueAdminSessionToken = issueAdminSessionToken;
@@ -20,6 +22,7 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const node_crypto_1 = require("node:crypto");
 const node_util_1 = require("node:util");
 const prismaClient_1 = require("../db/prismaClient");
+const portalOtp_1 = require("../services/portalOtp");
 /**
  * Shared authentication middleware.
  *
@@ -73,6 +76,26 @@ function staffDirectory() {
 const credentialVersion = (staff) => (0, node_crypto_1.createHash)('sha256').update(staff.passwordHash).digest('hex');
 const isPortalConfigured = () => Boolean(getJwtSecret() && (getAdminCredentials() || staffDirectory().size));
 exports.isPortalConfigured = isPortalConfigured;
+function portalAssignees() {
+    const owner = getAdminCredentials()?.email.toLowerCase();
+    return [...(owner ? [{ email: owner, role: 'owner' }] : []), ...[...staffDirectory().values()].map(({ email, role }) => ({ email, role }))];
+}
+function portalFactor(email) {
+    const raw = process.env.PORTAL_TOTP_SECRETS_JSON;
+    if (raw) {
+        try {
+            const entries = JSON.parse(raw);
+            if (!entries || typeof entries !== 'object' || Array.isArray(entries))
+                return 'unavailable';
+            if (Object.hasOwn(entries, email))
+                return (0, portalOtp_1.parseOtpSecret)(entries[email]) ?? 'unavailable';
+        }
+        catch {
+            return 'unavailable';
+        }
+    }
+    return process.env.PORTAL_TOTP_REQUIRED === 'true' ? 'unavailable' : null;
+}
 async function authenticatePortal(email, password) {
     if (typeof email !== 'string' || email.length > 160 || typeof password !== 'string' || password.length > 256)
         return null;
@@ -124,20 +147,24 @@ function readCookie(req, name) {
     return null;
 }
 /** Portal yöneticisi için imzalı oturum tokeni üretir. */
-function issueAdminSessionToken(email, role = 'owner') {
+function issueAdminSessionToken(email, role = 'owner', otpVerified = false) {
     const secret = getJwtSecret();
     if (!secret)
         return null;
+    const factor = portalFactor(email.toLowerCase());
+    if (factor === 'unavailable' || (factor && !otpVerified))
+        return null;
+    const mfa = factor ? { mfa: (0, portalOtp_1.otpFingerprint)(factor) } : {};
     if (role === 'owner') {
         const owner = getAdminCredentials();
         if (!owner || email.toLowerCase() !== owner.email.toLowerCase())
             return null;
-        return jsonwebtoken_1.default.sign({ email: owner.email, role: 'portal_super_admin' }, secret, { expiresIn: exports.ADMIN_SESSION_MAX_AGE_SEC });
+        return jsonwebtoken_1.default.sign({ email: owner.email, role: 'portal_super_admin', ...mfa }, secret, { expiresIn: exports.ADMIN_SESSION_MAX_AGE_SEC });
     }
     const staff = staffDirectory().get(email);
     if (!staff || staff.role !== role)
         return null;
-    return jsonwebtoken_1.default.sign({ email, role: 'portal_staff', staffRole: role, version: credentialVersion(staff) }, secret, { expiresIn: '8h' });
+    return jsonwebtoken_1.default.sign({ email, role: 'portal_staff', staffRole: role, version: credentialVersion(staff), ...mfa }, secret, { expiresIn: '8h' });
 }
 /** Tarayıcıya HttpOnly yönetici oturum çerezini yazar. */
 function setAdminSessionCookie(req, res, token, role = 'owner') {
@@ -168,6 +195,9 @@ function verifyAdminSessionToken(token) {
         if (typeof decoded === 'string' || typeof decoded.email !== 'string' || !decoded.email || !decoded.exp)
             return null;
         const email = decoded.email.toLowerCase();
+        const factor = portalFactor(email);
+        if (factor === 'unavailable' || (factor ? decoded.mfa !== (0, portalOtp_1.otpFingerprint)(factor) : decoded.mfa !== undefined))
+            return null;
         if (decoded.role === 'portal_super_admin') {
             return getAdminCredentials()?.email.toLowerCase() === email ? { email, role: 'owner' } : null;
         }
@@ -250,7 +280,8 @@ async function requireAdminAuth(req, res, next) {
         }
         // 4) HTTP Basic auth (preemptive; for curl / Prometheus scrapers)
         const authHeader = req.headers.authorization || '';
-        if (authHeader.startsWith('Basic ')) {
+        const ownerEmail = getAdminCredentials()?.email.toLowerCase();
+        if (authHeader.startsWith('Basic ') && ownerEmail && portalFactor(ownerEmail) === null) {
             try {
                 const decoded = Buffer.from(authHeader.slice(6), 'base64').toString('utf-8');
                 const idx = decoded.indexOf(':');

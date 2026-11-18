@@ -135,6 +135,8 @@ async function applyGrant(tx, accountId, grant) {
 }
 async function requestGrant(client, admin, accountId, grant) {
     return client.$transaction(async (tx) => {
+        // Serialize by requester across different player accounts so concurrent grants cannot miss the threshold.
+        await tx.$queryRaw `SELECT true AS locked FROM pg_advisory_xact_lock(hashtextextended(${`compensation:${admin.email}`}, 0))`;
         await lockAccount(tx, accountId);
         const existing = await tx.adminCompensation.findUnique({ where: { id: grant.id } });
         if (existing) {
@@ -154,9 +156,14 @@ async function requestGrant(client, admin, accountId, grant) {
         const change = pending ? {} : await applyGrant(tx, accountId, grant);
         const saved = await tx.adminCompensation.create({ data: {
                 ...grant, accountId, requester: admin.email, status: pending ? 'pending' : 'applied',
-                expiresAt: new Date(now.getTime() + 48 * 3_600_000), decidedAt: pending ? null : now,
+                createdAt: now, expiresAt: new Date(now.getTime() + 48 * 3_600_000), decidedAt: pending ? null : now,
             } });
         await audit(tx, admin, accountId, pending ? 'grant_requested' : 'grant_applied', grant.reason, { requestId: grant.id, kind: grant.kind, itemId: grant.itemId, amount: grant.amount, ...change });
+        const since = new Date(now.getTime() - 3_600_000);
+        const count = await tx.adminCompensation.count({ where: { requester: admin.email, createdAt: { gt: since } } });
+        if (count >= 5 && !await tx.adminRiskAlert.findFirst({ where: { actor: admin.email, createdAt: { gt: since } }, select: { id: true } })) {
+            await tx.adminRiskAlert.create({ data: { actor: admin.email, count, createdAt: now } });
+        }
         return saved;
     });
 }
