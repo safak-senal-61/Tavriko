@@ -47,7 +47,7 @@
     "socket.io-client": "^4.8.1",
     "supertest": "^7.3.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.7.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.12"
   },
   "overrides": {
