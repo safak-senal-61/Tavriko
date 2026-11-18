@@ -206,6 +206,17 @@ describe.skipIf(!dbUrl)('support, MFA and cohort flows on PostgreSQL', () => {
     expect((await get(path,support)).body.items.map((entry: {sender:string})=>entry.sender)).toEqual(['staff','player']);
   });
 
+  it('rejects a signed pre-migration portal cookie and accepts a new login for the same staff account', async () => {
+    const cookieName = cookies.get(owner)!.split('=')[0];
+    const legacy = jwt.sign({ email: owner, role: 'portal_super_admin' }, process.env.JWT_SECRET!, { expiresIn: '5m' });
+    expect((await request(app).get('/staff-only').set('Cookie', `${cookieName}=${legacy}`)).status).toBe(401);
+
+    const response = await login(owner);
+    expect(response.status).toBe(200);
+    const current = response.headers['set-cookie'][0].split(';')[0];
+    expect((await request(app).get('/staff-only').set('Cookie', current)).status).toBe(204);
+  });
+
   it('revokes only the selected portal session and rejects cross-origin or unauthorized requests', async () => {
     const fresh = await login(support);
     const second = fresh.headers['set-cookie'][0].split(';')[0];
