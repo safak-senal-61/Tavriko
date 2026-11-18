@@ -15,10 +15,24 @@ updates:
       minor-and-patch:
         update-types: ["minor", "patch"]
     ignore:
-      # Expo / React Native major sürümleri elle planlanmalı
+      # Expo'nun sabitlediği sürümleri SDK ile birlikte elle yükseltin.
       - dependency-name: "expo*"
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-native"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "@react-native-community/datetimepicker"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "@sentry/react-native"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "react-native-svg"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "react-native-worklets"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "@babel/core"
         update-types: ["version-update:semver-major"]
       - dependency-name: "prisma"
         update-types: ["version-update:semver-major"]
@@ -52,6 +66,20 @@ updates:
       - dependency-name: "expo*"
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-native"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "@react-native-community/datetimepicker"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "@sentry/react-native"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "react-native-svg"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "react-native-worklets"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
+      - dependency-name: "@babel/core"
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm

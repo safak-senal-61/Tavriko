@@ -187,8 +187,9 @@ router.post('/guest', async (req: Request, res: Response): Promise<void> => {
     const { displayName } = req.body;
     const result = await db.createGuest(displayName);
     res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    logger.error('AUTH', 'Misafir oturumu oluşturulamadı', { error: err instanceof Error ? err.name : 'unknown' });
+    res.status(500).json({ error: 'Misafir oturumu oluşturulamadı.' });
   }
 });
 
@@ -542,8 +543,9 @@ router.post('/delete-account', requireUserAuth, async (req: Request, res: Respon
     }
     const result = await db.deleteAccount(userId);
     res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch (err) {
+    logger.error('AUTH', 'Hesap silme işlemi başarısız', { error: err instanceof Error ? err.name : 'unknown' });
+    res.status(500).json({ error: 'Hesap silme işlemi tamamlanamadı.' });
   }
 });
 
