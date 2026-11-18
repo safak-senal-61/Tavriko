@@ -3,6 +3,7 @@ import { logger } from '../utils/logger';
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
 import { getPendingGoogleSessions } from './authRoutes';
+import { adminPages, adminSessionScript, adminTheme, renderAdminHeader, renderAdminHero, type AdminPage } from './adminShell';
 import {
   requireAdminAuth,
   getJwtSecret,
@@ -172,12 +173,15 @@ logRouter.post('/logs/simulate-google', requireAdminAuth, async (req: Request, r
   }
 });
 
-export function renderDashboardHtml(): string {
+export function renderDashboardHtml(page: AdminPage = adminPages[0]): string {
+  const mode = page.id;
+  const showMetrics = mode === 'overview' || mode === 'logs' || mode === 'db';
   return `<!DOCTYPE html>
 <html lang="tr">
 <head>
   <meta charset="utf-8">
-  <title>Tavriko & TriviaVerse - Yönetim & Canlı Operasyon Paneli</title>
+  <title>${page.label} | Tavriko Admin</title>
+  <meta name="robots" content="noindex, nofollow">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
   <style>
@@ -1016,97 +1020,70 @@ export function renderDashboardHtml(): string {
       overflow-y: auto;
       white-space: pre-wrap;
     }
+    ${adminTheme}
+    .admin-main{flex:1;width:100%;max-width:var(--admin-max);margin:0 auto;padding:0 var(--admin-pad) 32px;min-width:0}
+    .tab-content{display:block;min-width:0}
+    .kpi-card,.guide-card,.qr-card,.api-endpoint-card,.logs-wrapper,.cos-card,.mod-card{min-width:0;background:var(--card);border-color:var(--line);border-radius:12px;box-shadow:none}
+    .kpi-card{border-left:1px solid var(--line)!important}
+    .kpi-title{color:var(--muted);font-size:13px;text-transform:none;letter-spacing:0}
+    .kpi-val{font-variant-numeric:tabular-nums;letter-spacing:-.04em}
+    .btn{border-radius:8px;min-height:36px}
+    .btn-gold,.btn-gold:hover{background:var(--gold);color:#1c160d;box-shadow:none}
+    .btn-cyan,.btn-purple{background:var(--card-hover);color:var(--text);border:1px solid var(--line);box-shadow:none}
+    .api-code-editor,.response-view,.mod-input,.search-input{background:#101725;color:var(--text);border-color:var(--line);min-width:0;max-width:100%}
+    .response-view,.log-json,.admin-main code,.api-path{overflow-wrap:anywhere}
+    .api-path{min-width:0;max-width:100%}
+    .logs-toolbar{background:#101725;border-color:var(--line)}
+    .logs-wrapper{height:clamp(320px,64vh,760px)}
+    .logs-scroll{overflow:auto;min-height:0}
+    .log-header-row,.log-text{min-width:0;overflow-wrap:anywhere}
+    .tab-content :is([style*="background:#1A1333"],[style*="background:#150F2C"]){background:var(--card)!important}
+    .admin-directory{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .admin-directory a{display:block;min-width:0;padding:16px;background:var(--card);border:1px solid var(--line);border-radius:12px;text-decoration:none}
+    .admin-directory a:hover{border-color:var(--gold);background:var(--card-hover)}
+    .admin-directory strong{display:block;color:var(--text);font-size:16px;margin:3px 0}
+    .admin-directory p{color:var(--muted);font-size:13px}
+    .admin-section-title{font-size:20px;letter-spacing:-.025em;margin:18px 0 10px}
+    .admin-table{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+    .admin-table table{min-width:540px}
+    #tab-db>div:first-child{flex-wrap:wrap;gap:10px}
+    #pushTemplateGrid{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))!important}
+    .push-tpl,#tab-push :is(input,textarea,select){min-width:0;max-width:100%}
+    #tab-push>div{min-width:0;overflow-wrap:anywhere}
+    .filter-pills button{font:inherit;font-size:11px}
+    @media(max-width:700px){.admin-directory{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:420px){.admin-directory{grid-template-columns:1fr;gap:8px}.admin-directory a{padding:12px}.tab-content>div{min-width:0}.tab-content :is(button,.btn){min-height:42px}}
+    @media(prefers-reduced-motion:reduce){.admin-main *, .admin-main *:before,.admin-main *:after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
   </style>
 </head>
 <body>
-  <!-- High Security Gatekeeper Authentication Overlay -->
-  <div id="portalAuthOverlay" style="display: flex; position: fixed; inset: 0; background: rgba(11, 8, 24, 0.98); backdrop-filter: blur(16px); z-index: 99999; justify-content: center; align-items: center; padding: 20px;">
-    <div style="background: #150F2C; border: 1.5px solid #2D2254; box-shadow: 0 25px 60px rgba(0,0,0,0.7); border-radius: 22px; max-width: 440px; width: 100%; padding: 36px 30px; text-align: center;">
-      <div style="font-size: 46px; margin-bottom: 10px;">🛡️</div>
-      <div style="font-size: 20px; font-weight: 900; background: linear-gradient(135deg, #FFC43D 0%, #FF9F0A 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 6px;">
-        TAVRİKO ADMİN & OPS PORTAL
-      </div>
-      <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px;">
-        Express · Prisma PostgreSQL · Supabase Cloud · Redis · Vercel
-      </div>
-      <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 10px; padding: 10px 14px; margin-bottom: 22px; font-size: 12px; color: #FCA5A5; display: flex; align-items: center; gap: 8px; text-align: left;">
-        <span style="font-size: 16px;">🔒</span>
-        <span>Bu yönetim ve log portalı yalnızca yetkili sistem yöneticilerine açıktır.</span>
-      </div>
-      <form id="portalLoginForm" onsubmit="handlePortalLogin(event)" style="display: flex; flex-direction: column; gap: 14px; text-align: left;">
-        <div>
-          <label style="font-size: 11px; font-weight: 800; color: #E2E8F0; text-transform: uppercase;">Yönetici E-Posta</label>
-          <input type="email" id="portalEmailInput" required placeholder="jewelkaan01@gmail.com" style="width: 100%; margin-top: 5px; padding: 11px 14px; background: #0D081D; border: 1px solid var(--card-border); border-radius: 8px; color: #FFF; font-size: 14px; outline: none;" />
-        </div>
-        <div>
-          <label style="font-size: 11px; font-weight: 800; color: #E2E8F0; text-transform: uppercase;">Yönetici Şifresi</label>
-          <input type="password" id="portalPasswordInput" required placeholder="••••••••••••" style="width: 100%; margin-top: 5px; padding: 11px 14px; background: #0D081D; border: 1px solid var(--card-border); border-radius: 8px; color: #FFF; font-size: 14px; outline: none;" />
-        </div>
-        <div id="portalAuthError" style="display: none; background: rgba(239,68,68,0.2); border: 1px solid #EF4444; color: #FCA5A5; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 700;"></div>
-        <button type="submit" id="portalLoginSubmitBtn" class="btn btn-gold" style="justify-content: center; padding: 13px; font-size: 14px; margin-top: 6px;">
-          ⚡ SİSTEME GİRİŞ YAP
-        </button>
-      </form>
-    </div>
-  </div>
-
-  <header>
-    <div class="brand-wrap">
-      <div style="font-size:26px;">🎮</div>
-      <div>
-        <div class="brand-title">TAVRİKO ADMİN & OPS PORTAL</div>
-        <div class="brand-sub" style="font-size:11.5px; color:var(--text-muted);">Express · Prisma PostgreSQL · Supabase Cloud · Redis · Vercel</div>
-      </div>
-      <div class="env-tag"><div class="pulse-dot"></div> CANLI AKIŞ AKTİF</div>
-    </div>
-
-    <div class="header-nav">
-      <div class="nav-tabs">
-        <button class="nav-btn active" onclick="switchTab('tab-game', this)">🎮 Canlı Web Oyunu & Simülatör</button>
-        <button class="nav-btn" onclick="switchTab('tab-expo', this)">📱 Mobil & Bulut QR Kod</button>
-        <button class="nav-btn" onclick="switchTab('tab-cos', this)">✨ Kozmetikler & Animasyonlar</button>
-        <button class="nav-btn" onclick="switchTab('tab-api', this)">📖 API Dökümanı & Test</button>
-        <button class="nav-btn" id="nav-logs" onclick="switchTab('tab-logs', this)">📜 Canlı Loglar & Hatalar</button>
-        <button class="nav-btn" onclick="switchTab('tab-db', this)">👥 Kullanıcılar & Veritabanı</button>
-        <button class="nav-btn" onclick="switchTab('tab-mod', this)">🚫 Moderasyon & Engelleme</button>
-        <button class="nav-btn" onclick="switchTab('tab-push', this)">🔔 Push & Bildirimler</button>
-      </div>
-      <div class="header-actions">
-        <a href="/admin/health" class="btn btn-cyan" style="text-decoration:none;">Site Sağlığı / Polar Sandbox</a>
-        <a href="/app" target="_blank" class="btn btn-gold header-play-btn" style="text-decoration:none;">
-          🚀 Tam Ekran Oyna
-        </a>
-        <div class="header-user-chip" title="jewelkaan01@gmail.com">
-          <span class="header-user-name">👤 jewelkaan01@gmail.com</span>
-        </div>
-        <button class="btn btn-red" onclick="handlePortalLogout()">🔒 Çıkış</button>
-      </div>
-    </div>
-  </header>
-
-  <main>
-    <!-- KPI METRICS -->
+  ${renderAdminHeader(mode)}
+  <main class="admin-main" id="admin-main" tabindex="-1">
+    ${renderAdminHero(page)}
+    ${showMetrics ? `
     <div class="kpi-grid">
       <div class="kpi-card gold">
         <div class="kpi-title">PostgreSQL Gerçek Kullanıcı</div>
         <div class="kpi-val" id="kpiUsers">-</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-title">Toplam İşlem & Log</div>
-        <div class="kpi-val" id="kpiTotalLogs">0</div>
+        <div class="kpi-title">Son log kayıtları</div>
+        <div class="kpi-val" id="kpiTotalLogs">—</div>
       </div>
       <div class="kpi-card red">
-        <div class="kpi-title">Hatalar (Errors)</div>
-        <div class="kpi-val" id="kpiErrors" style="color:#F87171;">0</div>
+        <div class="kpi-title">Son kayıtlardaki hatalar</div>
+        <div class="kpi-val" id="kpiErrors" style="color:var(--red);">—</div>
       </div>
       <div class="kpi-card green">
-        <div class="kpi-title">Sunucu Uptime</div>
+        <div class="kpi-title">Yanıt veren sürecin çalışma süresi</div>
         <div class="kpi-val" id="kpiUptime">-</div>
       </div>
-    </div>
+    </div>` : ''}
+    ${mode === 'overview' ? `<section aria-labelledby="admin-tools-title"><h2 id="admin-tools-title" class="admin-section-title">Yönetim araçları</h2><div class="admin-directory">
+    ${adminPages.slice(1).map(p=>`<a href="${p.path}"><span class="admin-kicker">${p.group}</span><strong>${p.label}</strong><p>${p.description}</p></a>`).join('')}
+    </div></section>` : ''}
 
-    <!-- TAB 1: LIVE GAME SIMULATOR -->
-    <div id="tab-game" class="tab-content active">
+    ${mode === 'game' ? `<div id="tab-game" class="tab-content">
       <div class="game-sim-grid">
         
         <!-- Mobile Phone Device Frame -->
@@ -1118,7 +1095,7 @@ export function renderDashboardHtml(): string {
               <div style="width: 36px; height: 4px; background: #2A1F4E; border-radius: 2px;"></div>
             </div>
             <!-- Interactive Live Game IFrame -->
-            <iframe id="gameSimulatorIframe" src="/app" style="width: 100%; height: 100%; border: none; background: #12052C;"></iframe>
+            <iframe id="gameSimulatorIframe" title="Tavriko oyun simülatörü" src="/app" style="width: 100%; height: 100%; border: none; background: var(--bg);"></iframe>
           </div>
 
           <div class="sim-phone-actions">
@@ -1169,16 +1146,15 @@ export function renderDashboardHtml(): string {
               <li><b>1v1 Canlı Düello & Hızlı Eşleşme:</b> Çevrimiçi botlar veya diğer oyuncularla eşleşip gerçek zamanlı soru cevaplayabilirsiniz.</li>
               <li><b>Günlük Meydan Okuma & Seri (Streak):</b> Seri kazanımını artırabilir, 5 soruda 4 doğru hedefini test edebilirsiniz.</li>
               <li><b>Özel Oda:</b> 6 haneli oda kodu oluşturup arkadaşlarınızla paylaşabilirsiniz.</li>
-              <li><b>Mağaza & Sanal Ödeme:</b> Altın ve elmas paketlerini seçip kredi kartı ödeme ekranını deneyimleyebilirsiniz.</li>
+              <li><b>Mağaza:</b> Sanal para ile alışverişi deneyin. Test ödemeleri <a href="/admin/health">Polar Sandbox</a> bölümündedir.</li>
               <li><b>Canlı Log Senkronizasyonu:</b> Yaptığınız her işlem anlık olarak <i>"Canlı Loglar & Hatalar"</i> sekmesine işlenir.</li>
             </ul>
           </div>
         </div>
       </div>
-    </div>
+    </div>` : ''}
 
-    <!-- TAB 2: MOBILE & CLOUD QR CODE -->
-    <div id="tab-expo" class="tab-content">
+    ${mode === 'expo' ? `<div id="tab-expo" class="tab-content">
       <div class="expo-container">
         <div class="qr-card">
           <h2 style="font-size:18px; color:var(--gold); margin-bottom:4px;">Bulut Mobil QR Kodu</h2>
@@ -1249,10 +1225,9 @@ export function renderDashboardHtml(): string {
           </div>
         </div>
       </div>
-    </div>
+    </div>` : ''}
 
-    <!-- TAB: COSMETICS & ANIMATIONS -->
-    <div id="tab-cos" class="tab-content">
+    ${mode === 'cos' ? `<div id="tab-cos" class="tab-content">
       <div style="margin-bottom:20px;">
         <h2 style="font-size:20px; color:#FFFFFF; margin-bottom:6px;">✨ Kozmetikler & Animasyonlar</h2>
         <p style="font-size:13px; color:var(--text-muted);">Süreli (30 gün) profil kozmetikleri — animasyonlu, renk geçişli, çerçeveler, arka planlar ve isim efektleri</p>
@@ -1428,16 +1403,15 @@ export function renderDashboardHtml(): string {
           </div>
         </div>
       </div>
-    </div>
+    </div>` : ''}
 
-    <!-- TAB: MODERATION & BLOCKING -->
-    <div id="tab-mod" class="tab-content">
+    ${mode === 'mod' ? `<div id="tab-mod" class="tab-content">
       <div style="margin-bottom:20px;">
         <h2 style="font-size:20px; color:#FFFFFF; margin-bottom:6px;">🚫 Moderasyon & Kullanıcı Engelleme</h2>
         <p style="font-size:13px; color:var(--text-muted);">Kullanıcıları engelleyin, engeli kaldırın ve bildirim gönderin</p>
       </div>
 
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:18px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:18px;">
         <!-- Block user form -->
         <div class="guide-card">
           <h3 style="font-size:15px; color:var(--gold); margin-bottom:12px;">🚫 Kullanıcı Engelle</h3>
@@ -1489,10 +1463,9 @@ export function renderDashboardHtml(): string {
           </div>
         </div>
       </div>
-    </div>
+    </div>` : ''}
 
-    <!-- TAB 3: DETAILED API DOCUMENTATION -->
-    <div id="tab-api" class="tab-content">
+    ${mode === 'api' ? `<div id="tab-api" class="tab-content">
       <div style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
         <div>
           <h2 style="font-size:22px; color:#FFFFFF;">Detaylı API Kullanım Dökümanı & Test Alanı</h2>
@@ -1603,34 +1576,33 @@ export function renderDashboardHtml(): string {
         </div>
         <div id="res_health" class="response-view" style="display:none;"></div>
       </div>
-    </div>
+    </div>` : ''}
 
-    <!-- TAB 3: DETAILED REAL-TIME LOGS -->
-    <div id="tab-logs" class="tab-content">
+    ${mode === 'logs' ? `<div id="tab-logs" class="tab-content">
       <div class="logs-wrapper">
         <div class="logs-toolbar">
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-            <input type="text" id="logSearch" class="search-input" placeholder="🔍 Loglarda ara (URL, hata, IP...)" oninput="filterLogRows()">
+            <input type="search" id="logSearch" class="search-input" aria-label="Loglarda ara" placeholder="Loglarda ara (URL, hata, IP...)" oninput="filterLogRows()">
             
             <div class="filter-pills">
-              <span class="pill active" onclick="setLogFilter('LEVEL', 'ALL', this)">TÜMÜ</span>
-              <span class="pill" style="color:#FCA5A5;" onclick="setLogFilter('LEVEL', 'ERROR', this)">❌ HATALAR (ERROR)</span>
-              <span class="pill" style="color:#FCD34D;" onclick="setLogFilter('LEVEL', 'WARN', this)">⚠️ UYARILAR</span>
-              <span class="pill" style="color:#6EE7B7;" onclick="setLogFilter('LEVEL', 'SUCCESS', this)">✅ BAŞARILI</span>
-              <span class="pill" style="color:#93C5FD;" onclick="setLogFilter('LEVEL', 'INFO', this)">ℹ️ BİLGİ</span>
+              <button type="button" class="pill active" aria-pressed="true" onclick="setLogFilter('LEVEL', 'ALL', this)">Tümü</button>
+              <button type="button" class="pill" aria-pressed="false" style="color:var(--red);" onclick="setLogFilter('LEVEL', 'ERROR', this)">Hatalar</button>
+              <button type="button" class="pill" aria-pressed="false" style="color:var(--gold);" onclick="setLogFilter('LEVEL', 'WARN', this)">Uyarılar</button>
+              <button type="button" class="pill" aria-pressed="false" style="color:var(--green);" onclick="setLogFilter('LEVEL', 'SUCCESS', this)">Başarılı</button>
+              <button type="button" class="pill" aria-pressed="false" style="color:var(--cyan);" onclick="setLogFilter('LEVEL', 'INFO', this)">Bilgi</button>
             </div>
 
             <div class="filter-pills">
-              <span class="pill active" onclick="setLogFilter('CAT', 'ALL', this)">Kategori: Tümü</span>
-              <span class="pill" onclick="setLogFilter('CAT', 'CLIENT', this)">📱 Mobil</span>
-              <span class="pill" onclick="setLogFilter('CAT', 'HTTP', this)">🌐 HTTP</span>
-              <span class="pill" onclick="setLogFilter('CAT', 'AUTH', this)">🔐 Auth</span>
-              <span class="pill" onclick="setLogFilter('CAT', 'GOOGLE', this)">🌐 Google</span>
-              <span class="pill" style="color:#38BDF8;" onclick="setLogFilter('CAT', 'TELEGRAM', this)">🤖 Telegram</span>
+              <button type="button" class="pill active" aria-pressed="true" onclick="setLogFilter('CAT', 'ALL', this)">Kategori: Tümü</button>
+              <button type="button" class="pill" aria-pressed="false" onclick="setLogFilter('CAT', 'CLIENT', this)">Mobil</button>
+              <button type="button" class="pill" aria-pressed="false" onclick="setLogFilter('CAT', 'HTTP', this)">HTTP</button>
+              <button type="button" class="pill" aria-pressed="false" onclick="setLogFilter('CAT', 'AUTH', this)">Auth</button>
+              <button type="button" class="pill" aria-pressed="false" onclick="setLogFilter('CAT', 'GOOGLE', this)">Google</button>
+              <button type="button" class="pill" aria-pressed="false" onclick="setLogFilter('CAT', 'TELEGRAM', this)">Telegram</button>
             </div>
           </div>
 
-          <div style="display:flex; gap:8px; align-items:center;">
+          <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
             <label style="font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:4px; cursor:pointer;">
               <input type="checkbox" id="autoScrollCheck" checked> Otomatik Kaydır
             </label>
@@ -1643,10 +1615,9 @@ export function renderDashboardHtml(): string {
           <!-- Live rows injected here -->
         </div>
       </div>
-    </div>
+    </div>` : ''}
 
-    <!-- TAB 4: DATABASE & USERS -->
-    <div id="tab-db" class="tab-content">
+    ${mode === 'db' ? `<div id="tab-db" class="tab-content">
       <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
         <div>
           <h2 style="font-size:20px; color:#FFFFFF;">PostgreSQL / Supabase Kayıtlı Kullanıcılar</h2>
@@ -1655,7 +1626,7 @@ export function renderDashboardHtml(): string {
         <button class="btn btn-gold" onclick="refreshStats()">🔄 Verileri Yenile</button>
       </div>
 
-      <div style="background:var(--card); border:1px solid var(--card-border); border-radius:16px; overflow-x:auto;">
+      <div class="admin-table" tabindex="0" role="region" aria-label="Kayıtlı kullanıcılar tablosu">
         <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
           <thead>
             <tr style="border-bottom:1px solid var(--card-border); background:rgba(0,0,0,0.25); color:var(--gold);">
@@ -1668,14 +1639,13 @@ export function renderDashboardHtml(): string {
             </tr>
           </thead>
           <tbody id="usersTableBody">
-            <!-- Injected here -->
+            <tr><td colspan="6" style="padding:16px;">Kullanıcılar yükleniyor…</td></tr>
           </tbody>
         </table>
       </div>
-    </div>
+    </div>` : ''}
 
-    <!-- TAB: PUSH BILDIRIMLERI -->
-    <div id="tab-push" class="tab-content">
+    ${mode === 'push' ? `<div id="tab-push" class="tab-content">
       <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
         <div>
           <h2 style="font-size:20px; color:#FFFFFF;">🔔 Push Bildirimleri & Aktif Cihazlar</h2>
@@ -1688,7 +1658,7 @@ export function renderDashboardHtml(): string {
         FCM durumu yükleniyor…
       </div>
 
-      <div style="background:var(--card); border:1px solid var(--card-border); border-radius:16px; overflow-x:auto; margin-bottom:20px;">
+      <div class="admin-table" tabindex="0" role="region" aria-label="Kayıtlı cihazlar tablosu" style="margin-bottom:20px;">
         <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
           <thead>
             <tr style="border-bottom:1px solid var(--card-border); background:rgba(0,0,0,0.25); color:var(--gold);">
@@ -1772,7 +1742,7 @@ export function renderDashboardHtml(): string {
           <div id="pushBroadcastStatus" class="mod-status"></div>
         </div>
       </div>
-    </div>
+    </div>` : ''}
   </main>
 
   <script>
@@ -1781,15 +1751,10 @@ export function renderDashboardHtml(): string {
     let activeCatFilter = 'ALL';
     let errorCounter = 0;
 
-    function switchTab(tabId, btn) {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active');
-      const target = btn || (window.event && window.event.target);
-      if (target && target.classList) target.classList.add('active');
-      if (tabId === 'tab-push') loadPushDevices();
-    }
-    if (location.hash === '#tab-logs') switchTab('tab-logs', document.getElementById('nav-logs'));
+    const adminMode = ${JSON.stringify(mode)};
+    const legacyPaths = ${JSON.stringify(Object.fromEntries(adminPages.map(p=>['#tab-'+p.id,p.path])))};
+    if (adminMode === 'overview' && Object.hasOwn(legacyPaths,location.hash)) location.replace(legacyPaths[location.hash]);
+    const goToLogin = () => location.replace('/admin/login?next=' + encodeURIComponent(location.pathname + location.search));
 
     function renderSingleLog(entry, prepend = false) {
       const container = document.getElementById('logsScrollContainer');
@@ -1854,14 +1819,14 @@ export function renderDashboardHtml(): string {
     }
 
     function setLogFilter(type, val, element) {
-      if (type === 'LEVEL') {
-        activeLevelFilter = val;
-        element.parentElement.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
-      } else {
-        activeCatFilter = val;
-        element.parentElement.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
-      }
+      if (type === 'LEVEL') activeLevelFilter = val;
+      else activeCatFilter = val;
+      element.parentElement.querySelectorAll('.pill').forEach(p => {
+        p.classList.remove('active');
+        p.setAttribute('aria-pressed', 'false');
+      });
       element.classList.add('active');
+      element.setAttribute('aria-pressed', 'true');
       filterLogRows();
     }
 
@@ -1876,48 +1841,72 @@ export function renderDashboardHtml(): string {
           filterLogRows();
         } catch (err) {}
       };
-      evt.onerror = () => setTimeout(connectSSE, 4000);
+      evt.onerror = async () => {
+        try {
+          if ((await fetch('/api/portal/verify', {cache:'no-store'})).status === 401) {
+            evt.close();
+            goToLogin();
+          }
+        } catch {} // EventSource handles transient reconnects.
+      };
     }
 
     function loadInitialLogs() {
-      fetch('/api/logs?limit=250')
-        .then(r => r.json())
+      const container = document.getElementById('logsScrollContainer');
+      return fetch('/api/logs?limit=250')
+        .then(r => {
+          if (r.status === 401) goToLogin();
+          if (!r.ok) throw new Error('logs');
+          return r.json();
+        })
         .then(data => {
           logsList = data.logs || [];
           document.getElementById('kpiTotalLogs').innerText = logsList.length;
-          document.getElementById('logsScrollContainer').innerHTML = '';
           errorCounter = 0;
+          document.getElementById('kpiErrors').innerText = container ? '0' : logsList.filter(l => l.level === 'ERROR').length;
+          if (!container) return;
+          container.replaceChildren();
           for (const l of logsList) {
             renderSingleLog(l, false);
           }
           filterLogRows();
-        });
+        }).catch(() => { if (container) container.textContent = 'Loglar alınamadı. Sayfayı yenileyerek tekrar deneyin.'; });
     }
 
     function refreshStats() {
       fetch('/api/logs/stats')
-        .then(r => r.json())
+        .then(r => {
+          if (r.status === 401) goToLogin();
+          if (!r.ok) throw new Error('stats');
+          return r.json();
+        })
         .then(s => {
           document.getElementById('kpiUsers').innerText = s.postgresUsersCount ?? 0;
           const mins = Math.floor((s.uptimeSeconds || 0) / 60);
           document.getElementById('kpiUptime').innerText = mins + ' dk';
 
           const tbody = document.getElementById('usersTableBody');
-          tbody.innerHTML = '';
+          if (!tbody) return;
+          tbody.replaceChildren();
           if (s.recentUsers && s.recentUsers.length > 0) {
             s.recentUsers.forEach(u => {
               const tr = document.createElement('tr');
               tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
-              tr.innerHTML = \`
-                <td style="padding:10px 16px; font-weight:700; color:#FFFFFF;">\${u.displayName || u.username}</td>
-                <td style="padding:10px 16px; color:#A78BFA;">\${u.email || '-'}</td>
-                <td style="padding:10px 16px; font-weight:800; color:var(--gold);">\${u.friendCode || '-'}</td>
-                <td style="padding:10px 16px;">Seviye \${u.level || 1}</td>
-                <td style="padding:10px 16px;">🪙 \${u.coins ?? 0} · 💎 \${u.gems ?? 0}</td>
-                <td style="padding:10px 16px; color:var(--text-muted); font-size:12px;">\${u.createdAt ? new Date(u.createdAt).toLocaleDateString('tr-TR') : '-'}</td>
-              \`;
+              const cells = [u.displayName || u.username, u.email || '—', u.friendCode || '—', 'Seviye ' + (u.level || 1),
+                (u.coins ?? 0) + ' / ' + (u.gems ?? 0), u.createdAt ? new Date(u.createdAt).toLocaleDateString('tr-TR') : '—'];
+              cells.forEach((value,i) => {
+                const td = tr.insertCell();
+                td.style.padding = '10px 16px';
+                if (i === 2) td.style.color = 'var(--gold)';
+                td.textContent = String(value ?? '—');
+              });
               tbody.appendChild(tr);
             });
+          } else {
+            const empty = tbody.insertRow().insertCell();
+            empty.colSpan = 6;
+            empty.style.padding = '16px';
+            empty.textContent = 'Görüntülenecek kullanıcı kaydı yok.';
           }
         })
         .catch(() => {});
@@ -2253,78 +2242,6 @@ export function renderDashboardHtml(): string {
     }
     // ===== END TOPLU BILDIRIM FONKSIYONLARI =====
 
-    let portalAuthToken = localStorage.getItem('tavriko_portal_token');
-
-    async function checkPortalAuth() {
-      // Oturum HttpOnly çerezde tutulur; eski sürümlerden kalan localStorage tokeni
-      // varsa Bearer olarak da gönderilir.
-      try {
-        const headers = portalAuthToken ? { 'Authorization': 'Bearer ' + portalAuthToken } : {};
-        const res = await fetch('/api/portal/verify', { headers, credentials: 'same-origin' });
-        if (res.ok) {
-          hideAuthOverlay();
-          return true;
-        }
-      } catch {}
-      localStorage.removeItem('tavriko_portal_token');
-      portalAuthToken = null;
-      showAuthOverlay();
-      return false;
-    }
-
-    function showAuthOverlay() {
-      document.getElementById('portalAuthOverlay').style.display = 'flex';
-    }
-
-    function hideAuthOverlay() {
-      document.getElementById('portalAuthOverlay').style.display = 'none';
-    }
-
-    async function handlePortalLogin(e) {
-      e.preventDefault();
-      const email = document.getElementById('portalEmailInput').value.trim();
-      const password = document.getElementById('portalPasswordInput').value;
-      const errBox = document.getElementById('portalAuthError');
-      const btn = document.getElementById('portalLoginSubmitBtn');
-      errBox.style.display = 'none';
-      btn.disabled = true;
-      btn.innerText = 'Kontrol ediliyor...';
-
-      try {
-        const res = await fetch('/api/portal/login', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
-        const data = await res.json();
-        if (data.success && data.token) {
-          localStorage.setItem('tavriko_portal_token', data.token);
-          portalAuthToken = data.token;
-          hideAuthOverlay();
-          loadInitialLogs();
-          connectSSE();
-          refreshStats();
-        } else {
-          errBox.style.display = 'block';
-          errBox.innerText = data.error || 'Hatalı e-posta veya şifre!';
-        }
-      } catch (err) {
-        errBox.style.display = 'block';
-        errBox.innerText = 'Bağlantı hatası: ' + err.message;
-      } finally {
-        btn.disabled = false;
-        btn.innerText = '⚡ SİSTEME GİRİŞ YAP';
-      }
-    }
-
-    async function handlePortalLogout() {
-      try { await fetch('/api/portal/logout', { method: 'POST', credentials: 'same-origin' }); } catch {}
-      localStorage.removeItem('tavriko_portal_token');
-      portalAuthToken = null;
-      window.location.href = '/admin/login';
-    }
-
     function initCloudPortalUrls() {
       const cloudGameUrl = window.location.origin + '/app';
       const cloudApiUrl = window.location.origin + '/api';
@@ -2342,17 +2259,16 @@ export function renderDashboardHtml(): string {
 
     initCloudPortalUrls();
 
-    checkPortalAuth().then(isAuthed => {
-      if (isAuthed) {
-        initCloudPortalUrls();
-        loadInitialLogs();
-        connectSSE();
-        refreshStats();
-        loadBlockedUsers();
-        setInterval(refreshStats, 6000);
-      }
-    });
+    if (adminMode === 'logs') loadInitialLogs().then(connectSSE);
+    if (adminMode === 'overview' || adminMode === 'db') loadInitialLogs();
+    if (adminMode === 'overview' || adminMode === 'db' || adminMode === 'logs') {
+      refreshStats();
+      setInterval(() => { if (!document.hidden) refreshStats(); }, 15000);
+    }
+    if (adminMode === 'mod') loadBlockedUsers();
+    if (adminMode === 'push') loadPushDevices();
   </script>
+  ${adminSessionScript}
 </body>
 </html>`;
 }

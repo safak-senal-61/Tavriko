@@ -38,6 +38,7 @@ const referralRoutes_1 = __importDefault(require("./routes/referralRoutes"));
 const pushRoutes_1 = __importDefault(require("./routes/pushRoutes"));
 const auth_1 = require("./middleware/auth");
 const adminLoginPage_1 = require("./routes/adminLoginPage");
+const adminShell_1 = require("./routes/adminShell");
 const legalRoutes_1 = require("./routes/legalRoutes");
 const opsTelemetry_1 = require("./services/opsTelemetry");
 const opsRoutes_1 = require("./routes/opsRoutes");
@@ -586,14 +587,13 @@ function createApp() {
     }
     else {
         // Fallback if client dist is not yet available
-        app.get('/', (req, res) => {
-            res.setHeader('Content-Type', 'text/html; charset=utf-8');
-            res.send((0, logRoutes_1.renderDashboardHtml)());
+        app.get('/', (_req, res) => {
+            res.status(503).type('text').send('Tavriko web oyunu şu anda kullanılamıyor.');
         });
     }
     app.use((0, opsRoutes_1.createOpsRouter)(opsTelemetry));
     // Yönetici giriş sayfası: tarayıcının yerel şifre penceresi yerine kalıcı oturum çerezi.
-    app.get('/admin/login', (req, res) => {
+    app.get('/admin/login', adminShell_1.adminPageHeaders, (req, res) => {
         const nextPath = (0, adminLoginPage_1.sanitizeNextPath)(req.query.next);
         if ((0, auth_1.getAdminSessionFromRequest)(req)) {
             return res.redirect(302, nextPath);
@@ -603,24 +603,26 @@ function createApp() {
         res.setHeader('Cache-Control', 'no-store');
         return res.send((0, adminLoginPage_1.renderAdminLoginHtml)(nextPath, configured));
     });
-    // Admin & Operations Portal — birincil adres /admin (oturum çereziyle korunur)
-    app.get(['/admin', '/portal', '/dashboard', '/ops', '/dev', '/developer-portal', '/gelistirici'], auth_1.requireAdminAuth, (req, res) => {
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.send((0, logRoutes_1.renderDashboardHtml)());
-    });
-    // Eski /developer adresi artık /admin'e yönlendirir
-    app.get(['/developer', '/developer/'], auth_1.requireAdminAuth, (req, res) => {
-        res.redirect(301, '/admin');
+    // Canonical pages are server routes, not client-side tabs.
+    for (const page of adminShell_1.dashboardPages) {
+        app.get(page.path, adminShell_1.adminPageHeaders, auth_1.requireAdminAuth, (_req, res) => {
+            res.type('html').send((0, logRoutes_1.renderDashboardHtml)(page));
+        });
+    }
+    app.get(['/portal', '/dashboard', '/ops', '/dev', '/developer', '/developer-portal', '/gelistirici'], adminShell_1.adminPageHeaders, (_req, res) => {
+        res.redirect(302, '/admin');
     });
     // Telegram Admin dashboard
-    app.get('/telegram-admin', auth_1.requireAdminAuth, (req, res) => {
+    app.get('/telegram-admin', adminShell_1.adminPageHeaders, (_req, res) => res.redirect(302, '/admin/telegram'));
+    app.get('/admin/telegram', adminShell_1.adminPageHeaders, auth_1.requireAdminAuth, (_req, res) => {
         const isBotRunning = telegramBot.isRunning();
         const tokenSet = !!(process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_BOT_TOKEN.includes('placeholder'));
         res.send(`
       <!DOCTYPE html>
       <html lang="tr">
       <head>
-        <title>TriviaVerse Sunucu ve Yönetim Paneli</title>
+        <title>Telegram | Tavriko Admin</title>
+        <meta name="robots" content="noindex, nofollow">
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
@@ -754,18 +756,24 @@ function createApp() {
           .stat-box { background: #0E1321; border: 1px solid #2B3754; border-radius: 14px; padding: 14px; text-align: center; }
           .stat-val { font-size: 26px; font-weight: 800; color: #F8FAFC; }
           .stat-lbl { font-size: 11px; color: #94A3B8; font-weight: 600; margin-top: 4px; }
+          ${adminShell_1.adminTheme}
+          body{display:block;padding:0}
+          .container{max-width:var(--admin-max);padding:0 var(--admin-pad) 28px;margin:auto;border:0;background:none;box-shadow:none;border-radius:0}
+          .card,.stat-box,.notice{min-width:0;background:var(--card);border-color:var(--line);border-radius:12px}
+          .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+          .card :is(pre,textarea,input,select){max-width:100%;min-width:0}
+          .card{overflow-wrap:anywhere}
+          .form-control{background:#101725;color:var(--text);border-color:var(--line)}
+          .btn{background:var(--gold);color:#1c160d}
+          .btn:hover{background:#ffdc95;color:#1c160d}
+          .chip{background:var(--card-hover);border-color:var(--line)}
+          @media(max-width:680px){.grid{grid-template-columns:minmax(0,1fr)}.card{padding:14px}}
         </style>
       </head>
       <body>
-        <div class="container">
-          <div class="header">
-            <div class="badge">
-              <span class="status-indicator status-on"></span>
-              PORT 4000 ONLINE & SUNUCU HAZIR
-            </div>
-            <h1>⚡ TriviaVerse Kontrol Paneli</h1>
-            <p class="subtitle">Multiplayer Soru Yarışması, Evren GLM-5.3 LLM & Telegram Onay Sistemi</p>
-          </div>
+        ${(0, adminShell_1.renderAdminHeader)('telegram')}
+        <main class="container" id="admin-main" tabindex="-1">
+          ${(0, adminShell_1.renderAdminHero)(adminShell_1.adminPages.find(page => page.id === 'telegram'))}
 
           <div class="grid">
             <!-- Sol Kart: Mobil Oyun Bağlantısı -->
@@ -778,7 +786,7 @@ function createApp() {
                 <img src="/qr" alt="Tavriko Mobil QR Kodu" />
               </div>
               <div style="font-family: monospace; font-size: 12px; color: #818CF8; margin-top: 6px; word-break: break-all;">
-                https://${req.get('host') || 'tavriko-app.vercel.app'}/app
+                /app
               </div>
               <a href="/app" target="_blank" class="btn" style="margin-top: 14px; text-decoration: none;">
                 🌐 Oyunu Tarayıcıda Doğrudan Aç (/app)
@@ -909,8 +917,8 @@ function createApp() {
               💡 <b>Expo SDK 58 Bilgilendirmesi:</b> Telefonunuzdaki Expo Go SDK 58 ile tam uyumlu hale getirilmiştir. QR kodu telefonunuzdaki Expo Go ile okutarak doğrudan oyuna bağlanabilirsiniz.
             </div>
           </div>
-        </div>
-
+        </main>
+        ${adminShell_1.adminSessionScript}
         <script>
           async function saveTelegramConfig(e) {
             e.preventDefault();

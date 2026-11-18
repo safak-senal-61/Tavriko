@@ -100,5 +100,9 @@
 
 ## Site health and payments
 
-- Open `/admin` → “Site Sağlığı / Polar Sandbox” for protected per-instance diagnostics and Sandbox-only checkout.
+- Sign in at `/admin/login`; opening any protected admin route before signing in must return to that exact route after login.
+- From `/admin`, navigate through Oyun, Mobil ve QR, Kozmetikler, API Araçları, Canlı Loglar, Kullanıcılar, Moderasyon, Bildirimler, Telegram and Site Sağlığı. Every link has its own URL, active marker, page heading and reload/back behavior. Old `#tab-*` bookmarks resolve to the new URLs.
+- Check the simulator/QR, cosmetics previews, a read-only API call, log filters, user/device table overflow, local moderation and push templates, Telegram read-only tools, health pause/refresh and logout. Use synthetic accounts and never send production notifications, mutate production data or perform a new payment during UI QA.
+- Verify navigation, content and controls at desktop, 375px and 320px; only wide table containers may scroll horizontally. The public `/app` and Telegram Mini App are not redesigned.
+- Open `/admin/health` for protected per-instance diagnostics and Sandbox-only checkout.
 - See [Sandbox setup and telemetry scope](docs/polar-sandbox-and-site-health.md). Checkout never grants game items, and TRY purchases are disabled until a separate production integration is approved.
