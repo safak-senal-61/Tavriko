@@ -1,11 +1,12 @@
+import { adminSessionScript, adminTheme, renderAdminHeader } from './adminShell';
+
 export function renderOpsPage(): string {
   return `<!doctype html>
 <html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Site Sağlığı | Tavriko Admin</title>
 <style>
-:root{color-scheme:dark;--line:#2b384d;--text:#f1f4f9;--muted:#a4b2c8;--gold:#f3cc76;--green:#84dfb7;--red:#ffaaa3}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top right,#1b253b,transparent 45%),#0b101a;color:var(--text);font:15px/1.5 system-ui,sans-serif}
-main,nav{max-width:1120px;margin:auto;padding:0 24px}header{border-bottom:1px solid var(--line)}nav,.hero,.tools,.service-title{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}nav{min-height:64px}
+${adminTheme}
+.hero,.tools,.service-title{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 a,.kicker{color:var(--gold)}.kicker{font-size:12px;font-weight:750;letter-spacing:.12em}.hero{padding:32px 0 20px;align-items:end}.hero p,.panel p{margin:6px 0;color:var(--muted)}
 h1,h2,p{margin:0}h1{font-size:clamp(34px,6vw,52px);line-height:1.15;letter-spacing:-.04em}h2{font-size:20px;letter-spacing:-.025em}
 button{font:inherit;font-size:13px;font-weight:650;border:1px solid var(--line);background:#1c283a;color:var(--text);border-radius:8px;padding:9px 14px;cursor:pointer}button:hover:not(:disabled){border-color:var(--gold)}button:disabled{opacity:.55;cursor:default}button.primary{background:var(--gold);color:#1c160d}
@@ -18,10 +19,10 @@ button{font:inherit;font-size:13px;font-weight:650;border:1px solid var(--line);
 .chart{height:90px;border-bottom:1px solid var(--line);display:flex;gap:3px;margin:12px 0 4px;align-items:end}.bar{height:100%;flex:1;display:flex;justify-content:start;flex-direction:column-reverse;overflow:hidden}.bar b,.bar i{width:100%;display:block;background:#72a6ed;border-radius:2px}.bar i{background:#ec887d}.partial{opacity:.55}.chart-footer{display:flex;justify-content:space-between;gap:4px;color:var(--muted);font-size:12px}
 table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}th,td{padding:7px 3px;text-align:right;border-bottom:1px solid var(--line)}th:first-child,td:first-child{text-align:left}th{color:var(--muted)}
 ul{padding-left:18px;margin:8px 0}.sandbox{border-top:2px solid #9d7b40}.sandbox .tools{margin:12px 0;justify-content:start}
-@media(max-width:800px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:1fr}}@media(max-width:420px){main,nav{padding-inline:12px}.panel,.kpi{padding:12px}.hero{padding-top:24px}.kpis,.layout{gap:8px}}
+@media(max-width:800px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.layout{grid-template-columns:1fr}}@media(max-width:420px){.panel,.kpi{padding:12px}.hero{padding-top:24px}.kpis,.layout{gap:8px}}
 </style></head><body>
-<header><nav aria-label="Yönetim"><span class="kicker">TAVRİKO / OPS</span><a href="/admin">Yönetim paneline dön</a></nav></header>
-<main>
+${renderAdminHeader('health')}
+<main class="admin-wrap" id="admin-main" tabindex="-1">
 <div class="hero"><div><div class="kicker">SİSTEM GÖZLEMİ</div><h1>Site Sağlığı</h1><p>Sunucu kaynakları, API trafiği ve bağlantı kontrolleri.</p></div>
 <div class="tools"><button id="pause" type="button">Durdur</button><button id="reload" type="button">Şimdi yenile</button></div></div>
 <div class="state" aria-live="polite"><span class="pill" id="state">Ölçüm bekleniyor</span><span id="fresh">İlk örnek alınıyor.</span></div>
@@ -30,7 +31,7 @@ ul{padding-left:18px;margin:8px 0}.sandbox{border-top:2px solid #9d7b40}.sandbox
 <p id="fleet-fresh">Saatlik geçmiş ve dış erişilebilirlik ölçümleri yükleniyor.</p>
 <div class="kpis">
 <div class="kpi"><span class="muted">Vercel uygulama istekleri</span><strong id="fleet-app" class="value">—</strong><small id="fleet-app-note">Örnekler arası toplam</small></div>
-<div class="kpi"><span class="muted">Vercel edge kayıtları</span><strong id="fleet-edge" class="value">—</strong><small id="fleet-edge-note">Log Drain bekleniyor</small></div>
+<div class="kpi"><span class="muted">Vercel edge kayıtları</span><strong id="fleet-edge" class="value">—</strong><small id="fleet-edge-note">İsteğe bağlı Log Drain</small></div>
 <div class="kpi"><span class="muted">Cloudflare CDN istekleri</span><strong id="fleet-cdn" class="value">—</strong><small id="fleet-cdn-note">Son 24 saat</small></div>
 <div class="kpi"><span class="muted">Tarayıcı hata sinyalleri</span><strong id="fleet-browser" class="value">—</strong><small id="fleet-browser-note">Sınırlı sayıda anonim bildirim</small></div>
 </div>
@@ -49,7 +50,7 @@ ul{padding-left:18px;margin:8px 0}.sandbox{border-top:2px solid #9d7b40}.sandbox
 <div class="chart-footer"><span id="chart-start">—</span><span>Mavi: diğer · Kırmızı: 5xx</span><span>Son örnek</span></div>
 <table><thead><tr><th>Grup</th><th>İstek</th><th>4xx</th><th>5xx</th><th>p95</th></tr></thead><tbody id="groups"><tr><td colspan="5">Örnek bekleniyor.</td></tr></tbody></table></section>
 <section class="panel"><h2>İnceleme önerileri</h2><ul id="notes"><li>İlk ölçüm bekleniyor.</li></ul>
-<p><a href="/admin#tab-logs">Canlı loglar ve hataları aç</a></p>
+<p><a href="/admin/loglar">Canlı loglar ve hataları aç</a></p>
 <p>Bu bölüm tek Node.js örneğini ölçer. Birleşik trafik, CDN ve tarayıcı sinyalleri Dağıtık izleme bölümündedir.</p></section>
 </div><div class="stack">
 <section class="panel"><h2>Servis kontrolleri</h2><p>Panel açıkken alınır. Her örnekte 30 saniye önbelleklenir.</p><div id="services"></div></section>
@@ -58,6 +59,7 @@ ul{padding-left:18px;margin:8px 0}.sandbox{border-top:2px solid #9d7b40}.sandbox
 <div class="tools"><button type="button" class="primary" id="checkout" disabled>Test ödemesi başlat</button><button type="button" id="verify" hidden>Durumu tekrar sorgula</button></div>
 <div id="payment" class="muted" role="status">Sandbox yapılandırması kontrol ediliyor.</div></section>
 </div></div></main>
+${adminSessionScript}
 <script>
 const by = id => document.getElementById(id), put = (id, value) => { by(id).textContent = value; };
 const number = n => new Intl.NumberFormat('tr-TR', {maximumFractionDigits:1}).format(n);
@@ -98,7 +100,7 @@ async function refreshFleet() {
     put('fleet-app', observed('app.total'));
     put('fleet-app-note', c['app.total'] ? number(c['app.5xx'] || 0) + ' sunucu hatası · p95 ' + p95(d.fleet) : 'Ölçülmüş uygulama trafiği yok');
     put('fleet-edge', observed('vercel.total'));
-    put('fleet-edge-note', c['vercel.total'] ? number(c['vercel.cacheHit'] || 0) + ' cache HIT · ' + number(c['vercel.5xx'] || 0) + ' hata' : d.drainConfigured ? 'İmzalı kayıt bekleniyor' : 'Log Drain kurulumu gerekli');
+    put('fleet-edge-note', c['vercel.total'] ? number(c['vercel.cacheHit'] || 0) + ' cache HIT · ' + number(c['vercel.5xx'] || 0) + ' hata' : d.drainConfigured ? 'İmzalı kayıt bekleniyor' : 'Log Drain kapalı · isteğe bağlı');
     put('fleet-cdn', d.cdn.state === 'observed' ? number(d.cdn.total) : '—');
     put('fleet-cdn-note', d.cdn.state === 'observed' ? number(d.cdn.serverErrors) + ' sunucu hatası · örneklem düzeltilmiş' : ({unconfigured:'Analytics Engine kurulumu gerekli',unavailable:'Cloudflare sorgusu başarısız','no-data':'CDN verisi gözlenmedi'}[d.cdn.state]));
     put('fleet-browser', observed('browser.total'));

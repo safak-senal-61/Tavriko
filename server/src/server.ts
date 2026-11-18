@@ -32,6 +32,7 @@ import referralRoutes from './routes/referralRoutes';
 import pushRoutes from './routes/pushRoutes';
 import { requireAdminAuth, getAdminSessionFromRequest, setTelegramAdminVerifier } from './middleware/auth';
 import { renderAdminLoginHtml, sanitizeNextPath } from './routes/adminLoginPage';
+import { adminPageHeaders, adminPages, adminSessionScript, adminTheme, dashboardPages, renderAdminHeader, renderAdminHero } from './routes/adminShell';
 import { legalRouter } from './routes/legalRoutes';
 import { makeOpsTelemetry } from './services/opsTelemetry';
 import { createOpsRouter } from './routes/opsRoutes';
@@ -626,16 +627,15 @@ export function createApp() {
     });
   } else {
     // Fallback if client dist is not yet available
-    app.get('/', (req, res) => {
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.send(renderDashboardHtml());
+    app.get('/', (_req, res) => {
+      res.status(503).type('text').send('Tavriko web oyunu şu anda kullanılamıyor.');
     });
   }
 
   app.use(createOpsRouter(opsTelemetry));
 
   // Yönetici giriş sayfası: tarayıcının yerel şifre penceresi yerine kalıcı oturum çerezi.
-  app.get('/admin/login', (req, res) => {
+  app.get('/admin/login', adminPageHeaders, (req, res) => {
     const nextPath = sanitizeNextPath(req.query.next);
     if (getAdminSessionFromRequest(req)) {
       return res.redirect(302, nextPath);
@@ -648,18 +648,19 @@ export function createApp() {
     return res.send(renderAdminLoginHtml(nextPath, configured));
   });
 
-  // Admin & Operations Portal — birincil adres /admin (oturum çereziyle korunur)
-  app.get(['/admin', '/portal', '/dashboard', '/ops', '/dev', '/developer-portal', '/gelistirici'], requireAdminAuth, (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(renderDashboardHtml());
-  });
-  // Eski /developer adresi artık /admin'e yönlendirir
-  app.get(['/developer', '/developer/'], requireAdminAuth, (req, res) => {
-    res.redirect(301, '/admin');
+  // Canonical pages are server routes, not client-side tabs.
+  for (const page of dashboardPages) {
+    app.get(page.path, adminPageHeaders, requireAdminAuth, (_req, res) => {
+      res.type('html').send(renderDashboardHtml(page));
+    });
+  }
+  app.get(['/portal', '/dashboard', '/ops', '/dev', '/developer', '/developer-portal', '/gelistirici'], adminPageHeaders, (_req, res) => {
+    res.redirect(302, '/admin');
   });
 
   // Telegram Admin dashboard
-  app.get('/telegram-admin', requireAdminAuth, (req, res) => {
+  app.get('/telegram-admin', adminPageHeaders, (_req, res) => res.redirect(302, '/admin/telegram'));
+  app.get('/admin/telegram', adminPageHeaders, requireAdminAuth, (_req, res) => {
     const isBotRunning = telegramBot.isRunning();
     const tokenSet = !!(process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_BOT_TOKEN.includes('placeholder'));
 
@@ -667,7 +668,8 @@ export function createApp() {
       <!DOCTYPE html>
       <html lang="tr">
       <head>
-        <title>TriviaVerse Sunucu ve Yönetim Paneli</title>
+        <title>Telegram | Tavriko Admin</title>
+        <meta name="robots" content="noindex, nofollow">
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
@@ -801,18 +803,24 @@ export function createApp() {
           .stat-box { background: #0E1321; border: 1px solid #2B3754; border-radius: 14px; padding: 14px; text-align: center; }
           .stat-val { font-size: 26px; font-weight: 800; color: #F8FAFC; }
           .stat-lbl { font-size: 11px; color: #94A3B8; font-weight: 600; margin-top: 4px; }
+          ${adminTheme}
+          body{display:block;padding:0}
+          .container{max-width:var(--admin-max);padding:0 var(--admin-pad) 28px;margin:auto;border:0;background:none;box-shadow:none;border-radius:0}
+          .card,.stat-box,.notice{min-width:0;background:var(--card);border-color:var(--line);border-radius:12px}
+          .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+          .card :is(pre,textarea,input,select){max-width:100%;min-width:0}
+          .card{overflow-wrap:anywhere}
+          .form-control{background:#101725;color:var(--text);border-color:var(--line)}
+          .btn{background:var(--gold);color:#1c160d}
+          .btn:hover{background:#ffdc95;color:#1c160d}
+          .chip{background:var(--card-hover);border-color:var(--line)}
+          @media(max-width:680px){.grid{grid-template-columns:minmax(0,1fr)}.card{padding:14px}}
         </style>
       </head>
       <body>
-        <div class="container">
-          <div class="header">
-            <div class="badge">
-              <span class="status-indicator status-on"></span>
-              PORT 4000 ONLINE & SUNUCU HAZIR
-            </div>
-            <h1>⚡ TriviaVerse Kontrol Paneli</h1>
-            <p class="subtitle">Multiplayer Soru Yarışması, Evren GLM-5.3 LLM & Telegram Onay Sistemi</p>
-          </div>
+        ${renderAdminHeader('telegram')}
+        <main class="container" id="admin-main" tabindex="-1">
+          ${renderAdminHero(adminPages.find(page => page.id === 'telegram')!)}
 
           <div class="grid">
             <!-- Sol Kart: Mobil Oyun Bağlantısı -->
@@ -825,7 +833,7 @@ export function createApp() {
                 <img src="/qr" alt="Tavriko Mobil QR Kodu" />
               </div>
               <div style="font-family: monospace; font-size: 12px; color: #818CF8; margin-top: 6px; word-break: break-all;">
-                https://${req.get('host') || 'tavriko-app.vercel.app'}/app
+                /app
               </div>
               <a href="/app" target="_blank" class="btn" style="margin-top: 14px; text-decoration: none;">
                 🌐 Oyunu Tarayıcıda Doğrudan Aç (/app)
@@ -958,8 +966,8 @@ export function createApp() {
               💡 <b>Expo SDK 58 Bilgilendirmesi:</b> Telefonunuzdaki Expo Go SDK 58 ile tam uyumlu hale getirilmiştir. QR kodu telefonunuzdaki Expo Go ile okutarak doğrudan oyuna bağlanabilirsiniz.
             </div>
           </div>
-        </div>
-
+        </main>
+        ${adminSessionScript}
         <script>
           async function saveTelegramConfig(e) {
             e.preventDefault();

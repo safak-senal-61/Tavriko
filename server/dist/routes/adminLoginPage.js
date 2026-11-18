@@ -1,4 +1,8 @@
 "use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.sanitizeNextPath = sanitizeNextPath;
+exports.renderAdminLoginHtml = renderAdminLoginHtml;
+const adminShell_1 = require("./adminShell");
 /**
  * Yönetici paneli giriş sayfası (/admin/login).
  *
@@ -7,12 +11,9 @@
  * istatistik yenileme) 401 aldıkça tekrar tekrar açılıyordu. Artık giriş bu
  * sayfadan yapılır ve oturum 7 gün geçerli HttpOnly bir çerezde tutulur.
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.sanitizeNextPath = sanitizeNextPath;
-exports.renderAdminLoginHtml = renderAdminLoginHtml;
 /** Yalnızca site içi göreli yönlendirmelere izin verir (açık yönlendirme koruması). */
 function sanitizeNextPath(raw) {
-    if (typeof raw !== 'string')
+    if (typeof raw !== 'string' || /[\\\u0000-\u001f\u007f]/u.test(raw))
         return '/admin';
     if (!raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\'))
         return '/admin';
@@ -31,37 +32,37 @@ function renderAdminLoginHtml(nextPath, configured) {
   <meta name="robots" content="noindex, nofollow" />
   <title>Tavriko Yönetici Girişi</title>
   <style>
-    * { box-sizing: border-box; }
+    ${adminShell_1.adminTheme}
     body {
       margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: radial-gradient(circle at 20% 10%, #2A1060 0%, #0B0818 55%); color: #F4F0FF; padding: 20px;
+      padding: var(--admin-pad);
     }
     .card {
-      width: 100%; max-width: 400px; background: rgba(24, 14, 52, 0.92); border: 1px solid rgba(167, 139, 250, 0.25);
-      border-radius: 20px; padding: 32px 28px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+      width: 100%; max-width: 440px; background: var(--card); border: 1px solid var(--line);
+      border-radius: 12px; padding: clamp(18px,6vw,32px); box-shadow: 0 18px 48px rgba(0,0,0,.24);
     }
-    h1 { margin: 0 0 6px; font-size: 22px; }
-    p.sub { margin: 0 0 24px; color: #BFB3E0; font-size: 14px; line-height: 1.5; }
-    label { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: #C4B5FD; margin: 14px 0 6px; }
+    h1 { margin: 4px 0 6px; font-size: clamp(26px,6vw,34px); line-height:1.15; letter-spacing:-.035em; }
+    p.sub { margin: 0 0 24px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    label { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--muted); margin: 14px 0 6px; }
     input {
-      width: 100%; padding: 13px 14px; border-radius: 12px; border: 1px solid rgba(167, 139, 250, 0.35);
-      background: #120A2A; color: #FFFFFF; font-size: 15px; outline: none;
+      width: 100%; padding: 13px 14px; border-radius: 8px; border: 1px solid var(--line);
+      background: #101725; color: var(--text); font: inherit;
     }
-    input:focus { border-color: #A78BFA; box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.25); }
+    input:focus { border-color: var(--gold); }
     button {
-      width: 100%; margin-top: 22px; padding: 14px; border: 0; border-radius: 12px; cursor: pointer;
-      font-weight: 800; font-size: 15px; color: #12052C; background: linear-gradient(135deg, #FFD66B, #F5A623);
+      width: 100%; margin-top: 22px; padding: 14px; border: 0; border-radius: 8px; cursor: pointer;
+      font-weight: 750; font-size: 15px; color: #1c160d; background: var(--gold);
     }
     button:disabled { opacity: 0.6; cursor: wait; }
     .err { display: none; margin-top: 16px; padding: 12px; border-radius: 10px; background: rgba(239, 68, 68, 0.15);
       border: 1px solid rgba(239, 68, 68, 0.4); color: #FECACA; font-size: 14px; }
-    .note { margin-top: 18px; font-size: 12px; color: #9C8FC4; text-align: center; }
+    .note { margin-top: 18px; font-size: 12px; color: var(--muted); text-align: center; }
   </style>
 </head>
 <body>
   <main class="card">
-    <h1>Tavriko Yönetici Paneli</h1>
+    <div class="admin-kicker">TAVRİKO / YÖNETİM</div>
+    <h1>Yönetici Girişi</h1>
     <p class="sub">${configured ? 'Devam etmek için yönetici e-posta adresi ve şifresiyle giriş yapın. Oturumunuz bu cihazda 7 gün açık kalır.' : 'Yönetici girişi yapılandırılmamış. PORTAL_ADMIN_EMAIL, PORTAL_ADMIN_PASSWORD ve JWT_SECRET ortam değişkenlerini tanımlayın.'}</p>
     <form id="loginForm" autocomplete="on">
       <label for="email">E-POSTA</label>
@@ -95,8 +96,9 @@ function renderAdminLoginHtml(nextPath, configured) {
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.success) {
-          if (data.token) localStorage.setItem('tavriko_portal_token', data.token);
-          window.location.replace(NEXT);
+          try { localStorage.removeItem('tavriko_portal_token'); } catch {}
+          const oldTab = NEXT === '/admin' && /^#tab-(?:game|expo|cos|api|logs|db|mod|push)$/.test(location.hash) ? location.hash : '';
+          window.location.replace(NEXT + oldTab);
           return;
         }
         err.textContent = res.status === 429 ? 'Çok fazla deneme yapıldı. Lütfen birkaç dakika sonra tekrar deneyin.' : (data.error || 'Hatalı e-posta veya şifre.');
