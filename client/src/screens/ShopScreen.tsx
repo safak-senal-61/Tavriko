@@ -37,7 +37,6 @@ import {
   SpeedBoltIcon,
   CrownIcon,
 } from '../components/TavrikoIcons';
-import { PaymentItem } from './PaymentScreen';
 import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { Image } from 'react-native';
 import {
@@ -69,7 +68,6 @@ interface ShopScreenProps {
   onNavigateSecondary?: (tab: SecondaryNavTab) => void;
   onNotifications?: () => void;
   onProfile?: () => void;
-  onOpenPayment?: (item: PaymentItem) => void;
 }
 
 interface CategoryTabItem {
@@ -374,7 +372,6 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   onNavigateSecondary,
   onNotifications,
   onProfile,
-  onOpenPayment,
 }) => {
   const [activeTab, setActiveTab] = useState<ShopProductCategory>('chests');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -459,17 +456,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     }
 
     if (product.currency === 'try') {
-      if (onOpenPayment) {
-        onOpenPayment({
-          id: product.id,
-          title: product.name,
-          subtitle: product.desc,
-          price: `₺${product.price.toFixed(2)}`,
-          priceNumeric: product.price,
-        });
-      } else {
-        setConfirmProduct(product);
-      }
+      setIsError(true);
+      setStatusMessage('Gerçek para ile satın alma şu anda kapalı.');
       return;
     }
 
@@ -495,7 +483,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   };
 
   const handleConfirmPurchase = async () => {
-    if (!confirmProduct || !user) return;
+    if (!confirmProduct || confirmProduct.currency === 'try' || !user) return;
     const product = confirmProduct;
     setPurchasingId(product.id);
     setStatusMessage(null);
@@ -509,7 +497,6 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         body: JSON.stringify({
           userId: user.id,
           productId: product.id,
-          paymentMethod: product.currency === 'gems' ? 'gems' : product.currency === 'coins' ? 'coins' : 'credit_card',
           // Süreli kozmetiklerde seçilen süre sunucuya gönderilir
           durationId: isCosmeticProduct(product) ? durationId : undefined,
         }),
@@ -675,9 +662,9 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                 <TouchableOpacity
                   style={[
                     styles.priceBtn,
-                    owned ? styles.priceBtnOwned : styles.priceBtnActive,
+                    owned || item.currency === 'try' ? styles.priceBtnOwned : styles.priceBtnActive,
                   ]}
-                  disabled={owned || isBuying}
+                  disabled={owned || isBuying || item.currency === 'try'}
                   activeOpacity={0.8}
                   onPress={() => handleInitiatePurchase(item)}
                 >
@@ -685,10 +672,12 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                     <ActivityIndicator color="#12052C" size="small" />
                   ) : owned ? (
                     <Text style={styles.priceBtnTextOwned}>SAHİPSİN</Text>
+                  ) : item.currency === 'try' ? (
+                    <Text style={styles.priceBtnTextOwned}>ÖDEME KAPALI</Text>
                   ) : (
                     <View style={styles.priceContentRow}>
                       <Text style={styles.priceBtnText}>
-                        {item.currency === 'try' ? `₺${item.price.toFixed(2)}` : item.price}
+                        {item.price}
                       </Text>
                       {item.currency === 'coins' && <CoinIcon size={16} />}
                       {item.currency === 'gems' && <GemIcon size={16} />}

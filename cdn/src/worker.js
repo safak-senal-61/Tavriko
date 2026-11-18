@@ -9,8 +9,7 @@ const CORS = {
   'Timing-Allow-Origin': '*',
 };
 
-export default {
-  async fetch(request, env) {
+async function serve(request, env) {
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: { ...CORS, 'Access-Control-Max-Age': '86400' } });
     }
@@ -54,5 +53,22 @@ export default {
         : 'no-store'
     );
     return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+}
+
+export default {
+  async fetch(request, env) {
+    let status = 500;
+    try {
+      const result = await serve(request, env);
+      status = result.status;
+      return result;
+    } finally {
+      // Count only requests reaching the Worker; no asset name, IP, or query is retained.
+      try {
+        if (request.method === 'GET' || request.method === 'HEAD') {
+          env.CDN_OPS?.writeDataPoint({ indexes:['asset'], doubles:[status] });
+        }
+      } catch { /* analytics must not affect asset delivery */ }
+    }
   },
 };

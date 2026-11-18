@@ -1,16 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.DEFAULT_REALTIME_URL = void 0;
 exports.deliverGameInvite = deliverGameInvite;
 const logger_1 = require("../utils/logger");
 const pushService_1 = require("./pushService");
-const DEFAULT_REALTIME_URL = 'https://tavriko-realtime.uncertainidentity8.workers.dev';
+exports.DEFAULT_REALTIME_URL = 'https://tavriko-realtime.uncertainidentity8.workers.dev';
 async function relayInvite(userId, item) {
     const secret = process.env.INTERNAL_API_SECRET;
     if (!secret) {
         logger_1.logger.warn('SYSTEM', 'Cloudflare davet aktarımı yapılandırılmamış (INTERNAL_API_SECRET).');
         return;
     }
-    const base = process.env.REALTIME_HTTP_URL || DEFAULT_REALTIME_URL;
+    const base = process.env.REALTIME_HTTP_URL || exports.DEFAULT_REALTIME_URL;
     const result = await fetch(`${base.replace(/\/+$/, '')}/api/notify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-internal-secret': secret },

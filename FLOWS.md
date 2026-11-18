@@ -1,5 +1,13 @@
 # Visual refresh acceptance and regression checks
 
+## Mobile room invitations and notification actions
+- Home and Friends: one unread notification shows a compact round `1` against the bell; zero hides the badge and wider counts remain readable. Tap the bell to open the inbox and return with the badge cleared.
+- Inbox: private room, duel and friend notices get different primary labels. Verify accept and decline dispatch the correct action, only the tapped action shows progress, and an error leaves the invitation actionable.
+- Private lobby: create a room, open “Arkadaş Davet Et”, invite a synthetic friend and close/reopen. Check that the frame and divider stay aligned, including a long scrollable list and a narrow viewport.
+- Native: expand an Android/iOS push to check OS-rendered labels. Tap “Reddet” and verify the invitation is declined, never joined. Check background and cold-start behavior on a device.
+- Browser fixtures verified home/Friends badge geometry and `99+`, the inbox's action labels, accept navigation and decline retry, and creating a room and sending a mock invitation. The 14-friend list stayed inside the dialog at 320px, 375px and desktop widths. No real account or notification was used.
+- Client and focused server tests cover native action routing, push payloads, and recipient-only notification updates; actual Android/iOS system notification UI and live push delivery still need device QA.
+
 ## Referral links, daily challenge and equipped-title artwork
 - Preserve the purple/gold Tavriko design and existing artwork/fonts. Restore only the selected unlocked title's artwork beside the profile name; the title pill stays text-only.
 - Redesign daily challenge without changing configuration, rewards, completion or practice callbacks. Inspect pending/completed states and seven-day tracker at 320px, 375px and desktop/reduced motion.
@@ -89,3 +97,8 @@
 - Passed: guest browsing, promotion back to authentication, register/login tab cycle, password-reset view/back, category search, category modal open/close, group filter, all five profile tabs, character drawer open/close, six achievements with two earned/four locked, duel searching, seven-second bot fallback display and cancellation/re-entry.
 - Checked 375px mobile, 320px narrow mobile and 1280px desktop. Reduced-motion was enabled during matchmaking; content and timer remained available. No uncaught JavaScript errors or horizontal page overflow appeared in the exercised flows.
 - Existing real sign-in, account mutations, native iOS/Android runtime and actual two-player multiplayer were not exercised.
+
+## Site health and payments
+
+- Open `/admin` → “Site Sağlığı / Polar Sandbox” for protected per-instance diagnostics and Sandbox-only checkout.
+- See [Sandbox setup and telemetry scope](docs/polar-sandbox-and-site-health.md). Checkout never grants game items, and TRY purchases are disabled until a separate production integration is approved.

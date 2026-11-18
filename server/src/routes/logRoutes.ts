@@ -1066,12 +1066,13 @@ export function renderDashboardHtml(): string {
         <button class="nav-btn" onclick="switchTab('tab-expo', this)">📱 Mobil & Bulut QR Kod</button>
         <button class="nav-btn" onclick="switchTab('tab-cos', this)">✨ Kozmetikler & Animasyonlar</button>
         <button class="nav-btn" onclick="switchTab('tab-api', this)">📖 API Dökümanı & Test</button>
-        <button class="nav-btn" onclick="switchTab('tab-logs', this)">📜 Canlı Loglar & Hatalar</button>
+        <button class="nav-btn" id="nav-logs" onclick="switchTab('tab-logs', this)">📜 Canlı Loglar & Hatalar</button>
         <button class="nav-btn" onclick="switchTab('tab-db', this)">👥 Kullanıcılar & Veritabanı</button>
         <button class="nav-btn" onclick="switchTab('tab-mod', this)">🚫 Moderasyon & Engelleme</button>
         <button class="nav-btn" onclick="switchTab('tab-push', this)">🔔 Push & Bildirimler</button>
       </div>
       <div class="header-actions">
+        <a href="/admin/health" class="btn btn-cyan" style="text-decoration:none;">Site Sağlığı / Polar Sandbox</a>
         <a href="/app" target="_blank" class="btn btn-gold header-play-btn" style="text-decoration:none;">
           🚀 Tam Ekran Oyna
         </a>
@@ -1578,13 +1579,10 @@ export function renderDashboardHtml(): string {
           <span class="api-path">/api/social/shop/purchase</span>
           <span style="color:var(--text-muted); font-size:12px;">Mağaza Satın Alımı & Bakiye Denetimi</span>
         </div>
-        <p class="api-desc">Altın, Elmas veya Sandık satın alımını işler. Yetersiz bakiye durumunda detaylı eksik para uyarısı verir ve PostgreSQL'e işler.</p>
+        <p class="api-desc">Yalnızca katalogdaki oyun içi bakiye işlemleri. Gerçek para kapalı; Polar Sandbox ayrı yönetim sayfasındadır.</p>
         <div class="api-box-label">İstek Gövdesi (JSON Payload):</div>
         <textarea id="body_purchase" class="api-code-editor">{
-  "userId": "default",
-  "packId": "gems_100",
-  "cardHolder": "DENİZ YILMAZ",
-  "last4": "4821"
+  "productId": "coins_1000"
 }</textarea>
         <div style="display:flex; gap:8px;">
           <button class="btn btn-gold" onclick="executeApi('/api/social/shop/purchase', 'POST', 'body_purchase', 'res_purchase')">⚡ Test Et (Execute)</button>
@@ -1791,6 +1789,7 @@ export function renderDashboardHtml(): string {
       if (target && target.classList) target.classList.add('active');
       if (tabId === 'tab-push') loadPushDevices();
     }
+    if (location.hash === '#tab-logs') switchTab('tab-logs', document.getElementById('nav-logs'));
 
     function renderSingleLog(entry, prepend = false) {
       const container = document.getElementById('logsScrollContainer');

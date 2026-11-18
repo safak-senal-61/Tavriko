@@ -15,10 +15,11 @@
  *
  * Eylem butonları kategorilerle çalışır (sunucu data.categoryId / iOS
  * _category gönderir):
- *  - friend_request → "Sende Ekle" / "Reddet"
+ *  - friend_request → "Arkadaşı Ekle" / "Reddet"
  *  - duel_invite → "Düelloya Katıl" / "Reddet"
- * Bildirime veya butona dokununca notificationRouter ile ilgili sayfaya
- * yönlendirilir.
+ *  - room_invite → "Odaya Katıl" / "Reddet"
+ * Butonların görsel biçimini işletim sistemi belirler. iOS, reddetme
+ * eylemlerini destructive olarak vurgular.
  *
  * Hatalar sessizce yutulur — bildirim altyapısı oyun akışını asla bozmaz.
  */
@@ -44,20 +45,21 @@ function getEasProjectId(): string | undefined {
 
 /**
  * Bildirim kategorileri: bildirim üzerinde görünen eylem butonları.
- * 'friend_request' → arkadaşlık isteği; 'duel_invite' → düello daveti.
+ * Expo yanıt dinleyicisinin uygulama tamamen kapalıyken de çalışabilmesi
+ * için "Reddet" eylemi uygulamayı açar, ancak odaya yönlendirmez.
  */
 async function registerNotificationCategories(): Promise<void> {
   try {
     await Notifications.setNotificationCategoryAsync('friend_request', [
       {
         identifier: 'accept_friend',
-        buttonTitle: 'Sende Ekle',
+        buttonTitle: 'Arkadaşı Ekle',
         options: { opensAppToForeground: true },
       },
       {
         identifier: 'decline_friend',
         buttonTitle: 'Reddet',
-        options: { opensAppToForeground: false, isDestructive: true },
+        options: { opensAppToForeground: true, isDestructive: true },
       },
     ]);
     await Notifications.setNotificationCategoryAsync('duel_invite', [
@@ -68,8 +70,8 @@ async function registerNotificationCategories(): Promise<void> {
       },
       {
         identifier: 'decline_duel',
-        buttonTitle: 'Şimdi Değil',
-        options: { opensAppToForeground: false, isDestructive: true },
+        buttonTitle: 'Reddet',
+        options: { opensAppToForeground: true, isDestructive: true },
       },
     ]);
     await Notifications.setNotificationCategoryAsync('room_invite', [
@@ -80,8 +82,8 @@ async function registerNotificationCategories(): Promise<void> {
       },
       {
         identifier: 'decline_room',
-        buttonTitle: 'Şimdi Değil',
-        options: { opensAppToForeground: false, isDestructive: true },
+        buttonTitle: 'Reddet',
+        options: { opensAppToForeground: true, isDestructive: true },
       },
     ]);
   } catch {

@@ -6,6 +6,9 @@
   "main": "src/worker.js",
   "compatibility_date": "2025-02-01",
   "workers_dev": true,
+  "analytics_engine_datasets": [
+    { "binding": "CDN_OPS", "dataset": "tavriko_cdn_ops" }
+  ],
   "assets": {
     "directory": "../client/assets",
     "binding": "ASSETS",

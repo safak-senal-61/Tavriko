@@ -34,6 +34,9 @@ class UpstashRedisService {
     isAvailable() {
         return !this.usingFallback && this.client !== null;
     }
+    async ping() {
+        return (await this.client?.ping()) === 'PONG';
+    }
     async setQuestionExpiry(sessionId, questionId, expiresAtMs, ttlSec = 60) {
         const key = `expiry:${sessionId}:${questionId}`;
         if (this.client) {

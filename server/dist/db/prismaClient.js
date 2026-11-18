@@ -4130,7 +4130,7 @@ class PrismaService {
         let notif = user.notifications?.find((n) => n.id === notificationId);
         try {
             const dbNotif = await this.rawClient.userNotification.findUnique({
-                where: { id: notificationId },
+                where: { id: notificationId, userId: user.id },
             });
             if (dbNotif)
                 notif = dbNotif;
@@ -4138,6 +4138,9 @@ class PrismaService {
         catch { }
         if (!notif) {
             return { success: false, handled: finalHandled, error: 'Bildirim bulunamadı.', message: '' };
+        }
+        if (action === 'decline' && notif.handled === 'accepted') {
+            return { success: false, handled: 'accepted', error: 'Bu davet zaten kabul edildi.', message: '' };
         }
         notif.handled = finalHandled;
         const newSub = action === 'accept'
@@ -4149,7 +4152,7 @@ class PrismaService {
         // Update in PostgreSQL
         try {
             await this.rawClient.userNotification.update({
-                where: { id: notificationId },
+                where: { id: notificationId, userId: user.id },
                 data: { handled: finalHandled, sub: newSub },
             });
         }
@@ -4887,6 +4890,8 @@ class PrismaService {
         const product = shared_1.SHOP_CATALOG.find((p) => p.id === productId);
         if (!product)
             throw new Error('Ürün mağazada bulunamadı.');
+        if (product.currency === 'try')
+            throw new Error('Gerçek para ile satın alma şu anda kapalı.');
         // Süreli kozmetiklerde süre seçimi: 1 saatten en fazla 1 aya kadar.
         // Fiyat, temel fiyat x süre çarpanıyla ölçeklenir.
         const duration = (0, shared_1.isCosmeticProduct)(product) ? (0, shared_1.getShopDuration)(durationId) : null;

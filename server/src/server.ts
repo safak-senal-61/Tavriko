@@ -33,6 +33,10 @@ import pushRoutes from './routes/pushRoutes';
 import { requireAdminAuth, getAdminSessionFromRequest, setTelegramAdminVerifier } from './middleware/auth';
 import { renderAdminLoginHtml, sanitizeNextPath } from './routes/adminLoginPage';
 import { legalRouter } from './routes/legalRoutes';
+import { makeOpsTelemetry } from './services/opsTelemetry';
+import { createOpsRouter } from './routes/opsRoutes';
+import { createFleetRouter } from './routes/fleetRoutes';
+import { createFleetStore, fleetMiddleware } from './services/fleetTelemetry';
 
 function getLocalIpAddress(): string {
   const interfaces = os.networkInterfaces();
@@ -87,6 +91,11 @@ function redactSensitiveQuery(query: any): any {
 export function createApp() {
   initErrorMonitor();
   const app = express();
+  const opsTelemetry = makeOpsTelemetry();
+  const fleetStore = createFleetStore();
+  app.use(createFleetRouter(fleetStore));
+  app.use(opsTelemetry.middleware);
+  app.use(fleetMiddleware(fleetStore));
   // SECURITY: CORS yalnızca Tavriko kaynaklarına açık. Origin göndermeyen
   // istekler (mobil uygulama, sunucudan sunucuya) tarayıcı kısıtına takılmaz.
   const CORS_ALLOWED_ORIGINS = new Set([
@@ -173,6 +182,7 @@ export function createApp() {
       const lvl = res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'INFO';
       const cat = req.path.includes('/auth') ? 'AUTH' : 'HTTP';
       if (
+        /^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/ops(?:\/|$)/i.test(req.path) ||
         req.path === '/favicon.ico' ||
         req.path === '/api/logs' ||
         req.path === '/api/logs/stream' ||
@@ -621,6 +631,8 @@ export function createApp() {
       res.send(renderDashboardHtml());
     });
   }
+
+  app.use(createOpsRouter(opsTelemetry));
 
   // Yönetici giriş sayfası: tarayıcının yerel şifre penceresi yerine kalıcı oturum çerezi.
   app.get('/admin/login', (req, res) => {

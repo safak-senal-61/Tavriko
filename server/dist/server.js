@@ -39,6 +39,10 @@ const pushRoutes_1 = __importDefault(require("./routes/pushRoutes"));
 const auth_1 = require("./middleware/auth");
 const adminLoginPage_1 = require("./routes/adminLoginPage");
 const legalRoutes_1 = require("./routes/legalRoutes");
+const opsTelemetry_1 = require("./services/opsTelemetry");
+const opsRoutes_1 = require("./routes/opsRoutes");
+const fleetRoutes_1 = require("./routes/fleetRoutes");
+const fleetTelemetry_1 = require("./services/fleetTelemetry");
 function getLocalIpAddress() {
     const interfaces = os_1.default.networkInterfaces();
     for (const name of Object.keys(interfaces)) {
@@ -94,6 +98,11 @@ function redactSensitiveQuery(query) {
 function createApp() {
     (0, errorMonitor_1.initErrorMonitor)();
     const app = (0, express_1.default)();
+    const opsTelemetry = (0, opsTelemetry_1.makeOpsTelemetry)();
+    const fleetStore = (0, fleetTelemetry_1.createFleetStore)();
+    app.use((0, fleetRoutes_1.createFleetRouter)(fleetStore));
+    app.use(opsTelemetry.middleware);
+    app.use((0, fleetTelemetry_1.fleetMiddleware)(fleetStore));
     // SECURITY: CORS yalnızca Tavriko kaynaklarına açık. Origin göndermeyen
     // istekler (mobil uygulama, sunucudan sunucuya) tarayıcı kısıtına takılmaz.
     const CORS_ALLOWED_ORIGINS = new Set([
@@ -170,7 +179,8 @@ function createApp() {
             const duration = Date.now() - start;
             const lvl = res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'INFO';
             const cat = req.path.includes('/auth') ? 'AUTH' : 'HTTP';
-            if (req.path === '/favicon.ico' ||
+            if (/^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/ops(?:\/|$)/i.test(req.path) ||
+                req.path === '/favicon.ico' ||
                 req.path === '/api/logs' ||
                 req.path === '/api/logs/stream' ||
                 req.path.startsWith('/qr')) {
@@ -581,6 +591,7 @@ function createApp() {
             res.send((0, logRoutes_1.renderDashboardHtml)());
         });
     }
+    app.use((0, opsRoutes_1.createOpsRouter)(opsTelemetry));
     // Yönetici giriş sayfası: tarayıcının yerel şifre penceresi yerine kalıcı oturum çerezi.
     app.get('/admin/login', (req, res) => {
         const nextPath = (0, adminLoginPage_1.sanitizeNextPath)(req.query.next);
