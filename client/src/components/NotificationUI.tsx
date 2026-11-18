@@ -6,8 +6,12 @@ import { THEME } from '../theme/tokens';
 import { DISCOVERY_IMG, useReducedMotion } from './DiscoveryArtwork';
 import { useNotificationStore, useUnreadCount } from '../store/notificationStore';
 
-export function notificationVisual(type: NotificationItem['type']) {
+export const isPrivateRoomInvite = ({ type, roomCode }: Pick<NotificationItem, 'type' | 'roomCode'>) =>
+  (type === 'duel' || type === 'match_invite') && Boolean(roomCode && !roomCode.startsWith('DUEL-'));
+
+export function notificationVisual({ type, roomCode }: Pick<NotificationItem, 'type' | 'roomCode'>) {
   if (type === 'friend' || type === 'friend_request') return { image: DISCOVERY_IMG.social, label: 'ARKADAŞLIK', color: '#ADF0D8' };
+  if (isPrivateRoomInvite({ type, roomCode })) return { image: DISCOVERY_IMG.social, label: 'ÖZEL ODA DAVETİ', color: '#FFE19B' };
   if (type === 'duel' || type === 'match_invite') return { image: DISCOVERY_IMG.robot, label: 'DÜELLO DAVETİ', color: '#E1BFFF' };
   if (type === 'reward') return { image: DISCOVERY_IMG.collector, label: 'ÖDÜL', color: '#FFE19B' };
   if (type === 'league') return { image: DISCOVERY_IMG.victory, label: 'LİG', color: '#FFE19B' };
@@ -41,8 +45,10 @@ export const NotificationBell: React.FC = () => {
         <Bell size={21} color="#F2EAFE" strokeWidth={2} />
       </Animated.View>
       {count > 0 && (
-        <Animated.View testID="notification-unread-badge" style={[styles.badge, { transform: [{ scale: bounce }] }]}>
-          <Text style={styles.badgeText}>{count > 99 ? '99+' : count}</Text>
+        <Animated.View testID="notification-unread-badge" style={[
+          styles.badge, count < 10 ? styles.badgeSingle : styles.badgeWide, { transform: [{ scale: bounce }] },
+        ]}>
+          <Text allowFontScaling={false} style={styles.badgeText}>{count > 99 ? '99+' : count}</Text>
         </Animated.View>
       )}
     </View>
@@ -66,7 +72,7 @@ export const NotificationToast: React.FC<{ onOpen: () => void }> = ({ onOpen }) 
     return () => { clearTimeout(timer); animation.stop(); };
   }, [notification?.id, enter, reduced, dismiss]);
   if (!notification) return null;
-  const visual = notificationVisual(notification.type);
+  const visual = notificationVisual(notification);
   return (
     <Animated.View accessibilityLiveRegion="polite" style={[styles.toast, {
       opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }],
@@ -90,8 +96,10 @@ export const NotificationToast: React.FC<{ onOpen: () => void }> = ({ onOpen }) 
 
 const styles = StyleSheet.create({
   bell: { width: 26, height: 26, justifyContent: 'center', alignItems: 'center', overflow: 'visible' },
-  badge: { position: 'absolute', right: -11, top: -9, minWidth: 21, height: 21, paddingHorizontal: 4, borderRadius: 11, backgroundColor: '#FFC43D', borderWidth: 2, borderColor: '#281447', alignItems: 'center', justifyContent: 'center' },
-  badgeText: { color: '#29143E', fontFamily: THEME.fonts.extraBold, fontSize: 12, lineHeight: 15 },
+  badge: { position: 'absolute', right: -6, top: -6, height: 18, borderRadius: 9, backgroundColor: '#FFC43D', borderWidth: 1, borderColor: '#281447', alignItems: 'center', justifyContent: 'center' },
+  badgeSingle: { width: 18 },
+  badgeWide: { minWidth: 18, paddingHorizontal: 4 },
+  badgeText: { color: '#29143E', fontFamily: THEME.fonts.extraBold, fontSize: 11, lineHeight: 14, includeFontPadding: false, textAlign: 'center' },
   toast: { position: 'absolute', top: 76, left: 12, right: 12, zIndex: 100, flexDirection: 'row', backgroundColor: '#2C1B48', borderRadius: 22, borderWidth: 1, borderColor: '#8060A5', paddingLeft: 12, paddingVertical: 10, ...Platform.select({ web: { boxShadow: '0 12px 32px #09041488' }, default: { elevation: 15 } }) },
   toastBody: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 },
   toastImage: { width: 44, height: 48 },

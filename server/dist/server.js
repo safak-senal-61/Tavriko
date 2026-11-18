@@ -41,6 +41,8 @@ const adminLoginPage_1 = require("./routes/adminLoginPage");
 const legalRoutes_1 = require("./routes/legalRoutes");
 const opsTelemetry_1 = require("./services/opsTelemetry");
 const opsRoutes_1 = require("./routes/opsRoutes");
+const fleetRoutes_1 = require("./routes/fleetRoutes");
+const fleetTelemetry_1 = require("./services/fleetTelemetry");
 function getLocalIpAddress() {
     const interfaces = os_1.default.networkInterfaces();
     for (const name of Object.keys(interfaces)) {
@@ -97,7 +99,10 @@ function createApp() {
     (0, errorMonitor_1.initErrorMonitor)();
     const app = (0, express_1.default)();
     const opsTelemetry = (0, opsTelemetry_1.makeOpsTelemetry)();
+    const fleetStore = (0, fleetTelemetry_1.createFleetStore)();
+    app.use((0, fleetRoutes_1.createFleetRouter)(fleetStore));
     app.use(opsTelemetry.middleware);
+    app.use((0, fleetTelemetry_1.fleetMiddleware)(fleetStore));
     // SECURITY: CORS yalnızca Tavriko kaynaklarına açık. Origin göndermeyen
     // istekler (mobil uygulama, sunucudan sunucuya) tarayıcı kısıtına takılmaz.
     const CORS_ALLOWED_ORIGINS = new Set([

@@ -1,8 +1,8 @@
 import { formatNotificationTime } from '../utils/notificationTime';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable, TouchableOpacity, Image } from 'react-native';
 import type { UserProfile, NotificationItem } from '@trivia/shared';
-import { Check, CheckCheck, Clock3, RefreshCw, X } from 'lucide-react-native';
+import { Check, CheckCheck, Clock3, LogIn, RefreshCw, Swords, UserPlus, X } from 'lucide-react-native';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
@@ -11,7 +11,7 @@ import { socketService } from '../services/socketService';
 import { TavrikoScreen, TavrikoTopBar, CharacterAvatar } from '../components/TavrikoIcons';
 import { DISCOVERY_IMG, DiscoveryArtwork } from '../components/DiscoveryArtwork';
 import { GradientFill } from '../components/TavrikoGradient';
-import { notificationVisual } from '../components/NotificationUI';
+import { isPrivateRoomInvite, notificationVisual } from '../components/NotificationUI';
 import { isInvitation, isUnread, useNotificationStore, useUnreadCount } from '../store/notificationStore';
 
 interface NotificationsScreenProps {
@@ -28,7 +28,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   const { items, readIds, loading, error, markRead, patch, refresh } = useNotificationStore();
   const count = useUnreadCount();
   const [filter, setFilter] = useState<'all' | 'unread' | 'invites'>('all');
-  const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ id: string; action: 'accept' | 'decline' } | null>(null);
   const [responseError, setResponseError] = useState<{ id: string; text: string } | null>(null);
   const base = apiBaseUrl || DEFAULT_API_BASE;
   // Includes late HTTP snapshots and WebSocket arrivals while this inbox is open.
@@ -37,9 +37,9 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
     filter === 'unread' ? isUnread(item, readIds) : filter === 'invites' ? isInvitation(item) : true);
 
   const handleRespond = async (notification: NotificationItem, action: 'accept' | 'decline') => {
-    if (!user?.id || respondingId) return;
+    if (!user?.id || pending) return;
     const owner = user.id;
-    setRespondingId(notification.id);
+    setPending({ id: notification.id, action });
     setResponseError(null);
     sound.playSound('tap');
     // Do not pretend an invite succeeded until the server confirms it.
@@ -54,7 +54,8 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
       const duel = notification.type === 'match_invite' || notification.type === 'duel';
       patch(notification.id, {
         handled: action === 'accept' ? 'accepted' : 'declined',
-        sub: action === 'decline' ? 'İstek reddedildi.' : duel
+        sub: action === 'decline' ? 'İstek reddedildi.' : isPrivateRoomInvite(notification)
+          ? 'Davet kabul edildi. Özel odaya bağlanıyorsun.' : duel
           ? 'Düello kabul edildi. Odaya bağlanıyorsun.'
           : 'Arkadaşlık isteği kabul edildi. Artık birlikte oynayabilirsiniz.',
       });
@@ -69,7 +70,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
     } catch (err: any) {
       setResponseError({ id: notification.id, text: err.message || 'Bağlantı kurulamadı. Yeniden dene.' });
     } finally {
-      setRespondingId(null);
+      setPending(null);
     }
   };
 
@@ -139,9 +140,13 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
           </View>
         ) : shown.map(item => {
           const fresh = isUnread(item, readIds);
-          const visual = notificationVisual(item.type);
+          const visual = notificationVisual(item);
           const actionable = isInvitation(item) && !item.handled;
-          const responding = respondingId === item.id;
+          const privateRoom = isPrivateRoomInvite(item);
+          const duel = item.type === 'duel' || item.type === 'match_invite';
+          const AcceptIcon = privateRoom ? LogIn : duel ? Swords : UserPlus;
+          const accepting = pending?.id === item.id && pending.action === 'accept';
+          const declining = pending?.id === item.id && pending.action === 'decline';
           return (
             <View key={item.id} testID={`notification-card-${item.id}`} style={[styles.card, fresh && styles.cardFresh]}>
               <View style={styles.cardHeader}>
@@ -161,16 +166,21 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
               {responseError?.id === item.id && <Text accessibilityLiveRegion="polite" style={styles.errorText}>{responseError.text}</Text>}
               {actionable ? (
                 <View style={styles.actions}>
-                  <TouchableOpacity accessibilityRole="button" accessibilityState={{ disabled: !!respondingId }}
-                    disabled={!!respondingId} style={[styles.accept, responding && styles.busy]}
+                  <Pressable accessibilityRole="button" accessibilityState={{ disabled: !!pending, busy: accepting }}
+                    disabled={!!pending} style={({ pressed }) => [styles.action, styles.accept, pressed && styles.pressed, pending && !accepting && styles.inactive]}
                     onPress={() => void handleRespond(item, 'accept')}>
-                    {responding ? <ActivityIndicator size="small" color="#153B30" /> : <Check size={17} color="#153B30" />}
-                    <Text style={styles.acceptText}>{responding ? 'İşleniyor...' : item.type === 'duel' || item.type === 'match_invite' ? 'Düelloya katıl' : 'Kabul et'}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity accessibilityRole="button" disabled={!!respondingId} style={styles.decline}
-                    accessibilityState={{ disabled: !!respondingId }} onPress={() => void handleRespond(item, 'decline')}>
-                    <X size={16} color="#FFD2DC" /><Text style={styles.declineText}>Reddet</Text>
-                  </TouchableOpacity>
+                    <GradientFill colors={['#FFD765', '#FFB72F']} direction="diagonal" />
+                    <View pointerEvents="none" style={styles.actionIcon}>
+                      {accepting ? <ActivityIndicator size="small" color="#361F11" /> : <AcceptIcon size={18} color="#361F11" />}
+                    </View>
+                    <Text style={[styles.actionText, styles.acceptText]}>{accepting ? 'İşleniyor…' : privateRoom ? 'Odaya Katıl' : duel ? 'Düelloya Katıl' : 'Arkadaşı Ekle'}</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" disabled={!!pending}
+                    style={({ pressed }) => [styles.action, styles.decline, pressed && styles.pressed, pending && !declining && styles.inactive]}
+                    accessibilityState={{ disabled: !!pending, busy: declining }} onPress={() => void handleRespond(item, 'decline')}>
+                    {declining ? <ActivityIndicator size="small" color="#FFD0DF" /> : <X size={17} color="#FFD0DF" />}
+                    <Text style={[styles.actionText, styles.declineText]}>{declining ? 'İşleniyor…' : 'Reddet'}</Text>
+                  </Pressable>
                 </View>
               ) : isInvitation(item) && item.handled ? (
                 <View style={styles.handled}>
@@ -227,11 +237,15 @@ const styles = StyleSheet.create({
   newText: { color: '#C2F8E3', fontFamily: THEME.fonts.extraBold, fontSize: 12 },
   message: { color: '#DDD0EE', fontFamily: THEME.fonts.body, fontSize: 14, lineHeight: 21 },
   actions: { flexDirection: 'row', gap: 8 },
-  accept: { flex: 1.3, minHeight: 46, borderRadius: 12, backgroundColor: '#85E6C6', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 5, paddingHorizontal: 5 },
-  acceptText: { color: '#153B30', fontFamily: THEME.fonts.extraBold, fontSize: 14 },
-  decline: { flex: 1, minHeight: 46, borderRadius: 12, backgroundColor: '#483043', borderWidth: 1, borderColor: '#78536A', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 5 },
-  declineText: { color: '#FFD2DC', fontFamily: THEME.fonts.bold, fontSize: 14 },
-  busy: { opacity: 0.7 },
+  action: { minWidth: 0, minHeight: 48, borderRadius: 14, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, paddingHorizontal: 8, paddingVertical: 8, borderWidth: 1 },
+  accept: { flex: 1.4, backgroundColor: '#FFC43D', borderColor: '#FFE291' },
+  decline: { flex: 1, backgroundColor: '#3B243F', borderColor: '#77516F' },
+  actionIcon: { zIndex: 1 },
+  actionText: { flexShrink: 1, fontFamily: THEME.fonts.extraBold, fontSize: 14, textAlign: 'center' },
+  acceptText: { color: '#361F11' },
+  declineText: { color: '#FFD0DF' },
+  pressed: { opacity: 0.8 },
+  inactive: { opacity: 0.62 },
   handled: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 6 },
   handledText: { color: '#ADF0D8', fontFamily: THEME.fonts.extraBold, fontSize: 13 },
   readAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 5, minHeight: 44 },

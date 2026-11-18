@@ -1,0 +1,8 @@
+{
+  "name": "tavriko-uptime",
+  "main": "worker.mjs",
+  "compatibility_date": "2025-02-01",
+  "workers_dev": false,
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "vars": { "SITE_ORIGIN": "https://tavriko-app.vercel.app" }
+}

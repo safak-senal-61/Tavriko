@@ -35,6 +35,8 @@ import { renderAdminLoginHtml, sanitizeNextPath } from './routes/adminLoginPage'
 import { legalRouter } from './routes/legalRoutes';
 import { makeOpsTelemetry } from './services/opsTelemetry';
 import { createOpsRouter } from './routes/opsRoutes';
+import { createFleetRouter } from './routes/fleetRoutes';
+import { createFleetStore, fleetMiddleware } from './services/fleetTelemetry';
 
 function getLocalIpAddress(): string {
   const interfaces = os.networkInterfaces();
@@ -90,7 +92,10 @@ export function createApp() {
   initErrorMonitor();
   const app = express();
   const opsTelemetry = makeOpsTelemetry();
+  const fleetStore = createFleetStore();
+  app.use(createFleetRouter(fleetStore));
   app.use(opsTelemetry.middleware);
+  app.use(fleetMiddleware(fleetStore));
   // SECURITY: CORS yalnızca Tavriko kaynaklarına açık. Origin göndermeyen
   // istekler (mobil uygulama, sunucudan sunucuya) tarayıcı kısıtına takılmaz.
   const CORS_ALLOWED_ORIGINS = new Set([

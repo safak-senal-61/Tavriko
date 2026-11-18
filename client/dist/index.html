@@ -6,6 +6,34 @@
     <meta name="google-site-verification" content="fCy_lpFutqndmJrQ8HmRCWPrOz7-Nksqy9VIddZyjgM" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
+    <script>
+      // Early, anonymous browser diagnostics. Send only a fixed category, never URL, message or stack.
+      (() => {
+        const counts = Object.create(null);
+        const endpoint = '/api/observability/browser';
+        const cdnHost = 'tavriko-cdn.uncertainidentity8.workers.dev';
+        function report(kind) {
+          if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return;
+          counts[kind] = (counts[kind] || 0) + 1;
+          if (counts[kind] > 2) return;
+          const body = JSON.stringify({ kind });
+          try {
+            fetch(endpoint, { method: 'POST', credentials: 'omit', keepalive: true, headers: { 'Content-Type': 'application/json' }, body }).catch(() => {});
+          } catch {}
+        }
+        addEventListener('error', (event) => {
+          if (event.target === window) { report('js'); return; }
+          const target = event.target;
+          if (!target || !['IMG','LINK','SCRIPT','AUDIO','VIDEO','SOURCE'].includes(target.tagName)) return;
+          try {
+            const resource = new URL(target.currentSrc || target.src || target.href);
+            if (resource.hostname === cdnHost) report('cdn_asset');
+            else if (resource.origin === location.origin) report('app_asset');
+          } catch {}
+        }, true);
+        addEventListener('unhandledrejection', () => report('promise'));
+      })();
+    </script>
     <title>Tavriko — Bilgi Yarışması</title>
     <meta name="description" content="Tavriko: bilgini yarıştır, kazan! Çevrimiçi bilgi yarışması." />
     <meta name="theme-color" content="#1A0B4D" />
@@ -69,6 +97,6 @@
   <body>
     <noscript> JavaScript etkin olmadan Tavriko çalışmaz. </noscript>
     <div id="root"></div>
-  <script src="/_expo/static/js/web/index-c180da430b517460e1c5da7c98be4fae.js" defer></script>
+  <script src="/_expo/static/js/web/index-e6045f8718edf8e32ed96e986164c435.js" defer></script>
 </body>
 </html>

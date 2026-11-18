@@ -1,7 +1,7 @@
 /**
  * Push bildirimi → ekran yönlendirme köprüsü.
  *
- * Bildirime dokunma / eylem butonu ("Sende Ekle", "Düelloya Katıl") tepkileri
+ * Bildirime dokunma / eylem butonu ("Arkadaşı Ekle", "Odaya Katıl", "Reddet") tepkileri
  * bu modülde çözümlenir:
  *  - friend / friend_request → Arkadaşlar ekranı (istek kabul akışı)
  *  - duel / match_invite → düello odasına katılım (data.roomCode ile)
@@ -19,8 +19,10 @@
  */
 import { Platform } from 'react-native';
 import { useGameStore } from '../store/gameStore';
+import { useNotificationStore } from '../store/notificationStore';
 import { DEFAULT_API_BASE } from '../config';
 import { authHeaders } from '../utils/apiAuth';
+import { getStoredAuth, hydrateAuthStorage } from '../utils/authStorage';
 
 /** Bildirim rotası: doğrudan bir ekrana git veya bir düello odasına katıl. */
 export interface NotificationRoute {
@@ -139,6 +141,32 @@ async function acceptDuelFromNotification(data: Record<string, unknown>): Promis
   }
 }
 
+/** Reddetme yanıtı, bildirim gövdesine dokunma rotasına düşmemeli. */
+async function declineFromNotification(data: Record<string, unknown>): Promise<void> {
+  const notificationId = typeof data.notificationId === 'string' ? data.notificationId : null;
+  if (!notificationId) return;
+  await hydrateAuthStorage();
+  const { user, token } = getStoredAuth();
+  if (!user?.id || !token) return;
+
+  try {
+    const res = await fetch(`${DEFAULT_API_BASE}/social/notifications/respond`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ userId: user.id, notificationId, action: 'decline' }),
+    });
+    const result = await res.json();
+    if (!res.ok || !result.success) return;
+    const inbox = useNotificationStore.getState();
+    if (inbox.userId === user.id) {
+      inbox.patch(notificationId, { handled: 'declined', sub: 'İstek reddedildi.' });
+      inbox.markRead([notificationId]);
+    }
+  } catch {
+    // Başarısız olursa davet bildirim merkezinde tekrar yanıtlanabilir.
+  }
+}
+
 /**
  * Push bildirimi tepkisini işler (dokunuş veya eylem butonu).
  * expo-notifications response.actionIdentifier:
@@ -160,6 +188,10 @@ export function handleNotificationResponse(response: {
   }
   if (action === 'join_duel' || action === 'join_room') {
     void acceptDuelFromNotification(data);
+    return;
+  }
+  if (action === 'decline_friend' || action === 'decline_duel' || action === 'decline_room') {
+    void declineFromNotification(data);
     return;
   }
   // Varsayılan dokunuş → ilgili sayfaya yönlendir.
