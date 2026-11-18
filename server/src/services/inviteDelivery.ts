@@ -2,7 +2,7 @@ import type { NotificationItem } from '@trivia/shared';
 import { logger } from '../utils/logger';
 import { notificationToPushPayload, sendPushToUser } from './pushService';
 
-const DEFAULT_REALTIME_URL = 'https://tavriko-realtime.uncertainidentity8.workers.dev';
+export const DEFAULT_REALTIME_URL = 'https://tavriko-realtime.uncertainidentity8.workers.dev';
 
 async function relayInvite(userId: string, item: NotificationItem): Promise<void> {
   const secret = process.env.INTERNAL_API_SECRET;

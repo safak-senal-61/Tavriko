@@ -9,6 +9,7 @@ export interface CacheService {
   getCustomValue<T = any>(key: string): Promise<T | null>;
   setCustomValue(key: string, value: any, ttlSec?: number): Promise<void>;
   isAvailable(): boolean;
+  ping(): Promise<boolean>;
 }
 
 class UpstashRedisService implements CacheService {
@@ -43,6 +44,10 @@ class UpstashRedisService implements CacheService {
 
   public isAvailable(): boolean {
     return !this.usingFallback && this.client !== null;
+  }
+
+  public async ping(): Promise<boolean> {
+    return (await this.client?.ping()) === 'PONG';
   }
 
   public async setQuestionExpiry(sessionId: string, questionId: string, expiresAtMs: number, ttlSec: number = 60): Promise<void> {

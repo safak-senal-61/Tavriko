@@ -76,7 +76,6 @@ import {
   type NotificationRoute,
 } from '../services/notificationRouter';
 import { NotificationToast } from '../components/NotificationUI';
-import { PaymentScreen, PaymentItem } from '../screens/PaymentScreen';
 import { captureReferralLink, clearPendingReferral, getPendingReferral } from '../utils/referralLink';
 import { captureProfileLink, clearPendingProfileCode, getPendingProfileCode } from '../utils/profileLink';
 import { captureRoomLink, clearPendingRoomCode } from '../utils/roomLink';
@@ -115,7 +114,6 @@ export type ScreenName =
   | 'events'
   | 'inventory'
   | 'pro_league'
-  | 'payment'
   | 'developer';
 import { DEFAULT_API_BASE } from '../config';
 import { LegalConsentGate } from '../components/LegalDocuments';
@@ -187,7 +185,6 @@ export const RootNavigator: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string>('');
   /** Alt kategoride soru yok uyarısı: window.alert yerine marka dilinde modal */
   const [gameAlert, setGameAlert] = useState<{ message: string; title?: string } | null>(null);
-  const [selectedPaymentItem, setSelectedPaymentItem] = useState<PaymentItem | null>(null);
   // Guest Restriction & Redirect Banner State
   const [isGuest, setIsGuest] = useState<boolean>(false);
   const [authRedirectNotice, setAuthRedirectNotice] = useState<string | null>(null);
@@ -2415,31 +2412,11 @@ export const RootNavigator: React.FC = () => {
             onBack={() => navigateTo('home')}
             onNotifications={() => navigateTo('notifications')}
             onProfile={() => navigateTo('profile')}
-            onOpenPayment={(item) => {
-              setSelectedPaymentItem(item);
-              navigateTo('payment');
-            }}
             onNavigateSecondary={(tab) => {
               if (tab === 'play') navigateTo('home');
               else if (tab === 'leagues') navigateTo('pro_league');
               else if (tab === 'events') navigateTo('events');
               else if (tab === 'inventory') navigateTo('inventory');
-            }}
-          />
-        )}
-        {currentScreen === 'payment' && selectedPaymentItem && (
-          <PaymentScreen
-            user={user || undefined}
-            item={selectedPaymentItem}
-            apiBaseUrl={API_BASE}
-            onBack={() => {
-              setSelectedPaymentItem(null);
-              navigateTo('shop');
-            }}
-            onSuccess={(updatedUser) => {
-              setUser(updatedUser);
-              setSelectedPaymentItem(null);
-              navigateTo('shop');
             }}
           />
         )}

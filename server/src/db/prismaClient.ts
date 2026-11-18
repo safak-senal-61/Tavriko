@@ -5608,6 +5608,7 @@ export class PrismaService {
 
     const product = SHOP_CATALOG.find((p) => p.id === productId);
     if (!product) throw new Error('Ürün mağazada bulunamadı.');
+    if (product.currency === 'try') throw new Error('Gerçek para ile satın alma şu anda kapalı.');
 
     // Süreli kozmetiklerde süre seçimi: 1 saatten en fazla 1 aya kadar.
     // Fiyat, temel fiyat x süre çarpanıyla ölçeklenir.

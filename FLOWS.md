@@ -89,3 +89,8 @@
 - Passed: guest browsing, promotion back to authentication, register/login tab cycle, password-reset view/back, category search, category modal open/close, group filter, all five profile tabs, character drawer open/close, six achievements with two earned/four locked, duel searching, seven-second bot fallback display and cancellation/re-entry.
 - Checked 375px mobile, 320px narrow mobile and 1280px desktop. Reduced-motion was enabled during matchmaking; content and timer remained available. No uncaught JavaScript errors or horizontal page overflow appeared in the exercised flows.
 - Existing real sign-in, account mutations, native iOS/Android runtime and actual two-player multiplayer were not exercised.
+
+## Site health and payments
+
+- Open `/admin` → “Site Sağlığı / Polar Sandbox” for protected per-instance diagnostics and Sandbox-only checkout.
+- See [Sandbox setup and telemetry scope](docs/polar-sandbox-and-site-health.md). Checkout never grants game items, and TRY purchases are disabled until a separate production integration is approved.

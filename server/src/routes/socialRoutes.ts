@@ -236,48 +236,32 @@ router.get('/shop/catalog', (req: Request, res: Response): void => {
 router.post('/shop/purchase', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.authUserId;
-    const { productId, packId, paymentMethod = 'coins', durationId } = req.body;
+    const { productId, packId, durationId } = req.body || {};
     if (!userId) {
       res.status(400).json({ error: 'userId gerekli' });
       return;
     }
 
     const itemToBuy = productId || packId;
-    if (itemToBuy && SHOP_CATALOG.some((p) => p.id === itemToBuy)) {
+    const product = SHOP_CATALOG.find((p) => p.id === itemToBuy);
+    if (product?.currency === 'try' || itemToBuy === 'starter_pack' || itemToBuy === 'gems_500') {
+      res.status(409).json({ error: 'Gerçek para ile satın alma şu anda kapalı.' });
+      return;
+    }
+    if (product) {
       // Süreli kozmetiklerde durationId ('1h' | '1d' | '3d' | '1w' | '30d')
       // seçilen süreyi belirler; fiyat sunucuda ölçeklenir.
       const result = await db.purchaseShopProduct(
         userId,
         itemToBuy,
-        paymentMethod,
+        product.currency,
         typeof durationId === 'string' ? durationId : undefined
       );
       res.json({ success: true, user: result.user, message: result.message });
       return;
     }
 
-    // Fallback legacy pack support
-    let resolvedPack = req.body;
-    let message = 'Satın alma işlemi veritabanına kaydedildi!';
-    if (packId === 'starter_pack') {
-      resolvedPack = { coinsDelta: 1000, gemsDelta: 50, itemId: 'chest_wood', itemQty: 1 };
-      message = 'Başlangıç Paketi (+1.000 Altın, +50 Elmas, +1 Sandık) hesabına eklendi!';
-    } else if (packId === 'gems_100') {
-      resolvedPack = { gemsDelta: 100, coinsDelta: 0, itemId: undefined, itemQty: 0 };
-      message = '+100 Elmas hesabına başarıyla eklendi!';
-    } else if (packId === 'gems_500') {
-      resolvedPack = { gemsDelta: 550, coinsDelta: 0, itemId: undefined, itemQty: 0 };
-      message = 'Ödeme Onaylandı! +550 Elmas (50 Bonus) hesabına eklendi!';
-    } else if (packId === 'coins_2000') {
-      resolvedPack = { coinsDelta: 2000, gemsDelta: -10, itemId: undefined, itemQty: 0 };
-      message = '+2.000 Altın hesabına eklendi!';
-    } else if (packId === 'mega_chest') {
-      resolvedPack = { coinsDelta: -400, gemsDelta: 0, itemId: 'chest_silver', itemQty: 2 };
-      message = '2x Sandık envanterine eklendi!';
-    }
-
-    const updated = await db.purchaseShopPack(userId, resolvedPack);
-    res.json({ success: true, user: updated, message });
+    res.status(400).json({ error: 'Ürün mağazada bulunamadı.' });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
