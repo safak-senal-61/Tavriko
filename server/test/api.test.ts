@@ -1,5 +1,8 @@
 import request from 'supertest';
+import bcrypt from 'bcryptjs';
+import { vi } from 'vitest';
 import { createApp } from '../src/server';
+import { db } from '../src/db/prismaClient';
 import { Server } from 'http';
 
 describe('Trivia REST API', () => {
@@ -32,6 +35,23 @@ describe('Trivia REST API', () => {
     expect(res.body.user.displayName).toBe('TestOyuncu');
     expect(res.body.user.level).toBe(1);
     authToken = res.body.token;
+  });
+
+  it('does not expose an internal error when guest login fails', async () => {
+    const createGuest = vi.spyOn(db, 'createGuest').mockRejectedValueOnce(new Error('private-storage-diagnostic'));
+    try {
+      const res = await request(app).post('/api/auth/guest').send({ displayName: 'TestOyuncu' });
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: 'Misafir oturumu oluşturulamadı.' });
+    } finally {
+      createGuest.mockRestore();
+    }
+  });
+
+  it('verifies existing player password hashes after the bcryptjs update', async () => {
+    // Fixture generated with bcryptjs 2.4.3, never a real player's hash.
+    const legacyHash = '$2a$04$zB5W0G7kmtrEbFfcgd4u3u3BBtEBERoA3JoKVWTosKOWDqiEZaP1q';
+    await expect(bcrypt.compare('fixture-existing-password', legacyHash)).resolves.toBe(true);
   });
 
   it('retrieves all trivia categories including food, nature and animals', async () => {
