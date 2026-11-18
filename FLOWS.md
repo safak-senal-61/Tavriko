@@ -100,6 +100,9 @@
 
 ## Site health and payments
 
+- Kullanıcılar baseline: portal login returns to `/admin/kullanicilar`; eleven canonical links remain visible. The old account table listed only the latest ten records. New workspace must support search, filtering, paging, detail close and profile correction without exposing private account data in the list.
+- Account metrics: verify seven Istanbul calendar days (current day labeled partial), independent HTTP telemetry, empty/error states and responsive charts. Test profile cancel, no-op, success, stale-edit handling and insufficient access using synthetic accounts only.
+- Accounts workspace verification: desktop and 375px fixture browser exercised charts, filtering, sorting, paging, account lookup, copy ID, matches, no-op, review cancellation and confirmed profile correction. In the isolated Express app, verified sign-in to the original deep link, no-database/telemetry states, all eleven admin routes and logout. API tests cover origin, session, payload allowlist and stale writes. No live records were changed.
 - Sign in at `/admin/login`; opening any protected admin route before signing in must return to that exact route after login.
 - From `/admin`, navigate through Oyun, Mobil ve QR, Kozmetikler, API Araçları, Canlı Loglar, Kullanıcılar, Moderasyon, Bildirimler, Telegram and Site Sağlığı. Every link has its own URL, active marker, page heading and reload/back behavior. Old `#tab-*` bookmarks resolve to the new URLs.
 - Check the simulator/QR, cosmetics previews, a read-only API call, log filters, user/device table overflow, local moderation and push templates, Telegram read-only tools, health pause/refresh and logout. Use synthetic accounts and never send production notifications, mutate production data or perform a new payment during UI QA.

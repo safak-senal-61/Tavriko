@@ -7,14 +7,14 @@ export const adminPages = [
   { id:'cos', path:'/admin/kozmetikler', label:'Kozmetikler', group:'Oyun ve içerik', description:'Profil çerçevelerini, renkleri ve animasyonları önizleyin.' },
   { id:'api', path:'/admin/api', label:'API Araçları', group:'Operasyon', description:'API belgelerini inceleyin ve uç noktaları test edin.' },
   { id:'logs', path:'/admin/loglar', label:'Canlı Loglar', group:'Operasyon', description:'Sunucu kayıtlarını filtreleyin ve hata ayrıntılarını inceleyin.' },
-  { id:'db', path:'/admin/kullanicilar', label:'Kullanıcılar', group:'Topluluk', description:'Veritabanındaki en yeni kullanıcı kayıtlarını inceleyin.' },
+  { id:'db', path:'/admin/kullanicilar', label:'Kullanıcılar', group:'Topluluk', description:'Oyuncu hesaplarını bulun, profilleri inceleyin ve erişim ölçümlerini takip edin.' },
   { id:'mod', path:'/admin/moderasyon', label:'Moderasyon', group:'Topluluk', description:'Kullanıcı engellerini ve moderasyon bildirimlerini yönetin.' },
   { id:'push', path:'/admin/bildirimler', label:'Bildirimler', group:'Topluluk', description:'Kayıtlı cihazları, bildirim testlerini ve duyuruları yönetin.' },
   { id:'telegram', path:'/admin/telegram', label:'Telegram', group:'Oyun ve içerik', description:'Onay botunu ve soru havuzu araçlarını yönetin.' },
   { id:'health', path:'/admin/health', label:'Site Sağlığı', group:'Operasyon', description:'Sunucu kaynaklarını, servis kontrollerini ve Polar Sandbox’ı izleyin.' },
 ] as const;
 export type AdminPage = typeof adminPages[number];
-export const dashboardPages = adminPages.filter(p => p.id !== 'health' && p.id !== 'telegram');
+export const dashboardPages = adminPages.filter(p => p.id !== 'health' && p.id !== 'telegram' && p.id !== 'db');
 
 export const adminPageHeaders: RequestHandler = (_req,res,next) => {
   res.set({ 'Cache-Control':'no-store', 'X-Robots-Tag':'noindex, nofollow', 'X-Content-Type-Options':'nosniff', 'Referrer-Policy':'same-origin' });

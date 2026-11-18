@@ -36,6 +36,7 @@ import { adminPageHeaders, adminPages, adminSessionScript, adminTheme, dashboard
 import { legalRouter } from './routes/legalRoutes';
 import { makeOpsTelemetry } from './services/opsTelemetry';
 import { createOpsRouter } from './routes/opsRoutes';
+import { createAdminAccountsRouter } from './routes/adminAccountsRoutes';
 import { createFleetRouter } from './routes/fleetRoutes';
 import { createFleetStore, fleetMiddleware } from './services/fleetTelemetry';
 
@@ -183,7 +184,7 @@ export function createApp() {
       const lvl = res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'INFO';
       const cat = req.path.includes('/auth') ? 'AUTH' : 'HTTP';
       if (
-        /^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/ops(?:\/|$)/i.test(req.path) ||
+        /^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/(?:ops|accounts)(?:\/|$)/i.test(req.path) ||
         req.path === '/favicon.ico' ||
         req.path === '/api/logs' ||
         req.path === '/api/logs/stream' ||
@@ -633,6 +634,7 @@ export function createApp() {
   }
 
   app.use(createOpsRouter(opsTelemetry));
+  app.use(createAdminAccountsRouter());
 
   // Yönetici giriş sayfası: tarayıcının yerel şifre penceresi yerine kalıcı oturum çerezi.
   app.get('/admin/login', adminPageHeaders, (req, res) => {
