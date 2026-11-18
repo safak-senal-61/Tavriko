@@ -1,13 +1,14 @@
-import { Router, type Request, type RequestHandler } from 'express';
+import { Router, type RequestHandler } from 'express';
 import type { Prisma } from '@prisma/client';
 import { db } from '../db/prismaClient';
-import { getAdminSessionFromRequest, portalAssignees, requireAdminAuth, type AdminSession } from '../middleware/auth';
+import { getAdminSessionFromRequest, portalAssignees, requireAdminAuth, sameOrigin, type AdminSession } from '../middleware/auth';
 import { adminPageHeaders } from './adminShell';
 import { renderAdminAccounts } from './adminAccountsPage';
 import { addSupportNote, audit, compensationCatalog, grantInput, limits, moderateAccount, OperationError,
   permissions, reasonText, requestGrant, restrictionsEnabled, reviewGrant, uuidPattern, type Operation } from '../services/adminAccountOperations';
 import { readPlayerAnalytics, readSignupCohorts } from '../services/playerAnalytics';
-import { caseText, ticketKinds, updateCase } from '../services/supportCases';
+import { readDuelFunnel } from '../services/duelFunnel';
+import { caseText, firstReplyHours, readCaseReplies, replyToCase, ticketKinds, updateCase } from '../services/supportCases';
 
 const prefix = '/api/admin/accounts';
 const size = 20;
@@ -23,17 +24,6 @@ const detailSelect = {
   matches: { orderBy: [{ playedAt: 'desc' }, { id: 'desc' }], take: 5, select: { playedAt: true, mode: true, score: true } },
 } satisfies Prisma.UserSelect;
 
-function sameOrigin(req: Request): boolean {
-  try {
-    const origin = req.get('origin') || '';
-    const url = new URL(origin);
-    const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-    return origin === url.origin && url.host === req.get('host') &&
-      (url.protocol === 'https:' || (local && url.protocol === 'http:')) &&
-      (!req.get('sec-fetch-site') || req.get('sec-fetch-site') === 'same-origin');
-  } catch { return false; }
-}
-
 export function registrationWindow(now: Date) {
   const localDay = Math.floor((now.getTime() + 3 * 3_600_000) / dayMs) * dayMs;
   const days = Array.from({ length: 7 }, (_, i) => new Date(localDay - (6 - i) * dayMs).toISOString().slice(0, 10));
@@ -42,19 +32,19 @@ export function registrationWindow(now: Date) {
 
 export function createAdminAccountsRouter(client = db.rawClient) {
   const router = Router();
-  router.get('/admin/kullanicilar', adminPageHeaders, (req, res, next) => {
-    const session = getAdminSessionFromRequest(req);
+  router.get('/admin/kullanicilar', adminPageHeaders, async (req, res, next) => {
+    const session = await getAdminSessionFromRequest(req, client);
     if (!session) { next(); return; }
     res.type('html').send(renderAdminAccounts(session.role !== 'owner'));
   });
   router.get('/admin/kullanicilar', adminPageHeaders, requireAdminAuth, (_req, res) => {
     res.redirect(302, '/admin/login?next=%2Fadmin%2Fkullanicilar');
   });
-  router.use(prefix, adminPageHeaders, (req, res, next) => {
-    const session = getAdminSessionFromRequest(req);
+  router.use(prefix, adminPageHeaders, async (req, res, next) => {
+    const session = await getAdminSessionFromRequest(req, client);
     if (session) { res.locals.accountAdmin = session; next(); return; }
     // Do not let service, Basic or Telegram credentials operate on player accounts.
-    void requireAdminAuth(req, res, () => res.status(403).json({ error: 'Bu işlem için portal oturumu gerekli.' }));
+    void requireAdminAuth(req, res, () => res.status(403).json({ error: 'Bu işlem için portal oturumu gerekli.' }), client);
   });
 
   const mutation = (operation: Operation | 'cases', keys: string[]): RequestHandler => (req, res, next) => {
@@ -109,7 +99,9 @@ export function createAdminAccountsRouter(client = db.rawClient) {
       res.json(await pending);
     } catch { unavailable(res); }
   });
-  type Metrics = Awaited<ReturnType<typeof readPlayerAnalytics>> & { signup: Awaited<ReturnType<typeof readSignupCohorts>> | null };
+  type Metrics = Awaited<ReturnType<typeof readPlayerAnalytics>> & {
+    signup: Awaited<ReturnType<typeof readSignupCohorts>> | null; duelFunnel: Awaited<ReturnType<typeof readDuelFunnel>> | 'unavailable';
+  };
   let playerCache: { value: Metrics; at: number } | undefined;
   let loadingPlayers: Promise<Metrics> | undefined;
   router.get(prefix + '/player-metrics', async (_req, res) => {
@@ -119,8 +111,9 @@ export function createAdminAccountsRouter(client = db.rawClient) {
       if (playerCache && now.getTime() - playerCache.at < 30_000 && playerCache.value.days.at(-1)?.day === days.at(-1)) {
         res.json(playerCache.value); return;
       }
-      loadingPlayers ??= Promise.all([readPlayerAnalytics(client, days, first, now), readSignupCohorts(client, now).catch(() => null)])
-        .then(([value, signup]) => ({ ...value, signup }))
+      loadingPlayers ??= Promise.all([readPlayerAnalytics(client, days, first, now), readSignupCohorts(client, now).catch(() => null),
+        readDuelFunnel(client, now).catch(() => 'unavailable' as const)])
+        .then(([value, signup, duelFunnel]) => ({ ...value, signup, duelFunnel }))
         .then(value => { playerCache = { value, at: now.getTime() }; return value; })
         .finally(() => { loadingPlayers = undefined; });
       res.json(await loadingPlayers);
@@ -131,24 +124,50 @@ export function createAdminAccountsRouter(client = db.rawClient) {
     const kinds = ticketKinds(admin.role);
     if (!kinds.length) return res.status(403).json({ error: 'Talep kuyruğu için yetki gerekli.' });
     const { queue = 'active', owner = 'all', page = '1', account } = req.query;
-    if (typeof page !== 'string' || !/^[1-9]\d{0,2}$/.test(page) || !['active', 'resolved'].includes(String(queue)) ||
+    if (typeof page !== 'string' || !/^[1-9]\d{0,2}$/.test(page) || !['active', 'resolved', 'overdue', 'waiting'].includes(String(queue)) ||
         typeof queue !== 'string' || typeof owner !== 'string' || !['all', 'mine', 'unassigned'].includes(owner) ||
         (account !== undefined && (typeof account !== 'string' || !accountId.test(account)))) {
       return res.status(400).json({ error: 'Talep filtreleri geçersiz.' });
     }
+    if (queue === 'overdue' && admin.role !== 'owner') return res.status(403).json({ error: 'Geciken talepler ekip sorumlusuna açıktır.' });
     const directory = portalAssignees();
+    const targetHours = firstReplyHours();
+    const deadline = new Date(Date.now() - targetHours * 3_600_000);
     const where: Prisma.SupportCaseWhereInput = { kind: { in: kinds },
       status: queue === 'resolved' ? 'resolved' : { in: ['open', 'in_progress'] }, ...(account ? { accountId: account as string } : {}),
+      ...(queue === 'overdue' ? { firstReplyAt: null, createdAt: { lte: deadline } } : {}),
+      ...(queue === 'waiting' ? { waitingForPlayer: true } : queue === 'active' && !account ? { waitingForPlayer: false } : {}),
       ...(owner === 'mine' ? { assignee: admin.email } : owner === 'unassigned' ? { OR: [
         { assignee: null }, ...kinds.map(kind => ({ kind, assignee: { notIn: directory.filter(person => ticketKinds(person.role).includes(kind)).map(person => person.email) } })),
       ] } : {}) };
     try {
       const items = await client.supportCase.findMany({ where, take: 21, skip: (Number(page) - 1) * 20,
-        orderBy: [{ createdAt: queue === 'active' ? 'asc' : 'desc' }, { id: 'asc' }] });
-      res.json({ items: items.slice(0,20).map(item => ({ ...item, canEdit: admin.role === 'owner' || item.assignee === admin.email ||
+        orderBy: [{ createdAt: queue === 'resolved' ? 'desc' : 'asc' }, { id: 'asc' }] });
+      const overdue = admin.role === 'owner' ? await client.supportCase.count({ where: {
+        status: { not: 'resolved' }, firstReplyAt: null, createdAt: { lte: deadline },
+      } }) : null;
+      res.json({ targetHours, overdue, items: items.slice(0,20).map(item => ({ ...item,
+        late: (item.firstReplyAt ?? new Date()).getTime() - item.createdAt.getTime() >= targetHours * 3_600_000,
+        canEdit: admin.role === 'owner' || item.assignee === admin.email ||
         !directory.some(person => person.email === item.assignee && ticketKinds(person.role).includes(item.kind)) })), more: items.length > 20 && Number(page) < 999,
         staff: directory.filter(person => (admin.role === 'owner' || person.email === admin.email) && ticketKinds(person.role).some(kind => kinds.includes(kind))) });
     } catch { unavailable(res); }
+  });
+  router.get(prefix + '/cases/:id/replies', async (req, res) => {
+    const id = String(req.params.id);
+    if (!uuidPattern.test(id)) return res.status(404).json({ error: 'Talep bulunamadı.' });
+    try { res.json(await readCaseReplies(client, id, { admin: res.locals.accountAdmin })); }
+    catch (error) { failed(res, error); }
+  });
+  router.post(prefix + '/cases/:id/replies', mutation('cases', ['revision','body','ask']), async (req, res) => {
+    const id = String(req.params.id);
+    const { revision, ask } = req.body;
+    const body = caseText(req.body.body, 3, 1200);
+    if (!uuidPattern.test(id) || !Number.isSafeInteger(revision) || revision < 0 || typeof ask !== 'boolean' || !body) {
+      return res.status(400).json({ error: 'Mesajı ve talep bilgilerini kontrol edin.' });
+    }
+    try { res.status(201).json(await replyToCase(client, id, { admin: res.locals.accountAdmin }, { revision, body, ask })); }
+    catch (error) { failed(res, error); }
   });
   router.post(prefix + '/cases/:id', mutation('cases', ['revision','assignee','status','reason','resolution']), async (req, res) => {
     const { revision, assignee, status } = req.body;

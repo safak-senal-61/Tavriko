@@ -9,7 +9,7 @@ const id = 'usr_fixture';
 const email = 'admin-fixture@example.test';
 const updatedAt = new Date('2026-11-17T13:05:00.000Z');
 const profileChange = { displayName: 'Çağrı Yılmaz', resetAvatar: true, reason: 'support', expectedUpdatedAt: updatedAt.toISOString() };
-const cookie = () => `${ADMIN_SESSION_COOKIE}=${issueAdminSessionToken(email)}`;
+const cookie = () => `${ADMIN_SESSION_COOKIE}=${issueAdminSessionToken(email, 'owner', false, 'f16fb9bd-5126-4449-abe2-2b7f04a5ccfa')}`;
 
 function fixture() {
   const user = {
@@ -18,7 +18,8 @@ function fixture() {
   };
   const $queryRaw = vi.fn().mockResolvedValue([]);
   const adminAccountEvent = { create: vi.fn().mockResolvedValue({ id: 'fixture-event' }) };
-  const client = { user, $queryRaw, $transaction: async (callback: (tx: object) => Promise<unknown>) =>
+  const portalSession = { findFirst: vi.fn().mockResolvedValue({ method: 'password', createdAt: new Date() }) };
+  const client = { user, portalSession, $queryRaw, $transaction: async (callback: (tx: object) => Promise<unknown>) =>
     callback({ user, adminAccountEvent }) };
   const app = express().use(express.json()).use(createAdminAccountsRouter(client as unknown as Parameters<typeof createAdminAccountsRouter>[0]));
   const patch = (payload = profileChange, origin = 'https://test.tavriko.example') => request(app).patch(prefix + '/' + id + '/profile')

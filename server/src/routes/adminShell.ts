@@ -51,7 +51,7 @@ export function renderAdminHeader(active: AdminPage['id'], accountsOnly = false)
   return `<a class="admin-skip" href="#admin-main">İçeriğe geç</a>
 <header class="admin-header"><div class="admin-wrap admin-top">
 <a class="admin-brand" href="${accountsOnly ? '/admin/kullanicilar' : '/admin'}"><span aria-hidden="true">T</span>TAVRİKO / YÖNETİM</a>
-<div class="admin-actions"><a class="admin-command" href="/app" target="_blank" rel="noopener">Oyunu aç</a><button class="admin-command" type="button" id="admin-logout">Çıkış</button></div>
+<div class="admin-actions"><a class="admin-command" href="/admin/kullanicilar#staff-security">Oturumlar</a><a class="admin-command" href="/app" target="_blank" rel="noopener">Oyunu aç</a><button class="admin-command" type="button" id="admin-logout">Çıkış</button></div>
 </div><nav class="admin-wrap admin-nav" aria-label="Yönetim bölümleri">
 ${adminPages.filter(p => !accountsOnly || p.id === 'db').map(p => `<a href="${p.path}"${p.id===active?' aria-current="page"':''}>${p.label}</a>`).join('')}
 </nav></header>`;

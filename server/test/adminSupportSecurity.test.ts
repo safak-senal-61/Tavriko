@@ -9,7 +9,9 @@ import { createPortalLoginHandler } from '../src/routes/logRoutes';
 import { createSupportRouter } from '../src/routes/supportRoutes';
 import { otpCode, parseOtpSecret, consumeOtp } from '../src/services/portalOtp';
 import { readSignupCohorts } from '../src/services/playerAnalytics';
-import { requireAdminAuth } from '../src/middleware/auth';
+import { getAdminSessionFromRequest, requireAdminAuth } from '../src/middleware/auth';
+import { createPortalSecurityRouter, portalLogout } from '../src/routes/portalSecurityRoutes';
+import { changeDuelConsent, readDuelFunnel, recordDuelMilestone } from '../src/services/duelFunnel';
 
 const playerJwtSecret = process.env.JWT_SECRET || process.env.SUPABASE_JWT_SECRET;
 const fixtureFactor = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
@@ -60,7 +62,10 @@ describe.skipIf(!dbUrl)('support, MFA and cohort flows on PostgreSQL', () => {
     for (const id of [player, other]) await client.user.create({ data: { id, username: id, email: `${id}@example.test`, displayName: id, friendCode:id } });
     app = express().use(express.json());
     app.post('/api/portal/login', createPortalLoginHandler(client));
-    app.get('/owner-only', requireAdminAuth, (_req,res) => res.sendStatus(204));
+    app.get('/owner-only', (req,res,next) => { void requireAdminAuth(req,res,next,client); }, (_req,res) => res.sendStatus(204));
+    app.get('/staff-only', async (req,res) => res.sendStatus(await getAdminSessionFromRequest(req,client) ? 204 : 401));
+    app.post('/logout', portalLogout(client));
+    app.use('/security', createPortalSecurityRouter(client));
     app.use('/api/support', createSupportRouter(client)).use(createAdminAccountsRouter(client));
     for (const email of [owner,support,moderator,approver]) {
       const response = await login(email);
@@ -72,6 +77,7 @@ describe.skipIf(!dbUrl)('support, MFA and cohort flows on PostgreSQL', () => {
   afterAll(async () => {
     if (client) {
       await client.portalOtpState.deleteMany({ where: { email: { contains: run } } });
+      await client.portalSession.deleteMany({ where: { email: { contains: run } } });
       await client.adminRiskAlert.deleteMany({ where: { actor: { contains: run } } });
       await client.adminCompensation.deleteMany({ where: { accountId: { startsWith: player } } });
       await client.adminAccountEvent.deleteMany({ where: { accountId: { startsWith: player } } });
@@ -174,5 +180,72 @@ describe.skipIf(!dbUrl)('support, MFA and cohort flows on PostgreSQL', () => {
     expect(result.cohorts.find(c=>c.day==='2032-05-10')).toEqual({day:'2032-05-10',signups:2,firstMatch:1,d1:0,d7:1});
     expect(result.cohorts.find(c=>c.day==='2032-05-16')).toEqual({day:'2032-05-16',signups:1,firstMatch:null,d1:1,d7:null});
     expect(result.d7).toEqual({signedUp:2,played:1,rate:0.5});
+  });
+
+  it('escalates unanswered cases, returns requested info to the staff queue and guards message visibility', async () => {
+    const opened = await playerPost(other, { kind: 'support', subject:'Konuşma testi', message:'İlk mesaj için bir test.' });
+    const id = opened.body.id;
+    await client.supportCase.update({ where: { id }, data: { createdAt: new Date(Date.now()-25*3_600_000) } });
+    expect((await get(`${cases}?queue=overdue`,owner)).body.items).toEqual(expect.arrayContaining([expect.objectContaining({id,late:true})]));
+    expect((await get(`${cases}?queue=overdue`,support)).status).toBe(403);
+    expect((await post(`${cases}/${id}`,support,{revision:0,assignee:support,status:'in_progress',reason})).status).toBe(200);
+    expect((await get(`${cases}?queue=overdue`,owner)).body.items).toEqual(expect.arrayContaining([expect.objectContaining({id})]));
+    const path = `${cases}/${id}/replies`;
+    const playerPath = `/api/support/${id}/replies`;
+    expect((await post(path,support,{revision:1,body:'Oda kodunu paylaşır mısınız?',ask:true})).status).toBe(201);
+    expect((await get(`${cases}?queue=overdue&account=${other}`,owner)).body.items).toEqual([]);
+    expect((await get(`${cases}?queue=waiting`,support)).body.items).toEqual(expect.arrayContaining([expect.objectContaining({id})]));
+    expect((await request(app).get(playerPath).set('Authorization',token(player))).status).toBe(404);
+    const thread = (await request(app).get(playerPath).set('Authorization',token(other))).body;
+    expect(thread).toMatchObject({ waitingForPlayer:true, revision:2, items:[{sender:'staff',body:'Oda kodunu paylaşır mısınız?'}] });
+    expect(JSON.stringify(thread)).not.toContain(support);
+    const reply = {revision:2,body:'Oda kodum QA15.'};
+    expect((await request(app).post(playerPath).set('Authorization',token(other)).send(reply)).status).toBe(201);
+    expect((await request(app).post(playerPath).set('Authorization',token(other)).send(reply)).status).toBe(409);
+    expect((await get(`${cases}?queue=active`,support)).body.items).toEqual(expect.arrayContaining([expect.objectContaining({id,waitingForPlayer:false})]));
+    expect((await get(path,support)).body.items.map((entry: {sender:string})=>entry.sender)).toEqual(['staff','player']);
+  });
+
+  it('revokes only the selected portal session and rejects cross-origin or unauthorized requests', async () => {
+    const fresh = await login(support);
+    const second = fresh.headers['set-cookie'][0].split(';')[0];
+    const ownerSessions = (await get('/security/sessions?scope=team',owner)).body.items;
+    const target = ownerSessions.find((row: {email:string;id:string}) => row.email===support &&
+      row.id!==JSON.parse(Buffer.from(cookies.get(support)!.split('.')[1],'base64url').toString()).jti);
+    expect(target).toBeTruthy();
+    const path = `/security/sessions/${target.id}/revoke`;
+    expect((await get('/security/sessions?scope=team',support)).status).toBe(403);
+    expect((await post(path,moderator,{})).status).toBe(404);
+    expect((await request(app).post(path).set('Cookie',cookies.get(owner)!).set('Origin','https://other.test').send({})).status).toBe(403);
+    expect((await request(app).get('/staff-only').set('Cookie',second)).status).toBe(204);
+    expect((await post(path,owner,{})).status).toBe(200);
+    expect((await request(app).get('/staff-only').set('Cookie',second)).status).toBe(401);
+    expect((await get('/staff-only',support)).status).toBe(204);
+    expect((await post('/logout',support,{})).status).toBe(200);
+    expect((await get('/staff-only',support)).status).toBe(401);
+  });
+
+  it('counts only mature opted-in signups and a completion from the same verified match', async () => {
+    vi.stubEnv('DUEL_FUNNEL_START_AT','2034-05-01T00:00:00Z');
+    const date = (value: string) => new Date(`2034-05-${value}:00:00Z`);
+    const names = ['complete','other_room','declined','new','no_click'].map(key=>`${player}_${key}`);
+    for (const [i,id] of names.entries()) await client.user.create({ data: {
+      id, username:id, email:`${id}@example.test`, displayName:id, friendCode:id, createdAt:date(i===3?'09T12':'02T12'),
+    } });
+    for (const [i,id] of names.entries()) {
+      const day = i===3?'09':'02';
+      if (i!==2) await changeDuelConsent(client,id,'enroll',date(`${day}T13`));
+      if (i!==4) await changeDuelConsent(client,id,'select',date(`${day}T14`));
+    }
+    const room = randomUUID(), wrong = randomUUID();
+    for (const id of names.slice(0,3)) await client.$transaction(async tx => {
+      await recordDuelMilestone(tx,'matched',room,[id],date('02T15'));
+      await recordDuelMilestone(tx,'completed',id===names[0]?room:wrong,[id],date('02T16'));
+    });
+    expect(await readDuelFunnel(client,date('12T12'))).toEqual({ coverageStart:'2034-05-01T00:00:00.000Z', registered:3,selected:2,matched:2,completed:1 });
+    await changeDuelConsent(client,names[0],'withdraw',date('12T12'));
+    expect(await readDuelFunnel(client,date('12T12'))).toMatchObject({registered:2,selected:1,matched:1,completed:0});
+    expect(await client.duelFunnelEvent.count({where:{accountId:names[2]}})).toBe(0);
+    vi.stubEnv('DUEL_FUNNEL_START_AT','');
   });
 });

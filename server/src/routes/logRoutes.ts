@@ -8,13 +8,14 @@ import {
   requireAdminAuth,
   isPortalConfigured,
   authenticatePortal,
-  issueAdminSessionToken,
   setAdminSessionCookie,
-  clearAdminSessionCookie,
   getAdminSessionFromRequest,
   portalFactor,
+  portalTokenClaims,
+  sameOrigin,
 } from '../middleware/auth';
 import { consumeOtp } from '../services/portalOtp';
+import { createManagedSession, portalLogout } from './portalSecurityRoutes';
 
 export const logRouter = Router();
 
@@ -23,6 +24,9 @@ export const createPortalLoginHandler = (client = db.rawClient) => async (req: R
   res.set('Cache-Control', 'no-store');
   if (!req.is('application/json')) {
     res.status(415).json({ error: 'JSON gerekli.' }); return;
+  }
+  if (req.get('origin') && !sameOrigin(req)) {
+    res.status(403).json({ error: 'Girişi Tavriko yönetim panelinden başlatın.' }); return;
   }
   if (!isPortalConfigured()) {
     res.status(503).json({ success: false, error: 'Yönetici portalı yapılandırılmamış.' });
@@ -46,7 +50,7 @@ export const createPortalLoginHandler = (client = db.rawClient) => async (req: R
         }); return;
       }
     }
-    const token = issueAdminSessionToken(session.email, session.role, !!factor);
+    const token = await createManagedSession(client, req, session, factor ? 'totp' : 'password').catch(() => null);
     if (!token) {
       res.status(503).json({ success: false, error: 'Yönetici portalı yapılandırılmamış.' });
       return;
@@ -65,13 +69,10 @@ export const createPortalLoginHandler = (client = db.rawClient) => async (req: R
 };
 logRouter.post('/portal/login', createPortalLoginHandler());
 
-logRouter.post('/portal/logout', (_req: Request, res: Response) => {
-  clearAdminSessionCookie(res);
-  res.json({ success: true });
-});
+logRouter.post('/portal/logout', portalLogout());
 
-logRouter.get('/portal/verify', (req: Request, res: Response) => {
-  const session = getAdminSessionFromRequest(req);
+logRouter.get('/portal/verify', async (req: Request, res: Response) => {
+  const session = await getAdminSessionFromRequest(req);
   if (session) {
     res.set('Cache-Control', 'no-store').json({ success: true, email: session.email, role: session.role });
     return;
@@ -93,6 +94,17 @@ logRouter.get('/logs/stream', requireAdminAuth, (req: Request, res: Response) =>
   res.flushHeaders();
 
   logger.addSseClient(res);
+  if (portalTokenClaims(req)) {
+    let checking = false;
+    const timer = setInterval(async () => {
+      if (checking) return;
+      checking = true;
+      try { if (!(await getAdminSessionFromRequest(req))) res.end(); }
+      finally { checking = false; }
+    }, 10_000);
+    timer.unref?.();
+    res.on('close', () => clearInterval(timer));
+  }
   logger.info('SYSTEM', 'Yeni bir istemci SSE log akışına bağlandı');
 });
 

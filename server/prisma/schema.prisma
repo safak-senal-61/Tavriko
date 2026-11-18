@@ -85,6 +85,7 @@ model User {
   updatedAt                 DateTime            @updatedAt
   restrictedUntil           DateTime?
   supportCases              SupportCase[]
+  duelFunnel                DuelFunnelEvent[]
   claimedSeasonFreeTiers    Json                @default("[]")
   claimedSeasonPremiumTiers Json                @default("[]")
   equippedBackground        String?
@@ -233,12 +234,78 @@ model SupportCase {
   status         String   @default("open")
   resolution     String?
   revision       Int      @default(0)
+  waitingForPlayer Boolean @default(false)
+  firstReplyAt   DateTime?
+  replies        SupportCaseReply[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   @@index([accountId, createdAt])
   @@index([kind, status, createdAt, id])
+  @@index([firstReplyAt, status, createdAt])
   @@map("support_cases")
+}
+
+model SupportCaseReply {
+  id        String      @id @default(uuid()) @db.Uuid
+  caseId    String      @db.Uuid
+  ticket    SupportCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  sender    String
+  body      String
+  createdAt DateTime    @default(now())
+
+  @@index([caseId, createdAt, id])
+  @@map("support_case_replies")
+}
+
+model PortalSession {
+  id        String    @id @db.Uuid
+  email     String
+  method    String
+  device    String
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  revokedBy String?
+  passkeyId String?
+
+  @@index([email, revokedAt, expiresAt])
+  @@index([expiresAt])
+  @@map("portal_sessions")
+}
+
+model PortalPasskey {
+  id        String   @id
+  email     String
+  publicKey Bytes
+  counter   BigInt
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@map("portal_passkeys")
+}
+
+model PortalWebAuthnChallenge {
+  id        String   @id @db.Uuid
+  challenge String
+  purpose   String
+  binding   String
+  expiresAt DateTime
+
+  @@index([expiresAt])
+  @@map("portal_webauthn_challenges")
+}
+
+model DuelFunnelEvent {
+  accountId String
+  account   User     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  stage     String
+  room      String
+  at        DateTime
+
+  @@id([accountId, stage, room])
+  @@index([at])
+  @@map("duel_funnel_events")
 }
 
 model AdminRiskAlert {

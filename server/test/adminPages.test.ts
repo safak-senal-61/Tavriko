@@ -12,6 +12,9 @@ describe('Tavriko admin pages', () => {
     vi.stubEnv('PORTAL_ADMIN_EMAIL','admin-routes-fixture@example.test');
     vi.stubEnv('PORTAL_ADMIN_PASSWORD','fixture-routes-only');
     vi.stubEnv('JWT_SECRET','fixture-admin-routes-jwt-test-secret');
+    const { db } = await import('../src/db/prismaClient');
+    vi.spyOn(db.rawClient.portalSession, 'create').mockResolvedValue({} as never);
+    vi.spyOn(db.rawClient.portalSession, 'findFirst').mockResolvedValue({ method: 'password', createdAt: new Date() } as never);
     const { createApp } = await import('../src/server');
     app = createApp();
     const login = await request(app.app).post('/api/portal/login').send({
@@ -21,7 +24,7 @@ describe('Tavriko admin pages', () => {
     cookie = login.headers['set-cookie'][0].split(';')[0];
   });
 
-  afterAll(() => { app?.close(); vi.unstubAllEnvs(); });
+  afterAll(() => { app?.close(); vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
   it.each(adminPages)('protects $path and renders its own title and active link', async page => {
     const guest = await request(app.app).get(page.path).set('Accept','text/html');

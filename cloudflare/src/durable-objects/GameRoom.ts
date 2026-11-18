@@ -50,6 +50,7 @@ export class GameRoomDO extends DurableObject<Env> {
   private apiService: ApiService;
   private access: PlayerAccessGate;
   private verifiedPlayers = new Set<string>();
+  private funnelMatchId: string | null = null;
   private rateLimiters = new WeakMap<WebSocket, RateLimiter>();
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -64,6 +65,7 @@ export class GameRoomDO extends DurableObject<Env> {
       const storedAlarm = await this.ctx.storage.get<AlarmContext>('alarmContext');
       const storedPrivacy = await this.ctx.storage.get<boolean>('isPrivateRoom');
       this.verifiedPlayers = new Set(await this.ctx.storage.get<string[]>('verifiedPlayers') ?? []);
+      this.funnelMatchId = await this.ctx.storage.get<string>('funnelMatchId') ?? null;
 
       if (storedRoom) this.room = storedRoom;
       if (storedQuestions) this.questions = storedQuestions;
@@ -94,10 +96,13 @@ export class GameRoomDO extends DurableObject<Env> {
       );
     }
 
-    if (request.method === 'POST' && (url.pathname === '/create-match' || url.pathname.endsWith('/create-match'))) {
+    if (request.method === 'POST' && url.hostname === 'internal' && url.pathname === '/create-match') {
       const data = (await request.json()) as any;
       this.verifiedPlayers.clear();
       await this.ctx.storage.delete('verifiedPlayers');
+      this.funnelMatchId = typeof data.funnelMatchId === 'string' ? data.funnelMatchId : null;
+      if (this.funnelMatchId) await this.ctx.storage.put('funnelMatchId', this.funnelMatchId);
+      else await this.ctx.storage.delete('funnelMatchId');
       const roomCode = sanitizeRoomCode(data.roomCode || url.searchParams.get('roomCode') || '');
       this.room = {
         code: roomCode,
@@ -937,7 +942,8 @@ export class GameRoomDO extends DurableObject<Env> {
     if (!this.room || this.room.status === 'game_over') return;
 
     const summary = buildFinalMatchSummary(this.room);
-    const tracked = { ...summary, matchId: crypto.randomUUID(), verifiedPlayerIds: [...this.verifiedPlayers], category: this.room.category };
+    const tracked = { ...summary, matchId: this.funnelMatchId ?? crypto.randomUUID(), verifiedPlayerIds: [...this.verifiedPlayers],
+      category: this.room.category, funnelMatch: this.funnelMatchId !== null };
 
     await this.persist();
 

@@ -9,6 +9,7 @@ const adminShell_1 = require("./adminShell");
 const adminAccountsPage_1 = require("./adminAccountsPage");
 const adminAccountOperations_1 = require("../services/adminAccountOperations");
 const playerAnalytics_1 = require("../services/playerAnalytics");
+const duelFunnel_1 = require("../services/duelFunnel");
 const supportCases_1 = require("../services/supportCases");
 const prefix = '/api/admin/accounts';
 const size = 20;
@@ -23,19 +24,6 @@ const detailSelect = {
     _count: { select: { inventoryItems: true, pushTokens: true } },
     matches: { orderBy: [{ playedAt: 'desc' }, { id: 'desc' }], take: 5, select: { playedAt: true, mode: true, score: true } },
 };
-function sameOrigin(req) {
-    try {
-        const origin = req.get('origin') || '';
-        const url = new URL(origin);
-        const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-        return origin === url.origin && url.host === req.get('host') &&
-            (url.protocol === 'https:' || (local && url.protocol === 'http:')) &&
-            (!req.get('sec-fetch-site') || req.get('sec-fetch-site') === 'same-origin');
-    }
-    catch {
-        return false;
-    }
-}
 function registrationWindow(now) {
     const localDay = Math.floor((now.getTime() + 3 * 3_600_000) / dayMs) * dayMs;
     const days = Array.from({ length: 7 }, (_, i) => new Date(localDay - (6 - i) * dayMs).toISOString().slice(0, 10));
@@ -43,8 +31,8 @@ function registrationWindow(now) {
 }
 function createAdminAccountsRouter(client = prismaClient_1.db.rawClient) {
     const router = (0, express_1.Router)();
-    router.get('/admin/kullanicilar', adminShell_1.adminPageHeaders, (req, res, next) => {
-        const session = (0, auth_1.getAdminSessionFromRequest)(req);
+    router.get('/admin/kullanicilar', adminShell_1.adminPageHeaders, async (req, res, next) => {
+        const session = await (0, auth_1.getAdminSessionFromRequest)(req, client);
         if (!session) {
             next();
             return;
@@ -54,15 +42,15 @@ function createAdminAccountsRouter(client = prismaClient_1.db.rawClient) {
     router.get('/admin/kullanicilar', adminShell_1.adminPageHeaders, auth_1.requireAdminAuth, (_req, res) => {
         res.redirect(302, '/admin/login?next=%2Fadmin%2Fkullanicilar');
     });
-    router.use(prefix, adminShell_1.adminPageHeaders, (req, res, next) => {
-        const session = (0, auth_1.getAdminSessionFromRequest)(req);
+    router.use(prefix, adminShell_1.adminPageHeaders, async (req, res, next) => {
+        const session = await (0, auth_1.getAdminSessionFromRequest)(req, client);
         if (session) {
             res.locals.accountAdmin = session;
             next();
             return;
         }
         // Do not let service, Basic or Telegram credentials operate on player accounts.
-        void (0, auth_1.requireAdminAuth)(req, res, () => res.status(403).json({ error: 'Bu işlem için portal oturumu gerekli.' }));
+        void (0, auth_1.requireAdminAuth)(req, res, () => res.status(403).json({ error: 'Bu işlem için portal oturumu gerekli.' }), client);
     });
     const mutation = (operation, keys) => (req, res, next) => {
         const admin = res.locals.accountAdmin;
@@ -70,7 +58,7 @@ function createAdminAccountsRouter(client = prismaClient_1.db.rawClient) {
             res.status(403).json({ error: 'Bu işlem için rolünüz yetkili değil.' });
             return;
         }
-        if (!sameOrigin(req)) {
+        if (!(0, auth_1.sameOrigin)(req)) {
             res.status(403).json({ error: 'İşlemi Tavriko yönetim panelinden başlatın.' });
             return;
         }
@@ -144,8 +132,9 @@ function createAdminAccountsRouter(client = prismaClient_1.db.rawClient) {
                 res.json(playerCache.value);
                 return;
             }
-            loadingPlayers ??= Promise.all([(0, playerAnalytics_1.readPlayerAnalytics)(client, days, first, now), (0, playerAnalytics_1.readSignupCohorts)(client, now).catch(() => null)])
-                .then(([value, signup]) => ({ ...value, signup }))
+            loadingPlayers ??= Promise.all([(0, playerAnalytics_1.readPlayerAnalytics)(client, days, first, now), (0, playerAnalytics_1.readSignupCohorts)(client, now).catch(() => null),
+                (0, duelFunnel_1.readDuelFunnel)(client, now).catch(() => 'unavailable')])
+                .then(([value, signup, duelFunnel]) => ({ ...value, signup, duelFunnel }))
                 .then(value => { playerCache = { value, at: now.getTime() }; return value; })
                 .finally(() => { loadingPlayers = undefined; });
             res.json(await loadingPlayers);
@@ -160,26 +149,62 @@ function createAdminAccountsRouter(client = prismaClient_1.db.rawClient) {
         if (!kinds.length)
             return res.status(403).json({ error: 'Talep kuyruğu için yetki gerekli.' });
         const { queue = 'active', owner = 'all', page = '1', account } = req.query;
-        if (typeof page !== 'string' || !/^[1-9]\d{0,2}$/.test(page) || !['active', 'resolved'].includes(String(queue)) ||
+        if (typeof page !== 'string' || !/^[1-9]\d{0,2}$/.test(page) || !['active', 'resolved', 'overdue', 'waiting'].includes(String(queue)) ||
             typeof queue !== 'string' || typeof owner !== 'string' || !['all', 'mine', 'unassigned'].includes(owner) ||
             (account !== undefined && (typeof account !== 'string' || !accountId.test(account)))) {
             return res.status(400).json({ error: 'Talep filtreleri geçersiz.' });
         }
+        if (queue === 'overdue' && admin.role !== 'owner')
+            return res.status(403).json({ error: 'Geciken talepler ekip sorumlusuna açıktır.' });
         const directory = (0, auth_1.portalAssignees)();
+        const targetHours = (0, supportCases_1.firstReplyHours)();
+        const deadline = new Date(Date.now() - targetHours * 3_600_000);
         const where = { kind: { in: kinds },
             status: queue === 'resolved' ? 'resolved' : { in: ['open', 'in_progress'] }, ...(account ? { accountId: account } : {}),
+            ...(queue === 'overdue' ? { firstReplyAt: null, createdAt: { lte: deadline } } : {}),
+            ...(queue === 'waiting' ? { waitingForPlayer: true } : queue === 'active' && !account ? { waitingForPlayer: false } : {}),
             ...(owner === 'mine' ? { assignee: admin.email } : owner === 'unassigned' ? { OR: [
                     { assignee: null }, ...kinds.map(kind => ({ kind, assignee: { notIn: directory.filter(person => (0, supportCases_1.ticketKinds)(person.role).includes(kind)).map(person => person.email) } })),
                 ] } : {}) };
         try {
             const items = await client.supportCase.findMany({ where, take: 21, skip: (Number(page) - 1) * 20,
-                orderBy: [{ createdAt: queue === 'active' ? 'asc' : 'desc' }, { id: 'asc' }] });
-            res.json({ items: items.slice(0, 20).map(item => ({ ...item, canEdit: admin.role === 'owner' || item.assignee === admin.email ||
+                orderBy: [{ createdAt: queue === 'resolved' ? 'desc' : 'asc' }, { id: 'asc' }] });
+            const overdue = admin.role === 'owner' ? await client.supportCase.count({ where: {
+                    status: { not: 'resolved' }, firstReplyAt: null, createdAt: { lte: deadline },
+                } }) : null;
+            res.json({ targetHours, overdue, items: items.slice(0, 20).map(item => ({ ...item,
+                    late: (item.firstReplyAt ?? new Date()).getTime() - item.createdAt.getTime() >= targetHours * 3_600_000,
+                    canEdit: admin.role === 'owner' || item.assignee === admin.email ||
                         !directory.some(person => person.email === item.assignee && (0, supportCases_1.ticketKinds)(person.role).includes(item.kind)) })), more: items.length > 20 && Number(page) < 999,
                 staff: directory.filter(person => (admin.role === 'owner' || person.email === admin.email) && (0, supportCases_1.ticketKinds)(person.role).some(kind => kinds.includes(kind))) });
         }
         catch {
             unavailable(res);
+        }
+    });
+    router.get(prefix + '/cases/:id/replies', async (req, res) => {
+        const id = String(req.params.id);
+        if (!adminAccountOperations_1.uuidPattern.test(id))
+            return res.status(404).json({ error: 'Talep bulunamadı.' });
+        try {
+            res.json(await (0, supportCases_1.readCaseReplies)(client, id, { admin: res.locals.accountAdmin }));
+        }
+        catch (error) {
+            failed(res, error);
+        }
+    });
+    router.post(prefix + '/cases/:id/replies', mutation('cases', ['revision', 'body', 'ask']), async (req, res) => {
+        const id = String(req.params.id);
+        const { revision, ask } = req.body;
+        const body = (0, supportCases_1.caseText)(req.body.body, 3, 1200);
+        if (!adminAccountOperations_1.uuidPattern.test(id) || !Number.isSafeInteger(revision) || revision < 0 || typeof ask !== 'boolean' || !body) {
+            return res.status(400).json({ error: 'Mesajı ve talep bilgilerini kontrol edin.' });
+        }
+        try {
+            res.status(201).json(await (0, supportCases_1.replyToCase)(client, id, { admin: res.locals.accountAdmin }, { revision, body, ask }));
+        }
+        catch (error) {
+            failed(res, error);
         }
     });
     router.post(prefix + '/cases/:id', mutation('cases', ['revision', 'assignee', 'status', 'reason', 'resolution']), async (req, res) => {

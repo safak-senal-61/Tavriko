@@ -52,5 +52,30 @@ function createSupportRouter(client = prismaClient_1.db.rawClient) {
             res.status(503).json({ error: 'Talep kaydedilemedi. Yeniden göndermeden önce listeyi yenileyin.' });
         }
     });
+    router.get('/:id/replies', async (req, res) => {
+        if (!adminAccountOperations_1.uuidPattern.test(req.params.id))
+            return res.status(404).json({ error: 'Talep bulunamadı.' });
+        try {
+            res.json(await (0, supportCases_1.readCaseReplies)(client, req.params.id, { account: req.authUserId }));
+        }
+        catch (error) {
+            res.status(error instanceof adminAccountOperations_1.OperationError ? error.status : 503).json({ error: error instanceof adminAccountOperations_1.OperationError ? error.message : 'Konuşma yüklenemedi.' });
+        }
+    });
+    router.post('/:id/replies', async (req, res) => {
+        if (!req.is('application/json'))
+            return res.status(415).json({ error: 'JSON gerekli.' });
+        const { revision, body } = req.body || {};
+        const text = (0, supportCases_1.caseText)(body, 3, 1200);
+        if (!adminAccountOperations_1.uuidPattern.test(req.params.id) || !Number.isSafeInteger(revision) || revision < 0 || !text) {
+            return res.status(400).json({ error: 'Mesajı ve talep bilgilerini kontrol edin.' });
+        }
+        try {
+            res.status(201).json(await (0, supportCases_1.replyToCase)(client, req.params.id, { account: req.authUserId }, { revision, body: text, ask: false }));
+        }
+        catch (error) {
+            res.status(error instanceof adminAccountOperations_1.OperationError ? error.status : 503).json({ error: error instanceof adminAccountOperations_1.OperationError ? error.message : 'Mesaj kaydedilemedi. Tekrar göndermeden önce konuşmayı yenileyin.' });
+        }
+    });
     return router;
 }

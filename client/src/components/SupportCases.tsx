@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-type Case = { id: string; subject: string; message: string; status: keyof typeof statuses; createdAt: string; resolution: string | null };
+type Case = { id: string; subject: string; message: string; status: keyof typeof statuses; createdAt: string; resolution: string | null; waitingForPlayer?: boolean };
 type Event = { id: string; action: 'warn' | 'restrict'; createdAt: string };
 const statuses = { open: 'Açık', in_progress: 'İnceleniyor', resolved: 'Sonuçlandı' };
 const date = (value: string) => new Date(value).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul' });
@@ -98,14 +98,76 @@ export function SupportCases({ api, token }: { api: string; token: string }) {
       {!loading && !loadError && items.length === 0 && <Text style={s.secondary}>Henüz bir talep görünmüyor.</Text>}
       {items.map(item => <View key={item.id} style={s.choice}>
         <Text style={s.title}>{item.subject}</Text>
-        <Text style={s.secondary}>{date(item.createdAt)} · {statuses[item.status]}</Text>
+        <Text style={s.secondary}>{date(item.createdAt)} · {item.waitingForPlayer ? 'Yanıtınız bekleniyor' : statuses[item.status]}</Text>
         <Text style={s.body}>{item.message}</Text>
         {!!item.resolution && <Text style={s.body}>Destek yanıtı: {item.resolution}</Text>}
+        <CaseConversation endpoint={`${endpoint}/${encodeURIComponent(item.id)}/replies`} token={token} />
       </View>)}
       {(page > 1 || more) && <View style={s.header}>
         {page > 1 && <Pressable accessibilityRole="button" style={s.button} disabled={loading} onPress={() => void refresh(page - 1)}><Text style={s.body}>Önceki</Text></Pressable>}
         {more && <Pressable accessibilityRole="button" style={s.button} disabled={loading} onPress={() => void refresh(page + 1)}><Text style={s.body}>Sonraki</Text></Pressable>}
       </View>}
+    </>}
+  </View>;
+}
+
+type Conversation = {
+  items: Array<{ id: string; sender: 'staff' | 'player'; body: string; createdAt: string }>;
+  revision: number; status: Case['status']; waitingForPlayer: boolean;
+};
+
+function CaseConversation({ endpoint, token }: { endpoint: string; token: string }) {
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState<Conversation | null>(null);
+  const [draft, setDraft] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef<AbortController | null>(null);
+  useEffect(() => () => { inFlight.current?.abort(); }, [endpoint, token]);
+  async function request(send = false) {
+    if (inFlight.current || (send && (!data || draft.trim().length < 3))) return;
+    const controller = new AbortController();
+    inFlight.current = controller; setBusy(true); setFeedback('');
+    const headers = { Authorization: `Bearer ${token}` };
+    try {
+      if (send) {
+        const response = await fetch(endpoint, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ revision: data!.revision, body: draft }), signal: controller.signal });
+        if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || 'Yanıt gönderilemedi.');
+        if (!controller.signal.aborted) { setDraft(''); setFeedback('Yanıtınız gönderildi.'); }
+      }
+      const response = await fetch(endpoint, { headers, signal: controller.signal });
+      if (!response.ok) throw new Error(send ? 'Yanıt gönderildi. Konuşmayı yenileyin.' : 'Konuşma yüklenemedi.');
+      const next = await response.json();
+      if (!controller.signal.aborted) setData(next);
+    } catch (error) {
+      if (!controller.signal.aborted) setFeedback(error instanceof Error ? error.message : 'İşlem tamamlanamadı.');
+    } finally {
+      inFlight.current = null;
+      if (!controller.signal.aborted) setBusy(false);
+    }
+  }
+  return <View style={s.group}>
+    <Pressable style={s.button} accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => {
+      setOpen(!open); if (!open) void request();
+    }}><Text style={s.secondary}>{open ? 'Konuşmayı gizle' : 'Konuşmayı aç'}</Text></Pressable>
+    {open && <>
+      {data?.waitingForPlayer && <Text style={s.title}>Destek ekibi yanıtınızı bekliyor</Text>}
+      {data?.items.map(item => <View key={item.id} style={s.choice}>
+        <Text style={s.secondary}>{item.sender === 'staff' ? 'Tavriko destek' : 'Siz'} · {date(item.createdAt)}</Text>
+        <Text style={s.body}>{item.body}</Text>
+      </View>)}
+      {data && !data.items.length && <Text style={s.secondary}>Henüz ek mesaj yok.</Text>}
+      <Pressable style={s.button} disabled={busy} accessibilityRole="button" onPress={() => void request()}>
+        <Text style={s.secondary}>Konuşmayı yenile</Text></Pressable>
+      {!!feedback && <Text accessibilityLiveRegion="polite" style={s.body}>{feedback}</Text>}
+      {data && data.status !== 'resolved' && <>
+        <TextInput accessibilityLabel="Talebe yanıt" placeholder="Yanıtınızı yazın" placeholderTextColor="#AEA0C3"
+          value={draft} onChangeText={setDraft} maxLength={1200} multiline editable={!busy} style={[s.input, s.message]} />
+        <Pressable style={[s.button, s.primary, { opacity: busy || draft.trim().length < 3 ? 0.55 : 1 }]}
+          disabled={busy || draft.trim().length < 3} accessibilityRole="button" onPress={() => void request(true)}>
+          <Text style={s.primaryText}>Yanıt gönder</Text></Pressable>
+      </>}
     </>}
   </View>;
 }

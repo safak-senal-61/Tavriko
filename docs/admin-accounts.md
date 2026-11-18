@@ -33,7 +33,9 @@ Hesap ve telafi türü başına son 24 saatte **1.000 altın, 50 elmas veya 1 ko
 Oyuncu Ayarlar → Hesap → Destek talepleri ve itirazlar altında başvuru açar, durumunu ve sonuç yanıtını takip eder. Kayıtlı hesap gerekir; üç etkin ve son 24 saatte beş yeni başvuru sınırı vardır. Oyuncu son 30 gündeki kendi uyarı veya kısıtlamasına yalnız bir kez itiraz edebilir. İç moderasyon gerekçesi, iç işlem notu ve personel e-postası oyuncuya gönderilmez.
 
 - **Kuyruk:** Destek rolü genel talepleri, moderatör itirazları, sahip ikisini görür. Sahip uygun bir görevli atayabilir; personel kendi adına alır. Atama, durum ve iç gerekçe zaman çizelgesine kaydedilir. Görevli kendi moderasyon işlemine yönelik itirazı sonuçlandıramaz; ikinci bir moderatör veya sahip gerekir.
-- **Yanıt:** Sonuçlandırma oyuncuya ayrı bir yanıt ve uygulama içi bildirim verir. İtiraz kararı kısıtlamayı otomatik kaldırmaz. Bu sürüm karşılıklı mesajlaşma veya dosya eki içermez. Oyuncu hesabı silinirse talepler ve yanıtlar silinir; talep kimliği ve işlem metaverisi iç denetim defterinde kalır.
+- **Konuşma:** Oyuncu ve atanmış görevli aynı dosyada mesajlaşabilir. Görevli “Oyuncudan bilgi iste” seçtiğinde kayıt oyuncu yanıtı bekleyenlere taşınır; oyuncu yazınca ekibin aktif kuyruğuna döner. Görevlinin mesajı uygulama içi bildirim oluşturur. Dosya başına en çok 60 mesaj, oyuncu başına saatte en çok 10 mesaj vardır. Sonuçlanan konuşma salt okunurdur. Dosya eki yoktur.
+- **İlk yanıt hedefi:** `SUPPORT_FIRST_REPLY_HOURS` ile 1–168 saat arası seçilir (varsayılan 24 takvim saati). Atama ve dahili not süreyi durdurmaz; oyuncunun gördüğü ilk görevli mesajı veya sonuç yanıtı durdurur. Aşan yanıtsız kayıtlar otomatik olarak portal sahibinin “Geciken · ekip sorumlusu” filtresinde öne çıkar. Bu bir panel kuyruğudur; harici bildirim veya otomatik görevli değişikliği yapmaz.
+- **Sonuç:** İtiraz kararı kısıtlamayı otomatik kaldırmaz. Oyuncu hesabı silinirse talepler ve konuşma silinir; talep kimliği ve işlem metaverisi iç denetim defterinde kalır.
 
 ## İki adımlı portal girişi ve risk kuyruğu
 
@@ -41,12 +43,22 @@ Oyuncu Ayarlar → Hesap → Destek talepleri ve itirazlar altında başvuru aç
 - **Oturumlar:** Hesabın faktörü eklenir, kaldırılır veya değiştirilirse eski oturum geçersizdir. Aynı kod zaman adımında yeniden kabul edilmez; PostgreSQL her hesap için beş dakikalık dilimde sekiz kod denemesi sınırı uygular. Sahipte iki adımlı giriş etkinken HTTP Basic çalışmaz. Ayrı servis ve Telegram kimlikleri bu portal ayarıyla değiştirilmez; hesap çalışma alanı servis/Telegram kimliği kabul etmez. Kayıp cihazda yetkili operatör yeni anahtar üretip gizli ayarı değiştirir; otomatik kurtarma kodu yoktur.
 - **Risk incelemesi:** Bir görevli farklı hesaplar dahil son bir saatte beş farklı telafi kaydı oluşturursa uyarı açılır. Onay bekleyen kayıtlar sayılır; aynı işlem kimliğiyle tekrarlar sayılmaz. Sahip/onaycı ilgili kayıtları inceleyebilir ve gerekçe ekleyerek uyarıyı kapatabilir; kişi kendi uyarısını kapatamaz. Bu uyarı işlem limitlerinin yerine geçmez ve otomatik engelleme yapmaz.
 
+## Personel oturumları ve geçiş anahtarları
+
+Önce migration’ı uygulayın. Dağıtımla birlikte veritabanında kaydı olmayan eski portal çerezleri ve Bearer anahtarları çalışmaz; herkes tekrar giriş yapar. Personel kendi oturumlarını, portal sahibi ayrıca ekip oturumlarını listeler ve tek tek kapatır. Cihaz adı tarayıcı bildiriminden yaklaşık olarak üretilir; ham kullanıcı aracısı veya IP bu tablolara yazılmaz. Kapatılan çerez/Bearer sonraki istekte reddedilir, açık canlı log bağlantısı en geç yaklaşık 10 saniyelik denetimde kapanır. Basic/servis/Telegram kimlikleri ayrı kalır; personel paneli oturumu sayılmaz.
+
+Geçiş anahtarını açmak için `PORTAL_WEBAUTHN_ORIGIN` ayarına panelin sabit tam HTTPS origin’ini girin (yol ve sonda `/` yok; yerel geliştirmede `http://localhost:PORT` kabul edilir). Kimlik alanı bu ana makine adıdır; rastgele Vercel önizleme adreslerini paylaşmaz. Aktif TOTP ile giriş yapan kişi beş dakika içinde anahtar ekleyebilir veya kaldırabilir. Tarayıcı kullanıcı doğrulamasını (cihaz PIN’i/biyometri) ister. Anahtar, şifre veya TOTP sırrı yerine yalnız cihazın imzasını doğrular; veritabanında açık anahtar tutulur. Anahtar silinince o anahtarla açılan oturumlar da iptal edilir. Normal şifre + doğrulayıcı girişi kurtarma seçeneği olarak kalır.
+
 ## Kayıt kohortları
 
 Son 30 kayıt günü, Türkiye saatine göre gösterilir. D0 kayıt günüdür. İlk maç dönüşümü, D0–D6 içinde en az bir doğrulanmış çevrimiçi maçı tamamlayanların oranıdır. D1 ve D7 tam olarak ilgili takvim gününde bir maç tamamlayanların oranıdır. Henüz bitmemiş gözlem süreleri oranın paydasına girmez. Maç ölçümünün başladığı kısmi gün ve öncesi, misafirler ve eski doğrulanmamış maç kayıtları dahil edilmez; uygun veri yoksa sıfır yerine bilgi mesajı görünür.
 
+## İlk Hızlı Düello hunisi
+
+Backend ve Cloudflare Worker sürümleri hazırlandıktan sonra Worker’da `DUEL_FUNNEL_TRACKING_ENABLED=true`, backend’de `DUEL_FUNNEL_START_AT=YYYY-MM-DDTHH:MM:SSZ` ayarlayın. Paylaşılan `INTERNAL_API_SECRET` ile hazırlıkta eşleşme ve maç sonucu akışını doğrulamadan canlıda tarih ayarlamayın. Ölçüm, ilk 24 saatinde Ayarlar → Gizlilik’ten açıkça katılan yeni hesapları kapsar; dileyen oyuncu aynı yerde izni kaldırınca huni kayıtları silinir. Bu özellik PostHog’a veri göndermez. Huni, son 30 olgun kayıt gününde kayıt tarihinden itibaren tam yedi günlük pencere kullanır. Olay sırası ve eşleşme kimliği eşleşmelidir; Hızlı Düello dışındaki oyunlar, yerel Socket.IO, olgunlaşmamış hesaplar ve geriye dönük olaylar dahil değildir. Hızlı Düello bot eşleşmeleri dahil, bot hesapları ve misafirler hariçtir. Ekrandaki yüzdeler bir önceki adımdandır; sonuç tüm kayıtların oranı olarak yorumlanmamalıdır.
+
 ## Sıradaki geliştirmeler
 
-- **Destek önceliği ve yanıt süresi:** İlk yanıt hedefi, süresi aşan talepler ve oyuncudan bilgi isteme.
-- **Operasyon güvenliği:** Yönetici oturumlarını cihaz bazında iptal etme, kurtarma kodları veya kurumsal SSO.
-- **Ürün analitiği:** İlk maç öncesi terk adımları, oyun modu ve kayıt kanalı bazında kohortlar.
+- **Destek operasyonu:** Öncelik, kategoriler, hazır yanıtlar ve sonradan yeniden açma kuralları.
+- **Operasyon güvenliği:** Rol değişiklikleri ve açıklamalı personel güvenliği denetim ekranı.
+- **Ürün analitiği:** Rakip türü, bekleme süresi ve bağlantı kopmasıyla eşleşme kayıplarını ayırma.

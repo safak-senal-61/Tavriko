@@ -7,13 +7,15 @@ exports.ADMIN_SESSION_MAX_AGE_SEC = exports.ADMIN_SESSION_COOKIE = exports.isPor
 exports.getJwtSecret = getJwtSecret;
 exports.getInternalSecret = getInternalSecret;
 exports.portalAssignees = portalAssignees;
+exports.portalAccount = portalAccount;
+exports.sameOrigin = sameOrigin;
 exports.portalFactor = portalFactor;
 exports.authenticatePortal = authenticatePortal;
 exports.requireUserAuth = requireUserAuth;
 exports.issueAdminSessionToken = issueAdminSessionToken;
 exports.setAdminSessionCookie = setAdminSessionCookie;
 exports.clearAdminSessionCookie = clearAdminSessionCookie;
-exports.verifyAdminSessionToken = verifyAdminSessionToken;
+exports.portalTokenClaims = portalTokenClaims;
 exports.getAdminSessionFromRequest = getAdminSessionFromRequest;
 exports.checkAdminCredentials = checkAdminCredentials;
 exports.setTelegramAdminVerifier = setTelegramAdminVerifier;
@@ -74,11 +76,28 @@ function staffDirectory() {
     return directory;
 }
 const credentialVersion = (staff) => (0, node_crypto_1.createHash)('sha256').update(staff.passwordHash).digest('hex');
+const ownerVersion = (password, secret) => (0, node_crypto_1.createHmac)('sha256', secret).update(`portal-owner-v1:${password}`).digest('hex');
 const isPortalConfigured = () => Boolean(getJwtSecret() && (getAdminCredentials() || staffDirectory().size));
 exports.isPortalConfigured = isPortalConfigured;
 function portalAssignees() {
     const owner = getAdminCredentials()?.email.toLowerCase();
     return [...(owner ? [{ email: owner, role: 'owner' }] : []), ...[...staffDirectory().values()].map(({ email, role }) => ({ email, role }))];
+}
+function portalAccount(email) {
+    return portalAssignees().find(entry => entry.email === email);
+}
+function sameOrigin(req) {
+    try {
+        const origin = req.get('origin') || '';
+        const url = new URL(origin);
+        const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+        return origin === url.origin && url.host === req.get('host') &&
+            (url.protocol === 'https:' || (local && url.protocol === 'http:')) &&
+            (!req.get('sec-fetch-site') || req.get('sec-fetch-site') === 'same-origin');
+    }
+    catch {
+        return false;
+    }
 }
 function portalFactor(email) {
     const raw = process.env.PORTAL_TOTP_SECRETS_JSON;
@@ -147,7 +166,7 @@ function readCookie(req, name) {
     return null;
 }
 /** Portal yöneticisi için imzalı oturum tokeni üretir. */
-function issueAdminSessionToken(email, role = 'owner', otpVerified = false) {
+function issueAdminSessionToken(email, role, otpVerified, id) {
     const secret = getJwtSecret();
     if (!secret)
         return null;
@@ -159,12 +178,13 @@ function issueAdminSessionToken(email, role = 'owner', otpVerified = false) {
         const owner = getAdminCredentials();
         if (!owner || email.toLowerCase() !== owner.email.toLowerCase())
             return null;
-        return jsonwebtoken_1.default.sign({ email: owner.email, role: 'portal_super_admin', ...mfa }, secret, { expiresIn: exports.ADMIN_SESSION_MAX_AGE_SEC });
+        const version = ownerVersion(owner.password, secret);
+        return jsonwebtoken_1.default.sign({ email: owner.email, role: 'portal_super_admin', version, ...mfa }, secret, { expiresIn: exports.ADMIN_SESSION_MAX_AGE_SEC, jwtid: id });
     }
     const staff = staffDirectory().get(email);
     if (!staff || staff.role !== role)
         return null;
-    return jsonwebtoken_1.default.sign({ email, role: 'portal_staff', staffRole: role, version: credentialVersion(staff), ...mfa }, secret, { expiresIn: '8h' });
+    return jsonwebtoken_1.default.sign({ email, role: 'portal_staff', staffRole: role, version: credentialVersion(staff), ...mfa }, secret, { expiresIn: '8h', jwtid: id });
 }
 /** Tarayıcıya HttpOnly yönetici oturum çerezini yazar. */
 function setAdminSessionCookie(req, res, token, role = 'owner') {
@@ -192,33 +212,45 @@ function verifyAdminSessionToken(token) {
         return null;
     try {
         const decoded = jsonwebtoken_1.default.verify(token, secret, { algorithms: ['HS256'] });
-        if (typeof decoded === 'string' || typeof decoded.email !== 'string' || !decoded.email || !decoded.exp)
+        if (typeof decoded === 'string' || typeof decoded.email !== 'string' || !decoded.email || !decoded.exp ||
+            typeof decoded.jti !== 'string' || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(decoded.jti))
             return null;
         const email = decoded.email.toLowerCase();
         const factor = portalFactor(email);
         if (factor === 'unavailable' || (factor ? decoded.mfa !== (0, portalOtp_1.otpFingerprint)(factor) : decoded.mfa !== undefined))
             return null;
         if (decoded.role === 'portal_super_admin') {
-            return getAdminCredentials()?.email.toLowerCase() === email ? { email, role: 'owner' } : null;
+            const owner = getAdminCredentials();
+            return owner?.email.toLowerCase() === email && decoded.version === ownerVersion(owner.password, secret)
+                ? { email, role: 'owner', id: decoded.jti } : null;
         }
         if (decoded.role !== 'portal_staff')
             return null;
         const staff = staffDirectory().get(email);
         return staff && decoded.staffRole === staff.role && decoded.version === credentialVersion(staff)
-            ? { email, role: staff.role } : null;
+            ? { email, role: staff.role, id: decoded.jti } : null;
     }
     catch {
         return null;
     }
 }
-function getAdminSessionFromRequest(req) {
+function portalTokenClaims(req, cookieOnly = false) {
     const authHeader = req.headers.authorization || '';
-    if (authHeader.startsWith('Bearer ')) {
-        const viaBearer = verifyAdminSessionToken(authHeader.slice(7));
-        if (viaBearer)
-            return viaBearer;
+    const token = !cookieOnly && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : readCookie(req, exports.ADMIN_SESSION_COOKIE);
+    return verifyAdminSessionToken(token);
+}
+async function getAdminSessionFromRequest(req, client = prismaClient_1.db.rawClient, cookieOnly = false) {
+    const decoded = portalTokenClaims(req, cookieOnly);
+    if (!decoded)
+        return null;
+    try {
+        const row = await client.portalSession.findFirst({ where: { id: decoded.id, email: decoded.email, revokedAt: null, expiresAt: { gt: new Date() } },
+            select: { method: true, createdAt: true } });
+        return row ? { ...decoded, ...row } : null;
     }
-    return verifyAdminSessionToken(readCookie(req, exports.ADMIN_SESSION_COOKIE));
+    catch {
+        return null;
+    }
 }
 function checkAdminCredentials(email, password) {
     const creds = getAdminCredentials();
@@ -255,7 +287,7 @@ function wantsHtml(req) {
  * arka plan isteğinde kendi şifre penceresini tekrar tekrar açıyordu. Oturumu
  * olmayan tarayıcı sayfa istekleri /admin/login sayfasına yönlendirilir.
  */
-async function requireAdminAuth(req, res, next) {
+async function requireAdminAuth(req, res, next, client = prismaClient_1.db.rawClient) {
     try {
         // 1) Service-to-service internal secret
         const internalSecret = getInternalSecret();
@@ -268,7 +300,7 @@ async function requireAdminAuth(req, res, next) {
             return;
         }
         // 2) + 3) Portal session (cookie or Bearer)
-        const portal = getAdminSessionFromRequest(req);
+        const portal = await getAdminSessionFromRequest(req, client);
         if (portal) {
             if (portal.role === 'owner')
                 next();

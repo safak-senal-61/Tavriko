@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db } from '../db/prismaClient';
 import { requireUserAuth } from '../middleware/auth';
 import { OperationError, uuidPattern } from '../services/adminAccountOperations';
-import { appealCutoff, caseText, openCase, publicCaseFields } from '../services/supportCases';
+import { appealCutoff, caseText, openCase, publicCaseFields, readCaseReplies, replyToCase } from '../services/supportCases';
 import { isGuestIdentity } from '../services/playerAccess';
 
 export function createSupportRouter(client = db.rawClient) {
@@ -40,6 +40,21 @@ export function createSupportRouter(client = db.rawClient) {
       if (error instanceof OperationError) return res.status(error.status).json({ error: error.message });
       res.status(503).json({ error: 'Talep kaydedilemedi. Yeniden göndermeden önce listeyi yenileyin.' });
     }
+  });
+  router.get('/:id/replies', async (req, res) => {
+    if (!uuidPattern.test(req.params.id)) return res.status(404).json({ error: 'Talep bulunamadı.' });
+    try { res.json(await readCaseReplies(client, req.params.id, { account: req.authUserId! })); }
+    catch (error) { res.status(error instanceof OperationError ? error.status : 503).json({ error: error instanceof OperationError ? error.message : 'Konuşma yüklenemedi.' }); }
+  });
+  router.post('/:id/replies', async (req, res) => {
+    if (!req.is('application/json')) return res.status(415).json({ error: 'JSON gerekli.' });
+    const { revision, body } = req.body || {};
+    const text = caseText(body, 3, 1200);
+    if (!uuidPattern.test(req.params.id) || !Number.isSafeInteger(revision) || revision < 0 || !text) {
+      return res.status(400).json({ error: 'Mesajı ve talep bilgilerini kontrol edin.' });
+    }
+    try { res.status(201).json(await replyToCase(client, req.params.id, { account: req.authUserId! }, { revision, body: text, ask: false })); }
+    catch (error) { res.status(error instanceof OperationError ? error.status : 503).json({ error: error instanceof OperationError ? error.message : 'Mesaj kaydedilemedi. Tekrar göndermeden önce konuşmayı yenileyin.' }); }
   });
   return router;
 }

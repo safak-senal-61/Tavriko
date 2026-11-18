@@ -5,6 +5,7 @@ exports.readSignupCohorts = readSignupCohorts;
 exports.readPlayerAnalytics = readPlayerAnalytics;
 const node_crypto_1 = require("node:crypto");
 const adminAccountOperations_1 = require("./adminAccountOperations");
+const duelFunnel_1 = require("./duelFunnel");
 async function recordCompletedPlayers(client, summary) {
     if (!Array.isArray(summary.verifiedPlayerIds) || !summary.verifiedPlayerIds.length)
         return;
@@ -34,6 +35,9 @@ async function recordCompletedPlayers(client, summary) {
             }),
             skipDuplicates: true,
         });
+        if (summary.mode === 'duel' && summary.funnelMatch === true && typeof summary.matchId === 'string') {
+            await (0, duelFunnel_1.recordDuelMilestone)(tx, 'completed', summary.matchId, users.map(user => user.id));
+        }
     });
 }
 async function readSignupCohorts(client, now) {

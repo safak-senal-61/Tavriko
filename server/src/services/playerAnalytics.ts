@@ -2,8 +2,9 @@ import { createHash } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
 import type { FinalMatchSummary } from '@trivia/shared';
 import { uuidPattern } from './adminAccountOperations';
+import { recordDuelMilestone } from './duelFunnel';
 
-export type TrackedMatchSummary = FinalMatchSummary & { matchId?: string; verifiedPlayerIds?: string[]; category?: string };
+export type TrackedMatchSummary = FinalMatchSummary & { matchId?: string; verifiedPlayerIds?: string[]; category?: string; funnelMatch?: boolean };
 
 export async function recordCompletedPlayers(client: PrismaClient, summary: TrackedMatchSummary) {
   if (!Array.isArray(summary.verifiedPlayerIds) || !summary.verifiedPlayerIds.length) return;
@@ -31,6 +32,9 @@ export async function recordCompletedPlayers(client: PrismaClient, summary: Trac
       }),
       skipDuplicates: true,
     });
+    if (summary.mode === 'duel' && summary.funnelMatch === true && typeof summary.matchId === 'string') {
+      await recordDuelMilestone(tx, 'completed', summary.matchId, users.map(user => user.id));
+    }
   });
 }
 

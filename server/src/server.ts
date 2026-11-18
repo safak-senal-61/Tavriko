@@ -38,6 +38,8 @@ import { makeOpsTelemetry } from './services/opsTelemetry';
 import { createOpsRouter } from './routes/opsRoutes';
 import { createAdminAccountsRouter } from './routes/adminAccountsRoutes';
 import { createSupportRouter } from './routes/supportRoutes';
+import { createPortalSecurityRouter, portalPasskeyConfig } from './routes/portalSecurityRoutes';
+import { createDuelFunnelRouter } from './routes/duelFunnelRoutes';
 import { createFleetRouter } from './routes/fleetRoutes';
 import { createFleetStore, fleetMiddleware } from './services/fleetTelemetry';
 import { checkPlayerAccess, socketIdentity, validPlayerId } from './services/playerAccess';
@@ -173,6 +175,7 @@ export function createApp() {
       '/api/auth/reset-password',
       '/api/auth/google/complete-session',
       '/api/portal/login',
+      '/api/portal/security/passkeys',
     ],
     rateLimitAuth
   );
@@ -191,7 +194,8 @@ export function createApp() {
         /^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/(?:ops|accounts)(?:\/|$)/i.test(req.path) ||
         req.path === '/favicon.ico' ||
         req.path === '/api/logs' || req.path === '/api/internal/player-access' ||
-        /^\/api\/portal\/login\/?$/i.test(req.path) || /^\/api\/support(?:\/|$)/i.test(req.path) ||
+        /^\/api\/portal(?:\/|$)/i.test(req.path) || /^\/api\/support(?:\/|$)/i.test(req.path) ||
+        /^\/api\/(?:internal|player)\/duel-funnel(?:\/|$)/i.test(req.path) ||
         req.path === '/api/logs/stream' ||
         req.path.startsWith('/qr')
       ) {
@@ -659,18 +663,21 @@ export function createApp() {
   app.use(createOpsRouter(opsTelemetry));
   app.use(createAdminAccountsRouter());
   app.use('/api/support', createSupportRouter());
+  app.use('/api/portal/security', createPortalSecurityRouter());
+  app.use(createDuelFunnelRouter());
 
   // Yönetici giriş sayfası: tarayıcının yerel şifre penceresi yerine kalıcı oturum çerezi.
-  app.get('/admin/login', adminPageHeaders, (req, res) => {
+  app.get('/admin/login', adminPageHeaders, async (req, res) => {
     const nextPath = sanitizeNextPath(req.query.next);
-    const session = getAdminSessionFromRequest(req);
+    const session = await getAdminSessionFromRequest(req);
     if (session) {
       return res.redirect(302, session.role === 'owner' ? nextPath : '/admin/kullanicilar');
     }
     const configured = isPortalConfigured();
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
-    return res.send(renderAdminLoginHtml(nextPath, configured));
+    const keyConfig = portalPasskeyConfig();
+    return res.send(renderAdminLoginHtml(nextPath, configured, Boolean(keyConfig && new URL(keyConfig.origin).host === req.get('host'))));
   });
 
   // Canonical pages are server routes, not client-side tabs.

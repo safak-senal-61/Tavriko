@@ -9,12 +9,17 @@ const authRoutes_1 = require("./authRoutes");
 const adminShell_1 = require("./adminShell");
 const auth_1 = require("../middleware/auth");
 const portalOtp_1 = require("../services/portalOtp");
+const portalSecurityRoutes_1 = require("./portalSecurityRoutes");
 exports.logRouter = (0, express_1.Router)();
 const createPortalLoginHandler = (client = prismaClient_1.db.rawClient) => async (req, res) => {
     const { email, password, code } = req.body || {};
     res.set('Cache-Control', 'no-store');
     if (!req.is('application/json')) {
         res.status(415).json({ error: 'JSON gerekli.' });
+        return;
+    }
+    if (req.get('origin') && !(0, auth_1.sameOrigin)(req)) {
+        res.status(403).json({ error: 'Girişi Tavriko yönetim panelinden başlatın.' });
         return;
     }
     if (!(0, auth_1.isPortalConfigured)()) {
@@ -42,7 +47,7 @@ const createPortalLoginHandler = (client = prismaClient_1.db.rawClient) => async
                 return;
             }
         }
-        const token = (0, auth_1.issueAdminSessionToken)(session.email, session.role, !!factor);
+        const token = await (0, portalSecurityRoutes_1.createManagedSession)(client, req, session, factor ? 'totp' : 'password').catch(() => null);
         if (!token) {
             res.status(503).json({ success: false, error: 'Yönetici portalı yapılandırılmamış.' });
             return;
@@ -62,12 +67,9 @@ const createPortalLoginHandler = (client = prismaClient_1.db.rawClient) => async
 };
 exports.createPortalLoginHandler = createPortalLoginHandler;
 exports.logRouter.post('/portal/login', (0, exports.createPortalLoginHandler)());
-exports.logRouter.post('/portal/logout', (_req, res) => {
-    (0, auth_1.clearAdminSessionCookie)(res);
-    res.json({ success: true });
-});
-exports.logRouter.get('/portal/verify', (req, res) => {
-    const session = (0, auth_1.getAdminSessionFromRequest)(req);
+exports.logRouter.post('/portal/logout', (0, portalSecurityRoutes_1.portalLogout)());
+exports.logRouter.get('/portal/verify', async (req, res) => {
+    const session = await (0, auth_1.getAdminSessionFromRequest)(req);
     if (session) {
         res.set('Cache-Control', 'no-store').json({ success: true, email: session.email, role: session.role });
         return;
@@ -86,6 +88,23 @@ exports.logRouter.get('/logs/stream', auth_1.requireAdminAuth, (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
     logger_1.logger.addSseClient(res);
+    if ((0, auth_1.portalTokenClaims)(req)) {
+        let checking = false;
+        const timer = setInterval(async () => {
+            if (checking)
+                return;
+            checking = true;
+            try {
+                if (!(await (0, auth_1.getAdminSessionFromRequest)(req)))
+                    res.end();
+            }
+            finally {
+                checking = false;
+            }
+        }, 10_000);
+        timer.unref?.();
+        res.on('close', () => clearInterval(timer));
+    }
     logger_1.logger.info('SYSTEM', 'Yeni bir istemci SSE log akışına bağlandı');
 });
 // Public client log ingestion (mobile app). Input is size-capped and sanitized

@@ -29,6 +29,7 @@ import type { LegalDocumentId } from '@trivia/shared';
 import { LegalDocumentList, LegalDocumentModal } from '../components/LegalDocuments';
 import { getLegalConsent } from '../utils/legalConsent';
 import { SupportCases } from '../components/SupportCases';
+import { DuelFunnelPreference } from '../components/DuelFunnelPreference';
 import Constants from 'expo-constants';
 import {
   TavrikoScreen,
@@ -671,6 +672,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </>}
 
         {settingsTab === 'privacy' && <>
+        {!!token && user && !user.isGuest && <DuelFunnelPreference api={Platform.OS === 'web' ? getApiBaseUrl() : apiBaseUrl || getApiBaseUrl()} account={user.id} token={token} />}
         {/* 4. Privacy & WebSocket Presence Section */}
         <View style={styles.sectionHeader}>
           <ShieldIcon size={18} color="#FFC43D" />

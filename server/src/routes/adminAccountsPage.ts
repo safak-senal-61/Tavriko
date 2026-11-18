@@ -1,5 +1,6 @@
 import { adminPages, adminSessionScript, adminTheme, renderAdminHeader, renderAdminHero } from './adminShell';
 import { adminCasesScript } from './adminCasesScript';
+import { staffSecurityScript } from './portalSecurityScript';
 
 export function renderAdminAccounts(accountsOnly = false) {
   const accountPage = adminPages.find(page => page.id === 'db')!;
@@ -69,15 +70,32 @@ ${renderAdminHero(accountPage)}
       <tbody id="cohort-rows"></tbody></table></div>
   </details>
 </section>
+<section class="account-panel ops-panel metric" aria-labelledby="duel-funnel-title">
+  <header><h2 id="duel-funnel-title">İlk Hızlı Düello hunisi</h2><span class="muted">İlk 7 gün · Son 30 olgun kayıt günü</span></header>
+  <p id="duel-funnel-status" class="account-status" role="status">Huni yükleniyor.</p>
+  <dl class="details-grid ops-grid" id="duel-funnel-steps"></dl>
+  <p class="muted">Yalnız ölçüme izin veren yeni hesaplar. Hızlı Düello dışındaki modlar ölçülmez.</p>
+</section>
 <section class="account-panel ops-panel" id="cases-panel" aria-labelledby="cases-title" hidden>
   <div class="dialog-head"><h2 id="cases-title">Destek ve itiraz kuyruğu</h2><button type="button" id="cases-refresh">Talepleri yenile</button></div>
   <div class="account-controls queue-fields">
-    <label>Talep durumu<select id="cases-state"><option value="active">Açık ve inceleniyor</option><option value="resolved">Sonuçlanan</option></select></label>
+    <label>Talep durumu<select id="cases-state"><option value="active">Ekip yanıtı bekleyen</option><option value="waiting">Oyuncu yanıtı bekleyen</option><option value="resolved">Sonuçlanan</option></select></label>
     <label>Sorumlu filtresi<select id="cases-owner"><option value="all">Tümü</option><option value="mine">Bana atananlar</option><option value="unassigned">Atanmamış</option></select></label>
     <button type="button" id="cases-clear-account" hidden>Hesap filtresini kaldır</button>
   </div>
   <p class="account-status" id="cases-status" role="status"></p><ul class="ops-list" id="cases-list"></ul>
   <div class="ops-pager"><button id="cases-prev" type="button" disabled>Önceki</button><button id="cases-next" type="button" disabled>Sonraki</button></div>
+</section>
+<section class="account-panel ops-panel" id="staff-security" aria-labelledby="staff-title">
+  <div class="dialog-head"><h2 id="staff-title">Personel oturumları</h2><button id="staff-refresh" type="button">Oturumları yenile</button></div>
+  <div class="ops-filters"><label>Oturum kapsamı<select id="staff-scope"><option value="mine">Oturumlarım</option></select></label></div>
+  <p>Tarayıcı ve işletim sistemi yaklaşık bilgidir. Kapatılan oturum yeniden giriş gerektirir.</p>
+  <p class="account-status" id="staff-status" role="status">Oturumlar yükleniyor.</p><ul class="ops-list" id="staff-sessions"></ul>
+  <details id="staff-keys" hidden><summary>Geçiş anahtarlarım</summary>
+    <p class="account-status" id="staff-key-status" role="status"></p>
+    <button type="button" id="staff-enroll" disabled>Geçiş anahtarı ekle</button>
+    <ul class="ops-list" id="staff-key-list"></ul>
+  </details>
 </section>
 <section class="account-panel ops-panel" id="risk-panel" aria-labelledby="risk-title" hidden>
   <div class="dialog-head"><h2 id="risk-title">Telafi risk incelemesi</h2><button type="button" id="risk-refresh">Uyarıları yenile</button></div>
@@ -223,7 +241,7 @@ async function refreshMetrics() {
       status('http-status','Trafik verisi alınamadı.',true);
     })),
     read(api+'/player-metrics').then(d => {
-      if (epoch === metricEpoch) showCohorts(d.signup);
+      if (epoch === metricEpoch) {showCohorts(d.signup);showDuelFunnel(d.duelFunnel);}
       if (epoch !== metricEpoch) return;
       const metrics = [
         ['Bugün aktif',d.days.at(-1).active], ['7 günlük aktif',d.weeklyActive], ['7 günde geri dönen',d.weeklyReturning],
@@ -245,6 +263,7 @@ async function refreshMetrics() {
       by('player-facts').hidden = by('player-figure').hidden = true;
       status('player-status','Oyuncu ölçümü alınamadı.',true);
       showCohorts(null);
+      showDuelFunnel('unavailable');
     })
   ]);
 }
@@ -522,8 +541,11 @@ read(api+'/access').then(d=>{
   grantForm.elements.itemId.replaceChildren(...(d.items || []).map(item=>{const option=el('option',item.name);option.value=item.id;return option;}));
   if (d.permissions.review) loadReviews();
   if (d.permissions.review) {by('risk-panel').hidden=false;loadRisk();}
-  if (d.caseKinds?.length) {by('cases-panel').hidden=by('detail-cases').hidden=false;loadCases();}
+  if (d.caseKinds?.length) {by('cases-panel').hidden=by('detail-cases').hidden=false;
+    if(d.role==='owner')by('cases-state').append(caseOption('overdue','Geciken · ekip sorumlusu'));loadCases();}
+  if(d.role==='owner')by('staff-scope').append(caseOption('team','Ekip oturumları'));
+  loadStaffSecurity();
   syncGrant();syncModeration();
 }).catch(()=>{by('ops-role').hidden=false;by('ops-role').textContent='Portal yetkileri alınamadı; değişiklik işlemleri kapalı.';});
 refreshMetrics(); loadList(1);
-` + adminCasesScript;
+` + adminCasesScript + staffSecurityScript;

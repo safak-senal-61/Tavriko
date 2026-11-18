@@ -120,3 +120,9 @@
 - From player account settings, submit a support request and an appeal using a synthetic account. Verify another player cannot list the request or appeal that moderation event. Assign, start and resolve from the appropriate staff queue; only the public resolution reaches the player.
 - Enroll synthetic staff in TOTP, verify the challenge, valid login, rejection of concurrent code replay, pre-enrollment cookies and password-only Basic. Validate the recovery procedure in staging before forcing enrollment.
 - Create five distinct compensations across accounts in an hour. Check one pending alert with linked records and independent review; idempotent replays do not count. Seed cohort points at Istanbul midnight and check D1, D7 and incomplete denominators.
+# Destek konuşması, personel oturumları ve ilk düello
+
+- Oyuncu destek talebini açar; görevli aynı talepte bilgi ister. Oyuncu konuşmayı yenileyip cevaplar; kayıt görevli kuyruğunda tekrar işlem bekler. Başka oyuncunun mesajları görünmez; kapalı talep yeni yanıt almaz.
+- İlk yanıt hedefi geçen açık talepler ekip sorumlusunun gecikenler görünümünde yer alır; yalnızca dahili işlem veya atama süreyi durdurmaz.
+- Personel kendi oturumlarını listeler ve başka bir oturumu kapatır. Portal sahibi diğer personelin oturumlarını da kapatabilir. Passkey kurulumu ve doğrulanmış oturumla yeniden giriş, mevcut parola/TOTP seçeneğini bozmaz.
+- Hızlı Düello hunisi kayıt, seçim, doğrulanmış eşleşme ve aynı odada tamamlanan maç sayılarını gösterir. Kapsam başlangıcı veya olgunlaşmış kayıt yoksa oran göstermez.

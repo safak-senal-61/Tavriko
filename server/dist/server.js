@@ -44,6 +44,8 @@ const opsTelemetry_1 = require("./services/opsTelemetry");
 const opsRoutes_1 = require("./routes/opsRoutes");
 const adminAccountsRoutes_1 = require("./routes/adminAccountsRoutes");
 const supportRoutes_1 = require("./routes/supportRoutes");
+const portalSecurityRoutes_1 = require("./routes/portalSecurityRoutes");
+const duelFunnelRoutes_1 = require("./routes/duelFunnelRoutes");
 const fleetRoutes_1 = require("./routes/fleetRoutes");
 const fleetTelemetry_1 = require("./services/fleetTelemetry");
 const playerAccess_1 = require("./services/playerAccess");
@@ -175,6 +177,7 @@ function createApp() {
         '/api/auth/reset-password',
         '/api/auth/google/complete-session',
         '/api/portal/login',
+        '/api/portal/security/passkeys',
     ], rateLimitAuth);
     // Prometheus metrik aracisi (tavriko_http_* metrikleri)
     app.use(metrics_1.metricsMiddleware);
@@ -188,7 +191,8 @@ function createApp() {
             if (/^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/(?:ops|accounts)(?:\/|$)/i.test(req.path) ||
                 req.path === '/favicon.ico' ||
                 req.path === '/api/logs' || req.path === '/api/internal/player-access' ||
-                /^\/api\/portal\/login\/?$/i.test(req.path) || /^\/api\/support(?:\/|$)/i.test(req.path) ||
+                /^\/api\/portal(?:\/|$)/i.test(req.path) || /^\/api\/support(?:\/|$)/i.test(req.path) ||
+                /^\/api\/(?:internal|player)\/duel-funnel(?:\/|$)/i.test(req.path) ||
                 req.path === '/api/logs/stream' ||
                 req.path.startsWith('/qr')) {
                 return;
@@ -631,17 +635,20 @@ function createApp() {
     app.use((0, opsRoutes_1.createOpsRouter)(opsTelemetry));
     app.use((0, adminAccountsRoutes_1.createAdminAccountsRouter)());
     app.use('/api/support', (0, supportRoutes_1.createSupportRouter)());
+    app.use('/api/portal/security', (0, portalSecurityRoutes_1.createPortalSecurityRouter)());
+    app.use((0, duelFunnelRoutes_1.createDuelFunnelRouter)());
     // Yönetici giriş sayfası: tarayıcının yerel şifre penceresi yerine kalıcı oturum çerezi.
-    app.get('/admin/login', adminShell_1.adminPageHeaders, (req, res) => {
+    app.get('/admin/login', adminShell_1.adminPageHeaders, async (req, res) => {
         const nextPath = (0, adminLoginPage_1.sanitizeNextPath)(req.query.next);
-        const session = (0, auth_1.getAdminSessionFromRequest)(req);
+        const session = await (0, auth_1.getAdminSessionFromRequest)(req);
         if (session) {
             return res.redirect(302, session.role === 'owner' ? nextPath : '/admin/kullanicilar');
         }
         const configured = (0, auth_1.isPortalConfigured)();
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.setHeader('Cache-Control', 'no-store');
-        return res.send((0, adminLoginPage_1.renderAdminLoginHtml)(nextPath, configured));
+        const keyConfig = (0, portalSecurityRoutes_1.portalPasskeyConfig)();
+        return res.send((0, adminLoginPage_1.renderAdminLoginHtml)(nextPath, configured, Boolean(keyConfig && new URL(keyConfig.origin).host === req.get('host'))));
     });
     // Canonical pages are server routes, not client-side tabs.
     for (const page of adminShell_1.dashboardPages) {

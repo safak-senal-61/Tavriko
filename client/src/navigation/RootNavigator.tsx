@@ -20,6 +20,7 @@ import { seenScopeKey, getSeenQuestionIds, markQuestionsSeen } from '../utils/se
 import { socketService } from '../services/socketService';
 import { sound } from '../services/soundService';
 import { identifyPlayer, trackEvent, markMatchmakingStart, trackMatchFound } from '../services/analytics';
+import { duelFunnelPreference, recordDuelSelection } from '../services/duelFunnel';
 import { THEME } from '../theme/tokens';
 import {
   CategoryId,
@@ -115,7 +116,7 @@ export type ScreenName =
   | 'inventory'
   | 'pro_league'
   | 'developer';
-import { DEFAULT_API_BASE } from '../config';
+import { DEFAULT_API_BASE, getApiBaseUrl } from '../config';
 import { LegalConsentGate } from '../components/LegalDocuments';
 import {
   consumeGoogleLegalAck,
@@ -320,6 +321,12 @@ export const RootNavigator: React.FC = () => {
   const [autoLegalInFlight, setAutoLegalInFlight] = useState(false);
   const autoGoogleConsentTriedRef = useRef<string | null>(null);
   const realSessionToken = token && token !== 'mock_token' ? token : null;
+  useEffect(() => {
+    if (!user?.id || user.isGuest || !realSessionToken) return;
+    const controller = new AbortController();
+    void duelFunnelPreference(getApiBaseUrl(), user.id, realSessionToken, undefined, controller.signal).catch(() => {});
+    return () => controller.abort();
+  }, [user?.id, user?.isGuest, realSessionToken]);
   const showLegalGate =
     Boolean(realSessionToken) && currentScreen !== 'auth' && currentScreen !== 'splash' && needsLegalConsent(user, isGuest);
 
@@ -1090,6 +1097,7 @@ export const RootNavigator: React.FC = () => {
   const handleStartQuickMatch = () => {
     requireAuth(() => {
       if (!user) return;
+      if (realSessionToken) recordDuelSelection(getApiBaseUrl(), user.id, realSessionToken);
       isGameActiveRef.current = true;
       setDuelOpponent(null);
       setAnsweredOpponentIds(new Set());

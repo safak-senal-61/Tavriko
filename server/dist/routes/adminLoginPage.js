@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sanitizeNextPath = sanitizeNextPath;
 exports.renderAdminLoginHtml = renderAdminLoginHtml;
 const adminShell_1 = require("./adminShell");
+const portalSecurityScript_1 = require("./portalSecurityScript");
 /**
  * Yönetici paneli giriş sayfası (/admin/login).
  *
@@ -21,7 +22,7 @@ function sanitizeNextPath(raw) {
         return '/admin';
     return raw;
 }
-function renderAdminLoginHtml(nextPath, configured) {
+function renderAdminLoginHtml(nextPath, configured, passkey = false) {
     // JSON gömülürken </script> kaçışını engellemek için < karakteri kaçırılır.
     const nextJson = JSON.stringify(nextPath).replace(/</g, '\\u003c');
     return `<!DOCTYPE html>
@@ -74,6 +75,7 @@ function renderAdminLoginHtml(nextPath, configured) {
         <input id="code" name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" />
       </div>
       <button id="submitBtn" type="submit"${configured ? '' : ' disabled'}>Giriş Yap</button>
+      ${passkey ? '<button id="passkeyBtn" type="button" hidden>Geçiş anahtarıyla giriş</button>' : ''}
       <div id="err" class="err" role="alert"></div>
     </form>
     <p class="note">Bu sayfa yalnızca yetkili yöneticiler içindir.</p>
@@ -83,10 +85,26 @@ function renderAdminLoginHtml(nextPath, configured) {
     const form = document.getElementById('loginForm');
     const btn = document.getElementById('submitBtn');
     const err = document.getElementById('err');
+    ${portalSecurityScript_1.passkeyBrowserScript}
+    const keyButton=document.getElementById('passkeyBtn');
+    if(keyButton&&supportsPasskeys()){
+      keyButton.hidden=false;
+      keyButton.addEventListener('click',async()=>{
+        keyButton.disabled=btn.disabled=true;err.style.display='none';
+        try{
+          const result=await browserPasskey('login');
+          location.replace(result.role==='owner'?NEXT:'/admin/kullanicilar');
+        }catch(error){
+          err.textContent=error.name==='NotAllowedError'?'Geçiş anahtarı kullanılamadı. Şifreyle de giriş yapabilirsiniz.':error.message;
+          err.style.display='block';
+        }finally{keyButton.disabled=btn.disabled=false;}
+      });
+    }
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       err.style.display = 'none';
       btn.disabled = true;
+      if (keyButton) keyButton.disabled=true;
       btn.textContent = 'Kontrol ediliyor...';
       try {
         const res = await fetch('/api/portal/login', {
@@ -119,6 +137,7 @@ function renderAdminLoginHtml(nextPath, configured) {
         err.style.display = 'block';
       } finally {
         btn.disabled = false;
+        if (keyButton) keyButton.disabled=false;
         btn.textContent = 'Giriş Yap';
       }
     });

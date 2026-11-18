@@ -5,6 +5,21 @@ exports.adminCasesScript = void 0;
 exports.adminCasesScript = String.raw `
 const caseStates={open:'Açık',in_progress:'İnceleniyor',resolved:'Sonuçlandı'};
 const percentage=new Intl.NumberFormat('tr-TR',{style:'percent',maximumFractionDigits:1});
+function showDuelFunnel(data){
+  const list=by('duel-funnel-steps');list.replaceChildren();
+  if(data==='unavailable')return status('duel-funnel-status','Huni verileri alınamadı.',true);
+  if(!data)return status('duel-funnel-status','Huni ölçümü etkin değil.');
+  if(!data.registered)return status('duel-funnel-status','Henüz 7 günü dolmuş ölçüme katılan kayıt yok.');
+  status('duel-funnel-status','Ölçüm başlangıcı: '+date(data.coverageStart)+'. Yüzdeler önceki adıma göredir.');
+  const stages=[['Kayıt (ölçüme katılan)',data.registered],['Hızlı Düello seçildi',data.selected],
+    ['Eşleşme bulundu',data.matched],['Aynı eşleşmede maç tamamlandı',data.completed]];
+  stages.forEach(([label,value],i)=>{
+    const tile=el('div'),previous=i?stages[i-1][1]:0;
+    tile.append(el('dt',label),el('dd',num(value)+(i&&previous?' · '+percentage.format(value/previous):'')));
+    if(i&&previous)tile.append(el('small',num(previous-value)+' oyuncu bu adıma geçmedi.'));
+    list.append(tile);
+  });
+}
 function showCohorts(data) {
   by('cohort-details').hidden=!data?.cohorts.length;
   by('cohort-summary').replaceChildren(); by('cohort-rows').replaceChildren();
@@ -36,14 +51,18 @@ async function loadCases(target=1, message=''){
     const d=await read(api+'/cases?'+params);
     if(epoch!==caseEpoch)return;
     casePage=target;
-    status('cases-status',[message,caseAccount?'Hesap: '+caseAccount:'',d.items.length?'Sayfa '+target+' · '+num(d.items.length)+' kayıt':'Bu filtrede talep yok.'].filter(Boolean).join(' · '));
+    status('cases-status',[message,'İlk yanıt hedefi: '+d.targetHours+' saat',d.overdue===null?'':num(d.overdue)+' geciken',
+      caseAccount?'Hesap: '+caseAccount:'',d.items.length?'Sayfa '+target+' · '+num(d.items.length)+' kayıt':'Bu filtrede talep yok.'].filter(Boolean).join(' · '));
     by('cases-prev').disabled=target<=1;by('cases-next').disabled=!d.more;
     for(const item of d.items){
       const row=el('li'),view=el('button','Hesabı aç');view.type='button';view.addEventListener('click',()=>openDetail(item.accountId));
       row.append(el('strong',item.subject),el('small',(item.kind==='appeal'?'Moderasyon itirazı':'Destek')+' · '+caseStates[item.status]+' · '+timestamp(item.createdAt)+' · '+item.accountId),
         el('p',item.message,'case-copy'),el('small','Sorumlu: '+(item.assignee || 'Atanmamış')),view);
+      if(item.waitingForPlayer)row.append(el('small','Oyuncu yanıtı bekleniyor'));
+      if(item.late)row.append(el('small',item.firstReplyAt?'İlk yanıt hedefi aşıldı':'İlk yanıt gecikti'));
       if(item.moderationId)row.append(el('small','Moderasyon kaydı: '+item.moderationId));
       if(item.resolution)row.append(el('p','Oyuncuya yanıt: '+item.resolution,'case-copy'));
+      row.append(caseConversation(item));
       const staff=d.staff.filter(s=>s.role==='owner'||s.role===(item.kind==='appeal'?'moderator':'support'));
       if(item.status!=='resolved' && item.canEdit && staff.length){
         const edit=el('details'),form=el('form',null,'ops-form');edit.append(el('summary','Ata veya durum değiştir'),form);
@@ -69,6 +88,45 @@ async function loadCases(target=1, message=''){
       by('cases-list').append(row);
     }
   }catch(error){if(epoch===caseEpoch)status('cases-status',error.message,true);}
+}
+function caseConversation(item){
+  const panel=el('details'),controls=el('div'),messages=el('div'),form=el('form',null,'ops-form');
+  const endpoint='/cases/'+encodeURIComponent(item.id)+'/replies';
+  const reload=el('button','Konuşmayı yenile'),feedback=el('p'),field=el('textarea'),action=el('select'),send=el('button','Mesajı gönder');
+  panel.append(el('summary','Konuşmayı aç'),controls,messages,form,feedback);
+  reload.type='button';controls.append(reload);feedback.setAttribute('role','status');
+  field.required=true;field.minLength=3;field.maxLength=1200;
+  action.append(caseOption('reply','Yanıt gönder'),caseOption('ask','Oyuncudan bilgi iste'));
+  send.type='submit';caseField(form,'Mesaj türü',action);caseField(form,'Oyuncuya açık mesaj',field);form.append(send);form.hidden=true;
+  let revision=item.revision,request=0;
+  async function refresh(){
+    const seq=++request;reload.disabled=send.disabled=true;
+    try{
+      const d=await read(api+endpoint);if(seq!==request)return;
+      revision=d.revision;messages.replaceChildren();
+      if(!d.items.length)messages.append(el('p','Henüz ek mesaj yok.'));
+      for(const m of d.items)messages.append(el('small',(m.sender==='staff'?'Tavriko destek':'Oyuncu')+' · '+timestamp(m.createdAt)),
+        el('p',m.body,'case-copy'));
+      form.hidden=!item.canEdit||d.status==='resolved';feedback.textContent=d.waitingForPlayer?'Oyuncudan yanıt bekleniyor.':'';
+    }catch(error){feedback.textContent=error.message;}
+    finally{if(seq===request)reload.disabled=send.disabled=false;}
+  }
+  panel.addEventListener('toggle',()=>{if(panel.open)void refresh();});
+  reload.addEventListener('click',refresh);
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();reload.disabled=send.disabled=true;
+    try{
+      const ask=action.value==='ask',sent=await write(endpoint,{revision,body:field.value,ask});field.value='';
+      if(revision===item.revision)item.revision=sent.revision;
+      const queue=by('cases-state').value;
+      if(queue==='overdue'||(ask&&queue==='active')||(!ask&&queue==='waiting')){
+        await loadCases(casePage,ask?'Mesaj gönderildi. Talep oyuncu yanıtını bekliyor.':'Mesaj gönderildi.');by('cases-refresh').focus();
+      }
+      else{await refresh();feedback.textContent='Mesaj gönderildi. '+feedback.textContent;}
+    }catch(error){feedback.textContent=error.message;}
+    finally{reload.disabled=send.disabled=false;}
+  });
+  return panel;
 }
 by('cases-refresh').addEventListener('click',()=>loadCases(casePage));
 for(const id of ['cases-state','cases-owner'])by(id).addEventListener('change',()=>loadCases(1));

@@ -10,6 +10,7 @@ import { encodeWsMessage, decodeWsMessage, createWsError, WsMessage } from '../w
 import { sanitizeString, RateLimiter } from '../websocket/validation';
 import { verifyJwt, AuthUser } from '../auth/authenticate';
 import { accessResponse, enforcingPlayerAccess, isGuestIdentity, PlayerAccessGate } from '../auth/playerAccess';
+import { ApiService } from '../services/apiService';
 
 interface QueueEntry {
   matchId: string;
@@ -22,6 +23,7 @@ interface QueueEntry {
   difficulty: DifficultyLevel;
   queuedAt: number;
   status: 'searching' | 'matched' | 'cancelled';
+  verifiedAccount?: boolean;
   /** İstemciden gelen (PostHog flag) bot'a düşme süresi; yoksa varsayılan 7sn */
   botFallbackMs?: number;
 }
@@ -75,10 +77,12 @@ export class MatchmakerDO extends DurableObject<Env> {
   private publicRooms: Map<string, PublicRoomEntry> = new Map();
   private rateLimiters = new WeakMap<WebSocket, RateLimiter>();
   private access: PlayerAccessGate;
+  private api: ApiService;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.access = new PlayerAccessGate(env);
+    this.api = new ApiService(env.BACKEND_API_URL, env.INTERNAL_API_SECRET);
 
     // Restore persisted queue entries & rebuild active socket presences
     this.ctx.blockConcurrencyWhile(async () => {
@@ -683,6 +687,7 @@ export class MatchmakerDO extends DurableObject<Env> {
     mode: GameMode,
     category: CategoryId,
     difficulty: DifficultyLevel,
+    funnelMatchId: string | null,
     players: Array<{
       id: string;
       username: string;
@@ -690,11 +695,11 @@ export class MatchmakerDO extends DurableObject<Env> {
       avatarUrl?: string;
       isBot?: boolean;
     }>
-  ): Promise<void> {
+  ): Promise<boolean> {
     try {
       const roomId = this.env.GAME_ROOMS.idFromName(roomCode);
       const roomStub = this.env.GAME_ROOMS.get(roomId);
-      await roomStub.fetch('http://internal/create-match', {
+      const response = await roomStub.fetch('http://internal/create-match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -703,10 +708,13 @@ export class MatchmakerDO extends DurableObject<Env> {
           category: category || 'general_culture',
           difficulty: difficulty || 'medium',
           players,
+          funnelMatchId,
         }),
       });
+      return response.ok;
     } catch (err) {
       console.error('[MatchmakerDO] setupRoomInGameRoomDO error:', err);
+      return false;
     }
   }
 
@@ -724,11 +732,13 @@ export class MatchmakerDO extends DurableObject<Env> {
     const matchId = playerA.matchId;
 
     // Pre-create room in GameRoomDO with BOTH real human players
-    await this.setupRoomInGameRoomDO(
+    const analyticsId = playerA.mode === 'duel' && this.env.DUEL_FUNNEL_TRACKING_ENABLED === 'true' ? crypto.randomUUID() : null;
+    const ready = await this.setupRoomInGameRoomDO(
       roomCode,
       playerA.mode,
       playerA.category,
       playerA.difficulty,
+      analyticsId,
       [
         {
           id: playerA.playerId,
@@ -746,6 +756,8 @@ export class MatchmakerDO extends DurableObject<Env> {
         },
       ]
     );
+    if (ready && analyticsId) this.ctx.waitUntil(this.api.reportDuelMatch(analyticsId,
+      [playerA, playerB].filter(player => player.verifiedAccount).map(player => player.playerId), Date.now()));
 
     const socketsA = this.ctx.getWebSockets(`player:${playerA.playerId}`);
     const socketsB = this.ctx.getWebSockets(`player:${playerB.playerId}`);
@@ -815,11 +827,13 @@ export class MatchmakerDO extends DurableObject<Env> {
     const uniqueBotId = `${chosenBot.id}_${Math.random().toString(36).substring(2, 6)}`;
 
     // Pre-create room in GameRoomDO with BOTH human player and bot player!
-    await this.setupRoomInGameRoomDO(
+    const analyticsId = player.mode === 'duel' && this.env.DUEL_FUNNEL_TRACKING_ENABLED === 'true' ? crypto.randomUUID() : null;
+    const ready = await this.setupRoomInGameRoomDO(
       roomCode,
       player.mode,
       player.category,
       player.difficulty,
+      analyticsId,
       [
         {
           id: player.playerId,
@@ -837,6 +851,7 @@ export class MatchmakerDO extends DurableObject<Env> {
         },
       ]
     );
+    if (ready && analyticsId && player.verifiedAccount) this.ctx.waitUntil(this.api.reportDuelMatch(analyticsId, [player.playerId], Date.now()));
 
     const matchFoundPayload = {
       matchId,

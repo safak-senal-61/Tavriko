@@ -4,7 +4,8 @@ import express from 'express';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createAdminAccountsRouter, registrationWindow } from '../src/routes/adminAccountsRoutes';
-import { logRouter } from '../src/routes/logRoutes';
+import { createPortalLoginHandler, logRouter } from '../src/routes/logRoutes';
+import { db } from '../src/db/prismaClient';
 import { compensationCatalog } from '../src/services/adminAccountOperations';
 import { readPlayerAnalytics, recordCompletedPlayers, type TrackedMatchSummary } from '../src/services/playerAnalytics';
 
@@ -54,18 +55,20 @@ describe.skipIf(!dbUrl)('account operations on PostgreSQL', () => {
       id: player, username: player, email: `${player}@example.test`, displayName: 'Örnek Hesap',
       friendCode: player, ...(player === id ? { createdAt: new Date(Date.now()-14*86_400_000) } : {}),
     } });
-    app = express().use(express.json()).use('/api', logRouter).use(createAdminAccountsRouter(client));
+    vi.spyOn(db.rawClient.portalSession, 'findFirst').mockImplementation(args => client.portalSession.findFirst(args));
+    app = express().use(express.json()).post('/api/portal/login', createPortalLoginHandler(client)).use('/api', logRouter).use(createAdminAccountsRouter(client));
     for (const email of [owner, support, approver, moderator]) cookies[email] = await login(email);
   });
   afterAll(async () => {
     if (client) {
       await client.adminAccountEvent.deleteMany({ where: { accountId: id } });
+      await client.portalSession.deleteMany({ where: { email: { in: [owner,support,approver,moderator] } } });
       await client.adminCompensation.deleteMany({ where: { accountId: id } });
       await client.matchHistory.deleteMany({ where: { userId: { in: [id, newId] } } });
       await client.user.deleteMany({ where: { id: { in: [id, newId] } } });
       await client.$disconnect();
     }
-    vi.unstubAllEnvs();
+    vi.restoreAllMocks(); vi.unstubAllEnvs();
   });
 
   it('separates staff capabilities and revokes a staff session when the directory changes', async () => {

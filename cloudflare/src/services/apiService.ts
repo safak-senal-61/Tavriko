@@ -80,4 +80,19 @@ export class ApiService {
       return false;
     }
   }
+
+  public async reportDuelMatch(room: string, ids: string[], matchedAt: number): Promise<void> {
+    if (!this.internalSecret || !ids.length) return;
+    const cleanUrl = (this.backendUrl || 'https://tavriko-app.vercel.app').replace(/\/+$/, '');
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await fetch(`${cleanUrl}/api/internal/duel-funnel/matched`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-internal-secret': this.internalSecret },
+          body: JSON.stringify({ room, ids, matchedAt }), signal: AbortSignal.timeout(3500),
+        });
+        if (response.status < 500) return;
+      } catch { /* Retry once; backend writes are idempotent. */ }
+    }
+    console.warn('[ApiService] Duel milestone delivery failed.');
+  }
 }
