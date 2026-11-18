@@ -109,3 +109,11 @@
 - Verify navigation, content and controls at desktop, 375px and 320px; only wide table containers may scroll horizontally. The public `/app` and Telegram Mini App are not redesigned.
 - Open `/admin/health` for protected per-instance diagnostics and Sandbox-only checkout.
 - See [Sandbox setup and telemetry scope](docs/polar-sandbox-and-site-health.md). Checkout never grants game items, and TRY purchases are disabled until a separate production integration is approved.
+
+## Admin account operations
+
+- Sign in as support: only the account workspace is visible. Open a synthetic account, save an internal note, then start a compensation above the rolling direct limit. The timeline shows the requester and reason; the balance stays unchanged while pending.
+- Sign in as a different approver: open the queue, inspect the account and approve with a reason. Check the balance, both timeline entries and the empty queue. Verify repeat submissions, self-review, expired requests, unrelated roles and over-cap requests are rejected or idempotent as appropriate.
+- As moderator: warn, restrict for a fixed time, and lift. Verify the player notification never contains the internal reason. In a staging Worker and backend with the flag enabled, check queue, room entry, active-message recheck, expiry and backend unavailability using synthetic accounts.
+- Seed registered completions inside and outside the seven Istanbul days. Verify deduplication, weekly unique/returning counts, new sign-ups with a first match, separate HTTP telemetry and readable mobile charts.
+- Use a local `*_qa` PostgreSQL URL in `ADMIN_OPERATIONS_TEST_DATABASE_URL` for database integration tests. See [deployment order, staff roles and limits](docs/admin-accounts.md) before enabling enforcement. Do not verify with production user accounts.

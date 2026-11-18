@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { createHash, scrypt, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 import { db } from '../db/prismaClient';
 
 /**
@@ -29,6 +31,44 @@ function getAdminCredentials(): { email: string; password: string } | null {
     return { email: email.trim(), password };
   }
   return null;
+}
+
+export type AdminRole = 'owner' | 'support' | 'moderator' | 'approver';
+export type AdminSession = { email: string; role: AdminRole };
+type Staff = { email: string; role: Exclude<AdminRole, 'owner'>; passwordHash: string };
+const derive = promisify(scrypt);
+
+function staffDirectory(): Map<string, Staff> {
+  const directory = new Map<string, Staff>();
+  try {
+    const input: unknown = JSON.parse(process.env.PORTAL_STAFF_JSON || '[]');
+    if (!Array.isArray(input) || input.length > 50) return directory;
+    const owner = getAdminCredentials()?.email.toLowerCase();
+    for (const staff of input) {
+      if (!staff || typeof staff.email !== 'string' || staff.email.length > 160 ||
+          !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(staff.email) ||
+          !['support', 'moderator', 'approver'].includes(staff.role) ||
+          typeof staff.passwordHash !== 'string' || !/^[a-f0-9]{32}:[a-f0-9]{128}$/.test(staff.passwordHash)) return new Map();
+      const email = staff.email.toLowerCase();
+      if (email === owner || directory.has(email)) return new Map();
+      directory.set(email, { email, role: staff.role, passwordHash: staff.passwordHash });
+    }
+  } catch { return new Map(); }
+  return directory;
+}
+
+const credentialVersion = (staff: Staff) => createHash('sha256').update(staff.passwordHash).digest('hex');
+export const isPortalConfigured = () => Boolean(getJwtSecret() && (getAdminCredentials() || staffDirectory().size));
+
+export async function authenticatePortal(email: unknown, password: unknown): Promise<AdminSession | null> {
+  if (typeof email !== 'string' || email.length > 160 || typeof password !== 'string' || password.length > 256) return null;
+  const normalized = email.trim().toLowerCase();
+  if (checkAdminCredentials(email, password)) return { email: normalized, role: 'owner' };
+  const staff = staffDirectory().get(normalized);
+  if (!staff) return null;
+  const [salt, hash] = staff.passwordHash.split(':');
+  const actual = await derive(password, Buffer.from(salt, 'hex'), 64) as Buffer;
+  return timingSafeEqual(actual, Buffer.from(hash, 'hex')) ? { email: staff.email, role: staff.role } : null;
 }
 
 declare global {
@@ -77,21 +117,28 @@ function readCookie(req: Request, name: string): string | null {
 }
 
 /** Portal yöneticisi için imzalı oturum tokeni üretir. */
-export function issueAdminSessionToken(email: string): string | null {
+export function issueAdminSessionToken(email: string, role: AdminRole = 'owner'): string | null {
   const secret = getJwtSecret();
   if (!secret) return null;
-  return jwt.sign({ email, role: 'portal_super_admin' }, secret, { expiresIn: ADMIN_SESSION_MAX_AGE_SEC });
+  if (role === 'owner') {
+    const owner = getAdminCredentials();
+    if (!owner || email.toLowerCase() !== owner.email.toLowerCase()) return null;
+    return jwt.sign({ email: owner.email, role: 'portal_super_admin' }, secret, { expiresIn: ADMIN_SESSION_MAX_AGE_SEC });
+  }
+  const staff = staffDirectory().get(email);
+  if (!staff || staff.role !== role) return null;
+  return jwt.sign({ email, role: 'portal_staff', staffRole: role, version: credentialVersion(staff) }, secret, { expiresIn: '8h' });
 }
 
 /** Tarayıcıya HttpOnly yönetici oturum çerezini yazar. */
-export function setAdminSessionCookie(req: Request, res: Response, token: string): void {
+export function setAdminSessionCookie(req: Request, res: Response, token: string, role: AdminRole = 'owner'): void {
   const secure = req.secure || req.headers['x-forwarded-proto'] === 'https' || Boolean(process.env.VERCEL);
   const parts = [
     `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
-    `Max-Age=${ADMIN_SESSION_MAX_AGE_SEC}`,
+    `Max-Age=${role === 'owner' ? ADMIN_SESSION_MAX_AGE_SEC : 8 * 60 * 60}`,
   ];
   if (secure) parts.push('Secure');
   res.append('Set-Cookie', parts.join('; '));
@@ -102,23 +149,27 @@ export function clearAdminSessionCookie(res: Response): void {
 }
 
 /** Portal JWT'sini doğrular (Bearer başlığı veya oturum çerezi). */
-export function verifyAdminSessionToken(token: string | null | undefined): { email: string } | null {
+export function verifyAdminSessionToken(token: string | null | undefined): AdminSession | null {
   if (!token) return null;
   const secret = getJwtSecret();
   if (!secret) return null;
   try {
-    const decoded = jwt.verify(token, secret) as any;
-    if (!decoded || decoded.role !== 'portal_super_admin') return null;
-    const creds = getAdminCredentials();
-    // Yönetici e-postası değiştiyse eski oturumlar geçersiz olur.
-    if (creds && decoded.email && decoded.email !== creds.email) return null;
-    return { email: String(decoded.email || '') };
+    const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] });
+    if (typeof decoded === 'string' || typeof decoded.email !== 'string' || !decoded.email || !decoded.exp) return null;
+    const email = decoded.email.toLowerCase();
+    if (decoded.role === 'portal_super_admin') {
+      return getAdminCredentials()?.email.toLowerCase() === email ? { email, role: 'owner' } : null;
+    }
+    if (decoded.role !== 'portal_staff') return null;
+    const staff = staffDirectory().get(email);
+    return staff && decoded.staffRole === staff.role && decoded.version === credentialVersion(staff)
+      ? { email, role: staff.role } : null;
   } catch {
     return null;
   }
 }
 
-export function getAdminSessionFromRequest(req: Request): { email: string } | null {
+export function getAdminSessionFromRequest(req: Request): AdminSession | null {
   const authHeader = req.headers.authorization || '';
   if (authHeader.startsWith('Bearer ')) {
     const viaBearer = verifyAdminSessionToken(authHeader.slice(7));
@@ -130,10 +181,12 @@ export function getAdminSessionFromRequest(req: Request): { email: string } | nu
 export function checkAdminCredentials(email: unknown, password: unknown): boolean {
   const creds = getAdminCredentials();
   if (!creds || typeof email !== 'string' || typeof password !== 'string') return false;
+  const expected = Buffer.from(creds.password);
+  const supplied = Buffer.from(password);
   return (
     email.trim().toLowerCase() === creds.email.toLowerCase() &&
-    password.length === creds.password.length &&
-    password === creds.password
+    supplied.length === expected.length &&
+    timingSafeEqual(supplied, expected)
   );
 }
 
@@ -184,8 +237,11 @@ export async function requireAdminAuth(req: Request, res: Response, next: NextFu
     }
 
     // 2) + 3) Portal session (cookie or Bearer)
-    if (getAdminSessionFromRequest(req)) {
-      next();
+    const portal = getAdminSessionFromRequest(req);
+    if (portal) {
+      if (portal.role === 'owner') next();
+      else if (wantsHtml(req)) res.redirect(302, '/admin/kullanicilar');
+      else res.status(403).json({ error: 'Bu alan için yönetici yetkisi gerekli.' });
       return;
     }
 

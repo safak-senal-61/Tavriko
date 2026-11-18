@@ -83,6 +83,7 @@ model User {
   friendIds                 Json                @default("[]")
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
+  restrictedUntil           DateTime?
   claimedSeasonFreeTiers    Json                @default("[]")
   claimedSeasonPremiumTiers Json                @default("[]")
   equippedBackground        String?
@@ -179,7 +180,43 @@ model MatchHistory {
   user           User?    @relation(fields: [userId], references: [id])
 
   @@index([userId])
+  @@index([playedAt, userId])
+  @@index([userId, playedAt])
   @@map("match_history")
+}
+
+// No FK to users: keep the operational record if the player deletes the account.
+model AdminAccountEvent {
+  id        String   @id @default(uuid())
+  accountId String
+  actor     String
+  role      String
+  action    String
+  reason    String
+  details   Json
+  createdAt DateTime @default(now())
+
+  @@index([accountId, createdAt, id])
+  @@map("admin_account_events")
+}
+
+model AdminCompensation {
+  id          String   @id @db.Uuid
+  accountId   String
+  requester   String
+  reviewer    String?
+  kind        String
+  itemId      String?
+  amount      Int
+  status      String
+  reason      String
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  decidedAt   DateTime?
+
+  @@index([accountId, kind, status, decidedAt])
+  @@index([status, expiresAt, createdAt])
+  @@map("admin_compensations")
 }
 
 model PasswordResetToken {

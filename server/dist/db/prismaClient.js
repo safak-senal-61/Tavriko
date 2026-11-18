@@ -675,6 +675,7 @@ class PrismaService {
                         settings: (args.create.settings ?? {}),
                         createdAt: args.create.createdAt ?? now,
                         updatedAt: args.create.updatedAt ?? now,
+                        restrictedUntil: args.create.restrictedUntil ?? null,
                     };
             }
             this.store.users.set(record.id, record);
@@ -1214,8 +1215,6 @@ class PrismaService {
                     friendCode: profile.friendCode || this.generateFriendCode(record.id),
                     level: record.level,
                     xp: record.xp,
-                    coins: record.coins,
-                    gems: record.gems ?? 14,
                     dailyStreak: profile.dailyStreak ?? 1,
                     rankTitle: record.rankTitle,
                     rankPoints: record.rankPoints,
@@ -1265,7 +1264,8 @@ class PrismaService {
             for (const item of profile.inventory || []) {
                 await this.userInventoryItem.upsert({
                     where: { userId_itemId: { userId: record.id, itemId: item.id } },
-                    update: { name: item.name, desc: item.desc, qty: item.qty },
+                    // A local snapshot must not replace the current inventory quantity.
+                    update: { name: item.name, desc: item.desc },
                     create: {
                         userId: record.id,
                         itemId: item.id,
@@ -2342,12 +2342,13 @@ class PrismaService {
             }
         }
         // Automatically update live event progress ONLY for tasks the user actively started and not completed yet
-        this.updateStartedEvents(record, {
+        const eventDelta = {
             matches: 1,
             won: delta.won,
             correctAnswers: safeCorrect,
             streak: safeStreak,
-        });
+        };
+        this.updateStartedEvents(record, eventDelta);
         this.users.set(userId, record);
         this.users.set(record.id, record);
         if (record.username)
@@ -2355,26 +2356,49 @@ class PrismaService {
         if (!record.isGuest) {
             this.savePersistedUsers();
             try {
-                await this.rawClient.user.update({
-                    where: { id: record.id },
-                    data: {
-                        coins: record.coins,
-                        gems: record.gems,
-                        xp: record.xp,
-                        level: record.level,
-                        seasonXp: record.seasonXp || 0,
-                        rankTitle: record.rankTitle,
-                        rankPoints: record.rankPoints,
-                        totalMatches: record.stats.totalMatches,
-                        wins: record.stats.wins,
-                        correctAnswers: record.stats.correctAnswers,
-                        totalAnswers: record.stats.totalAnswers,
-                        bestStreak: record.stats.bestStreak,
-                        categoryMastery: record.categoryMastery,
-                        eventProgress: (record.eventProgress || {}),
-                        updatedAt: new Date(),
-                    },
+                const saved = await this.rawClient.$transaction(async (tx) => {
+                    const [locked] = await tx.$queryRaw `
+            SELECT "eventProgress" FROM "users" WHERE "id" = ${record.id} FOR UPDATE`;
+                    if (!locked)
+                        throw new Error('Oyuncu hesabı bulunamadı.');
+                    record.eventProgress = locked.eventProgress || {};
+                    if (delta.roomCode) {
+                        const ledger = this.readMatchLedger(record);
+                        const duplicate = Object.hasOwn(ledger, delta.roomCode) ? ledger[delta.roomCode] : undefined;
+                        if (duplicate)
+                            return { duplicate, balances: null };
+                        this.writeMatchLedger(record, delta.roomCode, appliedRewards);
+                    }
+                    this.updateStartedEvents(record, eventDelta);
+                    const balances = await tx.user.update({
+                        where: { id: record.id },
+                        data: {
+                            coins: { increment: appliedCoins },
+                            xp: record.xp,
+                            level: record.level,
+                            seasonXp: record.seasonXp || 0,
+                            rankTitle: record.rankTitle,
+                            rankPoints: record.rankPoints,
+                            totalMatches: record.stats.totalMatches,
+                            wins: record.stats.wins,
+                            correctAnswers: record.stats.correctAnswers,
+                            totalAnswers: record.stats.totalAnswers,
+                            bestStreak: record.stats.bestStreak,
+                            categoryMastery: record.categoryMastery,
+                            eventProgress: (record.eventProgress || {}),
+                            updatedAt: new Date(),
+                        },
+                        select: { coins: true, gems: true },
+                    });
+                    return { duplicate: null, balances };
                 });
+                if (saved.duplicate) {
+                    this.recordedMatchRewards.set(`${record.id}:${delta.roomCode}`, saved.duplicate);
+                    const current = await this.loadRecord(record.id) || record;
+                    return { user: this.toProfile(current), rewards: { ...saved.duplicate, alreadyRecorded: true } };
+                }
+                record.coins = saved.balances.coins;
+                record.gems = saved.balances.gems;
             }
             catch (err) {
                 console.error('[recordGameStats] PostgreSQL update error:', err);
@@ -2395,18 +2419,18 @@ class PrismaService {
         return this.toProfile(record);
     }
     /** Etkinlik ilerlemesini veritabanına yazar (sunucusuz ortamda bellek kaybolduğu için şart). */
-    async persistEventProgress(record, extra = {}) {
+    async persistEventStart(record, eventId) {
         if (record.isGuest)
             return;
         this.savePersistedUsers();
         try {
-            await this.rawClient.user.update({
-                where: { id: record.id },
-                data: { eventProgress: (record.eventProgress || {}), ...extra, updatedAt: new Date() },
-            });
+            await this.rawClient.$executeRaw `
+        UPDATE "users" SET "eventProgress" = jsonb_set(COALESCE("eventProgress", '{}'::jsonb),
+          ARRAY[${eventId}], ${JSON.stringify(record.eventProgress?.[eventId])}::jsonb, true), "updatedAt" = now()
+        WHERE "id" = ${record.id} AND COALESCE(("eventProgress" #>> ARRAY[${eventId}, 'started'])::boolean, false) = false`;
         }
         catch (err) {
-            console.error('[persistEventProgress] DB update error:', err);
+            console.error('[persistEventStart] DB update error:', err);
         }
     }
     updateStartedEvents(record, delta) {
@@ -2556,21 +2580,53 @@ class PrismaService {
         record.stats.correctAnswers += data.correctAnswers;
         record.stats.totalAnswers += data.totalQuestions;
         // Apply progress to started events from daily challenge
-        this.updateStartedEvents(record, {
+        const eventDelta = {
             matches: 1,
             won: true,
             correctAnswers: data.correctAnswers,
             streak: data.correctAnswers,
-        });
+        };
+        this.updateStartedEvents(record, eventDelta);
         const prog = (0, shared_1.calculateLevelFromXp)(record.xp);
         record.level = prog.level;
         record.rankTitle = prog.rankTitle;
         this.users.set(record.id, record);
         if (!record.isGuest) {
             this.savePersistedUsers();
-            this.syncUserToPrisma(record)
-                .catch(() => { })
-                .finally(() => { void this.persistEventProgress(record); });
+            if (process.env.DATABASE_URL || process.env.DIRECT_URL) {
+                try {
+                    await this.rawClient.$transaction(async (tx) => {
+                        const [locked] = await tx.$queryRaw `
+              SELECT "categoryMastery" #>> '{dailyChallenge,lastCompletedDate}' AS completed, "eventProgress"
+              FROM "users" WHERE "id" = ${record.id} FOR UPDATE`;
+                        if (!locked || (!alreadyDoneToday && locked.completed === todayStr))
+                            throw new Error('Günlük ödül zaten işlendi.');
+                        record.eventProgress = locked.eventProgress || {};
+                        this.updateStartedEvents(record, eventDelta);
+                        const updated = await tx.user.update({ where: { id: record.id }, data: {
+                                coins: { increment: alreadyDoneToday ? 0 : cfg.rewardCoins },
+                                gems: { increment: alreadyDoneToday ? 0 : cfg.rewardGems },
+                                dailyStreak: record.dailyStreak, xp: record.xp, level: record.level, rankTitle: record.rankTitle,
+                                totalMatches: record.stats.totalMatches, wins: record.stats.wins, correctAnswers: record.stats.correctAnswers,
+                                totalAnswers: record.stats.totalAnswers, bestStreak: record.stats.bestStreak,
+                                categoryMastery: record.categoryMastery, eventProgress: (record.eventProgress || {}),
+                            }, select: { coins: true, gems: true } });
+                        const item = cfg.rewardChest && !alreadyDoneToday
+                            ? record.inventory?.find(i => i.id === 'chest' || i.id === cfg.rewardChest) : undefined;
+                        if (item)
+                            await tx.userInventoryItem.upsert({
+                                where: { userId_itemId: { userId: record.id, itemId: item.id } },
+                                update: { qty: { increment: 1 } },
+                                create: { userId: record.id, itemId: item.id, name: item.name, desc: item.desc, qty: 1 },
+                            });
+                        record.coins = updated.coins;
+                        record.gems = updated.gems;
+                    });
+                }
+                catch {
+                    return { success: false, user: null, error: 'Günlük maç kaydedilemedi veya ödül zaten işlendi.', streakIncreased: false };
+                }
+            }
         }
         return {
             success: true,
@@ -4486,8 +4542,8 @@ class PrismaService {
                 await this.rawClient.user.update({
                     where: { id: record.id },
                     data: {
-                        coins: record.coins,
-                        gems: record.gems,
+                        coins: { increment: pack.coinsDelta || 0 },
+                        gems: { increment: pack.gemsDelta || 0 },
                         xp: record.xp,
                         level: record.level,
                         updatedAt: new Date(),
@@ -4506,6 +4562,7 @@ class PrismaService {
             throw new Error('Kullanıcı bulunamadı.');
         if (!record.inventory)
             record.inventory = this.defaultInventory();
+        const originalCoins = record.coins, originalGems = record.gems || 0;
         const item = record.inventory.find((i) => i.id === itemId);
         if (!item || item.qty <= 0) {
             throw new Error('Bu eşyadan envanterinizde kalmadı.');
@@ -4603,40 +4660,39 @@ class PrismaService {
         if (!record.isGuest) {
             this.savePersistedUsers();
             try {
-                await this.rawClient.user.update({
-                    where: { id: record.id },
-                    data: {
-                        coins: record.coins,
-                        gems: record.gems,
-                        xp: record.xp,
-                        level: record.level,
-                        settings: (record.settings || {}),
-                        equippedFrame: record.equippedFrame ?? null,
-                        equippedBadge: record.equippedBadge ?? null,
-                        equippedNameEffect: record.equippedNameEffect ?? null,
-                        equippedBackground: record.equippedBackground ?? null,
-                        equippedFrameExpiresAt: this.toBigIntSafe(record.equippedFrameExpiresAt),
-                        equippedBadgeExpiresAt: this.toBigIntSafe(record.equippedBadgeExpiresAt),
-                        equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
-                        equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
-                        updatedAt: new Date(),
-                    },
+                const updated = await this.rawClient.$transaction(async (tx) => {
+                    const user = await tx.user.update({
+                        where: { id: record.id },
+                        data: {
+                            coins: { increment: record.coins - originalCoins },
+                            gems: { increment: (record.gems || 0) - originalGems },
+                            xp: record.xp, level: record.level, settings: (record.settings || {}),
+                            equippedFrame: record.equippedFrame ?? null,
+                            equippedBadge: record.equippedBadge ?? null,
+                            equippedNameEffect: record.equippedNameEffect ?? null,
+                            equippedBackground: record.equippedBackground ?? null,
+                            equippedFrameExpiresAt: this.toBigIntSafe(record.equippedFrameExpiresAt),
+                            equippedBadgeExpiresAt: this.toBigIntSafe(record.equippedBadgeExpiresAt),
+                            equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
+                            equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
+                        },
+                        select: { coins: true, gems: true },
+                    });
+                    const quantity = await tx.userInventoryItem.updateMany({ where: {
+                            userId: record.id, itemId, qty: { gt: 0 },
+                        }, data: { qty: { decrement: 1 } } });
+                    if (!quantity.count)
+                        throw new Error('Eşya artık envanterde yok.');
+                    await tx.userInventoryItem.deleteMany({ where: { userId: record.id, itemId, qty: 0 } });
+                    return user;
                 });
-                // Kuşanılan kozmetik/iksir envanterden düştü: PostgreSQL'e de yansıt
-                if (item.qty <= 0) {
-                    await this.rawClient.userInventoryItem.deleteMany({
-                        where: { userId: record.id, itemId },
-                    }).catch(() => { });
-                }
-                else {
-                    await this.rawClient.userInventoryItem.update({
-                        where: { userId_itemId: { userId: record.id, itemId } },
-                        data: { qty: item.qty, updatedAt: new Date() },
-                    }).catch(() => { });
-                }
+                record.coins = updated.coins;
+                record.gems = updated.gems;
             }
             catch (err) {
                 console.error('[useInventoryItem] DB update error:', err);
+                if (process.env.DATABASE_URL || process.env.DIRECT_URL)
+                    throw new Error('Eşya kullanımı kaydedilemedi. Envanteri yenileyip tekrar deneyin.');
             }
         }
         return { user: this.toProfile(record), rewardText };
@@ -4887,6 +4943,7 @@ class PrismaService {
         let record = await this.loadRecord(userId);
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
+        const originalCoins = record.coins, originalGems = record.gems || 0;
         const product = shared_1.SHOP_CATALOG.find((p) => p.id === productId);
         if (!product)
             throw new Error('Ürün mağazada bulunamadı.');
@@ -4973,47 +5030,6 @@ class PrismaService {
                     record.equippedBadge = item.id;
                     record.equippedBadgeExpiresAt = expiresAt;
                 }
-                if (!record.isGuest) {
-                    try {
-                        // Envanterdeki güncel (tüketime göre düzeltilmiş) adetla senkronize et
-                        const invItem = record.inventory.find((i) => i.id === item.id);
-                        const currentQty = invItem?.qty ?? 0;
-                        const invDuration = invItem?.durationHours;
-                        if (currentQty <= 0) {
-                            await this.rawClient.userInventoryItem.deleteMany({
-                                where: { userId: record.id, itemId: item.id },
-                            });
-                        }
-                        else {
-                            await this.rawClient.userInventoryItem.upsert({
-                                where: {
-                                    userId_itemId: {
-                                        userId: record.id,
-                                        itemId: item.id,
-                                    },
-                                },
-                                update: {
-                                    qty: currentQty,
-                                    name: item.name,
-                                    desc: item.desc,
-                                    durationHours: invDuration,
-                                    updatedAt: new Date(),
-                                },
-                                create: {
-                                    userId: record.id,
-                                    itemId: item.id,
-                                    name: item.name,
-                                    desc: item.desc,
-                                    qty: currentQty,
-                                    durationHours: invDuration,
-                                },
-                            });
-                        }
-                    }
-                    catch (itemErr) {
-                        console.error('[purchaseShopProduct] DB inventory upsert error:', itemErr);
-                    }
-                }
             }
         }
         this.users.set(userId, record);
@@ -5025,27 +5041,48 @@ class PrismaService {
         if (!record.isGuest) {
             this.savePersistedUsers();
             try {
-                await this.rawClient.user.update({
-                    where: { id: record.id },
-                    data: {
-                        coins: record.coins,
-                        gems: record.gems,
-                        hasPremiumPass: record.hasPremiumPass,
-                        equippedFrame: record.equippedFrame ?? null,
-                        equippedBadge: record.equippedBadge ?? null,
-                        equippedNameEffect: record.equippedNameEffect ?? null,
-                        equippedBackground: record.equippedBackground ?? null,
-                        equippedFrameExpiresAt: this.toBigIntSafe(record.equippedFrameExpiresAt),
-                        equippedBadgeExpiresAt: this.toBigIntSafe(record.equippedBadgeExpiresAt),
-                        equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
-                        equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
-                        blockedUserIds: (record.blockedUserIds || []),
-                        updatedAt: new Date(),
-                    },
+                const updated = await this.rawClient.$transaction(async (tx) => {
+                    const user = await tx.user.update({
+                        where: {
+                            id: record.id,
+                            ...(product.currency === 'coins' ? { coins: { gte: effectivePrice } } : { gems: { gte: effectivePrice } }),
+                        },
+                        data: {
+                            coins: { increment: record.coins - originalCoins },
+                            gems: { increment: (record.gems || 0) - originalGems },
+                            hasPremiumPass: record.hasPremiumPass,
+                            equippedFrame: record.equippedFrame ?? null,
+                            equippedBadge: record.equippedBadge ?? null,
+                            equippedNameEffect: record.equippedNameEffect ?? null,
+                            equippedBackground: record.equippedBackground ?? null,
+                            equippedFrameExpiresAt: this.toBigIntSafe(record.equippedFrameExpiresAt),
+                            equippedBadgeExpiresAt: this.toBigIntSafe(record.equippedBadgeExpiresAt),
+                            equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
+                            equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
+                            updatedAt: new Date(),
+                        },
+                        select: { coins: true, gems: true },
+                    });
+                    for (const item of product.grantItems ?? []) {
+                        // An auto-equipped cosmetic consumes the newly purchased copy, not a separate support grant.
+                        const qty = item.qty - (['frame', 'badge', 'background', 'name_effect'].includes(item.category ?? '') ? 1 : 0);
+                        if (qty <= 0)
+                            continue;
+                        await tx.userInventoryItem.upsert({
+                            where: { userId_itemId: { userId: record.id, itemId: item.id } },
+                            update: { qty: { increment: qty } },
+                            create: { userId: record.id, itemId: item.id, name: item.name, desc: item.desc, qty, durationHours: duration?.hours },
+                        });
+                    }
+                    return user;
                 });
+                record.coins = updated.coins;
+                record.gems = updated.gems;
             }
             catch (err) {
                 console.error('[purchaseShopProduct] DB update error:', err);
+                if (process.env.DATABASE_URL || process.env.DIRECT_URL)
+                    throw new Error('Satın alma kaydedilemedi. Bakiyeyi yenileyip tekrar deneyin.');
             }
         }
         return {
@@ -5239,8 +5276,8 @@ class PrismaService {
                 await this.rawClient.user.update({
                     where: { id: record.id },
                     data: {
-                        coins: record.coins,
-                        gems: record.gems,
+                        coins: { increment: coins },
+                        gems: { increment: gems },
                         xp: record.xp,
                         level: record.level,
                         rankTitle: record.rankTitle,
@@ -5330,7 +5367,7 @@ class PrismaService {
             completed: progress >= event.targetCount,
             claimed: !!state.claimed,
         };
-        await this.persistEventProgress(record);
+        await this.persistEventStart(record, eventId);
         return {
             user: this.toProfile(record),
             event: eventData,
@@ -5380,21 +5417,37 @@ class PrismaService {
         if (!record.isGuest) {
             this.savePersistedUsers();
             try {
-                await this.rawClient.user.update({
-                    where: { id: record.id },
-                    data: {
-                        coins: record.coins,
-                        gems: record.gems,
-                        xp: record.xp,
-                        level: record.level,
-                        seasonXp: record.seasonXp || 0,
-                        eventProgress: (record.eventProgress || {}),
-                        updatedAt: new Date(),
-                    },
+                const saved = await this.rawClient.$transaction(async (tx) => {
+                    const [locked] = await tx.$queryRaw `
+            SELECT "eventProgress"
+            FROM "users" WHERE "id" = ${record.id} FOR UPDATE`;
+                    const current = locked?.eventProgress?.[eventId];
+                    if (!current || current.claimed || current.progress < event.targetCount)
+                        return null;
+                    record.eventProgress = { ...locked.eventProgress, [eventId]: { ...current, completed: true, claimed: true } };
+                    return tx.user.update({
+                        where: { id: record.id },
+                        data: {
+                            coins: { increment: event.rewardCoins },
+                            gems: { increment: event.rewardGems },
+                            xp: record.xp,
+                            level: record.level,
+                            seasonXp: record.seasonXp || 0,
+                            eventProgress: (record.eventProgress || {}),
+                            updatedAt: new Date(),
+                        },
+                        select: { coins: true, gems: true },
+                    });
                 });
+                if (!saved)
+                    throw new Error('Bu etkinliğin ödülü zaten alındı.');
+                record.coins = saved.coins;
+                record.gems = saved.gems;
             }
             catch (err) {
                 console.error('[claimEventReward] DB update error:', err);
+                if (process.env.DATABASE_URL || process.env.DIRECT_URL)
+                    throw new Error('Ödül kaydedilemedi veya daha önce alındı.');
             }
         }
         return {

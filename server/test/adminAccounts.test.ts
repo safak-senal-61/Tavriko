@@ -17,11 +17,13 @@ function fixture() {
     count: vi.fn().mockResolvedValue(40), updateMany: vi.fn().mockResolvedValue({ count: 1 }),
   };
   const $queryRaw = vi.fn().mockResolvedValue([]);
-  const client = { user, $queryRaw };
+  const adminAccountEvent = { create: vi.fn().mockResolvedValue({ id: 'fixture-event' }) };
+  const client = { user, $queryRaw, $transaction: async (callback: (tx: object) => Promise<unknown>) =>
+    callback({ user, adminAccountEvent }) };
   const app = express().use(express.json()).use(createAdminAccountsRouter(client as unknown as Parameters<typeof createAdminAccountsRouter>[0]));
   const patch = (payload = profileChange, origin = 'https://test.tavriko.example') => request(app).patch(prefix + '/' + id + '/profile')
     .set('Host', 'test.tavriko.example').set('Origin', origin).set('Cookie', cookie()).send(payload);
-  return { app, user, $queryRaw, patch };
+  return { app, user, $queryRaw, patch, adminAccountEvent };
 }
 
 beforeEach(() => {
@@ -108,13 +110,17 @@ describe('profile corrections', () => {
     expect(user.updateMany).not.toHaveBeenCalled();
   });
   it('updates only approved profile fields and checks the exact account version', async () => {
-    const { patch, user } = fixture();
+    const { patch, user, adminAccountEvent } = fixture();
     user.findUnique.mockResolvedValue({displayName:'Eski Ad',avatarUrl:'av2',updatedAt});
     const r = await patch();
     expect(r.status).toBe(200);
     expect(user.updateMany).toHaveBeenCalledExactlyOnceWith({
       where:{id,updatedAt},data:{displayName:'Çağrı Yılmaz',avatarUrl:'av1'},
     });
+    expect(adminAccountEvent.create).toHaveBeenCalledWith({ data: {
+      accountId: id, actor: email, role: 'owner', action: 'profile', reason: 'support',
+      details: { displayName: { before: 'Eski Ad', after: 'Çağrı Yılmaz' }, avatar: { before: 'custom', after: 'default' } },
+    } });
   });
   it('rejects no-op edits and concurrent writes; never reports them saved', async () => {
     const { patch, user } = fixture();

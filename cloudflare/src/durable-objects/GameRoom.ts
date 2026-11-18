@@ -21,6 +21,7 @@ import { encodeWsMessage, decodeWsMessage, createWsError, WsMessage } from '../w
 import { sanitizeString, sanitizeRoomCode, RateLimiter } from '../websocket/validation';
 import { ApiService } from '../services/apiService';
 import { verifyJwt, AuthUser } from '../auth/authenticate';
+import { accessResponse, enforcingPlayerAccess, isGuestIdentity, PlayerAccessGate } from '../auth/playerAccess';
 
 /** 1v1 düello / hızlı eşleşme maçlarındaki soru sayısı */
 export const DUEL_TOTAL_ROUNDS = 15;
@@ -47,11 +48,14 @@ export class GameRoomDO extends DurableObject<Env> {
   private alarmContext: AlarmContext | null = null;
   private isPrivateRoom: boolean = false;
   private apiService: ApiService;
+  private access: PlayerAccessGate;
+  private verifiedPlayers = new Set<string>();
   private rateLimiters = new WeakMap<WebSocket, RateLimiter>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.apiService = new ApiService(env.BACKEND_API_URL, env.INTERNAL_API_SECRET);
+    this.access = new PlayerAccessGate(env);
 
     // Restore state from persistent SQLite storage
     this.ctx.blockConcurrencyWhile(async () => {
@@ -59,6 +63,7 @@ export class GameRoomDO extends DurableObject<Env> {
       const storedQuestions = await this.ctx.storage.get<Question[]>('questions');
       const storedAlarm = await this.ctx.storage.get<AlarmContext>('alarmContext');
       const storedPrivacy = await this.ctx.storage.get<boolean>('isPrivateRoom');
+      this.verifiedPlayers = new Set(await this.ctx.storage.get<string[]>('verifiedPlayers') ?? []);
 
       if (storedRoom) this.room = storedRoom;
       if (storedQuestions) this.questions = storedQuestions;
@@ -91,6 +96,8 @@ export class GameRoomDO extends DurableObject<Env> {
 
     if (request.method === 'POST' && (url.pathname === '/create-match' || url.pathname.endsWith('/create-match'))) {
       const data = (await request.json()) as any;
+      this.verifiedPlayers.clear();
+      await this.ctx.storage.delete('verifiedPlayers');
       const roomCode = sanitizeRoomCode(data.roomCode || url.searchParams.get('roomCode') || '');
       this.room = {
         code: roomCode,
@@ -203,6 +210,9 @@ export class GameRoomDO extends DurableObject<Env> {
 
     // Support guests or query-based identity if token was not strictly provided
     if (!authUser) {
+      if (enforcingPlayerAccess(this.env) && (token || (rawPlayerId && !isGuestIdentity(rawPlayerId)))) {
+        return new Response('Oyuncu oturumu gerekli.', { status: 401 });
+      }
       const pid = rawPlayerId || `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       const name = sanitizeString(rawDisplayName || `Misafir ${pid.slice(-4)}`, 30);
       authUser = {
@@ -213,6 +223,11 @@ export class GameRoomDO extends DurableObject<Env> {
         isGuest: true,
       };
     }
+    if (enforcingPlayerAccess(this.env) && authUser.isGuest && !isGuestIdentity(authUser.id)) {
+      return new Response('Misafir oturumu geçersiz.', { status: 401 });
+    }
+    const access = await this.access.check(authUser.id);
+    if (access !== 'allowed') return accessResponse(access);
 
     // Initialize room if not already created
     if (!this.room) {
@@ -334,6 +349,10 @@ export class GameRoomDO extends DurableObject<Env> {
       isHost,
     };
     server.serializeAttachment(attachment);
+    if (!authUser.isGuest && !this.verifiedPlayers.has(authUser.id)) {
+      this.verifiedPlayers.add(authUser.id);
+      await this.ctx.storage.put('verifiedPlayers', [...this.verifiedPlayers]);
+    }
 
     // Broadcast update to room
     if (isReconnecting) {
@@ -390,6 +409,13 @@ export class GameRoomDO extends DurableObject<Env> {
     }
 
     const playerId = attachment.playerId;
+    const access = await this.access.check(playerId, ws);
+    if (access !== 'allowed') {
+      ws.send(createWsError(access === 'restricted' ? 'Oyun erişimi kısıtlı.' : 'Oyun erişimi doğrulanamadı.',
+        access === 'restricted' ? 'ACCOUNT_RESTRICTED' : 'ACCESS_UNAVAILABLE', envelope.requestId));
+      ws.close(access === 'restricted' ? 1008 : 1013);
+      return;
+    }
 
     try {
       switch (envelope.event) {
@@ -908,9 +934,10 @@ export class GameRoomDO extends DurableObject<Env> {
   }
 
   private async finishGame(): Promise<void> {
-    if (!this.room) return;
+    if (!this.room || this.room.status === 'game_over') return;
 
     const summary = buildFinalMatchSummary(this.room);
+    const tracked = { ...summary, matchId: crypto.randomUUID(), verifiedPlayerIds: [...this.verifiedPlayers], category: this.room.category };
 
     await this.persist();
 
@@ -918,7 +945,7 @@ export class GameRoomDO extends DurableObject<Env> {
     this.broadcast(SOCKET_EVENTS.GAME_OVER, summary);
 
     // Asynchronously submit match results to PostgreSQL backend
-    this.ctx.waitUntil(this.apiService.submitMatchResults(summary));
+    this.ctx.waitUntil(this.apiService.submitMatchResults(tracked));
   }
 
   private handleSendEmote(playerId: string, envelope: WsMessage): void {

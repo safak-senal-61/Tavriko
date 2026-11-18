@@ -6,43 +6,38 @@ import { getPendingGoogleSessions } from './authRoutes';
 import { adminPages, adminSessionScript, adminTheme, renderAdminHeader, renderAdminHero, type AdminPage } from './adminShell';
 import {
   requireAdminAuth,
-  getJwtSecret,
-  checkAdminCredentials,
+  isPortalConfigured,
+  authenticatePortal,
   issueAdminSessionToken,
   setAdminSessionCookie,
   clearAdminSessionCookie,
   getAdminSessionFromRequest,
 } from '../middleware/auth';
 
-// SECURITY: portal credentials come exclusively from environment variables.
-// The previously hardcoded values were exposed in the public repository and
-// MUST be rotated by the operator.
-const PORTAL_ADMIN_EMAIL = process.env.PORTAL_ADMIN_EMAIL || '';
-const PORTAL_ADMIN_PASSWORD = process.env.PORTAL_ADMIN_PASSWORD || '';
-const PORTAL_CONFIGURED = Boolean(PORTAL_ADMIN_EMAIL && PORTAL_ADMIN_PASSWORD && getJwtSecret());
-
 export const logRouter = Router();
 
-logRouter.post('/portal/login', (req: Request, res: Response) => {
+logRouter.post('/portal/login', async (req: Request, res: Response) => {
   const { email, password } = req.body || {};
-  if (!PORTAL_CONFIGURED) {
-    logger.warn('AUTH', 'Portal girişi reddedildi: PORTAL_ADMIN_EMAIL/PORTAL_ADMIN_PASSWORD ortam değişkenleri tanımlı değil.');
+  if (!isPortalConfigured()) {
     res.status(503).json({ success: false, error: 'Yönetici portalı yapılandırılmamış.' });
     return;
   }
-  if (checkAdminCredentials(email, password)) {
-    const token = issueAdminSessionToken(PORTAL_ADMIN_EMAIL.trim());
+  const session = await authenticatePortal(email, password).catch(() => null);
+  if (session) {
+    const token = issueAdminSessionToken(session.email, session.role);
     if (!token) {
       res.status(503).json({ success: false, error: 'Yönetici portalı yapılandırılmamış.' });
       return;
     }
     // Tarayıcı panelleri HttpOnly çerezle oturumu korur; böylece sayfa yenilense veya
     // arka plan istekleri yapılsa da tekrar şifre sorulmaz.
-    setAdminSessionCookie(req, res, token);
-    logger.success('AUTH', `Portal Yöneticisi Giriş Yaptı: ${PORTAL_ADMIN_EMAIL}`);
-    res.json({ success: true, token, email: PORTAL_ADMIN_EMAIL.trim() });
+    setAdminSessionCookie(req, res, token, session.role);
+    logger.success('AUTH', 'Portal oturumu açıldı', { role: session.role });
+    res.set('Cache-Control', 'no-store').json({
+      success: true, email: session.email, role: session.role, ...(session.role === 'owner' ? { token } : {}),
+    });
   } else {
-    logger.warn('AUTH', `Başarısız portal giriş denemesi: ${typeof email === 'string' ? email : '-'}`);
+    logger.warn('AUTH', 'Başarısız portal giriş denemesi');
     res.status(401).json({ success: false, error: 'Hatalı e-posta adresi veya yönetici şifresi!' });
   }
 });
@@ -55,7 +50,7 @@ logRouter.post('/portal/logout', (_req: Request, res: Response) => {
 logRouter.get('/portal/verify', (req: Request, res: Response) => {
   const session = getAdminSessionFromRequest(req);
   if (session) {
-    res.json({ success: true, email: session.email || PORTAL_ADMIN_EMAIL });
+    res.set('Cache-Control', 'no-store').json({ success: true, email: session.email, role: session.role });
     return;
   }
   res.status(401).json({ success: false, error: 'Geçersiz veya süresi dolmuş oturum' });
@@ -1410,6 +1405,7 @@ export function renderDashboardHtml(page: AdminPage = adminPages[0]): string {
       <div style="margin-bottom:20px;">
         <h2 style="font-size:20px; color:#FFFFFF; margin-bottom:6px;">🚫 Moderasyon & Kullanıcı Engelleme</h2>
         <p style="font-size:13px; color:var(--text-muted);">Kullanıcıları engelleyin, engeli kaldırın ve bildirim gönderin</p>
+        <p style="margin-top:8px"><a href="/admin/kullanicilar">Süreli oyun kısıtlaması, uyarı ve işlem geçmişi için Kullanıcılar panelini aç</a></p>
       </div>
 
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:18px;">

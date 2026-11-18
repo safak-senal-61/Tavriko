@@ -98,7 +98,7 @@ function renderAdminLoginHtml(nextPath, configured) {
         if (res.ok && data.success) {
           try { localStorage.removeItem('tavriko_portal_token'); } catch {}
           const oldTab = NEXT === '/admin' && /^#tab-(?:game|expo|cos|api|logs|db|mod|push)$/.test(location.hash) ? location.hash : '';
-          window.location.replace(NEXT + oldTab);
+          window.location.replace(data.role === 'owner' ? NEXT + oldTab : '/admin/kullanicilar');
           return;
         }
         err.textContent = res.status === 429 ? 'Çok fazla deneme yapıldı. Lütfen birkaç dakika sonra tekrar deneyin.' : (data.error || 'Hatalı e-posta veya şifre.');

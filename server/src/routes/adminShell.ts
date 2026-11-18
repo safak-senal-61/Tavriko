@@ -47,13 +47,13 @@ a.admin-command,button.admin-command{width:auto;display:inline-flex;align-items:
 @media(max-width:420px){:root{--admin-pad:12px}.admin-hero{padding-top:24px}.admin-top{min-height:54px}.admin-nav a{font-size:12px;padding-inline:4px}}
 `;
 
-export function renderAdminHeader(active: AdminPage['id']): string {
+export function renderAdminHeader(active: AdminPage['id'], accountsOnly = false): string {
   return `<a class="admin-skip" href="#admin-main">İçeriğe geç</a>
 <header class="admin-header"><div class="admin-wrap admin-top">
-<a class="admin-brand" href="/admin"><span aria-hidden="true">T</span>TAVRİKO / YÖNETİM</a>
+<a class="admin-brand" href="${accountsOnly ? '/admin/kullanicilar' : '/admin'}"><span aria-hidden="true">T</span>TAVRİKO / YÖNETİM</a>
 <div class="admin-actions"><a class="admin-command" href="/app" target="_blank" rel="noopener">Oyunu aç</a><button class="admin-command" type="button" id="admin-logout">Çıkış</button></div>
 </div><nav class="admin-wrap admin-nav" aria-label="Yönetim bölümleri">
-${adminPages.map(p => `<a href="${p.path}"${p.id===active?' aria-current="page"':''}>${p.label}</a>`).join('')}
+${adminPages.filter(p => !accountsOnly || p.id === 'db').map(p => `<a href="${p.path}"${p.id===active?' aria-current="page"':''}>${p.label}</a>`).join('')}
 </nav></header>`;
 }
 

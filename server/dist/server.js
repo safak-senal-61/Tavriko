@@ -42,8 +42,12 @@ const adminShell_1 = require("./routes/adminShell");
 const legalRoutes_1 = require("./routes/legalRoutes");
 const opsTelemetry_1 = require("./services/opsTelemetry");
 const opsRoutes_1 = require("./routes/opsRoutes");
+const adminAccountsRoutes_1 = require("./routes/adminAccountsRoutes");
 const fleetRoutes_1 = require("./routes/fleetRoutes");
 const fleetTelemetry_1 = require("./services/fleetTelemetry");
+const playerAccess_1 = require("./services/playerAccess");
+const adminAccountOperations_1 = require("./services/adminAccountOperations");
+const playerAnalytics_1 = require("./services/playerAnalytics");
 function getLocalIpAddress() {
     const interfaces = os_1.default.networkInterfaces();
     for (const name of Object.keys(interfaces)) {
@@ -180,9 +184,9 @@ function createApp() {
             const duration = Date.now() - start;
             const lvl = res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'INFO';
             const cat = req.path.includes('/auth') ? 'AUTH' : 'HTTP';
-            if (/^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/ops(?:\/|$)/i.test(req.path) ||
+            if (/^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/(?:ops|accounts)(?:\/|$)/i.test(req.path) ||
                 req.path === '/favicon.ico' ||
-                req.path === '/api/logs' ||
+                req.path === '/api/logs' || req.path === '/api/internal/player-access' ||
                 req.path === '/api/logs/stream' ||
                 req.path.startsWith('/qr')) {
                 return;
@@ -222,44 +226,75 @@ function createApp() {
     });
     wss.on('connection', (ws, request) => {
         const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
-        const playerId = url.searchParams.get('playerId');
+        const enforcing = (0, adminAccountOperations_1.restrictionsEnabled)();
+        const requested = url.searchParams.get('playerId');
+        const playerId = enforcing
+            ? (0, playerAccess_1.socketIdentity)(request.headers.authorization?.replace(/^Bearer\s+/i, '') || url.searchParams.get('token'), requested)
+            : requested;
         const roomCode = url.searchParams.get('roomCode');
-        if (playerId) {
-            presenceManager_1.presenceManager.registerSocket(playerId, ws);
-            if (roomCode) {
-                presenceManager_1.presenceManager.setUserRoom(playerId, roomCode);
+        let lastCheckedAt = 0;
+        let check;
+        const verifyAccess = () => {
+            if (!enforcing)
+                return Promise.resolve(true);
+            if (!playerId)
+                return Promise.resolve(false);
+            if (!check || Date.now() - lastCheckedAt >= 10_000) {
+                lastCheckedAt = Date.now();
+                check = (0, playerAccess_1.checkPlayerAccess)(playerId);
             }
-            ws.send(JSON.stringify({
-                event: 'presence:sync',
-                payload: { presences: presenceManager_1.presenceManager.getAllPresences() },
-                timestamp: Date.now(),
-            }));
-        }
-        ws.on('message', (data) => {
-            try {
-                const text = data.toString();
-                const msg = JSON.parse(text);
-                if (msg.event === 'ping') {
-                    ws.send(JSON.stringify({ event: 'pong', timestamp: Date.now() }));
-                }
-                else if (msg.event === 'presence:ping' && msg.payload?.playerId) {
-                    presenceManager_1.presenceManager.touchUser(msg.payload.playerId);
-                }
-                else if (msg.event === 'presence:register' && msg.payload?.playerId) {
-                    presenceManager_1.presenceManager.registerSocket(msg.payload.playerId, ws);
-                    ws.send(JSON.stringify({
-                        event: 'presence:sync',
-                        payload: { presences: presenceManager_1.presenceManager.getAllPresences() },
-                        timestamp: Date.now(),
-                    }));
-                }
+            return check.then(access => access === 'allowed');
+        };
+        void verifyAccess().then(allowed => {
+            if (!allowed) {
+                ws.close(1008);
+                return;
             }
-            catch { }
-        });
-        ws.on('close', () => {
+            if (ws.readyState !== ws_1.WebSocket.OPEN)
+                return;
             if (playerId) {
-                presenceManager_1.presenceManager.unregisterSocket(playerId, ws);
+                presenceManager_1.presenceManager.registerSocket(playerId, ws);
+                if (roomCode) {
+                    presenceManager_1.presenceManager.setUserRoom(playerId, roomCode);
+                }
+                ws.send(JSON.stringify({
+                    event: 'presence:sync',
+                    payload: { presences: presenceManager_1.presenceManager.getAllPresences() },
+                    timestamp: Date.now(),
+                }));
             }
+            ws.on('message', async (data) => {
+                if (!(await verifyAccess())) {
+                    ws.close(1008);
+                    return;
+                }
+                try {
+                    const text = data.toString();
+                    const msg = JSON.parse(text);
+                    if (enforcing && msg.payload?.playerId && msg.payload.playerId !== playerId)
+                        return;
+                    if (msg.event === 'ping') {
+                        ws.send(JSON.stringify({ event: 'pong', timestamp: Date.now() }));
+                    }
+                    else if (msg.event === 'presence:ping' && msg.payload?.playerId) {
+                        presenceManager_1.presenceManager.touchUser(msg.payload.playerId);
+                    }
+                    else if (msg.event === 'presence:register' && msg.payload?.playerId) {
+                        presenceManager_1.presenceManager.registerSocket(msg.payload.playerId, ws);
+                        ws.send(JSON.stringify({
+                            event: 'presence:sync',
+                            payload: { presences: presenceManager_1.presenceManager.getAllPresences() },
+                            timestamp: Date.now(),
+                        }));
+                    }
+                }
+                catch { }
+            });
+            ws.on('close', () => {
+                if (playerId) {
+                    presenceManager_1.presenceManager.unregisterSocket(playerId, ws);
+                }
+            });
         });
     });
     // Initialize Telegram Bot & Admin Approval Service
@@ -592,13 +627,15 @@ function createApp() {
         });
     }
     app.use((0, opsRoutes_1.createOpsRouter)(opsTelemetry));
+    app.use((0, adminAccountsRoutes_1.createAdminAccountsRouter)());
     // Yönetici giriş sayfası: tarayıcının yerel şifre penceresi yerine kalıcı oturum çerezi.
     app.get('/admin/login', adminShell_1.adminPageHeaders, (req, res) => {
         const nextPath = (0, adminLoginPage_1.sanitizeNextPath)(req.query.next);
-        if ((0, auth_1.getAdminSessionFromRequest)(req)) {
-            return res.redirect(302, nextPath);
+        const session = (0, auth_1.getAdminSessionFromRequest)(req);
+        if (session) {
+            return res.redirect(302, session.role === 'owner' ? nextPath : '/admin/kullanicilar');
         }
-        const configured = Boolean(process.env.PORTAL_ADMIN_EMAIL && process.env.PORTAL_ADMIN_PASSWORD && (process.env.JWT_SECRET || process.env.SUPABASE_JWT_SECRET));
+        const configured = (0, auth_1.isPortalConfigured)();
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.setHeader('Cache-Control', 'no-store');
         return res.send((0, adminLoginPage_1.renderAdminLoginHtml)(nextPath, configured));
@@ -3640,6 +3677,10 @@ function createApp() {
     });
     // Prisma ORM <-> Supabase Sync Endpoint
     app.all('/api/admin/prisma-sync', async (req, res) => {
+        // Never let a local snapshot overwrite live account balances, profile fields or inventory.
+        if (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL || process.env.DIRECT_URL) {
+            return res.status(410).json({ error: 'Canlı veritabanında yerel veri aktarımı devre dışı.' });
+        }
         try {
             const result = await prismaClient_1.db.pushAllDataViaPrismaToSupabase();
             const health = await prismaClient_1.prisma.checkHealth();
@@ -3670,6 +3711,19 @@ function createApp() {
     app.use('/api/push', pushRoutes_1.default);
     app.use(legalRoutes_1.legalRouter);
     // --- Cloudflare Durable Objects Internal Endpoints ---
+    app.post('/api/internal/player-access', async (req, res) => {
+        const secret = process.env.INTERNAL_API_SECRET;
+        const supplied = req.get('x-internal-secret');
+        if (!secret || !supplied || !(0, telegramBot_1.safeEqualStrings)(secret, supplied)) {
+            return res.status(403).json({ error: 'Yetkisiz erişim' });
+        }
+        const id = req.body?.id;
+        if (typeof id !== 'string' || !playerAccess_1.validPlayerId.test(id))
+            return res.status(400).json({ error: 'Oyuncu kimliği geçersiz.' });
+        const enabled = (0, adminAccountOperations_1.restrictionsEnabled)();
+        const access = await (0, playerAccess_1.checkPlayerAccess)(id);
+        return res.status(access === 'unavailable' ? 503 : 200).set('Cache-Control', 'no-store').json({ enabled, access });
+    });
     app.post('/api/internal/room-questions', async (req, res) => {
         // SECURITY: internal endpoints are service-to-service only. The secret header is
         // REQUIRED; previously a missing header bypassed the check entirely.
@@ -3699,7 +3753,7 @@ function createApp() {
             if (!summary || !summary.roomCode || !Array.isArray(summary.rankings)) {
                 return res.status(400).json({ error: 'Geçersiz maç özeti' });
             }
-            // Record match history in Prisma
+            // Keep the existing operational summary; analytics stores separate per-player rows in PostgreSQL.
             await prismaClient_1.db.matchHistory.create({
                 data: {
                     roomCode: summary.roomCode,
@@ -3714,6 +3768,8 @@ function createApp() {
             // Galibiyet / dereceli maç / doğru sayısı yalnızca bu yetkili özetten hesaplanır.
             // XP, altın ve LP sunucuda recordMatchResult içinde paylaşılan formülle yazılır.
             await prismaClient_1.db.recordFinalMatch(summary);
+            if (process.env.DATABASE_URL || process.env.DIRECT_URL)
+                await (0, playerAnalytics_1.recordCompletedPlayers)(prismaClient_1.db.rawClient, summary);
             logger_1.logger.info('SOCKET', `Cloudflare Durable Objects maçı kaydedildi: ${summary.roomCode}`, {
                 mode: summary.mode,
                 playersCount: summary.rankings.length,

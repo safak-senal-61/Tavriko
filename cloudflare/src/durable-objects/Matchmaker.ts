@@ -9,6 +9,7 @@ import { Env } from '../env';
 import { encodeWsMessage, decodeWsMessage, createWsError, WsMessage } from '../websocket/protocol';
 import { sanitizeString, RateLimiter } from '../websocket/validation';
 import { verifyJwt, AuthUser } from '../auth/authenticate';
+import { accessResponse, enforcingPlayerAccess, isGuestIdentity, PlayerAccessGate } from '../auth/playerAccess';
 
 interface QueueEntry {
   matchId: string;
@@ -73,9 +74,11 @@ export class MatchmakerDO extends DurableObject<Env> {
   private presences: Map<string, PresenceEntry> = new Map();
   private publicRooms: Map<string, PublicRoomEntry> = new Map();
   private rateLimiters = new WeakMap<WebSocket, RateLimiter>();
+  private access: PlayerAccessGate;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+    this.access = new PlayerAccessGate(env);
 
     // Restore persisted queue entries & rebuild active socket presences
     this.ctx.blockConcurrencyWhile(async () => {
@@ -362,6 +365,9 @@ export class MatchmakerDO extends DurableObject<Env> {
 
     const verifiedAccount = !!authUser && !authUser.isGuest;
     if (!authUser) {
+      if (enforcingPlayerAccess(this.env) && (token || (rawPlayerId && !isGuestIdentity(rawPlayerId)))) {
+        return new Response('Oyuncu oturumu gerekli.', { status: 401 });
+      }
       const pid = rawPlayerId || `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       const name = sanitizeString(rawDisplayName || `Oyuncu ${pid.slice(-4)}`, 30);
       authUser = {
@@ -371,10 +377,16 @@ export class MatchmakerDO extends DurableObject<Env> {
         avatarUrl: rawAvatarUrl || 'av1',
         isGuest: true,
       };
-    } else if (!verifiedAccount && rawPlayerId && authUser.id !== rawPlayerId) {
+    } else if (!verifiedAccount && rawPlayerId && authUser.id !== rawPlayerId &&
+        (!enforcingPlayerAccess(this.env) || isGuestIdentity(rawPlayerId))) {
       // Local guest sessions keep their client-generated identifier.
       authUser.id = rawPlayerId;
     }
+    if (enforcingPlayerAccess(this.env) && authUser.isGuest && !isGuestIdentity(authUser.id)) {
+      return new Response('Misafir oturumu geçersiz.', { status: 401 });
+    }
+    const access = await this.access.check(authUser.id);
+    if (access !== 'allowed') return accessResponse(access);
 
     // Accept WebSocket into hibernation
     const pair = new WebSocketPair();
@@ -451,6 +463,14 @@ export class MatchmakerDO extends DurableObject<Env> {
 
     const attachment = ws.deserializeAttachment() as (QueueEntry & { inRoom?: boolean; currentRoomCode?: string }) | null;
     if (!attachment || !attachment.playerId) return;
+    const access = await this.access.check(attachment.playerId, ws);
+    if (access !== 'allowed') {
+      await this.dequeuePlayer(attachment.playerId);
+      ws.send(createWsError(access === 'restricted' ? 'Oyun erişimi kısıtlı.' : 'Oyun erişimi doğrulanamadı.',
+        access === 'restricted' ? 'ACCOUNT_RESTRICTED' : 'ACCESS_UNAVAILABLE', envelope.requestId));
+      ws.close(access === 'restricted' ? 1008 : 1013);
+      return;
+    }
 
     switch (envelope.event) {
       case SOCKET_EVENTS.FIND_MATCH: {

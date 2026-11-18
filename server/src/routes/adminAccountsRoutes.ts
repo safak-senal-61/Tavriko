@@ -2,9 +2,11 @@ import { Router, type Request, type RequestHandler } from 'express';
 import type { Prisma } from '@prisma/client';
 import { db } from '../db/prismaClient';
 import { getAdminSessionFromRequest, requireAdminAuth } from '../middleware/auth';
-import { logger } from '../utils/logger';
 import { adminPageHeaders } from './adminShell';
 import { renderAdminAccounts } from './adminAccountsPage';
+import { addSupportNote, audit, compensationCatalog, grantInput, limits, moderateAccount, OperationError,
+  permissions, reasonText, requestGrant, restrictionsEnabled, reviewGrant, uuidPattern, type Operation } from '../services/adminAccountOperations';
+import { readPlayerAnalytics } from '../services/playerAnalytics';
 
 const prefix = '/api/admin/accounts';
 const size = 20;
@@ -19,11 +21,6 @@ const detailSelect = {
   _count: { select: { inventoryItems: true, pushTokens: true } },
   matches: { orderBy: [{ playedAt: 'desc' }, { id: 'desc' }], take: 5, select: { playedAt: true, mode: true, score: true } },
 } satisfies Prisma.UserSelect;
-
-function portalOnly(req: Request, res: Parameters<RequestHandler>[1], next: Parameters<RequestHandler>[2]) {
-  if (getAdminSessionFromRequest(req)?.email) { next(); return; }
-  res.status(403).json({ error: 'Bu işlem için portal yönetici oturumu gerekli.' });
-}
 
 function sameOrigin(req: Request): boolean {
   try {
@@ -44,10 +41,46 @@ export function registrationWindow(now: Date) {
 
 export function createAdminAccountsRouter(client = db.rawClient) {
   const router = Router();
-  router.get('/admin/kullanicilar', adminPageHeaders, requireAdminAuth, (_req, res) => {
-    res.type('html').send(renderAdminAccounts());
+  router.get('/admin/kullanicilar', adminPageHeaders, (req, res, next) => {
+    const session = getAdminSessionFromRequest(req);
+    if (!session) { next(); return; }
+    res.type('html').send(renderAdminAccounts(session.role !== 'owner'));
   });
-  router.use(prefix, adminPageHeaders, requireAdminAuth, portalOnly);
+  router.get('/admin/kullanicilar', adminPageHeaders, requireAdminAuth, (_req, res) => {
+    res.redirect(302, '/admin/login?next=%2Fadmin%2Fkullanicilar');
+  });
+  router.use(prefix, adminPageHeaders, (req, res, next) => {
+    const session = getAdminSessionFromRequest(req);
+    if (session) { res.locals.accountAdmin = session; next(); return; }
+    // Do not let service, Basic or Telegram credentials operate on player accounts.
+    void requireAdminAuth(req, res, () => res.status(403).json({ error: 'Bu işlem için portal oturumu gerekli.' }));
+  });
+
+  const mutation = (operation: Operation, keys: string[]): RequestHandler => (req, res, next) => {
+    if (!permissions(res.locals.accountAdmin)[operation]) { res.status(403).json({ error: 'Bu işlem için rolünüz yetkili değil.' }); return; }
+    if (!sameOrigin(req)) { res.status(403).json({ error: 'İşlemi Tavriko yönetim panelinden başlatın.' }); return; }
+    if (!req.is('application/json')) { res.status(415).json({ error: 'JSON gerekli.' }); return; }
+    if (!req.body || Array.isArray(req.body) || typeof req.body !== 'object' || Object.keys(req.body).some(key => !keys.includes(key))) {
+      res.status(400).json({ error: 'İşlem alanları geçersiz.' }); return;
+    }
+    next();
+  };
+  const validId: RequestHandler = (req, res, next) => {
+    if (typeof req.params.id !== 'string' || !accountId.test(req.params.id)) {
+      res.status(400).json({ error: 'Hesap kimliği geçersiz.' }); return;
+    }
+    next();
+  };
+  const failed = (res: Parameters<RequestHandler>[1], error: unknown) => {
+    if (error instanceof OperationError) return res.status(error.status).json({ error: error.message });
+    return res.status(503).json({ error: 'İşlem sonucu doğrulanamadı. Tekrar denemeden önce hesabı yenileyin.' });
+  };
+  router.get(prefix + '/access', (_req, res) => {
+    const admin = res.locals.accountAdmin;
+    const roles = permissions(admin);
+    res.json({ role: admin.role, actor: admin.email, permissions: roles, restrictions: restrictionsEnabled(), limits,
+      ...(roles.grant ? { items: compensationCatalog.map(({ id, name }) => ({ id, name })) } : {}) });
+  });
 
   let pending: Promise<object> | undefined;
   let cached: { value: object; at: number } | undefined;
@@ -72,6 +105,30 @@ export function createAdminAccountsRouter(client = db.rawClient) {
         cached = { value, at: Date.now() }; return value;
       }).finally(() => { pending = undefined; });
       res.json(await pending);
+    } catch { unavailable(res); }
+  });
+  let playerCache: { value: Awaited<ReturnType<typeof readPlayerAnalytics>>; at: number } | undefined;
+  let loadingPlayers: Promise<Awaited<ReturnType<typeof readPlayerAnalytics>>> | undefined;
+  router.get(prefix + '/player-metrics', async (_req, res) => {
+    try {
+      const now = new Date();
+      const { days, first } = registrationWindow(now);
+      if (playerCache && now.getTime() - playerCache.at < 30_000 && playerCache.value.days.at(-1)?.day === days.at(-1)) {
+        res.json(playerCache.value); return;
+      }
+      loadingPlayers ??= readPlayerAnalytics(client, days, first, now)
+        .then(value => { playerCache = { value, at: now.getTime() }; return value; })
+        .finally(() => { loadingPlayers = undefined; });
+      res.json(await loadingPlayers);
+    } catch { unavailable(res); }
+  });
+  router.get(prefix + '/compensations/pending', async (_req, res) => {
+    if (!permissions(res.locals.accountAdmin).review) { res.status(403).json({ error: 'Onay yetkisi gerekli.' }); return; }
+    try {
+      const requests = await client.adminCompensation.findMany({
+        where: { status: 'pending', expiresAt: { gt: new Date() } }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: 51,
+      });
+      res.json({ requests: requests.slice(0, 50), more: requests.length > 50 });
     } catch { unavailable(res); }
   });
   router.get(prefix, async (req, res) => {
@@ -112,9 +169,61 @@ export function createAdminAccountsRouter(client = db.rawClient) {
       res.json({ account: { ...fields, avatarState: avatarUrl === 'av1' ? 'default' : avatarUrl ? 'custom' : 'unset' } });
     } catch { unavailable(res); }
   });
-  router.patch(prefix + '/:id/profile', async (req, res) => {
-    if (!sameOrigin(req)) { res.status(403).json({ error: 'İşlemi Tavriko yönetim panelinden başlatın.' }); return; }
-    if (!req.is('application/json')) { res.status(415).json({ error: 'JSON gerekli.' }); return; }
+  router.get(prefix + '/:id/timeline', validId, async (req, res) => {
+    const id = String(req.params.id);
+    const page = req.query.page ?? '1';
+    if (typeof page !== 'string' || !/^[1-9][0-9]{0,2}$/.test(page)) { res.status(400).json({ error: 'Sayfa geçersiz.' }); return; }
+    try {
+      const [user, entries] = await Promise.all([
+        client.user.findUnique({ where: { id }, select: { restrictedUntil: true } }),
+        client.adminAccountEvent.findMany({
+          where: { accountId: id }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (Number(page) - 1) * 20, take: 21,
+        }),
+      ]);
+      if (!user && !entries.length) { res.status(404).json({ error: 'Hesap veya geçmiş bulunamadı.' }); return; }
+      res.json({ entries: entries.slice(0, 20), hasNext: entries.length > 20 && Number(page) < 999,
+        restrictedUntil: user?.restrictedUntil && user.restrictedUntil > new Date() ? user.restrictedUntil : null });
+    } catch { unavailable(res); }
+  });
+  router.post(prefix + '/:id/notes', validId, mutation('note', ['note']), async (req, res) => {
+    const note = reasonText(req.body.note);
+    if (!note) { res.status(400).json({ error: 'Not 8–500 karakter olmalı ve tek satır olmalı.' }); return; }
+    try {
+      const entry = await addSupportNote(client, res.locals.accountAdmin, String(req.params.id), note);
+      res.status(201).json({ id: entry.id });
+    } catch (error) { failed(res, error); }
+  });
+  router.post(prefix + '/:id/moderation', validId, mutation('moderate', ['action', 'reason', 'hours']), async (req, res) => {
+    const { action, hours } = req.body;
+    const reason = reasonText(req.body.reason);
+    if (!reason || !['warn', 'restrict', 'lift'].includes(action) ||
+        (action === 'restrict' ? !Number.isInteger(hours) || hours < 1 || hours > 24 * 30 : hours !== undefined)) {
+      res.status(400).json({ error: 'İşlemi, gerekçeyi ve kısıtlama süresini (1–720 saat) kontrol edin.' }); return;
+    }
+    try {
+      res.json(await moderateAccount(client, res.locals.accountAdmin, String(req.params.id), action, reason, hours));
+    } catch (error) { failed(res, error); }
+  });
+  router.post(prefix + '/:id/compensations', validId, mutation('grant', ['id', 'kind', 'itemId', 'amount', 'reason']), async (req, res) => {
+    const input = grantInput(req.body);
+    if (!input) { res.status(400).json({ error: 'Telafi türünü, miktarı, kataloğu ve gerekçeyi kontrol edin.' }); return; }
+    try {
+      const grant = await requestGrant(client, res.locals.accountAdmin, String(req.params.id), input);
+      res.json({ id: grant.id, status: grant.status, expiresAt: grant.expiresAt });
+    } catch (error) { failed(res, error); }
+  });
+  router.post(prefix + '/compensations/:id/review', mutation('review', ['decision', 'reason']), async (req, res) => {
+    const { decision } = req.body;
+    const reason = reasonText(req.body.reason);
+    if (!reason || typeof req.params.id !== 'string' || !uuidPattern.test(req.params.id) || (decision !== 'approve' && decision !== 'reject')) {
+      res.status(400).json({ error: 'Kararı ve gerekçeyi kontrol edin.' }); return;
+    }
+    try {
+      const grant = await reviewGrant(client, res.locals.accountAdmin, req.params.id.toLowerCase(), decision, reason);
+      res.json({ id: grant.id, status: grant.status });
+    } catch (error) { failed(res, error); }
+  });
+  router.patch(prefix + '/:id/profile', mutation('profile', ['displayName', 'resetAvatar', 'expectedUpdatedAt', 'reason']), async (req, res) => {
     const { id } = req.params;
     const input = req.body;
     if (typeof id !== 'string' || !accountId.test(id) || !input || Array.isArray(input) || typeof input !== 'object' ||
@@ -140,13 +249,16 @@ export function createAdminAccountsRouter(client = db.rawClient) {
         res.status(409).json({ error: 'Hesap bu sırada değişti. Bilgileri yeniden yükleyin.' }); return;
       }
       if (!Object.keys(data).length) { res.status(400).json({ error: 'Kaydedilecek değişiklik yok.' }); return; }
-      const result = await client.user.updateMany({ where: { id, updatedAt: timestamp }, data });
-      if (!result.count) { res.status(409).json({ error: 'Hesap bu sırada değişti. Bilgileri yeniden yükleyin.' }); return; }
-      logger.success('AUTH', 'Yönetici profil düzeltmesi', {
-        accountId: id, admin: getAdminSessionFromRequest(req)?.email, reason, fields: Object.keys(data),
+      await client.$transaction(async tx => {
+        const result = await tx.user.updateMany({ where: { id, updatedAt: timestamp }, data });
+        if (!result.count) throw new OperationError(409, 'Hesap bu sırada değişti. Bilgileri yeniden yükleyin.');
+        await audit(tx, res.locals.accountAdmin, id, 'profile', reason, {
+          ...(data.displayName ? { displayName: { before: current.displayName, after: data.displayName } } : {}),
+          ...(data.avatarUrl ? { avatar: { before: current.avatarUrl ? 'custom' : 'unset', after: 'default' } } : {}),
+        });
       });
       res.json({ ok: true });
-    } catch { res.status(503).json({ error: 'İşlem sonucu doğrulanamadı. Tekrar denemeden önce hesabı yenileyin.' }); }
+    } catch (error) { failed(res, error); }
   });
   return router;
 }
