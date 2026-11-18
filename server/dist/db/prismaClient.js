@@ -4130,7 +4130,7 @@ class PrismaService {
         let notif = user.notifications?.find((n) => n.id === notificationId);
         try {
             const dbNotif = await this.rawClient.userNotification.findUnique({
-                where: { id: notificationId },
+                where: { id: notificationId, userId: user.id },
             });
             if (dbNotif)
                 notif = dbNotif;
@@ -4138,6 +4138,9 @@ class PrismaService {
         catch { }
         if (!notif) {
             return { success: false, handled: finalHandled, error: 'Bildirim bulunamadı.', message: '' };
+        }
+        if (action === 'decline' && notif.handled === 'accepted') {
+            return { success: false, handled: 'accepted', error: 'Bu davet zaten kabul edildi.', message: '' };
         }
         notif.handled = finalHandled;
         const newSub = action === 'accept'
@@ -4149,7 +4152,7 @@ class PrismaService {
         // Update in PostgreSQL
         try {
             await this.rawClient.userNotification.update({
-                where: { id: notificationId },
+                where: { id: notificationId, userId: user.id },
                 data: { handled: finalHandled, sub: newSub },
             });
         }
