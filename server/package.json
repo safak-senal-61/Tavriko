@@ -16,7 +16,7 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
-    "@google/genai": "^2.32.0",
+    "@google/genai": "^3.3.0",
     "@prisma/client": "^6.19.3",
     "@sentry/node": "^11.12.0",
     "@simplewebauthn/server": "14.1.0",

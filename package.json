@@ -29,7 +29,7 @@
     "deploy:cdn": "node cdn/generate-manifest.mjs && npx wrangler@latest deploy --config cdn/wrangler.jsonc"
   },
   "dependencies": {
-    "@google/genai": "^2.32.0",
+    "@google/genai": "^3.3.0",
     "@prisma/client": "^6.19.3",
     "@supabase/supabase-js": "^2.119.1",
     "@trivia/shared": "file:shared",
