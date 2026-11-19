@@ -36,9 +36,10 @@
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
         "com.google.android.gms.permission.AD_ID"
+      ],
+      "blockedPermissions": [
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
     "splash": {
@@ -75,7 +76,12 @@
       "expo-asset",
       "expo-font",
       "./plugins/notification-sound",
-      "expo-audio",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": false
+        }
+      ],
       "expo-web-browser",
       "@react-native-community/datetimepicker",
       [
