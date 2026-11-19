@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [fix/android-version-code]
-    paths: [".github/workflows/android-aab.yml"]
+    paths: [".github/workflows/android-aab.yml", "client/app.json"]
 
 jobs:
   build:
