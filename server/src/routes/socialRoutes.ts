@@ -546,4 +546,41 @@ router.post('/daily-challenge/complete', requireUserAuth, async (req: Request, r
   }
 });
 
+// --- Ödüllü reklam (Reklam izle, jeton kazan) ---
+router.get('/ads/rewarded/status', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(400).json({ error: 'userId gereklidir' });
+      return;
+    }
+    const status = await db.getRewardedAdStatusForUser(userId);
+    if (!status) {
+      res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+      return;
+    }
+    res.json({ success: true, status });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/ads/rewarded/claim', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.authUserId;
+    if (!userId) {
+      res.status(400).json({ error: 'userId gereklidir' });
+      return;
+    }
+    const result = await db.claimRewardedAd(userId);
+    if (!result.success) {
+      res.status(429).json({ error: result.error, user: result.user, status: result.status });
+      return;
+    }
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
