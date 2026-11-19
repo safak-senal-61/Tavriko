@@ -5,6 +5,10 @@ import { Matchmaker } from '../engine/Matchmaker';
 import { db } from '../db/prismaClient';
 import { presenceManager } from '../services/presenceManager';
 import { addBreadcrumb } from '../utils/errorMonitor';
+import { randomUUID } from 'node:crypto';
+import { restrictionsEnabled } from '../services/adminAccountOperations';
+import { checkPlayerAccess, socketIdentity } from '../services/playerAccess';
+import { recordCompletedPlayers } from '../services/playerAnalytics';
 
 export function setupSocketHandlers(
   io: SocketIOServer,
@@ -58,8 +62,16 @@ export function setupSocketHandlers(
 
   roomManager.onGameOver = (roomCode: string, summary: FinalMatchSummary) => {
     io.to(roomCode).emit(SOCKET_EVENTS.GAME_OVER, summary);
+    const verifiedPlayerIds = [...(io.sockets.adapter.rooms.get(roomCode) ?? [])].map(id => io.sockets.sockets.get(id)?.data.playerId)
+      .filter((id): id is string => typeof id === 'string');
+    const category = roomManager.getRoom(roomCode)?.category;
     // Yerel Socket.IO modunda da sonuç sunucuda (istemciden bağımsız) kaydedilir
-    void db.recordFinalMatch(summary).catch(() => {});
+    void (async () => {
+      await db.recordFinalMatch(summary);
+      if (process.env.DATABASE_URL || process.env.DIRECT_URL) {
+        await recordCompletedPlayers(db.rawClient, { ...summary, matchId: randomUUID(), verifiedPlayerIds, category });
+      }
+    })().catch(error => console.error('Match persistence failed', error));
   };
 
   roomManager.onStateSync = (roomCode: string, room: GameRoom) => {
@@ -103,9 +115,34 @@ export function setupSocketHandlers(
 
   // Socket connection map: socketId -> { playerId, roomCode }
   const socketMeta: Map<string, { playerId: string; roomCode?: string }> = new Map();
+  io.use((socket, next) => {
+    if (!restrictionsEnabled()) { next(); return; }
+    const playerId = socketIdentity(socket.handshake.auth?.token, socket.handshake.query.playerId);
+    if (!playerId) { next(new Error('Oyuncu oturumu gerekli.')); return; }
+    void checkPlayerAccess(playerId).then(access => {
+      if (access !== 'allowed') { next(new Error(access)); return; }
+      socket.data.playerId = playerId;
+      next();
+    });
+  });
 
   io.on('connection', (socket: Socket) => {
-    const initialPlayerId = socket.handshake.query.playerId as string;
+    const initialPlayerId = (socket.data.playerId || socket.handshake.query.playerId) as string;
+    if (restrictionsEnabled()) {
+      let checkedAt = 0;
+      let check: ReturnType<typeof checkPlayerAccess>;
+      socket.use((packet, next) => {
+        const data = packet[1];
+        if (data && ((data.playerId != null && data.playerId !== initialPlayerId) || (data.hostId != null && data.hostId !== initialPlayerId))) {
+          next(new Error('Oyuncu kimliği eşleşmiyor.')); return;
+        }
+        if (!check || Date.now() - checkedAt >= 10_000) { checkedAt = Date.now(); check = checkPlayerAccess(initialPlayerId); }
+        void check.then(access => {
+          if (access === 'allowed') next();
+          else socket.disconnect(true);
+        });
+      });
+    }
     addBreadcrumb('WS bağlandı (Socket.IO)', 'ws', {
       socketId: socket.id,
       playerId: initialPlayerId || undefined,

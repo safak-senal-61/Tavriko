@@ -19,6 +19,7 @@
     "@google/genai": "^2.32.0",
     "@prisma/client": "^6.19.3",
     "@sentry/node": "^11.12.0",
+    "@simplewebauthn/server": "14.1.0",
     "@supabase/supabase-js": "^2.119.1",
     "@trivia/shared": "file:../shared",
     "@types/qrcode": "^1.5.6",

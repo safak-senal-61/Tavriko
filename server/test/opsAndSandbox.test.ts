@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../src/db/prismaClient', () => ({ db: {
   verifyToken: (token: string) => token === 'player' ? { userId: 'signed-player' } : null,
   purchaseShopProduct: vi.fn().mockResolvedValue({ user: {}, message: 'ok' }),
+  rawClient: { portalSession: { findFirst: vi.fn().mockResolvedValue({ method: 'password', createdAt: new Date() }) } },
 } }));
 vi.mock('../src/db/supabaseClient', () => ({ supabaseService: { getClient: () => null } }));
 vi.mock('../src/cache/redisClient', () => ({ cacheService: { isAvailable: () => false } }));
@@ -126,7 +127,7 @@ describe('Admin and storefront routes', () => {
     vi.stubEnv('POLAR_SANDBOX_ENABLED', 'false');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ status:'ok', service:'Tavriko Real-time Multiplayer Gateway' })));
   });
-  const cookie = () => `${ADMIN_SESSION_COOKIE}=${issueAdminSessionToken(email)}`;
+  const cookie = () => `${ADMIN_SESSION_COOKIE}=${issueAdminSessionToken(email, 'owner', false, 'c82b0f7a-0fa9-4ce0-ac11-8849b26c34a9')}`;
   it('protects the HTML and JSON, and keeps snapshots private', async () => {
     const ops = makeOpsTelemetry();
     ops.record('api', 500, 40);

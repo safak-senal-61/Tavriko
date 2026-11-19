@@ -100,9 +100,29 @@
 
 ## Site health and payments
 
+- Kullanıcılar baseline: portal login returns to `/admin/kullanicilar`; eleven canonical links remain visible. The old account table listed only the latest ten records. New workspace must support search, filtering, paging, detail close and profile correction without exposing private account data in the list.
+- Account metrics: verify seven Istanbul calendar days (current day labeled partial), independent HTTP telemetry, empty/error states and responsive charts. Test profile cancel, no-op, success, stale-edit handling and insufficient access using synthetic accounts only.
+- Accounts workspace verification: desktop and 375px fixture browser exercised charts, filtering, sorting, paging, account lookup, copy ID, matches, no-op, review cancellation and confirmed profile correction. In the isolated Express app, verified sign-in to the original deep link, no-database/telemetry states, all eleven admin routes and logout. API tests cover origin, session, payload allowlist and stale writes. No live records were changed.
 - Sign in at `/admin/login`; opening any protected admin route before signing in must return to that exact route after login.
 - From `/admin`, navigate through Oyun, Mobil ve QR, Kozmetikler, API Araçları, Canlı Loglar, Kullanıcılar, Moderasyon, Bildirimler, Telegram and Site Sağlığı. Every link has its own URL, active marker, page heading and reload/back behavior. Old `#tab-*` bookmarks resolve to the new URLs.
 - Check the simulator/QR, cosmetics previews, a read-only API call, log filters, user/device table overflow, local moderation and push templates, Telegram read-only tools, health pause/refresh and logout. Use synthetic accounts and never send production notifications, mutate production data or perform a new payment during UI QA.
 - Verify navigation, content and controls at desktop, 375px and 320px; only wide table containers may scroll horizontally. The public `/app` and Telegram Mini App are not redesigned.
 - Open `/admin/health` for protected per-instance diagnostics and Sandbox-only checkout.
 - See [Sandbox setup and telemetry scope](docs/polar-sandbox-and-site-health.md). Checkout never grants game items, and TRY purchases are disabled until a separate production integration is approved.
+
+## Admin account operations
+
+- Sign in as support: only the account workspace is visible. Open a synthetic account, save an internal note, then start a compensation above the rolling direct limit. The timeline shows the requester and reason; the balance stays unchanged while pending.
+- Sign in as a different approver: open the queue, inspect the account and approve with a reason. Check the balance, both timeline entries and the empty queue. Verify repeat submissions, self-review, expired requests, unrelated roles and over-cap requests are rejected or idempotent as appropriate.
+- As moderator: warn, restrict for a fixed time, and lift. Verify the player notification never contains the internal reason. In a staging Worker and backend with the flag enabled, check queue, room entry, active-message recheck, expiry and backend unavailability using synthetic accounts.
+- Seed registered completions inside and outside the seven Istanbul days. Verify deduplication, weekly unique/returning counts, new sign-ups with a first match, separate HTTP telemetry and readable mobile charts.
+- Use a local `*_qa` PostgreSQL URL in `ADMIN_OPERATIONS_TEST_DATABASE_URL` for database integration tests. See [deployment order, staff roles and limits](docs/admin-accounts.md) before enabling enforcement. Do not verify with production user accounts.
+- From player account settings, submit a support request and an appeal using a synthetic account. Verify another player cannot list the request or appeal that moderation event. Assign, start and resolve from the appropriate staff queue; only the public resolution reaches the player.
+- Enroll synthetic staff in TOTP, verify the challenge, valid login, rejection of concurrent code replay, pre-enrollment cookies and password-only Basic. Validate the recovery procedure in staging before forcing enrollment.
+- Create five distinct compensations across accounts in an hour. Check one pending alert with linked records and independent review; idempotent replays do not count. Seed cohort points at Istanbul midnight and check D1, D7 and incomplete denominators.
+# Destek konuşması, personel oturumları ve ilk düello
+
+- Oyuncu destek talebini açar; görevli aynı talepte bilgi ister. Oyuncu konuşmayı yenileyip cevaplar; kayıt görevli kuyruğunda tekrar işlem bekler. Başka oyuncunun mesajları görünmez; kapalı talep yeni yanıt almaz.
+- İlk yanıt hedefi geçen açık talepler ekip sorumlusunun gecikenler görünümünde yer alır; yalnızca dahili işlem veya atama süreyi durdurmaz.
+- Personel kendi oturumlarını listeler ve başka bir oturumu kapatır. Portal sahibi diğer personelin oturumlarını da kapatabilir. Passkey kurulumu ve doğrulanmış oturumla yeniden giriş, mevcut parola/TOTP seçeneğini bozmaz.
+- Hızlı Düello hunisi kayıt, seçim, doğrulanmış eşleşme ve aynı odada tamamlanan maç sayılarını gösterir. Kapsam başlangıcı veya olgunlaşmış kayıt yoksa oran göstermez.

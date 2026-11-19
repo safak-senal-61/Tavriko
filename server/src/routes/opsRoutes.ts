@@ -81,7 +81,7 @@ export function createOpsRouter(telemetry: ReturnType<typeof makeOpsTelemetry>, 
   let lastCheckout = -Infinity;
   function checkoutRoute(handler: (req: Parameters<RequestHandler>[0], email: string, polar: ReturnType<typeof buildPolarSandbox>) => Promise<object>): RequestHandler {
     return async (req, res) => {
-      const admin = getAdminSessionFromRequest(req);
+      const admin = await getAdminSessionFromRequest(req);
       if (!admin?.email) { res.status(401).json({ error: 'Yönetici oturumu gerekli.' }); return; }
       const config = sandboxConfig();
       if (!config) { res.status(503).json({ error: 'Polar Sandbox etkin değil veya yapılandırması eksik.' }); return; }

@@ -5,6 +5,10 @@ const shared_1 = require("@trivia/shared");
 const prismaClient_1 = require("../db/prismaClient");
 const presenceManager_1 = require("../services/presenceManager");
 const errorMonitor_1 = require("../utils/errorMonitor");
+const node_crypto_1 = require("node:crypto");
+const adminAccountOperations_1 = require("../services/adminAccountOperations");
+const playerAccess_1 = require("../services/playerAccess");
+const playerAnalytics_1 = require("../services/playerAnalytics");
 function setupSocketHandlers(io, roomManager, matchmaker) {
     // Wire up room manager callbacks to broadcast to rooms
     roomManager.onRoundStart = (roomCode, question) => {
@@ -46,8 +50,16 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
     };
     roomManager.onGameOver = (roomCode, summary) => {
         io.to(roomCode).emit(shared_1.SOCKET_EVENTS.GAME_OVER, summary);
+        const verifiedPlayerIds = [...(io.sockets.adapter.rooms.get(roomCode) ?? [])].map(id => io.sockets.sockets.get(id)?.data.playerId)
+            .filter((id) => typeof id === 'string');
+        const category = roomManager.getRoom(roomCode)?.category;
         // Yerel Socket.IO modunda da sonuç sunucuda (istemciden bağımsız) kaydedilir
-        void prismaClient_1.db.recordFinalMatch(summary).catch(() => { });
+        void (async () => {
+            await prismaClient_1.db.recordFinalMatch(summary);
+            if (process.env.DATABASE_URL || process.env.DIRECT_URL) {
+                await (0, playerAnalytics_1.recordCompletedPlayers)(prismaClient_1.db.rawClient, { ...summary, matchId: (0, node_crypto_1.randomUUID)(), verifiedPlayerIds, category });
+            }
+        })().catch(error => console.error('Match persistence failed', error));
     };
     roomManager.onStateSync = (roomCode, room) => {
         io.to(roomCode).emit(shared_1.SOCKET_EVENTS.ROOM_STATE_SYNC, room);
@@ -86,8 +98,48 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
     };
     // Socket connection map: socketId -> { playerId, roomCode }
     const socketMeta = new Map();
+    io.use((socket, next) => {
+        if (!(0, adminAccountOperations_1.restrictionsEnabled)()) {
+            next();
+            return;
+        }
+        const playerId = (0, playerAccess_1.socketIdentity)(socket.handshake.auth?.token, socket.handshake.query.playerId);
+        if (!playerId) {
+            next(new Error('Oyuncu oturumu gerekli.'));
+            return;
+        }
+        void (0, playerAccess_1.checkPlayerAccess)(playerId).then(access => {
+            if (access !== 'allowed') {
+                next(new Error(access));
+                return;
+            }
+            socket.data.playerId = playerId;
+            next();
+        });
+    });
     io.on('connection', (socket) => {
-        const initialPlayerId = socket.handshake.query.playerId;
+        const initialPlayerId = (socket.data.playerId || socket.handshake.query.playerId);
+        if ((0, adminAccountOperations_1.restrictionsEnabled)()) {
+            let checkedAt = 0;
+            let check;
+            socket.use((packet, next) => {
+                const data = packet[1];
+                if (data && ((data.playerId != null && data.playerId !== initialPlayerId) || (data.hostId != null && data.hostId !== initialPlayerId))) {
+                    next(new Error('Oyuncu kimliği eşleşmiyor.'));
+                    return;
+                }
+                if (!check || Date.now() - checkedAt >= 10_000) {
+                    checkedAt = Date.now();
+                    check = (0, playerAccess_1.checkPlayerAccess)(initialPlayerId);
+                }
+                void check.then(access => {
+                    if (access === 'allowed')
+                        next();
+                    else
+                        socket.disconnect(true);
+                });
+            });
+        }
         (0, errorMonitor_1.addBreadcrumb)('WS bağlandı (Socket.IO)', 'ws', {
             socketId: socket.id,
             playerId: initialPlayerId || undefined,

@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sanitizeNextPath = sanitizeNextPath;
 exports.renderAdminLoginHtml = renderAdminLoginHtml;
 const adminShell_1 = require("./adminShell");
+const portalSecurityScript_1 = require("./portalSecurityScript");
 /**
  * Yönetici paneli giriş sayfası (/admin/login).
  *
@@ -21,7 +22,7 @@ function sanitizeNextPath(raw) {
         return '/admin';
     return raw;
 }
-function renderAdminLoginHtml(nextPath, configured) {
+function renderAdminLoginHtml(nextPath, configured, passkey = false) {
     // JSON gömülürken </script> kaçışını engellemek için < karakteri kaçırılır.
     const nextJson = JSON.stringify(nextPath).replace(/</g, '\\u003c');
     return `<!DOCTYPE html>
@@ -63,13 +64,18 @@ function renderAdminLoginHtml(nextPath, configured) {
   <main class="card">
     <div class="admin-kicker">TAVRİKO / YÖNETİM</div>
     <h1>Yönetici Girişi</h1>
-    <p class="sub">${configured ? 'Devam etmek için yönetici e-posta adresi ve şifresiyle giriş yapın. Oturumunuz bu cihazda 7 gün açık kalır.' : 'Yönetici girişi yapılandırılmamış. PORTAL_ADMIN_EMAIL, PORTAL_ADMIN_PASSWORD ve JWT_SECRET ortam değişkenlerini tanımlayın.'}</p>
+    <p class="sub">${configured ? 'Yönetici e-posta adresi ve şifrenizle başlayın. İstenirse doğrulayıcı uygulamanızdaki kodu girin.' : 'Yönetici girişi yapılandırılmamış. PORTAL_ADMIN_EMAIL, PORTAL_ADMIN_PASSWORD ve JWT_SECRET ortam değişkenlerini tanımlayın.'}</p>
     <form id="loginForm" autocomplete="on">
       <label for="email">E-POSTA</label>
       <input id="email" name="email" type="email" autocomplete="username" required />
       <label for="password">ŞİFRE</label>
       <input id="password" name="password" type="password" autocomplete="current-password" required />
+      <div id="otp-fields" hidden>
+        <label for="code">DOĞRULAMA KODU</label>
+        <input id="code" name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" />
+      </div>
       <button id="submitBtn" type="submit"${configured ? '' : ' disabled'}>Giriş Yap</button>
+      ${passkey ? '<button id="passkeyBtn" type="button" hidden>Geçiş anahtarıyla giriş</button>' : ''}
       <div id="err" class="err" role="alert"></div>
     </form>
     <p class="note">Bu sayfa yalnızca yetkili yöneticiler içindir.</p>
@@ -79,10 +85,26 @@ function renderAdminLoginHtml(nextPath, configured) {
     const form = document.getElementById('loginForm');
     const btn = document.getElementById('submitBtn');
     const err = document.getElementById('err');
+    ${portalSecurityScript_1.passkeyBrowserScript}
+    const keyButton=document.getElementById('passkeyBtn');
+    if(keyButton&&supportsPasskeys()){
+      keyButton.hidden=false;
+      keyButton.addEventListener('click',async()=>{
+        keyButton.disabled=btn.disabled=true;err.style.display='none';
+        try{
+          const result=await browserPasskey('login');
+          location.replace(result.role==='owner'?NEXT:'/admin/kullanicilar');
+        }catch(error){
+          err.textContent=error.name==='NotAllowedError'?'Geçiş anahtarı kullanılamadı. Şifreyle de giriş yapabilirsiniz.':error.message;
+          err.style.display='block';
+        }finally{keyButton.disabled=btn.disabled=false;}
+      });
+    }
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       err.style.display = 'none';
       btn.disabled = true;
+      if (keyButton) keyButton.disabled=true;
       btn.textContent = 'Kontrol ediliyor...';
       try {
         const res = await fetch('/api/portal/login', {
@@ -92,13 +114,20 @@ function renderAdminLoginHtml(nextPath, configured) {
           body: JSON.stringify({
             email: document.getElementById('email').value.trim(),
             password: document.getElementById('password').value,
+            code: document.getElementById('code').value.trim(),
           }),
         });
         const data = await res.json().catch(() => ({}));
+        if (data.otpRequired) {
+          const code = document.getElementById('code');
+          document.getElementById('otp-fields').hidden = false;
+          code.required = true;
+          code.select();
+        }
         if (res.ok && data.success) {
           try { localStorage.removeItem('tavriko_portal_token'); } catch {}
           const oldTab = NEXT === '/admin' && /^#tab-(?:game|expo|cos|api|logs|db|mod|push)$/.test(location.hash) ? location.hash : '';
-          window.location.replace(NEXT + oldTab);
+          window.location.replace(data.role === 'owner' ? NEXT + oldTab : '/admin/kullanicilar');
           return;
         }
         err.textContent = res.status === 429 ? 'Çok fazla deneme yapıldı. Lütfen birkaç dakika sonra tekrar deneyin.' : (data.error || 'Hatalı e-posta veya şifre.');
@@ -108,6 +137,7 @@ function renderAdminLoginHtml(nextPath, configured) {
         err.style.display = 'block';
       } finally {
         btn.disabled = false;
+        if (keyButton) keyButton.disabled=false;
         btn.textContent = 'Giriş Yap';
       }
     });

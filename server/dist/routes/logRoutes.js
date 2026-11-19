@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.logRouter = void 0;
+exports.createPortalLoginHandler = exports.logRouter = void 0;
 exports.renderDashboardHtml = renderDashboardHtml;
 const express_1 = require("express");
 const logger_1 = require("../utils/logger");
@@ -8,45 +8,70 @@ const prismaClient_1 = require("../db/prismaClient");
 const authRoutes_1 = require("./authRoutes");
 const adminShell_1 = require("./adminShell");
 const auth_1 = require("../middleware/auth");
-// SECURITY: portal credentials come exclusively from environment variables.
-// The previously hardcoded values were exposed in the public repository and
-// MUST be rotated by the operator.
-const PORTAL_ADMIN_EMAIL = process.env.PORTAL_ADMIN_EMAIL || '';
-const PORTAL_ADMIN_PASSWORD = process.env.PORTAL_ADMIN_PASSWORD || '';
-const PORTAL_CONFIGURED = Boolean(PORTAL_ADMIN_EMAIL && PORTAL_ADMIN_PASSWORD && (0, auth_1.getJwtSecret)());
+const portalOtp_1 = require("../services/portalOtp");
+const portalSecurityRoutes_1 = require("./portalSecurityRoutes");
 exports.logRouter = (0, express_1.Router)();
-exports.logRouter.post('/portal/login', (req, res) => {
-    const { email, password } = req.body || {};
-    if (!PORTAL_CONFIGURED) {
-        logger_1.logger.warn('AUTH', 'Portal girişi reddedildi: PORTAL_ADMIN_EMAIL/PORTAL_ADMIN_PASSWORD ortam değişkenleri tanımlı değil.');
+const createPortalLoginHandler = (client = prismaClient_1.db.rawClient) => async (req, res) => {
+    const { email, password, code } = req.body || {};
+    res.set('Cache-Control', 'no-store');
+    if (!req.is('application/json')) {
+        res.status(415).json({ error: 'JSON gerekli.' });
+        return;
+    }
+    if (req.get('origin') && !(0, auth_1.sameOrigin)(req)) {
+        res.status(403).json({ error: 'Girişi Tavriko yönetim panelinden başlatın.' });
+        return;
+    }
+    if (!(0, auth_1.isPortalConfigured)()) {
         res.status(503).json({ success: false, error: 'Yönetici portalı yapılandırılmamış.' });
         return;
     }
-    if ((0, auth_1.checkAdminCredentials)(email, password)) {
-        const token = (0, auth_1.issueAdminSessionToken)(PORTAL_ADMIN_EMAIL.trim());
+    const session = await (0, auth_1.authenticatePortal)(email, password).catch(() => null);
+    if (session) {
+        const factor = (0, auth_1.portalFactor)(session.email);
+        if (factor === 'unavailable') {
+            res.status(503).json({ error: 'İki adımlı giriş bu hesap için yapılandırılmamış. Sistem yöneticisine başvurun.' });
+            return;
+        }
+        if (factor) {
+            if (typeof code !== 'string' || !/^\d{6}$/.test(code)) {
+                res.status(401).json({ otpRequired: true, error: 'Doğrulayıcı uygulamadaki altı haneli kodu girin.' });
+                return;
+            }
+            const result = await (0, portalOtp_1.consumeOtp)(client, session.email, factor, code).catch(() => 'unavailable');
+            if (result !== 'ok') {
+                res.status(result === 'limited' ? 429 : result === 'unavailable' ? 503 : 401).json({
+                    otpRequired: true, error: result === 'limited' ? 'Deneme sınırına ulaşıldı. Birkaç dakika bekleyin.'
+                        : result === 'unavailable' ? 'Doğrulama şu anda kullanılamıyor.' : 'Kod geçersiz, süresi dolmuş veya daha önce kullanılmış.',
+                });
+                return;
+            }
+        }
+        const token = await (0, portalSecurityRoutes_1.createManagedSession)(client, req, session, factor ? 'totp' : 'password').catch(() => null);
         if (!token) {
             res.status(503).json({ success: false, error: 'Yönetici portalı yapılandırılmamış.' });
             return;
         }
         // Tarayıcı panelleri HttpOnly çerezle oturumu korur; böylece sayfa yenilense veya
         // arka plan istekleri yapılsa da tekrar şifre sorulmaz.
-        (0, auth_1.setAdminSessionCookie)(req, res, token);
-        logger_1.logger.success('AUTH', `Portal Yöneticisi Giriş Yaptı: ${PORTAL_ADMIN_EMAIL}`);
-        res.json({ success: true, token, email: PORTAL_ADMIN_EMAIL.trim() });
+        (0, auth_1.setAdminSessionCookie)(req, res, token, session.role);
+        logger_1.logger.success('AUTH', 'Portal oturumu açıldı', { role: session.role });
+        res.set('Cache-Control', 'no-store').json({
+            success: true, email: session.email, role: session.role, ...(session.role === 'owner' ? { token } : {}),
+        });
     }
     else {
-        logger_1.logger.warn('AUTH', `Başarısız portal giriş denemesi: ${typeof email === 'string' ? email : '-'}`);
+        logger_1.logger.warn('AUTH', 'Başarısız portal giriş denemesi');
         res.status(401).json({ success: false, error: 'Hatalı e-posta adresi veya yönetici şifresi!' });
     }
-});
-exports.logRouter.post('/portal/logout', (_req, res) => {
-    (0, auth_1.clearAdminSessionCookie)(res);
-    res.json({ success: true });
-});
-exports.logRouter.get('/portal/verify', (req, res) => {
-    const session = (0, auth_1.getAdminSessionFromRequest)(req);
+};
+exports.createPortalLoginHandler = createPortalLoginHandler;
+exports.logRouter.post('/portal/login', (0, exports.createPortalLoginHandler)());
+exports.logRouter.post('/portal/logout', (0, portalSecurityRoutes_1.portalLogout)());
+exports.logRouter.get('/portal/verify', async (req, res) => {
+    const session = await (0, auth_1.getAdminSessionFromRequest)(req);
     if (session) {
-        res.json({ success: true, email: session.email || PORTAL_ADMIN_EMAIL });
+        res.set('Cache-Control', 'no-store').json({ success: true, email: session.email, role: session.role });
         return;
     }
     res.status(401).json({ success: false, error: 'Geçersiz veya süresi dolmuş oturum' });
@@ -63,6 +88,23 @@ exports.logRouter.get('/logs/stream', auth_1.requireAdminAuth, (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
     logger_1.logger.addSseClient(res);
+    if ((0, auth_1.portalTokenClaims)(req)) {
+        let checking = false;
+        const timer = setInterval(async () => {
+            if (checking)
+                return;
+            checking = true;
+            try {
+                if (!(await (0, auth_1.getAdminSessionFromRequest)(req)))
+                    res.end();
+            }
+            finally {
+                checking = false;
+            }
+        }, 10_000);
+        timer.unref?.();
+        res.on('close', () => clearInterval(timer));
+    }
     logger_1.logger.info('SYSTEM', 'Yeni bir istemci SSE log akışına bağlandı');
 });
 // Public client log ingestion (mobile app). Input is size-capped and sanitized
@@ -160,7 +202,7 @@ exports.logRouter.post('/logs/simulate-google', auth_1.requireAdminAuth, async (
 });
 function renderDashboardHtml(page = adminShell_1.adminPages[0]) {
     const mode = page.id;
-    const showMetrics = mode === 'overview' || mode === 'logs' || mode === 'db';
+    const showMetrics = mode === 'overview' || mode === 'logs';
     return `<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -1033,7 +1075,6 @@ function renderDashboardHtml(page = adminShell_1.adminPages[0]) {
     .admin-table table{min-width:540px}
     .admin-table th{white-space:nowrap}
     .table-hint{display:none;color:var(--muted);font-size:12px;margin:0 0 5px}
-    #tab-db>div:first-child{flex-wrap:wrap;gap:10px}
     #pushTemplateGrid{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))!important}
     .push-tpl,#tab-push :is(input,textarea,select){min-width:0;max-width:100%}
     #tab-push>div{min-width:0;overflow-wrap:anywhere}
@@ -1396,6 +1437,7 @@ function renderDashboardHtml(page = adminShell_1.adminPages[0]) {
       <div style="margin-bottom:20px;">
         <h2 style="font-size:20px; color:#FFFFFF; margin-bottom:6px;">🚫 Moderasyon & Kullanıcı Engelleme</h2>
         <p style="font-size:13px; color:var(--text-muted);">Kullanıcıları engelleyin, engeli kaldırın ve bildirim gönderin</p>
+        <p style="margin-top:8px"><a href="/admin/kullanicilar">Süreli oyun kısıtlaması, uyarı ve işlem geçmişi için Kullanıcılar panelini aç</a></p>
       </div>
 
       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:18px;">
@@ -1601,35 +1643,6 @@ function renderDashboardHtml(page = adminShell_1.adminPages[0]) {
         <div class="logs-scroll" id="logsScrollContainer">
           <!-- Live rows injected here -->
         </div>
-      </div>
-    </div>` : ''}
-
-    ${mode === 'db' ? `<div id="tab-db" class="tab-content">
-      <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <h2 style="font-size:20px; color:#FFFFFF;">PostgreSQL / Supabase Kayıtlı Kullanıcılar</h2>
-          <p style="font-size:13px; color:var(--text-muted);">Canlı veritabanından çekilen en güncel 10 kullanıcı hesabı</p>
-        </div>
-        <button class="btn btn-gold" onclick="refreshStats()">🔄 Verileri Yenile</button>
-      </div>
-
-      <p class="table-hint">Tüm sütunları görmek için tabloyu yana kaydırın.</p>
-      <div class="admin-table" tabindex="0" role="region" aria-label="Kayıtlı kullanıcılar tablosu">
-        <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
-          <thead>
-            <tr style="border-bottom:1px solid var(--card-border); background:rgba(0,0,0,0.25); color:var(--gold);">
-              <th style="padding:12px 16px;">Kullanıcı Adı</th>
-              <th style="padding:12px 16px;">E-Posta</th>
-              <th style="padding:12px 16px;">Arkadaş Kodu</th>
-              <th style="padding:12px 16px;">Seviye & XP</th>
-              <th style="padding:12px 16px;">Bakiye (Altın / Elmas)</th>
-              <th style="padding:12px 16px;">Kayıt Tarihi</th>
-            </tr>
-          </thead>
-          <tbody id="usersTableBody">
-            <tr><td colspan="6" style="padding:16px;">Kullanıcılar yükleniyor…</td></tr>
-          </tbody>
-        </table>
       </div>
     </div>` : ''}
 
@@ -1874,29 +1887,6 @@ function renderDashboardHtml(page = adminShell_1.adminPages[0]) {
           const mins = Math.floor((s.uptimeSeconds || 0) / 60);
           document.getElementById('kpiUptime').innerText = mins + ' dk';
 
-          const tbody = document.getElementById('usersTableBody');
-          if (!tbody) return;
-          tbody.replaceChildren();
-          if (s.recentUsers && s.recentUsers.length > 0) {
-            s.recentUsers.forEach(u => {
-              const tr = document.createElement('tr');
-              tr.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
-              const cells = [u.displayName || u.username, u.email || '—', u.friendCode || '—', 'Seviye ' + (u.level || 1),
-                (u.coins ?? 0) + ' / ' + (u.gems ?? 0), u.createdAt ? new Date(u.createdAt).toLocaleDateString('tr-TR') : '—'];
-              cells.forEach((value,i) => {
-                const td = tr.insertCell();
-                td.style.padding = '10px 16px';
-                if (i === 2) td.style.color = 'var(--gold)';
-                td.textContent = String(value ?? '—');
-              });
-              tbody.appendChild(tr);
-            });
-          } else {
-            const empty = tbody.insertRow().insertCell();
-            empty.colSpan = 6;
-            empty.style.padding = '16px';
-            empty.textContent = 'Görüntülenecek kullanıcı kaydı yok.';
-          }
         })
         .catch(() => {});
     }

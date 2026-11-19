@@ -323,6 +323,8 @@ const worker: ExportedHandler<Env> = {
         roomCode = 'TAV-' + Math.random().toString(36).substring(2, 7).toUpperCase();
       }
 
+      // Room creation is a private Durable Object call from the matchmaker.
+      if (request.method !== 'GET') return new Response('Method not allowed', { status: 405 });
       const roomId = env.GAME_ROOMS.idFromName(roomCode);
       const roomStub = env.GAME_ROOMS.get(roomId);
 

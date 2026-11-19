@@ -30,14 +30,21 @@ import triviaRoutes from './routes/triviaRoutes';
 import socialRoutes from './routes/socialRoutes';
 import referralRoutes from './routes/referralRoutes';
 import pushRoutes from './routes/pushRoutes';
-import { requireAdminAuth, getAdminSessionFromRequest, setTelegramAdminVerifier } from './middleware/auth';
+import { requireAdminAuth, getAdminSessionFromRequest, isPortalConfigured, setTelegramAdminVerifier } from './middleware/auth';
 import { renderAdminLoginHtml, sanitizeNextPath } from './routes/adminLoginPage';
 import { adminPageHeaders, adminPages, adminSessionScript, adminTheme, dashboardPages, renderAdminHeader, renderAdminHero } from './routes/adminShell';
 import { legalRouter } from './routes/legalRoutes';
 import { makeOpsTelemetry } from './services/opsTelemetry';
 import { createOpsRouter } from './routes/opsRoutes';
+import { createAdminAccountsRouter } from './routes/adminAccountsRoutes';
+import { createSupportRouter } from './routes/supportRoutes';
+import { createPortalSecurityRouter, portalPasskeyConfig } from './routes/portalSecurityRoutes';
+import { createDuelFunnelRouter } from './routes/duelFunnelRoutes';
 import { createFleetRouter } from './routes/fleetRoutes';
 import { createFleetStore, fleetMiddleware } from './services/fleetTelemetry';
+import { checkPlayerAccess, socketIdentity, validPlayerId } from './services/playerAccess';
+import { restrictionsEnabled } from './services/adminAccountOperations';
+import { recordCompletedPlayers } from './services/playerAnalytics';
 
 function getLocalIpAddress(): string {
   const interfaces = os.networkInterfaces();
@@ -168,6 +175,7 @@ export function createApp() {
       '/api/auth/reset-password',
       '/api/auth/google/complete-session',
       '/api/portal/login',
+      '/api/portal/security/passkeys',
     ],
     rateLimitAuth
   );
@@ -183,9 +191,11 @@ export function createApp() {
       const lvl = res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'INFO';
       const cat = req.path.includes('/auth') ? 'AUTH' : 'HTTP';
       if (
-        /^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/ops(?:\/|$)/i.test(req.path) ||
+        /^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/(?:ops|accounts)(?:\/|$)/i.test(req.path) ||
         req.path === '/favicon.ico' ||
-        req.path === '/api/logs' ||
+        req.path === '/api/logs' || req.path === '/api/internal/player-access' ||
+        /^\/api\/portal(?:\/|$)/i.test(req.path) || /^\/api\/support(?:\/|$)/i.test(req.path) ||
+        /^\/api\/(?:internal|player)\/duel-funnel(?:\/|$)/i.test(req.path) ||
         req.path === '/api/logs/stream' ||
         req.path.startsWith('/qr')
       ) {
@@ -239,8 +249,23 @@ export function createApp() {
 
   wss.on('connection', (ws: WsWebSocket, request: http.IncomingMessage) => {
     const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
-    const playerId = url.searchParams.get('playerId');
+    const enforcing = restrictionsEnabled();
+    const requested = url.searchParams.get('playerId');
+    const playerId = enforcing
+      ? socketIdentity(request.headers.authorization?.replace(/^Bearer\s+/i, '') || url.searchParams.get('token'), requested)
+      : requested;
     const roomCode = url.searchParams.get('roomCode');
+    let lastCheckedAt = 0;
+    let check: ReturnType<typeof checkPlayerAccess>;
+    const verifyAccess = () => {
+      if (!enforcing) return Promise.resolve(true);
+      if (!playerId) return Promise.resolve(false);
+      if (!check || Date.now() - lastCheckedAt >= 10_000) { lastCheckedAt = Date.now(); check = checkPlayerAccess(playerId); }
+      return check.then(access => access === 'allowed');
+    };
+    void verifyAccess().then(allowed => {
+      if (!allowed) { ws.close(1008); return; }
+      if (ws.readyState !== WsWebSocket.OPEN) return;
 
     if (playerId) {
       presenceManager.registerSocket(playerId, ws);
@@ -256,10 +281,12 @@ export function createApp() {
       );
     }
 
-    ws.on('message', (data) => {
+    ws.on('message', async (data) => {
+      if (!(await verifyAccess())) { ws.close(1008); return; }
       try {
         const text = data.toString();
         const msg = JSON.parse(text);
+        if (enforcing && msg.payload?.playerId && msg.payload.playerId !== playerId) return;
         if (msg.event === 'ping') {
           ws.send(JSON.stringify({ event: 'pong', timestamp: Date.now() }));
         } else if (msg.event === 'presence:ping' && msg.payload?.playerId) {
@@ -281,6 +308,7 @@ export function createApp() {
       if (playerId) {
         presenceManager.unregisterSocket(playerId, ws);
       }
+    });
     });
   });
 
@@ -633,19 +661,23 @@ export function createApp() {
   }
 
   app.use(createOpsRouter(opsTelemetry));
+  app.use(createAdminAccountsRouter());
+  app.use('/api/support', createSupportRouter());
+  app.use('/api/portal/security', createPortalSecurityRouter());
+  app.use(createDuelFunnelRouter());
 
   // Yönetici giriş sayfası: tarayıcının yerel şifre penceresi yerine kalıcı oturum çerezi.
-  app.get('/admin/login', adminPageHeaders, (req, res) => {
+  app.get('/admin/login', adminPageHeaders, async (req, res) => {
     const nextPath = sanitizeNextPath(req.query.next);
-    if (getAdminSessionFromRequest(req)) {
-      return res.redirect(302, nextPath);
+    const session = await getAdminSessionFromRequest(req);
+    if (session) {
+      return res.redirect(302, session.role === 'owner' ? nextPath : '/admin/kullanicilar');
     }
-    const configured = Boolean(
-      process.env.PORTAL_ADMIN_EMAIL && process.env.PORTAL_ADMIN_PASSWORD && (process.env.JWT_SECRET || process.env.SUPABASE_JWT_SECRET)
-    );
+    const configured = isPortalConfigured();
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
-    return res.send(renderAdminLoginHtml(nextPath, configured));
+    const keyConfig = portalPasskeyConfig();
+    return res.send(renderAdminLoginHtml(nextPath, configured, Boolean(keyConfig && new URL(keyConfig.origin).host === req.get('host'))));
   });
 
   // Canonical pages are server routes, not client-side tabs.
@@ -3695,6 +3727,10 @@ export function createApp() {
 
   // Prisma ORM <-> Supabase Sync Endpoint
   app.all('/api/admin/prisma-sync', async (req, res) => {
+    // Never let a local snapshot overwrite live account balances, profile fields or inventory.
+    if (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL || process.env.DIRECT_URL) {
+      return res.status(410).json({ error: 'Canlı veritabanında yerel veri aktarımı devre dışı.' });
+    }
     try {
       const result = await db.pushAllDataViaPrismaToSupabase();
       const health = await prisma.checkHealth();
@@ -3727,6 +3763,19 @@ export function createApp() {
   app.use(legalRouter);
 
   // --- Cloudflare Durable Objects Internal Endpoints ---
+  app.post('/api/internal/player-access', async (req, res) => {
+    const secret = process.env.INTERNAL_API_SECRET;
+    const supplied = req.get('x-internal-secret');
+    if (!secret || !supplied || !safeEqualStrings(secret, supplied)) {
+      return res.status(403).json({ error: 'Yetkisiz erişim' });
+    }
+    const id = req.body?.id;
+    if (typeof id !== 'string' || !validPlayerId.test(id)) return res.status(400).json({ error: 'Oyuncu kimliği geçersiz.' });
+    const enabled = restrictionsEnabled();
+    const access = await checkPlayerAccess(id);
+    return res.status(access === 'unavailable' ? 503 : 200).set('Cache-Control','no-store').json({ enabled, access });
+  });
+
   app.post('/api/internal/room-questions', async (req, res) => {
     // SECURITY: internal endpoints are service-to-service only. The secret header is
     // REQUIRED; previously a missing header bypassed the check entirely.
@@ -3768,7 +3817,7 @@ export function createApp() {
         return res.status(400).json({ error: 'Geçersiz maç özeti' });
       }
 
-      // Record match history in Prisma
+      // Keep the existing operational summary; analytics stores separate per-player rows in PostgreSQL.
       await db.matchHistory.create({
         data: {
           roomCode: summary.roomCode,
@@ -3785,6 +3834,7 @@ export function createApp() {
       // Galibiyet / dereceli maç / doğru sayısı yalnızca bu yetkili özetten hesaplanır.
       // XP, altın ve LP sunucuda recordMatchResult içinde paylaşılan formülle yazılır.
       await db.recordFinalMatch(summary);
+      if (process.env.DATABASE_URL || process.env.DIRECT_URL) await recordCompletedPlayers(db.rawClient, summary);
 
       logger.info('SOCKET', `Cloudflare Durable Objects maçı kaydedildi: ${summary.roomCode}`, {
         mode: summary.mode,

@@ -83,6 +83,9 @@ model User {
   friendIds                 Json                @default("[]")
   createdAt                 DateTime            @default(now())
   updatedAt                 DateTime            @updatedAt
+  restrictedUntil           DateTime?
+  supportCases              SupportCase[]
+  duelFunnel                DuelFunnelEvent[]
   claimedSeasonFreeTiers    Json                @default("[]")
   claimedSeasonPremiumTiers Json                @default("[]")
   equippedBackground        String?
@@ -179,7 +182,154 @@ model MatchHistory {
   user           User?    @relation(fields: [userId], references: [id])
 
   @@index([userId])
+  @@index([playedAt, userId])
+  @@index([userId, playedAt])
   @@map("match_history")
+}
+
+// No FK to users: keep the operational record if the player deletes the account.
+model AdminAccountEvent {
+  id        String   @id @default(uuid())
+  accountId String
+  actor     String
+  role      String
+  action    String
+  reason    String
+  details   Json
+  createdAt DateTime @default(now())
+
+  @@index([accountId, createdAt, id])
+  @@map("admin_account_events")
+}
+
+model AdminCompensation {
+  id          String   @id @db.Uuid
+  accountId   String
+  requester   String
+  reviewer    String?
+  kind        String
+  itemId      String?
+  amount      Int
+  status      String
+  reason      String
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+  decidedAt   DateTime?
+
+  @@index([accountId, kind, status, decidedAt])
+  @@index([status, expiresAt, createdAt])
+  @@index([requester, createdAt])
+  @@map("admin_compensations")
+}
+
+model SupportCase {
+  id             String   @id @default(uuid()) @db.Uuid
+  accountId      String
+  account        User     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  kind           String
+  subject        String
+  message        String
+  moderationId   String?  @unique
+  assignee       String?
+  status         String   @default("open")
+  resolution     String?
+  revision       Int      @default(0)
+  waitingForPlayer Boolean @default(false)
+  firstReplyAt   DateTime?
+  replies        SupportCaseReply[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([accountId, createdAt])
+  @@index([kind, status, createdAt, id])
+  @@index([firstReplyAt, status, createdAt])
+  @@map("support_cases")
+}
+
+model SupportCaseReply {
+  id        String      @id @default(uuid()) @db.Uuid
+  caseId    String      @db.Uuid
+  ticket    SupportCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  sender    String
+  body      String
+  createdAt DateTime    @default(now())
+
+  @@index([caseId, createdAt, id])
+  @@map("support_case_replies")
+}
+
+model PortalSession {
+  id        String    @id @db.Uuid
+  email     String
+  method    String
+  device    String
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  revokedBy String?
+  passkeyId String?
+
+  @@index([email, revokedAt, expiresAt])
+  @@index([expiresAt])
+  @@map("portal_sessions")
+}
+
+model PortalPasskey {
+  id        String   @id
+  email     String
+  publicKey Bytes
+  counter   BigInt
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@map("portal_passkeys")
+}
+
+model PortalWebAuthnChallenge {
+  id        String   @id @db.Uuid
+  challenge String
+  purpose   String
+  binding   String
+  expiresAt DateTime
+
+  @@index([expiresAt])
+  @@map("portal_webauthn_challenges")
+}
+
+model DuelFunnelEvent {
+  accountId String
+  account   User     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  stage     String
+  room      String
+  at        DateTime
+
+  @@id([accountId, stage, room])
+  @@index([at])
+  @@map("duel_funnel_events")
+}
+
+model AdminRiskAlert {
+  id          String   @id @default(uuid()) @db.Uuid
+  actor       String
+  count       Int
+  createdAt   DateTime @default(now())
+  reviewedAt  DateTime?
+  reviewer    String?
+  reason      String?
+
+  @@index([actor, createdAt])
+  @@index([reviewedAt, createdAt, id])
+  @@map("admin_risk_alerts")
+}
+
+model PortalOtpState {
+  email       String @id
+  factor      String
+  lastStep    Int    @default(-1)
+  window      Int
+  attempts    Int
+
+  @@map("portal_otp_states")
 }
 
 model PasswordResetToken {

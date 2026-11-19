@@ -7,6 +7,8 @@ export interface Env {
   BACKEND_API_URL: string;
   JWT_SECRET: string;
   INTERNAL_API_SECRET?: string;
+  ACCOUNT_RESTRICTIONS_ENABLED?: string;
+  DUEL_FUNNEL_TRACKING_ENABLED?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
   SENTRY_DSN?: string;
   RECONNECTION_GRACE_SEC?: number;

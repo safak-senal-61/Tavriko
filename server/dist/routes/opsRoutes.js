@@ -86,7 +86,7 @@ function createOpsRouter(telemetry, makePolar = polarSandbox_1.buildPolarSandbox
     let lastCheckout = -Infinity;
     function checkoutRoute(handler) {
         return async (req, res) => {
-            const admin = (0, auth_1.getAdminSessionFromRequest)(req);
+            const admin = await (0, auth_1.getAdminSessionFromRequest)(req);
             if (!admin?.email) {
                 res.status(401).json({ error: 'Yönetici oturumu gerekli.' });
                 return;

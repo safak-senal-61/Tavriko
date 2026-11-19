@@ -10,13 +10,13 @@ exports.adminPages = [
     { id: 'cos', path: '/admin/kozmetikler', label: 'Kozmetikler', group: 'Oyun ve içerik', description: 'Profil çerçevelerini, renkleri ve animasyonları önizleyin.' },
     { id: 'api', path: '/admin/api', label: 'API Araçları', group: 'Operasyon', description: 'API belgelerini inceleyin ve uç noktaları test edin.' },
     { id: 'logs', path: '/admin/loglar', label: 'Canlı Loglar', group: 'Operasyon', description: 'Sunucu kayıtlarını filtreleyin ve hata ayrıntılarını inceleyin.' },
-    { id: 'db', path: '/admin/kullanicilar', label: 'Kullanıcılar', group: 'Topluluk', description: 'Veritabanındaki en yeni kullanıcı kayıtlarını inceleyin.' },
+    { id: 'db', path: '/admin/kullanicilar', label: 'Kullanıcılar', group: 'Topluluk', description: 'Oyuncu hesaplarını bulun, profilleri inceleyin ve erişim ölçümlerini takip edin.' },
     { id: 'mod', path: '/admin/moderasyon', label: 'Moderasyon', group: 'Topluluk', description: 'Kullanıcı engellerini ve moderasyon bildirimlerini yönetin.' },
     { id: 'push', path: '/admin/bildirimler', label: 'Bildirimler', group: 'Topluluk', description: 'Kayıtlı cihazları, bildirim testlerini ve duyuruları yönetin.' },
     { id: 'telegram', path: '/admin/telegram', label: 'Telegram', group: 'Oyun ve içerik', description: 'Onay botunu ve soru havuzu araçlarını yönetin.' },
     { id: 'health', path: '/admin/health', label: 'Site Sağlığı', group: 'Operasyon', description: 'Sunucu kaynaklarını, servis kontrollerini ve Polar Sandbox’ı izleyin.' },
 ];
-exports.dashboardPages = exports.adminPages.filter(p => p.id !== 'health' && p.id !== 'telegram');
+exports.dashboardPages = exports.adminPages.filter(p => p.id !== 'health' && p.id !== 'telegram' && p.id !== 'db');
 const adminPageHeaders = (_req, res, next) => {
     res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin' });
     next();
@@ -47,13 +47,13 @@ a.admin-command,button.admin-command{width:auto;display:inline-flex;align-items:
 @media(max-width:700px){.admin-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.admin-nav a{min-height:42px}}
 @media(max-width:420px){:root{--admin-pad:12px}.admin-hero{padding-top:24px}.admin-top{min-height:54px}.admin-nav a{font-size:12px;padding-inline:4px}}
 `;
-function renderAdminHeader(active) {
+function renderAdminHeader(active, accountsOnly = false) {
     return `<a class="admin-skip" href="#admin-main">İçeriğe geç</a>
 <header class="admin-header"><div class="admin-wrap admin-top">
-<a class="admin-brand" href="/admin"><span aria-hidden="true">T</span>TAVRİKO / YÖNETİM</a>
-<div class="admin-actions"><a class="admin-command" href="/app" target="_blank" rel="noopener">Oyunu aç</a><button class="admin-command" type="button" id="admin-logout">Çıkış</button></div>
+<a class="admin-brand" href="${accountsOnly ? '/admin/kullanicilar' : '/admin'}"><span aria-hidden="true">T</span>TAVRİKO / YÖNETİM</a>
+<div class="admin-actions"><a class="admin-command" href="/admin/kullanicilar#staff-security">Oturumlar</a><a class="admin-command" href="/app" target="_blank" rel="noopener">Oyunu aç</a><button class="admin-command" type="button" id="admin-logout">Çıkış</button></div>
 </div><nav class="admin-wrap admin-nav" aria-label="Yönetim bölümleri">
-${exports.adminPages.map(p => `<a href="${p.path}"${p.id === active ? ' aria-current="page"' : ''}>${p.label}</a>`).join('')}
+${exports.adminPages.filter(p => !accountsOnly || p.id === 'db').map(p => `<a href="${p.path}"${p.id === active ? ' aria-current="page"' : ''}>${p.label}</a>`).join('')}
 </nav></header>`;
 }
 exports.adminSessionScript = `<script>
