@@ -76,6 +76,7 @@
       "expo-asset",
       "expo-font",
       "./plugins/notification-sound",
+      "./plugins/optional-hardware-features",
       [
         "expo-audio",
         {
