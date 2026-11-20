@@ -166,10 +166,13 @@ export function createApp() {
   // Global HTTP Request & Error Logger Middleware
   app.use((req, res, next) => {
     const start = Date.now();
+    // Express may strip a mounted router's prefix from req.path before finish.
+    const requestPath = req.path;
+    const isPasswordReset = /^\/api\/auth\/(?:forgot|reset)-password\/?$/i.test(requestPath);
     res.on('finish', () => {
       const duration = Date.now() - start;
       const lvl = res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'INFO';
-      const cat = req.path.includes('/auth') ? 'AUTH' : 'HTTP';
+      const cat = isPasswordReset || req.path.includes('/auth') ? 'AUTH' : 'HTTP';
       if (
         /^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/(?:ops|accounts)(?:\/|$)/i.test(req.path) ||
         req.path === '/favicon.ico' ||
@@ -181,11 +184,10 @@ export function createApp() {
       ) {
         return;
       }
-      const isPasswordReset = /^\/api\/auth\/(?:forgot|reset)-password\/?$/i.test(req.path);
       logger.log(
         cat,
         lvl,
-        `${req.method} ${isPasswordReset ? req.path : req.originalUrl} -> ${res.statusCode} (${duration}ms)`,
+        `${req.method} ${isPasswordReset ? requestPath : req.originalUrl} -> ${res.statusCode} (${duration}ms)`,
         {
           ip: req.ip,
           query: !isPasswordReset && Object.keys(req.query).length ? redactSensitiveBody(req.query) : undefined,
