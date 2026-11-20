@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, ScrollView } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, {
   useAnimatedStyle,
@@ -65,9 +65,7 @@ export const ReconnectScreen: React.FC<ReconnectScreenProps> = ({
     }
   };
 
-  return (
-    <TavrikoScreen style={styles.centerAll}>
-      {online ? (
+  const content = online ? (
         <Animated.View entering={FadeIn.duration(300)} style={styles.ringWrap}>
           <Svg width={150} height={150} viewBox="0 0 150 150">
             <Circle
@@ -143,11 +141,17 @@ export const ReconnectScreen: React.FC<ReconnectScreenProps> = ({
             <Text style={styles.leaveBtnText}>Ana ekrana dön</Text>
           </TouchableOpacity>
         </Animated.View>
-      )}
+  );
+  return (
+    <TavrikoScreen style={Platform.OS === 'web' ? undefined : styles.centerAll}>
+      {Platform.OS === 'web' ? (
+        <ScrollView contentContainerStyle={styles.webScroll}>{content}</ScrollView>
+      ) : content}
     </TavrikoScreen>
   );
 };
 const styles = StyleSheet.create({
+  webScroll: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 16 },
   centerAll: {
     alignItems: 'center',
     justifyContent: 'center',

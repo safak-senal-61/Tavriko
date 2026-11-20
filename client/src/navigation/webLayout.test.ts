@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { getHomeWebSizing, getWebLayout } from './webLayout';
+import { getHomeWebSizing, getWebLayout, WEB_PAGES, type ScreenName } from './webLayout';
 
-const mainTabs = ['home', 'categories', 'leaderboard', 'friends', 'profile'];
+const mainTabs = ['home', 'categories', 'leaderboard', 'friends', 'profile'] as const;
+const allPages = Object.keys(WEB_PAGES) as ScreenName[];
 
 describe('player web layout', () => {
   it('preserves mobile, native and frameless splash layouts', () => {
@@ -20,7 +21,8 @@ describe('player web layout', () => {
           frameGutter: home.frameGutter,
           reserveUtility: width >= 1440,
           showUtility: width >= 1440,
-          contentMaxWidth: undefined,
+          frameWidth: home.frameWidth,
+          pageInset: home.pageInset,
         });
       }
     }
@@ -29,11 +31,43 @@ describe('player web layout', () => {
     expect(getWebLayout(768, 1024, 'home', true).split).toBe(true);
   });
 
-  it('keeps gameplay readable without moving the outer desktop frame', () => {
+  it('centers gameplay within a full frame without an empty QR column', () => {
     expect(getWebLayout(1920, 870, 'quiz_arena', true)).toMatchObject({
-      roomy: true, split: false, reserveUtility: true, showUtility: false, contentMaxWidth: 920,
+      roomy: true, split: false, reserveUtility: false, showUtility: false, contentWidth: 980,
       frameMaxWidth: getWebLayout(1920, 870, 'home', true).frameMaxWidth,
     });
+  });
+
+  it('gives every desktop workspace the same frame, useful width and visible utility', () => {
+    const home = getWebLayout(1568, 708, 'home', true);
+    for (const screen of allPages) {
+      const page = getWebLayout(1568, 708, screen, true);
+      if (page.mode === 'workspace' || page.mode === 'dashboard') {
+        expect(page.frameWidth, screen).toBe(home.frameWidth);
+        expect(page.contentWidth, screen).toBeGreaterThanOrEqual(1040);
+        expect(page.showUtility, screen).toBe(true);
+      }
+    }
+  });
+
+  it('fits every page within its frame and preserves phone and native fallbacks', () => {
+    for (const screen of allPages) {
+      for (const [width, height] of [[640, 950], [768, 1024], [820, 1180], [1032, 1376], [1376, 1032], [1568, 708], [1920, 1080]]) {
+        const page = getWebLayout(width, height, screen, true);
+        expect(page.frameWidth, screen).toBeLessThanOrEqual(width);
+        expect(page.pageInset, screen).toBeGreaterThanOrEqual(16);
+        expect(page.contentWidth + 2 * page.pageInset, screen).toBeCloseTo(page.frameWidth);
+      }
+      expect(getWebLayout(375, 812, screen, true).roomy, screen).toBe(false);
+      expect(getWebLayout(1032, 1376, screen, false).roomy, screen).toBe(false);
+    }
+  });
+
+  it('uses frame width, including the QR panel, to decide how many cards fit', () => {
+    expect(getWebLayout(768, 1024, 'shop', true).columns).toBe(1);
+    expect(getWebLayout(1032, 1376, 'shop', true).columns).toBe(2);
+    expect(getWebLayout(1440, 860, 'shop', true).columns).toBe(3);
+    expect(getWebLayout(1920, 870, 'inventory', true).columns).toBe(3);
   });
 
   it('puts the leaderboard in columns on wide landscape, but not portrait', () => {

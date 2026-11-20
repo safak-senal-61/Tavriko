@@ -6,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -286,7 +287,7 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 140,
+    paddingBottom: Platform.OS === 'web' ? 20 : 140,
     paddingHorizontal: 4,
     paddingTop: 4,
   },

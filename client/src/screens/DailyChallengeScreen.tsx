@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Check, Target, CalendarDays, ChevronRight } from 'lucide-react-native';
 import { UserProfile, DailyChallengeConfig, getDailyChallengeConfig } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import { TavrikoScreen, TavrikoTopBar, Button3D, CoinIcon, GemIcon, ChestIcon } from '../components/TavrikoIcons';
 import { DiscoveryArtwork, DISCOVERY_IMG } from '../components/DiscoveryArtwork';
 import { GradientFill } from '../components/TavrikoGradient';
@@ -13,6 +14,8 @@ interface DailyChallengeScreenProps {
   onStartDaily: (config: DailyChallengeConfig) => void;
 }
 export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({ user, onBack, onStartDaily }) => {
+  const page = usePlayerWebLayout();
+  const dailyColumns = page?.roomy === true && page.contentWidth >= 900;
   const streak = Math.max(1, user?.dailyStreak ?? 1);
   const completed = Boolean(user?.dailyChallenge?.completedToday);
   const cfg = getDailyChallengeConfig(streak);
@@ -22,6 +25,8 @@ export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({ user
       avatarSeed={user?.avatarUrl || user?.displayName} />
     <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
       <View style={s.heading}><CalendarDays size={18} color="#FFD270" /><Text style={s.eyebrow}>GÜNLÜK MEYDAN OKUMA</Text></View>
+      <View style={[s.dailyBody, dailyColumns && s.webDailyBody]}>
+      <View style={[s.dailySection, dailyColumns && s.webDailySection]}>
       <View style={s.hero}>
         <GradientFill colors={['#49305E', '#321C50', '#25213F']} direction="diagonal" />
         <View style={s.heroRow}>
@@ -48,6 +53,8 @@ export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({ user
         })}
       </View>
 
+      </View>
+      <View style={[s.dailySection, dailyColumns && s.webDailySection]}>
       <View style={[s.mission, completed && s.completed]}>
         <View style={s.missionTop}><View style={s.status}><Target size={15} color={completed ? '#87EBC9' : '#FFD270'} />
           <Text style={completed ? s.mint : s.gold}>{completed ? 'BUGÜN TAMAMLANDI' : `${cfg.dayNumber}. GÜNÜN GÖREVİ`}</Text></View>
@@ -70,11 +77,17 @@ export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({ user
           <Text style={s.body}>{completed ? `+${next.rewardXp} XP · ${next.rewardCoins} altın · ${next.rewardGems} elmas` : 'Her gün oyna, Mega Sandık hedefine yaklaş.'}</Text></View>
         <ChevronRight size={18} color="#C8B7DF" />
       </View>
+      </View>
+      </View>
     </ScrollView>
   </TavrikoScreen>;
 };
 const s = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 36, gap: 16 },
+  dailyBody: { gap: 16 },
+  dailySection: { gap: 16 },
+  webDailyBody: { flexDirection: 'row', alignItems: 'flex-start' },
+  webDailySection: { flex: 1, minWidth: 0 },
   heading: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   eyebrow: { color: '#F3D58B', fontFamily: THEME.fonts.extraBold, fontSize: 12, letterSpacing: 1 },
   hero: { borderRadius: 26, borderColor: '#75518A', borderWidth: 1, overflow: 'hidden' },

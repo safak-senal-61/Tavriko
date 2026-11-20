@@ -85,7 +85,7 @@ export const ProfileSetupScreen: React.FC<ProfileSetupScreenProps> = ({
   );
 
   const [rarityFilter, setRarityFilter] = useState<'all' | 'Efsanevi' | 'Epik' | 'Nadir'>('all');
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
 
   const filteredAvatars = useMemo(() => {
     if (rarityFilter === 'all') return SORTED_AVATARS;

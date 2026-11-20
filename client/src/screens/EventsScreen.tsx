@@ -1,4 +1,5 @@
 import { cdnImage } from '../utils/cdn';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -8,6 +9,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Animated,
+  Platform,
 } from 'react-native';
 import { UserProfile, GameEvent } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -65,6 +67,8 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
   onProfile,
   onStartEvent,
 }) => {
+  const page = usePlayerWebLayout();
+  const eventColumns = page?.roomy && page.contentWidth >= 900;
   const [activeTab, setActiveTab] = useState<EventTab>('daily');
   const [events, setEvents] = useState<GameEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -251,7 +255,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
             desc="Bu kategoride henüz yeni görev başlamadı. Yakında tekrar kontrol et."
           />
         ) : (
-          <Animated.View style={[styles.eventsList, { opacity: fadeAnim }]}>
+          <Animated.View style={[styles.eventsList, eventColumns && styles.webEventsList, { opacity: fadeAnim }]}>
             {filteredEvents.map((item, index) => {
               const current = item.currentCount ?? (item as any).currentProgress ?? 0;
               const target = item.targetCount ?? (item as any).target ?? 1;
@@ -274,6 +278,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                   entering={FadeInDown.delay(Math.min(index, 8) * 60).duration(360)}
                   style={[
                     styles.eventCard,
+                    eventColumns && styles.webEventCard,
                     isCompleted && !isClaimed && styles.eventCardCompleted,
                   ]}
                 >
@@ -432,7 +437,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 160, // Ample space so bottom card is never covered by bottom nav
+    paddingBottom: Platform.OS === 'web' ? 20 : 160,
     paddingHorizontal: 14,
   },
   heroBox: {
@@ -544,6 +549,8 @@ const styles = StyleSheet.create({
   eventsList: {
     gap: 12,
   },
+  webEventsList: { flexDirection: 'row', flexWrap: 'wrap' },
+  webEventCard: { width: '49%', minWidth: 0 },
   eventCard: {
     backgroundColor: KIT.card,
     borderRadius: 18,

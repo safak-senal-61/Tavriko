@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import {
   View,
   Text,
@@ -373,6 +374,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   onNotifications,
   onProfile,
 }) => {
+  const threeProducts = usePlayerWebLayout()?.columns === 3;
   const [activeTab, setActiveTab] = useState<ShopProductCategory>('chests');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
@@ -583,6 +585,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         <Animated.View
           style={[
             styles.productGrid,
+            threeProducts && styles.webProductGrid,
             {
               opacity: contentOpacity,
               transform: [{ translateX: contentTranslateX }],
@@ -598,7 +601,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               <Reanimated.View
                 key={`${activeTab}-${item.id}`}
                 entering={FadeInDown.delay(Math.min(index, 8) * 55).duration(360)}
-                style={[styles.productCard, owned && styles.productCardOwned]}
+                style={[styles.productCard, threeProducts && styles.webProductCard, owned && styles.productCardOwned]}
               >
                 <View style={[styles.rarityBar, { backgroundColor: rarityColor }]} />
                 {/* Rozetler */}
@@ -806,7 +809,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 160,
+    paddingBottom: Platform.OS === 'web' ? 20 : 160,
     paddingHorizontal: 4,
   },
   heroWrap: {
@@ -888,6 +891,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 8,
   },
+  webProductGrid: { justifyContent: 'flex-start' },
+  webProductCard: { width: '32%' },
   productCard: {
     width: '48%',
     backgroundColor: KIT.card,
