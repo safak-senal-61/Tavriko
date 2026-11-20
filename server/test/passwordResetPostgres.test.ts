@@ -55,7 +55,7 @@ describe.skipIf(!fixtureUrl)('password reset with isolated PostgreSQL', () => {
     const issued = (a ?? b)!;
     expect(issued).toMatchObject({ email, validMinutes: 15, code: /^\d{6}$/ });
     const stored = await dbB.passwordResetToken.findUniqueOrThrow({ where: { id: tokenId } });
-    expect(stored.code).toMatch(/^v1:0:[a-f0-9]{64}$/);
+    expect(stored.code).toMatch(/^v2:0:[a-f0-9]{64}$/);
     expect(stored.expiresAt.getTime() - stored.createdAt.getTime()).toBe(900_000);
     expect(await Promise.all([verify(issued.code), verify(issued.code, username)])).toEqual(expect.arrayContaining([true, false]));
     const after = await dbA.user.findUniqueOrThrow({ where: { id } });
@@ -71,7 +71,7 @@ describe.skipIf(!fixtureUrl)('password reset with isolated PostgreSQL', () => {
     expect(await Promise.all(Array.from({ length: 5 }, () => verify(wrong)))).toEqual(Array(5).fill(false));
     const locked = await dbA.passwordResetToken.findUniqueOrThrow({ where: { id: tokenId } });
     expect(locked.used).toBe(true);
-    expect(locked.code).toMatch(/^v1:5:/);
+    expect(locked.code).toMatch(/^v2:5:/);
     expect(await verify(first.code)).toBe(false);
     await expireCooldown();
     const second = (await issuePasswordReset(dbB, username, secret))!;
@@ -101,5 +101,12 @@ describe.skipIf(!fixtureUrl)('password reset with isolated PostgreSQL', () => {
     await dbA.user.update({ where: { id }, data: { passwordHash: null, googleId: randomUUID() } });
     expect(await issuePasswordReset(dbA, email, secret)).toBeNull();
     expect(await issuePasswordReset(dbB, 'unknown@example.test', secret)).toBeNull();
+  });
+
+  it('invalidates an outstanding OTP after the password changes independently', async () => {
+    const issued = (await issuePasswordReset(dbA, email, secret))!;
+    const changedHash = await bcrypt.hash('IndependentlyChangedPass3!', 10);
+    await dbB.user.update({ where: { id }, data: { passwordHash: changedHash } });
+    expect(await verify(issued.code)).toBe(false);
   });
 });

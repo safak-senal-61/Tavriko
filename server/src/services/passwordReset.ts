@@ -1,4 +1,5 @@
-import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomInt, scrypt, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -6,6 +7,7 @@ export const PASSWORD_RESET_VALID_MINUTES = 15;
 export const PASSWORD_RESET_RESEND_SECONDS = 60;
 export const PASSWORD_RESET_TOKEN_PREFIX = 'password-reset:';
 const MAX_ATTEMPTS = 5;
+const deriveKey = promisify(scrypt);
 
 export function getPasswordResetSecret(): string {
   return process.env.JWT_SECRET || process.env.SUPABASE_JWT_SECRET || '';
@@ -34,11 +36,14 @@ async function lockAccount(tx: Prisma.TransactionClient, identifier: string): Pr
 
 const tokenId = (id: string) => `${PASSWORD_RESET_TOKEN_PREFIX}${id}`;
 
-function digest(secret: string, account: ResetAccount, code: string): string {
-  // Bind to the current mailbox and password, so changing either invalidates the code.
-  return createHmac('sha256', secret)
-    .update(JSON.stringify(['password-reset-v1', account.id, account.email, account.passwordHash, code]))
-    .digest('hex');
+async function digest(secret: string, account: ResetAccount, code: string): Promise<string> {
+  // The per-account salt is keyed by the server secret. scrypt limits offline
+  // guesses even if that secret leaks. Changing the mailbox or password invalidates the code.
+  const salt = createHmac('sha256', secret)
+    .update(JSON.stringify(['password-reset-v2', account.id, account.email]))
+    .digest();
+  const digest = await deriveKey(JSON.stringify([account.passwordHash, code]), salt, 32) as Buffer;
+  return digest.toString('hex');
 }
 
 export async function issuePasswordReset(db: PrismaClient, identifier: string, secret: string) {
@@ -56,13 +61,13 @@ export async function issuePasswordReset(db: PrismaClient, identifier: string, s
     let mac: string;
     do {
       code = randomInt(1_000_000).toString().padStart(6, '0');
-      mac = digest(secret, account, code);
+      mac = await digest(secret, account, code);
     } while (existing?.code.endsWith(`:${mac}`));
     const data = {
       email: account.email,
       // Store the version, attempt count and keyed digest in the existing column.
       // This slot never matches the legacy account-deletion flow's raw six-digit code.
-      code: `v1:0:${mac}`,
+      code: `v2:0:${mac}`,
       used: false,
       createdAt: now,
       expiresAt: new Date(now.getTime() + PASSWORD_RESET_VALID_MINUTES * 60_000),
@@ -83,14 +88,14 @@ export async function confirmPasswordReset(
     if (!active || active.used || active.email !== account.email || active.expiresAt.getTime() <= Date.now()) {
       return false;
     }
-    const parts = /^v1:([0-4]):([a-f0-9]{64})$/.exec(active.code);
+    const parts = /^v2:([0-4]):([a-f0-9]{64})$/.exec(active.code);
     if (!parts) return false;
     const [, failures, storedMac] = parts;
-    const candidateMac = digest(secret, account, input.code);
+    const candidateMac = await digest(secret, account, input.code);
     if (!timingSafeEqual(Buffer.from(storedMac, 'hex'), Buffer.from(candidateMac, 'hex'))) {
       const attempts = Number(failures) + 1;
       await tx.passwordResetToken.update({
-        where: { id }, data: { code: `v1:${attempts}:${storedMac}`, used: attempts >= MAX_ATTEMPTS },
+        where: { id }, data: { code: `v2:${attempts}:${storedMac}`, used: attempts >= MAX_ATTEMPTS },
       });
       return false;
     }

@@ -550,24 +550,22 @@ router.post('/forgot-password', async (req, res) => {
         res.status(503).json({ error: RESET_UNAVAILABLE });
         return;
     }
-    try {
+    // Keep account lookup, the expensive OTP derivation and delivery out of the
+    // public response path, so eligibility is not revealed by processing time.
+    const delivery = Promise.resolve().then(async () => {
         const reset = await (0, passwordReset_1.issuePasswordReset)(prismaClient_1.db.rawClient, target, secret);
-        if (reset) {
-            // Do not make the public response wait on the email provider for known accounts.
-            const delivery = (0, oneSignalEmail_1.sendOneSignalPasswordResetEmail)(config, reset);
-            if (process.env.VERCEL)
-                (0, functions_1.waitUntil)(delivery);
-        }
-        res.json({
-            success: true,
-            message: RESET_ACCEPTED,
-            resendAfterSeconds: passwordReset_1.PASSWORD_RESET_RESEND_SECONDS,
-        });
-    }
-    catch {
+        if (reset)
+            await (0, oneSignalEmail_1.sendOneSignalPasswordResetEmail)(config, reset);
+    }).catch(() => {
         logger_1.logger.error('AUTH', 'Şifre sıfırlama kodu hazırlanamadı.');
-        res.status(503).json({ error: RESET_UNAVAILABLE });
-    }
+    });
+    if (process.env.VERCEL)
+        (0, functions_1.waitUntil)(delivery);
+    res.json({
+        success: true,
+        message: RESET_ACCEPTED,
+        resendAfterSeconds: passwordReset_1.PASSWORD_RESET_RESEND_SECONDS,
+    });
 });
 router.post('/reset-password', async (req, res) => {
     res.set('Cache-Control', 'no-store');

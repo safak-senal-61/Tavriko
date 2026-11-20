@@ -38,7 +38,8 @@ afterEach(() => {
 describe('OneSignal password reset delivery and auth responses', () => {
   it('targets only the registered mailbox and puts the OTP only in the email body', async () => {
     vi.stubEnv('VERCEL', '1');
-    mocks.issue.mockResolvedValue(payload);
+    let completeLookup!: (reset: typeof payload) => void;
+    mocks.issue.mockReturnValue(new Promise((resolve) => { completeLookup = resolve; }));
     const accepted = await request(app).post('/auth/forgot-password').send({ email: '  FIXTURE@example.test  ' });
     expect(accepted.status).toBe(200);
     expect(accepted.headers['cache-control']).toBe('no-store');
@@ -46,6 +47,8 @@ describe('OneSignal password reset delivery and auth responses', () => {
     expect(JSON.stringify(accepted.body)).not.toMatch(/004891|fixture@example/);
     expect(mocks.issue).toHaveBeenCalledWith(expect.anything(), payload.email, expect.any(String));
     expect(mocks.waitUntil).toHaveBeenCalledOnce();
+    expect(transport).not.toHaveBeenCalled();
+    completeLookup(payload);
     await mocks.waitUntil.mock.calls[0][0];
     expect(transport).toHaveBeenCalledOnce();
     const [endpoint, options] = transport.mock.calls[0];

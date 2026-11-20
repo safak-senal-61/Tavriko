@@ -67,37 +67,15 @@ const SENSITIVE_KEYS = /pass|token|secret|authorization|otp|code|cookie/i;
 // request payloads to logs. Logs are readable from the admin portal and must never
 // contain credentials in plaintext.
 function redactSensitiveBody(body) {
-    if (!body || typeof body !== 'object')
-        return body;
     try {
-        const clone = Array.isArray(body) ? [] : {};
-        for (const key of Object.keys(body)) {
-            const value = body[key];
-            if (SENSITIVE_KEYS.test(key)) {
-                clone[key] = '[REDACTED]';
-            }
-            else if (value && typeof value === 'object') {
-                clone[key] = redactSensitiveBody(value);
-            }
-            else {
-                clone[key] = value;
-            }
-        }
-        return clone;
-    }
-    catch {
-        return '[redacted]';
-    }
-}
-function redactSensitiveQuery(query) {
-    if (!query || typeof query !== 'object')
-        return query;
-    try {
-        const clone = {};
-        for (const key of Object.keys(query)) {
-            clone[key] = SENSITIVE_KEYS.test(key) ? '[REDACTED]' : query[key];
-        }
-        return clone;
+        if (Array.isArray(body))
+            return body.map(redactSensitiveBody);
+        if (!body || typeof body !== 'object')
+            return body;
+        // fromEntries defines own data properties instead of invoking inherited setters.
+        return Object.fromEntries(Object.entries(body).map(([key, value]) => [
+            key, SENSITIVE_KEYS.test(key) ? '[REDACTED]' : redactSensitiveBody(value),
+        ]));
     }
     catch {
         return '[redacted]';
@@ -197,11 +175,12 @@ function createApp() {
                 req.path.startsWith('/qr')) {
                 return;
             }
-            logger_1.logger.log(cat, lvl, `${req.method} ${req.originalUrl} -> ${res.statusCode} (${duration}ms)`, {
+            const isPasswordReset = /^\/api\/auth\/(?:forgot|reset)-password\/?$/i.test(req.path);
+            logger_1.logger.log(cat, lvl, `${req.method} ${isPasswordReset ? req.path : req.originalUrl} -> ${res.statusCode} (${duration}ms)`, {
                 ip: req.ip,
-                query: Object.keys(req.query).length ? redactSensitiveQuery(req.query) : undefined,
+                query: !isPasswordReset && Object.keys(req.query).length ? redactSensitiveBody(req.query) : undefined,
                 body: req.method !== 'GET' &&
-                    !/^\/api\/auth\/(?:forgot|reset)-password\/?$/i.test(req.path) &&
+                    !isPasswordReset &&
                     Object.keys(req.body || {}).length ? redactSensitiveBody(req.body) : undefined,
             });
         });
