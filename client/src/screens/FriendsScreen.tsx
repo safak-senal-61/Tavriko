@@ -557,7 +557,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     }
   };
   return (
-    <TavrikoScreen>
+    <TavrikoScreen mainTab>
       <TavrikoTopBar
         leftType="bell"
         onLeftPress={onNotifications || onBack}
@@ -1196,7 +1196,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
 };
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 110,
+    paddingBottom: Platform.OS === 'web' ? 12 : 110,
   },
   title: {
     fontFamily: THEME.fonts.display,

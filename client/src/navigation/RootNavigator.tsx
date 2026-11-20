@@ -150,7 +150,7 @@ const GAME_SESSION_SCREENS: ScreenName[] = [
 ];
 export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsConsentValue) => void }> = ({ onAnalyticsDecide }) => {
   const [pendingReferral, setPendingReferral] = useState(() => captureReferralLink());
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
   const isNativeTablet = !isWeb && windowWidth > 540;
 
@@ -178,7 +178,7 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
     : 'splash';
 
   const [currentScreen, setCurrentScreen] = useState<ScreenName>(initialScreen);
-  const webLayout = getWebLayout(windowWidth, currentScreen, isWeb);
+  const webLayout = getWebLayout(windowWidth, windowHeight, currentScreen, isWeb);
   /* KVKK: arkadaşın tam profili (salt okunur) — ayarlar/hesap bölümleri gizli */
   const [viewingProfile, setViewingProfile] = useState<UserProfile | null>(null);
   // İnternet bağlantısı durumu (netMonitor besler; overlay + oyun koruma süresi)
@@ -1689,17 +1689,24 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
     <View style={[
       styles.outerWrapper,
       isNativeTablet && styles.tabletOuter,
-      webLayout.roomy && styles.webOuter,
+      webLayout.roomy && [styles.webOuter, { paddingHorizontal: webLayout.frameGutter }],
     ]}>
       <StatusBar hidden={true} animated={false} />
 
       <View style={[
         styles.appFrame,
         isNativeTablet && styles.nativeTabletFrame,
-        webLayout.roomy && styles.webFrame,
-        webLayout.roomy && { maxWidth: webLayout.maxWidth },
+        webLayout.roomy && [styles.webFrame, { maxWidth: webLayout.frameMaxWidth }],
       ]}>
-        <Animated.View style={[styles.container, !isWeb && styles.nativeContainer, { opacity: screenFade }]}>
+        <Animated.View
+          testID={isWeb ? 'player-web-content' : undefined}
+          style={[
+            styles.container,
+            !isWeb && styles.nativeContainer,
+            webLayout.contentMaxWidth ? { maxWidth: webLayout.contentMaxWidth } : null,
+            { opacity: screenFade },
+          ]}
+        >
         {currentScreen === 'splash' && (
           <SplashScreen
             onFinish={() => {
@@ -2155,6 +2162,7 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
         )}
         {currentScreen === 'leaderboard' && (
           <LeaderboardScreen
+            wideLayout={webLayout.leaderboardColumns}
             user={user || undefined}
             apiBaseUrl={API_BASE}
             onBack={() => navigateTo('home')}
@@ -2465,6 +2473,7 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
           </View>
         </ScrollView>
       )}
+      {webLayout.reserveUtility && !webLayout.showUtility && <View style={styles.desktopSidebarSpacer} />}
       <LegalConsentGate
         visible={showLegalGate && !autoLegalInFlight}
         isUpdate={isLegalUpdate(user)}
@@ -2504,7 +2513,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 16,
-    paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#100822',
   },
@@ -2553,6 +2561,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     minHeight: 0,
   },
+  desktopSidebarSpacer: { flexShrink: 0, width: 248 },
   desktopSidebarContent: {
     flexGrow: 1,
     justifyContent: 'center',

@@ -11,6 +11,7 @@ import {
   StyleProp,
   Image,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import Svg, {
   Defs,
@@ -31,6 +32,7 @@ import { NotificationBell } from './NotificationUI';
 import { useUnreadCount } from '../store/notificationStore';
 import { BackgroundScene, backgroundFor } from './StoreKit';
 import { getCosmeticDef, UserProfile } from '@trivia/shared';
+import { WEB_TAB_WIDE_WIDTH } from '../navigation/webLayout';
 // Brand Assets
 export const BRAND_LOGO_MAIN = cdnImage('images/brand/logo_full.png');
 export const BRAND_LOGO_BANNER = cdnImage('images/brand/logo_full.png');
@@ -1055,10 +1057,11 @@ export const useProTheme = (
 export const TavrikoScreen: React.FC<{
   children: React.ReactNode;
   style?: ViewStyle;
+  mainTab?: boolean;
   /* Görüntülenen kullanıcının profili (arkadaş profili gibi): verilirse
      ekran arka planı ve tema o kullanıcının kuşandığı arka plandan alınır. */
   profileUser?: UserProfile | null;
-}> = ({ children, style, profileUser }) => {
+}> = ({ children, style, profileUser, mainTab }) => {
   // Kuşanılmış profil arka planı: süresi dolmamışsa tüm uygulamanın arka planını değiştirir.
   const storeUser = useGameStore((s) => s.user);
   const bgSource = profileUser ?? storeUser;
@@ -1069,8 +1072,10 @@ export const TavrikoScreen: React.FC<{
   const bgIsImage = activeBg ? !!backgroundFor(activeBg) : false;
   // PRO/VIP teması: arayüz vurgu renkleri de arka planla değişir
   const proTheme = useProTheme(profileUser);
+  const { width } = useWindowDimensions();
+  const wideTab = mainTab && Platform.OS === 'web' && width >= WEB_TAB_WIDE_WIDTH;
   return (
-    <View style={[styles.screenRoot, style]}>
+    <View style={[styles.screenRoot, wideTab && styles.webTabScreen, style]}>
       {/* Kuşanılmış arka plan: uygulama geneli */}
       {activeBg && (
         <View style={styles.equippedBgLayer} pointerEvents="none">
@@ -1366,7 +1371,11 @@ const NavBarBase = <K extends string>({
   const idx = items.findIndex((i) => i.key === activeKey);
   const showPill = idx >= 0 && items[idx].key !== raisedKey;
   return (
-    <View style={[styles.bottomNav, inFlow && styles.bottomNavInFlow]} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+    <View
+      style={[styles.bottomNav, inFlow && styles.bottomNavInFlow]}
+      accessibilityRole="tablist"
+      onLayout={(e) => setW(e.nativeEvent.layout.width)}
+    >
       <View style={styles.navSheen} pointerEvents="none" />
       {w > 0 && showPill && (
         <View
@@ -1386,7 +1395,14 @@ const NavBarBase = <K extends string>({
         };
         if (item.key === raisedKey) {
           return (
-            <TouchableOpacity key={item.key} style={styles.navItem} onPress={press} activeOpacity={0.85}>
+            <TouchableOpacity
+              key={item.key}
+              style={styles.navItem}
+              onPress={press}
+              activeOpacity={0.85}
+              accessibilityRole="tab"
+              aria-selected={isActive}
+            >
               <View style={styles.navRaised}>
                 <GradientFill direction="vertical" colors={['#FFD970', '#FFB21E']} />
                 <View style={styles.navRaisedIcon}>
@@ -1402,7 +1418,14 @@ const NavBarBase = <K extends string>({
           );
         }
         return (
-          <TouchableOpacity key={item.key} style={styles.navItem} onPress={press} activeOpacity={0.8}>
+          <TouchableOpacity
+            key={item.key}
+            style={styles.navItem}
+            onPress={press}
+            activeOpacity={0.8}
+            accessibilityRole="tab"
+            aria-selected={isActive}
+          >
             <NavIcon tab={item.key as any} active={isActive} size={22} />
             <Text style={[styles.navLabel, isActive && styles.navLabelActive]} numberOfLines={1}>
               {item.label}
@@ -1417,8 +1440,7 @@ const NavBarBase = <K extends string>({
 export const TavrikoBottomNav: React.FC<{
   activeTab: MainNavTab;
   onSelectTab: (tab: MainNavTab) => void;
-  inFlow?: boolean;
-}> = ({ activeTab, onSelectTab, inFlow }) => (
+}> = ({ activeTab, onSelectTab }) => (
   <NavBarBase<MainNavTab>
     items={[
       { key: 'play', label: 'Oyna' },
@@ -1429,7 +1451,7 @@ export const TavrikoBottomNav: React.FC<{
     ]}
     activeKey={activeTab}
     onSelect={onSelectTab}
-    inFlow={inFlow}
+    inFlow={Platform.OS === 'web'}
   />
 );
 
@@ -1461,6 +1483,7 @@ const styles = StyleSheet.create({
     maxWidth: Platform.OS === 'web' ? '100%' : 620,
     alignSelf: 'center',
   },
+  webTabScreen: { paddingHorizontal: 24, paddingTop: 14, minHeight: 0 },
   equippedBgLayer: {
     position: 'absolute',
     top: 0,
