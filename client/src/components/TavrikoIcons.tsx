@@ -1353,18 +1353,20 @@ const NavBarBase = <K extends string>({
   activeKey,
   onSelect,
   raisedKey,
+  inFlow,
 }: {
   items: NavItemDef<K>[];
   activeKey: K;
   onSelect: (k: K) => void;
   raisedKey?: K;
+  inFlow?: boolean;
 }) => {
   const [w, setW] = useState(0);
   const slot = w > 0 ? (w - 12) / items.length : 0;
   const idx = items.findIndex((i) => i.key === activeKey);
   const showPill = idx >= 0 && items[idx].key !== raisedKey;
   return (
-    <View style={styles.bottomNav} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+    <View style={[styles.bottomNav, inFlow && styles.bottomNavInFlow]} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
       <View style={styles.navSheen} pointerEvents="none" />
       {w > 0 && showPill && (
         <View
@@ -1415,7 +1417,8 @@ const NavBarBase = <K extends string>({
 export const TavrikoBottomNav: React.FC<{
   activeTab: MainNavTab;
   onSelectTab: (tab: MainNavTab) => void;
-}> = ({ activeTab, onSelectTab }) => (
+  inFlow?: boolean;
+}> = ({ activeTab, onSelectTab, inFlow }) => (
   <NavBarBase<MainNavTab>
     items={[
       { key: 'play', label: 'Oyna' },
@@ -1426,6 +1429,7 @@ export const TavrikoBottomNav: React.FC<{
     ]}
     activeKey={activeTab}
     onSelect={onSelectTab}
+    inFlow={inFlow}
   />
 );
 
@@ -1454,7 +1458,7 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 44 : 26,
     overflow: 'hidden',
     width: '100%',
-    maxWidth: 620,
+    maxWidth: Platform.OS === 'web' ? '100%' : 620,
     alignSelf: 'center',
   },
   equippedBgLayer: {
@@ -1715,6 +1719,15 @@ const styles = StyleSheet.create({
         elevation: 12,
       },
     }),
+  },
+  bottomNavInFlow: {
+    position: 'relative',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexShrink: 0,
+    marginTop: 8,
+    marginBottom: 14,
   },
   navSheen: {
     position: 'absolute',

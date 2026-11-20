@@ -1,12 +1,12 @@
 /**
  * Analitik onay bandı — KVKK uyumu.
  *
- * İlk açılışta (onay kararı yokken) alt köşede belirir. "Kabul Et"
- * deneneye kadar PostHog hiçbir olay göndermez; "Reddet" kalıcı olarak
+ * İlk açılışta (onay kararı yokken) belirir. "Kabul Et"
+ * denene kadar PostHog hiçbir olay göndermez; "Reddet" kalıcı olarak
  * kapatır. Gizlilik Politikası dokümanı bandın içinden açılabilir.
  */
 import React, { useEffect, useState } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { FileText, ShieldCheck } from 'lucide-react-native';
 import {
   getAnalyticsConsent,
@@ -25,6 +25,8 @@ interface Props {
 export const AnalyticsConsentBanner: React.FC<Props> = ({ onDecide }) => {
   const [visible, setVisible] = useState(false);
   const [openDoc, setOpenDoc] = useState<LegalDocumentId | null>(null);
+  const { height } = useWindowDimensions();
+  const shortWeb = Platform.OS === 'web' && height <= 420;
 
   useEffect(() => {
     void hydrateAnalyticsConsent().then(() => {
@@ -42,18 +44,23 @@ export const AnalyticsConsentBanner: React.FC<Props> = ({ onDecide }) => {
     <>
       <Modal visible={visible} transparent animationType="fade" onRequestClose={() => {}}>
         <View style={styles.backdrop} pointerEvents="auto">
-          <View style={styles.sheet} accessibilityViewIsModal>
-            <View style={styles.iconWrap}>
-              <ShieldCheck size={24} color="#6FF0C6" />
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[styles.scrollContent, shortWeb && styles.scrollShort]}
+            keyboardShouldPersistTaps="handled"
+          >
+          <View style={[styles.sheet, shortWeb && styles.sheetShort]} accessibilityViewIsModal>
+            <View style={[styles.iconWrap, shortWeb && styles.iconShort]}>
+              <ShieldCheck size={shortWeb ? 19 : 24} color="#6FF0C6" />
             </View>
             <Text style={styles.title}>Deneyimini geliştirmemize yardım et</Text>
-            <Text style={styles.body}>
+            <Text style={[styles.body, shortWeb && styles.bodyShort]}>
               Tavriko’yu daha iyi hale getirmek için oyun içi etkileşimleri anonim olarak ölçüyoruz
               (PostHog). Veriler hiçbir şekilde üçüncü kişilerle paylaşılmaz; ne topladığımızı
               Gizlilik Politikası’mızda okuyabilirsin.
             </Text>
             <Pressable
-              style={styles.docLink}
+              style={[styles.docLink, shortWeb && styles.docLinkShort]}
               onPress={() => setOpenDoc('privacy')}
               accessibilityRole="button"
               accessibilityLabel="Gizlilik Politikasını aç"
@@ -77,8 +84,9 @@ export const AnalyticsConsentBanner: React.FC<Props> = ({ onDecide }) => {
             >
               <Text style={styles.denyText}>Şimdilik Reddet</Text>
             </Pressable>
-            <Text style={styles.hint}>Reddetmek oyunu etkilemez; tercihini Ayarlar’dan her zaman değiştirebilirsin.</Text>
+            <Text style={[styles.hint, shortWeb && styles.hintShort]}>Reddetmek oyunu etkilemez; tercihini Ayarlar’dan her zaman değiştirebilirsin.</Text>
           </View>
+          </ScrollView>
         </View>
       </Modal>
       <LegalDocumentModal documentId={openDoc} onClose={() => setOpenDoc(null)} />
@@ -90,11 +98,17 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(4,2,20,0.82)',
+  },
+  scroll: { flex: 1 },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
     alignItems: 'center',
     padding: 20,
   },
+  scrollShort: { padding: 12 },
   sheet: {
+    flexShrink: 0,
     width: '100%',
     maxWidth: 420,
     backgroundColor: '#150A38',
@@ -103,6 +117,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,196,61,0.25)',
     padding: 20,
   },
+  sheetShort: { padding: 14 },
   iconWrap: {
     alignSelf: 'center',
     width: 46,
@@ -113,6 +128,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+  iconShort: { width: 34, height: 34, borderRadius: 17, marginBottom: 6 },
   title: {
     color: '#FFFFFF',
     fontSize: 18,
@@ -127,6 +143,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 12,
   },
+  bodyShort: { lineHeight: 18, marginBottom: 8 },
   docLink: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -134,6 +151,7 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 14,
   },
+  docLinkShort: { marginBottom: 8 },
   docLinkText: {
     color: '#FFC43D',
     fontSize: 13.5,
@@ -171,4 +189,5 @@ const styles = StyleSheet.create({
     marginTop: 12,
     lineHeight: 15,
   },
+  hintShort: { marginTop: 8 },
 });

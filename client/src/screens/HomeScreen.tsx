@@ -48,6 +48,7 @@ const MODE_IMAGES = {
 };
 
 interface HomeScreenProps {
+  wideLayout?: boolean;
   user: UserProfile;
   isGuest?: boolean;
   onQuickMatch: () => void;
@@ -78,9 +79,11 @@ const ModeTile: React.FC<{
   borderColor: string;
   glowColor: string;
   onPress: () => void;
-}> = ({ label, image, colors, borderColor, glowColor, onPress }) => (
+  wide?: boolean;
+  short?: boolean;
+}> = ({ label, image, colors, borderColor, glowColor, onPress, wide, short }) => (
   <TouchableOpacity
-    style={[styles.modeTile, { borderColor, shadowColor: glowColor }]}
+    style={[styles.modeTile, wide && styles.modeTileWide, { borderColor, shadowColor: glowColor }]}
     onPress={() => {
       sound.playSound('tap');
       sound.triggerHaptic('light');
@@ -92,9 +95,9 @@ const ModeTile: React.FC<{
   >
     <GradientFill colors={colors} direction="diagonal" />
     <View style={styles.modeTileShine} pointerEvents="none" />
-    <Image source={image} style={styles.modeTileImg} resizeMode="contain" />
-    <View style={styles.modeTileLabelRow}>
-      <Text style={styles.modeTileText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+    <Image source={image} style={[styles.modeTileImg, wide && styles.modeTileImgWide, short && styles.modeTileImgShort]} resizeMode="contain" />
+    <View style={[styles.modeTileLabelRow, wide && styles.modeTileLabelWide]}>
+      <Text style={[styles.modeTileText, wide && styles.modeTileTextWide]} numberOfLines={wide ? 2 : 1} adjustsFontSizeToFit minimumFontScale={0.75}>
         {label}
       </Text>
       <Text style={styles.modeTileChevron}>›</Text>
@@ -110,7 +113,8 @@ const FeatureTile: React.FC<{
   borderColor: string;
   glowColor: string;
   onPress: () => void;
-}> = ({ label, icon, colors, borderColor, glowColor, onPress }) => (
+  wide?: boolean;
+}> = ({ label, icon, colors, borderColor, glowColor, onPress, wide }) => (
   <TouchableOpacity
     style={[styles.featureTile, { borderColor, shadowColor: glowColor }]}
     onPress={() => {
@@ -125,13 +129,14 @@ const FeatureTile: React.FC<{
     <GradientFill colors={colors} direction="diagonal" />
     <View style={styles.featureTileShine} pointerEvents="none" />
     <Image source={icon} style={styles.featureTileIcon} resizeMode="contain" />
-    <Text style={styles.featureTileText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
+    <Text style={[styles.featureTileText, wide && styles.featureTileTextWide]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
       {label}
     </Text>
   </TouchableOpacity>
 );
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
+  wideLayout = false,
   user,
   isGuest = false,
   onQuickMatch,
@@ -187,15 +192,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return () => loop.stop();
   }, [fadeAnim, slideAnim, pulseAnim]);
 
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const narrow = windowWidth < 390;
+  const useWebNav = Platform.OS === 'web';
+  const shortLayout = wideLayout && windowHeight <= 620;
   const prog = calculateLevelFromXp(user.xp ?? 0);
   const completedToday = Boolean(user.dailyChallenge?.completedToday);
   const streakDays = Math.max(1, user.dailyStreak ?? 1);
   const unread = useUnreadCount();
 
   return (
-    <TavrikoScreen>
+    <TavrikoScreen style={wideLayout ? styles.screenWide : undefined}>
       {/* Üst Bar: Logo + Altın + Elmas + Bildirim */}
       {isGuest ? (
         <TavrikoTopBar
@@ -262,7 +269,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       )}
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, isGuest && { paddingBottom: 36 }]}
+        contentContainerStyle={[styles.scrollContent, useWebNav && styles.scrollContentWeb, isGuest && { paddingBottom: 36 }]}
         showsVerticalScrollIndicator={false}
       >
         <Animated.View
@@ -290,7 +297,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <Reanimated.View entering={FadeInDown.delay(60).duration(380)}>
           {/* Profil Kartı: Avatar + İsim + Seviye + XP */}
           <TouchableOpacity
-            style={styles.profileCard}
+            style={[styles.profileCard, shortLayout && styles.profileCardShort]}
             onPress={() => {
               sound.playSound('tap');
               if (onSeason) onSeason();
@@ -302,9 +309,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               colors={['rgba(107, 60, 255, 0.38)', 'rgba(36, 16, 80, 0.55)', 'rgba(56, 189, 248, 0.16)']}
               direction="diagonal"
             />
-            <View style={styles.profileAvatarWrap}>
-              <View style={styles.profileAvatarRing}>
-                <CharacterAvatar seed={user.avatarUrl || user.displayName} size={62} />
+            <View style={[styles.profileAvatarWrap, shortLayout && styles.profileAvatarWrapShort]}>
+              <View style={[styles.profileAvatarRing, shortLayout && styles.profileAvatarRingShort]}>
+                <CharacterAvatar seed={user.avatarUrl || user.displayName} size={shortLayout ? 48 : 62} />
               </View>
               <View style={styles.profileCrown} pointerEvents="none">
                 <CrownIcon size={26} />
@@ -337,10 +344,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
           </Reanimated.View>
 
-          <Reanimated.View entering={FadeInDown.delay(130).duration(380)}>
+          <View style={[wideLayout && styles.playGridWide, shortLayout && styles.playGridShort]}>
+          <Reanimated.View entering={FadeInDown.delay(130).duration(380)} style={wideLayout && styles.heroColumnWide}>
           {/* Hızlı Eşleşme (1v1 Düello) Hero Kartı */}
-          <View style={styles.heroCard}>
-            <Image source={DUEL_BANNER} style={styles.heroImage} resizeMode="cover" />
+          <View style={[styles.heroCard, wideLayout && styles.heroCardWide, shortLayout && styles.heroCardShort]}>
+            <Image source={DUEL_BANNER} style={[styles.heroImage, wideLayout && styles.heroImageWide]} resizeMode="cover" />
             <GradientFill
               colors={['rgba(15, 6, 36, 0)', 'rgba(15, 6, 36, 0)', 'rgba(15, 6, 36, 0.7)', 'rgba(15, 6, 36, 0.96)']}
               stops={[0, 0.45, 0.72, 0.85]}
@@ -350,7 +358,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
             <View style={styles.heroBottom}>
               <Text
-                style={[styles.heroTitle, narrow && styles.heroTitleNarrow]}
+                style={[styles.heroTitle, (narrow || wideLayout) && styles.heroTitleNarrow]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.7}
@@ -359,13 +367,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </Text>
               <View style={styles.heroSubRow}>
                 <CrownIcon size={16} />
-                <Text style={styles.heroSub} numberOfLines={1}>
+                <Text style={styles.heroSub} numberOfLines={wideLayout ? 2 : 1}>
                   15 Soru · {formatNumberTR(user.rankPoints ?? 1000)} Lig Puanı · {formatNumberTR(user.stats?.totalMatches ?? 0)} Düello Maçı
                 </Text>
               </View>
               <Animated.View style={{ transform: [{ scale: pulseAnim }], alignSelf: 'stretch' }}>
                 <TouchableOpacity
-                  style={styles.playButton}
+                  style={[styles.playButton, shortLayout && styles.playButtonShort]}
                   onPress={() => {
                     sound.playSound('tap');
                     sound.triggerHaptic('medium');
@@ -386,11 +394,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
           </Reanimated.View>
 
-          <Reanimated.View entering={FadeInDown.delay(200).duration(380)}>
+          <Reanimated.View entering={FadeInDown.delay(200).duration(380)} style={wideLayout && styles.modesColumnWide}>
           {/* 2x2 Mod Kartları */}
-          <View style={styles.modesGrid}>
-            <View style={styles.modesRow}>
+          <View style={[styles.modesGrid, wideLayout && styles.modesGridWide]}>
+            <View style={[styles.modesRow, wideLayout && styles.modesRowWide]}>
               <ModeTile
+                wide={wideLayout}
+                short={shortLayout}
                 label="Özel Oda"
                 image={MODE_IMAGES.customRoom}
                 colors={['#5B2CC4', '#3A1690', '#24105A']}
@@ -399,6 +409,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onPress={onCustomRoom}
               />
               <ModeTile
+                wide={wideLayout}
+                short={shortLayout}
                 label="Tek Kişilik"
                 image={MODE_IMAGES.singlePlayer}
                 colors={['#1F5FE0', '#16388F', '#0F1E5A']}
@@ -407,8 +419,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onPress={onPractice}
               />
             </View>
-            <View style={styles.modesRow}>
+            <View style={[styles.modesRow, wideLayout && styles.modesRowWide]}>
               <ModeTile
+                wide={wideLayout}
+                short={shortLayout}
                 label="Günlük"
                 image={MODE_IMAGES.daily}
                 colors={['#7A4A0E', '#4A2A10', '#2A1636']}
@@ -417,6 +431,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onPress={onDailyChallenge}
               />
               <ModeTile
+                wide={wideLayout}
+                short={shortLayout}
                 label="Arkadaşlar"
                 image={MODE_IMAGES.friends}
                 colors={['#8A1F55', '#5A1440', '#2C0E36']}
@@ -428,6 +444,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
 
           </Reanimated.View>
+          </View>
 
           <Reanimated.View entering={FadeInDown.delay(270).duration(380)}>
           {/* Günlük Seri Bandı */}
@@ -467,6 +484,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <View style={styles.extraFeaturesRow}>
             {onSeason && (
               <FeatureTile
+                wide={wideLayout}
                 label="Sezon 1"
                 icon={UI_IMG.season}
                 colors={['#7C4DFF', '#3A1690', '#24105A']}
@@ -477,6 +495,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
             {onProLeague && (
               <FeatureTile
+                wide={wideLayout}
                 label="Pro Lig"
                 icon={UI_IMG.prolig}
                 colors={['#2F7BE8', '#16388F', '#0F1E5A']}
@@ -487,6 +506,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
             {onShop && (
               <FeatureTile
+                wide={wideLayout}
                 label="Mağaza"
                 icon={UI_IMG.shop}
                 colors={['#D98A1F', '#8A4A12', '#4A2A10']}
@@ -497,6 +517,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
             {onEvents && (
               <FeatureTile
+                wide={wideLayout}
                 label="Etkinlik"
                 icon={UI_IMG.events}
                 colors={['#FF6A2F', '#B02E10', '#5A1408']}
@@ -507,6 +528,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
             {onInventory && (
               <FeatureTile
+                wide={wideLayout}
                 label="Envanter"
                 icon={UI_IMG.inventory}
                 colors={['#8A2E9E', '#5A1D6E', '#2C0E36']}
@@ -523,6 +545,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* Alt Navigasyon */}
       {!isGuest && (
         <TavrikoBottomNav
+          inFlow={useWebNav}
           activeTab="play"
           onSelectTab={(tab) => {
             if (tab === 'explore') onExploreCategories();
@@ -554,9 +577,20 @@ const glow = (color: string, radius = 14, opacity = 0.45) =>
   });
 
 const styles = StyleSheet.create({
+  screenWide: { maxWidth: '100%', paddingHorizontal: 24, paddingTop: 14 },
   scrollContent: {
     paddingBottom: 104,
   },
+  scrollContentWeb: { paddingBottom: 12 },
+  playGridWide: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 14,
+    marginTop: 14,
+  },
+  playGridShort: { marginTop: 10 },
+  heroColumnWide: { flex: 3, minWidth: 0 },
+  modesColumnWide: { flex: 2, minWidth: 0 },
   // ---- Üst Bar ----
   headerRow: {
     flexDirection: 'row',
@@ -674,12 +708,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(120, 140, 255, 0.55)',
   },
+  profileCardShort: { paddingVertical: 10 },
   profileAvatarWrap: {
     width: 76,
     height: 76,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  profileAvatarWrapShort: { width: 58, height: 58 },
   profileAvatarRing: {
     width: 72,
     height: 72,
@@ -692,6 +728,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...glow('#FFC43D', 10, 0.6),
   },
+  profileAvatarRingShort: { width: 56, height: 56, borderRadius: 28 },
   profileCrown: {
     position: 'absolute',
     top: -12,
@@ -767,6 +804,9 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 250,
   },
+  heroCardWide: { marginTop: 0, height: 302 },
+  heroCardShort: { height: 218 },
+  heroImageWide: { height: '90%' },
   heroBadge: {
     position: 'absolute',
     top: 12,
@@ -830,6 +870,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     ...glow('#5ADBB5', 16, 0.75),
   },
+  playButtonShort: { height: 50 },
   playButtonShine: {
     position: 'absolute',
     top: 4,
@@ -853,10 +894,12 @@ const styles = StyleSheet.create({
     marginTop: 14,
     gap: 10,
   },
+  modesGridWide: { flex: 1, marginTop: 0 },
   modesRow: {
     flexDirection: 'row',
     gap: 10,
   },
+  modesRowWide: { flex: 1 },
   modeTile: {
     flex: 1,
     minWidth: 0,
@@ -868,6 +911,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.45,
     shadowRadius: 10,
     elevation: 5,
+  },
+  modeTileWide: {
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 6,
+    paddingBottom: 10,
   },
   modeTileShine: {
     position: 'absolute',
@@ -884,6 +934,8 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
   },
+  modeTileImgWide: { position: 'relative', top: 0, left: 0, width: 78, height: 78 },
+  modeTileImgShort: { width: 62, height: 62 },
   modeTileLabelRow: {
     position: 'absolute',
     left: 56,
@@ -894,6 +946,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 3,
   },
+  modeTileLabelWide: { position: 'relative', left: 0, right: 0, bottom: 0, justifyContent: 'center' },
   modeTileText: {
     color: '#FFFFFF',
     fontSize: 15,
@@ -904,6 +957,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
+  modeTileTextWide: { textAlign: 'center' },
   modeTileChevron: {
     color: '#FFFFFF',
     fontSize: 22,
@@ -996,4 +1050,5 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
+  featureTileTextWide: { fontSize: 13 },
 });

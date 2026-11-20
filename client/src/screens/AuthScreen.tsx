@@ -66,6 +66,7 @@ import { sound } from '../services/soundService';
 
 // Tavriko marka logosu (şeffaf arka planlı, CDN yerine paket içinden — hızlı ve garantili)
 const AUTH_LOGO = cdnImage('images/brand/emblem_tight.png');
+const AUTH_ARENA = cdnImage('images/duel_banner.png');
 
 /** Doğum tarihi: Date → "GG.AA.YYYY" (sunucunun beklediği biçim). */
 function formatBirthDateTR(d: Date): string {
@@ -84,6 +85,7 @@ function parseBirthDateTR(value: string): Date | null {
 const GOOGLE_CLIENT_ID =
   '411578437442-gs1rck2124rgr516fe9dn9tuu15ge9ig.apps.googleusercontent.com';
 interface AuthScreenProps {
+  wideLayout?: boolean;
   onSuccess: (user: UserProfile, token: string) => void;
   onGuestContinue: () => void;
   apiBaseUrl: string;
@@ -127,6 +129,7 @@ const GoogleGLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
   </Svg>
 );
 export const AuthScreen: React.FC<AuthScreenProps> = ({
+  wideLayout = false,
   onSuccess,
   onGuestContinue,
   apiBaseUrl,
@@ -695,6 +698,18 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const stepBonusCoins = regStep * 200;
   const stepBonusGems = regStep * 5;
   const stepProgressPct = regStep * 25;
+  const guestEntry = (
+    <Reanimated.View entering={FadeInUp.delay(320).duration(450)}>
+      <GuestDiscoveryCard
+        compact
+        onPress={() => {
+          sound.playSound('nav');
+          sound.triggerHaptic('light');
+          onGuestContinue();
+        }}
+      />
+    </Reanimated.View>
+  );
   if (finishingOAuth && !errorMsg) {
     return (
       <View style={[styles.authRoot, { alignItems: 'center', justifyContent: 'center' }]}>
@@ -706,9 +721,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     );
   }
   return (
-    <View style={styles.authRoot}>
+    <View style={[styles.authRoot, wideLayout && styles.authRootWide]}>
       {/* Luxury Multi-Layered Cosmic Background */}
-      <Svg style={StyleSheet.absoluteFill} viewBox="0 0 400 850" preserveAspectRatio="none">
+      <Svg style={StyleSheet.absoluteFill} viewBox="0 0 400 850" preserveAspectRatio="none" pointerEvents="none">
         <Defs>
           <LinearGradient id="bgGrad" x1="0" y1="0" x2="0.3" y2="1">
             <Stop offset="0" stopColor="#2E1165" />
@@ -722,13 +737,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         <Circle cx="50" cy="620" r="160" fill="#DB2777" opacity="0.15" />
       </Svg>
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, compact && styles.scrollContentCompact, tiny && styles.scrollContentTiny]}
+        style={[styles.scrollView, wideLayout && styles.authRootWide]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          compact && styles.scrollContentCompact,
+          tiny && styles.scrollContentTiny,
+          wideLayout && styles.scrollContentWide,
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={wideLayout && styles.authIntro}>
         {/* Clean Modern Brand Header (3D Crown) — sabit, animasyonsuz */}
-        <View style={[styles.heroWrap, compact && styles.heroWrapCompact, tiny && styles.heroWrapTiny]}>
+        <View style={[styles.heroWrap, compact && styles.heroWrapCompact, tiny && styles.heroWrapTiny, wideLayout && styles.heroWrapWide]}>
           <View style={[styles.heroCrownWrap, compact && styles.heroCrownWrapCompact, tiny && styles.heroCrownWrapTiny]}>
             <View style={[styles.heroCrownGlow, compact && styles.heroCrownGlowCompact]} />
             <Image
@@ -743,8 +764,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             <Text style={[styles.brandSubtitle, compact && styles.brandSubtitleCompact, tiny && styles.brandSubtitleTiny]}>CANLI BİLGİ & DÜELLO</Text>
           </View>
         </View>
+          {wideLayout && (
+            <>
+              <View style={styles.arenaPreview}>
+                <Image source={AUTH_ARENA} style={styles.arenaImage} resizeMode="cover" accessible={false} />
+                <View style={styles.arenaCaption}>
+                  <Text style={styles.arenaTitle}>Bilgini yarıştır, kazan!</Text>
+                  <Text style={styles.arenaSubtitle}>Canlı düellolar, günlük görevler ve Pro Lig</Text>
+                </View>
+              </View>
+              {guestEntry}
+            </>
+          )}
+        </View>
         {/* Main Glass Auth Card */}
-        <Reanimated.View entering={FadeInDown.delay(220).duration(500).springify().damping(16)} style={[styles.card, compact && styles.cardCompact, tiny && styles.cardTiny]}>
+        <Reanimated.View entering={FadeInDown.delay(220).duration(500).springify().damping(16)} style={[styles.card, compact && styles.cardCompact, tiny && styles.cardTiny, wideLayout && styles.cardWide]}>
           {redirectNotice ? (
             <View style={styles.redirectNoticeBanner}>
               <Text style={styles.errorText}>🔒 {redirectNotice}</Text>
@@ -1368,17 +1402,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </>
           )}
         </Reanimated.View>
-        {/* Guest Mode Entry */}
-        <Reanimated.View entering={FadeInUp.delay(320).duration(450)}>
-          <GuestDiscoveryCard
-            compact
-            onPress={() => {
-              sound.playSound('nav');
-              sound.triggerHaptic('light');
-              onGuestContinue();
-            }}
-          />
-        </Reanimated.View>
+        {!wideLayout && guestEntry}
       </ScrollView>
       <LegalDocumentModal documentId={openLegalDoc} onClose={() => setOpenLegalDoc(null)} />
       {/* Country Picker Modal */}
@@ -1446,6 +1470,32 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     alignSelf: 'center',
   },
+  authRootWide: { maxWidth: '100%' },
+  scrollContentWide: {
+    maxWidth: 1032,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+  },
+  authIntro: { flex: 1, minWidth: 0, maxWidth: 464 },
+  heroWrapWide: { flexDirection: 'row', gap: 12, marginBottom: 14 },
+  arenaPreview: {
+    minHeight: 180,
+    justifyContent: 'flex-end',
+    backgroundColor: '#130932',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.5)',
+    overflow: 'hidden',
+  },
+  arenaImage: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
+  arenaCaption: { backgroundColor: 'rgba(14, 5, 34, 0.92)', padding: 12 },
+  arenaTitle: { color: '#FFFFFF', fontFamily: THEME.fonts.display, fontSize: 23 },
+  arenaSubtitle: { color: '#E2D7F5', fontFamily: THEME.fonts.bold, fontSize: 13, marginTop: 2 },
+  cardWide: { flex: 1, minWidth: 0, width: 'auto', padding: 20 },
   // ---- Mobil kompakt yerleşim: küçük ekranlarda kaydırmasız sığdırma ----
   // Logo ekranın en tepesine yapışmasın: üstte nefes payı bırak (status bar).
   scrollContentCompact: {

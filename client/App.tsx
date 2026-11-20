@@ -20,7 +20,6 @@ import {
   hydrateAnalyticsConsent,
   type AnalyticsConsentValue,
 } from './src/services/analyticsConsent';
-import { AnalyticsConsentBanner } from './src/components/AnalyticsConsentBanner';
 
 // Sentry hata izleme: DSN doğrudan koda gömülüdür. Client DSN'leri gizli
 // değildir (her tarayıcı/mobil bundle'ında görünür), yalnızca olay GÖNDERME
@@ -172,13 +171,7 @@ function AppInner() {
     );
   }
 
-  return (
-    <>
-      <RootNavigator />
-      {/* KVKK: analitik yalnızca açık onayla başlar; karar yoksa bandı göster */}
-      <AnalyticsConsentBanner onDecide={setAnalyticsConsentState} />
-    </>
-  );
+  return <RootNavigator onAnalyticsDecide={setAnalyticsConsentState} />;
 }
 
 // Sentry.wrap, SDK kapalıyken bile bileşeni değiştirmeden geçirir.
