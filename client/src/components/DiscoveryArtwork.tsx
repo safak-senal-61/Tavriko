@@ -145,10 +145,10 @@ export const GuestDiscoveryCard: React.FC<{ onPress: () => void; compact?: boole
   );
 };
 
-export const AchievementState: React.FC<{ done: boolean }> = ({ done }) => (
+export const AchievementState: React.FC<{ done: boolean; roomy?: boolean }> = ({ done, roomy }) => (
   <View style={[styles.state, done && styles.stateDone]}>
-    {done ? <Check size={11} color="#A7F3D0" /> : <LockKeyhole size={10} color="#D9CDF5" />}
-    <Text style={[styles.stateText, done && { color: '#A7F3D0' }]}>{done ? 'Kazanıldı' : 'Kilitli'}</Text>
+    {done ? <Check size={roomy ? 14 : 11} color="#A7F3D0" /> : <LockKeyhole size={roomy ? 13 : 10} color="#D9CDF5" />}
+    <Text style={[styles.stateText, roomy && { fontSize: 12 }, done && { color: '#A7F3D0' }]}>{done ? 'Kazanıldı' : 'Kilitli'}</Text>
   </View>
 );
 

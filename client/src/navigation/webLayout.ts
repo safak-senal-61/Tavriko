@@ -44,6 +44,21 @@ export const WEB_PAGES = {
 
 export type ScreenName = keyof typeof WEB_PAGES;
 
+// Scale the artwork separately from type and hit targets. Use the space left
+// after the actual screen inset and QR rail, not the browser's raw width.
+export function getWebUiSizing(contentWidth: number, height: number, roomy: boolean) {
+  const growth = roomy ? Math.max(0, Math.min(1, (contentWidth - 560) / 640)) : 0;
+  const short = height <= 620;
+  return {
+    art: roomy ? 1.14 + growth * (short ? 0.12 : 0.28) : 1,
+    buttonHeight: roomy && !short ? Math.round(54 + growth * 6) : 50,
+    buttonLabel: roomy ? Math.round(18 + growth * 2) : 18,
+    navIcon: roomy ? Math.round(24 + growth * 4) : 22,
+    navLabel: roomy ? Math.round(12 + growth * 2) : 10.5,
+    navHeight: roomy && !short ? Math.round(68 + growth * 6) : 66,
+  };
+}
+
 export function getWebLayout(width: number, height: number, screen: ScreenName, isWeb: boolean) {
   const page: PageLayout = WEB_PAGES[screen];
   const roomy = isWeb && width >= TABLET_WIDTH && page.mode !== 'splash';
@@ -68,6 +83,7 @@ export function getWebLayout(width: number, height: number, screen: ScreenName, 
     frameWidth,
     pageInset,
     contentWidth,
+    ui: getWebUiSizing(contentWidth, height, roomy),
     columns: !roomy || contentWidth < 720 ? 1 : contentWidth < 1050 ? 2 : 3,
     mode: page.mode,
   };

@@ -142,6 +142,9 @@ const DifficultyCard: React.FC<{
   onPress: () => void;
   inGrid: boolean;
 }> = ({ diff, index, selected, onPress, inGrid }) => {
+  const page = usePlayerWebLayout();
+  const roomy = page?.roomy;
+  const medalSize = Math.round(44 * (page?.ui.art ?? 1));
   // Ölçek animasyonu kaldırıldı: basınca kart ekran dışına taşıyordu.
   return (
     <Animated.View
@@ -151,6 +154,7 @@ const DifficultyCard: React.FC<{
       <TouchableOpacity
         style={[
           styles.diffCard,
+          roomy && styles.webDiffCard,
           { shadowColor: selected ? diff.glow : 'transparent' },
           selected && { backgroundColor: diff.tint },
           selected && { borderColor: diff.color },
@@ -162,6 +166,7 @@ const DifficultyCard: React.FC<{
         <View
           style={[
             styles.diffMedal,
+            roomy && { width: medalSize, height: medalSize, borderRadius: medalSize / 2 },
             { borderColor: `${diff.color}66`, backgroundColor: `${diff.color}14` },
             selected && { shadowColor: diff.glow },
           ]}
@@ -170,14 +175,14 @@ const DifficultyCard: React.FC<{
         </View>
         <View style={styles.diffBody}>
           <View style={styles.diffTitleRow}>
-            <Text style={[styles.diffTitle, { color: diff.color }]}>{diff.title}</Text>
+            <Text style={[styles.diffTitle, roomy && { fontSize: 22 }, { color: diff.color }]}>{diff.title}</Text>
             <View style={styles.starsRow}>
               {Array.from({ length: diff.stars }).map((_, idx) => (
                 <XpStarIcon key={idx} size={17} />
               ))}
             </View>
           </View>
-          <Text style={styles.diffDesc}>{diff.desc}</Text>
+          <Text style={[styles.diffDesc, roomy && { fontSize: 14 }]}>{diff.desc}</Text>
         </View>
         <View style={[styles.xpPill, { borderColor: `${diff.color}59` }]}>
           <Text style={[styles.xpPillText, { color: diff.color }]}>{diff.xpMultiplier}</Text>
@@ -346,6 +351,7 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
 const styles = StyleSheet.create({
   webGrid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12 },
   webGridItem: { width: '49%', minWidth: 0 },
+  webDiffCard: { minHeight: 90, paddingHorizontal: 16 },
   scrollContent: {
     paddingBottom: 28,
   },
