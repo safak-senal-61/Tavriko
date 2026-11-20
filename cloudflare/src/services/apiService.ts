@@ -1,4 +1,4 @@
-import { Question, CategoryId, DifficultyLevel, FinalMatchSummary } from '@trivia/shared';
+import { Question, CategoryId, DifficultyLevel, FinalMatchSummary, uniqueQuestions } from '@trivia/shared';
 import { getFallbackQuestions } from '../game/defaultQuestions';
 
 export class ApiService {
@@ -16,10 +16,9 @@ export class ApiService {
     const cleanUrl = (this.backendUrl || 'https://tavriko-app.vercel.app').replace(/\/+$/, '');
     const endpoint = `${cleanUrl}/api/internal/room-questions`;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
-
       const resp = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -35,12 +34,10 @@ export class ApiService {
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
-
       if (resp.ok) {
         const data: any = await resp.json();
         if (Array.isArray(data.questions) && data.questions.length > 0) {
-          return data.questions as Question[];
+          return uniqueQuestions(data.questions as Question[], count);
         }
         // Alt kategori seçiliyse ve havuzda soru yoksa başka kategorinin sorularını
         // uydurma; boş dön, oda sahibine "sorular yüklenemedi" hatası gösterilsin.
@@ -48,10 +45,12 @@ export class ApiService {
       }
     } catch (err: any) {
       console.warn(`[ApiService] Question fetch failed from ${endpoint}, falling back to defaults:`, err?.message);
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     // Graceful fallback to rich offline questions
-    return getFallbackQuestions(categoryId, difficulty, count);
+    return subCategory ? [] : getFallbackQuestions(categoryId, difficulty, count);
   }
 
   public async submitMatchResults(summary: FinalMatchSummary): Promise<boolean> {

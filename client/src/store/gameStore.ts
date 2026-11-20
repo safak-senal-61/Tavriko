@@ -35,7 +35,7 @@ interface GameState {
   roundResultsByRound: Record<number, RoundResult>;
   finalSummary: FinalMatchSummary | null;
   // Actions for gameplay
-  setCurrentQuestion: (q: ClientQuestion | null) => void;
+  setCurrentQuestion: (q: ClientQuestion | null, preserveAnswer?: boolean) => void;
   selectOption: (optId: string | null) => void;
   setTimeRemaining: (sec: number) => void;
   setRoundResult: (result: RoundResult | null) => void;
@@ -253,8 +253,8 @@ export const useGameStore = create<GameState>((set) => ({
   lastRoundResult: null,
   roundResultsByRound: {},
   finalSummary: null,
-  setCurrentQuestion: (currentQuestion) =>
-    set({
+  setCurrentQuestion: (currentQuestion, preserveAnswer = false) =>
+    set(preserveAnswer ? { currentQuestion } : {
       currentQuestion,
       selectedOptionId: null,
       isAnswerLocked: false,

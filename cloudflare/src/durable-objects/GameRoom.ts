@@ -34,18 +34,19 @@ interface WsAttachment {
   isHost: boolean;
 }
 
-type AlarmType = 'countdown' | 'round_end' | 'intermission' | 'reconnect_grace';
+type AlarmType = 'countdown' | 'round_end' | 'intermission';
 
 interface AlarmContext {
   type: AlarmType;
   roundNumber?: number;
-  disconnectedPlayerId?: string;
+  dueAt?: number;
 }
 
 export class GameRoomDO extends DurableObject<Env> {
   private room: GameRoom | null = null;
   private questions: Question[] = [];
   private alarmContext: AlarmContext | null = null;
+  private reconnectDeadlines: Record<string, number> = {};
   private isPrivateRoom: boolean = false;
   private apiService: ApiService;
   private access: PlayerAccessGate;
@@ -62,14 +63,30 @@ export class GameRoomDO extends DurableObject<Env> {
     this.ctx.blockConcurrencyWhile(async () => {
       const storedRoom = await this.ctx.storage.get<GameRoom>('room');
       const storedQuestions = await this.ctx.storage.get<Question[]>('questions');
-      const storedAlarm = await this.ctx.storage.get<AlarmContext>('alarmContext');
+      const storedAlarm = await this.ctx.storage.get<AlarmContext | { type: 'reconnect_grace'; disconnectedPlayerId?: string }>('alarmContext');
       const storedPrivacy = await this.ctx.storage.get<boolean>('isPrivateRoom');
       this.verifiedPlayers = new Set(await this.ctx.storage.get<string[]>('verifiedPlayers') ?? []);
       this.funnelMatchId = await this.ctx.storage.get<string>('funnelMatchId') ?? null;
 
       if (storedRoom) this.room = storedRoom;
       if (storedQuestions) this.questions = storedQuestions;
-      if (storedAlarm) this.alarmContext = storedAlarm;
+      this.reconnectDeadlines = await this.ctx.storage.get<Record<string, number>>('reconnectDeadlines') ?? {};
+      if (storedAlarm?.type === 'reconnect_grace' && storedRoom) {
+        // Recover games saved by the old scheduler, which replaced the round alarm.
+        const graceAt = await this.ctx.storage.getAlarm();
+        if (storedAlarm.disconnectedPlayerId && graceAt !== null) {
+          this.reconnectDeadlines[storedAlarm.disconnectedPlayerId] = graceAt;
+          await this.persistReconnectDeadlines();
+        }
+        const delay = (storedRoom.currentQuestion?.timeLimitSec || storedRoom.questionTimeSec || 15) * 1000;
+        if (storedRoom.status === 'question_active') {
+          await this.scheduleAlarm('round_end', (storedRoom.roundStartedAt || Date.now()) + delay - Date.now(), { roundNumber: storedRoom.currentRound });
+        } else if (storedRoom.status === 'round_result') {
+          await this.scheduleAlarm('intermission', 100);
+        }
+      } else if (storedAlarm && storedAlarm.type !== 'reconnect_grace') {
+        this.alarmContext = { ...storedAlarm, dueAt: storedAlarm.dueAt ?? (await this.ctx.storage.getAlarm()) ?? Date.now() };
+      }
       if (typeof storedPrivacy === 'boolean') this.isPrivateRoom = storedPrivacy;
 
       // Eski kayıtlardan kalan botları özel odalardan temizle
@@ -100,6 +117,7 @@ export class GameRoomDO extends DurableObject<Env> {
       const data = (await request.json()) as any;
       this.verifiedPlayers.clear();
       await this.ctx.storage.delete('verifiedPlayers');
+      await this.clearGameAlarms();
       this.funnelMatchId = typeof data.funnelMatchId === 'string' ? data.funnelMatchId : null;
       if (this.funnelMatchId) await this.ctx.storage.put('funnelMatchId', this.funnelMatchId);
       else await this.ctx.storage.delete('funnelMatchId');
@@ -159,19 +177,7 @@ export class GameRoomDO extends DurableObject<Env> {
         this.room.totalRounds,
         this.room.subCategory
       );
-      this.questions = questions || [];
-      if (this.questions.length < (this.room.totalRounds || 5) && this.questions.length > 0) {
-        let cIdx = 1;
-        while (this.questions.length < (this.room.totalRounds || 5)) {
-          for (const baseQ of [...this.questions]) {
-            if (this.questions.length >= (this.room.totalRounds || 5)) break;
-            this.questions.push({
-              ...baseQ,
-              id: `${baseQ.id}_cycle_${cIdx++}`,
-            });
-          }
-        }
-      }
+      this.questions = questions;
       this.room.totalRounds = this.questions.length;
       await this.persist();
       await this.ctx.storage.put('questions', this.questions);
@@ -325,6 +331,11 @@ export class GameRoomDO extends DurableObject<Env> {
       // Reconnection
       const existing = this.room.players[authUser.id];
       existing.isConnected = true;
+      if (Object.hasOwn(this.reconnectDeadlines, authUser.id)) {
+        delete this.reconnectDeadlines[authUser.id];
+        await this.persistReconnectDeadlines();
+        await this.armNextAlarm();
+      }
       if (authUser.displayName) existing.displayName = authUser.displayName;
       if (authUser.avatarUrl) existing.avatarUrl = authUser.avatarUrl;
     }
@@ -515,14 +526,12 @@ export class GameRoomDO extends DurableObject<Env> {
 
       await this.persist();
 
-      // If active game, schedule alarm for grace period expiration
-      if (this.room.status === 'question_active' || this.room.status === 'round_result') {
-        const connectedRemaining = Object.values(this.room.players).filter((p) => p.isConnected);
-        if (connectedRemaining.length <= 1 && this.room.mode === 'duel') {
-          await this.scheduleAlarm('reconnect_grace', gracePeriodSec * 1000, {
-            disconnectedPlayerId: playerId,
-          });
-        }
+      // Keep the phase deadline intact while waiting for the player to reconnect.
+      if (this.room.mode === 'duel' &&
+          ['countdown', 'question_active', 'round_result'].includes(this.room.status)) {
+        this.reconnectDeadlines = { ...this.reconnectDeadlines, [playerId]: Date.now() + gracePeriodSec * 1000 };
+        await this.persistReconnectDeadlines();
+        await this.armNextAlarm();
       }
     }
   }
@@ -533,9 +542,24 @@ export class GameRoomDO extends DurableObject<Env> {
 
   // --- Authoritative Alarm Handler ---
   async alarm(): Promise<void> {
-    if (!this.room || !this.alarmContext) return;
+    if (!this.room || this.room.status === 'game_over') return;
+
+    const now = Date.now();
+    const expired = Object.entries(this.reconnectDeadlines).filter(([, deadline]) => deadline <= now);
+    if (expired.some(([id]) => this.room?.players[id]?.isConnected === false)) {
+      await this.finishGame();
+      return;
+    }
+    if (expired.length) {
+      for (const [id] of expired) delete this.reconnectDeadlines[id];
+      await this.persistReconnectDeadlines();
+    }
 
     const ctx = this.alarmContext;
+    if (!ctx || (ctx.dueAt ?? now) > now) {
+      await this.armNextAlarm();
+      return;
+    }
     this.alarmContext = null;
     await this.ctx.storage.delete('alarmContext');
 
@@ -556,15 +580,6 @@ export class GameRoomDO extends DurableObject<Env> {
         }
         break;
 
-      case 'reconnect_grace':
-        // If player still disconnected after grace period, declare game over
-        if (ctx.disconnectedPlayerId && this.room.players[ctx.disconnectedPlayerId]) {
-          const p = this.room.players[ctx.disconnectedPlayerId];
-          if (!p.isConnected && this.room.status !== 'game_over') {
-            await this.finishGame();
-          }
-        }
-        break;
     }
   }
 
@@ -612,9 +627,7 @@ export class GameRoomDO extends DurableObject<Env> {
       // If room is now empty, cancel all alarms and end game
       if (connectedRemaining.length === 0) {
         this.room.status = 'game_over';
-        await this.ctx.storage.deleteAlarm();
-        this.alarmContext = null;
-        await this.ctx.storage.delete('alarmContext');
+        await this.clearGameAlarms();
       } else if (this.room.status === 'question_active' || this.room.status === 'round_result') {
         // If 1v1 mode and only 1 player remains, finish game immediately
         if (remainingPlayers.length <= 1) {
@@ -673,24 +686,12 @@ export class GameRoomDO extends DurableObject<Env> {
       this.room.subCategory
     );
 
-    if (!questions || questions.length === 0) {
+    if (questions.length === 0) {
       ws.send(createWsError('Sorular yüklenemedi, lütfen tekrar deneyin', 'QUESTIONS_ERROR', envelope.requestId));
       return;
     }
 
     this.questions = questions;
-    if (this.questions.length < (this.room.totalRounds || 5) && this.questions.length > 0) {
-      let cIdx = 1;
-      while (this.questions.length < (this.room.totalRounds || 5)) {
-        for (const baseQ of [...questions]) {
-          if (this.questions.length >= (this.room.totalRounds || 5)) break;
-          this.questions.push({
-            ...baseQ,
-            id: `${baseQ.id}_cycle_${cIdx++}`,
-          });
-        }
-      }
-    }
     this.room.totalRounds = this.questions.length;
     this.room.currentRound = 0;
     this.room.status = 'countdown';
@@ -780,7 +781,7 @@ export class GameRoomDO extends DurableObject<Env> {
 
     // Set round timeout alarm
     const questionSec = question.timeLimitSec || this.room.questionTimeSec || 15;
-    await this.scheduleAlarm('round_end', questionSec * 1000, { roundNumber: roundNum });
+    await this.scheduleAlarm('round_end', this.room.roundStartedAt + questionSec * 1000 - Date.now(), { roundNumber: roundNum });
 
     // Schedule realistic bot answers for any bot in the room
     Object.values(this.room.players).forEach((p) => {
@@ -793,6 +794,11 @@ export class GameRoomDO extends DurableObject<Env> {
   private async handleSubmitAnswer(ws: WebSocket, playerId: string, envelope: WsMessage): Promise<void> {
     if (!this.room || this.room.status !== 'question_active' || !this.room.currentQuestion) {
       ws.send(createWsError('Soru aktif değil veya süre doldu', 'ROUND_INACTIVE', envelope.requestId));
+      return;
+    }
+
+    if (envelope.payload?.roundNumber !== undefined && envelope.payload.roundNumber !== this.room.currentRound) {
+      ws.send(createWsError('Bu soru artık aktif değil', 'ROUND_INACTIVE', envelope.requestId));
       return;
     }
 
@@ -836,10 +842,12 @@ export class GameRoomDO extends DurableObject<Env> {
     if (!this.room || this.room.status !== 'question_active' || !this.room.currentQuestion) return;
     const player = this.room.players[playerId];
     if (!player || player.hasAnsweredCurrentRound) return;
+    const roundNumber = this.room.currentRound;
 
     applyPlayerRoundAnswer(this.room, playerId, selectedOptionId, elapsedMs);
 
     await this.persist();
+    if (this.room.status !== 'question_active' || this.room.currentRound !== roundNumber) return;
 
     // Broadcast that player answered (without revealing correctness)
     this.broadcast(SOCKET_EVENTS.PLAYER_ANSWERED, { playerId, streak: player.currentStreak });
@@ -852,7 +860,7 @@ export class GameRoomDO extends DurableObject<Env> {
 
     if (allAnswered) {
       // Early trigger for round end ONLY when EVERY player has answered
-      await this.scheduleAlarm('round_end', 450, { roundNumber: this.room.currentRound });
+      await this.scheduleAlarm('round_end', 450, { roundNumber });
     }
   }
 
@@ -894,19 +902,7 @@ export class GameRoomDO extends DurableObject<Env> {
         this.room.totalRounds || 5,
         this.room.subCategory
       );
-      this.questions = questions || [];
-      if (this.questions.length < (this.room.totalRounds || 5) && this.questions.length > 0) {
-        let cIdx = 1;
-        while (this.questions.length < (this.room.totalRounds || 5)) {
-          for (const baseQ of [...this.questions]) {
-            if (this.questions.length >= (this.room.totalRounds || 5)) break;
-            this.questions.push({
-              ...baseQ,
-              id: `${baseQ.id}_cycle_${cIdx++}`,
-            });
-          }
-        }
-      }
+      this.questions = questions;
       this.room.totalRounds = this.questions.length;
       await this.ctx.storage.put('questions', this.questions);
     }
@@ -946,6 +942,7 @@ export class GameRoomDO extends DurableObject<Env> {
       category: this.room.category, funnelMatch: this.funnelMatchId !== null };
 
     await this.persist();
+    await this.clearGameAlarms();
 
     // Broadcast Game Over summary
     this.broadcast(SOCKET_EVENTS.GAME_OVER, summary);
@@ -1020,6 +1017,7 @@ export class GameRoomDO extends DurableObject<Env> {
   private getClientQuestion(): ClientQuestion | null {
     if (!this.room || !this.room.currentQuestion) return null;
     const q = this.room.currentQuestion;
+    const timeLimitSec = q.timeLimitSec || this.room.questionTimeSec || 15;
     return {
       id: q.id,
       categoryId: q.categoryId,
@@ -1028,7 +1026,8 @@ export class GameRoomDO extends DurableObject<Env> {
       options: q.options,
       roundNumber: this.room.currentRound,
       totalRounds: this.room.totalRounds,
-      timeLimitSec: q.timeLimitSec || this.room.questionTimeSec || 15,
+      timeLimitSec,
+      timeRemainingMs: Math.max(0, (this.room.roundStartedAt ?? Date.now()) + timeLimitSec * 1000 - Date.now()),
       ...(q.subCategory ? { subCategory: q.subCategory } : {}),
     };
   }
@@ -1098,9 +1097,26 @@ export class GameRoomDO extends DurableObject<Env> {
   }
 
   private async scheduleAlarm(type: AlarmType, delayMs: number, extra?: Partial<AlarmContext>): Promise<void> {
-    this.alarmContext = { type, ...extra };
+    this.alarmContext = { type, ...extra, dueAt: Date.now() + Math.max(100, delayMs) };
     await this.ctx.storage.put('alarmContext', this.alarmContext);
-    await this.ctx.storage.setAlarm(Date.now() + Math.max(100, delayMs));
+    await this.armNextAlarm();
+  }
+
+  private async armNextAlarm(): Promise<void> {
+    const next = Math.min(this.alarmContext?.dueAt ?? Infinity, ...Object.values(this.reconnectDeadlines));
+    if (Number.isFinite(next)) await this.ctx.storage.setAlarm(next);
+    else await this.ctx.storage.deleteAlarm();
+  }
+
+  private async persistReconnectDeadlines(): Promise<void> {
+    await this.ctx.storage.put('reconnectDeadlines', this.reconnectDeadlines);
+  }
+
+  private async clearGameAlarms(): Promise<void> {
+    this.alarmContext = null;
+    this.reconnectDeadlines = {};
+    await this.ctx.storage.delete(['alarmContext', 'reconnectDeadlines']);
+    await this.ctx.storage.deleteAlarm();
   }
 
   private syncPublicRoomDirectory(): void {

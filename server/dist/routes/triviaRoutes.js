@@ -21,7 +21,7 @@ router.get('/questions/practice', async (req, res) => {
     const category = req.query.category || 'mixed';
     const difficulty = req.query.difficulty;
     const subCategory = req.query.subcategory || undefined;
-    const count = parseInt(req.query.count, 10) || 5;
+    const count = Math.min(50, Math.max(1, parseInt(req.query.count, 10) || 5));
     const seenIdsRaw = req.query.seenIds;
     const seenIds = seenIdsRaw ? seenIdsRaw.split(',') : [];
     const sessionId = req.query.sessionId || 'practice';
@@ -64,7 +64,12 @@ router.post('/questions/submit', async (req, res) => {
     const { questionId, selectedOptionId, timeRemainingMs, totalTimeMs, currentStreak, playerId, sessionId } = req.body;
     const sessionKey = sessionId || 'practice';
     const userKey = playerId || sessionKey || req.ip || 'anon_player';
-    const question = prismaClient_1.db.getQuestionById(questionId);
+    let question = prismaClient_1.db.getQuestionById(questionId);
+    if (!question) {
+        // Vercel may serve the submit on a different cold instance than /practice.
+        await prismaClient_1.db.ensureQuestionsRestored();
+        question = prismaClient_1.db.getQuestionById(questionId);
+    }
     if (!question) {
         res.status(404).json({ error: 'Soru bulunamadı' });
         return;

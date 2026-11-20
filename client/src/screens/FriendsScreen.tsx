@@ -42,6 +42,7 @@ interface FriendsScreenProps {
   isGuest?: boolean;
   apiBaseUrl?: string;
   onBack: () => void;
+  onSignIn: () => void;
   onInviteToMatch: (friendId: string, friendName?: string, roomCode?: string) => void;
   onJoinFriendRoom?: (roomCode: string) => void;
   onNavigateTab?: (tab: 'play' | 'explore' | 'leaders' | 'friends' | 'profile') => void;
@@ -81,6 +82,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   isGuest = false,
   apiBaseUrl,
   onBack,
+  onSignIn,
   onInviteToMatch,
   onJoinFriendRoom,
   onNavigateTab,
@@ -133,6 +135,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   const [addLoading, setAddLoading] = useState(false);
   const [addSuccessMsg, setAddSuccessMsg] = useState<string | null>(null);
   const [addErrorMsg, setAddErrorMsg] = useState<string | null>(null);
+  const [signInRequired, setSignInRequired] = useState(false);
   const base = apiBaseUrl || DEFAULT_API_BASE;
   const fetchFriends = () => {
     const uid = user?.id || 'default';
@@ -410,31 +413,35 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     }
   };
   const handleAddFriend = async () => {
+    if (addLoading) return;
     const clean = addInput.trim();
     if (!clean) {
       sound.playSound('wrong');
       setAddErrorMsg('Lütfen arkadaşlık kodu veya kullanıcı adı girin.');
       return;
     }
-    if (!user) {
+    if (!user || isGuest || user.isGuest || !token || token === 'mock_token') {
       sound.playSound('wrong');
-      setAddErrorMsg('Arkadaş eklemek için lütfen giriş yapın.');
+      setSignInRequired(true);
+      setAddErrorMsg('Arkadaş eklemek için hesabına giriş yap.');
       return;
     }
     setAddLoading(true);
     setAddErrorMsg(null);
     setAddSuccessMsg(null);
+    setSignInRequired(false);
     try {
       const res = await fetch(`${base}/social/friends/add`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({
-          userId: user.id,
-          codeOrUsername: clean,
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ codeOrUsername: clean }),
       });
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        setSignInRequired(true);
+        throw new Error('Oturumun artık geçerli değil. Arkadaşlık isteği göndermek için tekrar giriş yap.');
+      }
+      if (!res.ok || !data.success) {
         throw new Error(data.error || 'Arkadaşlık isteği gönderilemedi.');
       }
       sound.playSound('reward');
@@ -450,7 +457,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       fetchFriends();
     } catch (err: any) {
       sound.playSound('wrong');
-      setAddErrorMsg(err.message || 'Kullanıcı bulunamadı.');
+      setAddErrorMsg(err.message || 'Bağlantını kontrol edip tekrar dene.');
     } finally {
       setAddLoading(false);
     }
@@ -458,6 +465,8 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
 
   const handleRespondIncomingRequest = async (req: any, action: 'accept' | 'decline') => {
     if (!user) return;
+    setSignInRequired(false);
+    setChallengeNotice(null);
     sound.playSound(action === 'accept' ? 'reward' : 'tap');
     sound.triggerHaptic(action === 'accept' ? 'success' : 'light');
     setRespondingReqId(req.id);
@@ -471,7 +480,12 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
           action,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        setSignInRequired(true);
+        setChallengeNotice('İsteğe yanıt vermek için tekrar giriş yap.');
+        return;
+      }
       if (res.ok && data.success) {
         if (action === 'accept') {
           if (req.type === 'match_invite' || req.type === 'duel') {
@@ -487,8 +501,12 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
           }
         }
         fetchFriends();
+      } else {
+        setChallengeNotice(data.error || 'İsteğe yanıt verilemedi. Lütfen tekrar dene.');
       }
-    } catch {} finally {
+    } catch {
+      setChallengeNotice('İsteğe yanıt verilemedi. Bağlantını kontrol edip tekrar dene.');
+    } finally {
       setRespondingReqId(null);
     }
   };
@@ -584,6 +602,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         {challengeNotice && (
           <View style={styles.challengeNoticeCard}>
             <Text style={styles.challengeNoticeText}>{challengeNotice}</Text>
+            {signInRequired && <Button3D title="TEKRAR GİRİŞ YAP" variant="mint" onPress={onSignIn} />}
           </View>
         )}
         {/* 3 Navigation Tabs */}
@@ -763,10 +782,10 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 </View>
               )}
               <Button3D
-                title={addLoading ? 'GÖNDERİLİYOR...' : 'ARKADAŞLIK İSTEĞİ GÖNDER'}
+                title={signInRequired ? 'TEKRAR GİRİŞ YAP' : addLoading ? 'GÖNDERİLİYOR...' : 'ARKADAŞLIK İSTEĞİ GÖNDER'}
                 variant="mint"
                 disabled={addLoading}
-                onPress={handleAddFriend}
+                onPress={signInRequired ? onSignIn : handleAddFriend}
                 style={{ marginTop: 14 }}
                 textStyle={{ fontSize: 13 }}
               />
