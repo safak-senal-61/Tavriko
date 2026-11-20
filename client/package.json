@@ -59,7 +59,7 @@
     "@babel/core": "^7.25.2",
     "@types/react": "~19.3.0",
     "qrcode": "^1.5.4",
-    "typescript": "~6.0.3",
+    "typescript": "~7.0.2",
     "vitest": "^4.1.12"
   },
   "overrides": {
