@@ -1,5 +1,12 @@
 # Visual refresh acceptance and regression checks
 
+## Web guest reload and friend code entry
+- Login: dismiss the analytics prompt, switch between “Giriş Yap” and “Kayıt Ol”, and return to login. Select “Misafir olarak göz at” and expect Keşfet and the guest sign-in card, without a registered-user notification badge.
+- Reload in Keşfet after entering as a server guest, after the guest endpoint fails, and while it is still pending. Keep the guest restriction and show Keşfet, not the login screen. Existing locally stored `guest_local_` profiles must also restore as guests. Intentionally tapping the guest sign-in card must still open login.
+- Friends: with an isolated account, open “+ Arkadaş Ekle”. The code field shows a fixed `TV-`, uppercases typed input, accepts a full pasted code without duplicating its prefix, and leaves `TV-` visible after select-all/backspace or a successful send. An empty suffix does not make a request.
+- Switch to “Kullanıcı adıyla ekle” and back. Username submission keeps its original text, and only code submissions get a `TV-` prefix. Verify the API payload, success/error feedback, and check the form at desktop and 375px. Do not send real requests to production accounts.
+- Local Chromium QA: confirmed all four guest reload cases (including the legacy profile), deliberate account sign-in and reload, and both friend request modes at 1280px and 375px. Used intercepted API responses and synthetic accounts.
+
 ## Mobile room invitations and notification actions
 - Home and Friends: one unread notification shows a compact round `1` against the bell; zero hides the badge and wider counts remain readable. Tap the bell to open the inbox and return with the badge cleared.
 - Inbox: private room, duel and friend notices get different primary labels. Verify accept and decline dispatch the correct action, only the tapped action shows progress, and an error leaves the invitation actionable.

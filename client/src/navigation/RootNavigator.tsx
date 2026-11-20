@@ -14,7 +14,7 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import { useGameStore, clearAllAccountStorage, getStoredAuth } from '../store/gameStore';
+import { useGameStore, clearAllAccountStorage } from '../store/gameStore';
 import { authHeaders } from '../utils/apiAuth';
 import { shuffleOptionsForPlayer } from '../utils/optionShuffle';
 import { seenScopeKey, getSeenQuestionIds, markQuestionsSeen } from '../utils/seenQuestions';
@@ -169,7 +169,7 @@ export const RootNavigator: React.FC = () => {
       window.location.hash.includes('developer') ||
       window.location.pathname.includes('/developer'));
 
-  const initialAuthUser = getStoredAuth()?.user || useGameStore.getState().user;
+  const initialAuthUser = useGameStore.getState().user;
   const initialScreen: ScreenName = isWebOAuthReturn
     ? 'auth'
     : isWebDeveloperReturn
@@ -189,8 +189,7 @@ export const RootNavigator: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string>('');
   /** Alt kategoride soru yok uyarısı: window.alert yerine marka dilinde modal */
   const [gameAlert, setGameAlert] = useState<{ message: string; title?: string } | null>(null);
-  // Guest Restriction & Redirect Banner State
-  const [isGuest, setIsGuest] = useState<boolean>(false);
+  // Guest redirect banner
   const [authRedirectNotice, setAuthRedirectNotice] = useState<string | null>(null);
   // Screen transition animation
   const screenFade = useRef(new Animated.Value(1)).current;
@@ -278,6 +277,7 @@ export const RootNavigator: React.FC = () => {
     setFinalSummary,
     resetGame,
   } = useGameStore();
+  const isGuest = user?.isGuest === true;
 
   // PostHog: kullanıcı kimliği netleştiğinde analitik tarafında tanımla
   useEffect(() => {
@@ -379,7 +379,7 @@ export const RootNavigator: React.FC = () => {
   // One inbox for every screen: HTTP reconnect snapshots and socket arrivals
   // share the same IDs, read receipts and exact badge count.
   useEffect(() => {
-    const owner = user && !user.isGuest && !isGuest ? user.id : null;
+    const owner = user && !isGuest ? user.id : null;
     const inbox = useNotificationStore.getState();
     inbox.activate(owner, user?.notifications);
     if (!owner) return;
@@ -471,7 +471,7 @@ export const RootNavigator: React.FC = () => {
   const sharedProfileHandledRef = useRef<string | null>(null);
   useEffect(() => {
     const code = sharedProfileCode || getPendingProfileCode();
-    if (!code || !user || isGuest || user.isGuest || sharedProfileHandledRef.current === code) return;
+    if (!code || !user || isGuest || sharedProfileHandledRef.current === code) return;
     sharedProfileHandledRef.current = code;
     setSharedProfileLoading(true);
     fetch(`${API_BASE}/social/users/by-code/${encodeURIComponent(code)}`)
@@ -892,36 +892,17 @@ export const RootNavigator: React.FC = () => {
   // Auth & Profile Actions
   // -------------------------------------------------------------
   const handleGuestPlay = async () => {
-    setIsGuest(true);
     setAuthRedirectNotice(null);
-    try {
-      const res = await fetch(`${API_BASE}/auth/guest`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName: 'Misafir Oyuncu' }),
-      });
-      const data = await res.json();
-      if (data.user) {
-        setUser(
-          {
-            ...data.user,
-            displayName: 'Misafir Oyuncu',
-            avatarUrl: 'av0',
-          },
-          data.token
-        );
-        // Guests go straight to Keşfet (CategoryExploreScreen)!
-        navigateTo('categories');
-        return;
-      }
-    } catch {
-      // Fallback local guest
+    if (useGameStore.getState().user?.isGuest) {
+      navigateTo('categories');
+      return;
     }
     const fallbackUser: UserProfile = {
       id: 'guest_local_' + Math.random().toString(36).substring(2, 7),
       username: 'misafir_oyuncu',
       displayName: 'Misafir Oyuncu',
       avatarUrl: 'av0',
+      isGuest: true,
       level: 1,
       xp: 0,
       coins: 200,
@@ -937,11 +918,31 @@ export const RootNavigator: React.FC = () => {
       },
       categoryMastery: {},
     };
+    // Persist the choice before the network request so a quick reload resumes Keşfet.
     setUser(fallbackUser, 'mock_token');
     navigateTo('categories');
+    try {
+      const res = await fetch(`${API_BASE}/auth/guest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: fallbackUser.displayName }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      // Do not overwrite a real account that signed in while the guest request was pending.
+      if (data.user && data.token && useGameStore.getState().user?.id === fallbackUser.id) {
+        setUser({
+          ...data.user,
+          displayName: fallbackUser.displayName,
+          avatarUrl: fallbackUser.avatarUrl,
+          isGuest: true,
+        }, data.token);
+      }
+    } catch {
+      // The local guest can continue when the guest endpoint is unavailable.
+    }
   };
   const handleAuthSuccess = (loggedInUser: UserProfile, token: string) => {
-    setIsGuest(false);
     setAuthRedirectNotice(null);
     setUser(loggedInUser, token);
     const referral = getPendingReferral();
@@ -1267,7 +1268,7 @@ export const RootNavigator: React.FC = () => {
 
   // --- Paylaşılan oda bağlantısından otomatik katılım (?oda=KOD) ---
   useEffect(() => {
-    if (!sharedRoomCode || !user || isGuest || user.isGuest) return;
+    if (!sharedRoomCode || !user || isGuest) return;
     if (sharedRoomHandledRef.current === sharedRoomCode) return;
     if (activeRoomRef.current) return; // zaten bir odada
     sharedRoomHandledRef.current = sharedRoomCode;
@@ -2127,7 +2128,6 @@ export const RootNavigator: React.FC = () => {
             apiBaseUrl={API_BASE}
             onBack={() => navigateTo('home')}
             onSignIn={() => {
-              setIsGuest(false);
               setUser(null, null);
               setAuthRedirectNotice('Arkadaş eklemek için hesabına giriş yap.');
               navigateTo('auth');
@@ -2247,7 +2247,6 @@ export const RootNavigator: React.FC = () => {
             onBack={() => navigateTo('home')}
             onDeveloper={() => navigateTo('developer')}
             onLogout={() => {
-              setIsGuest(false);
               setAuthRedirectNotice(null);
               setUser(null, null);
               resetGame();
@@ -2308,7 +2307,6 @@ export const RootNavigator: React.FC = () => {
                 }
               }
               clearAllAccountStorage();
-              setIsGuest(false);
               setAuthRedirectNotice(null);
               setUser(null, null);
               resetGame();
@@ -2516,7 +2514,6 @@ export const RootNavigator: React.FC = () => {
         onAccept={() => { void acceptLegal('in_app'); }}
         onLogout={() => {
           setLegalGateError(null);
-          setIsGuest(false);
           setAuthRedirectNotice(null);
           setUser(null, null);
           resetGame();
