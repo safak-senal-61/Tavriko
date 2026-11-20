@@ -1,9 +1,12 @@
 import { Router, Request, Response } from 'express';
+import { waitUntil } from '@vercel/functions';
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
 import { UserProfile, LEGAL_VERSION, REQUIRED_LEGAL_DOCUMENTS, LegalConsentRecord } from '@trivia/shared';
 import { logger } from '../utils/logger';
 import { requireUserAuth } from '../middleware/auth';
+import { getOneSignalEmailConfig, sendOneSignalPasswordResetEmail } from '../services/oneSignalEmail';
+import { confirmPasswordReset, getPasswordResetSecret, issuePasswordReset, PASSWORD_RESET_RESEND_SECONDS } from '../services/passwordReset';
 
 const LEGAL_CONSENT_REQUIRED_ERROR =
   'Devam etmek için Kullanım Koşulları, Gizlilik Politikası ve KVKK Aydınlatma Metni’ni onaylamalısın.';
@@ -550,8 +553,7 @@ router.post('/delete-account', requireUserAuth, async (req: Request, res: Respon
 });
 
 // KVKK: /remove-account web sayfasının e-posta ile hesap silme akışı.
-// E-posta altyapısı olmadığından doğrulama kodu yanıtta gösterilir (şifre
-// sıfırlamadaki demoResetCode deseniyle aynı).
+// Bu eski akış, şifre sıfırlama OTP'lerinden ayrı çalışır.
 router.post('/request-delete-code', async (req: Request, res: Response): Promise<void> => {
   try {
     const { email } = req.body || {};
@@ -576,41 +578,78 @@ router.post('/confirm-delete', async (req: Request, res: Response): Promise<void
   }
 });
 
-router.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { identifier, email } = req.body;
-    const target = identifier || email;
-    if (!target) {
-      res.status(400).json({ error: 'Lütfen kayıtlı e-posta adresinizi veya kullanıcı adınızı girin.' });
-      return;
-    }
+const RESET_UNAVAILABLE = 'Şifre sıfırlama şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.';
+const RESET_ACCEPTED = 'Bu e-posta bir şifreli hesaba bağlıysa doğrulama kodu gönderilir. Gelen kutunuzu ve spam klasörünüzü kontrol edin.';
 
-    // SECURITY: the one-time code is delivered out-of-band (email), NEVER returned in
-    // the HTTP response. A generic response is sent whether or not the account exists
-    // to prevent user enumeration.
-    await db.requestPasswordReset(target).catch(() => undefined);
+function readResetIdentifier(body: Request['body']): string | null {
+  const value = body?.identifier ?? body?.email;
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized.length > 254) return null;
+  return normalized;
+}
+
+router.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
+  res.set('Cache-Control', 'no-store');
+  const target = readResetIdentifier(req.body);
+  if (!target) {
+    res.status(400).json({ error: 'Lütfen kayıtlı e-posta adresinizi veya kullanıcı adınızı girin.' });
+    return;
+  }
+  const config = getOneSignalEmailConfig();
+  const secret = getPasswordResetSecret();
+  if (!config || !secret) {
+    res.status(503).json({ error: RESET_UNAVAILABLE });
+    return;
+  }
+  try {
+    const reset = await issuePasswordReset(db.rawClient, target, secret);
+    if (reset) {
+      // Do not make the public response wait on the email provider for known accounts.
+      const delivery = sendOneSignalPasswordResetEmail(config, reset);
+      if (process.env.VERCEL) waitUntil(delivery);
+    }
     res.json({
       success: true,
-      message: 'Şifre sıfırlama kodu kayıtlı e-posta adresinize gönderildi.',
+      message: RESET_ACCEPTED,
+      resendAfterSeconds: PASSWORD_RESET_RESEND_SECONDS,
     });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
+  } catch {
+    logger.error('AUTH', 'Şifre sıfırlama kodu hazırlanamadı.');
+    res.status(503).json({ error: RESET_UNAVAILABLE });
   }
 });
 
 router.post('/reset-password', async (req: Request, res: Response): Promise<void> => {
+  res.set('Cache-Control', 'no-store');
+  const target = readResetIdentifier(req.body);
+  const { otpCode, code, newPassword } = req.body || {};
+  const finalCode = otpCode ?? code;
+  if (!target || typeof finalCode !== 'string' || !/^\d{6}$/.test(finalCode.trim())) {
+    res.status(400).json({ error: '6 haneli doğrulama kodunu eksiksiz girin.' });
+    return;
+  }
+  if (typeof newPassword !== 'string' || newPassword.length < 8 || Buffer.byteLength(newPassword) > 72) {
+    res.status(400).json({ error: 'Yeni şifre en az 8 karakter olmalı ve 72 baytı aşmamalıdır.' });
+    return;
+  }
+  const secret = getPasswordResetSecret();
+  if (!secret) {
+    res.status(503).json({ error: RESET_UNAVAILABLE });
+    return;
+  }
   try {
-    const { identifier, email, otpCode, code, newPassword } = req.body;
-    const target = identifier || email;
-    const finalCode = otpCode || code;
-    if (!target || !finalCode || !newPassword) {
-      res.status(400).json({ error: 'Tüm alanların doldurulması zorunludur.' });
+    const confirmed = await confirmPasswordReset(db.rawClient, {
+      identifier: target, code: finalCode.trim(), password: newPassword,
+    }, secret);
+    if (!confirmed) {
+      res.status(400).json({ error: 'Kod geçersiz, kullanılmış veya süresi dolmuş. Gerekirse yeni kod isteyin.' });
       return;
     }
-    const result = await db.confirmPasswordReset(target, finalCode, newPassword);
-    res.json(result);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    res.json({ success: true, message: 'Şifreniz başarıyla yenilendi!' });
+  } catch {
+    logger.error('AUTH', 'Şifre sıfırlama doğrulaması tamamlanamadı.');
+    res.status(503).json({ error: RESET_UNAVAILABLE });
   }
 });
 

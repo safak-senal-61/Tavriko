@@ -1,4 +1,5 @@
 import { cdnImage } from '../utils/cdn';
+import { getApiBaseUrl } from '../config';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -135,6 +136,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   apiBaseUrl,
   redirectNotice,
 }) => {
+  const resetApiBase = Platform.OS === 'web' ? getApiBaseUrl() : apiBaseUrl;
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [regStep, setRegStep] = useState<1 | 2 | 3 | 4>(1);
   // Yasal metin onayı (kayıt) ve metin görüntüleyici
@@ -169,11 +171,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   // Password Reset flow
   const [resetStep, setResetStep] = useState<'request' | 'verify'>('request');
   const [resetCode, setResetCode] = useState('');
-  const [demoResetCodeHint, setDemoResetCodeHint] = useState<string | null>(null);
+  const [resetResendAt, setResetResendAt] = useState(0);
+  const [resetResendSeconds, setResetResendSeconds] = useState(0);
   const [newResetPassword, setNewResetPassword] = useState('');
   const [confirmResetPassword, setConfirmResetPassword] = useState('');
   const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!resetResendAt) return;
+    const timer = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((resetResendAt - Date.now()) / 1000));
+      setResetResendSeconds(remaining);
+      if (!remaining) clearInterval(timer);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resetResendAt]);
   // Mobilde giriş/kayıt ekranı sayfaya tam sığmalı (kaydırma olmamalı).
   // Küçük ekranlarda yerleşim kompaktlaştırılır; web'de dar görünümlü
   // (telefon) pencerelerde de kompakt mod devreye girer; masaüstündeki
@@ -617,30 +629,42 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       setLoading(false);
     }
   };
-  const handleRequestResetCode = async () => {
-    setErrorMsg(null);
+  const clearResetForm = () => {
+    setResetStep('request');
+    setResetCode('');
+    setNewResetPassword('');
+    setConfirmResetPassword('');
+    setShowResetPassword(false);
     setResetSuccessMsg(null);
-    if (!email.trim() || !email.includes('@')) {
+    setResetResendAt(0);
+    setResetResendSeconds(0);
+    setErrorMsg(null);
+  };
+  const handleRequestResetCode = async () => {
+    if (loading || (resetStep === 'verify' && Date.now() < resetResendAt)) return;
+    setErrorMsg(null);
+    const target = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target) || target.length > 254) {
       sound.playSound('wrong');
       setErrorMsg('Şifre sıfırlama kodu için kayıtlı e-posta adresinizi girin.');
       return;
     }
     setLoading(true);
     try {
-      const res = await fetch(`${apiBaseUrl}/auth/forgot-password`, {
+      const res = await fetch(`${resetApiBase}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: target }),
       });
       const data = await res.json();
-      if (!res.ok) {
+      if (!res.ok || data.success !== true) {
         throw new Error(data.error || 'Sıfırlama kodu gönderilemedi.');
       }
       sound.playSound('reward');
-      setDemoResetCodeHint(data.resetCodeDemo || null);
-      if (data.resetCodeDemo) {
-        setResetCode(data.resetCodeDemo);
-      }
+      setResetCode('');
+      const wait = Math.max(0, Math.min(600, Number(data.resendAfterSeconds) || 60));
+      setResetResendAt(Date.now() + wait * 1000);
+      setResetResendSeconds(wait);
       setResetStep('verify');
       setResetSuccessMsg(data.message);
     } catch (err: any) {
@@ -651,8 +675,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     }
   };
   const handleConfirmResetPassword = async () => {
+    if (loading) return;
     setErrorMsg(null);
-    if (!resetCode.trim() || resetCode.trim().length < 6) {
+    if (!/^\d{6}$/.test(resetCode)) {
       sound.playSound('wrong');
       setErrorMsg('6 haneli doğrulama kodunu eksiksiz girin.');
       return;
@@ -669,7 +694,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     }
     setLoading(true);
     try {
-      const res = await fetch(`${apiBaseUrl}/auth/reset-password`, {
+      const res = await fetch(`${resetApiBase}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -679,13 +704,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         }),
       });
       const data = await res.json();
-      if (!res.ok) {
+      if (!res.ok || data.success !== true) {
         throw new Error(data.error || 'Şifre güncellenemedi.');
       }
       sound.playSound('victory');
-      setPassword(newResetPassword);
+      setPassword('');
       setMode('login');
-      setResetStep('request');
+      clearResetForm();
       setResetSuccessMsg('Şifreniz başarıyla yenilendi! Şimdi giriş yapabilirsiniz.');
     } catch (err: any) {
       sound.playSound('wrong');
@@ -856,10 +881,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </View>
               <TouchableOpacity
                 style={styles.forgotLinkWrap}
+                accessibilityRole="button"
+                testID="open-password-reset"
                 onPress={() => {
                   sound.playSound('tap');
+                  clearResetForm();
                   setMode('forgot');
-                  setErrorMsg(null);
                 }}
               >
                 <Text style={styles.forgotLinkText}>Şifremi Unuttum?</Text>
@@ -1269,41 +1296,50 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <Text style={styles.forgotTitle}>ŞİFREMİ UNUTTUM</Text>
                 <Text style={styles.forgotSub}>
                   {resetStep === 'request'
-                    ? 'Hesabınıza kayıtlı e-posta adresini girin, 6 haneli şifre yenileme kodunuzu hemen oluşturalım.'
-                    : 'Gönderilen 6 haneli doğrulama kodunu ve yeni şifrenizi girin.'}
+                    ? 'Hesabınıza kayıtlı e-posta adresini girin. Şifrenizi yenilemek için 6 haneli bir kod isteyebilirsiniz.'
+                    : 'E-postadaki 6 haneli doğrulama kodunu ve yeni şifrenizi girin.'}
                 </Text>
               </View>
               <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>KAYITLI E-POSTA ADRESİNİZ</Text>
               <TextInput
+                testID="reset-email"
+                accessibilityLabel="Kayıtlı e-posta adresiniz"
                 style={[styles.input, compact && styles.inputCompact, tiny && styles.inputTiny]}
                 placeholder="ornek@gmail.com"
                 placeholderTextColor={THEME.colors.textMuted}
                 autoCapitalize="none"
+                autoComplete="email"
                 keyboardType="email-address"
                 value={email}
                 onChangeText={setEmail}
+                editable={resetStep === 'request' && !loading}
               />
               {resetStep === 'verify' && (
                 <>
-                  {demoResetCodeHint && (
-                    <View style={styles.codeHintBox}>
-                      <Text style={styles.codeHintLabel}>DOĞRULAMA KODUNUZ:</Text>
-                      <Text style={styles.codeHintValue}>{demoResetCodeHint}</Text>
-                    </View>
+                  {resetSuccessMsg && (
+                    <Text testID="reset-inbox-status" accessibilityLiveRegion="polite" style={styles.resetInboxStatus}>
+                      {resetSuccessMsg}
+                    </Text>
                   )}
                   <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>6 HANELİ DOĞRULAMA KODU</Text>
                   <TextInput
+                    testID="reset-otp"
+                    accessibilityLabel="6 haneli doğrulama kodu"
                     style={[styles.input, styles.codeInput]}
-                    placeholder="123456"
+                    placeholder="000000"
                     placeholderTextColor={THEME.colors.textMuted}
                     keyboardType="number-pad"
+                    autoComplete="one-time-code"
                     maxLength={6}
                     value={resetCode}
-                    onChangeText={setResetCode}
+                    onChangeText={(value) => setResetCode(value.replace(/[^0-9]/g, '').slice(0, 6))}
                   />
-                  <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>YENİ ŞİFRE (EN AZ 6 KARAKTER)</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>YENİ ŞİFRE (EN AZ 8 KARAKTER)</Text>
                   <View style={styles.passwordInputWrap}>
                     <TextInput
+                      testID="reset-new-password"
+                      accessibilityLabel="Yeni şifre"
+                      autoComplete="new-password"
                       style={[styles.passwordInput, compact && styles.inputCompact, tiny && styles.inputTiny]}
                       placeholder="••••••••"
                       placeholderTextColor={THEME.colors.textMuted}
@@ -1313,6 +1349,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     />
                     <TouchableOpacity
                       style={styles.eyeBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={showResetPassword ? 'Yeni şifreyi gizle' : 'Yeni şifreyi göster'}
                       onPress={() => setShowResetPassword(!showResetPassword)}
                     >
                       {showResetPassword ? <EyeOpenIcon size={20} /> : <EyeOffIcon size={20} />}
@@ -1321,6 +1359,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>YENİ ŞİFRE TEKRAR</Text>
                   <View style={styles.passwordInputWrap}>
                     <TextInput
+                      testID="reset-confirm-password"
+                      accessibilityLabel="Yeni şifre tekrar"
+                      autoComplete="new-password"
                       style={[styles.passwordInput, compact && styles.inputCompact, tiny && styles.inputTiny]}
                       placeholder="••••••••"
                       placeholderTextColor={THEME.colors.textMuted}
@@ -1344,6 +1385,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 />
               ) : resetStep === 'request' ? (
                 <Button3D
+                  testID="reset-send"
                   title="SIFIRLAMA KODU GÖNDER"
                   variant="gold"
                   onPress={handleRequestResetCode}
@@ -1351,19 +1393,46 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 />
               ) : (
                 <Button3D
+                  testID="reset-submit"
                   title="ŞİFREMİ YENİLE"
                   variant="mint"
                   onPress={handleConfirmResetPassword}
                   style={[{ marginTop: compact ? 10 : 14 }, compact && styles.btnCompact, tiny && styles.btnTiny]}
                 />
               )}
+              {resetStep === 'verify' && (
+                <View style={styles.resetActions}>
+                  <TouchableOpacity
+                    testID="reset-resend"
+                    accessibilityRole="button"
+                    style={styles.resetSecondaryAction}
+                    onPress={handleRequestResetCode}
+                    disabled={loading || resetResendSeconds > 0}
+                  >
+                    <Text style={[styles.backToLoginText, resetResendSeconds > 0 && styles.resetActionMuted]}>
+                      {resetResendSeconds > 0 ? `Tekrar gönder (${resetResendSeconds} sn)` : 'Kodu tekrar gönder'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    testID="reset-change-email"
+                    accessibilityRole="button"
+                    style={styles.resetSecondaryAction}
+                    onPress={clearResetForm}
+                    disabled={loading}
+                  >
+                    <Text style={styles.backToLoginText}>E-postayı değiştir</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
               <TouchableOpacity
                 style={styles.backToLoginBtn}
+                accessibilityRole="button"
+                testID="reset-back"
+                disabled={loading}
                 onPress={() => {
                   sound.playSound('tap');
+                  clearResetForm();
                   setMode('login');
-                  setResetStep('request');
-                  setErrorMsg(null);
                 }}
               >
                 <Text style={styles.backToLoginText}>← Giriş Ekranına Dön</Text>
@@ -1966,27 +2035,15 @@ const styles = StyleSheet.create({
     color: '#D9CDF5',
     lineHeight: 17,
   },
-  codeHintBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  resetInboxStatus: {
     backgroundColor: 'rgba(90, 219, 181, 0.15)',
-    borderWidth: 1,
-    borderColor: '#5ADBB5',
     borderRadius: 12,
     padding: 10,
-    marginTop: 10,
-  },
-  codeHintLabel: {
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-    color: '#5ADBB5',
-  },
-  codeHintValue: {
-    fontSize: 18,
-    fontFamily: THEME.fonts.display,
-    color: '#FFFFFF',
-    letterSpacing: 3,
+    marginTop: 8,
+    color: '#C4F5E7',
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: THEME.fonts.medium,
   },
   codeInput: {
     textAlign: 'center',
@@ -1998,6 +2055,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     marginTop: 6,
+  },
+  resetActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  resetSecondaryAction: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  resetActionMuted: {
+    color: '#ACA1BE',
   },
   backToLoginText: {
     fontSize: 12,

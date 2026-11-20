@@ -200,7 +200,9 @@ function createApp() {
             logger_1.logger.log(cat, lvl, `${req.method} ${req.originalUrl} -> ${res.statusCode} (${duration}ms)`, {
                 ip: req.ip,
                 query: Object.keys(req.query).length ? redactSensitiveQuery(req.query) : undefined,
-                body: req.method !== 'GET' && Object.keys(req.body || {}).length ? redactSensitiveBody(req.body) : undefined,
+                body: req.method !== 'GET' &&
+                    !/^\/api\/auth\/(?:forgot|reset)-password\/?$/i.test(req.path) &&
+                    Object.keys(req.body || {}).length ? redactSensitiveBody(req.body) : undefined,
             });
         });
         next();
