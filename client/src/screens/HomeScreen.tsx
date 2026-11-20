@@ -188,6 +188,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         useNativeDriver: useNative,
       }),
     ]).start();
+    // Keep the browser's hit target steady, especially for wide/short layouts.
+    // Native retains the original pulse.
+    if (!useNative) return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
