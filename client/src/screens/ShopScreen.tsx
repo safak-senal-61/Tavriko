@@ -59,6 +59,7 @@ import {
   backgroundFor,
   BadgeVisual,
 } from '../components/StoreKit';
+import { RewardedAdCard } from '../components/RewardedAdCard';
 
 interface ShopScreenProps {
   user?: UserProfile;
@@ -562,6 +563,16 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             <Text style={styles.heroCtaText}>Sandıklara bak</Text>
           </TouchableOpacity>
         </KitHero>
+
+        <RewardedAdCard
+          user={user}
+          apiBaseUrl={apiBaseUrl}
+          onUpdateUser={onUpdateUser}
+          onMessage={(message, error) => {
+            setIsError(error);
+            setStatusMessage(message);
+          }}
+        />
 
         <KitChips
           tabs={CATEGORY_TABS.map((c) => ({ id: c.id, label: c.name }))}
