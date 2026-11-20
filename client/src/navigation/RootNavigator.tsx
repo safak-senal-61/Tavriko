@@ -7,6 +7,7 @@ import {
   Platform,
   AppState,
   Animated,
+  ScrollView,
   useWindowDimensions,
   Text,
   TouchableOpacity,
@@ -86,8 +87,11 @@ import { captureRoomLink, clearPendingRoomCode } from '../utils/roomLink';
 import { ProfileInspectModal, PublicProfileCard } from '../components/ProfileInspectModal';
 import { DeveloperScreen } from '../screens/DeveloperScreen';
 import { ConnectionStatusOverlay } from '../components/ConnectionStatusOverlay';
+import { AnalyticsConsentBanner } from '../components/AnalyticsConsentBanner';
+import type { AnalyticsConsentValue } from '../services/analyticsConsent';
 import { useNetStatus, OFFLINE_GAME_GRACE_MS } from '../store/netStatus';
 import { netMonitor } from '../services/netMonitor';
+import { getWebLayout } from './webLayout';
 export type ScreenName =
   | 'splash'
   | 'auth'
@@ -119,7 +123,7 @@ export type ScreenName =
   | 'inventory'
   | 'pro_league'
   | 'developer';
-import { DEFAULT_API_BASE, getApiBaseUrl } from '../config';
+import { CLOUD_BASE_URL, DEFAULT_API_BASE, getApiBaseUrl } from '../config';
 import { LegalConsentGate } from '../components/LegalDocuments';
 import {
   consumeGoogleLegalAck,
@@ -144,16 +148,11 @@ const GAME_SESSION_SCREENS: ScreenName[] = [
   'duel_versus',
   'matchmaking',
 ];
-export const RootNavigator: React.FC = () => {
+export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsConsentValue) => void }> = ({ onAnalyticsDecide }) => {
   const [pendingReferral, setPendingReferral] = useState(() => captureReferralLink());
   const { width: windowWidth } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
-  // Genis ekran (tablet, yatay, masaüstu): ortalanmis 520px telefon cercevesi.
-  // Artik yalnizca web'de degil, native tabletlerde de aktif — telefon
-  // arayuzu tablete yayilip bos/gerilimli gorunmesin diye.
-  const isDesktop = windowWidth > 540;
-  // Yan menu (sidebar) yalnizca cok genis web ekranlarinda.
-  const isWide = isWeb && windowWidth >= 1180;
+  const isNativeTablet = !isWeb && windowWidth > 540;
 
   const isWebOAuthReturn =
     isWeb &&
@@ -179,6 +178,7 @@ export const RootNavigator: React.FC = () => {
     : 'splash';
 
   const [currentScreen, setCurrentScreen] = useState<ScreenName>(initialScreen);
+  const webLayout = getWebLayout(windowWidth, currentScreen, isWeb);
   /* KVKK: arkadaşın tam profili (salt okunur) — ayarlar/hesap bölümleri gizli */
   const [viewingProfile, setViewingProfile] = useState<UserProfile | null>(null);
   // İnternet bağlantısı durumu (netMonitor besler; overlay + oyun koruma süresi)
@@ -1686,66 +1686,20 @@ export const RootNavigator: React.FC = () => {
     if (!activeRoom) void evaluatePracticeAnswer(null, 0);
   };
   return (
-    <View style={[styles.outerWrapper, isDesktop && styles.desktopOuter]}>
+    <View style={[
+      styles.outerWrapper,
+      isNativeTablet && styles.tabletOuter,
+      webLayout.roomy && styles.webOuter,
+    ]}>
       <StatusBar hidden={true} animated={false} />
 
-      {/* Desktop Left Sidebar (Wide Displays >= 1180px) */}
-      {isWide && (
-        <View style={styles.desktopSidebarLeft}>
-          <View style={styles.desktopCard}>
-            <View style={{ alignItems: 'center', marginBottom: 18 }}>
-              <View style={styles.crownGlow}>
-                <Text style={{ fontSize: 32 }}>👑</Text>
-              </View>
-              <Text style={styles.brandTitleText}>Tavriko</Text>
-              <Text style={styles.brandSubtitleText}>CANLI BİLGİ & DÜELLO</Text>
-            </View>
-
-            <View style={styles.desktopFeatureList}>
-              <View style={styles.desktopFeatureItem}>
-                <Text style={styles.desktopFeatureIcon}>⚡</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.desktopFeatureTitle}>1v1 Canlı Düello</Text>
-                  <Text style={styles.desktopFeatureDesc}>Gerçek zamanlı hız ve bilgi yarışı</Text>
-                </View>
-              </View>
-
-              <View style={styles.desktopFeatureItem}>
-                <Text style={styles.desktopFeatureIcon}>🏆</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.desktopFeatureTitle}>Pro Lig & Sezon</Text>
-                  <Text style={styles.desktopFeatureDesc}>Haftalık liglerde zirveye tırman</Text>
-                </View>
-              </View>
-
-              <View style={styles.desktopFeatureItem}>
-                <Text style={styles.desktopFeatureIcon}>🧠</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.desktopFeatureTitle}>18+ Zengin Kategori</Text>
-                  <Text style={styles.desktopFeatureDesc}>Yüzlerce doğrulanmış güncel soru</Text>
-                </View>
-              </View>
-
-              <View style={styles.desktopFeatureItem}>
-                <Text style={styles.desktopFeatureIcon}>🔥</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.desktopFeatureTitle}>Günlük Seri</Text>
-                  <Text style={styles.desktopFeatureDesc}>Her gün gir, ödülleri ve XP'yi katla</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.desktopStatusPill}>
-              <View style={styles.pulseDot} />
-              <Text style={styles.desktopStatusText}>7/24 Kesintisiz Bulut Aktif</Text>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* Main Centered Mobile Frame */}
-      <View style={[styles.phoneFrame, isDesktop && styles.desktopPhoneFrame]}>
-        <Animated.View style={[styles.container, { opacity: screenFade }]}>
+      <View style={[
+        styles.appFrame,
+        isNativeTablet && styles.nativeTabletFrame,
+        webLayout.roomy && styles.webFrame,
+        webLayout.roomy && { maxWidth: webLayout.maxWidth },
+      ]}>
+        <Animated.View style={[styles.container, !isWeb && styles.nativeContainer, { opacity: screenFade }]}>
         {currentScreen === 'splash' && (
           <SplashScreen
             onFinish={() => {
@@ -1759,6 +1713,7 @@ export const RootNavigator: React.FC = () => {
         )}
         {currentScreen === 'auth' && (
           <AuthScreen
+            wideLayout={webLayout.split}
             onSuccess={handleAuthSuccess}
             onGuestContinue={handleGuestPlay}
             apiBaseUrl={API_BASE}
@@ -1775,6 +1730,7 @@ export const RootNavigator: React.FC = () => {
         )}
         {currentScreen === 'home' && user && (
           <HomeScreen
+            wideLayout={webLayout.split}
             user={user}
             isGuest={isGuest}
             onQuickMatch={handleStartQuickMatch}
@@ -1822,6 +1778,7 @@ export const RootNavigator: React.FC = () => {
         )}
         {currentScreen === 'categories' && (
           <CategoryExploreScreen
+            wideLayout={webLayout.split}
             avatarSeed={user?.avatarUrl || user?.displayName}
             coins={user?.coins}
             gems={user?.gems}
@@ -2455,9 +2412,8 @@ export const RootNavigator: React.FC = () => {
         />
       )}
 
-      {/* Desktop Right Sidebar (Wide Displays >= 1180px) */}
-      {isWide && (
-        <View style={styles.desktopSidebarRight}>
+      {webLayout.showUtility && (
+        <ScrollView style={styles.desktopSidebar} contentContainerStyle={styles.desktopSidebarContent}>
           <View style={styles.desktopCard}>
             <View style={{ alignItems: 'center', marginBottom: 12 }}>
               <Text style={{ fontSize: 26, marginBottom: 4 }}>📱</Text>
@@ -2469,9 +2425,10 @@ export const RootNavigator: React.FC = () => {
 
             <View style={styles.desktopQrWrapper}>
               <Image
-                source={{ uri: '/qr' }}
-                style={{ width: 140, height: 140, borderRadius: 12 }}
+                source={{ uri: `${CLOUD_BASE_URL}/qr` }}
+                style={{ width: 128, height: 128, borderRadius: 8 }}
                 resizeMode="contain"
+                accessibilityLabel="Tavriko mobil bağlantısının QR kodu"
               />
             </View>
 
@@ -2479,6 +2436,7 @@ export const RootNavigator: React.FC = () => {
 
             <TouchableOpacity
               style={styles.portalShortcutBtn}
+              accessibilityRole="button"
               onPress={() => {
                 navigateTo('developer');
               }}
@@ -2488,9 +2446,10 @@ export const RootNavigator: React.FC = () => {
 
             <TouchableOpacity
               style={[styles.portalShortcutBtn, { marginTop: 6, backgroundColor: 'rgba(255, 196, 61, 0.1)', borderColor: 'rgba(255, 196, 61, 0.3)' }]}
+              accessibilityRole="button"
               onPress={() => {
                 if (typeof window !== 'undefined') {
-                  window.open('/developer', '_blank');
+                  window.open('/developer', '_blank', 'noopener,noreferrer');
                 }
               }}
             >
@@ -2504,7 +2463,7 @@ export const RootNavigator: React.FC = () => {
               </Text>
             </View>
           </View>
-        </View>
+        </ScrollView>
       )}
       <LegalConsentGate
         visible={showLegalGate && !autoLegalInFlight}
@@ -2520,6 +2479,8 @@ export const RootNavigator: React.FC = () => {
           navigateTo('auth');
         }}
       />
+      {/* Web'de açılış görselini kapatmadan, ilk etkileşimli ekranda sor. */}
+      {(!isWeb || currentScreen !== 'splash') && <AnalyticsConsentBanner onDecide={onAnalyticsDecide} />}
     </View>
   );
 };
@@ -2531,20 +2492,29 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  desktopOuter: {
+  tabletOuter: {
     backgroundColor: '#090414',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
   },
-  phoneFrame: {
+  webOuter: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#100822',
+  },
+  appFrame: {
     flex: 1,
     width: '100%',
     height: '100%',
     backgroundColor: THEME.colors.background,
   },
-  desktopPhoneFrame: {
+  nativeTabletFrame: {
     maxWidth: 520,
     width: 520,
     height: '100%',
@@ -2555,25 +2525,36 @@ const styles = StyleSheet.create({
     boxShadow: '0 0 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(108, 92, 231, 0.35)',
     overflow: 'hidden',
   },
+  webFrame: {
+    flexBasis: 0,
+    minWidth: 0,
+    minHeight: 0,
+    alignSelf: 'stretch',
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.24)',
+  },
   container: {
     flex: 1,
     backgroundColor: THEME.colors.background,
     width: '100%',
-    maxWidth: 520,
     alignSelf: 'center',
+    minHeight: 0,
   },
-  desktopSidebarLeft: {
-    width: 300,
-    height: '100%',
-    maxHeight: 760,
-    marginRight: 28,
-    justifyContent: 'center',
+  nativeContainer: {
+    maxWidth: 520,
   },
-  desktopSidebarRight: {
-    width: 300,
-    height: '100%',
-    maxHeight: 760,
-    marginLeft: 28,
+  desktopSidebar: {
+    flexGrow: 0,
+    flexShrink: 0,
+    width: 248,
+    maxHeight: '100%',
+    alignSelf: 'center',
+    minHeight: 0,
+  },
+  desktopSidebarContent: {
+    flexGrow: 1,
     justifyContent: 'center',
   },
   desktopCard: {
@@ -2581,83 +2562,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    padding: 24,
-    ...(Platform.OS === 'web' ? ({ backdropFilter: 'blur(20px)', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)' } as any) : {}),
-  },
-  crownGlow: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: 'rgba(255, 196, 61, 0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 196, 61, 0.35)',
-  },
-  brandTitleText: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 34,
-    color: '#FFFFFF',
-    letterSpacing: 1,
-  },
-  brandSubtitleText: {
-    fontFamily: THEME.fonts.extraBold,
-    fontSize: 12,
-    color: '#FFC43D',
-    letterSpacing: 2,
-    marginTop: 2,
-  },
-  desktopFeatureList: {
-    gap: 14,
-    marginVertical: 18,
-  },
-  desktopFeatureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    padding: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  desktopFeatureIcon: {
-    fontSize: 20,
-  },
-  desktopFeatureTitle: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  desktopFeatureDesc: {
-    color: THEME.colors.textSecondary,
-    fontSize: 11,
-    fontFamily: THEME.fonts.medium,
-    marginTop: 1,
-  },
-  desktopStatusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.35)',
-    borderRadius: 20,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-  },
-  pulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10B981',
-  },
-  desktopStatusText: {
-    color: '#10B981',
-    fontSize: 11,
-    fontFamily: THEME.fonts.bold,
+    padding: 16,
   },
   desktopCardTitle: {
     color: '#FFFFFF',
@@ -2666,7 +2571,7 @@ const styles = StyleSheet.create({
   },
   desktopCardDesc: {
     color: THEME.colors.textSecondary,
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: THEME.fonts.medium,
     textAlign: 'center',
     marginTop: 4,
@@ -2682,7 +2587,7 @@ const styles = StyleSheet.create({
   },
   desktopQrUrlText: {
     color: '#A78BFA',
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: THEME.fonts.bold,
     textAlign: 'center',
     marginBottom: 12,
@@ -2692,6 +2597,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#FFC43D',
     borderRadius: 14,
+    minHeight: 44,
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2701,6 +2607,7 @@ const styles = StyleSheet.create({
     color: '#FFC43D',
     fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
   },
   desktopTipBox: {
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
@@ -2711,13 +2618,13 @@ const styles = StyleSheet.create({
   },
   desktopTipTitle: {
     color: '#FFC43D',
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
     marginBottom: 2,
   },
   desktopTipText: {
     color: THEME.colors.textSecondary,
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: THEME.fonts.body,
     lineHeight: 15,
   },

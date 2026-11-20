@@ -30,6 +30,7 @@ import {
 } from '../components/DiscoverArtwork';
 
 interface CategoryExploreScreenProps {
+  wideLayout?: boolean;
   onBack: () => void;
   onSelectCategory: (categoryId: CategoryId, subCategory?: string) => void;
   onNavigateTab?: (tab: 'play' | 'explore' | 'leaders' | 'friends' | 'profile') => void;
@@ -105,6 +106,7 @@ const withAlpha = (hex: string, alpha: number): string => {
 type CategoryWithCounts = CategoryInfo & { totalQuestions: number };
 
 export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
+  wideLayout = false,
   onBack,
   onSelectCategory,
   onNavigateTab,
@@ -263,7 +265,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   };
 
   return (
-    <TavrikoScreen>
+    <TavrikoScreen style={wideLayout ? styles.screenWide : undefined}>
       <TavrikoTopBar
         leftType="bell"
         onLeftPress={onNotifications || onBack}
@@ -278,6 +280,8 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
+          Platform.OS === 'web' && styles.scrollContentWeb,
+          wideLayout && styles.scrollContentWide,
           isGuest && { paddingBottom: 36 },
         ]}
         showsVerticalScrollIndicator={false}
@@ -368,8 +372,8 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
             })}
           </ScrollView>
 
-          {/* Kategori Kartları — 2 sütunlu modern ızgara */}
-          <View style={styles.grid}>
+          {/* Kategori kartları: telefonda iki, geniş web'de üç sütun. */}
+          <View style={[styles.grid, wideLayout && styles.gridWide]}>
             {visibleSections.map((cat, idx) => {
               const accent = cat.primaryColor || '#8B5CF6';
               const art = DISCOVER_CATEGORY_IMG[cat.id];
@@ -377,7 +381,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                 <Reanimated.View
                   key={`${activeGroup}-${cat.id}`}
                   entering={FadeInDown.delay(Math.min(idx, 10) * 45).duration(320)}
-                  style={styles.catCell}
+                  style={[styles.catCell, wideLayout && styles.catCellWide]}
                 >
                   <TouchableOpacity
                     style={[
@@ -572,6 +576,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
 
       {!isGuest && (
         <TavrikoBottomNav
+          inFlow={Platform.OS === 'web'}
           activeTab="explore"
           onSelectTab={(tab) => {
             if (tab === 'play') onBack();
@@ -584,10 +589,13 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  screenWide: { maxWidth: '100%', paddingHorizontal: 24, paddingTop: 14 },
   scrollContent: {
     paddingBottom: 120,
     paddingHorizontal: 12,
   },
+  scrollContentWeb: { paddingBottom: 12 },
+  scrollContentWide: { paddingHorizontal: 0 },
 
   // Kahraman başlık kartı
   hero: {
@@ -715,6 +723,8 @@ const styles = StyleSheet.create({
   catCell: {
     width: '48.6%',
   },
+  gridWide: { justifyContent: 'flex-start', columnGap: '2%' },
+  catCellWide: { width: '32%' },
   catCard: {
     borderRadius: 22,
     borderWidth: 1.4,

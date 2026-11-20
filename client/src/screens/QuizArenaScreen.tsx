@@ -8,6 +8,7 @@ import {
   AppStateStatus,
   useWindowDimensions,
   Image,
+  Platform,
   ScrollView,
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
@@ -758,6 +759,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const compact = windowHeight < 800;
   const tiny = windowHeight < 690;
+  const wideAnswers = Platform.OS === 'web' && windowWidth >= 700;
   const myRacer = activeRacers.find((r) => r.isMe);
   const myScore = formatCleanScore(currentScore, myRacer?.correctAnswers || 0, totalRounds);
   const rightPlayer = useMemo(() => {
@@ -828,7 +830,8 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const subCategoryLabel = subCategoryObj?.name || subCategoryName;
   const difficultyLabel = (diffMap[question.difficulty] || 'Orta').toLocaleUpperCase('tr-TR');
   const difficultyColor = DIFFICULTY_COLORS[question.difficulty] || DIFFICULTY_COLORS.medium;
-  const ArenaBody = isGroup ? ScrollView : View;
+  const scrollArena = isGroup || Platform.OS === 'web';
+  const ArenaBody = scrollArena ? ScrollView : View;
 
   return (
     <TavrikoScreen style={styles.screenContainer}>
@@ -873,8 +876,11 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         )}
       </View>
       <ArenaBody
-        style={isGroup ? styles.groupArenaScroll : styles.arenaBody}
-        {...(isGroup ? { contentContainerStyle: styles.groupArenaBody, showsVerticalScrollIndicator: false } : {})}
+        style={scrollArena ? styles.arenaScroll : styles.arenaBody}
+        {...(scrollArena ? {
+          contentContainerStyle: isGroup ? styles.groupArenaBody : styles.webArenaBody,
+          showsVerticalScrollIndicator: !isGroup,
+        } : {})}
       >
       {/* Günlük Meydan Okuma bilgisi */}
       {dailyChallengeInfo && (
@@ -1013,7 +1019,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       </Animated.View>
 
       {/* 5. Şıklar */}
-      <View style={[styles.optionsContainer, compact && { gap: 7 }, denseLayout && { gap: 5 }]}>
+      <View style={[styles.optionsContainer, compact && { gap: 7 }, denseLayout && { gap: 5 }, wideAnswers && styles.optionsWide]}>
         {question.options.map((opt, index) => {
           const activeSelectedId = selectedOptionId || localSelectedOptionId;
           const isMyChoice = activeSelectedId === opt.id;
@@ -1025,7 +1031,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
             <Animated.View
               key={`${question.id}-${question.roundNumber}-${opt.id}`}
               entering={FadeInDown.delay(90 + index * 70).duration(360).springify().damping(16)}
-              style={styles.optWrap}
+              style={[styles.optWrap, wideAnswers && styles.optWrapWide]}
             >
               <TouchableOpacity
                 style={[
@@ -1208,8 +1214,11 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   arenaBody: { flex: 1, justifyContent: 'space-between' },
-  groupArenaScroll: { flex: 1 },
+  arenaScroll: { flex: 1, minHeight: 0 },
   groupArenaBody: { flexGrow: 1, justifyContent: 'space-between', paddingVertical: 6, gap: 6 },
+  webArenaBody: { flexGrow: 1, justifyContent: 'space-between', paddingBottom: 5, gap: 8 },
+  optionsWide: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
+  optWrapWide: { width: '49%' },
   // ---- Üst Bar ----
   topRow: {
     flexDirection: 'row',

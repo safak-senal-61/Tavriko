@@ -1,5 +1,11 @@
 # Visual refresh acceptance and regression checks
 
+## Responsive player web app
+- Open `/app` signed out: verify the complete splash artwork and that the desktop utility panel does not appear over it. Dismiss the analytics prompt; in a short window both choices must remain reachable without zooming out.
+- Cycle through Giriş Yap, Kayıt Ol and Şifremi Unuttum?; enter Misafir olarak göz at, search in Keşfet, open and close a category, and use the guest sign-in card to return to login. Resize without losing text entered in the form.
+- With a synthetic signed-in player, verify HIZLI EŞLEŞME and all four game modes, the daily streak, five feature tiles and five bottom tabs. Check inbox and return, open/cancel matchmaking, open the room creation/join tabs and verify quiz answers remain reachable in a short landscape viewport.
+- Check portrait mobile (320px and 375px), tablets (768px and 1024px), desktop (1280px and 1568px) and a short desktop window. Keep the phone design, use two columns where there is room, prevent horizontal page overflow, and keep the bottom navigation clear of scrollable content. On desktop, check the QR and both developer shortcuts.
+
 ## Web guest reload and friend code entry
 - Login: dismiss the analytics prompt, switch between “Giriş Yap” and “Kayıt Ol”, and return to login. Select “Misafir olarak göz at” and expect Keşfet and the guest sign-in card, without a registered-user notification badge.
 - Reload in Keşfet after entering as a server guest, after the guest endpoint fails, and while it is still pending. Keep the guest restriction and show Keşfet, not the login screen. Existing locally stored `guest_local_` profiles must also restore as guests. Intentionally tapping the guest sign-in card must still open login.

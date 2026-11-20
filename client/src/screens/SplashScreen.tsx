@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Image, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, Image, Platform, useWindowDimensions } from 'react-native';
 import { cdnImage } from '../utils/cdn';
 
 const SPLASH_ART = cdnImage('splash-screen.png');
@@ -28,16 +28,14 @@ interface SplashScreenProps {
  * splash'in yalnızca bir kısmı görünüyordu. Açık yüzde boyutlar hem
  * native hem web'de tam ekran dolgu garantiler.
  *
- * CİHAZ UYUMU: Telefonlar için "cover" (kenarına kadar dolgu, görsel
- * oranı telefonlarla neredeyse birebir). Tablet / yatay / masaüstü gibi
- * geniş ekranlarda cover, yükleme halkası ve alt sahneyi kırpar; bu
- * yüzden geniş ekranlarda "contain" kullanılır — tüm tasarım görünür,
- * kenarlarda zemin rengiyle uyumlu bantlar kalır.
+ * Tablet ve masaüstü web'de özgün poster kırpılmaz; aynı görselin
+ * yumuşatılmış arka planı yatay alanı doldurur.
  */
 export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   const { width, height } = useWindowDimensions();
   // Telefon: ~0.45-0.56 oran; tablet/yatay: >= 0.62
   const isWideScreen = height > 0 && width / height >= 0.62;
+  const useBackdrop = Platform.OS === 'web' && isWideScreen && width >= 640;
 
   useEffect(() => {
     const t = setTimeout(onFinish, 1400);
@@ -45,11 +43,18 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   }, [onFinish]);
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, useBackdrop && styles.wideRoot]}>
+      {useBackdrop && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none" aria-hidden>
+          <Image source={SPLASH_ART} style={styles.image} resizeMode="cover" blurRadius={28} accessible={false} />
+          <View style={styles.backdropDim} />
+        </View>
+      )}
       <Image
         source={SPLASH_ART}
         style={styles.image}
         resizeMode={isWideScreen ? 'contain' : 'cover'}
+        accessibilityLabel="Tavriko yükleniyor"
       />
     </View>
   );
@@ -60,6 +65,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#01025B',
   },
+  wideRoot: { backgroundColor: '#080722', overflow: 'hidden' },
+  backdropDim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(8, 7, 34, 0.68)' },
   image: {
     ...StyleSheet.absoluteFill,
     width: '100%',
