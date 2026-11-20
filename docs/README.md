@@ -8,5 +8,6 @@ Suggested documents:
 - `DATABASE.md` — verified schema, relations, migrations, and RLS.
 - `REALTIME.md` — verified events, payloads, room/session lifecycle, and reconnect behavior.
 - `TESTING.md` — available scripts and reliable test commands.
+- [OneSignal password reset](password-reset-onesignal.md) — production email setup and OTP behavior.
 
 Do not fill these files with assumptions. Keep them concise and update only when source changes.

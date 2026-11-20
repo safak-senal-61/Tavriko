@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { vi } from 'vitest';
 import { createApp } from '../src/server';
 import { db } from '../src/db/prismaClient';
+import { logger } from '../src/utils/logger';
 import { Server } from 'http';
 
 describe('Trivia REST API', () => {
@@ -52,6 +53,18 @@ describe('Trivia REST API', () => {
     // Fixture generated with bcryptjs 2.4.3, never a real player's hash.
     const legacyHash = '$2a$04$zB5W0G7kmtrEbFfcgd4u3u3BBtEBERoA3JoKVWTosKOWDqiEZaP1q';
     await expect(bcrypt.compare('fixture-existing-password', legacyHash)).resolves.toBe(true);
+  });
+
+  it.each(['forgot-password', 'reset-password'])('keeps %s bodies and URL queries out of application logs', async (route) => {
+    const path = `/api/auth/${route}`;
+    const response = await request(app)
+      .post(`${path}?email=query-only@example.test`)
+      .send({ email: { invalid: 'body-only@example.test' }, otpCode: '042615', newPassword: 'FixtureOnlyPass1!' });
+    expect(response.status).toBe(400);
+    const entry = logger.getRecentLogs().find((log) => log.message.startsWith(`POST ${path}`));
+    expect(entry?.category).toBe('AUTH');
+    expect(entry?.message).toMatch(new RegExp(`^POST ${path} -> 400 `));
+    expect(JSON.stringify(entry)).not.toMatch(/query-only|body-only|042615|FixtureOnlyPass1/);
   });
 
   it('retrieves all trivia categories including food, nature and animals', async () => {

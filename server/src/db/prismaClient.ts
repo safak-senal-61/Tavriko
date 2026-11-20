@@ -53,6 +53,7 @@ import { mergeQuestionStores } from '../utils/questionStoreMerge';
 import { presenceManager } from '../services/presenceManager';
 import { queuePushForNotification } from '../services/pushService';
 import { deliverGameInvite } from '../services/inviteDelivery';
+import { PASSWORD_RESET_TOKEN_PREFIX } from '../services/passwordReset';
 
 // SECURITY: no hardcoded fallback secret. If the environment does not provide a
 // secret, token signing/verification fails loudly instead of silently using a
@@ -91,9 +92,6 @@ export interface UserRecord {
   bio?: string;
   passwordHash?: string;
   googleId?: string;
-  resetOtpCode?: string;
-  resetOtpExpiresAt?: number;
-  resetOtpAttempts?: number;
   avatarUrl: string;
   friendCode?: string;
   isGuest: boolean;
@@ -2136,9 +2134,7 @@ export class PrismaService {
     };
   }
 
-  /* KVKK: /remove-account web sayfası için e-posta ile hesap silme akışı.
-     E-posta altyapısı olmadığından doğrulama kodu istemciye gösterilir
-     (mevcut şifre sıfırlama akışıyla aynı desen). */
+  /* KVKK: /remove-account web sayfasının ayrı, eski hesap silme akışı. */
   public async requestAccountDeletionCode(
     email: string
   ): Promise<{ success: boolean; message: string; code?: string }> {
@@ -2189,7 +2185,7 @@ export class PrismaService {
     let tokens: Array<{ id: string; code: string; expiresAt: Date; used: boolean }> = [];
     try {
       tokens = await this.rawClient.passwordResetToken.findMany({
-        where: { email: cleanEmail, used: false },
+        where: { email: cleanEmail, used: false, NOT: { id: { startsWith: PASSWORD_RESET_TOKEN_PREFIX } } },
         orderBy: { createdAt: 'desc' },
         take: 5,
       });
@@ -2220,96 +2216,6 @@ export class PrismaService {
       return { success: false, message: 'Hesap bulunamadı veya zaten silinmiş.' };
     }
     return this.deleteAccount(userId);
-  }
-
-  public async requestPasswordReset(identifier: string): Promise<{
-    success: boolean;
-    message: string;
-    demoResetCode: string;
-    emailMasked: string;
-  }> {
-    const cleanId = identifier.trim().toLowerCase();
-    const record = Array.from(this.users.values()).find(
-      (u) => !u.isGuest && (u.username === cleanId || (u.email && u.email.toLowerCase() === cleanId))
-    );
-
-    if (!record) {
-      // SECURITY: generic error to prevent user enumeration via reset endpoint
-      throw new Error('Doğrulama kodu gönderilemedi. Lütfen bilgilerinizi kontrol edin.');
-    }
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    record.resetOtpCode = otp;
-    record.resetOtpExpiresAt = Date.now() + 15 * 60 * 1000;
-    record.resetOtpAttempts = 0;
-    this.savePersistedUsers();
-
-    const emailStr = record.email || `${record.username}@tavriko.app`;
-    return {
-      success: true,
-      message: `Şifre sıfırlama doğrulama kodu (${emailStr}) hesabınız için oluşturuldu.`,
-      demoResetCode: otp,
-      emailMasked: emailStr,
-    };
-  }
-
-  public async confirmPasswordReset(
-    identifier: string,
-    otpCode: string,
-    newPassword: string
-  ): Promise<{ success: boolean; message: string; token: string; user: UserProfile }> {
-    const cleanId = identifier.trim().toLowerCase();
-    const record = Array.from(this.users.values()).find(
-      (u) => !u.isGuest && (u.username === cleanId || (u.email && u.email.toLowerCase() === cleanId))
-    );
-
-    if (!record) {
-      // SECURITY: generic error to prevent user enumeration via reset endpoint
-      throw new Error('Doğrulama başarısız. Lütfen bilgilerinizi kontrol edin.');
-    }
-
-    // SECURITY: brute-force protection — after 5 failed attempts the OTP is
-    // invalidated and the user must request a new code.
-    const MAX_OTP_ATTEMPTS = 5;
-    if ((record.resetOtpAttempts || 0) >= MAX_OTP_ATTEMPTS) {
-      record.resetOtpCode = undefined;
-      record.resetOtpExpiresAt = undefined;
-      this.savePersistedUsers();
-      throw new Error('Çok fazla hatalı deneme. Lütfen yeni bir doğrulama kodu isteyin.');
-    }
-
-    if (!record.resetOtpCode || record.resetOtpCode !== otpCode.trim()) {
-      record.resetOtpAttempts = (record.resetOtpAttempts || 0) + 1;
-      if (record.resetOtpAttempts >= MAX_OTP_ATTEMPTS) {
-        record.resetOtpCode = undefined;
-        record.resetOtpExpiresAt = undefined;
-      }
-      this.savePersistedUsers();
-      throw new Error('Girdiğiniz 6 haneli doğrulama kodu geçersiz.');
-    }
-
-    if (record.resetOtpExpiresAt && Date.now() > record.resetOtpExpiresAt) {
-      throw new Error('Doğrulama kodunun süresi dolmuş. Lütfen yeni kod isteyin.');
-    }
-
-    if (!newPassword || newPassword.length < 8) {
-      throw new Error('Yeni şifreniz en az 8 karakter olmalıdır.');
-    }
-
-    record.passwordHash = await bcrypt.hash(newPassword, 10);
-    record.resetOtpCode = undefined;
-    record.resetOtpExpiresAt = undefined;
-    record.resetOtpAttempts = 0;
-    this.savePersistedUsers();
-    supabaseService.upsertUser(record).catch(() => {});
-
-    const token = jwt.sign({ userId: record.id, username: record.username }, JWT_SECRET, { expiresIn: '30d' });
-    return {
-      success: true,
-      message: 'Şifreniz başarıyla yenilendi!',
-      token,
-      user: this.toProfile(record),
-    };
   }
 
   public async updateUserProfile(

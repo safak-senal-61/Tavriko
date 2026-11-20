@@ -146,3 +146,10 @@
 - İlk yanıt hedefi geçen açık talepler ekip sorumlusunun gecikenler görünümünde yer alır; yalnızca dahili işlem veya atama süreyi durdurmaz.
 - Personel kendi oturumlarını listeler ve başka bir oturumu kapatır. Portal sahibi diğer personelin oturumlarını da kapatabilir. Passkey kurulumu ve doğrulanmış oturumla yeniden giriş, mevcut parola/TOTP seçeneğini bozmaz.
 - Hızlı Düello hunisi kayıt, seçim, doğrulanmış eşleşme ve aynı odada tamamlanan maç sayılarını gösterir. Kapsam başlangıcı veya olgunlaşmış kayıt yoksa oran göstermez.
+
+## OneSignal password reset
+
+- From login, open “Şifremi Unuttum?”, enter a registered email, and select “SIFIRLAMA KODU GÖNDER”. Expect instructions to check the inbox, no code in the HTTP response or on the screen, and a six-digit code in the transactional email only. Unknown addresses get the same public response and no email.
+- Enter the code and matching new passwords, then select “ŞİFREMİ YENİLE”. Expect a return to login with confirmation, no automatic login, and successful sign-in with the new password only.
+- Check service unavailable, wrong code, five failed attempts, expired/used codes, repeat send, and email change. A resend has a 60-second account-level cooldown. The reset and its confirmation must work across separate app instances; an account-deletion code cannot reset a password.
+- Run the web flow on desktop and 375px mobile, then recheck login/register switching and guest exploration. Use an isolated account, mock delivery locally, and only send real mail to an authorized test inbox after production configuration.
