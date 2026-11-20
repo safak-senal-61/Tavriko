@@ -33,6 +33,7 @@ import { UI_IMG } from '../components/StoreKit';
 import { NotificationBell } from '../components/NotificationUI';
 import { InfoHint } from '../components/InfoHint';
 import { useUnreadCount } from '../store/notificationStore';
+import { getHomeWebSizing } from '../navigation/webLayout';
 
 const LOGO_MARK = cdnImage('images/logo_mark.png');
 // 1v1 hızlı eşleşme bannerı PAKET İÇİNDEN yüklenir (require). CDN'den
@@ -81,7 +82,8 @@ const ModeTile: React.FC<{
   onPress: () => void;
   wide?: boolean;
   short?: boolean;
-}> = ({ label, image, colors, borderColor, glowColor, onPress, wide, short }) => (
+  portraitHeight?: number;
+}> = ({ label, image, colors, borderColor, glowColor, onPress, wide, short, portraitHeight }) => (
   <TouchableOpacity
     style={[styles.modeTile, wide && styles.modeTileWide, { borderColor, shadowColor: glowColor }]}
     onPress={() => {
@@ -95,9 +97,23 @@ const ModeTile: React.FC<{
   >
     <GradientFill colors={colors} direction="diagonal" />
     <View style={styles.modeTileShine} pointerEvents="none" />
-    <Image source={image} style={[styles.modeTileImg, wide && styles.modeTileImgWide, short && styles.modeTileImgShort]} resizeMode="contain" />
+    <Image
+      source={image}
+      style={[
+        styles.modeTileImg,
+        wide && styles.modeTileImgWide,
+        short && styles.modeTileImgShort,
+        portraitHeight ? { width: Math.min(106, portraitHeight - 39), height: Math.min(106, portraitHeight - 39) } : null,
+      ]}
+      resizeMode="contain"
+    />
     <View style={[styles.modeTileLabelRow, wide && styles.modeTileLabelWide]}>
-      <Text style={[styles.modeTileText, wide && styles.modeTileTextWide]} numberOfLines={wide ? 2 : 1} adjustsFontSizeToFit minimumFontScale={0.75}>
+      <Text
+        style={[styles.modeTileText, wide && styles.modeTileTextWide, portraitHeight ? styles.modeTileTextPortrait : null]}
+        numberOfLines={wide ? 2 : 1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
+      >
         {label}
       </Text>
       <Text style={styles.modeTileChevron}>›</Text>
@@ -116,7 +132,7 @@ const FeatureTile: React.FC<{
   wide?: boolean;
 }> = ({ label, icon, colors, borderColor, glowColor, onPress, wide }) => (
   <TouchableOpacity
-    style={[styles.featureTile, { borderColor, shadowColor: glowColor }]}
+    style={[styles.featureTile, wide && styles.featureTileWide, { borderColor, shadowColor: glowColor }]}
     onPress={() => {
       sound.playSound('tap');
       sound.triggerHaptic('light');
@@ -128,7 +144,7 @@ const FeatureTile: React.FC<{
   >
     <GradientFill colors={colors} direction="diagonal" />
     <View style={styles.featureTileShine} pointerEvents="none" />
-    <Image source={icon} style={styles.featureTileIcon} resizeMode="contain" />
+    <Image source={icon} style={[styles.featureTileIcon, wide && styles.featureTileIconWide]} resizeMode="contain" />
     <Text style={[styles.featureTileText, wide && styles.featureTileTextWide]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>
       {label}
     </Text>
@@ -195,14 +211,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const narrow = windowWidth < 390;
   const useWebNav = Platform.OS === 'web';
-  const shortLayout = wideLayout && windowHeight <= 620;
+  const { short: shortLayout, portrait: portraitLayout, heroHeight, modeHeight } =
+    getHomeWebSizing(windowWidth, windowHeight, wideLayout);
+  const sideBySide = wideLayout && !portraitLayout;
   const prog = calculateLevelFromXp(user.xp ?? 0);
   const completedToday = Boolean(user.dailyChallenge?.completedToday);
   const streakDays = Math.max(1, user.dailyStreak ?? 1);
   const unread = useUnreadCount();
 
   return (
-    <TavrikoScreen style={wideLayout ? styles.screenWide : undefined}>
+    <TavrikoScreen mainTab>
       {/* Üst Bar: Logo + Altın + Elmas + Bildirim */}
       {isGuest ? (
         <TavrikoTopBar
@@ -344,10 +362,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
           </Reanimated.View>
 
-          <View style={[wideLayout && styles.playGridWide, shortLayout && styles.playGridShort]}>
-          <Reanimated.View entering={FadeInDown.delay(130).duration(380)} style={wideLayout && styles.heroColumnWide}>
+          <View style={[wideLayout && styles.playGridWide, portraitLayout && styles.playGridPortrait, shortLayout && styles.playGridShort]}>
+          <Reanimated.View entering={FadeInDown.delay(130).duration(380)} style={sideBySide && styles.heroColumnWide}>
           {/* Hızlı Eşleşme (1v1 Düello) Hero Kartı */}
-          <View style={[styles.heroCard, wideLayout && styles.heroCardWide, shortLayout && styles.heroCardShort]}>
+          <View style={[styles.heroCard, wideLayout && styles.heroCardWide, heroHeight ? { height: heroHeight } : null]}>
             <Image source={DUEL_BANNER} style={[styles.heroImage, wideLayout && styles.heroImageWide]} resizeMode="cover" />
             <GradientFill
               colors={['rgba(15, 6, 36, 0)', 'rgba(15, 6, 36, 0)', 'rgba(15, 6, 36, 0.7)', 'rgba(15, 6, 36, 0.96)']}
@@ -358,7 +376,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </View>
             <View style={styles.heroBottom}>
               <Text
-                style={[styles.heroTitle, (narrow || wideLayout) && styles.heroTitleNarrow]}
+                style={[styles.heroTitle, (narrow || shortLayout || (sideBySide && windowWidth < 1024)) && styles.heroTitleNarrow]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.7}
@@ -371,7 +389,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   15 Soru · {formatNumberTR(user.rankPoints ?? 1000)} Lig Puanı · {formatNumberTR(user.stats?.totalMatches ?? 0)} Düello Maçı
                 </Text>
               </View>
-              <Animated.View style={{ transform: [{ scale: pulseAnim }], alignSelf: 'stretch' }}>
+              <Animated.View
+                style={[styles.playButtonWrap, wideLayout && styles.playButtonWrapWide, { transform: [{ scale: pulseAnim }] }]}
+              >
                 <TouchableOpacity
                   style={[styles.playButton, shortLayout && styles.playButtonShort]}
                   onPress={() => {
@@ -394,13 +414,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
           </Reanimated.View>
 
-          <Reanimated.View entering={FadeInDown.delay(200).duration(380)} style={wideLayout && styles.modesColumnWide}>
+          <Reanimated.View entering={FadeInDown.delay(200).duration(380)} style={sideBySide && styles.modesColumnWide}>
           {/* 2x2 Mod Kartları */}
-          <View style={[styles.modesGrid, wideLayout && styles.modesGridWide]}>
-            <View style={[styles.modesRow, wideLayout && styles.modesRowWide]}>
+          <View style={[styles.modesGrid, wideLayout && styles.modesGridWide, portraitLayout && styles.modesGridPortrait]}>
+            <View style={[styles.modesRow, sideBySide && styles.modesRowWide, modeHeight ? { height: modeHeight } : null]}>
               <ModeTile
                 wide={wideLayout}
                 short={shortLayout}
+                portraitHeight={modeHeight}
                 label="Özel Oda"
                 image={MODE_IMAGES.customRoom}
                 colors={['#5B2CC4', '#3A1690', '#24105A']}
@@ -411,6 +432,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <ModeTile
                 wide={wideLayout}
                 short={shortLayout}
+                portraitHeight={modeHeight}
                 label="Tek Kişilik"
                 image={MODE_IMAGES.singlePlayer}
                 colors={['#1F5FE0', '#16388F', '#0F1E5A']}
@@ -419,10 +441,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onPress={onPractice}
               />
             </View>
-            <View style={[styles.modesRow, wideLayout && styles.modesRowWide]}>
+            <View style={[styles.modesRow, sideBySide && styles.modesRowWide, modeHeight ? { height: modeHeight } : null]}>
               <ModeTile
                 wide={wideLayout}
                 short={shortLayout}
+                portraitHeight={modeHeight}
                 label="Günlük"
                 image={MODE_IMAGES.daily}
                 colors={['#7A4A0E', '#4A2A10', '#2A1636']}
@@ -433,6 +456,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <ModeTile
                 wide={wideLayout}
                 short={shortLayout}
+                portraitHeight={modeHeight}
                 label="Arkadaşlar"
                 image={MODE_IMAGES.friends}
                 colors={['#8A1F55', '#5A1440', '#2C0E36']}
@@ -484,7 +508,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <View style={styles.extraFeaturesRow}>
             {onSeason && (
               <FeatureTile
-                wide={wideLayout}
+                wide={wideLayout && !shortLayout}
                 label="Sezon 1"
                 icon={UI_IMG.season}
                 colors={['#7C4DFF', '#3A1690', '#24105A']}
@@ -495,7 +519,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
             {onProLeague && (
               <FeatureTile
-                wide={wideLayout}
+                wide={wideLayout && !shortLayout}
                 label="Pro Lig"
                 icon={UI_IMG.prolig}
                 colors={['#2F7BE8', '#16388F', '#0F1E5A']}
@@ -506,7 +530,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
             {onShop && (
               <FeatureTile
-                wide={wideLayout}
+                wide={wideLayout && !shortLayout}
                 label="Mağaza"
                 icon={UI_IMG.shop}
                 colors={['#D98A1F', '#8A4A12', '#4A2A10']}
@@ -517,7 +541,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
             {onEvents && (
               <FeatureTile
-                wide={wideLayout}
+                wide={wideLayout && !shortLayout}
                 label="Etkinlik"
                 icon={UI_IMG.events}
                 colors={['#FF6A2F', '#B02E10', '#5A1408']}
@@ -528,7 +552,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             )}
             {onInventory && (
               <FeatureTile
-                wide={wideLayout}
+                wide={wideLayout && !shortLayout}
                 label="Envanter"
                 icon={UI_IMG.inventory}
                 colors={['#8A2E9E', '#5A1D6E', '#2C0E36']}
@@ -545,7 +569,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       {/* Alt Navigasyon */}
       {!isGuest && (
         <TavrikoBottomNav
-          inFlow={useWebNav}
           activeTab="play"
           onSelectTab={(tab) => {
             if (tab === 'explore') onExploreCategories();
@@ -577,7 +600,6 @@ const glow = (color: string, radius = 14, opacity = 0.45) =>
   });
 
 const styles = StyleSheet.create({
-  screenWide: { maxWidth: '100%', paddingHorizontal: 24, paddingTop: 14 },
   scrollContent: {
     paddingBottom: 104,
   },
@@ -589,6 +611,7 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   playGridShort: { marginTop: 10 },
+  playGridPortrait: { flexDirection: 'column', gap: 14 },
   heroColumnWide: { flex: 3, minWidth: 0 },
   modesColumnWide: { flex: 2, minWidth: 0 },
   // ---- Üst Bar ----
@@ -804,8 +827,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 250,
   },
-  heroCardWide: { marginTop: 0, height: 302 },
-  heroCardShort: { height: 218 },
+  heroCardWide: { marginTop: 0 },
   heroImageWide: { height: '90%' },
   heroBadge: {
     position: 'absolute',
@@ -857,6 +879,8 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.extraBold,
     flexShrink: 1,
   },
+  playButtonWrap: { alignSelf: 'stretch' },
+  playButtonWrapWide: { width: '100%', maxWidth: 650, alignSelf: 'center' },
   playButton: {
     height: 64,
     borderRadius: 32,
@@ -895,6 +919,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   modesGridWide: { flex: 1, marginTop: 0 },
+  modesGridPortrait: { flex: 0, gap: 12 },
   modesRow: {
     flexDirection: 'row',
     gap: 10,
@@ -958,6 +983,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   modeTileTextWide: { textAlign: 'center' },
+  modeTileTextPortrait: { fontSize: 18 },
   modeTileChevron: {
     color: '#FFFFFF',
     fontSize: 22,
@@ -1029,6 +1055,7 @@ const styles = StyleSheet.create({
     shadowRadius: 9,
     elevation: 4,
   },
+  featureTileWide: { minHeight: 94, paddingVertical: 12 },
   featureTileShine: {
     position: 'absolute',
     top: 0,
@@ -1041,6 +1068,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
   },
+  featureTileIconWide: { width: 44, height: 44 },
   featureTileText: {
     color: '#FFFFFF',
     fontSize: 10.5,

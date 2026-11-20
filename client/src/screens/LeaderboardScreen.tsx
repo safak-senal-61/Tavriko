@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -28,6 +29,7 @@ import Animated, {
 } from 'react-native-reanimated';
 interface LeaderboardScreenProps {
   user?: UserProfile;
+  wideLayout?: boolean;
   apiBaseUrl?: string;
   onBack: () => void;
   onNavigateTab?: (tab: 'play' | 'explore' | 'leaders' | 'friends' | 'profile') => void;
@@ -61,6 +63,7 @@ const normalizeLeaderName = (name?: string) =>
 
 export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
   user,
+  wideLayout = false,
   apiBaseUrl,
   onBack,
   onNavigateTab,
@@ -128,6 +131,7 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
   const unitLabel = activeTab === 'weekly' ? 'LP' : 'XP';
   const podium = sortedLeaders.slice(0, 3);
   const rest = sortedLeaders.slice(3);
+  const showColumns = wideLayout && rest.length > 0;
   // Görsel sıra: 2 - 1 - 3
   const podiumOrder = [podium[1], podium[0], podium[2]];
 
@@ -139,7 +143,7 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
   const segStyle = useAnimatedStyle(() => ({ transform: [{ translateX: segX.value }] }));
 
   return (
-    <TavrikoScreen>
+    <TavrikoScreen mainTab>
       <TavrikoTopBar
         leftType="bell"
         onLeftPress={onNotifications || onBack}
@@ -185,7 +189,7 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
               style={styles.segmentBtn}
               onPress={() => setActiveTab(key)}
               accessibilityRole="tab"
-              accessibilityState={{ selected: activeTab === key }}
+              aria-selected={activeTab === key}
             >
               <View style={styles.segmentLabelRow}>
                 <Text style={[styles.segmentText, activeTab === key && styles.segmentTextActive]}>{label}</Text>
@@ -205,8 +209,10 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
         ) : sortedLeaders.length === 0 ? (
           <Text style={styles.emptyText}>Henüz sıralamada oyuncu yok.</Text>
         ) : (
-          <>
-            <View style={styles.podiumRow} key={`podium-${activeTab}`}>
+          <View style={showColumns && styles.boardColumns}>
+            <View style={showColumns && styles.podiumPanel}>
+              {showColumns && <Text style={styles.panelTitle}>İlk 3</Text>}
+              <View style={styles.podiumRow} key={`podium-${activeTab}`}>
               {podiumOrder.map((item, slot) => {
                 if (!item) return <View key={`empty-${slot}`} style={styles.podiumCol} />;
                 const place = slot === 1 ? 1 : slot === 0 ? 2 : 3;
@@ -235,9 +241,12 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
                   </Animated.View>
                 );
               })}
+              </View>
             </View>
 
             {rest.length > 0 && (
+              <View style={showColumns && styles.listColumn}>
+              {showColumns && <Text style={styles.panelTitle}>Sıralama</Text>}
               <View style={styles.listCard}>
                 {rest.map((item, idx) => {
                   const isMe = user ? item.userId === user.id || item.id === user.id : false;
@@ -267,8 +276,9 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
                   );
                 })}
               </View>
+              </View>
             )}
-          </>
+          </View>
         )}
       </ScrollView>
       <TavrikoBottomNav
@@ -290,7 +300,7 @@ const PODIUM_TONES = [
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 120,
+    paddingBottom: Platform.OS === 'web' ? 12 : 120,
     paddingHorizontal: 2,
   },
   headRow: {
@@ -367,6 +377,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 32,
     fontFamily: THEME.fonts.bold,
+  },
+  boardColumns: { flexDirection: 'row', gap: 18, alignItems: 'flex-start' },
+  podiumPanel: {
+    flex: 5,
+    minWidth: 0,
+    padding: 14,
+    backgroundColor: 'rgba(20, 8, 52, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 18,
+  },
+  listColumn: { flex: 6, minWidth: 0 },
+  panelTitle: {
+    color: '#E8DFFF',
+    fontFamily: THEME.fonts.extraBold,
+    fontSize: 15,
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
   podiumRow: {
     flexDirection: 'row',

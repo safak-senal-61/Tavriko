@@ -265,7 +265,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   };
 
   return (
-    <TavrikoScreen style={wideLayout ? styles.screenWide : undefined}>
+    <TavrikoScreen mainTab>
       <TavrikoTopBar
         leftType="bell"
         onLeftPress={onNotifications || onBack}
@@ -576,7 +576,6 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
 
       {!isGuest && (
         <TavrikoBottomNav
-          inFlow={Platform.OS === 'web'}
           activeTab="explore"
           onSelectTab={(tab) => {
             if (tab === 'play') onBack();
@@ -589,7 +588,6 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
-  screenWide: { maxWidth: '100%', paddingHorizontal: 24, paddingTop: 14 },
   scrollContent: {
     paddingBottom: 120,
     paddingHorizontal: 12,

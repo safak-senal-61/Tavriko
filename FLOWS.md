@@ -1,6 +1,8 @@
 # Visual refresh acceptance and regression checks
 
 ## Responsive player web app
+- At 1032×1376 (13-inch iPad Pro in portrait), Home shows a full-width game banner above the four mode cards. Rotate to landscape: the banner and modes sit side by side. The fixed bottom row must not cover scrollable content in either orientation.
+- At 768px, 1032px, 1376px, and 1920px, switch through Oyna, Keşfet, Liderler, Arkadaşlar, and Profil: the outer frame and bottom navigation must keep the same horizontal and vertical position. Test the Lig Puanı and Toplam XP tabs and scroll to the last player. At desktop width check both columns; portrait tablet keeps the list below the podium.
 - Open `/app` signed out: verify the complete splash artwork and that the desktop utility panel does not appear over it. Dismiss the analytics prompt; in a short window both choices must remain reachable without zooming out.
 - Cycle through Giriş Yap, Kayıt Ol and Şifremi Unuttum?; enter Misafir olarak göz at, search in Keşfet, open and close a category, and use the guest sign-in card to return to login. Resize without losing text entered in the form.
 - With a synthetic signed-in player, verify HIZLI EŞLEŞME and all four game modes, the daily streak, five feature tiles and five bottom tabs. Check inbox and return, open/cancel matchmaking, open the room creation/join tabs and verify quiz answers remain reachable in a short landscape viewport.

@@ -701,7 +701,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   return (
     /* profileUser: ekran arka planı ve tema, görüntülenen kişinin kuşandığı
        arka plandan alınır (arkadaş profili görüntüleme). */
-    <TavrikoScreen style={styles.profileScreenRoot} profileUser={user}>
+    <TavrikoScreen mainTab profileUser={user}>
       <TavrikoTopBar
         leftType="back"
         onLeftPress={onBack}
@@ -1024,7 +1024,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <RNAnimated.View
           style={{
             width: '100%',
-            maxWidth: 580,
+            maxWidth: profileContentWidth,
             alignItems: 'center',
             opacity: tabContentOpacity,
             transform: [{ translateY: tabContentTranslateY }],
@@ -1534,21 +1534,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   );
 };
 
+const profileContentWidth = Platform.OS === 'web' ? 860 : 580;
 const card = {
   backgroundColor: '#0F172A',
   borderWidth: 1.5,
   borderColor: 'rgba(255, 255, 255, 0.12)',
   borderRadius: 22,
   width: '100%',
-  maxWidth: 580,
+  maxWidth: profileContentWidth,
 } as const;
 
 const styles = StyleSheet.create({
-  profileScreenRoot: {
-    // TavrikoScreen screenRoot (16px) aynen geçerli — kenar boşluğu ezilmez.
-  },
   scrollContent: {
-    paddingBottom: 150,
+    paddingBottom: Platform.OS === 'web' ? 16 : 150,
     alignItems: 'center',
     width: '100%',
   },
@@ -1860,7 +1858,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.12)',
     width: '100%',
-    maxWidth: 580,
+    maxWidth: profileContentWidth,
     alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'space-between',
