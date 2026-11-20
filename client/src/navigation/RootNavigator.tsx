@@ -17,6 +17,7 @@ import { useGameStore, clearAllAccountStorage, getStoredAuth } from '../store/ga
 import { authHeaders } from '../utils/apiAuth';
 import { shuffleOptionsForPlayer } from '../utils/optionShuffle';
 import { seenScopeKey, getSeenQuestionIds, markQuestionsSeen } from '../utils/seenQuestions';
+import { getOfflinePracticeAnswer, requestPracticeAnswer } from '../utils/practiceAnswers';
 import { socketService } from '../services/socketService';
 import { sound } from '../services/soundService';
 import { identifyPlayer, trackEvent, markMatchmakingStart, trackMatchFound } from '../services/analytics';
@@ -34,6 +35,7 @@ import {
   CustomRoomSettings,
   MatchQuestionReviewItem,
   ALL_CATEGORIES,
+  uniqueQuestions,
 } from '@trivia/shared';
 // Screens
 import { SplashScreen } from '../screens/SplashScreen';
@@ -620,6 +622,9 @@ export const RootNavigator: React.FC = () => {
     const unsubQuestion = socketService.onQuestionStart((question: ClientQuestion) => {
       if (isSinglePlayerActiveRef.current) return;
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
+      const state = useGameStore.getState();
+      const isSameRound = state.currentQuestion?.id === question.id &&
+        state.currentQuestion.roundNumber === question.roundNumber;
       // Her oyuncunun şıkları kendi ekranında farklı sırada görünür. Cevaplar
       // şık ID'si ile gönderilip ID ile değerlendirildiği için bu güvenlidir;
       // tohum oyuncu+soru olduğundan yeniden bağlanınca sıra değişmez.
@@ -630,10 +635,13 @@ export const RootNavigator: React.FC = () => {
           user?.id || 'guest',
           `${question.id}-${question.roundNumber}`
         ),
-      });
+      }, isSameRound);
+      if (isSameRound) return; // Reconnect: sync the timer, but keep the selected answer.
       setRoundResult(null);
       setMultiplayerFeedback(null);
-      selectOption(null);
+      const me = user && activeRoomRef.current?.players[user.id];
+      selectOption(me?.hasAnsweredCurrentRound && activeRoomRef.current?.currentRound === question.roundNumber
+        ? me.lastSelectedOptionId ?? null : null);
       setAnsweredOpponentIds(new Set());
       if (currentScreenRef.current !== 'quiz_arena') {
         navigateTo('quiz_arena');
@@ -1337,8 +1345,9 @@ export const RootNavigator: React.FC = () => {
     };
     practiceStatsRef.current = initStats;
     setPracticeStats(initStats);
-    practiceSessionIdRef.current =
-      'sess_' + Math.random().toString(36).substring(2, 9);
+    const sessionId = 'sess_' + Math.random().toString(36).substring(2, 9);
+    practiceSessionIdRef.current = sessionId;
+    const isCurrentSession = () => practiceSessionIdRef.current === sessionId && isSinglePlayerActiveRef.current;
     try {
       // Anti-tekrar: bu kapsamda (kategori/alt kategori) daha önce çözülen
       // sorular sunucuya seenIds olarak gönderilir; havuz tükenirse sunucu
@@ -1346,10 +1355,11 @@ export const RootNavigator: React.FC = () => {
       const scopeKey = seenScopeKey(category, subCategory);
       const seenIds = (await getSeenQuestionIds(scopeKey)).slice(-250);
       const res = await fetch(
-        `${API_BASE}/questions/practice?category=${category}${subCategory ? `&subcategory=${encodeURIComponent(subCategory)}` : ''}&difficulty=${difficulty}&count=${questionCount}&sessionId=${practiceSessionIdRef.current}${seenIds.length ? `&seenIds=${encodeURIComponent(seenIds.join(','))}` : ''}`
+        `${API_BASE}/questions/practice?category=${category}${subCategory ? `&subcategory=${encodeURIComponent(subCategory)}` : ''}&difficulty=${difficulty}&count=${questionCount}&sessionId=${sessionId}${seenIds.length ? `&seenIds=${encodeURIComponent(seenIds.join(','))}` : ''}`
       );
       if (res.ok) {
         const data = await res.json();
+        if (!isCurrentSession()) return;
         if (subCategory && data.code === 'SUBCATEGORY_EMPTY') {
           // Alt kategoride soru yoksa başka alt kategoriden soru göstermek yerine bilgilendir.
           isGameActiveRef.current = false;
@@ -1361,15 +1371,15 @@ export const RootNavigator: React.FC = () => {
           });
           return;
         }
-        if (data.questions && data.questions.length > 0) {
-          void markQuestionsSeen(scopeKey, data.questions.map((q: ClientQuestion) => q.id));
-          setPracticeQuestions(data.questions);
+        const selected = Array.isArray(data.questions) ? uniqueQuestions<ClientQuestion>(data.questions, questionCount) : [];
+        if (selected.length > 0) {
+          const questions = selected.map((q, index) => ({ ...q, roundNumber: index + 1, totalRounds: selected.length }));
+          void markQuestionsSeen(scopeKey, questions.map((q) => q.id));
+          setPracticeQuestions(questions);
           setPracticeIndex(0);
-          setPracticeStats((prev) => ({
-            ...prev,
-            totalQuestions: data.questions.length,
-          }));
-          setCurrentQuestion(data.questions[0]);
+          practiceStatsRef.current = { ...initStats, totalQuestions: questions.length };
+          setPracticeStats(practiceStatsRef.current);
+          setCurrentQuestion(questions[0]);
           selectOption(null);
           navigateTo('quiz_arena');
           return;
@@ -1377,6 +1387,14 @@ export const RootNavigator: React.FC = () => {
       }
     } catch {
       // Offline fallback below
+    }
+    if (!isCurrentSession()) return;
+    if (subCategory || isDaily) {
+      isGameActiveRef.current = false;
+      isSinglePlayerActiveRef.current = false;
+      setIsSinglePlayerActive(false);
+      setGameAlert({ title: 'Sorular Yüklenemedi', message: 'Bağlantını kontrol edip tekrar dene.' });
+      return;
     }
     // High quality offline fallback questions
     const fallbackQuestions: ClientQuestion[] = [
@@ -1456,13 +1474,13 @@ export const RootNavigator: React.FC = () => {
         timeLimitSec: 15,
       },
     ];
-    setPracticeQuestions(fallbackQuestions);
+    const count = Math.min(questionCount, fallbackQuestions.length);
+    const questions = fallbackQuestions.slice(0, count).map((q) => ({ ...q, totalRounds: count }));
+    setPracticeQuestions(questions);
     setPracticeIndex(0);
-    setPracticeStats((prev) => ({
-      ...prev,
-      totalQuestions: fallbackQuestions.length,
-    }));
-    setCurrentQuestion(fallbackQuestions[0]);
+    practiceStatsRef.current = { ...initStats, totalQuestions: questions.length };
+    setPracticeStats(practiceStatsRef.current);
+    setCurrentQuestion(questions[0]);
     selectOption(null);
     navigateTo('quiz_arena');
   };
@@ -1470,7 +1488,9 @@ export const RootNavigator: React.FC = () => {
   // oyuncu "Sonraki Soru" düğmesine basana kadar geri bildirim ekranda kalır.
   const schedulePracticeAdvance = () => {
     if (loadStoredPreferences().autoNextQuestion === false) return;
+    const sessionId = practiceSessionIdRef.current;
     scheduleGameTimeout(() => {
+      if (practiceSessionIdRef.current !== sessionId || !isSinglePlayerActiveRef.current) return;
       advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
     }, 1500);
   };
@@ -1586,7 +1606,7 @@ export const RootNavigator: React.FC = () => {
             mode: 'solo',
             difficulty: selectedDifficulty,
             bestStreak: practiceStreak,
-            category: selectedCategory || (practiceCategory as any) || 'general_culture',
+            category: selectedCategory || 'general_culture',
           }),
         })
           .then((r) => r.json())
@@ -1602,173 +1622,65 @@ export const RootNavigator: React.FC = () => {
       }
     }
   };
-  const handleSubmitAnswer = async (
-    optionId: string,
-    timeRemainingMs: number
-  ) => {
-    // Multiplayer flow
-    if (activeRoom && user) {
-      selectOption(optionId);
-      socketService.submitAnswer(activeRoom.code, user.id, optionId);
-      return;
-    }
-    // Practice / Guest Flow
+  const evaluatePracticeAnswer = async (optionId: string | null, timeRemainingMs: number) => {
     if (isEvaluatingRef.current || isAnswerLocked || !currentQuestion) return;
     isEvaluatingRef.current = true;
     selectOption(optionId);
-    try {
-      const res = await fetch(`${API_BASE}/questions/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          questionId: currentQuestion.id,
-          selectedOptionId: optionId,
-          timeRemainingMs,
-          totalTimeMs: currentQuestion.timeLimitSec * 1000,
-          currentStreak: practiceStreak,
-          sessionId: practiceSessionIdRef.current,
-          playerId: user?.id || 'guest_local',
-        }),
-      });
-      if (res.ok) {
-        const result = await res.json();
-        const rawPts = result.pointsAwarded || 0;
-        const normPts = rawPts > 300 ? Math.round(rawPts / 10) : Math.max(0, Math.round(rawPts));
-        const rawSpd = result.speedBonus || 0;
-        const normSpd = rawSpd > 100 ? Math.round(rawSpd / 10) : Math.max(0, Math.round(rawSpd));
-        const feedback: RoundFeedback = {
-          isCorrect: result.isCorrect,
-          isTimeout: false,
-          correctOptionId: result.correctOptionId,
-          explanation: result.explanation || '',
-          pointsAwarded: normPts,
-          speedBonus: normSpd,
-          streak: result.streak || 0,
-        };
-        setPracticeFeedback(feedback);
-        setPracticeStreak(feedback.streak);
-        if (result.isCorrect) {
-          sound.playSound(feedback.streak >= 2 ? 'streak' : 'correct');
-          sound.triggerHaptic('success');
-        } else {
-          sound.playSound('wrong');
-          sound.triggerHaptic('error');
-        }
-        const updatedStats: PracticeStats = {
-          ...practiceStatsRef.current,
-          correctAnswers:
-            practiceStatsRef.current.correctAnswers + (result.isCorrect ? 1 : 0),
-          wrongAnswers:
-            practiceStatsRef.current.wrongAnswers + (result.isCorrect ? 0 : 1),
-          totalScore:
-            practiceStatsRef.current.totalScore + feedback.pointsAwarded,
-        };
-        practiceStatsRef.current = updatedStats;
-        setPracticeStats(updatedStats);
-        schedulePracticeAdvance();
-        return;
-      }
-    } catch {
-      // Offline fallback evaluation
-    }
-    // Local evaluation fallback if backend is unreachable
-    const isMockCorrect =
-      optionId === 'opt_b' || optionId === 'opt_c' || optionId === 'opt_a';
-    const points = isMockCorrect ? 120 : 0;
-    const newStreak = isMockCorrect ? practiceStreak + 1 : 0;
-    if (isMockCorrect) {
-      sound.playSound('correct');
-      sound.triggerHaptic('success');
-    } else {
-      sound.playSound('wrong');
-      sound.triggerHaptic('error');
-    }
-    setPracticeFeedback({
-      isCorrect: isMockCorrect,
-      isTimeout: false,
-      correctOptionId: 'opt_b',
-      explanation: 'Doğru cevap sistem tarafından teyit edildi.',
-      pointsAwarded: points,
-      speedBonus: 20,
-      streak: newStreak,
+    const sessionId = practiceSessionIdRef.current;
+    const offlineAnswer = getOfflinePracticeAnswer(currentQuestion.id);
+    const result = offlineAnswer ? null : await requestPracticeAnswer(`${API_BASE}/questions/submit`, {
+      questionId: currentQuestion.id,
+      selectedOptionId: optionId,
+      timeRemainingMs,
+      totalTimeMs: currentQuestion.timeLimitSec * 1000,
+      currentStreak: practiceStreak,
+      sessionId,
+      playerId: user?.id || 'guest_local',
     });
-    setPracticeStreak(newStreak);
-    const mockUpdatedStats: PracticeStats = {
-      ...practiceStatsRef.current,
-      correctAnswers:
-        practiceStatsRef.current.correctAnswers + (isMockCorrect ? 1 : 0),
-      wrongAnswers:
-        practiceStatsRef.current.wrongAnswers + (isMockCorrect ? 0 : 1),
-      totalScore: practiceStatsRef.current.totalScore + points,
+    if (sessionId !== practiceSessionIdRef.current || !isSinglePlayerActiveRef.current) return;
+
+    const isTimeout = optionId === null || result?.isTimeout === true;
+    const unavailable = !isTimeout && !result && !offlineAnswer;
+    const isCorrect = !isTimeout && (result?.isCorrect ?? optionId === offlineAnswer);
+    const rawPts = result?.pointsAwarded ?? (isCorrect ? 120 : 0);
+    const rawSpd = result?.speedBonus ?? (isCorrect ? 20 : 0);
+    const feedback: RoundFeedback = {
+      isCorrect,
+      isTimeout,
+      unavailable,
+      correctOptionId: result?.correctOptionId ?? offlineAnswer ?? '',
+      explanation: unavailable ? 'Bağlantı nedeniyle bu soru puanlanmadı.' : result?.explanation || '',
+      pointsAwarded: isCorrect ? (rawPts > 300 ? Math.round(rawPts / 10) : Math.max(0, Math.round(rawPts))) : 0,
+      speedBonus: isCorrect ? (rawSpd > 100 ? Math.round(rawSpd / 10) : Math.max(0, Math.round(rawSpd))) : 0,
+      streak: isCorrect ? result?.streak ?? practiceStreak + 1 : 0,
     };
-    practiceStatsRef.current = mockUpdatedStats;
-    setPracticeStats(mockUpdatedStats);
+    if (!unavailable) {
+      sound.playSound(isCorrect ? (feedback.streak >= 2 ? 'streak' : 'correct') : 'wrong');
+      sound.triggerHaptic(isCorrect ? 'success' : 'error');
+    }
+    setPracticeFeedback(feedback);
+    setPracticeStreak(feedback.streak);
+    const updatedStats: PracticeStats = {
+      ...practiceStatsRef.current,
+      correctAnswers: practiceStatsRef.current.correctAnswers + (isCorrect ? 1 : 0),
+      wrongAnswers: practiceStatsRef.current.wrongAnswers + (!isCorrect && !isTimeout && !unavailable ? 1 : 0),
+      emptyAnswers: practiceStatsRef.current.emptyAnswers + (isTimeout || unavailable ? 1 : 0),
+      totalScore: practiceStatsRef.current.totalScore + feedback.pointsAwarded,
+    };
+    practiceStatsRef.current = updatedStats;
+    setPracticeStats(updatedStats);
     schedulePracticeAdvance();
   };
-  const handleTimeExpired = async () => {
-    if (activeRoom && user) {
+  const handleSubmitAnswer = (optionId: string, timeRemainingMs: number) => {
+    if (activeRoom && user && currentQuestion) {
+      selectOption(optionId);
+      socketService.submitAnswer(activeRoom.code, user.id, optionId, currentQuestion.roundNumber);
       return;
     }
-    if (isEvaluatingRef.current || !currentQuestion) return;
-    isEvaluatingRef.current = true;
-    selectOption(null);
-    sound.playSound('wrong');
-    sound.triggerHaptic('error');
-    try {
-      const res = await fetch(`${API_BASE}/questions/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          questionId: currentQuestion.id,
-          selectedOptionId: null,
-          timeRemainingMs: 0,
-          totalTimeMs: currentQuestion.timeLimitSec * 1000,
-          currentStreak: practiceStreak,
-          sessionId: practiceSessionIdRef.current,
-          playerId: user?.id || 'guest_local',
-        }),
-      });
-      if (res.ok) {
-        const result = await res.json();
-        setPracticeFeedback({
-          isCorrect: false,
-          isTimeout: true,
-          correctOptionId: result.correctOptionId,
-          explanation: result.explanation || '',
-          pointsAwarded: 0,
-          speedBonus: 0,
-          streak: 0,
-        });
-        setPracticeStreak(0);
-        const timeoutStats: PracticeStats = {
-          ...practiceStatsRef.current,
-          emptyAnswers: practiceStatsRef.current.emptyAnswers + 1,
-        };
-        practiceStatsRef.current = timeoutStats;
-        setPracticeStats(timeoutStats);
-        schedulePracticeAdvance();
-        return;
-      }
-    } catch {
-      // Local fallback timeout
-    }
-    setPracticeFeedback({
-      isCorrect: false,
-      isTimeout: true,
-      correctOptionId: 'opt_b',
-      explanation: 'Süre doldu! Zamanında cevap verilmedi.',
-      pointsAwarded: 0,
-      speedBonus: 0,
-      streak: 0,
-    });
-    setPracticeStreak(0);
-    const mockTimeoutStats: PracticeStats = {
-      ...practiceStatsRef.current,
-      emptyAnswers: practiceStatsRef.current.emptyAnswers + 1,
-    };
-    practiceStatsRef.current = mockTimeoutStats;
-    setPracticeStats(mockTimeoutStats);
-    schedulePracticeAdvance();
+    void evaluatePracticeAnswer(optionId, timeRemainingMs);
+  };
+  const handleTimeExpired = () => {
+    if (!activeRoom) void evaluatePracticeAnswer(null, 0);
   };
   return (
     <View style={[styles.outerWrapper, isDesktop && styles.desktopOuter]}>
@@ -2028,7 +1940,10 @@ export const RootNavigator: React.FC = () => {
                 ),
               }}
               selectedOptionId={selectedOptionId}
-              isLocked={isEvaluatingRef.current}
+              isLocked={isEvaluatingRef.current || isAnswerLocked ||
+                !!(user && activeRoom?.currentRound === currentQuestion.roundNumber &&
+                  activeRoom.players[user.id]?.hasAnsweredCurrentRound)}
+              isMultiplayer={!!activeRoom}
               streak={
                 activeRoom && user
                   ? activeRoom.players[user.id]?.currentStreak || 0
@@ -2209,6 +2124,12 @@ export const RootNavigator: React.FC = () => {
             isGuest={isGuest}
             apiBaseUrl={API_BASE}
             onBack={() => navigateTo('home')}
+            onSignIn={() => {
+              setIsGuest(false);
+              setUser(null, null);
+              setAuthRedirectNotice('Arkadaş eklemek için hesabına giriş yap.');
+              navigateTo('auth');
+            }}
             onInviteToMatch={(friendId, friendName, roomCode) => {
               if (roomCode) {
                 handleCreateCustomRoom(undefined, roomCode);
@@ -2397,7 +2318,7 @@ export const RootNavigator: React.FC = () => {
           <DeveloperScreen
             user={user || undefined}
             apiBaseUrl={API_BASE}
-            onUpdateUser={(updated) => setUser(updated, null)}
+            onUpdateUser={(updated) => setUser(updated)}
             onNavigate={(screen) => navigateTo(screen)}
             onBack={() => navigateTo('settings')}
           />

@@ -22,7 +22,7 @@ router.get('/questions/practice', async (req: Request, res: Response): Promise<v
   const category = (req.query.category as CategoryId) || 'mixed';
   const difficulty = req.query.difficulty as DifficultyLevel | undefined;
   const subCategory = (req.query.subcategory as string) || undefined;
-  const count = parseInt(req.query.count as string, 10) || 5;
+  const count = Math.min(50, Math.max(1, parseInt(req.query.count as string, 10) || 5));
   const seenIdsRaw = req.query.seenIds as string | undefined;
   const seenIds = seenIdsRaw ? seenIdsRaw.split(',') : [];
   const sessionId = (req.query.sessionId as string) || 'practice';
@@ -74,7 +74,12 @@ router.post('/questions/submit', async (req: Request, res: Response): Promise<vo
   const sessionKey = sessionId || 'practice';
   const userKey = playerId || sessionKey || req.ip || 'anon_player';
 
-  const question = db.getQuestionById(questionId);
+  let question = db.getQuestionById(questionId);
+  if (!question) {
+    // Vercel may serve the submit on a different cold instance than /practice.
+    await db.ensureQuestionsRestored();
+    question = db.getQuestionById(questionId);
+  }
   if (!question) {
     res.status(404).json({ error: 'Soru bulunamadı' });
     return;

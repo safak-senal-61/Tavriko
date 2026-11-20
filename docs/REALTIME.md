@@ -50,13 +50,14 @@ Implemented in [`cloudflare/src/durable-objects/GameRoom.ts`](file:///c:/Users/%
    - Broadcasts `room:state_sync` (`{ room }`) on every state change.
 2. **`countdown`**:
    - Triggered automatically when all duel players connect, or when the host sends `room:start_game`.
-   - Fetches questions from the backend (`apiService.fetchQuestions` -> `GET /api/questions/match-set`) or falls back to built-in curated questions (`cloudflare/src/data/fallbackQuestions.ts`).
+   - Loads questions through `ApiService.fetchRoomQuestions` (`POST /api/internal/room-questions`), with built-in questions as a fallback for non-subcategory rooms. If there are fewer unique questions than requested, the room uses the actual count rather than repeating prompts.
    - Runs a 3-second countdown (`COUNTDOWN_DURATION_SEC = 3`) via Durable Object alarms, emitting `game:countdown_tick`.
 3. **`question`**:
    - Advances `room.currentRound`, sets `roundStartTimestamp = Date.now()`, resets `hasAnsweredCurrentRound = false` for all players, and broadcasts `game:question_start` with `ClientQuestion` (`correctOptionId` stripped).
    - Schedules a `round_end` Durable Object alarm for `questionTimeSec * 1000` (default 15s).
    - If a bot is in the room (`mode === 'duel'`), schedules a simulated bot answer (`scheduleBotAnswers`).
-   - When a player sends `game:submit_answer` (`{ roomCode, playerId, questionId, selectedOptionId }`):
+   - When a player sends `game:submit_answer` (`{ roomCode, playerId, roundNumber, selectedOptionId }`):
+     - Rejects submissions for an earlier round when `roundNumber` is included. Older clients may omit it.
      - Rejects duplicate submissions (`player.hasAnsweredCurrentRound === true`).
      - Computes elapsed time server-side (`Date.now() - room.roundStartTimestamp`).
      - Broadcasts `game:player_answered` (`{ playerId, hasAnswered: true }`) **without** broadcasting `room:state_sync` mid-round, preventing premature race-bar movement before all players have answered.
@@ -67,4 +68,5 @@ Implemented in [`cloudflare/src/durable-objects/GameRoom.ts`](file:///c:/Users/%
 5. **`finished`**:
    - `finishGame()` computes final standings (`calculateRankings`), constructs `FinalMatchSummary` (`podium`, `rankings`, `playedAt`), broadcasts `game:game_over`, and reports the match to `POST /api/matches/complete`.
 6. **Reconnection**:
-   - Disconnected players in an active match trigger a `reconnect_grace` alarm (`RECONNECTION_GRACE_SEC = 60`s) and receive a full state + active question snapshot upon reconnecting.
+   - An active duel stores reconnect deadlines separately from the phase deadline, then sets the single Durable Object alarm to the earliest outstanding deadline. A disconnect never replaces the current round or intermission deadline.
+   - A reconnecting player receives the room state and the current question with the server's remaining time, without restarting the countdown.

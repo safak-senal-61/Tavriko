@@ -33,19 +33,22 @@ router.get('/friends/:userId', async (req: Request, res: Response): Promise<void
 router.post('/friends/add', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.authUserId;
-    const { codeOrUsername } = req.body;
-    if (!userId || !codeOrUsername) {
-      res.status(400).json({ error: 'userId ve codeOrUsername gereklidir.' });
+    const codeOrUsername = typeof req.body?.codeOrUsername === 'string'
+      ? req.body.codeOrUsername.trim().replace(/^@/, '').trim()
+      : '';
+    if (!userId || !codeOrUsername || codeOrUsername.length > 120) {
+      res.status(400).json({ error: 'Geçerli bir arkadaşlık kodu veya kullanıcı adı girin.' });
       return;
     }
     const result = await db.addFriend(userId, codeOrUsername);
     if (!result.success) {
-      res.status(400).json({ error: result.error });
+      res.status(result.code === 'SESSION_REQUIRED' ? 401 : result.code === 'UNAVAILABLE' ? 503 : 400)
+        .json({ error: result.error, code: result.code });
       return;
     }
     res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(503).json({ error: 'Arkadaşlık isteği şu anda gönderilemedi. Lütfen tekrar deneyin.' });
   }
 });
 
@@ -128,13 +131,13 @@ router.post('/notifications/respond', requireUserAuth, async (req: Request, res:
   try {
     const userId = req.authUserId;
     const { notificationId, action } = req.body;
-    if (!userId || !notificationId || !action) {
-      res.status(400).json({ error: 'userId, notificationId ve action zorunludur.' });
+    if (!userId || typeof notificationId !== 'string' || !notificationId || (action !== 'accept' && action !== 'decline')) {
+      res.status(400).json({ error: 'Bildirim ve geçerli bir işlem seçilmelidir.' });
       return;
     }
     const result = await db.respondToNotification(userId, notificationId, action);
     if (!result.success) {
-      res.status(400).json({ error: result.error });
+      res.status(result.code === 'UNAVAILABLE' ? 503 : 400).json({ error: result.error, code: result.code });
       return;
     }
     res.json(result);

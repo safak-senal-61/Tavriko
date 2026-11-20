@@ -105,6 +105,8 @@ export interface ClientQuestion {
   roundNumber: number;
   totalRounds: number;
   timeLimitSec: number;
+  /** Live rooms include the remaining server time, including when a player reconnects. */
+  timeRemainingMs?: number;
   /** Sorunun ait olduğu alt kategori adı (ör. "Nişancı Oyunları (FPS)") */
   subCategory?: string;
 }

@@ -1,4 +1,4 @@
-import { Question, CategoryId, DifficultyLevel, canonicalCategoryId } from '@trivia/shared';
+import { Question, CategoryId, DifficultyLevel, canonicalCategoryId, uniqueQuestions } from '@trivia/shared';
 
 export const DEFAULT_QUESTIONS: Question[] = [
   {
@@ -168,6 +168,7 @@ export function getFallbackQuestions(
     }
   }
 
+  const categoryPool = pool;
   if (difficulty) {
     const difficultyMatches = pool.filter((q) => q.difficulty === difficulty);
     if (difficultyMatches.length >= 2) {
@@ -175,18 +176,8 @@ export function getFallbackQuestions(
     }
   }
 
-  // Shuffle pool
-  const shuffled = [...pool].sort(() => Math.random() - 0.5);
-  // If count exceeds pool length, duplicate with new ids
-  const result: Question[] = [];
-  let idx = 0;
-  while (result.length < count) {
-    const base = shuffled[idx % shuffled.length];
-    result.push({
-      ...base,
-      id: `${base.id}_round_${result.length + 1}_${Date.now()}`,
-    });
-    idx++;
-  }
-  return result.slice(0, count);
+  const preferred = [...pool].sort(() => Math.random() - 0.5);
+  const otherDifficulties = categoryPool.filter((q) => !pool.includes(q))
+    .sort(() => Math.random() - 0.5);
+  return uniqueQuestions([...preferred, ...otherDifficulties], count);
 }

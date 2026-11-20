@@ -2971,14 +2971,13 @@ class PrismaService {
     getQuestions(category = 'mixed', difficulty, count = 10, seenIds = [], subCategory) {
         const canonCat = (0, shared_1.canonicalCategoryId)(category);
         const allPublished = this.questions.filter((q) => q.reviewStatus === 'published');
-        const pickedMap = new Map();
+        const seen = new Set(seenIds);
         const categoryPool = canonCat === 'mixed'
             ? allPublished
             : allPublished.filter((q) => (0, shared_1.canonicalCategoryId)(q.categoryId) === canonCat);
         // Alt kategori filtresi KATIDIR: "Rol Yapma Oyunları" seçildiyse yalnızca o alt
         // kategorinin soruları gelir. Önceden eşleşme az/boş olduğunda üst kategorinin
         // tamamından (ör. FPS soruları) doldurma yapılıyordu.
-        let effectivePool = categoryPool;
         const requestedSub = subCategory ? subCategory.trim().toLowerCase() : '';
         if (requestedSub) {
             const catDef = questionsData_1.ALL_CATEGORIES.find((c) => c.id === canonCat);
@@ -2990,18 +2989,16 @@ class PrismaService {
             }
             const subPool = categoryPool.filter((q) => q.subCategory && acceptedNames.has(q.subCategory.trim().toLowerCase()));
             const shuffledSub = [...subPool].sort(() => 0.5 - Math.random());
-            let subPicked = shuffledSub.filter((q) => !seenIds.includes(q.id));
+            let subPicked = shuffledSub.filter((q) => !seen.has(q.id));
             if (difficulty && difficulty !== 'mixed') {
                 const withDiff = subPicked.filter((q) => q.difficulty === difficulty);
                 const others = subPicked.filter((q) => q.difficulty !== difficulty);
                 subPicked = [...withDiff, ...others];
             }
-            if (subPicked.length < count) {
-                subPicked = [...subPicked, ...shuffledSub.filter((q) => !subPicked.includes(q))];
-            }
-            return subPicked.slice(0, count);
+            return (0, shared_1.uniqueQuestions)([...subPicked, ...shuffledSub.filter((q) => seen.has(q.id))], count);
         }
-        let primaryPool = effectivePool.length > 0 ? effectivePool : allPublished;
+        const effectivePool = categoryPool.length > 0 ? categoryPool : allPublished;
+        let primaryPool = effectivePool;
         if (difficulty && difficulty !== 'mixed') {
             const withDiff = primaryPool.filter((q) => q.difficulty === difficulty);
             if (withDiff.length > 0) {
@@ -3011,83 +3008,22 @@ class PrismaService {
         const shuffledPrimary = canonCat === 'mixed'
             ? this.spreadAcrossCategories(primaryPool)
             : [...primaryPool].sort(() => 0.5 - Math.random());
-        for (const q of shuffledPrimary) {
-            if (pickedMap.size >= count)
-                break;
-            if (!seenIds.includes(q.id)) {
-                pickedMap.set(q.id, q);
-            }
-        }
-        if (pickedMap.size < count) {
-            const sameCategoryUnseen = effectivePool
-                .filter((q) => !pickedMap.has(q.id) && !seenIds.includes(q.id))
-                .sort(() => 0.5 - Math.random());
-            for (const q of sameCategoryUnseen) {
-                if (pickedMap.size >= count)
-                    break;
-                pickedMap.set(q.id, q);
-            }
-        }
-        if (pickedMap.size < count) {
-            for (const q of shuffledPrimary) {
-                if (pickedMap.size >= count)
-                    break;
-                if (!pickedMap.has(q.id)) {
-                    pickedMap.set(q.id, q);
-                }
-            }
-        }
-        if (pickedMap.size < count) {
-            const sameCategoryAny = [...effectivePool].sort(() => 0.5 - Math.random());
-            for (const q of sameCategoryAny) {
-                if (pickedMap.size >= count)
-                    break;
-                if (!pickedMap.has(q.id)) {
-                    pickedMap.set(q.id, q);
-                }
-            }
-        }
-        if (pickedMap.size < count && (canonCat === 'mixed' || effectivePool.length === 0)) {
-            const fallbackPool = allPublished
-                .filter((q) => !pickedMap.has(q.id))
-                .sort(() => 0.5 - Math.random());
-            for (const q of fallbackPool) {
-                if (pickedMap.size >= count)
-                    break;
-                pickedMap.set(q.id, q);
-            }
-        }
-        const pickedList = Array.from(pickedMap.values());
-        const poolForFill = categoryPool.length > 0 ? categoryPool : allPublished;
-        if (pickedList.length < count && poolForFill.length > 0) {
-            let cycleIdx = 1;
-            while (pickedList.length < count) {
-                for (const baseQ of poolForFill) {
-                    if (pickedList.length >= count)
-                        break;
-                    pickedList.push({
-                        ...baseQ,
-                        id: `${baseQ.id}_cycle_${cycleIdx++}`,
-                    });
-                }
-            }
-        }
-        return pickedList.sort(() => 0.5 - Math.random());
+        const primaryIds = new Set(primaryPool.map((q) => q.id));
+        const otherDifficulty = effectivePool.filter((q) => !primaryIds.has(q.id)).sort(() => 0.5 - Math.random());
+        return (0, shared_1.uniqueQuestions)([
+            ...shuffledPrimary.filter((q) => !seen.has(q.id)),
+            ...otherDifficulty.filter((q) => !seen.has(q.id)),
+            ...shuffledPrimary.filter((q) => seen.has(q.id)),
+            ...otherDifficulty.filter((q) => seen.has(q.id)),
+        ], count).sort(() => 0.5 - Math.random());
     }
     getDailyChallenge() {
         const today = new Date().toISOString().split('T')[0];
         const dedicated = this.questions.filter((q) => (q.targetPool === 'daily_challenge' || q.isDailyChallenge) && q.reviewStatus === 'published');
-        let selected = [];
-        if (dedicated.length >= 5) {
-            selected = [...dedicated].sort(() => 0.5 - Math.random()).slice(0, 5);
-        }
-        else if (dedicated.length > 0) {
-            const rest = this.getQuestions('mixed', undefined, 5 - dedicated.length);
-            selected = [...dedicated, ...rest];
-        }
-        else {
-            selected = this.getQuestions('mixed', undefined, 5);
-        }
+        const preferred = (0, shared_1.uniqueQuestions)(dedicated.sort(() => 0.5 - Math.random()), 5);
+        const selected = preferred.length === 5
+            ? preferred
+            : (0, shared_1.uniqueQuestions)([...preferred, ...this.getQuestions('mixed', undefined, 5)], 5);
         return {
             date: today,
             questions: selected,
@@ -3855,45 +3791,37 @@ class PrismaService {
         }
     }
     async addFriend(userId, targetCodeOrUsername) {
-        let me = this.users.get(userId);
-        try {
-            const dbMe = await this.rawClient.user.findFirst({
-                where: { OR: [{ id: userId }, { username: userId }] },
-            });
-            if (dbMe) {
-                me = this.prismaUserToRecord(dbMe);
-                this.users.set(me.id, me);
-            }
-        }
-        catch { }
-        if (!me)
-            return { success: false, error: 'Kullanıcı bulunamadı.' };
-        const clean = targetCodeOrUsername.trim().toUpperCase();
-        const cleanLower = targetCodeOrUsername.trim().toLowerCase();
-        // 1. Find target user in PostgreSQL or memory
+        let me;
         let target;
+        const unavailable = { success: false, code: 'UNAVAILABLE', error: 'Arkadaşlık isteği şu anda gönderilemedi. Lütfen tekrar deneyin.' };
         try {
-            const dbTarget = await this.rawClient.user.findFirst({
+            const dbMe = await this.rawClient.user.findUnique({ where: { id: userId } });
+            if (!dbMe) {
+                return { success: false, code: 'SESSION_REQUIRED', error: 'Arkadaş eklemek için hesabınıza tekrar giriş yapın.' };
+            }
+            me = this.prismaUserToRecord(dbMe);
+            const candidates = await this.rawClient.user.findMany({
                 where: {
                     OR: [
-                        { friendCode: { equals: clean, mode: 'insensitive' } },
-                        { username: { equals: cleanLower, mode: 'insensitive' } },
-                        { displayName: { equals: targetCodeOrUsername.trim(), mode: 'insensitive' } },
+                        { friendCode: { equals: targetCodeOrUsername, mode: 'insensitive' } },
+                        { username: { equals: targetCodeOrUsername, mode: 'insensitive' } },
+                        { displayName: { equals: targetCodeOrUsername, mode: 'insensitive' } },
                     ],
                 },
             });
-            if (dbTarget) {
-                target = this.prismaUserToRecord(dbTarget);
-                this.users.set(target.id, target);
+            const clean = targetCodeOrUsername.toLowerCase();
+            const codeMatches = candidates.filter((u) => u.friendCode.toLowerCase() === clean);
+            const usernameMatches = candidates.filter((u) => u.username.toLowerCase() === clean);
+            const matches = codeMatches.length ? codeMatches : usernameMatches.length ? usernameMatches : candidates;
+            if (matches.length > 1) {
+                return { success: false, error: 'Birden fazla oyuncu eşleşti. Arkadaşlık kodunu kullanın.' };
             }
+            if (matches[0])
+                target = this.prismaUserToRecord(matches[0]);
         }
-        catch { }
-        if (!target) {
-            target = Array.from(this.users.values()).find((u) => u &&
-                !u.isGuest &&
-                ((u.friendCode && u.friendCode.toUpperCase() === clean) ||
-                    u.username.toLowerCase() === cleanLower ||
-                    (u.displayName && u.displayName.toLowerCase() === cleanLower)));
+        catch (error) {
+            console.warn('[addFriend] Could not look up users:', error instanceof Error ? error.name : 'Unknown error');
+            return unavailable;
         }
         if (!target) {
             return {
@@ -3938,11 +3866,13 @@ class PrismaService {
                 };
             }
         }
-        catch { }
+        catch {
+            return unavailable;
+        }
         // Create a PENDING friend request notification for target (handled: null)
         // Target will ONLY become a friend when they accept this notification!
         const notifItem = {
-            id: 'notif_fr_' + Date.now(),
+            id: 'notif_fr_' + crypto_1.default.randomUUID(),
             type: 'friend_request',
             title: `${me.displayName} sana arkadaşlık isteği gönderdi!`,
             sub: 'Arkadaş olarak eklemek ve birlikte yarışmak için isteği kabul et.',
@@ -3970,11 +3900,13 @@ class PrismaService {
             });
         }
         catch (e) {
-            console.warn('[addFriend] DB notification error:', e.message);
+            console.warn('[addFriend] Could not save request:', e.code || e.name);
+            return unavailable;
         }
         if (!target.notifications)
             target.notifications = [];
         target.notifications.unshift(notifItem);
+        this.users.set(me.id, me);
         this.users.set(target.id, target);
         this.savePersistedUsers();
         // REAL-TIME WEBSOCKET PUSH TO TARGET
@@ -4198,12 +4130,76 @@ class PrismaService {
         if (action === 'decline' && notif.handled === 'accepted') {
             return { success: false, handled: 'accepted', error: 'Bu davet zaten kabul edildi.', message: '' };
         }
-        notif.handled = finalHandled;
         const newSub = action === 'accept'
             ? notif.type === 'match_invite' || notif.type === 'duel'
                 ? 'Düello kabul edildi! Odaya aktarılıyorsunuz...'
                 : 'Arkadaşlık isteği kabul edildi. Artık arkadaşsınız!'
             : 'İstek reddedildi.';
+        if (notif.type === 'friend_request' || notif.type === 'friend') {
+            const senderId = typeof notif.senderId === 'string' ? notif.senderId : undefined;
+            if (action === 'accept' && (!senderId || senderId === user.id)) {
+                return { success: false, handled: finalHandled, error: 'İsteği gönderen oyuncu bulunamadı.', message: '' };
+            }
+            const senderNotification = {
+                id: 'notif_fra_' + crypto_1.default.randomUUID(),
+                type: 'system',
+                title: `${user.displayName} arkadaşlık isteğini kabul etti!`,
+                sub: 'Artık Arkadaşlarım listesinde görebilir ve 1v1 düelloya davet edebilirsin.',
+                timeText: 'Az önce',
+                createdAt: Date.now(),
+                handled: 'accepted',
+            };
+            try {
+                const applied = await this.rawClient.$transaction(async (tx) => {
+                    const claim = await tx.userNotification.updateMany({
+                        where: { id: notificationId, userId: user.id, handled: null },
+                        data: { handled: finalHandled, sub: newSub },
+                    });
+                    if (!claim.count) {
+                        const existing = await tx.userNotification.findUnique({ where: { id: notificationId, userId: user.id } });
+                        return { handled: existing?.handled, players: [] };
+                    }
+                    const players = [];
+                    if (action === 'accept' && senderId) {
+                        for (const [id, otherId] of [[user.id, senderId], [senderId, user.id]].sort(([a], [b]) => a.localeCompare(b))) {
+                            const player = await tx.user.findUniqueOrThrow({ where: { id } });
+                            const friends = Array.isArray(player.friendIds) ? player.friendIds.filter((id) => typeof id === 'string') : [];
+                            if (!friends.includes(otherId))
+                                friends.push(otherId);
+                            players.push(await tx.user.update({ where: { id }, data: { friendIds: friends } }));
+                        }
+                        await tx.userNotification.create({ data: {
+                                id: senderNotification.id,
+                                userId: senderId,
+                                type: senderNotification.type,
+                                title: senderNotification.title,
+                                sub: senderNotification.sub,
+                                timeText: senderNotification.timeText,
+                                handled: 'accepted',
+                            } });
+                    }
+                    return { handled: finalHandled, players };
+                }, { isolationLevel: 'Serializable' });
+                if (applied.handled !== finalHandled) {
+                    return { success: false, handled: finalHandled, error: 'Bu arkadaşlık isteği artık beklemiyor.', message: '' };
+                }
+                for (const player of applied.players)
+                    this.users.set(player.id, this.prismaUserToRecord(player));
+                presenceManager_1.presenceManager.notifyUser(user.id, 'notification:update', { id: notificationId, handled: finalHandled });
+                if (senderId && applied.players.length) {
+                    presenceManager_1.presenceManager.notifyUser(senderId, 'notification:new', senderNotification);
+                    (0, pushService_1.queuePushForNotification)(senderId, senderNotification);
+                    presenceManager_1.presenceManager.notifyUser(senderId, 'friends:update', { friendId: user.id });
+                    presenceManager_1.presenceManager.notifyUser(user.id, 'friends:update', { friendId: senderId });
+                    return { success: true, handled: finalHandled, senderId, senderNotification, message: newSub };
+                }
+                return { success: true, handled: finalHandled, senderId, message: newSub };
+            }
+            catch {
+                return { success: false, handled: finalHandled, code: 'UNAVAILABLE', error: 'Arkadaşlık isteği şu anda güncellenemedi. Lütfen tekrar deneyin.', message: '' };
+            }
+        }
+        notif.handled = finalHandled;
         notif.sub = newSub;
         // Update in PostgreSQL
         try {
@@ -4214,71 +4210,6 @@ class PrismaService {
         }
         catch (err) {
             console.warn('[respondToNotification] DB update error:', err.message);
-        }
-        let createdSenderNotif;
-        if (notif.type === 'friend_request' || notif.type === 'friend') {
-            if (action === 'accept' && notif.senderId) {
-                if (!user.friendIds)
-                    user.friendIds = [];
-                if (!user.friendIds.includes(notif.senderId))
-                    user.friendIds.push(notif.senderId);
-                let sender = this.users.get(notif.senderId);
-                try {
-                    const dbSender = await this.rawClient.user.findUnique({ where: { id: notif.senderId } });
-                    if (dbSender) {
-                        sender = this.prismaUserToRecord(dbSender);
-                        this.users.set(sender.id, sender);
-                    }
-                }
-                catch { }
-                if (sender) {
-                    if (!sender.friendIds)
-                        sender.friendIds = [];
-                    if (!sender.friendIds.includes(user.id))
-                        sender.friendIds.push(user.id);
-                    try {
-                        await this.rawClient.user.update({
-                            where: { id: user.id },
-                            data: { friendIds: user.friendIds },
-                        });
-                        await this.rawClient.user.update({
-                            where: { id: sender.id },
-                            data: { friendIds: sender.friendIds },
-                        });
-                    }
-                    catch { }
-                    this.users.set(sender.id, sender);
-                    const senderNotif = {
-                        id: 'notif_fra_' + Date.now(),
-                        type: 'system',
-                        title: `${user.displayName} arkadaşlık isteğini kabul etti!`,
-                        sub: 'Artık Arkadaşlarım listesinde görebilir ve 1v1 düelloya davet edebilirsin.',
-                        timeText: 'Az önce',
-                        createdAt: Date.now(),
-                        handled: 'accepted',
-                    };
-                    createdSenderNotif = senderNotif;
-                    try {
-                        await this.rawClient.userNotification.create({
-                            data: {
-                                id: senderNotif.id,
-                                userId: sender.id,
-                                type: senderNotif.type,
-                                title: senderNotif.title,
-                                sub: senderNotif.sub,
-                                timeText: senderNotif.timeText,
-                                handled: 'accepted',
-                            },
-                        });
-                    }
-                    catch { }
-                    // WebSocket notify sender & self
-                    presenceManager_1.presenceManager.notifyUser(sender.id, 'notification:new', senderNotif);
-                    (0, pushService_1.queuePushForNotification)(sender.id, senderNotif);
-                    presenceManager_1.presenceManager.notifyUser(sender.id, 'friends:update', { friendId: user.id });
-                    presenceManager_1.presenceManager.notifyUser(user.id, 'friends:update', { friendId: sender.id });
-                }
-            }
         }
         this.users.set(user.id, user);
         this.savePersistedUsers();
@@ -4302,7 +4233,6 @@ class PrismaService {
             success: true,
             handled: finalHandled,
             senderId: notif.senderId || undefined,
-            senderNotification: createdSenderNotif,
             message: action === 'accept' ? 'İşlem başarıyla onaylandı.' : 'İstek reddedildi.',
         };
     }

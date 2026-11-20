@@ -48,6 +48,7 @@ export type QuestionAnswerState =
 export interface RoundFeedback {
   isCorrect: boolean;
   isTimeout: boolean;
+  unavailable?: boolean;
   correctOptionId: string;
   explanation: string;
   pointsAwarded: number;
@@ -58,6 +59,7 @@ interface QuizArenaScreenProps {
   question: ClientQuestion;
   selectedOptionId: string | null;
   isLocked: boolean;
+  isMultiplayer?: boolean;
   streak: number;
   currentScore: number;
   feedback?: RoundFeedback | null;
@@ -568,6 +570,8 @@ const MiniPlayerBlock: React.FC<{
 export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   question,
   selectedOptionId,
+  isLocked,
+  isMultiplayer = false,
   streak,
   currentScore,
   feedback,
@@ -605,8 +609,8 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   );
   const [answerState, setAnswerState] =
     useState<QuestionAnswerState>('answerable');
-  const [endTime, setEndTime] = useState<number>(() => Date.now() + totalMs);
-  const endTimeRef = useRef<number>(Date.now() + totalMs);
+  const [endTime, setEndTime] = useState<number>(() => Date.now() + (question.timeRemainingMs ?? totalMs));
+  const endTimeRef = useRef<number>(endTime);
   const hasExpiredRef = useRef<boolean>(false);
   const onTimeExpiredRef = useRef(onTimeExpired);
   onTimeExpiredRef.current = onTimeExpired;
@@ -628,7 +632,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         setAnswerState('incorrect');
       }
       // PostHog: soru bazlı başarı — zorluk dengesinin ana veri kaynağı
-      trackEvent('question_answered', {
+      if (!feedback.unavailable) trackEvent('question_answered', {
         question_id: question.id,
         category: question.categoryId,
         correct: feedback.isCorrect,
@@ -642,12 +646,21 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   useEffect(() => {
     hasExpiredRef.current = false;
     setLocalSelectedOptionId(null);
-    const newEndTime = Date.now() + totalMs;
+    const remainingMs = question.timeRemainingMs ?? totalMs;
+    const newEndTime = Date.now() + remainingMs;
     endTimeRef.current = newEndTime;
     setEndTime(newEndTime);
-    setSecondsLeft(Math.ceil(totalMs / 1000));
+    setSecondsLeft(Math.ceil(remainingMs / 1000));
     setAnswerState('answerable');
-  }, [question.id, totalMs]);
+  }, [question.id, question.roundNumber, totalMs]);
+  useEffect(() => {
+    if (question.timeRemainingMs === undefined) return;
+    // A replay after reconnect can shorten the timer but must not restart it.
+    const syncedEnd = Math.min(endTimeRef.current, Date.now() + question.timeRemainingMs);
+    endTimeRef.current = syncedEnd;
+    setEndTime(syncedEnd);
+    setSecondsLeft(Math.ceil(Math.max(0, syncedEnd - Date.now()) / 1000));
+  }, [question.timeRemainingMs]);
   // AppState background/foreground synchronization
   useEffect(() => {
     const subscription = AppState.addEventListener(
@@ -698,6 +711,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const handleSelect = (optionId: string) => {
     if (
       answerState !== 'answerable' ||
+      isLocked ||
       feedback ||
       hasExpiredRef.current ||
       secondsLeft <= 0
@@ -736,6 +750,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const optionLabels = ['A', 'B', 'C', 'D'];
   const isOptionsDisabled =
     answerState !== 'answerable' ||
+    isLocked ||
     !!feedback ||
     hasExpiredRef.current ||
     secondsLeft <= 0;
@@ -849,7 +864,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           <CircularTimer
             totalMs={totalMs}
             endTime={endTime}
-            isActive={answerState === 'answerable'}
+            isActive={!feedback && (answerState === 'answerable' || (isMultiplayer && answerState === 'submitting'))}
             secondsLeft={secondsLeft}
             onTimeExpired={handleTimeExpiredInternal}
             onSecondChange={handleSecondChange}
@@ -910,7 +925,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         <CircularTimer
           totalMs={totalMs}
           endTime={endTime}
-          isActive={answerState === 'answerable'}
+          isActive={!feedback && (answerState === 'answerable' || (isMultiplayer && answerState === 'submitting'))}
           secondsLeft={secondsLeft}
           onTimeExpired={handleTimeExpiredInternal}
           onSecondChange={handleSecondChange}
@@ -1003,7 +1018,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           const activeSelectedId = selectedOptionId || localSelectedOptionId;
           const isMyChoice = activeSelectedId === opt.id;
           const isCorrectChoice = !!feedback && feedback.correctOptionId === opt.id;
-          const isWrongChoice = !!feedback && isMyChoice && !isCorrectChoice;
+          const isWrongChoice = !!feedback && !feedback.unavailable && isMyChoice && !isCorrectChoice;
           const showPoints = !!feedback && feedback.isCorrect && isMyChoice && isCorrectChoice && feedback.pointsAwarded > 0;
 
           return (
@@ -1109,7 +1124,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
             style={[
               styles.inlineFeedbackCard,
               {
-                borderColor: feedback.isTimeout
+                borderColor: feedback.isTimeout || feedback.unavailable
                   ? 'rgba(255, 196, 61, 0.6)'
                   : feedback.isCorrect
                   ? 'rgba(63, 208, 138, 0.6)'
@@ -1121,7 +1136,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
               style={[
                 styles.inlineFeedbackTitle,
                 {
-                  color: feedback.isTimeout
+                  color: feedback.isTimeout || feedback.unavailable
                     ? '#FFC43D'
                     : feedback.isCorrect
                     ? '#7CFC8A'
@@ -1129,7 +1144,9 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                 },
               ]}
             >
-              {feedback.isTimeout
+              {feedback.unavailable
+                ? 'CEVAP DOĞRULANAMADI'
+                : feedback.isTimeout
                 ? 'SÜRE DOLDU!'
                 : feedback.isCorrect
                 ? `DOĞRU! +${feedback.pointsAwarded} puan`
@@ -1159,8 +1176,10 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
               </TouchableOpacity>
             ) : null}
           </Animated.View>
-        ) : answerState === 'submitting' ? (
-          <Text style={styles.bottomHintText}>Cevabın kilitlendi, rakipler bekleniyor...</Text>
+        ) : answerState === 'submitting' || (isMultiplayer && isLocked) ? (
+          <Text style={styles.bottomHintText}>
+            {isMultiplayer ? 'Cevabın seçildi. Turun bitmesi bekleniyor...' : 'Cevabın kontrol ediliyor...'}
+          </Text>
         ) : answerState === 'timed_out' ? (
           <Text style={[styles.bottomHintText, { color: '#FFC43D' }]}>
             Süre doldu! Sonuçlar hesaplanıyor...

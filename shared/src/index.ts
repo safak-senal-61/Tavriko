@@ -5,3 +5,4 @@ export * from './categories';
 export * from './cosmetics';
 export * from './legal';
 export * from './rewards';
+export * from './questionSelection';

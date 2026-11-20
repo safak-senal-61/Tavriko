@@ -208,7 +208,7 @@ class GameRoomManager {
         if (!room || room.hostId !== requesterId)
             return false;
         // Fetch questions for this match
-        const questions = this.questionProvider(room.category, room.difficulty, room.totalRounds, room.subCategory);
+        const questions = (0, shared_1.uniqueQuestions)(this.questionProvider(room.category, room.difficulty, room.totalRounds, room.subCategory), room.totalRounds);
         if (questions.length === 0)
             return false;
         this.questionsByRoom.set(code, questions);

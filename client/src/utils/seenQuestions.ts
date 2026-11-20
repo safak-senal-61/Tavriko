@@ -14,10 +14,12 @@
  * Bellek dostu: kapsam başına en fazla MAX_IDS_PER_SCOPE ID saklanır (FIFO).
  */
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const STORAGE_KEY = 'tavriko_seen_questions';
-const FILE_NAME = `${FileSystem.documentDirectory || ''}/.tavriko_seen_questions.json`.replace('//', '/');
+const FILE_NAME = FileSystem.documentDirectory
+  ? `${FileSystem.documentDirectory.replace(/\/$/, '')}/.tavriko_seen_questions.json`
+  : null;
 const MAX_IDS_PER_SCOPE = 1200;
 
 /** localStorage benzeri basit kalıcı depo arayüzü. */
@@ -48,13 +50,15 @@ async function ensureLoaded(): Promise<void> {
     } catch {
       cache = {};
     }
-  } else {
+  } else if (FILE_NAME) {
     try {
       const info = await FileSystem.getInfoAsync(FILE_NAME);
       cache = info.exists ? parseStore(await FileSystem.readAsStringAsync(FILE_NAME)) : {};
     } catch {
       cache = {};
     }
+  } else {
+    cache = {};
   }
   loaded = true;
 }
@@ -69,7 +73,7 @@ function persist(): void {
     } catch {
       // Kota dolu vb. — sessiz geç.
     }
-  } else {
+  } else if (FILE_NAME) {
     if (writeTimer) clearTimeout(writeTimer);
     writeTimer = setTimeout(() => {
       FileSystem.writeAsStringAsync(FILE_NAME, payload, { encoding: FileSystem.EncodingType.UTF8 }).catch(() => {});

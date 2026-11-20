@@ -14,6 +14,7 @@ import {
   FinalMatchSummary,
   PlayerScoreSummary,
   PublicRoomSummary,
+  uniqueQuestions,
 } from '@trivia/shared';
 import { GameStateMachine } from './GameStateMachine';
 import { addBreadcrumb } from '../utils/errorMonitor';
@@ -279,7 +280,7 @@ export class GameRoomManager {
     if (!room || room.hostId !== requesterId) return false;
 
     // Fetch questions for this match
-    const questions = this.questionProvider(room.category, room.difficulty, room.totalRounds, room.subCategory);
+    const questions = uniqueQuestions(this.questionProvider(room.category, room.difficulty, room.totalRounds, room.subCategory), room.totalRounds);
     if (questions.length === 0) return false;
 
     this.questionsByRoom.set(code, questions);
