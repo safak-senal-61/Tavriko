@@ -9,15 +9,17 @@ function uniqueQuestions(candidates, limit = Infinity) {
     for (const question of candidates) {
         if (result.length >= limit)
             break;
-        const prompt = question.text
+        const normalized = question.text
             .normalize('NFC')
             .toLocaleLowerCase('tr')
             .replace(/[’‘]/g, "'")
             .replace(/[“”]/g, '"')
             .replace(/\s+/gu, ' ')
-            .trim()
-            .replace(/[.!?…]+$/u, '')
             .trim();
+        let end = normalized.length;
+        while (end > 0 && '.!?…'.includes(normalized.charAt(end - 1)))
+            end--;
+        const prompt = normalized.slice(0, end).trimEnd();
         if (!prompt || ids.has(question.id) || prompts.has(prompt))
             continue;
         ids.add(question.id);

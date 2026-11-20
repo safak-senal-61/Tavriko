@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { getRandomValues } from 'expo-crypto';
 import {
   View,
   StyleSheet,
@@ -248,7 +249,7 @@ export const RootNavigator: React.FC = () => {
     rewards?: any;
   } | null>(null);
   const isEvaluatingRef = useRef<boolean>(false);
-  const practiceSessionIdRef = useRef<string>('sess_' + Math.random().toString(36).substring(2, 9));
+  const practiceSessionIdRef = useRef('');
   // 1v1 Live Duel State
   const [duelOpponent, setDuelOpponent] = useState<{
     id: string;
@@ -1046,7 +1047,7 @@ export const RootNavigator: React.FC = () => {
     setDailyResultModal(null);
     setIsPracticeSummaryVisible(false);
     isEvaluatingRef.current = false;
-    practiceSessionIdRef.current = 'sess_' + Math.random().toString(36).substring(2, 9);
+    practiceSessionIdRef.current = '';
 
     const clearedStats: PracticeStats = {
       totalQuestions: 5,
@@ -1345,7 +1346,8 @@ export const RootNavigator: React.FC = () => {
     };
     practiceStatsRef.current = initStats;
     setPracticeStats(initStats);
-    const sessionId = 'sess_' + Math.random().toString(36).substring(2, 9);
+    const sessionBytes = getRandomValues(new Uint8Array(16));
+    const sessionId = 'sess_' + Array.from(sessionBytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
     practiceSessionIdRef.current = sessionId;
     const isCurrentSession = () => practiceSessionIdRef.current === sessionId && isSinglePlayerActiveRef.current;
     try {

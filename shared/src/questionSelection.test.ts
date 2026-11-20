@@ -18,4 +18,15 @@ describe('unique quiz questions', () => {
       { id: 'neg', text: '-5 + 3 kaçtır?' },
     ])).toHaveLength(2);
   });
+
+  it('ignores punctuation at the end but keeps punctuation within the prompt', () => {
+    const first = { id: 'q1', text: 'Dur! Sonra ne oldu?...… ' };
+    const distinct = { id: 'q2', text: 'Dur. Sonra ne oldu?' };
+    expect(uniqueQuestions([
+      first,
+      { id: 'alias', text: 'Dur! Sonra ne oldu?' },
+      { id: 'blank', text: '...!?…' },
+      distinct,
+    ])).toEqual([first, distinct]);
+  });
 });
