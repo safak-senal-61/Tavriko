@@ -23,6 +23,7 @@ import {
   Button3D,
 } from '../components/TavrikoIcons';
 import { GuestDiscoveryCard } from '../components/DiscoveryArtwork';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import {
   DISCOVER_CATEGORY_IMG,
   DISCOVER_SUBCATEGORY_IMG,
@@ -118,6 +119,9 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   onLoginPrompt,
   apiBaseUrl,
 }) => {
+  const page = usePlayerWebLayout();
+  const artSize = Math.round(84 * (page?.ui.art ?? 1));
+  const webCategoryArt = page?.roomy && { width: artSize, height: artSize };
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
   const [liveCounts, setLiveCounts] = useState<Record<string, number>>({});
@@ -401,14 +405,14 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                           { boxShadow: `0 0 20px ${withAlpha(accent, 0.55)}` },
                         ]}
                       >
-                        <Image source={art} style={styles.catArt} />
+                        <Image source={art} style={[styles.catArt, webCategoryArt]} />
                       </View>
                     ) : (
                       <Text style={styles.catEmojiFallback}>
                         {(cat.subCategories && cat.subCategories[0]?.emoji) || '🎯'}
                       </Text>
                     )}
-                    <Text style={styles.catName} numberOfLines={2}>
+                    <Text style={[styles.catName, page?.roomy && styles.webCatName]} numberOfLines={2}>
                       {cat.name}
                     </Text>
                     <View style={styles.catMetaRow}>
@@ -750,6 +754,7 @@ const styles = StyleSheet.create({
     height: 84,
     resizeMode: 'contain',
   },
+  webCatName: { fontSize: 16, lineHeight: 21 },
   catEmojiFallback: {
     fontSize: 40,
     lineHeight: 92,

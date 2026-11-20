@@ -69,6 +69,9 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
 }) => {
   const page = usePlayerWebLayout();
   const eventColumns = page?.roomy && page.contentWidth >= 900;
+  const eventArtSize = Math.round(54 * (page?.ui.art ?? 1));
+  const webEventArt = page?.roomy && { width: eventArtSize, height: eventArtSize };
+  const webEventButton = page?.roomy && styles.webEventButton;
   const [activeTab, setActiveTab] = useState<EventTab>('daily');
   const [events, setEvents] = useState<GameEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -292,7 +295,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                           <PulseElement min={1} max={1.08} duration={900}>
                             <Image
                               source={getEventArtwork(item.metric, item.type)}
-                              style={[styles.eventArt, isCompleted && { borderColor: 'rgba(90, 219, 181, 0.7)' }]}
+                              style={[styles.eventArt, webEventArt, isCompleted && { borderColor: 'rgba(90, 219, 181, 0.7)' }]}
                               resizeMode="cover"
                               accessibilityLabel={item.title}
                             />
@@ -300,7 +303,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                         ) : (
                           <Image
                             source={getEventArtwork(item.metric, item.type)}
-                            style={styles.eventArt}
+                            style={[styles.eventArt, webEventArt]}
                             resizeMode="cover"
                             accessibilityLabel={item.title}
                           />
@@ -309,8 +312,8 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                     </FloatingElement>
 
                     <View style={styles.headerInfo}>
-                      <Text style={styles.eventTitle} numberOfLines={1}>{item.title}</Text>
-                      <Text style={styles.eventDesc} numberOfLines={2}>{desc}</Text>
+                      <Text style={[styles.eventTitle, page?.roomy && { fontSize: 17 }]} numberOfLines={page?.roomy ? 2 : 1}>{item.title}</Text>
+                      <Text style={[styles.eventDesc, page?.roomy && { fontSize: 14, lineHeight: 19 }]} numberOfLines={2}>{desc}</Text>
                     </View>
 
                     {/* Top Right Action Button */}
@@ -322,7 +325,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                       ) : isCompleted ? (
                         <PulseElement min={1} max={1.05} duration={700}>
                           <TouchableOpacity
-                            style={styles.collectBtn}
+                            style={[styles.collectBtn, webEventButton]}
                             disabled={isBusy}
                             activeOpacity={0.85}
                             onPress={() => handleAction(item)}
@@ -336,7 +339,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                         </PulseElement>
                       ) : (
                         <TouchableOpacity
-                          style={styles.playBtn}
+                          style={[styles.playBtn, webEventButton]}
                           disabled={isBusy}
                           activeOpacity={0.85}
                           onPress={() => handleAction(item)}
@@ -607,6 +610,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  webEventButton: { height: 46, minWidth: 88 },
   playBtnText: {
     color: '#1A0B3B',
     fontSize: 14,

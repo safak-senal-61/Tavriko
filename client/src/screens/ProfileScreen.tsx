@@ -245,6 +245,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const page = usePlayerWebLayout();
   const webProfile = page?.roomy;
   const fourStats = webProfile && page.contentWidth >= 920;
+  const ui = webProfile ? page.ui : undefined;
+  const twoCollections = webProfile && page.contentWidth >= 840;
+  const imageSize = (base: number) => Math.round(base * (ui?.art ?? 1));
+  const square = (size: number) => ({ width: size, height: size });
+  const metricArt = ui && square(imageSize(34));
+  const statArt = ui && square(imageSize(48));
   const base = apiBaseUrl || DEFAULT_API_BASE;
   const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
   const [showAvatarDrawer, setShowAvatarDrawer] = useState(false);
@@ -677,18 +683,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         return (
           <TouchableOpacity
             key={tKey}
-            style={[styles.tabBtn, isActive && styles.tabBtnActive]}
+            style={[styles.tabBtn, ui && { minHeight: ui.navHeight }, isActive && styles.tabBtnActive]}
             onPress={() => switchProfileTab(tKey)}
             activeOpacity={0.8}
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}
           >
-            {tKey === 'settings' ? <Settings size={22} color={isActive ? '#281543' : '#D9CDF5'} />
-              : tKey === 'account' ? <UserRound size={22} color={isActive ? '#281543' : '#D9CDF5'} />
+            {tKey === 'settings' ? <Settings size={ui?.navIcon ?? 22} color={isActive ? '#281543' : '#D9CDF5'} />
+              : tKey === 'account' ? <UserRound size={ui?.navIcon ?? 22} color={isActive ? '#281543' : '#D9CDF5'} />
               : <Image source={tKey === 'overview' ? PROFILE_IMG.tabOverview : tKey === 'mastery' ? PROFILE_IMG.tabMastery : PROFILE_IMG.tabTitles}
-                  style={styles.profileTabImage} resizeMode="contain" />}
+                  style={[styles.profileTabImage, ui && square(imageSize(26))]} resizeMode="contain" />}
             <Text
-              style={[styles.tabText, isActive && styles.tabTextActive]}
+              style={[styles.tabText, ui && { fontSize: Math.max(13, ui.navLabel) }, isActive && styles.tabTextActive]}
               numberOfLines={1}
               adjustsFontSizeToFit={true}
               minimumFontScale={0.72}
@@ -919,6 +925,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <TouchableOpacity
                 style={[
                   styles.heroActionBtnHalf,
+                  ui && styles.webHeroAction,
                   showAvatarDrawer && styles.heroActionBtnHalfActive,
                 ]}
                 onPress={() => {
@@ -931,6 +938,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text
                   style={[
                     styles.heroActionBtnText,
+                    ui && { fontSize: 15 },
                     showAvatarDrawer && styles.heroActionBtnTextActive,
                   ]}
                   numberOfLines={1}
@@ -940,7 +948,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.heroActionBtnHalf, styles.heroActionBtnEdit]}
+                style={[styles.heroActionBtnHalf, ui && styles.webHeroAction, styles.heroActionBtnEdit]}
                 onPress={() => {
                   sound.playSound('tap');
                   if (onEditPersonalInfo) onEditPersonalInfo();
@@ -948,8 +956,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 }}
                 activeOpacity={0.82}
               >
-                <EditPencilIcon size={14} color="#FFC43D" />
-                <Text style={[styles.heroActionBtnText, { color: '#FFC43D' }]} numberOfLines={1}>
+                <EditPencilIcon size={ui ? 18 : 14} color="#FFC43D" />
+                <Text style={[styles.heroActionBtnText, ui && { fontSize: 15 }, { color: '#FFC43D' }]} numberOfLines={1}>
                   Düzenle
                 </Text>
               </TouchableOpacity>
@@ -1040,7 +1048,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             {/* Primary 2x2 Key Performance Cards */}
             <View style={[styles.primaryStatsGrid, webProfile && styles.webStatsGrid]}>
               <View style={[styles.primaryStatBox, fourStats && styles.webStatBox]}>
-                <Image source={PROFILE_IMG.statMatches} style={styles.statArtwork} resizeMode="contain" />
+                <Image source={PROFILE_IMG.statMatches} style={[styles.statArtwork, statArt]} resizeMode="contain" />
                 <View
                   style={[
                     styles.statIconChip,
@@ -1056,7 +1064,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </Text>
               </View>
               <View style={[styles.primaryStatBox, fourStats && styles.webStatBox]}>
-                <Image source={PROFILE_IMG.statWinrate} style={styles.statArtwork} resizeMode="contain" />
+                <Image source={PROFILE_IMG.statWinrate} style={[styles.statArtwork, statArt]} resizeMode="contain" />
                 <View
                   style={[
                     styles.statIconChip,
@@ -1070,7 +1078,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.primaryStatSub}>{wins} Galibiyet</Text>
               </View>
               <View style={[styles.primaryStatBox, fourStats && styles.webStatBox]}>
-                <Image source={PROFILE_IMG.statCorrect} style={styles.statArtwork} resizeMode="contain" />
+                <Image source={PROFILE_IMG.statCorrect} style={[styles.statArtwork, statArt]} resizeMode="contain" />
                 <View
                   style={[
                     styles.statIconChip,
@@ -1087,7 +1095,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={styles.primaryStatSub}>Toplam {totalAnswers} soru</Text>
               </View>
               <View style={[styles.primaryStatBox, fourStats && styles.webStatBox]}>
-                <Image source={PROFILE_IMG.statAccuracy} style={styles.statArtwork} resizeMode="contain" />
+                <Image source={PROFILE_IMG.statAccuracy} style={[styles.statArtwork, statArt]} resizeMode="contain" />
                 <View
                   style={[
                     styles.statIconChip,
@@ -1105,24 +1113,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             {/* Compact Secondary Metrics Strip */}
             <View style={styles.secondaryMetricsCard}>
               <View style={styles.secondaryMetricItem}>
-                <Image source={PROFILE_IMG.metricTime} style={styles.metricArtwork} resizeMode="contain" />
-                <Text style={styles.secondaryMetricVal}>{avgSec} sn</Text>
-                <Text style={styles.secondaryMetricLbl}>Ort. Süre</Text>
+                <Image source={PROFILE_IMG.metricTime} style={[styles.metricArtwork, metricArt]} resizeMode="contain" />
+                <Text style={[styles.secondaryMetricVal, ui && styles.webMetricValue]}>{avgSec} sn</Text>
+                <Text style={[styles.secondaryMetricLbl, ui && styles.webSmallText]}>Ort. Süre</Text>
               </View>
               <View style={styles.secondaryMetricDivider} />
               <View style={styles.secondaryMetricItem}>
-                <Image source={PROFILE_IMG.metricStreak} style={styles.metricArtwork} resizeMode="contain" />
-                <Text style={styles.secondaryMetricVal}>
+                <Image source={PROFILE_IMG.metricStreak} style={[styles.metricArtwork, metricArt]} resizeMode="contain" />
+                <Text style={[styles.secondaryMetricVal, ui && styles.webMetricValue]}>
                   {user.dailyStreak || user.dailyChallenge?.streakDay || 0} gün
                 </Text>
-                <Text style={styles.secondaryMetricLbl}>Günlük Seri</Text>
+                <Text style={[styles.secondaryMetricLbl, ui && styles.webSmallText]}>Günlük Seri</Text>
               </View>
               <View style={styles.secondaryMetricDivider} />
               <View style={styles.secondaryMetricItem}>
-                <Image source={PROFILE_IMG.metricXp} style={styles.metricArtwork} resizeMode="contain" />
-                <Text style={styles.secondaryMetricVal}>{user.xp ?? 0}</Text>
+                <Image source={PROFILE_IMG.metricXp} style={[styles.metricArtwork, metricArt]} resizeMode="contain" />
+                <Text style={[styles.secondaryMetricVal, ui && styles.webMetricValue]}>{user.xp ?? 0}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={styles.secondaryMetricLbl}>Toplam XP</Text>
+                  <Text style={[styles.secondaryMetricLbl, ui && styles.webSmallText]}>Toplam XP</Text>
                   <InfoHint topic="xp" size={14} color="#5ADBB5" label="XP nasıl kazanılır?" />
                 </View>
               </View>
@@ -1149,22 +1157,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </View>
             )}
 
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Rozetler & Başarılar</Text>
+            <View style={[styles.sectionHeaderRow, ui && styles.webAchievementHeader]}>
+              <Text style={[styles.sectionTitle, ui && styles.webSectionTitle]}>Rozetler & Başarılar</Text>
               <Text style={styles.completionBadge}>
                 {doneAchievements}/{achievements.length}
               </Text>
             </View>
-            <View style={styles.badgeGrid}>
+            <View testID="profile-achievements" style={[styles.badgeGrid, ui && styles.webBadgeGrid]}>
               {achievements.map(({ name, desc, done, image }, index) => (
                 <Animated.View key={name} entering={FadeInDown.delay(index * 45).duration(280)}
-                  style={[styles.badgeCard, done && styles.badgeCardDone]}>
+                  style={[styles.badgeCard, ui && styles.webBadgeCard, done && styles.badgeCardDone]}>
                   <View style={!done && { opacity: 0.5 }}>
-                    <DiscoveryArtwork source={image} size={64} animated={done} />
+                    <DiscoveryArtwork source={image} size={imageSize(64)} animated={done} />
                   </View>
-                  <Text style={styles.badgeName}>{name}</Text>
-                  <Text style={styles.badgeDesc}>{desc}</Text>
-                  <AchievementState done={done} />
+                  <Text style={[styles.badgeName, ui && styles.webCardName]}>{name}</Text>
+                  <Text style={[styles.badgeDesc, ui && styles.webCardDesc]}>{desc}</Text>
+                  <AchievementState done={done} roomy={!!ui} />
                 </Animated.View>
               ))}
             </View>
@@ -1173,7 +1181,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         {/* TAB 2: Category Mastery */}
         {activeTab === 'mastery' && (
-          <View style={styles.masteryTabWrap}>
+          <View style={[styles.masteryTabWrap, ui && styles.webProfileSection]}>
             {/* En güçlü kategori spotlight */}
             {bestCategory && (
               <Animated.View entering={FadeInDown.delay(40).duration(400).springify().damping(16)} style={styles.masterySpotlight}>
@@ -1202,6 +1210,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <Text style={styles.cardSub}>
               Her kategoride verdiğin doğru cevaplar veritabanından canlı okunur.
             </Text>
+            <View style={twoCollections && styles.webCollectionGrid}>
             {masteryList.map((m, idx) => {
               const progress =
                 m.correctCount > 0 ? Math.min(100, Math.round((m.correctCount / maxCorrect) * 100)) : 0;
@@ -1210,24 +1219,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Animated.View
                   key={m.id}
                   entering={FadeInRight.delay(60 + Math.min(idx, 12) * 35).duration(340).springify().damping(18)}
-                  style={styles.masteryCard}
+                  style={[styles.masteryCard, ui && styles.webCollectionCard, twoCollections && styles.webCollectionItem]}
                 >
                   <View style={styles.masteryRow}>
-                    <View style={[styles.masteryIconWrap, { borderColor: `${m.color}55`, backgroundColor: `${m.color}18` }]}>
+                    <View style={[styles.masteryIconWrap, ui && square(imageSize(46)), { borderColor: `${m.color}55`, backgroundColor: `${m.color}18` }]}>
                       <Image
                         source={CATEGORY_IMG[m.id]}
-                        style={[styles.masteryIcon, m.correctCount === 0 && styles.masteryIconIdle]}
+                        style={[styles.masteryIcon, ui && square(imageSize(36)), m.correctCount === 0 && styles.masteryIconIdle]}
                         resizeMode="contain"
                       />
                     </View>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <View style={styles.masteryHeader}>
-                        <Text style={styles.masteryName} numberOfLines={1}>{m.name}</Text>
+                        <Text style={[styles.masteryName, ui && styles.webCardName]} numberOfLines={1}>{m.name}</Text>
                         <View style={[styles.masteryLevelChip, { backgroundColor: `${m.color}22`, borderColor: `${m.color}77` }]}>
                           <Text style={[styles.masteryLevelText, { color: m.color }]}>Sv. {m.level}</Text>
                         </View>
                       </View>
-                      <Text style={styles.masteryMeta}>{m.correctCount} doğru cevap</Text>
+                      <Text style={[styles.masteryMeta, ui && styles.webSmallText]}>{m.correctCount} doğru cevap</Text>
                     </View>
                   </View>
                   <View style={styles.masteryBarWrap}>
@@ -1239,19 +1248,20 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </Animated.View>
               );
             })}
+            </View>
           </View>
         )}
 
         {/* TAB 3: Titles */}
         {activeTab === 'titles' && (
-          <View>
+          <View style={ui && styles.webProfileSection}>
             {/* Unvan Hero Banner */}
             <Animated.View entering={FadeInDown.delay(40).duration(420)} style={styles.titlesHeroWrap}>
               <Image source={UI_IMG.titlesHero} style={styles.titlesHeroImg} resizeMode="cover" />
               <View style={styles.titlesHeroScrim} />
               <View style={styles.titlesHeroText}>
                 <Text style={styles.titlesHeroEyebrow}>UNVAN KOLEKSİYONU</Text>
-                <Text style={styles.titlesHeroTitle}>Unvan Seç & Kuşan</Text>
+                <Text style={[styles.titlesHeroTitle, ui && styles.webSectionTitle]}>Unvan Seç & Kuşan</Text>
                 <Text style={styles.titlesHeroSub}>
                   Seviye atladıkça yeni unvanlar açılır. Seçtiğin unvan PostgreSQL'e kaydedilir ve arkadaşların tarafından görülür.
                 </Text>
@@ -1270,6 +1280,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </Text>
             )}
 
+            <View style={twoCollections && styles.webCollectionGrid}>
             {TITLE_CATALOG.map((t, idx) => {
               const unlocked = prog.level >= t.minLevel;
               const equipped = t.title === equippedTitle;
@@ -1277,33 +1288,35 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Animated.View
                   key={t.title}
                   entering={FadeInRight.delay(70 + idx * 45).duration(380).springify().damping(18)}
+                  style={twoCollections && styles.webCollectionItem}
                 >
                   <TouchableOpacity
                     disabled={!unlocked || equipped || !!savingTitle || !!viewOnly}
                     onPress={() => handleEquipTitle(t.title)}
                     style={[
                       styles.titleRow,
+                      ui && styles.webCollectionCard,
                       equipped && styles.titleRowEquipped,
                       !unlocked && styles.titleRowLocked,
                     ]}
                     activeOpacity={0.85}
                   >
-                    <View style={styles.titleBadgeWrap}>
+                    <View style={[styles.titleBadgeWrap, ui && square(imageSize(46))]}>
                       <Image
                         source={t.icon}
-                        style={[styles.titleBadgeImg, !unlocked && styles.titleBadgeLocked]}
+                        style={[styles.titleBadgeImg, ui && square(imageSize(38)), !unlocked && styles.titleBadgeLocked]}
                         resizeMode="contain"
                       />
                       {equipped && <ShimmerView color="#3FD08A" duration={1800} style={styles.titleBadgeShine} />}
                     </View>
                     <View style={{ flex: 1 }}>
                       <View style={styles.titleNameRow}>
-                        <Text style={[styles.titleName, !unlocked && { color: '#8F84B5' }]}>{t.title}</Text>
+                        <Text style={[styles.titleName, ui && styles.webCardName, !unlocked && { color: '#8F84B5' }]}>{t.title}</Text>
                         <View style={[styles.titleRarityChip, { backgroundColor: `${t.badgeColor}22`, borderColor: `${t.badgeColor}88` }]}>
                           <Text style={[styles.titleRarityChipText, { color: t.badgeColor }]}>{t.rarity}</Text>
                         </View>
                       </View>
-                      <Text style={styles.titleReq}>
+                      <Text style={[styles.titleReq, ui && styles.webSmallText]}>
                         {unlocked
                           ? `Seviye ${t.minLevel} · Kuşanılabilir`
                           : `Kilitli · Seviye ${t.minLevel} gerekli`}
@@ -1326,12 +1339,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </Animated.View>
               );
             })}
+            </View>
           </View>
         )}
 
         {/* TAB 4: Quick Settings & Live Cloud Sync */}
         {activeTab === 'settings' && (
-          <View style={styles.detailsCard}>
+          <View style={[styles.detailsCard, ui && styles.webProfileSection]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.sectionTitle}>Oyun, senin ritmin.</Text>
@@ -1451,7 +1465,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         {/* TAB 5: Account */}
         {activeTab === 'account' && (
-          <View style={styles.detailsCard}>
+          <View style={[styles.detailsCard, ui && styles.webProfileSection]}>
             <View style={styles.detailsHeaderRow}>
               <Text style={styles.sectionTitle}>Hesap Bilgileri</Text>
               <Text style={styles.completionBadge}>Profil %{user.profileCompletionPct || 85}</Text>
@@ -1878,6 +1892,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   webProfileWidth: { maxWidth: 1184, alignSelf: 'center' },
+  webHeroAction: { height: 46 },
+  webProfileSection: { width: '100%' },
+  webCollectionGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  webCollectionItem: { width: '49%', minWidth: 0 },
+  webCollectionCard: { padding: 16, minHeight: 88 },
+  webSectionTitle: { fontSize: 23 },
+  webSmallText: { fontSize: 13 },
+  webMetricValue: { fontSize: 19 },
   tabBtnActive: {
     backgroundColor: '#F59E0B',
   },
@@ -2061,6 +2083,11 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: THEME.fonts.display, fontSize: 18, color: '#FFFFFF' },
 
   badgeGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 },
+  webAchievementHeader: { width: '100%', gap: 12, marginTop: 8, marginBottom: 14 },
+  webBadgeGrid: { width: '100%', rowGap: 14 },
+  webBadgeCard: { width: '32.25%', padding: 14, minHeight: 198, gap: 8 },
+  webCardName: { fontSize: 16 },
+  webCardDesc: { fontSize: 14, lineHeight: 19, minHeight: 0 },
   badgeCard: { ...card, width: '31.5%', minHeight: 172, padding: 8, backgroundColor: '#211637', alignItems: 'center', justifyContent: 'center', gap: 6 },
   badgeCardDone: { backgroundColor: '#30213E', borderColor: 'rgba(255,196,61,0.5)' },
   badgeName: { color: '#FFFFFF', fontSize: 12, fontFamily: THEME.fonts.extraBold, textAlign: 'center' },

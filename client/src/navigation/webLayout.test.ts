@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getHomeWebSizing, getWebLayout, WEB_PAGES, type ScreenName } from './webLayout';
+import { getHomeWebSizing, getWebLayout, getWebUiSizing, WEB_PAGES, type ScreenName } from './webLayout';
 
 const mainTabs = ['home', 'categories', 'leaderboard', 'friends', 'profile'] as const;
 const allPages = Object.keys(WEB_PAGES) as ScreenName[];
@@ -74,6 +74,23 @@ describe('player web layout', () => {
     expect(getWebLayout(1032, 1376, 'leaderboard', true).leaderboardColumns).toBe(false);
     expect(getWebLayout(1376, 1032, 'leaderboard', true).leaderboardColumns).toBe(true);
     expect(getWebLayout(1440, 1800, 'leaderboard', true).reserveUtility).toBe(false);
+  });
+
+  it('scales controls and art by usable space, preserving phone and short layouts', () => {
+    const phone = getWebLayout(375, 812, 'profile', true).ui;
+    const tablet = getWebLayout(1032, 1376, 'profile', true).ui;
+    const desktop = getWebLayout(1600, 900, 'profile', true).ui;
+    const short = getWebLayout(1280, 470, 'profile', true).ui;
+    expect(phone).toEqual(getWebUiSizing(1200, 900, false));
+    expect(phone.art).toBe(1);
+    expect(tablet.art).toBeGreaterThan(phone.art);
+    expect(desktop.art).toBeGreaterThan(tablet.art);
+    expect(desktop.art).toBeLessThanOrEqual(1.42);
+    expect(desktop.navLabel).toBeGreaterThan(phone.navLabel);
+    expect(desktop.buttonHeight).toBeGreaterThan(phone.buttonHeight);
+    expect(short.buttonHeight).toBe(phone.buttonHeight);
+    expect(short.navHeight).toBe(phone.navHeight);
+    expect(getWebLayout(1600, 900, 'profile', false).ui).toEqual(phone);
   });
 });
 

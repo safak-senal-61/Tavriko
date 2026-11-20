@@ -168,7 +168,10 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   onNotifications,
   onProfile,
 }) => {
-  const threeItems = usePlayerWebLayout()?.columns === 3;
+  const page = usePlayerWebLayout();
+  const threeItems = page?.columns === 3;
+  const roomy = page?.roomy;
+  const itemArt = Math.round(44 * (page?.ui.art ?? 1));
   const [activeTab, setActiveTab] = useState<InvTabType>('all');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
@@ -588,19 +591,19 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                   <View style={styles.qtyBadge}>
                     <Text style={styles.qtyText}>x{item.qty}</Text>
                   </View>
-                  <View style={styles.iconWrap}>
-                    {renderItemVisual(item, 44)}
+                  <View style={[styles.iconWrap, roomy && { height: 2.15 * itemArt }]}>
+                    {renderItemVisual(item, itemArt)}
                   </View>
-                  <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                  <Text style={styles.itemDesc} numberOfLines={2}>{item.desc}</Text>
+                  <Text style={[styles.itemName, roomy && { fontSize: 17 }]} numberOfLines={roomy ? 2 : 1}>{item.name}</Text>
+                  <Text style={[styles.itemDesc, roomy && { fontSize: 13, lineHeight: 18 }]} numberOfLines={2}>{item.desc}</Text>
                   {isChest && (
-                    <View style={styles.openPill}>
-                      <Text style={styles.openPillText}>Sandığı aç</Text>
+                    <View style={[styles.openPill, roomy && styles.webOpenPill]}>
+                      <Text style={[styles.openPillText, roomy && { fontSize: 14 }]}>Sandığı aç</Text>
                     </View>
                   )}
                   {isEquippable(item) && (
-                    <View style={styles.openPill}>
-                      <Text style={styles.openPillText}>
+                    <View style={[styles.openPill, roomy && styles.webOpenPill]}>
+                      <Text style={[styles.openPillText, roomy && { fontSize: 14 }]}>
                         {equippingItemId === item.id ? 'Uygulanıyor...' : 'Kuşan'}
                       </Text>
                     </View>
@@ -899,6 +902,7 @@ const styles = StyleSheet.create({
   },
   webGrid: { justifyContent: 'flex-start', columnGap: 12 },
   webItemWrap: { width: '32%' },
+  webOpenPill: { minHeight: 44, justifyContent: 'center' },
   itemCardWrap: {
     width: '48.5%',
     alignSelf: 'stretch',

@@ -1301,6 +1301,7 @@ export const Button3D: React.FC<{
   textStyle?: StyleProp<TextStyle>;
   testID?: string;
 }> = ({ title, variant = 'gold', onPress, disabled, style, textStyle, testID }) => {
+  const page = usePlayerWebLayout();
   const variantContainer =
     variant === 'mint'
       ? styles.btn3DMint
@@ -1333,11 +1334,12 @@ export const Button3D: React.FC<{
       style={[
         styles.btn3DBase,
         variantContainer,
+        page?.roomy && { minHeight: page.ui.buttonHeight },
         disabled && { opacity: 0.55 },
         style,
       ]}
     >
-      <Text style={[styles.btn3DTextBase, variantText, textStyle]}>{title}</Text>
+      <Text style={[styles.btn3DTextBase, variantText, page?.roomy && { fontSize: page.ui.buttonLabel }, textStyle]}>{title}</Text>
     </TouchableOpacity>
   );
 };
@@ -1377,12 +1379,15 @@ const NavBarBase = <K extends string>({
   inFlow?: boolean;
 }) => {
   const [w, setW] = useState(0);
+  const page = usePlayerWebLayout();
+  const ui = page?.roomy ? page.ui : undefined;
+  const labelSize = ui && { fontSize: ui.navLabel };
   const slot = w > 0 ? (w - 12) / items.length : 0;
   const idx = items.findIndex((i) => i.key === activeKey);
   const showPill = idx >= 0 && items[idx].key !== raisedKey;
   return (
     <View
-      style={[styles.bottomNav, inFlow && styles.bottomNavInFlow]}
+      style={[styles.bottomNav, inFlow && styles.bottomNavInFlow, ui && { height: ui.navHeight }]}
       accessibilityRole="tablist"
       onLayout={(e) => setW(e.nativeEvent.layout.width)}
     >
@@ -1416,12 +1421,12 @@ const NavBarBase = <K extends string>({
               <View style={styles.navRaised}>
                 <GradientFill direction="vertical" colors={['#FFD970', '#FFB21E']} />
                 <View style={styles.navRaisedIcon}>
-                  <Svg width={22} height={22} viewBox="0 0 64 64">
+                  <Svg width={ui?.navIcon ?? 22} height={ui?.navIcon ?? 22} viewBox="0 0 64 64">
                     <Path d="M22 12l30 20-30 20z" fill="#2A1200" stroke="#2A1200" strokeWidth="6" strokeLinejoin="round" />
                   </Svg>
                 </View>
               </View>
-              <Text style={[styles.navLabel, styles.navLabelRaised]} numberOfLines={1}>
+              <Text style={[styles.navLabel, labelSize, styles.navLabelRaised]} numberOfLines={1}>
                 {item.label}
               </Text>
             </TouchableOpacity>
@@ -1436,8 +1441,8 @@ const NavBarBase = <K extends string>({
             accessibilityRole="tab"
             aria-selected={isActive}
           >
-            <NavIcon tab={item.key as any} active={isActive} size={22} />
-            <Text style={[styles.navLabel, isActive && styles.navLabelActive]} numberOfLines={1}>
+            <NavIcon tab={item.key as any} active={isActive} size={ui?.navIcon ?? 22} />
+            <Text style={[styles.navLabel, labelSize, isActive && styles.navLabelActive]} numberOfLines={1}>
               {item.label}
             </Text>
           </TouchableOpacity>

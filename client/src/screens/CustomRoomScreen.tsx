@@ -118,6 +118,9 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   const page = usePlayerWebLayout();
   const webRoom = page?.roomy;
   const roomColumns = webRoom && page.contentWidth >= 860;
+  const roomArt = Math.round(96 * Math.min(1.17, page?.ui.art ?? 1));
+  const webChoice = webRoom && styles.webChoice;
+  const webChoiceText = webRoom && styles.webChoiceText;
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
 
   // Katılma Kodu State
@@ -322,13 +325,13 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               : 'Davet kodunu gir, arkadaşlarının oyununa hemen dahil ol.'}</Text>
           </View>
           <DiscoveryArtwork source={activeTab === 'create'
-            ? cdnImage('images/modes/custom_room.png') : DISCOVERY_IMG.social} size={96} />
+            ? cdnImage('images/modes/custom_room.png') : DISCOVERY_IMG.social} size={roomArt} />
         </View>
         <View style={[styles.tabToggleRow, webRoom && styles.webRoomWidth]} accessibilityRole="tablist">
           <TouchableOpacity
             accessibilityRole="tab" aria-selected={activeTab === 'create'}
             accessibilityState={{ selected: activeTab === 'create' }}
-            style={[styles.tabButton, activeTab === 'create' && styles.tabButtonActiveCreate]}
+            style={[styles.tabButton, webChoice, activeTab === 'create' && styles.tabButtonActiveCreate]}
             activeOpacity={0.85}
             onPress={() => {
               sound.playSound('tap');
@@ -342,7 +345,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               <Circle cx="32" cy="36" r="17" fill="#fff" opacity={0.18} />
               <Path d="M36 21L24 38h8l-3 13 14-19h-8z" fill="#FFC43D" />
             </Svg>
-            <Text style={[styles.tabButtonText, activeTab === 'create' && styles.tabButtonTextActive]}>
+            <Text style={[styles.tabButtonText, webChoiceText, activeTab === 'create' && styles.tabButtonTextActive]}>
               ODA KUR
             </Text>
           </TouchableOpacity>
@@ -350,7 +353,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
           <TouchableOpacity
             accessibilityRole="tab" aria-selected={activeTab === 'join'}
             accessibilityState={{ selected: activeTab === 'join' }}
-            style={[styles.tabButton, activeTab === 'join' && styles.tabButtonActiveJoin]}
+            style={[styles.tabButton, webChoice, activeTab === 'join' && styles.tabButtonActiveJoin]}
             activeOpacity={0.85}
             onPress={() => {
               sound.playSound('tap');
@@ -363,7 +366,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               <Path d="M29 29l24 24M43 43l7-7M50 50l6-6" stroke="#f5a300" strokeWidth="7" strokeLinecap="round" fill="none" />
               <Path d="M12 14a10 10 0 016-4" stroke="#fff" strokeWidth="3" strokeLinecap="round" fill="none" opacity={0.7} />
             </Svg>
-            <Text style={[styles.tabButtonText, activeTab === 'join' && styles.tabButtonTextActive]}>
+            <Text style={[styles.tabButtonText, webChoiceText, activeTab === 'join' && styles.tabButtonTextActive]}>
               ODAYA KATIL
             </Text>
           </TouchableOpacity>
@@ -475,7 +478,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                     return (
                       <TouchableOpacity
                         key={q}
-                        style={[styles.chipPill, isSelected && styles.chipPillActive]}
+                        style={[styles.chipPill, webChoice, isSelected && styles.chipPillActive]}
                         activeOpacity={0.85}
                         onPress={() => {
                           sound.playSound('tap');
@@ -483,7 +486,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                           setTotalRounds(q);
                         }}
                       >
-                        <Text style={[styles.chipPillText, isSelected && styles.chipPillTextActive]}>
+                        <Text style={[styles.chipPillText, webChoiceText, isSelected && styles.chipPillTextActive]}>
                           {q}
                         </Text>
                       </TouchableOpacity>
@@ -501,7 +504,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                     return (
                       <TouchableOpacity
                         key={sec}
-                        style={[styles.chipPill, isSelected && styles.chipPillActive]}
+                        style={[styles.chipPill, webChoice, isSelected && styles.chipPillActive]}
                         activeOpacity={0.85}
                         onPress={() => {
                           sound.playSound('tap');
@@ -509,7 +512,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                           setQuestionTimeSec(sec);
                         }}
                       >
-                        <Text style={[styles.chipPillText, isSelected && styles.chipPillTextActive]}>
+                        <Text style={[styles.chipPillText, webChoiceText, isSelected && styles.chipPillTextActive]}>
                           {sec}sn
                         </Text>
                       </TouchableOpacity>
@@ -527,7 +530,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 return (
                   <TouchableOpacity
                     key={num}
-                    style={[styles.chipPillSmall, isSelected && styles.chipPillActive]}
+                    style={[styles.chipPillSmall, webChoice, isSelected && styles.chipPillActive]}
                     activeOpacity={0.85}
                     onPress={() => {
                       sound.playSound('tap');
@@ -535,7 +538,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                       setMaxPlayers(num);
                     }}
                   >
-                    <Text style={[styles.chipPillText, isSelected && styles.chipPillTextActive]}>
+                    <Text style={[styles.chipPillText, webChoiceText, isSelected && styles.chipPillTextActive]}>
                       {num} Kişi
                     </Text>
                   </TouchableOpacity>
@@ -551,7 +554,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 return (
                   <TouchableOpacity
                     key={diff.id}
-                    style={[styles.chipPillSmall, isSelected && styles.chipPillActive]}
+                    style={[styles.chipPillSmall, webChoice, isSelected && styles.chipPillActive]}
                     activeOpacity={0.85}
                     onPress={() => {
                       sound.playSound('tap');
@@ -559,7 +562,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                       setDifficulty(diff.id);
                     }}
                   >
-                    <Text style={[styles.chipPillText, isSelected && styles.chipPillTextActive]}>
+                    <Text style={[styles.chipPillText, webChoiceText, isSelected && styles.chipPillTextActive]}>
                       {diff.label}
                     </Text>
                   </TouchableOpacity>
@@ -1133,6 +1136,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  webChoice: { minHeight: 44 },
+  webChoiceText: { fontSize: 16 },
   chipPillActive: {
     backgroundColor: '#F59E0B',
     ...Platform.select({
