@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import {
   View,
   Text,
@@ -8,6 +9,7 @@ import {
   Modal,
   Animated,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { UserProfile, InventoryItem, ItemCategory, COSMETIC_RENTAL_MS, getCosmeticDef } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -166,6 +168,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   onNotifications,
   onProfile,
 }) => {
+  const threeItems = usePlayerWebLayout()?.columns === 3;
   const [activeTab, setActiveTab] = useState<InvTabType>('all');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
@@ -558,7 +561,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
             desc="Diğer sekmelere göz atabilirsin."
           />
         ) : (
-          <View style={styles.grid}>
+          <View style={[styles.grid, threeItems && styles.webGrid]}>
             {filteredItems.map((item, index) => {
               const rarityColor = RARITY_COLORS[item.rarity || 'common'];
               const isChest = item.category === 'chest' || item.id.includes('chest');
@@ -567,7 +570,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                 <Reanimated.View
                   key={`${activeTab}-${item.id}`}
                   entering={FadeInDown.delay(Math.min(index, 8) * 50).duration(340)}
-                  style={styles.itemCardWrap}
+                  style={[styles.itemCardWrap, threeItems && styles.webItemWrap]}
                 >
                 <TouchableOpacity
                   style={styles.itemCard}
@@ -770,7 +773,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 140,
+    paddingBottom: Platform.OS === 'web' ? 20 : 140,
     paddingHorizontal: 4,
   },
   heroWrap: {
@@ -894,6 +897,8 @@ const styles = StyleSheet.create({
     rowGap: 10,
     marginTop: 8,
   },
+  webGrid: { justifyContent: 'flex-start', columnGap: 12 },
+  webItemWrap: { width: '32%' },
   itemCardWrap: {
     width: '48.5%',
     alignSelf: 'stretch',

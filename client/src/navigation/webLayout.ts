@@ -2,36 +2,74 @@ const TABLET_WIDTH = 640;
 export const WEB_TAB_WIDE_WIDTH = 760;
 const UTILITY_WIDTH = 1440;
 const FRAME_MAX_WIDTH = 1640;
+export const WEB_UTILITY_WIDTH = 248;
+export const WEB_FRAME_GAP = 16;
 
-const splitScreens = new Set(['auth', 'home', 'categories']);
-const utilityScreens = new Set(['auth', 'home', 'categories', 'leaderboard', 'friends', 'profile']);
-const focusedContentWidths: Record<string, number> = {
-  profile_setup: 740,
-  profile_edit: 740,
-  difficulty: 760,
-  matchmaking: 840,
-  duel_versus: 840,
-  quiz_arena: 920,
-  intermission: 920,
-  reconnect: 760,
-  error: 760,
-};
+type PageLayout = { mode: 'dashboard' | 'workspace' | 'focus' | 'splash'; maxWidth?: number };
 
-export function getWebLayout(width: number, height: number, screen: string, isWeb: boolean) {
-  const roomy = isWeb && width >= TABLET_WIDTH && screen !== 'splash';
+// Every navigator route has a deliberate layout. These widths constrain content,
+// not the background or the shared frame around it.
+export const WEB_PAGES = {
+  splash: { mode: 'splash' },
+  auth: { mode: 'dashboard' },
+  home: { mode: 'dashboard' },
+  categories: { mode: 'dashboard' },
+  leaderboard: { mode: 'dashboard' },
+  friends: { mode: 'dashboard' },
+  profile: { mode: 'dashboard' },
+  friend_profile: { mode: 'workspace', maxWidth: 1184 },
+  profile_setup: { mode: 'workspace', maxWidth: 1056 },
+  profile_edit: { mode: 'workspace', maxWidth: 1056 },
+  difficulty: { mode: 'workspace', maxWidth: 1120 },
+  custom_room: { mode: 'workspace', maxWidth: 1280 },
+  lobby: { mode: 'workspace', maxWidth: 1240 },
+  daily_challenge: { mode: 'workspace', maxWidth: 1120 },
+  practice: { mode: 'workspace', maxWidth: 1120 },
+  notifications: { mode: 'workspace', maxWidth: 1040 },
+  settings: { mode: 'workspace', maxWidth: 1120 },
+  season: { mode: 'workspace', maxWidth: 1240 },
+  shop: { mode: 'workspace', maxWidth: 1280 },
+  events: { mode: 'workspace', maxWidth: 1280 },
+  inventory: { mode: 'workspace', maxWidth: 1280 },
+  pro_league: { mode: 'workspace', maxWidth: 1280 },
+  developer: { mode: 'workspace', maxWidth: 1240 },
+  matchmaking: { mode: 'focus', maxWidth: 960 },
+  duel_versus: { mode: 'focus', maxWidth: 960 },
+  quiz_arena: { mode: 'focus', maxWidth: 980 },
+  intermission: { mode: 'focus', maxWidth: 980 },
+  match_result: { mode: 'focus', maxWidth: 1120 },
+  reconnect: { mode: 'focus', maxWidth: 820 },
+  error: { mode: 'focus', maxWidth: 820 },
+} satisfies Record<string, PageLayout>;
+
+export type ScreenName = keyof typeof WEB_PAGES;
+
+export function getWebLayout(width: number, height: number, screen: ScreenName, isWeb: boolean) {
+  const page: PageLayout = WEB_PAGES[screen];
+  const roomy = isWeb && width >= TABLET_WIDTH && page.mode !== 'splash';
   const landscape = width >= height;
-  // Keep the desktop lane reserved even on focused screens so navigation never moves the app frame.
-  const reserveUtility = roomy && width >= UTILITY_WIDTH && landscape;
+  const showUtility = roomy && landscape && width >= UTILITY_WIDTH && page.mode !== 'focus';
+  const frameGutter = Math.round(Math.min(32, Math.max(12, width * 0.017)));
+  const frameWidth = roomy
+    ? Math.min(FRAME_MAX_WIDTH, width - frameGutter * 2 - (showUtility ? WEB_UTILITY_WIDTH + WEB_FRAME_GAP : 0)) - 2
+    : width;
+  const minInset = frameWidth >= WEB_TAB_WIDE_WIDTH ? 24 : 16;
+  const pageInset = roomy ? Math.max(minInset, (frameWidth - (page.maxWidth ?? frameWidth)) / 2) : 16;
+  const contentWidth = Math.max(0, frameWidth - pageInset * 2);
 
   return {
     roomy,
-    split: roomy && width >= WEB_TAB_WIDE_WIDTH && splitScreens.has(screen),
-    leaderboardColumns: roomy && width >= 1080 && landscape,
-    reserveUtility,
-    showUtility: reserveUtility && utilityScreens.has(screen),
+    split: roomy && contentWidth >= 690 && (screen === 'auth' || screen === 'home' || screen === 'categories'),
+    leaderboardColumns: roomy && contentWidth >= 980 && landscape,
+    reserveUtility: showUtility,
+    showUtility,
     frameMaxWidth: FRAME_MAX_WIDTH,
-    frameGutter: Math.round(Math.min(32, Math.max(12, width * 0.017))),
-    contentMaxWidth: roomy ? focusedContentWidths[screen] : undefined,
+    frameGutter,
+    frameWidth,
+    pageInset,
+    contentWidth,
+    columns: !roomy || contentWidth < 720 ? 1 : contentWidth < 1050 ? 2 : 3,
+    mode: page.mode,
   };
 }
 

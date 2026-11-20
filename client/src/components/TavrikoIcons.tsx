@@ -33,6 +33,7 @@ import { useUnreadCount } from '../store/notificationStore';
 import { BackgroundScene, backgroundFor } from './StoreKit';
 import { getCosmeticDef, UserProfile } from '@trivia/shared';
 import { WEB_TAB_WIDE_WIDTH } from '../navigation/webLayout';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 // Brand Assets
 export const BRAND_LOGO_MAIN = cdnImage('images/brand/logo_full.png');
 export const BRAND_LOGO_BANNER = cdnImage('images/brand/logo_full.png');
@@ -1073,9 +1074,18 @@ export const TavrikoScreen: React.FC<{
   // PRO/VIP teması: arayüz vurgu renkleri de arka planla değişir
   const proTheme = useProTheme(profileUser);
   const { width } = useWindowDimensions();
+  const page = usePlayerWebLayout();
   const wideTab = mainTab && Platform.OS === 'web' && width >= WEB_TAB_WIDE_WIDTH;
   return (
-    <View style={[styles.screenRoot, wideTab && styles.webTabScreen, style]}>
+    <View
+      testID={page?.roomy ? 'player-web-page' : undefined}
+      style={[
+        styles.screenRoot,
+        wideTab && styles.webTabScreen,
+        style,
+        page?.roomy && { minHeight: 0, paddingTop: 14, paddingHorizontal: page.pageInset },
+      ]}
+    >
       {/* Kuşanılmış arka plan: uygulama geneli */}
       {activeBg && (
         <View style={styles.equippedBgLayer} pointerEvents="none">
@@ -1470,6 +1480,7 @@ export const TavrikoSecondaryBottomNav: React.FC<{
     activeKey={activeTab}
     onSelect={onSelectTab}
     raisedKey="play"
+    inFlow={Platform.OS === 'web'}
   />
 );
 const styles = StyleSheet.create({

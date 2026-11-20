@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { getRandomValues } from 'expo-crypto';
 import {
   View,
@@ -91,38 +91,10 @@ import { AnalyticsConsentBanner } from '../components/AnalyticsConsentBanner';
 import type { AnalyticsConsentValue } from '../services/analyticsConsent';
 import { useNetStatus, OFFLINE_GAME_GRACE_MS } from '../store/netStatus';
 import { netMonitor } from '../services/netMonitor';
-import { getWebLayout } from './webLayout';
-export type ScreenName =
-  | 'splash'
-  | 'auth'
-  | 'profile_setup'
-  | 'home'
-  | 'categories'
-  | 'difficulty'
-  | 'matchmaking'
-  | 'duel_versus'
-  | 'custom_room'
-  | 'lobby'
-  | 'quiz_arena'
-  | 'intermission'
-  | 'match_result'
-  | 'friends'
-  | 'profile'
-  | 'profile_edit'
-  | 'friend_profile'
-  | 'leaderboard'
-  | 'daily_challenge'
-  | 'practice'
-  | 'notifications'
-  | 'settings'
-  | 'reconnect'
-  | 'error'
-  | 'season'
-  | 'shop'
-  | 'events'
-  | 'inventory'
-  | 'pro_league'
-  | 'developer';
+import { getWebLayout, WEB_FRAME_GAP, WEB_UTILITY_WIDTH } from './webLayout';
+import type { ScreenName } from './webLayout';
+import { PlayerWebLayoutContext } from './PlayerWebLayoutContext';
+export type { ScreenName } from './webLayout';
 import { CLOUD_BASE_URL, DEFAULT_API_BASE, getApiBaseUrl } from '../config';
 import { LegalConsentGate } from '../components/LegalDocuments';
 import {
@@ -178,7 +150,10 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
     : 'splash';
 
   const [currentScreen, setCurrentScreen] = useState<ScreenName>(initialScreen);
-  const webLayout = getWebLayout(windowWidth, windowHeight, currentScreen, isWeb);
+  const webLayout = useMemo(
+    () => getWebLayout(windowWidth, windowHeight, currentScreen, isWeb),
+    [windowWidth, windowHeight, currentScreen, isWeb],
+  );
   /* KVKK: arkadaşın tam profili (salt okunur) — ayarlar/hesap bölümleri gizli */
   const [viewingProfile, setViewingProfile] = useState<UserProfile | null>(null);
   // İnternet bağlantısı durumu (netMonitor besler; overlay + oyun koruma süresi)
@@ -1700,13 +1675,14 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
       ]}>
         <Animated.View
           testID={isWeb ? 'player-web-content' : undefined}
+          nativeID={isWeb ? `player-screen-${currentScreen}` : undefined}
           style={[
             styles.container,
             !isWeb && styles.nativeContainer,
-            webLayout.contentMaxWidth ? { maxWidth: webLayout.contentMaxWidth } : null,
             { opacity: screenFade },
           ]}
         >
+        <PlayerWebLayoutContext.Provider value={webLayout}>
         {currentScreen === 'splash' && (
           <SplashScreen
             onFinish={() => {
@@ -2379,6 +2355,7 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
             onHome={() => navigateTo('home')}
           />
         )}
+        </PlayerWebLayoutContext.Provider>
         </Animated.View>
         {currentScreen !== 'notifications' && user && !isGuest && (
           <NotificationToast onOpen={() => navigateTo('notifications')} />
@@ -2473,7 +2450,6 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
           </View>
         </ScrollView>
       )}
-      {webLayout.reserveUtility && !webLayout.showUtility && <View style={styles.desktopSidebarSpacer} />}
       <LegalConsentGate
         visible={showLegalGate && !autoLegalInFlight}
         isUpdate={isLegalUpdate(user)}
@@ -2512,7 +2488,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 16,
+    gap: WEB_FRAME_GAP,
     paddingVertical: 12,
     backgroundColor: '#100822',
   },
@@ -2556,12 +2532,11 @@ const styles = StyleSheet.create({
   desktopSidebar: {
     flexGrow: 0,
     flexShrink: 0,
-    width: 248,
+    width: WEB_UTILITY_WIDTH,
     maxHeight: '100%',
     alignSelf: 'center',
     minHeight: 0,
   },
-  desktopSidebarSpacer: { flexShrink: 0, width: 248 },
   desktopSidebarContent: {
     flexGrow: 1,
     justifyContent: 'center',

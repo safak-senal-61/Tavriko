@@ -1139,7 +1139,8 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                       title="+ ARKADAŞ OLARAK EKLE"
                       variant="mint"
                       onPress={() => {
-                        setAddInput(inspectPlayer.username || inspectPlayer.id);
+                        setAddByUsername(true);
+                        setUsernameInput(inspectPlayer.username || '');
                         switchTabSmooth('add');
                         setInspectPlayer(null);
                       }}

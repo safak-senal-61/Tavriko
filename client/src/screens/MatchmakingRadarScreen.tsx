@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, Easing, Platform, Image, ScrollView, 
 import { ShieldCheck, Swords } from 'lucide-react-native';
 import { CategoryId, DifficultyLevel, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import { sound } from '../services/soundService';
 import { useReducedMotion } from '../components/DiscoveryArtwork';
 // Radar arenası PAKET İÇİNDEN yüklenir (require). CDN'den çekilen büyük PNG
@@ -177,6 +178,8 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
   const pingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Ekran yüksekliğine göre radar boyutu — küçük ekranlarda taşma olmasın
   const { height: windowHeight } = useWindowDimensions();
+  const page = usePlayerWebLayout();
+  const radarColumns = page?.roomy === true && page.contentWidth >= 820;
   const radarSize = Math.round(Math.min(250, Math.max(150, windowHeight * 0.28)));
   const radarRadius = radarSize / 2;
   const radarScale = radarSize / 270; // SONAR_POOL koordinatları 270px tabanlı
@@ -339,7 +342,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
 
   return (
     <TavrikoScreen>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, radarColumns && styles.webScrollContent]}>
       <Text style={[styles.title, { marginTop: 0, fontSize: 22, marginBottom: 2 }]}>Rakibin arenaya geliyor.</Text>
       <Text style={[styles.subtitle, { marginBottom: 10 }]}>
         {catObj?.name || 'Genel Kültür'} · Canlı Düello · 15 Soru
@@ -395,6 +398,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
         </View>
       </View>
 
+      <View style={radarColumns && styles.webRadarRow}>
       {/* Dairesel Radar Ekranı */}
       <View style={[styles.radarContainer, { width: radarSize, height: radarSize, marginVertical: 4 }]}>
         {/* Arena görseli + karartma katmanı: Android'de köşeli kare görünüm
@@ -514,6 +518,7 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
         )}
       </View>
 
+      <View style={radarColumns && styles.webRadarDetails}>
       <View style={styles.searchSteps}>
         {['Hazırsın', 'Canlı rakip', 'Bot alternatifi'].map((label, index) => (
           <View key={label} style={styles.searchStep}>
@@ -552,12 +557,17 @@ export const MatchmakingRadarScreen: React.FC<MatchmakingRadarScreenProps> = ({
           style={{ width: '100%', maxWidth: 280 }}
         />
       </View>
+      </View>
+      </View>
       </ScrollView>
     </TavrikoScreen>
   );
 };
 
 const styles = StyleSheet.create({
+  webScrollContent: { maxWidth: '100%' },
+  webRadarRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 28, paddingHorizontal: 14, paddingVertical: 16 },
+  webRadarDetails: { flex: 1, minWidth: 0, maxWidth: 520 },
   scrollContent: { paddingTop: 8, paddingBottom: 24, width: '100%', maxWidth: 580, alignSelf: 'center' },
   searchSteps: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginTop: 6, marginBottom: 8 },
   searchStep: { alignItems: 'center', gap: 6, flex: 1 },

@@ -5,6 +5,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { THEME } from '../theme/tokens';
 import {
@@ -23,8 +25,8 @@ export const ErrorStateScreen: React.FC<ErrorStateScreenProps> = ({
   onRetry,
   onHome,
 }) => {
-  return (
-    <TavrikoScreen style={styles.screenWrap}>
+  const content = (
+    <>
       <View style={styles.mainCenter}>
         <Image
           source={BRAND_APP_ICON}
@@ -59,10 +61,18 @@ export const ErrorStateScreen: React.FC<ErrorStateScreenProps> = ({
           </Text>
         </View>
       </View>
+    </>
+  );
+  return (
+    <TavrikoScreen style={styles.screenWrap}>
+      {Platform.OS === 'web' ? (
+        <ScrollView contentContainerStyle={styles.webScroll}>{content}</ScrollView>
+      ) : content}
     </TavrikoScreen>
   );
 };
 const styles = StyleSheet.create({
+  webScroll: { flexGrow: 1, gap: 20, paddingVertical: 12 },
   screenWrap: {
     justifyContent: 'space-between',
     paddingBottom: 24,
@@ -83,6 +93,7 @@ const styles = StyleSheet.create({
     fontSize: 30,
     color: '#FFFFFF',
     marginTop: 14,
+    textAlign: 'center',
   },
   subtitle: {
     color: '#D9CDF5',

@@ -1,4 +1,5 @@
 import { cdnImage } from '../utils/cdn';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   Animated as RNAnimated,
@@ -241,6 +242,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onSettings,
   viewOnly,
 }) => {
+  const page = usePlayerWebLayout();
+  const webProfile = page?.roomy;
+  const fourStats = webProfile && page.contentWidth >= 920;
   const base = apiBaseUrl || DEFAULT_API_BASE;
   const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
   const [showAvatarDrawer, setShowAvatarDrawer] = useState(false);
@@ -667,7 +671,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           ['account', 'Hesap'],
         ];
     return (
-    <View style={styles.tabRow}>
+    <View accessibilityRole="tablist" style={[styles.tabRow, webProfile && styles.webProfileWidth]}>
       {tabs.map(([tKey, label]) => {
         const isActive = activeTab === tKey;
         return (
@@ -712,7 +716,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Unified Compact Hero Identity Card */}
-        <View style={styles.heroCard}>
+        <View style={[styles.heroCard, webProfile && styles.webProfileWidth]}>
           {/* Kuşanılmış arka plan: profil kartının içinde görünür */}
           {activeBg && (
             <View style={[StyleSheet.absoluteFill, { borderRadius: styles.heroCard.borderRadius, overflow: 'hidden' }]} pointerEvents="none">
@@ -1022,20 +1026,20 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         {renderTabs()}
 
         <RNAnimated.View
-          style={{
+          style={[{
             width: '100%',
             maxWidth: profileContentWidth,
             alignItems: 'center',
             opacity: tabContentOpacity,
             transform: [{ translateY: tabContentTranslateY }],
-          }}
+          }, webProfile && styles.webProfileWidth]}
         >
         {/* TAB 1: Overview */}
         {activeTab === 'overview' && (
           <>
             {/* Primary 2x2 Key Performance Cards */}
-            <View style={styles.primaryStatsGrid}>
-              <View style={styles.primaryStatBox}>
+            <View style={[styles.primaryStatsGrid, webProfile && styles.webStatsGrid]}>
+              <View style={[styles.primaryStatBox, fourStats && styles.webStatBox]}>
                 <Image source={PROFILE_IMG.statMatches} style={styles.statArtwork} resizeMode="contain" />
                 <View
                   style={[
@@ -1051,7 +1055,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   {wins}G · {losses}M
                 </Text>
               </View>
-              <View style={styles.primaryStatBox}>
+              <View style={[styles.primaryStatBox, fourStats && styles.webStatBox]}>
                 <Image source={PROFILE_IMG.statWinrate} style={styles.statArtwork} resizeMode="contain" />
                 <View
                   style={[
@@ -1065,7 +1069,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <Text style={[styles.primaryStatValue, { color: '#3FD08A' }]}>%{winRate}</Text>
                 <Text style={styles.primaryStatSub}>{wins} Galibiyet</Text>
               </View>
-              <View style={styles.primaryStatBox}>
+              <View style={[styles.primaryStatBox, fourStats && styles.webStatBox]}>
                 <Image source={PROFILE_IMG.statCorrect} style={styles.statArtwork} resizeMode="contain" />
                 <View
                   style={[
@@ -1082,7 +1086,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </Text>
                 <Text style={styles.primaryStatSub}>Toplam {totalAnswers} soru</Text>
               </View>
-              <View style={styles.primaryStatBox}>
+              <View style={[styles.primaryStatBox, fourStats && styles.webStatBox]}>
                 <Image source={PROFILE_IMG.statAccuracy} style={styles.statArtwork} resizeMode="contain" />
                 <View
                   style={[
@@ -1541,7 +1545,6 @@ const card = {
   borderColor: 'rgba(255, 255, 255, 0.12)',
   borderRadius: 22,
   width: '100%',
-  maxWidth: profileContentWidth,
 } as const;
 
 const styles = StyleSheet.create({
@@ -1552,6 +1555,7 @@ const styles = StyleSheet.create({
   },
   heroCard: {
     ...card,
+    maxWidth: profileContentWidth,
     padding: 14,
     marginTop: 8,
     backgroundColor: '#0F172A',
@@ -1873,6 +1877,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
   },
+  webProfileWidth: { maxWidth: 1184, alignSelf: 'center' },
   tabBtnActive: {
     backgroundColor: '#F59E0B',
   },
@@ -1894,6 +1899,8 @@ const styles = StyleSheet.create({
     rowGap: 10,
     marginBottom: 10,
   },
+  webStatsGrid: { width: '100%' },
+  webStatBox: { width: '23.8%', minWidth: 0, minHeight: 130 },
   primaryStatBox: {
     ...card,
     width: '48.5%',

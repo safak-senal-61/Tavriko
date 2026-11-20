@@ -1,4 +1,5 @@
 import { cdnImage } from '../utils/cdn';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -114,6 +115,9 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   gems,
   apiBaseUrl,
 }) => {
+  const page = usePlayerWebLayout();
+  const webRoom = page?.roomy;
+  const roomColumns = webRoom && page.contentWidth >= 860;
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
 
   // Katılma Kodu State
@@ -291,7 +295,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   };
 
   return (
-    <TavrikoScreen style={styles.customScreenRoot}>
+    <TavrikoScreen style={webRoom ? undefined : styles.customScreenRoot}>
       <TavrikoTopBar
         leftType="back"
         onLeftPress={onBack}
@@ -320,7 +324,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
           <DiscoveryArtwork source={activeTab === 'create'
             ? cdnImage('images/modes/custom_room.png') : DISCOVERY_IMG.social} size={96} />
         </View>
-        <View style={styles.tabToggleRow} accessibilityRole="tablist">
+        <View style={[styles.tabToggleRow, webRoom && styles.webRoomWidth]} accessibilityRole="tablist">
           <TouchableOpacity
             accessibilityRole="tab" aria-selected={activeTab === 'create'}
             accessibilityState={{ selected: activeTab === 'create' }}
@@ -367,7 +371,9 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 
         {activeTab === 'create' ? (
           /* TAVRİKO ÖZGÜN ODA KURMA KARTI */
-          <View style={styles.roomSetupCard}>
+          <View style={[styles.roomSetupCard, webRoom && styles.webRoomWidth]}>
+            <View style={roomColumns && styles.roomColumns}>
+            <View testID="room-rules" style={roomColumns && styles.roomMainColumn}>
             <View style={styles.setupIntro}>
               <Text style={styles.setupTitle}>Oyun senin, kurallar senin.</Text>
               <Text style={styles.setupSubtitle}>Kategorini seç, masanı hazırla.</Text>
@@ -561,7 +567,10 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               })}
             </View>
 
+            </View>
+            <View testID="room-privacy" style={roomColumns && styles.roomSideColumn}>
             {/* 5. GİZLİLİK & CEZA AYARLARI */}
+            {roomColumns && <Text accessibilityRole="header" style={styles.roomSideHeading}>Oda ayarları</Text>}
           <View style={styles.switchRow}>
               <View style={{ flex: 1, paddingRight: 8 }}>
                 <Text style={styles.switchLabel}>Oda Gizliliği</Text>
@@ -570,6 +579,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 </Text>
               </View>
               <Switch
+                accessibilityLabel="Oda gizliliği"
                 value={privacy === 'public'}
                 onValueChange={(val) => {
                   sound.playSound('tap');
@@ -586,6 +596,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 <Text style={styles.switchSub}>Yanlış cevaplarda -50 puan düşer</Text>
               </View>
               <Switch
+                accessibilityLabel="Yanlış cevap cezası"
                 value={penaltyForWrong}
                 onValueChange={(val) => {
                   sound.playSound('tap');
@@ -605,6 +616,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 </Text>
               </View>
               <Switch
+                accessibilityLabel="Oda şifresi"
                 value={hasRoomPassword}
                 onValueChange={(val) => {
                   sound.playSound('tap');
@@ -639,10 +651,13 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               variant="gold"
               style={{ height: 60, marginTop: 14 }}
             />
+            </View>
+            </View>
           </View>
         ) : (
           /* ODAYA KATIL KARTI (Tavriko UI Kit Screen 08) */
-            <View style={styles.roomSetupCard}>
+            <View style={[styles.roomSetupCard, webRoom && styles.webRoomWidth, roomColumns && styles.roomColumns]}>
+            <View testID="room-join-code" style={roomColumns && styles.roomSideColumn}>
             <View style={styles.joinCodeHeaderRow}>
               <ModeSquircleIcon mode="custom_room" size={38} />
               <View style={styles.joinCodeHeaderTextCol}>
@@ -735,6 +750,8 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               </TouchableOpacity>
             </View>
 
+            </View>
+            <View testID="room-public-list" style={roomColumns && styles.roomMainColumn}>
             {/* HERKESE AÇIK ODALAR (Canlı Veritabanı & WebSocket Senkronizasyonu) */}
             <View style={styles.publicRoomsHeaderRow}>
               <View style={styles.publicRoomsDivider} />
@@ -828,6 +845,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 ))
               )}
             </View>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -916,6 +934,19 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  webRoomWidth: { maxWidth: '100%' },
+  roomColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 20 },
+  roomMainColumn: { flex: 1.25, minWidth: 0 },
+  roomSideColumn: {
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: 'rgba(15, 10, 36, 0.35)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 14,
+  },
+  roomSideHeading: { color: '#FFF', fontFamily: THEME.fonts.extraBold, fontSize: 17, marginBottom: 12 },
   roomHero: { width: '100%', flexDirection: 'row', alignItems: 'center', borderRadius: 24, borderWidth: 1, borderColor: '#78578F', padding: 16, marginBottom: 18, overflow: 'hidden', backgroundColor: '#302045' },
   heroBackdrop: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.18 },
   heroCopy: { flex: 1, minWidth: 0, paddingRight: 4 },

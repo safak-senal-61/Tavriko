@@ -1,4 +1,5 @@
 import { cdnImage } from '../utils/cdn';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import { GradientFill } from '../components/TavrikoGradient';
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -258,7 +259,7 @@ const FriendInviteCard: React.FC<{ onPress: () => void; subtitle: string; disabl
 };
 
 /** Boş slot: sadece şeffaf (arka plansız) soru işareti + bekleniyor yazısı */
-const EmptySlotCard: React.FC = () => {
+const EmptySlotCard: React.FC<{ inGrid: boolean }> = ({ inGrid }) => {
   const p = useSharedValue(0);
   useEffect(() => {
     p.value = withRepeat(withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }), -1, true);
@@ -270,7 +271,7 @@ const EmptySlotCard: React.FC = () => {
   return (
     <Reanimated.View
       entering={FadeInDown.delay(140).duration(400)}
-      style={styles.emptySlotRow}
+      style={[styles.emptySlotRow, inGrid && styles.webPlayerSlot]}
     >
       <Reanimated.Image
         source={LOBBY_IMG.questionMark}
@@ -385,6 +386,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   onStartGame,
   onKickPlayer,
 }) => {
+  const page = usePlayerWebLayout();
+  const playerGrid = page?.roomy === true && page.contentWidth >= 760;
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [chatText, setChatText] = useState('');
@@ -824,7 +827,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </Text>
         </View>
 
-        <View style={styles.playersList}>
+        <View style={[styles.playersList, playerGrid && styles.webPlayersList]}>
           {players.map((p, index) => {
             const playerIsHost = p.id === room.hostId;
             const isMe = p.id === currentUserId;
@@ -833,7 +836,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
               <Reanimated.View
                 key={p.id}
                 entering={FadeInDown.delay(index * 80).duration(380)}
-                style={[styles.playerRow, isMe && styles.playerRowMe]}
+                style={[styles.playerRow, playerGrid && styles.webPlayerSlot, isMe && styles.playerRowMe]}
               >
                 <View style={styles.playerAvatarWrap}>
                   {/* index prop'u verilirse seed çözümü atlanıp liste sırası
@@ -888,7 +891,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
           {/* Boş Slotlar: Üretilmiş kaide görseli + nefes alan parıltı */}
           {Array.from({ length: Math.min(4, emptySlotCount) }).map((_, idx) => (
-            <EmptySlotCard key={`empty_${idx}`} />
+            <EmptySlotCard key={`empty_${idx}`} inGrid={playerGrid} />
           ))}
         </View>
 
@@ -1283,6 +1286,8 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 14,
   },
+  webPlayersList: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  webPlayerSlot: { width: '49%', minWidth: 0 },
   playerRow: {
     flexDirection: 'row',
     alignItems: 'center',
