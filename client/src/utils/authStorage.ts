@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { UserProfile } from '@trivia/shared';
+import type { UserProfile } from '@trivia/shared';
 
 /**
  * Evrensel oturum depolama.
@@ -17,6 +17,16 @@ const KEY_TOKEN = 'tavriko_auth_token';
 let cachedUser: string | null = null;
 let cachedToken: string | null = null;
 let hydrated = Platform.OS === 'web';
+
+function parseStoredUser(rawUser: string | null): UserProfile | null {
+  if (!rawUser) return null;
+  const user = JSON.parse(rawUser) as UserProfile | null;
+  // Older offline guest profiles were saved without the guest flag.
+  if (user && typeof user.id === 'string' && user.id.startsWith('guest_') && user.isGuest === undefined) {
+    return { ...user, isGuest: true };
+  }
+  return user;
+}
 
 /** Uygulama açılışında bir kez çağrılır: mobilde güvenli depodan oturumu yükler. */
 export const hydrateAuthStorage = async (): Promise<void> => {
@@ -37,20 +47,16 @@ export const hydrateAuthStorage = async (): Promise<void> => {
 
 export const getStoredAuth = (): { user: UserProfile | null; token: string | null } => {
   if (Platform.OS === 'web') {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try {
-        const rawUser = window.localStorage.getItem(KEY_USER);
-        const rawToken = window.localStorage.getItem(KEY_TOKEN);
-        const user = rawUser ? (JSON.parse(rawUser) as UserProfile) : null;
-        return { user, token: rawToken || null };
-      } catch {
-        return { user: null, token: null };
-      }
+    try {
+      const storage = typeof window === 'undefined' ? undefined : window.localStorage;
+      const user = parseStoredUser(storage?.getItem(KEY_USER) ?? null);
+      return { user, token: storage?.getItem(KEY_TOKEN) || null };
+    } catch {
+      return { user: null, token: null };
     }
-    return { user: null, token: null };
   }
   try {
-    const user = cachedUser ? (JSON.parse(cachedUser) as UserProfile) : null;
+    const user = parseStoredUser(cachedUser);
     return { user, token: cachedToken || null };
   } catch {
     return { user: null, token: null };
@@ -59,22 +65,16 @@ export const getStoredAuth = (): { user: UserProfile | null; token: string | nul
 
 export const saveStoredAuth = (user: UserProfile | null, token?: string | null) => {
   if (Platform.OS === 'web') {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try {
-        if (user) {
-          window.localStorage.setItem(KEY_USER, JSON.stringify(user));
-        } else {
-          window.localStorage.removeItem(KEY_USER);
-        }
-        if (token !== undefined) {
-          if (token) {
-            window.localStorage.setItem(KEY_TOKEN, token);
-          } else {
-            window.localStorage.removeItem(KEY_TOKEN);
-          }
-        }
-      } catch {}
-    }
+    try {
+      const storage = typeof window === 'undefined' ? undefined : window.localStorage;
+      if (!storage) return;
+      if (user) storage.setItem(KEY_USER, JSON.stringify(user));
+      else storage.removeItem(KEY_USER);
+      if (token !== undefined) {
+        if (token) storage.setItem(KEY_TOKEN, token);
+        else storage.removeItem(KEY_TOKEN);
+      }
+    } catch {}
     return;
   }
   // Mobil: önbelleği hemen güncelle, güvenli depoya asenkron yaz.

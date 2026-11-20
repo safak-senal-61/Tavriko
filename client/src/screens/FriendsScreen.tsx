@@ -20,6 +20,7 @@ import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { trackEvent } from '../services/analytics';
 import { authHeaders } from '../utils/apiAuth';
+import { FRIEND_CODE_PREFIX, normalizeFriendCodeSuffix } from '../utils/friendCode';
 import { DEFAULT_API_BASE } from '../config';
 import { socketService } from '../services/socketService';
 import { ReferralCards } from '../components/ReferralCards';
@@ -131,7 +132,9 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     ]).start();
   };
   // Add Friend state
-  const [addInput, setAddInput] = useState('');
+  const [addByUsername, setAddByUsername] = useState(false);
+  const [codeSuffix, setCodeSuffix] = useState('');
+  const [usernameInput, setUsernameInput] = useState('');
   const [addLoading, setAddLoading] = useState(false);
   const [addSuccessMsg, setAddSuccessMsg] = useState<string | null>(null);
   const [addErrorMsg, setAddErrorMsg] = useState<string | null>(null);
@@ -414,10 +417,12 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   };
   const handleAddFriend = async () => {
     if (addLoading) return;
-    const clean = addInput.trim();
+    const clean = addByUsername
+      ? usernameInput.trim()
+      : codeSuffix && `${FRIEND_CODE_PREFIX}${codeSuffix}`;
     if (!clean) {
       sound.playSound('wrong');
-      setAddErrorMsg('Lütfen arkadaşlık kodu veya kullanıcı adı girin.');
+      setAddErrorMsg(addByUsername ? 'Lütfen kullanıcı adını gir.' : 'Lütfen TV- sonrasındaki arkadaş kodunu gir.');
       return;
     }
     if (!user || isGuest || user.isGuest || !token || token === 'mock_token') {
@@ -453,7 +458,8 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         data.message ||
           `📨 ${data.friend?.displayName || clean} oyuncusuna arkadaşlık isteği gönderildi! Kabul ettiğinde Arkadaşlarım listende görünecek.`
       );
-      setAddInput('');
+      if (addByUsername) setUsernameInput('');
+      else setCodeSuffix('');
       fetchFriends();
     } catch (err: any) {
       sound.playSound('wrong');
@@ -754,23 +760,45 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
               <GradientFill colors={['#1C0C3E00', '#1C0C3ECC', '#1C0C3E']} />
               <Reanimated.Text entering={ZoomIn.delay(80)} style={styles.addCardTitle}>ARKADAŞLIK İSTEĞİ GÖNDER</Reanimated.Text>
               <Text style={styles.addCardSub}>
-                Arkadaşının 7 haneli kodunu (Örn: TV-UB1AY94) veya kullanıcı adını girerek arkadaşlık isteği gönder. Karşı taraf Bildirimler kısmından kabul ettiğinde arkadaş listene eklenir.
+                {addByUsername
+                  ? 'Arkadaşının kullanıcı adını yaz.'
+                  : 'Arkadaş kodunun TV- sonrasındaki kısmını yaz.'}{' '}
+                Arkadaşın isteği kabul ettiğinde listende görünür.
               </Text>
               <View style={styles.inputWrap}>
+                {!addByUsername && <Text style={styles.codeInputPrefix}>{FRIEND_CODE_PREFIX}</Text>}
                 <TextInput
+                  key={addByUsername ? 'username' : 'friend-code'}
+                  testID={addByUsername ? 'input-friend-username' : 'input-friend-code'}
+                  accessibilityLabel={addByUsername ? 'Arkadaşının kullanıcı adı' : 'Arkadaş kodu, TV- sonrasındaki bölüm'}
                   style={styles.textInput}
-                  placeholder="Örn: TV-UB1AY94 veya kullanıcı adı"
+                  placeholder={addByUsername ? 'Örn: oyuncu_adi' : 'UB1AY94'}
                   placeholderTextColor="rgba(217, 205, 245, 0.45)"
-                  value={addInput}
+                  value={addByUsername ? usernameInput : codeSuffix}
                   onChangeText={(t) => {
-                    setAddInput(t);
+                    if (addByUsername) setUsernameInput(t);
+                    else setCodeSuffix(normalizeFriendCodeSuffix(t));
                     setAddErrorMsg(null);
                     setAddSuccessMsg(null);
                   }}
-                  autoCapitalize="none"
+                  autoCapitalize={addByUsername ? 'none' : 'characters'}
                   autoCorrect={false}
                 />
               </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={addLoading}
+                onPress={() => {
+                  setAddByUsername((prev) => !prev);
+                  setAddErrorMsg(null);
+                  setAddSuccessMsg(null);
+                }}
+                style={styles.addMethodButton}
+              >
+                <Text style={styles.addMethodLabel}>
+                  {addByUsername ? 'Arkadaş koduyla ekle' : 'Kullanıcı adıyla ekle'}
+                </Text>
+              </TouchableOpacity>
               {addErrorMsg && (
                 <View style={styles.errorBox}>
                   <Text style={styles.errorText}>⚠️ {addErrorMsg}</Text>
@@ -1366,6 +1394,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(8, 3, 20, 0.75)',
     borderRadius: 14,
     borderWidth: 1.5,
@@ -1374,9 +1404,29 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   textInput: {
+    flex: 1,
+    minWidth: 0,
+    padding: 0,
     color: '#FFFFFF',
     fontSize: 15,
     fontFamily: THEME.fonts.extraBold,
+  },
+  codeInputPrefix: {
+    color: '#FFC43D',
+    fontSize: 15,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  addMethodButton: {
+    alignSelf: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 12,
+  },
+  addMethodLabel: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textDecorationLine: 'underline',
   },
   errorBox: {
     backgroundColor: 'rgba(255, 92, 119, 0.16)',
