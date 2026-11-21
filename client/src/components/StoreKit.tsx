@@ -27,6 +27,7 @@ import Svg, { Defs, LinearGradient, Stop, Path, Circle } from 'react-native-svg'
 import { THEME } from '../theme/tokens';
 import { GradientFill } from './TavrikoGradient';
 import { CharacterAvatar } from './TavrikoAvatars';
+import { FRAME_ART, FrameArtwork } from './FrameArtwork';
 
 /* Mağaza / Envanter / Etkinlik / Sezon / Pro Lig ortak görsel kiti */
 
@@ -160,18 +161,12 @@ export const storeImageFor = (id: string, category?: string): ImageSourcePropTyp
 };
 
 /* Çerçeveler: görsel + iç boşluk oranı (avatarın çerçeve içinde kaplayacağı çap) */
-export const FRAME_IMG: Record<string, { src: ImageSourcePropType; inner: number }> = {
-  frame_neon: { src: cdnImage('images/store/frame_neon.png'), inner: 0.64 },
-  frame_gold: { src: cdnImage('images/store/frame_gold.png'), inner: 0.57 },
-  frame_flame: { src: cdnImage('images/store/frame_flame.png'), inner: 0.63 },
-};
-
 export const frameFor = (id: string) => {
   const k = (id || '').toLowerCase();
-  if (FRAME_IMG[k]) return FRAME_IMG[k];
-  if (k.includes('flame') || k.includes('fire')) return FRAME_IMG.frame_flame;
-  if (k.includes('gold') || k.includes('royal')) return FRAME_IMG.frame_gold;
-  if (k.includes('neon')) return FRAME_IMG.frame_neon;
+  if (Object.hasOwn(FRAME_ART, k)) return FRAME_ART[k];
+  if (k.includes('flame') || k.includes('fire')) return FRAME_ART.frame_flame;
+  if (k.includes('gold') || k.includes('royal')) return FRAME_ART.frame_gold;
+  if (k.includes('neon')) return FRAME_ART.frame_neon;
   return null;
 };
 
@@ -935,10 +930,11 @@ export const ANIMATED_NAME_COLORS: Record<string, string[]> = Object.fromEntries
 );
 
 /* Avatar + çerçeve: kullanıcının fotoğrafı/avatarı çerçevenin içinde görünür */
-export const FramedAvatar: React.FC<{ frameId: string; seed?: string; size: number }> = ({
+export const FramedAvatar: React.FC<{ frameId: string; seed?: string; size: number; animate?: boolean }> = ({
   frameId,
   seed,
   size,
+  animate,
 }) => {
   const fr = frameFor(frameId);
   const inner = Math.round(size * (fr?.inner ?? 0.78));
@@ -947,13 +943,7 @@ export const FramedAvatar: React.FC<{ frameId: string; seed?: string; size: numb
       <View style={{ width: inner, height: inner, borderRadius: inner / 2, overflow: 'hidden' }}>
         <CharacterAvatar seed={seed} size={inner} />
       </View>
-      {fr && (
-        <Image
-          source={fr.src}
-          style={{ position: 'absolute', width: size, height: size }}
-          resizeMode="contain"
-        />
-      )}
+      {fr && <FrameArtwork key={frameId} art={fr} size={size} animate={animate} />}
     </View>
   );
 };
@@ -1001,7 +991,8 @@ export const CosmeticPreviewModal: React.FC<{
   onAction?: () => void;
 }> = ({ visible, kind, itemId, title, seed, name, level, stats, onClose, actionLabel, onAction }) => {
   const bg = kind === 'background' ? backgroundFor(itemId) : null;
-  const isAnimFrame = kind === 'frame' && !!ANIMATED_FRAME_STYLES[(itemId || '').toLowerCase()];
+  const frameHasArt = kind === 'frame' && !!frameFor(itemId);
+  const isAnimFrame = kind === 'frame' && !frameHasArt && !!ANIMATED_FRAME_STYLES[(itemId || '').toLowerCase()];
   const isAnimBg = kind === 'background' && !!ANIMATED_BG_STYLES[(itemId || '').toLowerCase()];
   const isNameEffect = kind === 'name';
   const animNameDef = isNameEffect
@@ -1043,7 +1034,7 @@ export const CosmeticPreviewModal: React.FC<{
               isAnimFrame ? (
                 <AnimatedFrame frameId={itemId} seed={seed} size={200} />
               ) : (
-                <FramedAvatar frameId={itemId} seed={seed} size={200} />
+                <FramedAvatar frameId={itemId} seed={seed} size={Math.min(232, pvW - 32)} animate={visible} />
               )
             ) : (
               <View style={kit.pvAvatar}>

@@ -167,3 +167,9 @@
 - With an uncached and delayed response, open Liderlik, Pro Lig, Arkadaşlar, Etkinlikler, Bildirimler, and Herkese Açık Odalar. Expect content-shaped shimmer placeholders rather than a spinner, then the real result, empty state, or retry action.
 - Open a player profile and the invite/support panels with a cold cache. Reopen with a warm cache and verify no placeholder flashes. Turn on reduced motion or battery saver and confirm the placeholders remain still.
 - Delay sign-in or a test-only button action. Expect a short shimmer instead of a spinner; the original result and error behavior must stay unchanged.
+
+## Store frame collection
+
+- Open Mağaza → Çerçeveler. Check Kraliyet Altın, Alev, Siber Neon, Ejderha ve Anka, Buhar Zırhı and Buz Kristal. Each visible frame should hug the avatar without a colored rectangle, opaque hole, or jagged fringe.
+- Open a frame with Büyüt, close it and open a different frame. The large preview animates after it loads; with reduced motion or battery saver it stays sharp and still. Preview art must not cover the name or buttons on a narrow phone.
+- For an authorized test account or mocked purchase, select a duration and confirm with gems. The newly active rental should appear with the same artwork in Envanter and on the profile. Existing frame ownership and rentals retain their original IDs and prices.
