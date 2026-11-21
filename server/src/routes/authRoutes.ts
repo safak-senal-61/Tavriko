@@ -1,4 +1,6 @@
 import { Router, Request, Response } from 'express';
+import { isIP } from 'node:net';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import { waitUntil } from '@vercel/functions';
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
@@ -22,6 +24,25 @@ function buildLegalConsent(method: LegalConsentRecord['method']): LegalConsentRe
 }
 
 const router = Router();
+
+// Vercel overwrites this header at its edge. Do not trust a client-supplied
+// forwarding header on standalone servers, or change Express trust globally.
+const rateLimitKey = (req: Request): string => {
+  const forwarded = process.env.VERCEL === '1' ? req.get('x-forwarded-for')?.trim() : undefined;
+  const ip = forwarded && isIP(forwarded) ? forwarded : req.ip || req.socket.remoteAddress;
+  return ip && isIP(ip) ? ipKeyGenerator(ip) : 'unknown';
+};
+const rateLimitOptions = {
+  keyGenerator: rateLimitKey,
+  standardHeaders: 'draft-8' as const,
+  legacyHeaders: false,
+  message: { error: 'Çok fazla istek. Lütfen birkaç dakika sonra tekrar deneyin.' },
+};
+const signedRemovalRequestLimit = rateLimit({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const publicRemovalRequestLimit = rateLimit({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const signedRemovalConfirmLimit = rateLimit({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const publicRemovalConfirmLimit = rateLimit({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const sessionProfileLimit = rateLimit({ ...rateLimitOptions, windowMs: 60_000, limit: 120 });
 
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
@@ -541,7 +562,7 @@ const REMOVAL_UNAVAILABLE = 'Hesap silme doğrulaması şu anda kullanılamıyor
 const REMOVAL_ACCEPTED = 'Bu adres bir Tavriko hesabına bağlıysa doğrulama kodu e-postayla gönderilir. Gelen kutunuzu ve spam klasörünüzü kontrol edin.';
 const INVALID_REMOVAL_CODE = 'Kod geçersiz, kullanılmış veya süresi dolmuş. Gerekirse yeni bir kod isteyin.';
 
-router.post('/delete-account/request', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
+router.post('/delete-account/request', signedRemovalRequestLimit, requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   res.set('Cache-Control', 'no-store');
   const config = getOneSignalEmailConfig();
   const secret = getPasswordResetSecret();
@@ -572,7 +593,7 @@ router.post('/delete-account/request', requireUserAuth, async (req: Request, res
 });
 
 // Public account removal does not disclose whether the address is registered.
-router.post('/request-delete-code', (req: Request, res: Response): void => {
+router.post('/request-delete-code', publicRemovalRequestLimit, (req: Request, res: Response): void => {
   res.set('Cache-Control', 'no-store');
   const email = accountRemovalEmail(req.body?.email);
   if (!email) {
@@ -619,11 +640,11 @@ async function finishAccountRemoval(req: Request, res: Response, target: Removal
   }
 }
 
-router.post('/delete-account', requireUserAuth, async (req, res) => {
+router.post('/delete-account', signedRemovalConfirmLimit, requireUserAuth, async (req, res) => {
   await finishAccountRemoval(req, res, { id: req.authUserId! });
 });
 
-router.post('/confirm-delete', async (req, res) => {
+router.post('/confirm-delete', publicRemovalConfirmLimit, async (req, res) => {
   const email = accountRemovalEmail(req.body?.email);
   if (!email) {
     res.set('Cache-Control', 'no-store').status(400).json({ error: 'Geçerli bir e-posta adresi girin.' });
@@ -872,7 +893,7 @@ router.post('/sync-wallet', requireUserAuth, async (req: Request, res: Response)
   }
 });
 
-router.get('/me', async (req: Request, res: Response): Promise<void> => {
+router.get('/me', sessionProfileLimit, async (req: Request, res: Response): Promise<void> => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Yetkilendirme başlığı eksik' });

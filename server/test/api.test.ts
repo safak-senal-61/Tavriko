@@ -68,6 +68,17 @@ describe('Trivia REST API', () => {
     expect(JSON.stringify(entry)).not.toMatch(/query-only|body-only|042615|FixtureOnlyPass1/);
   });
 
+  it('keeps console messages and textual details on a single line', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const entry = logger.warn('HTTP', 'fixture\r\nnext\u2028line', 'details\nnext\u001b[1m');
+      expect(entry.message).toBe('fixture  next line');
+      expect(warn).toHaveBeenCalledWith(expect.any(String), 'fixture  next line', 'details next [1m');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('retrieves all trivia categories including food, nature and animals', async () => {
     const res = await request(app).get('/api/categories');
     expect(res.status).toBe(200);

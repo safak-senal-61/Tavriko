@@ -2,6 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getPendingGoogleSessions = getPendingGoogleSessions;
 const express_1 = require("express");
+const node_net_1 = require("node:net");
+const express_rate_limit_1 = require("express-rate-limit");
 const functions_1 = require("@vercel/functions");
 const prismaClient_1 = require("../db/prismaClient");
 const supabaseClient_1 = require("../db/supabaseClient");
@@ -21,6 +23,24 @@ function buildLegalConsent(method) {
     };
 }
 const router = (0, express_1.Router)();
+// Vercel overwrites this header at its edge. Do not trust a client-supplied
+// forwarding header on standalone servers, or change Express trust globally.
+const rateLimitKey = (req) => {
+    const forwarded = process.env.VERCEL === '1' ? req.get('x-forwarded-for')?.trim() : undefined;
+    const ip = forwarded && (0, node_net_1.isIP)(forwarded) ? forwarded : req.ip || req.socket.remoteAddress;
+    return ip && (0, node_net_1.isIP)(ip) ? (0, express_rate_limit_1.ipKeyGenerator)(ip) : 'unknown';
+};
+const rateLimitOptions = {
+    keyGenerator: rateLimitKey,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: { error: 'Çok fazla istek. Lütfen birkaç dakika sonra tekrar deneyin.' },
+};
+const signedRemovalRequestLimit = (0, express_rate_limit_1.rateLimit)({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const publicRemovalRequestLimit = (0, express_rate_limit_1.rateLimit)({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const signedRemovalConfirmLimit = (0, express_rate_limit_1.rateLimit)({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const publicRemovalConfirmLimit = (0, express_rate_limit_1.rateLimit)({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const sessionProfileLimit = (0, express_rate_limit_1.rateLimit)({ ...rateLimitOptions, windowMs: 60_000, limit: 120 });
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ||
     '411578437442-gs1rck2124rgr516fe9dn9tuu15ge9ig.apps.googleusercontent.com';
 const pendingSessions = new Map();
@@ -488,7 +508,7 @@ router.post('/google', async (req, res) => {
 const REMOVAL_UNAVAILABLE = 'Hesap silme doğrulaması şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.';
 const REMOVAL_ACCEPTED = 'Bu adres bir Tavriko hesabına bağlıysa doğrulama kodu e-postayla gönderilir. Gelen kutunuzu ve spam klasörünüzü kontrol edin.';
 const INVALID_REMOVAL_CODE = 'Kod geçersiz, kullanılmış veya süresi dolmuş. Gerekirse yeni bir kod isteyin.';
-router.post('/delete-account/request', auth_1.requireUserAuth, async (req, res) => {
+router.post('/delete-account/request', signedRemovalRequestLimit, auth_1.requireUserAuth, async (req, res) => {
     res.set('Cache-Control', 'no-store');
     const config = (0, oneSignalEmail_1.getOneSignalEmailConfig)();
     const secret = (0, passwordReset_1.getPasswordResetSecret)();
@@ -519,7 +539,7 @@ router.post('/delete-account/request', auth_1.requireUserAuth, async (req, res) 
     }
 });
 // Public account removal does not disclose whether the address is registered.
-router.post('/request-delete-code', (req, res) => {
+router.post('/request-delete-code', publicRemovalRequestLimit, (req, res) => {
     res.set('Cache-Control', 'no-store');
     const email = (0, accountRemoval_1.accountRemovalEmail)(req.body?.email);
     if (!email) {
@@ -567,10 +587,10 @@ async function finishAccountRemoval(req, res, target) {
         res.status(503).json({ error: REMOVAL_UNAVAILABLE });
     }
 }
-router.post('/delete-account', auth_1.requireUserAuth, async (req, res) => {
+router.post('/delete-account', signedRemovalConfirmLimit, auth_1.requireUserAuth, async (req, res) => {
     await finishAccountRemoval(req, res, { id: req.authUserId });
 });
-router.post('/confirm-delete', async (req, res) => {
+router.post('/confirm-delete', publicRemovalConfirmLimit, async (req, res) => {
     const email = (0, accountRemoval_1.accountRemovalEmail)(req.body?.email);
     if (!email) {
         res.set('Cache-Control', 'no-store').status(400).json({ error: 'Geçerli bir e-posta adresi girin.' });
@@ -812,7 +832,7 @@ router.post('/sync-wallet', auth_1.requireUserAuth, async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
-router.get('/me', async (req, res) => {
+router.get('/me', sessionProfileLimit, async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         res.status(401).json({ error: 'Yetkilendirme başlığı eksik' });

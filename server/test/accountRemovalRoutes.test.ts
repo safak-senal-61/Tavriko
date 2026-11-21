@@ -160,4 +160,17 @@ describe('account removal pages and endpoints', () => {
     );
     expect(() => renderAccountRemovalEmail({ code: '<b>123', validMinutes: 15 })).toThrow();
   });
+
+  it('rate-limits verification requests before delivery work and separates Vercel client IPs', async () => {
+    vi.stubEnv('VERCEL', '1');
+    mocks.issue.mockResolvedValue({ status: 'unavailable' });
+    const sendFrom = (ip: string) => request(app).post(`${base}/delete-account/request`).set(player).set('X-Forwarded-For', ip).send({});
+    for (let i = 0; i < 15; i++) expect((await sendFrom('192.0.2.11')).status).toBe(400);
+    const blocked = await sendFrom('192.0.2.11');
+    expect(blocked.status).toBe(429);
+    expect(Number(blocked.headers['retry-after'])).toBeGreaterThan(0);
+    expect(mocks.issue).toHaveBeenCalledTimes(15);
+    expect(transport).not.toHaveBeenCalled();
+    expect((await sendFrom('192.0.2.12')).status).toBe(400);
+  });
 });
