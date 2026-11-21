@@ -2214,32 +2214,7 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
                 }
               }
             }}
-            onDeleteAccount={async () => {
-              if (user) {
-                try {
-                  const res = await fetch(`${API_BASE}/auth/delete-account`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      ...(useGameStore.getState().token ? { Authorization: `Bearer ${useGameStore.getState().token}` } : {}),
-                    },
-                    body: JSON.stringify({ userId: user.id }),
-                  });
-                  const data = await res.json().catch(() => null);
-                  if (!res.ok || !data?.success) {
-                    // Silme başarısızsa veriler korunur ve kullanıcı bilgilendirilir
-                    Alert.alert(
-                      'Hesap Silinemedi',
-                      data?.message || 'Hesabınız silinirken bir hata oluştu. Lütfen tekrar deneyin.'
-                    );
-                    return;
-                  }
-                } catch (err) {
-                  console.error('Delete account failed:', err);
-                  Alert.alert('Hesap Silinemedi', 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.');
-                  return;
-                }
-              }
+            onAccountRemoved={() => {
               clearAllAccountStorage();
               setAuthRedirectNotice(null);
               setUser(null, null);

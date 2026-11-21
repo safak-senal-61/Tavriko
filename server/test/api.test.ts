@@ -55,15 +55,16 @@ describe('Trivia REST API', () => {
     await expect(bcrypt.compare('fixture-existing-password', legacyHash)).resolves.toBe(true);
   });
 
-  it.each(['forgot-password', 'reset-password'])('keeps %s bodies and URL queries out of application logs', async (route) => {
+  it.each(['forgot-password', 'reset-password', 'request-delete-code', 'confirm-delete', 'delete-account', 'delete-account/request'])('keeps %s bodies and URL queries out of application logs', async (route) => {
     const path = `/api/auth/${route}`;
     const response = await request(app)
       .post(`${path}?email=query-only@example.test`)
       .send({ email: { invalid: 'body-only@example.test' }, otpCode: '042615', newPassword: 'FixtureOnlyPass1!' });
-    expect(response.status).toBe(400);
-    const entry = logger.getRecentLogs().find((log) => log.message.startsWith(`POST ${path}`));
+    const status = route.startsWith('delete-account') ? 401 : 400;
+    expect(response.status).toBe(status);
+    const entry = logger.getRecentLogs().find((log) => log.message.startsWith(`POST ${path} `));
     expect(entry?.category).toBe('AUTH');
-    expect(entry?.message).toMatch(new RegExp(`^POST ${path} -> 400 `));
+    expect(entry?.message).toMatch(new RegExp(`^POST ${path} -> ${status} `));
     expect(JSON.stringify(entry)).not.toMatch(/query-only|body-only|042615|FixtureOnlyPass1/);
   });
 

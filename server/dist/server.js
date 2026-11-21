@@ -153,6 +153,9 @@ function createApp() {
         '/api/auth/register',
         '/api/auth/forgot-password',
         '/api/auth/reset-password',
+        '/api/auth/request-delete-code',
+        '/api/auth/confirm-delete',
+        '/api/auth/delete-account',
         '/api/auth/google/complete-session',
         '/api/portal/login',
         '/api/portal/security/passkeys',
@@ -164,11 +167,11 @@ function createApp() {
         const start = Date.now();
         // Express may strip a mounted router's prefix from req.path before finish.
         const requestPath = req.path;
-        const isPasswordReset = /^\/api\/auth\/(?:forgot|reset)-password\/?$/i.test(requestPath);
+        const isAccountSecurity = /^\/api\/auth\/(?:(?:forgot|reset)-password|request-delete-code|confirm-delete|delete-account(?:\/request)?)\/?$/i.test(requestPath);
         res.on('finish', () => {
             const duration = Date.now() - start;
             const lvl = res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'INFO';
-            const cat = isPasswordReset || req.path.includes('/auth') ? 'AUTH' : 'HTTP';
+            const cat = isAccountSecurity || req.path.includes('/auth') ? 'AUTH' : 'HTTP';
             if (/^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/(?:ops|accounts)(?:\/|$)/i.test(req.path) ||
                 req.path === '/favicon.ico' ||
                 req.path === '/api/logs' || req.path === '/api/internal/player-access' ||
@@ -178,11 +181,11 @@ function createApp() {
                 req.path.startsWith('/qr')) {
                 return;
             }
-            logger_1.logger.log(cat, lvl, `${req.method} ${isPasswordReset ? requestPath : req.originalUrl} -> ${res.statusCode} (${duration}ms)`, {
+            logger_1.logger.log(cat, lvl, `${req.method} ${isAccountSecurity ? requestPath : req.originalUrl} -> ${res.statusCode} (${duration}ms)`, {
                 ip: req.ip,
-                query: !isPasswordReset && Object.keys(req.query).length ? redactSensitiveBody(req.query) : undefined,
+                query: !isAccountSecurity && Object.keys(req.query).length ? redactSensitiveBody(req.query) : undefined,
                 body: req.method !== 'GET' &&
-                    !isPasswordReset &&
+                    !isAccountSecurity &&
                     Object.keys(req.body || {}).length ? redactSensitiveBody(req.body) : undefined,
             });
         });

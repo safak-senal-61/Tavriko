@@ -53,7 +53,6 @@ import { mergeQuestionStores } from '../utils/questionStoreMerge';
 import { presenceManager } from '../services/presenceManager';
 import { queuePushForNotification } from '../services/pushService';
 import { deliverGameInvite } from '../services/inviteDelivery';
-import { PASSWORD_RESET_TOKEN_PREFIX } from '../services/passwordReset';
 
 // SECURITY: no hardcoded fallback secret. If the environment does not provide a
 // secret, token signing/verification fails loudly instead of silently using a
@@ -67,6 +66,7 @@ if (!JWT_SECRET && process.env.NODE_ENV !== 'test') {
 }
 const PRISMA_DATA_DIR = path.join(__dirname, '..', '..', 'data', 'prisma');
 const USERS_DB_FILE = path.join(__dirname, '..', '..', 'supabase_users_store.json');
+const USE_PERSISTED_ACCOUNTS_ONLY = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
 const QUESTIONS_DB_FILE = path.join(__dirname, '..', '..', 'supabase_questions_store.json');
 
 export function computeQuestionHash(text: string, options: { text: string }[]): string {
@@ -731,7 +731,8 @@ export class PrismaService {
     } catch {
       // DB yok/erişilemez (test ortamı, kesinti) → önbelleğe düş
     }
-    return this.users.get(userId) || null;
+    const cached = this.users.get(userId);
+    return cached && (!USE_PERSISTED_ACCOUNTS_ONLY || cached.isGuest) ? cached : null;
   }
 
   public readonly user = {
@@ -1820,7 +1821,7 @@ export class PrismaService {
       },
     }).catch(() => null);
 
-    if (!dbUser) {
+    if (!dbUser && !USE_PERSISTED_ACCOUNTS_ONLY) {
       const memUser = Array.from(this.users.values()).find(
         (u) => !u.isGuest && (u.username === cleanId || (u.email && u.email.toLowerCase() === cleanId))
       );
@@ -1916,13 +1917,14 @@ export class PrismaService {
         console.error('[loginOrRegisterGoogle] DB update error:', err);
       }
     } else {
-      // Check in-memory fallback
-      existingRecord = Array.from(this.users.values()).find(
-        (u) =>
-          !u.isGuest &&
-          ((u.email && u.email.trim().toLowerCase() === cleanEmail) ||
-            (payload.googleId && u.googleId === payload.googleId))
-      ) || null;
+      // A deleted PostgreSQL account must not sign in from a stale snapshot.
+      if (!USE_PERSISTED_ACCOUNTS_ONLY) {
+        existingRecord = Array.from(this.users.values()).find(
+          (u) => !u.isGuest &&
+            ((u.email && u.email.trim().toLowerCase() === cleanEmail) ||
+              (payload.googleId && u.googleId === payload.googleId))
+        ) || null;
+      }
 
     if (!existingRecord) {
       // Truly a brand new user
@@ -2068,154 +2070,17 @@ export class PrismaService {
     return { token, user: this.toProfile(existingRecord), isNewUser };
   }
 
-  public async deleteAccount(userId: string): Promise<{ success: boolean; message: string }> {
-    // KVKK: hesap silme isteği, bellekte kullanıcı olmasa bile (sunucusuz
-    // ortamda her cold start boş bellekle başlar) PostgreSQL'den tüm verileri
-    // kalıcı olarak silmelidir. Veritabanı esas kaynaktır.
-    let dbExisted = false;
-    let dbDeleted = false;
-    try {
-      const dbUser = await this.rawClient.user.findUnique({
-        where: { id: userId },
-        select: { id: true, email: true },
-      });
-      if (dbUser) {
-        dbExisted = true;
-        // 1. Maç geçmişi satırları FK kısıtına takılmasın diye önce silinir
-        await this.rawClient.matchHistory.deleteMany({ where: { userId } }).catch(() => null);
-        // 2. Şifre sıfırlama kodları temizlenir
-        await this.rawClient.passwordResetToken
-          .deleteMany({ where: { email: dbUser.email } })
-          .catch(() => null);
-        // 3. Diğer kullanıcıların arkadaş/engel listelerinden çıkarılır (jsonb)
-        await this.rawClient
-          .$executeRaw`UPDATE users SET "friendIds" = ("friendIds" - ${userId}), "blockedUserIds" = ("blockedUserIds" - ${userId}) WHERE "friendIds" ? ${userId} OR "blockedUserIds" ? ${userId}`
-          .catch(() => null);
-        // 4. Kullanıcı satırı silinir (envanter/bildirim/referral cascade ile gider)
-        await this.rawClient.user.delete({ where: { id: userId } });
-        dbDeleted = true;
+  /** Drop process-local aliases only after the database transaction commits. */
+  public forgetDeletedAccount(userId: string): void {
+    for (const [key, record] of this.users) {
+      if (record.id === userId) this.users.delete(key);
+      else {
+        record.friendIds = record.friendIds?.filter((id) => id !== userId) ?? [];
+        record.blockedUserIds = record.blockedUserIds?.filter((id) => id !== userId) ?? [];
       }
-    } catch (err) {
-      console.error('[deleteAccount] DB delete error:', err);
     }
-
-    // Bellekteki kopya da temizlenir (varsa)
-    const memUser = this.users.get(userId);
-    if (memUser) {
-      this.users.delete(userId);
-      this.store.users.delete(userId);
-      for (const otherUser of this.users.values()) {
-        if (otherUser.friendIds && otherUser.friendIds.includes(userId)) {
-          otherUser.friendIds = otherUser.friendIds.filter((id) => id !== userId);
-        }
-      }
-      this.savePersistedUsers();
-    }
-
-    if (dbDeleted) {
-      return {
-        success: true,
-        message: 'Hesabınız ve tüm oyun verileriniz kalıcı olarak silindi.',
-      };
-    }
-    if (!dbExisted && memUser) {
-      return {
-        success: true,
-        message: 'Hesabınız ve tüm oyun verileriniz kalıcı olarak silindi.',
-      };
-    }
-    if (!dbExisted && !memUser) {
-      // Hesap zaten yok — sessizce başarı dönmek yerine durumu bildir
-      return { success: false, message: 'Kullanıcı bulunamadı veya hesap zaten silinmiş.' };
-    }
-    return {
-      success: false,
-      message: 'Hesap silinirken bir hata oluştu. Lütfen tekrar deneyin.',
-    };
-  }
-
-  /* KVKK: /remove-account web sayfasının ayrı, eski hesap silme akışı. */
-  public async requestAccountDeletionCode(
-    email: string
-  ): Promise<{ success: boolean; message: string; code?: string }> {
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      return { success: false, message: 'Geçerli bir e-posta adresi girin.' };
-    }
-    // Önce PostgreSQL (esas kaynak), yoksa bellek
-    let userId: string | null = null;
-    try {
-      const dbUser = await this.rawClient.user.findFirst({ where: { email: cleanEmail }, select: { id: true } });
-      if (dbUser) userId = dbUser.id;
-    } catch {}
-    if (!userId) {
-      const mem = Array.from(this.users.values()).find(
-        (u) => !u.isGuest && u.email && u.email.trim().toLowerCase() === cleanEmail
-      );
-      if (mem) userId = mem.id;
-    }
-    if (!userId) {
-      // SECURITY: kullanıcı sayımını engellemek için genel mesaj
-      return { success: true, message: 'Bu e-posta ile kayıtlı bir hesap bulunamadı.' };
-    }
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    try {
-      await this.rawClient.passwordResetToken.create({
-        data: { email: cleanEmail, code, expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
-      });
-    } catch (err) {
-      console.error('[requestAccountDeletionCode] DB error:', err);
-      return { success: false, message: 'Kod oluşturulamadı. Lütfen tekrar deneyin.' };
-    }
-    return {
-      success: true,
-      message: 'Hesap silme doğrulama kodunuz oluşturuldu (15 dakika geçerli).',
-      code,
-    };
-  }
-
-  public async confirmAccountDeletion(
-    email: string,
-    code: string
-  ): Promise<{ success: boolean; message: string }> {
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !code || !code.trim()) {
-      return { success: false, message: 'E-posta ve doğrulama kodu zorunludur.' };
-    }
-    let tokens: Array<{ id: string; code: string; expiresAt: Date; used: boolean }> = [];
-    try {
-      tokens = await this.rawClient.passwordResetToken.findMany({
-        where: { email: cleanEmail, used: false, NOT: { id: { startsWith: PASSWORD_RESET_TOKEN_PREFIX } } },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      });
-    } catch (err) {
-      console.error('[confirmAccountDeletion] DB error:', err);
-      return { success: false, message: 'Doğrulama yapılamadı. Lütfen tekrar deneyin.' };
-    }
-    const match = tokens.find((t) => t.code === code.trim() && t.expiresAt.getTime() > Date.now());
-    if (!match) {
-      return { success: false, message: 'Doğrulama kodu hatalı veya süresi dolmuş.' };
-    }
-    await this.rawClient.passwordResetToken
-      .update({ where: { id: match.id }, data: { used: true } })
-      .catch(() => null);
-    // E-postadan kullanıcı bulunur ve kalıcı silme çalıştırılır
-    let userId: string | null = null;
-    try {
-      const dbUser = await this.rawClient.user.findFirst({ where: { email: cleanEmail }, select: { id: true } });
-      if (dbUser) userId = dbUser.id;
-    } catch {}
-    if (!userId) {
-      const mem = Array.from(this.users.values()).find(
-        (u) => !u.isGuest && u.email && u.email.trim().toLowerCase() === cleanEmail
-      );
-      if (mem) userId = mem.id;
-    }
-    if (!userId) {
-      return { success: false, message: 'Hesap bulunamadı veya zaten silinmiş.' };
-    }
-    return this.deleteAccount(userId);
+    this.store.users.delete(userId);
+    this.savePersistedUsers();
   }
 
   public async updateUserProfile(
@@ -2223,7 +2088,6 @@ export class PrismaService {
     updates: Partial<{
       displayName: string;
       fullName: string;
-      email: string;
       countryCode: string;
       countryName: string;
       phone: string;
@@ -2252,7 +2116,6 @@ export class PrismaService {
       record.displayName = updates.displayName.trim();
     }
     if (updates.fullName !== undefined) record.fullName = updates.fullName.trim();
-    if (updates.email !== undefined) record.email = updates.email.trim().toLowerCase();
     if (updates.countryCode !== undefined) record.countryCode = updates.countryCode;
     if (updates.countryName !== undefined) record.countryName = updates.countryName;
     if (updates.phone !== undefined) record.phone = updates.phone.trim();
@@ -2293,7 +2156,6 @@ export class PrismaService {
           data: {
             displayName: record.displayName,
             fullName: record.fullName,
-            email: record.email,
             avatarUrl: record.avatarUrl,
             countryCode: record.countryCode,
             countryName: record.countryName,
@@ -2320,8 +2182,12 @@ export class PrismaService {
         console.error(`⚠️ [updateUserProfile] Prisma PostgreSQL güncelleme hatası:`, dbErr);
       }
 
-      await this.syncUserToPrisma(record).catch(() => {});
-      supabaseService.upsertUser(record).catch(() => {});
+      // PostgreSQL was updated above; do not upsert a stale profile snapshot
+      // back into a row another instance may have just removed.
+      if (!USE_PERSISTED_ACCOUNTS_ONLY) {
+        await this.syncUserToPrisma(record).catch(() => {});
+        supabaseService.upsertUser(record).catch(() => {});
+      }
     }
 
     return this.toProfile(record);
@@ -2794,7 +2660,7 @@ export class PrismaService {
       console.error('[getUserProfileAsync] Error querying Prisma:', err);
     }
     const record = this.users.get(userId);
-    return record ? this.toProfile(record) : null;
+    return record && (!USE_PERSISTED_ACCOUNTS_ONLY || record.isGuest) ? this.toProfile(record) : null;
   }
 
   /** Arkadaşlık koduna göre herkese açık profil getirir (profil paylaşım bağlantıları için). */
