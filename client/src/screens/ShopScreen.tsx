@@ -6,11 +6,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
   Modal,
   Platform,
   Animated,
 } from 'react-native';
+import { LoadingShimmer } from '../components/LoadingShimmer';
 import Svg, {
   Defs,
   LinearGradient,
@@ -680,7 +680,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                   onPress={() => handleInitiatePurchase(item)}
                 >
                   {isBuying ? (
-                    <ActivityIndicator color="#12052C" size="small" />
+                    <LoadingShimmer label="Satın alma işleniyor" ink />
                   ) : owned ? (
                     <Text style={styles.priceBtnTextOwned}>SAHİPSİN</Text>
                   ) : item.currency === 'try' ? (

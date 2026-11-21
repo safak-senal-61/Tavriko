@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform, Image, ScrollView, ActivityIndicator, useWindowDimensions, ImageSourcePropType } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform, Image, ScrollView, useWindowDimensions, ImageSourcePropType } from 'react-native';
+import { LoadingShimmer } from '../components/LoadingShimmer';
 import { Bot, Check, Radio, ShieldCheck, Swords, Volume2, VolumeX, X } from 'lucide-react-native';
 import { cdnImage } from '../utils/cdn';
 import { THEME } from '../theme/tokens';
@@ -125,7 +126,7 @@ export const DuelVersusScreen: React.FC<DuelVersusScreenProps> = ({
         <View style={styles.countdownPanel}>
           <View style={styles.countdownRow}>
             <View style={styles.countBubble}>
-              {countdown > 0 ? <Text style={styles.countNumber}>{countdown}</Text> : <ActivityIndicator size="small" color="#FFE2A4" />}
+              {countdown > 0 ? <Text style={styles.countNumber}>{countdown}</Text> : <LoadingShimmer />}
             </View>
             <View style={styles.countCopy}>
               <Text accessibilityLiveRegion="polite" style={styles.countTitle}>{countdown > 0 ? '15 soruluk düello başlıyor' : 'Arena hazırlanıyor'}</Text>

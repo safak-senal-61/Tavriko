@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { pageDataCache } from '../utils/pageDataCache';
 import {
   UserProfile,
   GameRoom,
@@ -357,3 +358,7 @@ export const useGameStore = create<GameState>((set) => ({
   setSoundEnabled: (soundEnabled) => set({ soundEnabled }),
   setHapticsEnabled: (hapticsEnabled) => set({ hapticsEnabled }),
 }));
+
+useGameStore.subscribe((next, previous) => {
+  if (next.token !== previous.token || next.user?.id !== previous.user?.id) pageDataCache.clearPrivate();
+});

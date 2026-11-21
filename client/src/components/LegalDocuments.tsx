@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, ActivityIndicator, Linking, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, Linking, Platform } from 'react-native';
+import { LoadingShimmer } from './LoadingShimmer';
 import {
   LEGAL_DOCUMENTS,
   LEGAL_VERSION,
@@ -230,7 +231,7 @@ export const LegalConsentGate: React.FC<{
             accessibilityRole="button"
           >
             {submitting ? (
-              <ActivityIndicator color="#12052C" />
+              <LoadingShimmer label="Onay kaydediliyor" ink />
             ) : (
               <Text style={styles.primaryBtnText}>ONAYLA VE DEVAM ET</Text>
             )}

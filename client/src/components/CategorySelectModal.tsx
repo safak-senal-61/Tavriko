@@ -20,7 +20,11 @@ import { CategoryCarousel } from './CategoryCarousel';
 import { sound } from '../services/soundService';
 import { THEME } from '../theme/tokens';
 import { DEFAULT_API_BASE } from '../config';
-import { CategoryCounts, fetchCategoryCounts, subCountKey } from '../utils/categoryCounts';
+import type { CategoryInfo } from '@trivia/shared';
+import { categoryCounts, subCountKey } from '../utils/categoryCounts';
+import { PAGE_TTL } from '../utils/pageDataCache';
+import { categoriesUrl } from '../utils/pageResources';
+import { usePageData } from '../utils/usePageData';
 
 /**
  * Kategori listesinin TEK DOĞRULUK KAYNAĞI shared/src/categories.ts kataloğudur;
@@ -58,21 +62,10 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
   onSelectCategory,
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'special'>('general');
-  const [counts, setCounts] = useState<CategoryCounts | null>(null);
+  const { data } = usePageData<CategoryInfo[]>(visible ? categoriesUrl(apiBaseUrl || DEFAULT_API_BASE) : null, PAGE_TTL.categories);
+  const counts = useMemo(() => Array.isArray(data) ? categoryCounts(data) : null, [data]);
   const [selectedMainId, setSelectedMainId] = useState<string>(initialCategoryId);
   const [selectedSubId, setSelectedSubId] = useState<string | null>(initialSubCategoryId || null);
-
-  // Canlı soru sayıları (Keşfet ile aynı uç nokta)
-  useEffect(() => {
-    if (!visible) return;
-    let alive = true;
-    fetchCategoryCounts(apiBaseUrl || DEFAULT_API_BASE)
-      .then((c) => alive && setCounts(c))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [visible, apiBaseUrl]);
 
   // Açılışta mevcut seçimi geri yükle
   useEffect(() => {
@@ -86,7 +79,7 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
     () =>
       MAIN_CATEGORIES.map((c) => ({
         ...c,
-        questionCount: counts ? counts.main[c.id] ?? 0 : undefined,
+        questionCount: counts?.main[c.id],
       })),
     [counts]
   );
@@ -98,7 +91,7 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
     const def = SHARED_CATEGORIES.find((c) => c.id === selectedMain.id);
     return (def?.subCategories || []).map((sc) => ({
       ...sc,
-      questionCount: counts ? counts.sub[subCountKey(selectedMain.id, sc.name)] ?? 0 : undefined,
+      questionCount: counts?.sub[subCountKey(selectedMain.id, sc.name)],
     }));
   }, [selectedMain.id, counts]);
 

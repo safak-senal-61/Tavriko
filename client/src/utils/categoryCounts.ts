@@ -11,20 +11,17 @@ export const subCountKey = (categoryId: string, subName: string): string =>
   `${categoryId}::${subName.trim().toLowerCase()}`;
 
 /**
- * Sunucudaki /categories uç noktasından canlı soru sayılarını okur.
+ * Sunucudaki /categories yanıtından canlı soru sayılarını çıkarır.
  * Keşfet ekranı ve özel oda kategori seçici aynı kaynağı kullanır; böylece
  * sayılar her yerde birebir aynı olur.
  */
-export async function fetchCategoryCounts(base: string): Promise<CategoryCounts> {
-  const res = await fetch(`${base}/categories`);
-  const data: CategoryInfo[] = await res.json();
-  if (!Array.isArray(data)) throw new Error('Kategori sayıları alınamadı');
+export function categoryCounts(data: CategoryInfo[]): CategoryCounts {
   const counts: CategoryCounts = { main: {}, sub: {} };
   for (const c of data) {
     if (!c || !c.id) continue;
-    counts.main[c.id] = c.totalQuestions ?? 0;
+    if (typeof c.totalQuestions === 'number') counts.main[c.id] = c.totalQuestions;
     for (const sc of c.subCategories || []) {
-      if (sc && sc.name) counts.sub[subCountKey(c.id, sc.name)] = sc.questionCount ?? 0;
+      if (sc?.name && typeof sc.questionCount === 'number') counts.sub[subCountKey(c.id, sc.name)] = sc.questionCount;
     }
   }
   return counts;

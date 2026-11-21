@@ -16,6 +16,10 @@ import { CategoryId, CategoryInfo, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
+import { categoryCounts, subCountKey } from '../utils/categoryCounts';
+import { PAGE_TTL } from '../utils/pageDataCache';
+import { categoriesUrl } from '../utils/pageResources';
+import { usePageData } from '../utils/usePageData';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -124,11 +128,14 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   const webCategoryArt = page?.roomy && { width: artSize, height: artSize };
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
-  const [liveCounts, setLiveCounts] = useState<Record<string, number>>({});
-  const [liveSubCounts, setLiveSubCounts] = useState<Record<string, number>>({});
+  const countsQuery = usePageData<CategoryInfo[]>(categoriesUrl(apiBaseUrl || DEFAULT_API_BASE), PAGE_TTL.categories);
+  const { main: liveCounts, sub: liveSubCounts } = useMemo(
+    () => categoryCounts(Array.isArray(countsQuery.data) ? countsQuery.data : []), [countsQuery.data],
+  );
   // Canlı sayılar yüklenene kadar statik (yanıltıcı) değerler gösterilmez;
   // sayı rozetlerinde "…" yer tutucusu görünür.
-  const [countsLoaded, setCountsLoaded] = useState(false);
+  const countsLoaded = Array.isArray(countsQuery.data);
+  const countLabel = (count?: number) => count !== undefined ? `${count} soru` : countsQuery.loading ? '…' : 'Sayı bilinmiyor';
   const [searchQuery, setSearchQuery] = useState('');
   const [activeGroup, setActiveGroup] = useState<GroupTab>('all');
   // Alt kategori seçim sayfası (bottom sheet) için seçili bölüm
@@ -148,40 +155,6 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
       }),
     ]).start();
   }, [fadeAnim, slideAnim]);
-
-  useEffect(() => {
-    const base = apiBaseUrl || DEFAULT_API_BASE;
-    let isMounted = true;
-    fetch(`${base}/categories`)
-      .then((res) => res.json())
-      .then((data: CategoryInfo[]) => {
-        if (!isMounted || !Array.isArray(data)) return;
-        const map: Record<string, number> = {};
-        const subMap: Record<string, number> = {};
-        for (const c of data) {
-          if (c && c.id) {
-            map[c.id] = c.totalQuestions;
-            for (const sc of c.subCategories || []) {
-              if (sc && sc.name) {
-                subMap[c.id + '::' + sc.name.trim().toLowerCase()] =
-                  sc.questionCount ?? 0;
-              }
-            }
-          }
-        }
-        setLiveCounts(map);
-        setLiveSubCounts(subMap);
-        setCountsLoaded(true);
-      })
-      .catch(() => {
-        // Hata olsa bile arayüz "…" üzerinde takılı kalmasın; statik değerler
-        // artık gerçekçi olmadığı için 0 üzerinden render edilir.
-        setCountsLoaded(true);
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, [apiBaseUrl]);
 
   // Kategoriler canlı soru sayılarıyla
   const categoriesWithRealCounts = useMemo((): CategoryWithCounts[] => {
@@ -315,7 +288,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
               <Text style={styles.heroTitle}>KEŞFET</Text>
               <Text style={styles.heroSubtitle} numberOfLines={2}>
                 {visibleSections.length} bölüm · {totalSubCount} kategori ·{' '}
-                {countsLoaded ? `${totalQuestionCount}+ soru` : 'soru sayıları yükleniyor…'}
+                {countsLoaded ? `${totalQuestionCount}+ soru` : countsQuery.loading ? 'soru sayıları yükleniyor…' : 'soru sayıları alınamadı'}
               </Text>
               <TouchableOpacity
                 style={styles.heroRandom}
@@ -418,7 +391,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                     <View style={styles.catMetaRow}>
                       <View style={styles.catCountPill}>
                         <Text style={styles.catCountText}>
-                          {countsLoaded ? `${cat.totalQuestions} soru` : '…'}
+                          {countLabel(liveCounts[cat.id])}
                         </Text>
                       </View>
                       <Text style={styles.catSubCount}>
@@ -498,7 +471,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                 <View style={styles.sheetStatsRow}>
                   <View style={styles.sheetStatPill}>
                     <Text style={styles.sheetStatText}>
-                      {countsLoaded ? `${sheetCategory.totalQuestions} soru` : '…'}
+                      {countLabel(liveCounts[sheetCategory.id])}
                     </Text>
                   </View>
                   <View style={styles.sheetStatPill}>
@@ -565,7 +538,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                             {sc.name}
                           </Text>
                           <Text style={styles.subChipCount}>
-                            {countsLoaded ? `${sc.questionCount ?? 0}` : '…'}
+                            {liveSubCounts[subCountKey(sheetCategory.id, sc.name)] ?? (countsQuery.loading ? '…' : '—')}
                           </Text>
                         </TouchableOpacity>
                       ))}

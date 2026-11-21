@@ -2,7 +2,9 @@ import { create } from 'zustand';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import type { NotificationItem } from '@trivia/shared';
-import { authHeaders } from '../utils/apiAuth';
+import { useGameStore } from './gameStore';
+import { PAGE_TTL, PageDataError, fetchPageJson, pageDataCache } from '../utils/pageDataCache';
+import { inboxUrl } from '../utils/pageResources';
 
 const STORAGE_PREFIX = 'tavriko_notification_reads_v1:';
 const SAMPLE_PREFIXES = ['notif_fr_sample', 'notif_duel_sample', 'notif_rew_sample'];
@@ -85,6 +87,7 @@ interface NotificationState {
   items: NotificationItem[];
   readIds: string[];
   loading: boolean;
+  hydrated: boolean;
   error: string | null;
   toast: NotificationItem | null;
   activate: (userId: string | null, initial?: NotificationItem[]) => void;
@@ -94,16 +97,21 @@ interface NotificationState {
   markRead: (ids: string[]) => void;
   markAllSeen: () => void;
   dismissToast: () => void;
-  refresh: (base: string) => Promise<void>;
+  refresh: (base: string, force?: boolean) => Promise<void>;
 }
 
-export const useNotificationStore = create<NotificationState>((set, get) => ({
-  userId: null, items: [], readIds: [], loading: false, error: null, toast: null,
+export const useNotificationStore = create<NotificationState>((set, get) => {
+  let epoch = 0;
+  let pending: Promise<void> | undefined;
+  return {
+  userId: null, items: [], readIds: [], loading: false, hydrated: false, error: null, toast: null,
   activate: (userId, initial = []) => {
+    epoch++;
+    pending = undefined;
     set({
       userId, items: userId ? cleanNotifications(initial) : [],
       readIds: userId ? readReceipts(userId) : [],
-      loading: false, error: null, toast: null,
+      loading: false, hydrated: false, error: null, toast: null,
     });
     // Mobilde kalıcı okundu bilgileri asenkron yüklenir ve gelince uygulanır.
     if (userId) void hydrateReceipts(userId);
@@ -150,26 +158,43 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     const ids = state.items.filter(item => isUnread(item, state.readIds)).map(item => item.id);
     if (ids.length) get().markRead(ids);
   },
-  refresh: async base => {
+  refresh: (base, force) => {
     const owner = get().userId;
-    if (!owner) return;
-    set({ loading: true, error: null });
-    try {
-      const response = await fetch(`${base}/social/notifications/${encodeURIComponent(owner)}`, { headers: authHeaders() });
-      if (!response.ok) throw new Error('Bildirimler alınamadı.');
-      const data = await response.json();
-      if (!Array.isArray(data.notifications)) throw new Error('Bildirimler alınamadı.');
-      if (get().userId === owner) {
-        get().mergeSnapshot(data.notifications);
-        set({ error: null });
-      }
-    } catch {
-      if (get().userId === owner) set({ error: 'Bağlantı kurulamadı. Bildirimlerini yeniden yükleyebilirsin.' });
-    } finally {
-      if (get().userId === owner) set({ loading: false });
-    }
+    if (!owner) return Promise.resolve();
+    const session = useGameStore.getState();
+    if (session.user?.id !== owner) return Promise.resolve();
+    if (pending) return pending;
+    const url = inboxUrl(base, owner);
+    const stamp = pageDataCache.snapshot(url, owner).updatedAt;
+    if (!force && get().hydrated && stamp !== undefined && Date.now() - stamp < PAGE_TTL.inbox) return Promise.resolve();
+    const requestEpoch = epoch;
+    const isCurrent = () => epoch === requestEpoch && get().userId === owner
+      && useGameStore.getState().user?.id === owner && useGameStore.getState().token === session.token;
+    // Avoid flashing the refresh icon when an automatic poll already has a snapshot.
+    set({ loading: Boolean(force || !get().hydrated), error: null });
+    pending = pageDataCache.load(url, PAGE_TTL.inbox, {
+      scope: owner, token: session.token, force,
+      fetcher: async signal => {
+        const { notifications } = await fetchPageJson<{ notifications: NotificationItem[] }>(url, signal, session.token);
+        if (!Array.isArray(notifications)) throw new Error('Bildirimler alınamadı.');
+        return notifications;
+      },
+    }).then(items => {
+      if (!isCurrent()) return;
+      get().mergeSnapshot(items);
+      set({ hydrated: true, error: null });
+    }).catch(error => {
+      if (!isCurrent()) return;
+      if (error instanceof PageDataError && [401, 403, 404].includes(error.status)) set({ items: [], toast: null });
+      set({ error: 'Bağlantı kurulamadı. Bildirimlerini yeniden yükleyebilirsin.' });
+    }).finally(() => {
+      if (epoch === requestEpoch) pending = undefined;
+      if (isCurrent()) set({ loading: false });
+    });
+    return pending;
   },
-}));
+  };
+});
 
 export function useUnreadCount() {
   return useNotificationStore(state => unreadCount(state.items, state.readIds));

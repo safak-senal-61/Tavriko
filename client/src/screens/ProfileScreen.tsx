@@ -9,12 +9,12 @@ import {
   StyleSheet,
   ScrollView,
   Share,
-  ActivityIndicator,
   Platform,
   Image,
   ImageSourcePropType,
   Modal,
 } from 'react-native';
+import { LoadingShimmer } from '../components/LoadingShimmer';
 import Animated, { FadeInRight, FadeInUp, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
@@ -1323,7 +1323,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                       </Text>
                     </View>
                     {savingTitle === t.title ? (
-                      <ActivityIndicator color="#FFC43D" size="small" />
+                      <LoadingShimmer label="Unvan kaydediliyor" />
                     ) : equipped ? (
                       <View style={styles.titleEquippedPill}>
                         <Text style={styles.titleEquippedPillText}>✓ KUŞANILDI</Text>

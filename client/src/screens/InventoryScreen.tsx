@@ -8,9 +8,9 @@ import {
   ScrollView,
   Modal,
   Animated,
-  ActivityIndicator,
   Platform,
 } from 'react-native';
+import { LoadingShimmer } from '../components/LoadingShimmer';
 import { UserProfile, InventoryItem, ItemCategory, COSMETIC_RENTAL_MS, getCosmeticDef } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -741,7 +741,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                         onPress={triggerChestOpeningAnimation}
                       >
                         {isOpeningChest ? (
-                          <ActivityIndicator color="#12052C" size="small" />
+                          <LoadingShimmer label="Sandık açılıyor" ink />
                         ) : (
                           <Text style={styles.openBtnText}>Sandığı Aç</Text>
                         )}

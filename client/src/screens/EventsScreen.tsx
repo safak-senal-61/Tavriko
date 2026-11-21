@@ -1,22 +1,27 @@
 import { cdnImage } from '../utils/cdn';
 import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Animated,
   Platform,
 } from 'react-native';
+import { LoadingShimmer, PageShimmer } from '../components/LoadingShimmer';
 import { UserProfile, GameEvent } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { trackEvent } from '../services/analytics';
 import { DEFAULT_API_BASE } from '../config';
 import { authHeaders } from '../utils/apiAuth';
+import { useGameStore } from '../store/gameStore';
+import { PageLoadError } from '../components/PageLoadError';
+import { PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
+import { eventsUrl } from '../utils/pageResources';
+import { usePageData } from '../utils/usePageData';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -73,8 +78,6 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
   const webEventArt = page?.roomy && { width: eventArtSize, height: eventArtSize };
   const webEventButton = page?.roomy && styles.webEventButton;
   const [activeTab, setActiveTab] = useState<EventTab>('daily');
-  const [events, setEvents] = useState<GameEvent[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
   const [actionEventId, setActionEventId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
@@ -83,30 +86,17 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const base = apiBaseUrl || DEFAULT_API_BASE;
-
-  const fetchEvents = () => {
-    let isMounted = true;
-    const url = `${base}/social/events?userId=${encodeURIComponent(user?.id || '')}`;
-    fetch(url)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!isMounted) return;
-        if (data.events && Array.isArray(data.events)) {
-          setEvents(data.events);
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-    return () => {
-      isMounted = false;
-    };
+  const token = useGameStore(state => state.token);
+  const url = user?.id ? eventsUrl(base, user.id) : null;
+  const { data: snapshot, loading, error, read } = usePageData<{ events: GameEvent[] }>(url, PAGE_TTL.events, user?.id, token);
+  const events = Array.isArray(snapshot?.events) ? snapshot.events : [];
+  const sameSession = () => useGameStore.getState().user?.id === user?.id && useGameStore.getState().token === token;
+  const patchEvent = (id: string, changes: Partial<GameEvent>) => {
+    if (!url || !sameSession()) return;
+    pageDataCache.invalidate<{ events: GameEvent[] }>(url, user?.id, data => ({
+      ...data, events: data.events.map(event => event.id === id ? { ...event, ...changes } : event),
+    }));
   };
-
-  useEffect(() => {
-    fetchEvents();
-  }, [user?.id, apiBaseUrl]);
 
   const switchTab = (tab: EventTab) => {
     sound.playSound('tap');
@@ -143,6 +133,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
         });
 
         const data = await res.json();
+        if (!sameSession()) return;
         if (!res.ok) {
           sound.playSound('wrong');
           sound.triggerHaptic('error');
@@ -165,9 +156,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
         if (data.user && onUpdateUser) {
           onUpdateUser(data.user);
         }
-        setEvents((prev) =>
-          prev.map((e) => (e.id === event.id ? { ...e, claimed: true } : e))
-        );
+        patchEvent(event.id, { claimed: true });
       } catch {
         sound.playSound('wrong');
         setIsError(true);
@@ -189,13 +178,12 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
 
         const data = await res.json();
         if (res.ok && data.event) {
-          setEvents((prev) =>
-            prev.map((e) => (e.id === event.id ? { ...e, started: true, currentCount: 0 } : e))
-          );
+          patchEvent(event.id, { ...data.event, started: true });
         }
       } catch {}
     }
 
+    if (!sameSession()) return;
     setActionEventId(null);
     // 3. Navigate to gameplay arena
     if (onStartEvent) {
@@ -250,7 +238,9 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
 
         {/* Content with Fade Animation */}
         {loading ? (
-          <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 36 }} />
+          <PageShimmer label="Etkinlikler yükleniyor" shape="cards" />
+        ) : error && !snapshot ? (
+          <PageLoadError onRetry={() => void read(true).catch(() => {})} />
         ) : filteredEvents.length === 0 ? (
           <KitEmpty
             source={STORE_IMG.eventsEmpty}
@@ -331,7 +321,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                             onPress={() => handleAction(item)}
                           >
                             {isBusy ? (
-                              <ActivityIndicator color="#0A2920" size="small" />
+                              <LoadingShimmer label="Ödül alınıyor" ink />
                             ) : (
                               <Text style={styles.collectBtnText}>Topla</Text>
                             )}
@@ -345,7 +335,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                           onPress={() => handleAction(item)}
                         >
                           {isBusy ? (
-                            <ActivityIndicator color="#1A0E00" size="small" />
+                            <LoadingShimmer label="Etkinlik hazırlanıyor" ink />
                           ) : (
                             <Text style={styles.playBtnText}>Oyna</Text>
                           )}

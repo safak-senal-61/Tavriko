@@ -8,7 +8,6 @@ import {
   ScrollView,
   Modal,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
