@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  useWindowDimensions,
   Modal,
   Platform,
   Animated,
@@ -109,22 +110,24 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
 }) => {
   const pId = product.id;
   const page = usePlayerWebLayout();
+  const { width } = useWindowDimensions();
   const art = page?.ui.art ?? 1;
   const size = (base: number) => Math.round(base * art);
   const previewHeight = art > 1 && { height: size(108) };
   const visualSize = size(92);
-  // Animasyonlu çerçeveler: renkli geçişli pulse halkaları
+  if ((product.category === 'frames' || pId.includes('frame')) && frameFor(pId)) {
+    const frameSize = size(Math.min(124, Math.round(width * 0.34)));
+    return (
+      <View style={[styles.visualTall, { height: frameSize + 10 }]}>
+        <FramedAvatar frameId={pId} seed={seed} size={frameSize} />
+      </View>
+    );
+  }
+  // Eski, vektör tabanlı çerçeveler.
   if (ANIMATED_FRAME_COLORS[pId]) {
     return (
       <View style={[styles.visualTall, previewHeight]}>
         <AnimatedFrame frameId={pId} seed={seed} size={size(100)} />
-      </View>
-    );
-  }
-  if ((product.category === 'frames' || pId.includes('frame')) && frameFor(pId)) {
-    return (
-      <View style={[styles.visualTall, previewHeight]}>
-        <FramedAvatar frameId={pId} seed={seed} size={size(100)} />
       </View>
     );
   }
@@ -629,6 +632,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                 {previewKind(item) ? (
                   <TouchableOpacity
                     activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.name} önizlemesini aç`}
                     onPress={() => {
                       sound.playSound('tap');
                       setPreviewProduct(item);
@@ -644,7 +649,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                 )}
 
                 {/* İsim & Açıklama */}
-                <Text style={[styles.productName, roomy && { fontSize: 17 }]} numberOfLines={roomy ? 2 : 1}>{item.name}</Text>
+                <Text style={[styles.productName, roomy && { fontSize: 17 }]} numberOfLines={roomy || item.category === 'frames' ? 2 : 1}>{item.name}</Text>
                 <Text style={[styles.productDesc, roomy && { fontSize: 13, lineHeight: 18 }]} numberOfLines={2}>{item.desc}</Text>
 
                 {/* 2x XP Artırıcı Aktifse: Kalan Süre Barı */}

@@ -41,7 +41,7 @@ import {
   AVATAR_PRESETS,
   AvatarPreset,
 } from '../components/TavrikoIcons';
-import { UI_IMG, FloatingImage, ShimmerView, CATEGORY_IMG, FramedAvatar, AnimatedFrame, AnimatedNameText, ANIMATED_FRAME_COLORS, backgroundFor, BackgroundScene, storeImageFor, BadgeVisual } from '../components/StoreKit';
+import { UI_IMG, FloatingImage, ShimmerView, CATEGORY_IMG, FramedAvatar, AnimatedFrame, AnimatedNameText, ANIMATED_FRAME_COLORS, backgroundFor, BackgroundScene, storeImageFor, BadgeVisual, frameFor } from '../components/StoreKit';
 import { DISCOVERY_IMG, PROFILE_IMG, DiscoveryArtwork, AchievementState } from '../components/DiscoveryArtwork';
 import { Settings, UserRound } from 'lucide-react-native';
 import { PreferenceSwitch } from '../components/PreferenceSwitch';
@@ -743,7 +743,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               }}
               activeOpacity={0.85}
             >
-              {activeFrame && ANIMATED_FRAME_COLORS[activeFrame] ? (
+              {activeFrame && !frameFor(activeFrame) && ANIMATED_FRAME_COLORS[activeFrame] ? (
                 <AnimatedFrame frameId={activeFrame} seed={user.avatarUrl || user.displayName} size={76} />
               ) : activeFrame ? (
                 <FramedAvatar frameId={activeFrame} seed={user.avatarUrl || user.displayName} size={76} />

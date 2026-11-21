@@ -32,7 +32,7 @@ import { socketService } from '../services/socketService';
 import { ReferralCards } from '../components/ReferralCards';
 import { DISCOVERY_IMG } from '../components/DiscoveryArtwork';
 import { GradientFill } from '../components/TavrikoGradient';
-import { AnimatedFrame, AnimatedNameText, ANIMATED_FRAME_COLORS, ANIMATED_NAME_COLORS } from '../components/StoreKit';
+import { AnimatedFrame, AnimatedNameText, ANIMATED_FRAME_COLORS, ANIMATED_NAME_COLORS, frameFor, FramedAvatar } from '../components/StoreKit';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -819,14 +819,20 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                   const frameDef = cosmetics.frame;
                   const bgDef = cosmetics.background;
                   const nameDef = cosmetics.nameEffect;
-                  const frameId = (inspectDetails as any)?.equippedFrame;
+                  const frameId = frameDef?.id;
                   const nameEffectId = (inspectDetails as any)?.equippedNameEffect;
                   const animatedFrame = frameId ? ANIMATED_FRAME_COLORS[frameId] : null;
                   const animatedName = nameEffectId ? ANIMATED_NAME_COLORS[nameEffectId] : null;
                   return (
                     <>
                       <Reanimated.View entering={ZoomIn.springify().damping(16)} style={styles.inspectAvatarWrap}>
-                        {animatedFrame ? (
+                        {frameId && frameFor(frameId) ? (
+                          <FramedAvatar
+                            frameId={frameId}
+                            seed={inspectDetails?.avatarUrl || inspectPlayer.avatarUrl || inspectPlayer.name}
+                            size={92}
+                          />
+                        ) : frameId && animatedFrame ? (
                           <AnimatedFrame
                             frameId={frameId}
                             seed={inspectDetails?.avatarUrl || inspectPlayer.avatarUrl || inspectPlayer.name}
