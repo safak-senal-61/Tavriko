@@ -68,12 +68,12 @@ describe('Trivia REST API', () => {
     expect(JSON.stringify(entry)).not.toMatch(/query-only|body-only|042615|FixtureOnlyPass1/);
   });
 
-  it('keeps console messages and textual details on a single line', () => {
+  it('logs dynamic messages and textual details on one line with a literal format', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
-      const entry = logger.warn('HTTP', 'fixture\r\nnext\u2028line', 'details\nnext\u001b[1m');
-      expect(entry.message).toBe('fixture  next line');
-      expect(warn).toHaveBeenCalledWith(expect.any(String), 'fixture  next line', 'details next [1m');
+      const entry = logger.warn('HTTP', 'fixture\r\nnext\u2028line %s', 'details\nnext\u001b[1m');
+      expect(entry.message).toBe('fixture next line %s');
+      expect(warn).toHaveBeenCalledWith('%s %s %s', expect.stringContaining('[WARN] [HTTP]'), 'fixture next line %s', 'detailsnext [1m');
     } finally {
       warn.mockRestore();
     }

@@ -10,6 +10,10 @@ export interface LogEntry {
   details?: any;
 }
 
+function singleLine(value: string): string {
+  return value.replace(/\n/g, '').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ');
+}
+
 class LoggerService {
   private logs: LogEntry[] = [];
   private readonly maxLogs: number = 400;
@@ -28,7 +32,7 @@ class LoggerService {
     const now = new Date();
     const timeStr = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
     // User input must not be able to introduce a new line or terminal escape.
-    const safeMessage = message.replace(/\n|\r/g, ' ').replace(/[\u001b\u2028\u2029]/g, ' ');
+    const safeMessage = singleLine(message);
 
     // Clean details to ensure JSON serializable
     let cleanDetails = details;
@@ -55,21 +59,21 @@ class LoggerService {
       this.logs.pop();
     }
 
-    // Console output with colors
-    const prefix = `[${entry.timestamp}] [${level}] [${category}]`;
+    // Keep dynamic values out of the console format string, including the client category.
+    const prefix = singleLine(`[${entry.timestamp}] [${level}] [${category}]`);
     let detailsText = '';
     try {
       const serialized = typeof cleanDetails === 'string' ? cleanDetails : JSON.stringify(cleanDetails) ?? '';
-      detailsText = serialized.replace(/\n|\r/g, ' ').replace(/[\u001b\u2028\u2029]/g, ' ');
+      detailsText = singleLine(serialized);
     } catch {
       detailsText = '[unserializable details]';
     }
     if (level === 'ERROR') {
-      console.error(prefix, safeMessage, detailsText);
+      console.error('%s %s %s', prefix, safeMessage, detailsText);
     } else if (level === 'WARN') {
-      console.warn(prefix, safeMessage, detailsText);
+      console.warn('%s %s %s', prefix, safeMessage, detailsText);
     } else {
-      console.log(prefix, safeMessage, detailsText);
+      console.log('%s %s %s', prefix, safeMessage, detailsText);
     }
 
     // Broadcast to SSE clients
