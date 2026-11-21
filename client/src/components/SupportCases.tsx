@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { PageShimmer } from './LoadingShimmer';
 import { useGameStore } from '../store/gameStore';
 import { PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
 import { usePageData } from '../utils/usePageData';
@@ -83,7 +84,7 @@ export function SupportCases({ api, token, owner }: { api: string; token: string
         <Text style={s.title}>Taleplerim</Text>
         <Pressable accessibilityRole="button" style={s.button} onPress={() => void read(true).catch(() => {})}><Text style={s.body}>Yenile</Text></Pressable>
       </View>
-      {loading && <ActivityIndicator color="#FFD273" accessibilityLabel="Talepler yükleniyor" />}
+      {loading && <PageShimmer label="Talepler yükleniyor" rows={2} />}
       {error && <Text accessibilityLiveRegion="polite" style={s.body}>Talepler yüklenemedi. Yeniden deneyin.</Text>}
       {data && items.length === 0 && <Text style={s.secondary}>Henüz bir talep görünmüyor.</Text>}
       {items.map(item => <View key={item.id} style={s.choice}>
@@ -146,7 +147,7 @@ function CaseConversation({ endpoint, listEndpoint, token, owner }: { endpoint: 
         <Text style={s.body}>{item.body}</Text>
       </View>)}
       {data && !data.items.length && <Text style={s.secondary}>Henüz ek mesaj yok.</Text>}
-      {loading && <ActivityIndicator color="#FFD273" accessibilityLabel="Konuşma yükleniyor" />}
+      {loading && <PageShimmer label="Konuşma yükleniyor" shape="lines" rows={2} />}
       {error && <Text accessibilityLiveRegion="polite" style={s.body}>Konuşma yüklenemedi. Yeniden deneyin.</Text>}
       <Pressable style={s.button} disabled={busy} accessibilityRole="button" onPress={() => void read(true).catch(() => {})}>
         <Text style={s.secondary}>Konuşmayı yenile</Text></Pressable>

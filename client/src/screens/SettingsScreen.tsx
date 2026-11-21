@@ -7,10 +7,10 @@ import {
   ScrollView,
   Platform,
   Modal,
-  ActivityIndicator,
   TextInput,
   Linking,
 } from 'react-native';
+import { LoadingShimmer } from '../components/LoadingShimmer';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { ExternalLink } from 'lucide-react-native';
 import { CLOUD_BASE_URL, getApiBaseUrl } from '../config';
@@ -355,7 +355,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 saveStatus === 'error' && styles.saveIndicatorError,
               ]}
             >
-              {saveStatus === 'saving' && <ActivityIndicator size="small" color="#FFC43D" />}
+              {saveStatus === 'saving' && <LoadingShimmer />}
               <Text
                 style={[
                   styles.saveIndicatorText,
@@ -942,7 +942,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 textStyle={{ fontSize: 13 }}
               />
             </View>
-            {isDeleting && <ActivityIndicator color="#FF5A6A" style={{ marginTop: 12 }} />}
+            {isDeleting && <LoadingShimmer wide label="Hesap silme isteği işleniyor" />}
           </View>
         </View>
       </Modal>

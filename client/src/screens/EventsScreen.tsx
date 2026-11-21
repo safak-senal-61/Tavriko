@@ -7,10 +7,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Animated,
   Platform,
 } from 'react-native';
+import { LoadingShimmer, PageShimmer } from '../components/LoadingShimmer';
 import { UserProfile, GameEvent } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -238,7 +238,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
 
         {/* Content with Fade Animation */}
         {loading ? (
-          <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 36 }} />
+          <PageShimmer label="Etkinlikler yükleniyor" shape="cards" />
         ) : error && !snapshot ? (
           <PageLoadError onRetry={() => void read(true).catch(() => {})} />
         ) : filteredEvents.length === 0 ? (
@@ -321,7 +321,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                             onPress={() => handleAction(item)}
                           >
                             {isBusy ? (
-                              <ActivityIndicator color="#0A2920" size="small" />
+                              <LoadingShimmer label="Ödül alınıyor" ink />
                             ) : (
                               <Text style={styles.collectBtnText}>Topla</Text>
                             )}
@@ -335,7 +335,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
                           onPress={() => handleAction(item)}
                         >
                           {isBusy ? (
-                            <ActivityIndicator color="#1A0E00" size="small" />
+                            <LoadingShimmer label="Etkinlik hazırlanıyor" ink />
                           ) : (
                             <Text style={styles.playBtnText}>Oyna</Text>
                           )}

@@ -161,3 +161,9 @@
 - Open Arkadaşlar, lobby invitations, Etkinlikler and Bildirimler, then revisit. Check fresh cache reuse, an empty result, a failed refresh and a successful mutation or socket event without stale results replacing newer data.
 - Check public rooms with and without a realtime room snapshot, and leave/re-enter. Timers, live room data, gameplay, authentication, purchases and wallet writes must not be served from a page cache.
 - Open support cases and referral panels twice, then switch accounts. No private result or pending response may carry over to the next account.
+
+## Loading placeholders
+
+- With an uncached and delayed response, open Liderlik, Pro Lig, Arkadaşlar, Etkinlikler, Bildirimler, and Herkese Açık Odalar. Expect content-shaped shimmer placeholders rather than a spinner, then the real result, empty state, or retry action.
+- Open a player profile and the invite/support panels with a cold cache. Reopen with a warm cache and verify no placeholder flashes. Turn on reduced motion or battery saver and confirm the placeholders remain still.
+- Delay sign-in or a test-only button action. Expect a short shimmer instead of a spinner; the original result and error behavior must stay unchanged.

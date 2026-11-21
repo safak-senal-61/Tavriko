@@ -15,8 +15,8 @@ import {
   Image,
   Modal,
   FlatList,
-  ActivityIndicator,
 } from 'react-native';
+import { PageShimmer } from '../components/LoadingShimmer';
 import { DEFAULT_API_BASE } from '../config';
 import { authHeaders } from '../utils/apiAuth';
 import { useGameStore } from '../store/gameStore';
@@ -1013,9 +1013,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             {roomFull ? (
               <Text style={styles.friendModalEmptyText}>Oda dolu. Yer açıldığında tekrar davet edebilirsin.</Text>
             ) : friendsLoading && friendsList.length === 0 ? (
-              <View style={styles.friendModalEmpty}>
-                <ActivityIndicator color="#9B8CFF" />
-              </View>
+              <PageShimmer label="Davet edilebilir arkadaşlar yükleniyor" rows={2} />
             ) : friendsError && !friendsData ? (
               <TouchableOpacity accessibilityRole="button" onPress={() => void readFriends(true).catch(() => {})} style={styles.friendModalEmpty}>
                 <Text style={styles.friendModalEmptyText}>Arkadaşlar yüklenemedi. Yeniden dene.</Text>

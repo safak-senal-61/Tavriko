@@ -6,9 +6,9 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
-  ActivityIndicator,
   Platform,
 } from 'react-native';
+import { PageShimmer } from './LoadingShimmer';
 import Reanimated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { calculateLevelFromXp, UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -88,7 +88,7 @@ export const ProfileInspectModal: React.FC<ProfileInspectModalProps> = ({
           <Text style={styles.eyebrow}>OYUNCU PROFİLİ</Text>
 
           {!profile ? (
-            <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 60, marginBottom: 60 }} />
+            <PageShimmer label="Oyuncu profili yükleniyor" shape="profile" />
           ) : (
             <ScrollView
               showsVerticalScrollIndicator={false}

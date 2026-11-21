@@ -5,12 +5,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Platform,
   Linking,
   Modal,
   TextInput,
 } from 'react-native';
+import { LoadingShimmer } from '../components/LoadingShimmer';
 import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -406,7 +406,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
               </View>
               <TouchableOpacity style={styles.pingBtn} onPress={checkApiLatency} disabled={isPinging}>
                 {isPinging ? (
-                  <ActivityIndicator size="small" color="#FFC43D" />
+                  <LoadingShimmer label="API yanıt süresi ölçülüyor" />
                 ) : (
                   <Text style={styles.pingText}>{apiPing !== null ? `${apiPing} ms` : 'Ping'}</Text>
                 )}
@@ -563,7 +563,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
                 activeOpacity={0.8}
               >
                 {tgTesting ? (
-                  <ActivityIndicator size="small" color="#38BDF8" />
+                  <LoadingShimmer label="Telegram bağlantısı sınanıyor" />
                 ) : (
                   <>
                     <Text style={{ fontSize: 15 }}>⚡</Text>
@@ -664,7 +664,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
                 activeOpacity={0.8}
               >
                 {blockLoading ? (
-                  <ActivityIndicator size="small" color="#FF8598" />
+                  <LoadingShimmer label="Engelleme uygulanıyor" />
                 ) : (
                   <Text style={[styles.modalBtnText, { color: '#FF8598' }]}>ENGELLE</Text>
                 )}
@@ -724,7 +724,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
                 activeOpacity={0.8}
               >
                 {notifSending ? (
-                  <ActivityIndicator size="small" color="#5ADBB5" />
+                  <LoadingShimmer label="Bildirim gönderiliyor" />
                 ) : (
                   <Text style={[styles.modalBtnText, { color: '#5ADBB5' }]}>GÖNDER</Text>
                 )}
@@ -827,7 +827,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
                 activeOpacity={0.8}
               >
                 {productAdding ? (
-                  <ActivityIndicator size="small" color="#FFC43D" />
+                  <LoadingShimmer label="Ürün ekleniyor" />
                 ) : (
                   <Text style={[styles.modalBtnText, { color: '#FFC43D' }]}>ÜRÜNÜ EKLE</Text>
                 )}

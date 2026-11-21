@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   Share,
   TextInput,
   Modal,
   Platform,
   Image,
 } from 'react-native';
+import { PageShimmer } from '../components/LoadingShimmer';
 import Reanimated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import * as Clipboard from 'expo-clipboard';
 import { UserProfile, calculateLevelFromXp, extractProfileCosmetics } from '@trivia/shared';
@@ -510,7 +510,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         {/* Tab 1: Friends List (ONLY ACCEPTED FRIENDS) */}
         {activeTab === 'friends' && (
           loading ? (
-            <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 28 }} />
+            <PageShimmer label="Arkadaş listesi yükleniyor" />
           ) : error && !data ? (
             <PageLoadError onRetry={() => void read(true).catch(() => {})} />
           ) : friendsList.length === 0 ? (
@@ -707,7 +707,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         {activeTab === 'requests' && (
           <View>
             {loading ? (
-              <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 28 }} />
+              <PageShimmer label="Arkadaşlık istekleri yükleniyor" rows={2} />
             ) : error && !data ? (
               <PageLoadError onRetry={() => void read(true).catch(() => {})} />
             ) : incomingRequests.length > 0 ? (

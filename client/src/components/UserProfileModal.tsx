@@ -5,10 +5,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   ScrollView,
   Image,
 } from 'react-native';
+import { PageShimmer } from './LoadingShimmer';
 import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { DEFAULT_API_BASE } from '../config';
@@ -86,10 +86,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           </View>
 
           {loading ? (
-            <View style={styles.loadingWrap}>
-              <ActivityIndicator color="#FFC43D" size="large" />
-              <Text style={styles.loadingText}>Profil yükleniyor...</Text>
-            </View>
+            <PageShimmer label="Profil yükleniyor" shape="profile" />
           ) : !profile ? (
             <PageLoadError onRetry={() => void read(true).catch(() => {})} />
           ) : (
@@ -261,16 +258,6 @@ const styles = StyleSheet.create({
   closeBtnText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontFamily: THEME.fonts.bold,
-  },
-  loadingWrap: {
-    paddingVertical: 40,
-    alignItems: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    color: '#D9CDF5',
-    fontSize: 13,
     fontFamily: THEME.fonts.bold,
   },
   errorWrap: {

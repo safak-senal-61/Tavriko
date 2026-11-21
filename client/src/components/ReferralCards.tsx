@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { PageShimmer } from './LoadingShimmer';
 import * as Clipboard from 'expo-clipboard';
 import { ChevronDown, Gift, Link2, Send, X } from 'lucide-react-native';
 import { CharacterAvatar, Button3D } from './TavrikoIcons';
@@ -75,7 +76,7 @@ export function ReferralCards({ base, token, userId, pendingToken, onClear, onCo
       <View style={s.row}><Text style={s.eyebrow}>SANA BİR DAVET VAR</Text>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Daveti kapat" disabled={sending} onPress={onClear} style={s.close}><X size={20} color="#E1D5F9" /></TouchableOpacity>
       </View>
-      {previewLoading && <View style={s.loading}><ActivityIndicator color="#FFC43D" /><Text style={s.body}>Davet sahibinin profili yükleniyor...</Text></View>}
+      {previewLoading && !preview && <PageShimmer label="Davet sahibinin profili yükleniyor" rows={1} />}
       {preview && <View style={s.person}>
         <CharacterAvatar seed={preview.inviter.avatarUrl || preview.inviter.displayName} size={58} />
         <View style={{ flex: 1, minWidth: 0 }}><Text style={s.name}>{preview.inviter.displayName}</Text>
@@ -105,7 +106,7 @@ export function ReferralCards({ base, token, userId, pendingToken, onClear, onCo
         <Text style={s.gold}>Yeni arkadaş başına +100 altın</Text><ChevronDown size={18} color="#FFD270" style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }} />
       </TouchableOpacity>
       {expanded && <View style={s.details}>
-        {loading && <View style={s.loading}><ActivityIndicator color="#FFC43D" /><Text style={s.body}>Özel bağlantın hazırlanıyor...</Text></View>}
+        {loading && <PageShimmer label="Özel bağlantın hazırlanıyor" shape="lines" rows={1} />}
         {link && !loading && <>
           <View style={s.stats}><Text style={s.body}>{link.joinedCount} onaylanan davet</Text><Text style={s.gold}>{link.earnedCoins} altın kazandın</Text></View>
           <View style={s.link}><Link2 size={18} color="#BFA3EF" /><Text selectable style={[s.body,
@@ -146,5 +147,4 @@ const s = StyleSheet.create({
   person: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 14 },
   name: { color: '#FFFFFF', fontFamily: THEME.fonts.display, fontSize: 20 },
   close: { padding: 8, minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' },
-  loading: { paddingVertical: 20, gap: 12, alignItems: 'center' },
 });

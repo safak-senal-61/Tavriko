@@ -5,10 +5,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   Platform,
 } from 'react-native';
 import { UserProfile } from '@trivia/shared';
+import { PageShimmer } from '../components/LoadingShimmer';
 import { THEME } from '../theme/tokens';
 import { DEFAULT_API_BASE } from '../config';
 import { PageLoadError } from '../components/PageLoadError';
@@ -189,7 +189,7 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
         </View>
 
         {loading ? (
-          <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 32 }} />
+          <PageShimmer label="Liderlik tablosu yükleniyor" rows={4} style={{ marginTop: 16 }} />
         ) : error && !data ? (
           <PageLoadError onRetry={() => void read(true).catch(() => {})} />
         ) : sortedLeaders.length === 0 ? (

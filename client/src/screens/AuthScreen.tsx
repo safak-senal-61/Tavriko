@@ -8,13 +8,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   Image,
   Platform,
   Modal,
   Linking,
   useWindowDimensions,
 } from 'react-native';
+import { LoadingShimmer } from '../components/LoadingShimmer';
 import * as ImagePicker from 'expo-image-picker';
 import { compressAvatarImageAsync } from '../utils/avatarImage';
 import * as WebBrowser from 'expo-web-browser';
@@ -738,7 +738,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   if (finishingOAuth && !errorMsg) {
     return (
       <View style={[styles.authRoot, { alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color="#FFC43D" />
+        <LoadingShimmer wide />
         <Text style={{ color: '#D9CDF5', fontSize: 14, marginTop: 16, fontFamily: THEME.fonts.bold }}>
           Google hesabınla oturum açılıyor...
         </Text>
@@ -897,11 +897,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </Reanimated.View>
               )}
               {loading ? (
-                <ActivityIndicator
-                  color={THEME.colors.gold}
-                  size="large"
-                  style={{ marginVertical: 14 }}
-                />
+                <LoadingShimmer wide label="Oturum açılıyor" style={{ marginTop: compact ? 8 : 12 }} />
               ) : (
                 <Button3D
                   title="GİRİŞ YAP"
@@ -1266,11 +1262,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     </View>
                   )}
                   {loading ? (
-                    <ActivityIndicator
-                      color={THEME.colors.gold}
-                      size="large"
-                      style={{ marginVertical: 14 }}
-                    />
+                    <LoadingShimmer wide label="Hesap oluşturuluyor" />
                   ) : (
                     <View style={[styles.stepNavButtonsRow, compact && styles.stepNavButtonsRowCompact]}>
                       <TouchableOpacity style={[styles.backStepBtn, compact && styles.backStepBtnCompact]} onPress={handlePrevRegStep}>
@@ -1378,11 +1370,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </Reanimated.View>
               )}
               {loading ? (
-                <ActivityIndicator
-                  color={THEME.colors.gold}
-                  size="large"
-                  style={{ marginVertical: 14 }}
-                />
+                <LoadingShimmer wide label={resetStep === 'request' ? 'Sıfırlama kodu gönderiliyor' : 'Şifre yenileniyor'}
+                  style={{ marginTop: compact ? 10 : 14 }} />
               ) : resetStep === 'request' ? (
                 <Button3D
                   testID="reset-send"

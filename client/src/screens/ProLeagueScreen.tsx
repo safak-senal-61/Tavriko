@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   TouchableOpacity,
   Platform,
 } from 'react-native';
+import { PageShimmer } from '../components/LoadingShimmer';
 import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { DEFAULT_API_BASE } from '../config';
@@ -109,7 +109,7 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
         </KitHero>
 
         {loading ? (
-          <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 32 }} />
+          <PageShimmer label="Pro Lig yükleniyor" style={{ marginTop: 16 }} />
         ) : error && !data ? (
           <PageLoadError onRetry={() => void read(true).catch(() => {})} />
         ) : (

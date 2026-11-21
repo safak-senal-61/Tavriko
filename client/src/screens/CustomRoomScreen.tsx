@@ -11,11 +11,11 @@ import {
   ScrollView,
   Switch,
   Platform,
-  ActivityIndicator,
   Modal,
   KeyboardAvoidingView,
   AppState,
 } from 'react-native';
+import { PageShimmer } from '../components/LoadingShimmer';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { ArrowRight, Clipboard as ClipboardIcon, RefreshCw } from 'lucide-react-native';
 import { DISCOVERY_IMG, DiscoveryArtwork } from '../components/DiscoveryArtwork';
@@ -731,24 +731,24 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 onPress={() => { socketService.getPublicRooms(); void fetchPublicRooms(true).catch(() => {}); }}
                 style={styles.refreshIconBtn}
                 activeOpacity={0.7}
+                disabled={isLoadingPublicRooms}
+                accessibilityState={{ busy: isLoadingPublicRooms, disabled: isLoadingPublicRooms }}
               >
-                {isLoadingPublicRooms ? (
-                  <ActivityIndicator size="small" color="#5ADBB5" />
-                ) : (
-                  <RefreshCw size={18} color="#ADF0D8" />
-                )}
+                <RefreshCw size={18} color={isLoadingPublicRooms ? '#819B98' : '#ADF0D8'} />
               </TouchableOpacity>
               <View style={styles.publicRoomsDivider} />
             </View>
 
             <View style={styles.publicRoomsList}>
-              {roomsError && !roomRows ? (
+              {isLoadingPublicRooms ? (
+                <PageShimmer label="Açık odalar yükleniyor" shape="cards" rows={2} />
+              ) : roomsError && !roomRows ? (
                 <PageLoadError onRetry={() => void fetchPublicRooms(true).catch(() => {})} />
               ) : publicRooms.length === 0 ? (
                 <View style={styles.emptyPublicRoomsBox}>
                   <DiscoveryArtwork source={DISCOVERY_IMG.social} size={100} />
                   <Text style={styles.emptyPublicRoomsTitle}>
-                    {isLoadingPublicRooms ? 'Aktif Odalar Taranıyor...' : 'Şu An Açık Oda Yok'}
+                    Şu An Açık Oda Yok
                   </Text>
                   <Text style={styles.emptyPublicRoomsSub}>
                     Herkese açık bekleyen bir oda bulunmuyor. Kendi odanı kurup diğer oyuncuları bekleyebilirsin!
