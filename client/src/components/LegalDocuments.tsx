@@ -26,6 +26,31 @@ export const legalWebUrl = (id?: LegalDocumentId) => {
   return `${origin}/legal${id ? `/${id}` : ''}`;
 };
 
+export const LegalWebLink: React.FC<{ path: string; label: string; danger?: boolean }> = ({ path, label, danger }) => {
+  const [failed, setFailed] = useState(false);
+  const color = danger ? '#FCA5A5' : '#C4B5FD';
+  const labelContent = <><ExternalLink size={14} color={color} /><Text style={[styles.webLinkText, { color }]}>{label}</Text></>;
+  if (Platform.OS === 'web') {
+    return React.createElement('a', {
+      href: path,
+      style: { display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, width: 'fit-content', color, textDecoration: 'none' },
+    }, labelContent);
+  }
+  const url = CLOUD_BASE_URL + path;
+  return (
+    <>
+      <TouchableOpacity
+        style={styles.webLinkRow}
+        onPress={() => { setFailed(false); void Linking.openURL(url).catch(() => setFailed(true)); }}
+        accessibilityRole="link"
+      >
+        {labelContent}
+      </TouchableOpacity>
+      {failed && <Text selectable style={styles.webLinkText}>Tarayıcı açılamadı. Adresi tarayıcınızda açın: {url}</Text>}
+    </>
+  );
+};
+
 // ---------------------------------------------------------------------------
 // Tek bir yasal metni tam ekran okutan modal
 // ---------------------------------------------------------------------------
@@ -159,18 +184,7 @@ export const LegalDocumentList: React.FC<{
       Sürüm: {formatLegalVersion()}
       {acceptedAt ? ` · Onay tarihin: ${new Date(acceptedAt).toLocaleDateString('tr-TR')}` : ''}
     </Text>
-    <TouchableOpacity
-      style={styles.webLinkRow}
-      onPress={() => {
-        const url = legalWebUrl();
-        if (Platform.OS === 'web' && typeof window !== 'undefined') window.open(url, '_blank', 'noopener');
-        else Linking.openURL(url).catch(() => {});
-      }}
-      accessibilityRole="link"
-    >
-      <ExternalLink size={14} color="#C4B5FD" />
-      <Text style={styles.webLinkText}>Tüm metinleri web’de aç</Text>
-    </TouchableOpacity>
+    <LegalWebLink path="/legal" label="Tüm metinleri web’de aç" />
   </View>
 );
 

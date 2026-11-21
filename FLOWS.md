@@ -173,3 +173,11 @@
 - Open Mağaza → Çerçeveler. Check Kraliyet Altın, Alev, Siber Neon, Ejderha ve Anka, Buhar Zırhı and Buz Kristal. Each visible frame should hug the avatar without a colored rectangle, opaque hole, or jagged fringe.
 - Open a frame with Büyüt, close it and open a different frame. The large preview animates after it loads; with reduced motion or battery saver it stays sharp and still. Preview art must not cover the name or buttons on a narrow phone.
 - For an authorized test account or mocked purchase, select a duration and confirm with gems. The newly active rental should appear with the same artwork in Envanter and on the profile. Existing frame ownership and rentals retain their original IDs and prices.
+
+## Account removal
+
+- At `/legal`, follow “Hesabımı sil”. In the game, open Settings → Sözleşmeler ve Politikalar and click “Hesabımı ve tüm verilerimi sil (web)”. Web navigates in the same tab; Android opens the public page in the browser.
+- On `/remove-account`, request a code with a synthetic address. The first response must not distinguish registered and unknown addresses or contain the OTP. At desktop and 375px, exercise the resend timer, changing the email, invalid code, the explicit acknowledgement and a stubbed successful response. Use only localhost fixtures.
+- In Settings → Hesap, open “Hesabımı Kalıcı Olarak Sil”. “Evet, Kod Gönder” makes an authenticated request, but does not delete anything. “Doğrula ve Sil” requires six digits and the server uses the signed-in account, never a request-supplied user ID or destination. Cancel and incorrect code leave the user signed in; only a successful deletion clears local account state. Old Android builds that submit no code must use the web flow or update.
+- Ordinary profile edits must not change the registered email address used for the verification code.
+- Removal and password-reset codes are separate. Removal codes expire after 15 minutes, have a 60-second resend interval and five incorrect attempts across resends while the code window is active. The database verification and removal operation is atomic. Manual restores and historical backups are not part of this operation.
