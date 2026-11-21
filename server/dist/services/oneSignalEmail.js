@@ -4,6 +4,7 @@ exports.getOneSignalEmailConfig = getOneSignalEmailConfig;
 exports.sendOneSignalPasswordResetEmail = sendOneSignalPasswordResetEmail;
 const node_crypto_1 = require("node:crypto");
 const logger_1 = require("../utils/logger");
+const passwordResetEmail_1 = require("./passwordResetEmail");
 const EMAIL_ENDPOINT = 'https://api.onesignal.com/notifications?c=email';
 function getOneSignalEmailConfig() {
     const appId = process.env.ONESIGNAL_APP_ID?.trim();
@@ -27,8 +28,8 @@ async function sendOneSignalPasswordResetEmail(config, reset) {
                 app_id: config.appId,
                 email_to: [reset.email],
                 email_subject: 'Tavriko şifre sıfırlama kodunuz',
-                email_preheader: 'Tek kullanımlık doğrulama kodunuz',
-                email_body: `<html lang="tr"><body><h1>Tavriko şifre sıfırlama</h1><p>Şifrenizi yenilemek için aşağıdaki kodu Tavriko’ya girin:</p><p style="font-size:28px;font-weight:bold;letter-spacing:4px">${reset.code}</p><p>Bu kod ${reset.validMinutes} dakika geçerlidir. Kimseyle paylaşmayın.</p><p>Bu isteği siz yapmadıysanız e-postayı yok sayabilirsiniz.</p></body></html>`,
+                email_preheader: 'Şifrenizi yenilemek için tek kullanımlık kodunuzu Tavriko’ya girin.',
+                email_body: (0, passwordResetEmail_1.renderPasswordResetEmail)(reset),
                 include_unsubscribed: true,
                 disable_email_click_tracking: true,
                 idempotency_key: (0, node_crypto_1.randomUUID)(),

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { logger } from '../utils/logger';
+import { renderPasswordResetEmail } from './passwordResetEmail';
 
 const EMAIL_ENDPOINT = 'https://api.onesignal.com/notifications?c=email';
 
@@ -29,8 +30,8 @@ export async function sendOneSignalPasswordResetEmail(
         app_id: config.appId,
         email_to: [reset.email],
         email_subject: 'Tavriko şifre sıfırlama kodunuz',
-        email_preheader: 'Tek kullanımlık doğrulama kodunuz',
-        email_body: `<html lang="tr"><body><h1>Tavriko şifre sıfırlama</h1><p>Şifrenizi yenilemek için aşağıdaki kodu Tavriko’ya girin:</p><p style="font-size:28px;font-weight:bold;letter-spacing:4px">${reset.code}</p><p>Bu kod ${reset.validMinutes} dakika geçerlidir. Kimseyle paylaşmayın.</p><p>Bu isteği siz yapmadıysanız e-postayı yok sayabilirsiniz.</p></body></html>`,
+        email_preheader: 'Şifrenizi yenilemek için tek kullanımlık kodunuzu Tavriko’ya girin.',
+        email_body: renderPasswordResetEmail(reset),
         include_unsubscribed: true,
         disable_email_click_tracking: true,
         idempotency_key: randomUUID(),
