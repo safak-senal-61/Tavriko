@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import authRoutes from '../src/routes/authRoutes';
 import { logger } from '../src/utils/logger';
 import { getOneSignalEmailConfig, sendOneSignalPasswordResetEmail } from '../src/services/oneSignalEmail';
+import { renderPasswordResetEmail } from '../src/services/passwordResetEmail';
 
 const mocks = vi.hoisted(() => ({ issue: vi.fn(), confirm: vi.fn(), waitUntil: vi.fn() }));
 vi.mock('../src/db/prismaClient', () => ({ db: { rawClient: {} } }));
@@ -56,8 +57,11 @@ describe('OneSignal password reset delivery and auth responses', () => {
     expect(options?.headers).toMatchObject({ Authorization: `Key ${key}` });
     const email = JSON.parse(String(options?.body));
     expect(email).toMatchObject({ app_id: appId, email_to: [payload.email], include_unsubscribed: true, disable_email_click_tracking: true });
-    expect(email.email_subject).not.toContain(payload.code);
-    expect(email.email_body).toContain(payload.code);
+    const { email_body, ...metadata } = email;
+    expect(JSON.stringify(metadata)).not.toContain(payload.code);
+    expect(email_body).toContain(`<html lang="tr">`);
+    expect(email_body).toContain(`>${payload.code}</p>`);
+    expect(email_body).not.toContain(payload.email);
     expect(email.email_body).toContain('15 dakika');
     expect(email).not.toHaveProperty('included_segments');
     expect(email).not.toHaveProperty('email_bcc');
@@ -99,5 +103,22 @@ describe('OneSignal password reset delivery and auth responses', () => {
     expect(mocks.confirm).toHaveBeenLastCalledWith(expect.anything(), {
       identifier: payload.email, code: payload.code, password: input.newPassword,
     }, expect.any(String));
+  });
+});
+
+describe('password reset email template', () => {
+  it('keeps the code copyable and the validity period dynamic, without external assets or links', () => {
+    const html = renderPasswordResetEmail({ code: '000123', validMinutes: 9 });
+    expect(html.match(/000123/g)).toHaveLength(1);
+    expect(html).toContain('>000123</p>');
+    expect(html).toContain('<strong>9 dakika</strong>');
+    expect(html).toContain('Şifremi Unuttum');
+    expect(html).toContain('Bu isteği siz yapmadıysanız');
+    expect(html).not.toMatch(/(?:\bhref|\bsrc)\s*=|url\(/i);
+  });
+
+  it('rejects malformed values before interpolating them', () => {
+    expect(() => renderPasswordResetEmail({ code: '<b>01>', validMinutes: 15 })).toThrow();
+    expect(() => renderPasswordResetEmail({ code: payload.code, validMinutes: NaN })).toThrow();
   });
 });
