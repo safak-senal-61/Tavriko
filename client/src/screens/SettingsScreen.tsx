@@ -794,7 +794,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </TouchableOpacity>
         </View>
         {user && !(user as any).isGuest && token &&
-          <SupportCases key={user.id + ':' + token} api={Platform.OS === 'web' ? getApiBaseUrl() : apiBaseUrl || getApiBaseUrl()} token={token} />}
+          <SupportCases key={user.id + ':' + token} api={Platform.OS === 'web' ? getApiBaseUrl() : apiBaseUrl || getApiBaseUrl()} token={token} owner={user.id} />}
         </>}
 
         {settingsTab === 'legal' && <>

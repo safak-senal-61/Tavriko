@@ -17,6 +17,10 @@ import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
 import { DEFAULT_API_BASE, REALTIME_WS_BASE } from '../config';
 import { authHeaders } from '../utils/apiAuth';
+import { useGameStore } from '../store/gameStore';
+import { PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
+import { friendsChanged } from '../utils/pageResources';
+import { usePageData } from '../utils/usePageData';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -59,7 +63,6 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
   // --- Block user ---
   const [blockModal, setBlockModal] = useState<boolean>(false);
   const [blockInput, setBlockInput] = useState<string>('');
-  const [blockedUsers, setBlockedUsers] = useState<Array<{ id: string; username?: string; displayName?: string }>>([]);
   const [blockLoading, setBlockLoading] = useState<boolean>(false);
 
   // --- Send notification ---
@@ -82,6 +85,17 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
   const [productStatus, setProductStatus] = useState<string | null>(null);
 
   const base = apiBaseUrl || DEFAULT_API_BASE;
+  const token = useGameStore(state => state.token);
+  const owner = !user?.isGuest ? user?.id : undefined;
+  const blockedUrl = owner ? `${base.replace(/\/+$/, '')}/social/blocked/${encodeURIComponent(owner)}` : null;
+  const { data: blockedData, error: blockedError, read: readBlocked } =
+    usePageData<{ blockedUsers: Array<{ id: string; username?: string; displayName?: string }> }>(blockedUrl, PAGE_TTL.friends, owner, token);
+  const blockedUsers = blockedData?.blockedUsers ?? [];
+  const refreshAfterBlockChange = (removedId?: string) => {
+    if (!blockedUrl || !owner || useGameStore.getState().user?.id !== owner || useGameStore.getState().token !== token) return;
+    pageDataCache.invalidate(blockedUrl, owner);
+    friendsChanged(base, owner, removedId);
+  };
 
   useEffect(() => {
     checkApiLatency();
@@ -94,12 +108,6 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
     }, 2000);
     return () => clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    if (user?.id && !user?.isGuest) {
-      loadBlockedUsers();
-    }
-  }, [user?.id]);
 
   const checkApiLatency = async () => {
     setIsPinging(true);
@@ -241,17 +249,6 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
   };
 
   // --- Block system ---
-  const loadBlockedUsers = async () => {
-    if (!user?.id) return;
-    try {
-      const res = await fetch(`${base}/social/blocked/${user.id}`, { headers: authHeaders() });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) setBlockedUsers(data.blockedUsers || []);
-      }
-    } catch {}
-  };
-
   const handleBlockUser = async () => {
     if (!user?.id || !blockInput.trim()) return;
     setBlockLoading(true);
@@ -266,7 +263,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
         notify(`Kullanıcı engellendi!`);
         setBlockInput('');
         setBlockModal(false);
-        loadBlockedUsers();
+        refreshAfterBlockChange(blockInput.trim());
       } else {
         notify(`Hata: ${data.error}`);
       }
@@ -288,7 +285,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
       const data = await res.json();
       if (data.success) {
         notify('Engel kaldırıldı!');
-        loadBlockedUsers();
+        refreshAfterBlockChange();
       }
     } catch (e: any) {
       notify(`Hata: ${e.message}`);
@@ -480,7 +477,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
 
             <TouchableOpacity
               style={styles.moderationBtn}
-              onPress={() => { sound.playSound('tap'); setBlockModal(true); loadBlockedUsers(); }}
+              onPress={() => { sound.playSound('tap'); setBlockModal(true); }}
               activeOpacity={0.8}
             >
               <Text style={{ fontSize: 18 }}>🚫</Text>
@@ -506,6 +503,10 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
             </TouchableOpacity>
 
             {/* Blocked users list */}
+            {blockedError && !blockedData && <TouchableOpacity accessibilityRole="button" style={styles.moderationBtn}
+              onPress={() => void readBlocked(true).catch(() => {})}>
+              <Text style={styles.moderationBtnText}>Engelli kullanıcılar yüklenemedi. Tekrar dene</Text>
+            </TouchableOpacity>}
             {blockedUsers.length > 0 && (
               <View style={styles.blockedList}>
                 <Text style={styles.blockedListHeader}>ENGELLİ KULLANICILAR ({blockedUsers.length})</Text>

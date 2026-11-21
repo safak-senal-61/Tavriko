@@ -1,10 +1,15 @@
-import type { NotificationItem } from '@trivia/shared';
+import type { NotificationItem, UserProfile } from '@trivia/shared';
 import { cleanNotifications, isUnread, unreadCount, useNotificationStore } from '../src/store/notificationStore';
+import { useGameStore } from '../src/store/gameStore';
 
 const makeNotification = (id: string, extra: Partial<NotificationItem> = {}): NotificationItem => ({
   id, type: 'system', title: 'Yeni haber', sub: 'Birlikte oyna.', timeText: 'Şimdi', ...extra,
 });
 const inbox = () => useNotificationStore.getState();
+const session = (id: string | null, token = 'test-session') => {
+  useGameStore.setState({ user: id ? { id } as UserProfile : null, token: id ? token : null });
+  inbox().activate(id);
+};
 
 describe('Shared notification inbox and exact unread count', () => {
   const memory = new Map<string, string>();
@@ -14,8 +19,9 @@ describe('Shared notification inbox and exact unread count', () => {
       configurable: true,
       value: { getItem: (key: string) => memory.get(key) || null, setItem: (key: string, value: string) => memory.set(key, value) },
     });
-    inbox().activate('player-a');
+    session('player-a');
   });
+  afterEach(() => { session(null); vi.unstubAllGlobals(); });
 
   it('increments 0 → 1 → 2 and deduplicates both socket paths', () => {
     expect(unreadCount(inbox().items, inbox().readIds)).toBe(0);
@@ -119,9 +125,10 @@ describe('Shared notification inbox and exact unread count', () => {
 
   it('ignores an HTTP response after changing accounts', async () => {
     let resolve!: (value: unknown) => void;
-    globalThis.fetch = vi.fn(() => new Promise(done => { resolve = done; })) as any;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(done => { resolve = done; })));
     const request = inbox().refresh('/api');
-    inbox().activate('player-b');
+    await Promise.resolve();
+    session('player-b');
     resolve({ ok: true, json: async () => ({ notifications: [makeNotification('private-a')] }) });
     await request;
     expect(inbox().userId).toBe('player-b');
@@ -130,10 +137,39 @@ describe('Shared notification inbox and exact unread count', () => {
 
   it('shows a retryable error without losing existing messages', async () => {
     inbox().receive(makeNotification('one'));
-    globalThis.fetch = vi.fn().mockRejectedValue(new Error('offline'));
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     await inbox().refresh('/api');
     expect(inbox().error).toContain('yeniden');
     expect(inbox().items).toHaveLength(1);
     expect(inbox().loading).toBe(false);
+  });
+
+  it('coalesces initial reads, keeps an empty inbox warm and allows a manual refresh', async () => {
+    const fetcher = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ notifications: [] })));
+    vi.stubGlobal('fetch', fetcher);
+    const initial = inbox().refresh('/api');
+    expect(inbox().refresh('/api')).toBe(initial);
+    await initial;
+    expect(inbox().hydrated).toBe(true);
+    await inbox().refresh('/api');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await inbox().refresh('/api', true);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not merge a snapshot from before a same-account relogin', async () => {
+    let resolve!: (value: Response) => void;
+    const fetcher = vi.fn()
+      .mockImplementationOnce(() => new Promise(done => { resolve = done; }))
+      .mockImplementationOnce(async () => new Response(JSON.stringify({ notifications: [makeNotification('new-session')] })));
+    vi.stubGlobal('fetch', fetcher);
+    const initial = inbox().refresh('/api');
+    await Promise.resolve();
+    session(null);
+    session('player-a', 'another-session');
+    await inbox().refresh('/api');
+    resolve(new Response(JSON.stringify({ notifications: [makeNotification('old-session')] })));
+    await initial;
+    expect(inbox().items.map(item => item.id)).toEqual(['new-session']);
   });
 });

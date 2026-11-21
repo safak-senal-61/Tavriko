@@ -1,6 +1,6 @@
 import { cdnImage } from '../utils/cdn';
 import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   Modal,
   KeyboardAvoidingView,
+  AppState,
 } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { ArrowRight, Clipboard as ClipboardIcon, RefreshCw } from 'lucide-react-native';
@@ -25,6 +26,9 @@ import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
 import { getApiBaseUrl, getRealtimeUrl } from '../config';
+import { fetchPageJson, PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
+import { usePageData } from '../utils/usePageData';
+import { PageLoadError } from '../components/PageLoadError';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -106,6 +110,27 @@ const FAKE_ROOM_CODES = new Set([
   'GLX883',
 ]);
 
+function normalizeRoomItem(r: any): PublicRoomItem | null {
+  const code = String(r?.code || '').trim().toUpperCase();
+  if (!code || FAKE_ROOM_CODES.has(code)) return null;
+  const players = Number(r?.players ?? r?.playerCount ?? 0);
+  const maxPlayers = Math.max(2, Number(r?.maxPlayers ?? 4));
+  if (players <= 0 || players >= maxPlayers) return null;
+  const rawCat = String(r?.category || r?.categoryId || 'genel_kultur');
+  return {
+    id: code, code, title: r?.name || `${r?.hostName || r?.host || 'Oyuncu'} Odası`,
+    categoryKey: rawCat,
+    categoryName: CATEGORY_LABELS[rawCat] || CATEGORY_LABELS[String(r?.categoryName || '').toLowerCase()] || r?.categoryName || 'Genel Kültür',
+    totalRounds: Math.max(1, Number(r?.totalRounds ?? r?.rounds ?? 7)),
+    timeSec: Math.max(5, Number(r?.questionTimeSec ?? r?.timeSec ?? 20)),
+    players, maxPlayers, hasPassword: Boolean(r?.hasPassword || r?.password),
+  };
+}
+
+const publicRoomRows = (rooms: unknown[]) => Array.from(new Map(
+  rooms.map(normalizeRoomItem).filter((room): room is PublicRoomItem => room !== null).map(room => [room.code, room]),
+).values());
+
 export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   onBack,
   onCreateRoom,
@@ -150,105 +175,47 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   const [selectedSub, setSelectedSub] = useState<SelectedSubCategory | null>(null);
   const [isCategoryModalVisible, setCategoryModalVisible] = useState(false);
 
-  // Canlı Veritabanı ve WebSocket Odaları (Sahte/mock odalar kaldırıldı)
-  const [publicRooms, setPublicRooms] = useState<PublicRoomItem[]>([]);
-  const [isLoadingPublicRooms, setIsLoadingPublicRooms] = useState(false);
-
-  const normalizeRoomItem = (r: any): PublicRoomItem | null => {
-    const code = String(r?.code || '').trim().toUpperCase();
-    if (!code || FAKE_ROOM_CODES.has(code)) return null;
-    const players = Number(r?.players ?? r?.playerCount ?? 0);
-    const maxPlayers = Math.max(2, Number(r?.maxPlayers ?? 4));
-    if (players <= 0 || players >= maxPlayers) return null;
-    const rawCat = String(r?.category || r?.categoryId || 'genel_kultur');
-    const categoryName =
-      CATEGORY_LABELS[rawCat] ||
-      CATEGORY_LABELS[String(r?.categoryName || '').toLowerCase()] ||
-      r?.categoryName ||
-      'Genel Kültür';
-    const hostName = r?.hostName || r?.host || 'Oyuncu';
-    const hasPassword = Boolean(r?.hasPassword || r?.password);
-    return {
-      id: code,
-      code,
-      title: r?.name || `${hostName} Odası`,
-      categoryKey: rawCat,
-      categoryName,
-      totalRounds: Math.max(1, Number(r?.totalRounds ?? r?.rounds ?? 7)),
-      timeSec: Math.max(5, Number(r?.questionTimeSec ?? r?.timeSec ?? 20)),
-      players,
-      maxPlayers,
-      hasPassword,
-    };
-  };
-
-  const fetchPublicRooms = async () => {
-    try {
-      setIsLoadingPublicRooms(true);
-      const base = apiBaseUrl || getApiBaseUrl();
-      const cleanBase = base.replace(/\/+$/, '');
-      const rtUrl = getRealtimeUrl()
-        .replace(/^wss:\/\//i, 'https://')
-        .replace(/^ws:\/\//i, 'http://')
-        .replace(/\/+$/, '');
-
-      const [apiRes, rtRes] = await Promise.all([
-        fetch(`${cleanBase}/trivia/rooms/public`).catch(() => null),
-        fetch(`${rtUrl}/rooms/public`).catch(() => null),
-      ]);
-
-      const byCode = new Map<string, PublicRoomItem>();
-
-      if (rtRes && rtRes.ok) {
-        const rtData = await rtRes.json().catch(() => null);
-        if (rtData && Array.isArray(rtData.rooms)) {
-          for (const r of rtData.rooms) {
-            const item = normalizeRoomItem(r);
-            if (item) byCode.set(item.code, item);
-          }
-        }
-      }
-
-      if (apiRes && apiRes.ok) {
-        const apiData = await apiRes.json().catch(() => null);
-        if (apiData && Array.isArray(apiData.rooms)) {
-          for (const r of apiData.rooms) {
-            const item = normalizeRoomItem(r);
-            if (item && !byCode.has(item.code)) {
-              byCode.set(item.code, item);
-            }
-          }
-        }
-      }
-
-      setPublicRooms(Array.from(byCode.values()));
-    } catch {
-      setPublicRooms([]);
-    } finally {
-      setIsLoadingPublicRooms(false);
-    }
-  };
+  const fallbackUrl = `${(apiBaseUrl || getApiBaseUrl()).replace(/\/+$/, '')}/trivia/rooms/public`;
+  const rtUrl = `${getRealtimeUrl().replace(/^wss:/i, 'https:').replace(/^ws:/i, 'http:').replace(/\/+$/, '')}/rooms/public`;
+  const loadRooms = useCallback(async (signal: AbortSignal) => {
+    const readRooms = (url: string) => fetchPageJson<{ rooms: unknown[] }>(url, signal)
+      .then(data => Array.isArray(data?.rooms) ? data.rooms : undefined).catch(() => undefined);
+    const [secondary, gateway] = await Promise.all([readRooms(fallbackUrl), readRooms(rtUrl)]);
+    if (!secondary && !gateway) throw new Error('Açık odalar alınamadı.');
+    // Keep legacy/server-hosted rooms discoverable; the gateway wins duplicate codes.
+    return publicRoomRows([...(secondary ?? []), ...(gateway ?? [])]);
+  }, [rtUrl, fallbackUrl]);
+  const { data: roomRows, loading: isLoadingPublicRooms, error: roomsError, read: fetchPublicRooms } =
+    usePageData<PublicRoomItem[]>(activeTab === 'join' ? rtUrl : null, PAGE_TTL.rooms, undefined, undefined, loadRooms);
+  const publicRooms = roomRows ?? [];
 
   useEffect(() => {
-    if (activeTab === 'join') {
-      fetchPublicRooms();
-      const interval = setInterval(fetchPublicRooms, 4000);
-      const unsub = socketService.onPublicRoomsUpdate((rooms) => {
-        if (Array.isArray(rooms)) {
-          const valid = rooms
-            .map((r: any) => normalizeRoomItem(r))
-            .filter((item): item is PublicRoomItem => Boolean(item));
-          setPublicRooms(valid);
-        }
-      });
+    if (activeTab !== 'join') return;
+    let lastSocketUpdate: number | undefined;
+    const unsub = socketService.onPublicRoomsUpdate(rooms => {
+      if (!Array.isArray(rooms)) return;
+      lastSocketUpdate = Date.now();
+      // Supersedes in-flight HTTP and keeps a short-lived snapshot for re-entry.
+      pageDataCache.seed(rtUrl, publicRoomRows(rooms));
+    });
+    const refreshVisible = () => {
+      if (Platform.OS === 'web' ? typeof document !== 'undefined' && document.hidden : AppState.currentState === 'background') return;
       socketService.getPublicRooms();
-
-      return () => {
-        clearInterval(interval);
-        unsub();
-      };
-    }
-  }, [activeTab, apiBaseUrl]);
+      if (lastSocketUpdate === undefined || Date.now() - lastSocketUpdate > 45_000) {
+        void fetchPublicRooms().catch(() => {});
+      }
+    };
+    refreshVisible();
+    const interval = setInterval(refreshVisible, 30_000);
+    const activity = AppState.addEventListener('change', state => { if (state === 'active') refreshVisible(); });
+    if (Platform.OS === 'web') document.addEventListener('visibilitychange', refreshVisible);
+    return () => {
+      clearInterval(interval);
+      activity.remove();
+      if (Platform.OS === 'web') document.removeEventListener('visibilitychange', refreshVisible);
+      unsub();
+    };
+  }, [activeTab, rtUrl, fetchPublicRooms]);
 
   const digits = Array.from({ length: 6 }).map((_, idx) => roomCode[idx] || '');
 
@@ -761,7 +728,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               <Text style={styles.publicRoomsSectionTitle}>HERKESE AÇIK ODALAR</Text>
               <TouchableOpacity
                 accessibilityRole="button" accessibilityLabel="Açık odaları yenile"
-                onPress={fetchPublicRooms}
+                onPress={() => { socketService.getPublicRooms(); void fetchPublicRooms(true).catch(() => {}); }}
                 style={styles.refreshIconBtn}
                 activeOpacity={0.7}
               >
@@ -775,7 +742,9 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
             </View>
 
             <View style={styles.publicRoomsList}>
-              {publicRooms.length === 0 ? (
+              {roomsError && !roomRows ? (
+                <PageLoadError onRetry={() => void fetchPublicRooms(true).catch(() => {})} />
+              ) : publicRooms.length === 0 ? (
                 <View style={styles.emptyPublicRoomsBox}>
                   <DiscoveryArtwork source={DISCOVERY_IMG.social} size={100} />
                   <Text style={styles.emptyPublicRoomsTitle}>

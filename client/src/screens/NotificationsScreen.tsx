@@ -13,19 +13,20 @@ import { DISCOVERY_IMG, DiscoveryArtwork } from '../components/DiscoveryArtwork'
 import { GradientFill } from '../components/TavrikoGradient';
 import { isPrivateRoomInvite, notificationVisual } from '../components/NotificationUI';
 import { isInvitation, isUnread, useNotificationStore, useUnreadCount } from '../store/notificationStore';
+import { useGameStore } from '../store/gameStore';
+import { friendsChanged } from '../utils/pageResources';
 
 interface NotificationsScreenProps {
   user?: UserProfile;
   apiBaseUrl?: string;
   onBack: () => void;
   onAcceptDuel?: (roomCode?: string) => void;
-  onRefreshUser?: () => void;
 }
 
 export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
-  user, apiBaseUrl, onBack, onAcceptDuel, onRefreshUser,
+  user, apiBaseUrl, onBack, onAcceptDuel,
 }) => {
-  const { items, readIds, loading, error, markRead, patch, refresh } = useNotificationStore();
+  const { items, readIds, loading, hydrated, error, markRead, patch, refresh } = useNotificationStore();
   const count = useUnreadCount();
   const [filter, setFilter] = useState<'all' | 'unread' | 'invites'>('all');
   const [pending, setPending] = useState<{ id: string; action: 'accept' | 'decline' } | null>(null);
@@ -39,6 +40,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   const handleRespond = async (notification: NotificationItem, action: 'accept' | 'decline') => {
     if (!user?.id || pending) return;
     const owner = user.id;
+    const token = useGameStore.getState().token;
     setPending({ id: notification.id, action });
     setResponseError(null);
     sound.playSound('tap');
@@ -50,7 +52,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'İstek tamamlanamadı. Lütfen yeniden dene.');
-      if (useNotificationStore.getState().userId !== owner) return;
+      if (useNotificationStore.getState().userId !== owner || useGameStore.getState().token !== token) return;
       const duel = notification.type === 'match_invite' || notification.type === 'duel';
       patch(notification.id, {
         handled: action === 'accept' ? 'accepted' : 'declined',
@@ -66,7 +68,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
       if (action === 'accept' && !duel && (data.senderId || notification.senderId)) {
         socketService.notifyUserRealtime(data.senderId || notification.senderId, 'friends:update', { friendId: owner });
       }
-      onRefreshUser?.();
+      if (!duel) friendsChanged(base, owner);
     } catch (err: any) {
       setResponseError({ id: notification.id, text: err.message || 'Bağlantı kurulamadı. Yeniden dene.' });
     } finally {
@@ -93,7 +95,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
 
         <View style={styles.toolbar}>
           <Text style={styles.inboxTitle}>Gelen kutun <Text style={styles.total}>{items.length}</Text></Text>
-          <TouchableOpacity onPress={() => void refresh(base)} accessibilityRole="button"
+          <TouchableOpacity onPress={() => void refresh(base, true)} accessibilityRole="button"
             accessibilityLabel="Bildirimleri yenile" disabled={loading} style={styles.refresh}>
             {loading ? <ActivityIndicator size="small" color="#E1BFFF" /> : <RefreshCw size={17} color="#E1BFFF" />}
           </TouchableOpacity>
@@ -116,12 +118,12 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
         {error && (
           <View accessibilityLiveRegion="polite" style={styles.error}>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity accessibilityRole="button" onPress={() => void refresh(base)} style={styles.retry}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => void refresh(base, true)} style={styles.retry}>
               <Text style={styles.retryText}>Yeniden dene</Text>
             </TouchableOpacity>
           </View>
         )}
-        {loading && items.length === 0 ? (
+        {loading && !hydrated && items.length === 0 ? (
           <View style={styles.loading}>
             {[0, 1, 2].map(i => <View key={i} style={styles.skeleton}><View style={styles.skeletonImage} /><View style={styles.skeletonCopy} /></View>)}
             <Text style={styles.meta}>Haberlerin yükleniyor...</Text>

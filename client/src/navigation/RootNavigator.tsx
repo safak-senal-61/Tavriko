@@ -17,6 +17,8 @@ import {
 } from 'react-native';
 import { useGameStore, clearAllAccountStorage } from '../store/gameStore';
 import { authHeaders } from '../utils/apiAuth';
+import { PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
+import { eventsUrl, friendsChanged, leaderboardUrl, profileUrl, referralUrl } from '../utils/pageResources';
 import { shuffleOptionsForPlayer } from '../utils/optionShuffle';
 import { seenScopeKey, getSeenQuestionIds, markQuestionsSeen } from '../utils/seenQuestions';
 import { getOfflinePracticeAnswer, requestPracticeAnswer } from '../utils/practiceAnswers';
@@ -338,18 +340,35 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
     }
   }, [showLegalGate, user?.id, acceptLegal]);
 
-  const refreshUserProfile = useCallback(async () => {
+  const refreshUserProfile = useCallback(async (afterWrite = false) => {
     const current = useGameStore.getState();
-    if (!current.user || current.user.isGuest) return;
+    if (!current.user || current.user.isGuest || !current.token) return;
     const owner = current.user.id;
+    const url = profileUrl(API_BASE, owner);
+    if (afterWrite) pageDataCache.invalidate(url, owner);
+    const previous = pageDataCache.snapshot(url, owner);
     try {
-      const response = await fetch(`${API_BASE}/social/profile/${encodeURIComponent(owner)}`, {
-        headers: current.token ? { Authorization: `Bearer ${current.token}` } : {},
-      });
-      const fresh = response.ok ? await response.json() : null;
-      if (fresh?.id === owner && useGameStore.getState().user?.id === owner) syncWithFreshUser(fresh);
+      const fresh = await pageDataCache.load<UserProfile>(url, PAGE_TTL.profile, { scope: owner, token: current.token });
+      const latest = useGameStore.getState();
+      // A warm read or a request started before another local update must not roll back the account.
+      if (fresh?.id === owner && latest.user === current.user && latest.token === current.token
+          && pageDataCache.snapshot(url, owner) !== previous) {
+        const localAvatar = current.user.avatarUrl;
+        // Preserve the boot-time migration for older accounts with a locally chosen avatar.
+        if (!afterWrite && localAvatar && !['av1', 'av_1'].includes(localAvatar)
+            && (!fresh.avatarUrl || ['av1', 'av_1'].includes(fresh.avatarUrl))) {
+          void fetch(`${API_BASE}/auth/profile`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${current.token}` },
+            body: JSON.stringify({ userId: owner, avatarUrl: localAvatar }),
+          }).catch(() => {});
+          syncWithFreshUser({ ...fresh, avatarUrl: localAvatar });
+        } else syncWithFreshUser(fresh);
+      }
     } catch {}
   }, [syncWithFreshUser]);
+
+  useEffect(() => { if (user?.id && !isGuest) void refreshUserProfile(); }, [user?.id, token, isGuest, refreshUserProfile]);
 
   // One inbox for every screen: HTTP reconnect snapshots and socket arrivals
   // share the same IDs, read receipts and exact badge count.
@@ -374,7 +393,7 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
       subscription.remove();
       if (Platform.OS === 'web' && typeof window !== 'undefined') window.removeEventListener('focus', refresh);
     };
-  }, [user?.id, isGuest]);
+  }, [user?.id, token, isGuest]);
 
   const currentQuestionRef = useRef<ClientQuestion | null>(currentQuestion);
   currentQuestionRef.current = currentQuestion;
@@ -457,7 +476,7 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
       })
       .catch(() => {})
       .finally(() => setSharedProfileLoading(false));
-  }, [sharedProfileCode, user, isGuest]);
+  }, [sharedProfileCode, user?.id, isGuest]);
   // Keep system status bar completely hidden in fullscreen mode without triggering re-layouts on screen changes
   useEffect(() => {
     StatusBar.setHidden(true, 'none');
@@ -469,44 +488,6 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
     return () => sub.remove();
   }, []);
 
-  // Yetkili sunucu senkronizasyonu: Uygulama açılışında bir kez PostgreSQL'den güncel profili çeker
-  const hasInitialProfileFetchedRef = useRef(false);
-  useEffect(() => {
-    if (!hasInitialProfileFetchedRef.current && user && !isGuest && user.id) {
-      hasInitialProfileFetchedRef.current = true;
-      fetch(`${API_BASE}/social/profile/${user.id}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((freshUser) => {
-          if (freshUser && freshUser.id === user.id) {
-            // Eğer sunucudan varsayılan av1 dönerse ama yerelde kullanıcının seçtiği özel bir avatar varsa, yerel avatarı koru ve sunucuya bildir
-            if (
-              user.avatarUrl &&
-              user.avatarUrl !== 'av1' &&
-              user.avatarUrl !== 'av_1' &&
-              (!freshUser.avatarUrl || freshUser.avatarUrl === 'av1' || freshUser.avatarUrl === 'av_1')
-            ) {
-              freshUser.avatarUrl = user.avatarUrl;
-              // Sunucu veritabanını da bu avatar ile hemen kalıcı güncelle
-              fetch(`${API_BASE}/auth/profile`, {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify({
-                  userId: user.id,
-                  avatarUrl: user.avatarUrl,
-                }),
-              }).catch(() => {});
-            }
-            setUser(freshUser);
-          }
-        })
-        .catch(() => {});
-    }
-  }, []);
   // Apply stored user preferences (sound, music, haptics) once at app boot
   useEffect(() => {
     applyStoredPreferencesOnBoot();
@@ -712,7 +693,10 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
                 return;
               }
               if (data?.user) {
+                if (useGameStore.getState().user?.id !== user.id || useGameStore.getState().token !== token) return;
                 setUser(data.user);
+                pageDataCache.invalidate(eventsUrl(API_BASE, user.id), user.id);
+                pageDataCache.invalidate(leaderboardUrl(API_BASE));
               }
               if (data?.rewards && !(data.rewards.alreadyRecorded && !data.rewards.xp && !data.rewards.lp)) {
                 setMatchRewards({
@@ -832,7 +816,8 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
       sound.playSound('reward');
       sound.triggerHaptic('success');
       if (currentScreenRef.current === 'notifications') inbox.dismissToast();
-      void refreshUserProfile();
+      if (['friend', 'friend_request', 'friend_accepted'].includes(notif.type)) friendsChanged(API_BASE, user.id);
+      if (notif.type === 'reward') pageDataCache.invalidate(referralUrl(API_BASE), user.id);
     });
     const unsubNotifUpdate = socketService.on('notification:update', (data: { id: string; handled: 'accepted' | 'declined' }) => {
       if (data?.id && (data.handled === 'accepted' || data.handled === 'declined')) {
@@ -840,8 +825,10 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
       }
     });
 
-    const unsubFriendsSync = socketService.on('friends:update', () => {
-      refreshUserProfile();
+    const unsubFriendsSync = socketService.on('friends:update', (change?: { removedBy?: string }) => {
+      friendsChanged(API_BASE, user.id, change?.removedBy);
+      // May include a referral reward. Keep the profile and wallet authoritative.
+      void refreshUserProfile(true);
     });
 
     const heartbeatInterval = setInterval(() => {
@@ -862,7 +849,7 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
       presenceAppState.remove();
       clearInterval(heartbeatInterval);
     };
-  }, [user?.id, user?.displayName, user?.avatarUrl, token, isGuest, scheduleGameTimeout]);
+  }, [user?.id, user?.displayName, user?.avatarUrl, token, isGuest, scheduleGameTimeout, refreshUserProfile]);
   // -------------------------------------------------------------
   // Auth & Profile Actions
   // -------------------------------------------------------------
@@ -1521,7 +1508,10 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
             .then((r) => r.json())
             .then((data) => {
               if (data?.user) {
+                if (useGameStore.getState().user?.id !== user.id || useGameStore.getState().token !== token) return;
                 setUser(data.user);
+                pageDataCache.invalidate(eventsUrl(API_BASE, user.id), user.id);
+                pageDataCache.invalidate(leaderboardUrl(API_BASE));
               }
               sound.playSound('victory');
               sound.triggerHaptic('success');
@@ -1590,7 +1580,10 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
           .then((r) => r.json())
           .then((data) => {
             if (data?.user) {
+              if (useGameStore.getState().user?.id !== user.id || useGameStore.getState().token !== token) return;
               setUser(data.user);
+              pageDataCache.invalidate(eventsUrl(API_BASE, user.id), user.id);
+              pageDataCache.invalidate(leaderboardUrl(API_BASE));
             }
             if (data?.rewards) {
               setPracticeRewards({ xp: data.rewards.xp, coins: data.rewards.coins, boosted: !!data.rewards.boosted });
@@ -1863,6 +1856,7 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
             room={activeRoom}
             currentUserId={user.id}
             user={user}
+            apiBaseUrl={API_BASE}
             onBack={handleExitCurrentGame}
             onToggleReady={handleToggleReady}
             onStartGame={handleStartGame}
@@ -2062,7 +2056,7 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
             token={token}
             pendingReferral={pendingReferral}
             onClearReferral={() => { clearPendingReferral(); setPendingReferral(null); }}
-            onReferralConnected={() => { void refreshUserProfile(); }}
+            onReferralConnected={() => { void refreshUserProfile(true); }}
             user={user || undefined}
             isGuest={isGuest}
             apiBaseUrl={API_BASE}
@@ -2176,7 +2170,6 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
                 handleStartQuickMatch();
               }
             }}
-            onRefreshUser={() => { void refreshUserProfile(); }}
           />
         )}
         {currentScreen === 'settings' && (
@@ -2269,7 +2262,7 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
             user={user || undefined}
             apiBaseUrl={API_BASE}
             onUpdateUser={(u) => setUser(u)}
-            onRefreshUser={() => { void refreshUserProfile(); }}
+            onRefreshUser={() => { void refreshUserProfile(true); }}
             onBack={() => navigateTo('home')}
             onProfile={() => navigateTo('profile')}
           />

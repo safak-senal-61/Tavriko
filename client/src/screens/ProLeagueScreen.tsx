@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,10 @@ import Reanimated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { KitHero, STORE_IMG, KIT } from '../components/StoreKit';
 import { UserProfileModal } from '../components/UserProfileModal';
 import { sound } from '../services/soundService';
+import { PageLoadError } from '../components/PageLoadError';
+import { PAGE_TTL } from '../utils/pageDataCache';
+import { leaderboardRows, leaderboardUrl } from '../utils/pageResources';
+import { usePageData } from '../utils/usePageData';
 
 interface ProLeagueScreenProps {
   user?: UserProfile;
@@ -51,31 +55,11 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
   onNotifications,
   onProfile,
 }) => {
-  const [players, setPlayers] = useState<LeaguePlayer[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, error, read } = usePageData<LeaguePlayer[] | {
+    topPlayers?: LeaguePlayer[]; leaders?: LeaguePlayer[];
+  }>(leaderboardUrl(apiBaseUrl || DEFAULT_API_BASE), PAGE_TTL.leaderboard);
+  const players = leaderboardRows(data);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const base = apiBaseUrl || DEFAULT_API_BASE;
-    let isMounted = true;
-    setLoading(true);
-    fetch(`${base}/social/leaderboard`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!isMounted) return;
-        const list = Array.isArray(data) ? data : data?.topPlayers;
-        if (Array.isArray(list)) {
-          setPlayers(list);
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, [apiBaseUrl, user?.rankPoints]);
 
   const myEntry = players.find((p) => p.userId === user?.id);
   const myRank = myEntry ? myEntry.rank : 1;
@@ -126,6 +110,8 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
 
         {loading ? (
           <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 32 }} />
+        ) : error && !data ? (
+          <PageLoadError onRetry={() => void read(true).catch(() => {})} />
         ) : (
           <>
             {/* Top 3 Podium */}

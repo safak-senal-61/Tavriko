@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
   View,
@@ -22,6 +22,12 @@ import { trackEvent } from '../services/analytics';
 import { authHeaders } from '../utils/apiAuth';
 import { FRIEND_CODE_PREFIX, normalizeFriendCodeSuffix } from '../utils/friendCode';
 import { DEFAULT_API_BASE } from '../config';
+import { PageLoadError } from '../components/PageLoadError';
+import { useGameStore } from '../store/gameStore';
+import { PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
+import { friendsChanged, friendsUrl, profileUrl, type FriendsPayload } from '../utils/pageResources';
+import { usePageData } from '../utils/usePageData';
+import { UserProfileModal } from '../components/UserProfileModal';
 import { socketService } from '../services/socketService';
 import { ReferralCards } from '../components/ReferralCards';
 import { DISCOVERY_IMG } from '../components/DiscoveryArtwork';
@@ -92,17 +98,15 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'friends' | 'add' | 'requests'>('friends');
   const [copied, setCopied] = useState(false);
-  const [friendCode, setFriendCode] = useState(user?.friendCode || 'TV-10000');
-  const [friendsList, setFriendsList] = useState<FriendRowItem[]>([]);
-  const [sentRequests, setSentRequests] = useState<any[]>([]);
-  const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [respondingReqId, setRespondingReqId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [challengeLoadingId, setChallengeLoadingId] = useState<string | null>(null);
   const [challengeNotice, setChallengeNotice] = useState<string | null>(null);
   // Profile Inspection Modal State
   const [inspectPlayer, setInspectPlayer] = useState<FriendRowItem | null>(null);
   const [inspectDetails, setInspectDetails] = useState<any | null>(null);
+  const [privateProfileId, setPrivateProfileId] = useState<string | null>(null);
+  const latestProfilePress = useRef(0);
+  useEffect(() => () => { latestProfilePress.current++; }, []);
   const [inspectLoading, setInspectLoading] = useState(false);
   const [removingFriend, setRemovingFriend] = useState(false);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
@@ -140,185 +144,40 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   const [addErrorMsg, setAddErrorMsg] = useState<string | null>(null);
   const [signInRequired, setSignInRequired] = useState(false);
   const base = apiBaseUrl || DEFAULT_API_BASE;
-  const fetchFriends = () => {
-    const uid = user?.id || 'default';
-    setLoading(true);
-    socketService.requestPresenceSnapshot();
-    fetch(`${base}/social/friends/${uid}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.friendCode) setFriendCode(data.friendCode);
-        if (Array.isArray(data.sentRequests)) setSentRequests(data.sentRequests);
-        if (Array.isArray(data.incomingRequests)) setIncomingRequests(data.incomingRequests);
-        if (Array.isArray(data.friends)) {
-          // Strictly deduplicate users by ID, username, and normalized display name
-          const seenIds = new Set<string>();
-          const seenUsernames = new Set<string>();
-          const seenNames = new Set<string>();
-
-          // 1. Never show the current user in their own friends list
-          if (user?.id) seenIds.add(user.id);
-          if (uid && uid !== 'default') seenIds.add(uid);
-          if (user?.username) seenUsernames.add(user.username.toLowerCase().trim());
-          const myNormName = (user?.displayName || user?.fullName || user?.username || '')
-            .toLowerCase()
-            .replace(/[^a-z0-9ğüşıöç]/gi, '')
-            .trim();
-          if (myNormName) seenNames.add(myNormName);
-
-          // 2. ONLY include accepted friends (f.isFriend === true) and merge Cloudflare WS presence
-          const acceptedOnly = data.friends
-            .filter((f: FriendRowItem) => f && f.isFriend !== false)
-            .map((f: FriendRowItem) => {
-              const wsPresence = socketService.getUserPresence(f.id);
-              const isOnline = Boolean(f.online || wsPresence?.online);
-              const inRoom = Boolean(f.inRoom || wsPresence?.inRoom);
-              const currentRoomCode = f.currentRoomCode || wsPresence?.currentRoomCode;
-              let status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
-              if (inRoom && currentRoomCode) {
-                status = `Oda: #${currentRoomCode} · Lobide`;
-              }
-              return {
-                ...f,
-                isFriend: true,
-                online: isOnline,
-                inRoom,
-                currentRoomCode,
-                status,
-              };
-            });
-
-          const sorted = [...acceptedOnly].sort((a, b) => {
-            if (a.inRoom !== b.inRoom) return a.inRoom ? -1 : 1;
-            if (a.online !== b.online) return a.online ? -1 : 1;
-            return (b.xp || 0) - (a.xp || 0);
-          });
-
-          const cleanFriends = sorted.filter((f: FriendRowItem) => {
-            if (!f || !f.id || seenIds.has(f.id)) return false;
-            const uName = (f.username || '').toLowerCase().trim();
-            const normName = (f.displayName || f.name || f.username || '')
-              .toLowerCase()
-              .replace(/[^a-z0-9ğüşıöç]/gi, '')
-              .trim();
-            // Display names are not unique. Two friends named Ahmet are two people.
-            seenIds.add(f.id);
-            if (uName) seenUsernames.add(uName);
-            if (normName) seenNames.add(normName);
-            return true;
-          });
-          setFriendsList(cleanFriends);
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        setLoading(false);
-      });
-  };
-
+  const owner = !isGuest ? user?.id : undefined;
+  const { data, loading, error, read } = usePageData<FriendsPayload<FriendRowItem>>(
+    owner ? friendsUrl(base, owner) : null, PAGE_TTL.friends, owner, token);
+  const sentRequests = data?.sentRequests ?? [];
+  const incomingRequests = data?.incomingRequests ?? [];
+  const [presenceVersion, updatePresence] = useState(0);
+  const friendsList = useMemo(() => {
+    const seen = new Set([owner]);
+    return (data?.friends ?? []).filter(friend => {
+      if (!friend?.id || friend.isFriend === false || seen.has(friend.id)) return false;
+      seen.add(friend.id);
+      return true;
+    }).map(friend => {
+      const presence = socketService.getUserPresence(friend.id);
+      const online = presence?.online ?? friend.online;
+      const inRoom = presence ? presence.inRoom : friend.inRoom;
+      const currentRoomCode = presence ? presence.currentRoomCode : friend.currentRoomCode;
+      return { ...friend, online, inRoom, currentRoomCode,
+        status: inRoom && currentRoomCode ? `Oda: #${currentRoomCode} · Lobide`
+          : online ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı' };
+    }).sort((a, b) => Number(Boolean(b.inRoom)) - Number(Boolean(a.inRoom))
+      || Number(b.online) - Number(a.online) || (b.xp || 0) - (a.xp || 0));
+  }, [data, owner, presenceVersion]);
   useEffect(() => {
-    fetchFriends();
-
-    const unsubPresenceSnapshot = socketService.on('presence:snapshot', (data: any) => {
-      if (!data || !Array.isArray(data.presences)) return;
-      const onlineMap = new Map<string, any>();
-      for (const p of data.presences) {
-        if (p && p.userId) onlineMap.set(p.userId, p);
-      }
-      setFriendsList((prev) =>
-        prev.map((f) => {
-          const p = onlineMap.get(f.id);
-          const isOnline = p ? Boolean(p.online) : f.online;
-          const inRoom = p ? Boolean(p.inRoom) : f.inRoom;
-          const currentRoomCode = p?.currentRoomCode || f.currentRoomCode;
-          let status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
-          if (inRoom && currentRoomCode) {
-            status = `Oda: #${currentRoomCode} · Lobide`;
-          }
-          return { ...f, online: isOnline, inRoom, currentRoomCode, status };
-        })
-      );
-    });
-
-    // Listen to real-time presence events from WebSocket
-    const unsubPresenceUpdate = socketService.on('presence:update', (data: any) => {
-      if (!data || !data.userId) return;
-      setFriendsList((prev) =>
-        prev.map((f) => {
-          if (f.id === data.userId) {
-            const isOnline = data.online ?? f.online;
-            const inRoom = data.inRoom ?? f.inRoom;
-            const currentRoomCode = data.currentRoomCode ?? f.currentRoomCode;
-            let status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
-            if (inRoom && currentRoomCode) {
-              status = `Oda: #${currentRoomCode} · Lobide`;
-            }
-            return {
-              ...f,
-              online: isOnline,
-              inRoom,
-              currentRoomCode,
-              status,
-            };
-          }
-          return f;
-        })
-      );
-    });
-
-    const unsubUserOnline = socketService.on('user:online', (data: any) => {
-      const uid = data?.userId || data?.presence?.userId;
-      if (!uid) return;
-      setFriendsList((prev) =>
-        prev.map((f) => {
-          if (f.id === uid) {
-            return {
-              ...f,
-              online: true,
-              status: 'Arkadaşın · Çevrimiçi',
-            };
-          }
-          return f;
-        })
-      );
-    });
-
-    const unsubUserOffline = socketService.on('user:offline', (data: any) => {
-      const uid = data?.userId || data?.presence?.userId;
-      if (!uid) return;
-      setFriendsList((prev) =>
-        prev.map((f) => {
-          if (f.id === uid) {
-            return {
-              ...f,
-              online: false,
-              inRoom: false,
-              status: 'Arkadaşın · Çevrimdışı',
-            };
-          }
-          return f;
-        })
-      );
-    });
-
-    const unsubFriendsUpdate = socketService.on('friends:update', () => {
-      fetchFriends();
-    });
-
-    const unsubNewNotif = socketService.on('notification:new', () => {
-      fetchFriends();
-    });
-
-    return () => {
-      unsubPresenceSnapshot();
-      unsubPresenceUpdate();
-      unsubUserOnline();
-      unsubUserOffline();
-      unsubFriendsUpdate();
-      unsubNewNotif();
-    };
-  }, [apiBaseUrl, user?.id]);
-  const currentCode = user?.friendCode || friendCode;
+    if (!owner) return;
+    const onPresence = () => updatePresence(n => n + 1);
+    const unsub = ['presence:snapshot', 'presence:update', 'user:online', 'user:offline']
+      .map(event => socketService.on(event, onPresence));
+    socketService.requestPresenceSnapshot();
+    return () => unsub.forEach(remove => remove());
+  }, [owner]);
+  const sameSession = () => Boolean(owner && useGameStore.getState().user?.id === owner && useGameStore.getState().token === token);
+  const fetchFriends = (removedId?: string) => { if (owner && sameSession()) friendsChanged(base, owner, removedId); };
+  const currentCode = user?.friendCode || data?.friendCode || 'TV-10000';
   const handleCopyCode = async () => {
     sound.playSound('reward');
     sound.triggerHaptic('success');
@@ -339,42 +198,32 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     sound.playSound('tap');
     sound.triggerHaptic('light');
     setConfirmRemoveId(null);
-    /* Tam profil sayfası kullanılıyorsa küçük modal hiç açılmaz:
-       profil arkadan çekilip doğrudan tam ekran görüntülenir. */
-    if (onOpenFullProfile) {
-      setInspectLoading(true);
-      try {
-        const res = await fetch(`${base}/social/profile/${player.id}`, {
-          headers: authHeaders(),
-        });
-        if (res.ok) {
-          const fullProfile = await res.json();
-          if (fullProfile?.id) {
-            setInspectLoading(false);
-            onOpenFullProfile(fullProfile);
-            return;
-          }
-        }
-      } catch {
-        // offline: eski modal temel bilgilerle açılır
-      }
-      setInspectLoading(false);
-    }
-    setInspectPlayer(player);
-    setInspectDetails(null);
-    setInspectLoading(true);
+    if (!owner) return;
+    const press = ++latestProfilePress.current;
+    const isCurrent = () => press === latestProfilePress.current && sameSession();
+    const url = profileUrl(base, player.id);
+    // A warm profile opens immediately; a stale one is checked before showing it
+    // because the owner's visibility settings may have changed.
+    setInspectLoading(!pageDataCache.snapshot(url, owner).data);
     try {
-      const res = await fetch(`${base}/social/profile/${player.id}`, {
-        headers: authHeaders(),
-      });
-      if (res.ok) {
-        const fullProfile = await res.json();
-        setInspectDetails(fullProfile);
+      const fullProfile = await pageDataCache.load<UserProfile & { isPrivate?: boolean }>(url, PAGE_TTL.profile, { scope: owner, token });
+      if (!isCurrent()) return;
+      if (fullProfile?.isPrivate) {
+        setPrivateProfileId(player.id);
+        return;
       }
+      if (fullProfile?.id && onOpenFullProfile) {
+        onOpenFullProfile(fullProfile);
+        return;
+      }
+      setInspectPlayer(player);
+      setInspectDetails(fullProfile);
     } catch {
-      // offline / cached fallback
+      if (!isCurrent()) return;
+      setInspectPlayer(player);
+      setInspectDetails(null);
     } finally {
-      setInspectLoading(false);
+      if (isCurrent()) setInspectLoading(false);
     }
   };
 
@@ -396,12 +245,13 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       if (!res.ok) {
         throw new Error(data.error || 'Arkadaş çıkarılamadı.');
       }
+      if (!sameSession()) return;
       sound.playSound('reward');
       sound.triggerHaptic('success');
       socketService.notifyUserRealtime(targetPlayer.id, 'friends:update', {
         removedBy: user.id,
       });
-      setFriendsList((prev) => prev.filter((item) => item.id !== targetPlayer.id));
+      fetchFriends(targetPlayer.id);
       setConfirmRemoveId(null);
       setInspectPlayer(null);
       setChallengeNotice(
@@ -449,6 +299,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Arkadaşlık isteği gönderilemedi.');
       }
+      if (!sameSession()) return;
       sound.playSound('reward');
       sound.triggerHaptic('success');
       if (data.friend?.id && data.notification) {
@@ -493,6 +344,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         return;
       }
       if (res.ok && data.success) {
+        if (!sameSession()) return;
         if (action === 'accept') {
           if (req.type === 'match_invite' || req.type === 'duel') {
             const targetRoom = data.roomCode || req.roomCode || 'DUEL1';
@@ -659,6 +511,8 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         {activeTab === 'friends' && (
           loading ? (
             <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 28 }} />
+          ) : error && !data ? (
+            <PageLoadError onRetry={() => void read(true).catch(() => {})} />
           ) : friendsList.length === 0 ? (
             <View style={styles.emptyStateBox}>
               <Text style={styles.emptyStateTitle}>Henüz ekli arkadaşın yok</Text>
@@ -852,7 +706,11 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         {/* Tab 3: Incoming Friend Requests & Duel Invitations */}
         {activeTab === 'requests' && (
           <View>
-            {incomingRequests.length > 0 ? (
+            {loading ? (
+              <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 28 }} />
+            ) : error && !data ? (
+              <PageLoadError onRetry={() => void read(true).catch(() => {})} />
+            ) : incomingRequests.length > 0 ? (
               incomingRequests.map((req, rIdx) => (
                 <Reanimated.View
                   key={req.id}
@@ -917,6 +775,8 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         />
       )}
       {/* Interactive Player Profile Modal */}
+      {privateProfileId && <UserProfileModal visible userId={privateProfileId} currentUserId={owner} apiBaseUrl={base}
+        onClose={() => setPrivateProfileId(null)} />}
       <Modal
         visible={Boolean(inspectPlayer)}
         transparent

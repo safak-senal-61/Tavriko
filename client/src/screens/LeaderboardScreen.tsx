@@ -11,6 +11,10 @@ import {
 import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { DEFAULT_API_BASE } from '../config';
+import { PageLoadError } from '../components/PageLoadError';
+import { PAGE_TTL } from '../utils/pageDataCache';
+import { leaderboardRows, leaderboardUrl } from '../utils/pageResources';
+import { usePageData } from '../utils/usePageData';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -70,41 +74,21 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
   onNotifications,
 }) => {
   const [activeTab, setActiveTab] = useState<'weekly' | 'all_time'>('weekly');
-  const [leaders, setLeaders] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const base = apiBaseUrl || DEFAULT_API_BASE;
-    let isMounted = true;
-    setLoading(true);
-    fetch(`${base}/social/leaderboard`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!isMounted) return;
-        const list = Array.isArray(data) ? data : data?.topPlayers || data?.leaders;
-        if (Array.isArray(list)) {
-          const normalized: LeaderboardEntry[] = list.map((item: any, idx: number) => ({
-            rank: idx + 1,
-            id: item.id || item.userId,
-            userId: item.userId || item.id || `u_${idx}`,
-            username: item.username,
-            displayName: item.displayName || item.username || 'Oyuncu',
-            avatarUrl: item.avatarUrl,
-            rankPoints: Number(item.rankPoints) || 1000,
-            level: Number(item.level) || 1,
-            xp: Number(item.xp) || 0,
-            rankTitle: item.rankTitle || 'Acemi Kaşif',
-          }));
-          setLeaders(normalized);
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, [apiBaseUrl, user?.rankPoints, user?.xp]);
+  const { data, loading, error, read } = usePageData<LeaderboardEntry[] | {
+    topPlayers?: LeaderboardEntry[]; leaders?: LeaderboardEntry[];
+  }>(leaderboardUrl(apiBaseUrl || DEFAULT_API_BASE), PAGE_TTL.leaderboard);
+  const leaders = React.useMemo(() => leaderboardRows(data).map((item, idx): LeaderboardEntry => ({
+    rank: idx + 1,
+    id: item.id || item.userId,
+    userId: item.userId || item.id || `u_${idx}`,
+    username: item.username,
+    displayName: item.displayName || item.username || 'Oyuncu',
+    avatarUrl: item.avatarUrl,
+    rankPoints: Number(item.rankPoints) || 1000,
+    level: Number(item.level) || 1,
+    xp: Number(item.xp) || 0,
+    rankTitle: item.rankTitle || 'Acemi Kaşif',
+  })), [data]);
 
   const sortedLeaders = React.useMemo(() => {
     const sorted = [...leaders].sort((a, b) =>
@@ -206,6 +190,8 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
 
         {loading ? (
           <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 32 }} />
+        ) : error && !data ? (
+          <PageLoadError onRetry={() => void read(true).catch(() => {})} />
         ) : sortedLeaders.length === 0 ? (
           <Text style={styles.emptyText}>Henüz sıralamada oyuncu yok.</Text>
         ) : (

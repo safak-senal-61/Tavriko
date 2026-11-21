@@ -7,14 +7,18 @@ import { GradientFill } from './TavrikoGradient';
 import { DiscoveryArtwork, DISCOVERY_IMG } from './DiscoveryArtwork';
 import { THEME } from '../theme/tokens';
 import { socketService } from '../services/socketService';
+import { useGameStore } from '../store/gameStore';
+import { PAGE_TTL } from '../utils/pageDataCache';
+import { referralUrl } from '../utils/pageResources';
+import { usePageData } from '../utils/usePageData';
 
 type Props = { base: string; token?: string | null; userId?: string; pendingToken?: string | null;
   onClear: () => void; onConnected: () => void };
 export function ReferralCards({ base, token, userId, pendingToken, onClear, onConnected }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const [link, setLink] = useState<any>(null);
+  const { data: link, loading, error: linkError, read } = usePageData<{ url: string; joinedCount: number; earnedCoins: number }>(
+    expanded && userId && token ? referralUrl(base) : null, PAGE_TTL.referral, userId, token);
   const [preview, setPreview] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
@@ -36,16 +40,8 @@ export function ReferralCards({ base, token, userId, pendingToken, onClear, onCo
       .finally(() => { if (active) setPreviewLoading(false); });
     return () => { active = false; };
   }, [base, pendingToken, reloadPreview]);
-  useEffect(() => { setLink(null); setExpanded(false); setError(''); setNotice(''); }, [userId]);
-  const loadLink = async () => {
-    setExpanded(true); setLoading(true); setError(''); setNotice('');
-    try {
-      const res = await fetch(`${base}/referrals/me`, { headers });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Bağlantı hazırlanamadı.');
-      setLink(data);
-    } catch (e: any) { setError(e.message || 'Bağlantı hazırlanamadı. Tekrar dene.'); }
-    finally { setLoading(false); }
+  const toggleLink = () => {
+    setExpanded(!expanded); setError(''); setNotice('');
   };
   const confirm = async () => {
     if (sending || !pendingToken || !token) return;
@@ -56,6 +52,7 @@ export function ReferralCards({ base, token, userId, pendingToken, onClear, onCo
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Davet gönderilemedi.');
+      if (useGameStore.getState().user?.id !== userId || useGameStore.getState().token !== token) return;
       // Existing edge gateway transport makes the inviter refresh without waiting for polling.
       socketService.notifyUserRealtime(data.inviterId, 'friends:update', { friendId: userId });
       setNotice(data.message); onClear(); onConnected();
@@ -63,10 +60,12 @@ export function ReferralCards({ base, token, userId, pendingToken, onClear, onCo
     finally { setSending(false); }
   };
   const copy = async () => {
+    if (!link) return;
     try { await Clipboard.setStringAsync(link.url); setNotice('Davet bağlantın kopyalandı.'); }
     catch { setError('Kopyalanamadı. Aşağıdaki bağlantıyı seçip kopyalayabilirsin.'); }
   };
   const share = async () => {
+    if (!link) return;
     try { await Share.share({ message: `Tavriko’da birlikte oynayalım! Girişten sonra profil kartımdaki “Daveti gönder” düğmesine dokun.\n${link.url}` }); }
     catch { setError('Paylaşım açılamadı. Bağlantıyı kopyalayabilirsin.'); }
   };
@@ -94,7 +93,7 @@ export function ReferralCards({ base, token, userId, pendingToken, onClear, onCo
     <View style={s.card}>
       <GradientFill colors={['#3F2467', '#271546', '#263246']} direction="diagonal" />
       <TouchableOpacity accessibilityRole="button" accessibilityLabel="Arkadaş davet et kazan" accessibilityState={{ expanded }} activeOpacity={0.9}
-        onPress={() => expanded ? setExpanded(false) : void loadLink()} style={s.hero}>
+        onPress={toggleLink} style={s.hero}>
         <View style={{ flex: 1, minWidth: 0 }}><View style={s.row}><Gift size={15} color="#FFD270" /><Text style={s.eyebrow}>BİRLİKTE DAHA GÜZEL</Text></View>
           <Text style={s.title}>Arkadaşını çağır.{'\n'}Birlikte kazan.</Text>
           <Text style={s.body}>Sana özel bağlantını paylaş, ekibini büyüt.</Text>
@@ -102,7 +101,7 @@ export function ReferralCards({ base, token, userId, pendingToken, onClear, onCo
         <DiscoveryArtwork source={DISCOVERY_IMG.social} size={88} />
       </TouchableOpacity>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={expanded ? 'Davet bağlantısını gizle' : 'Davet bağlantımı aç'}
-        onPress={() => expanded ? setExpanded(false) : void loadLink()} style={s.footer}>
+        onPress={toggleLink} style={s.footer}>
         <Text style={s.gold}>Yeni arkadaş başına +100 altın</Text><ChevronDown size={18} color="#FFD270" style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }} />
       </TouchableOpacity>
       {expanded && <View style={s.details}>
@@ -118,7 +117,9 @@ export function ReferralCards({ base, token, userId, pendingToken, onClear, onCo
           <View style={s.rule}><Send size={17} color="#BFA3EF" /><Text style={[s.body, { flex: 1 }]}>Bağlantı açılır, giriş yapılır, profil kartından davet onaylanır. Arkadaşlık sadece bu son adımda kurulur.</Text></View>
           <Text style={s.fine}>100 altın, bağlantın oluşturulduktan sonra yeni hesap açan ve daveti onaylayan her kişi için sana bir kez verilir. Mevcut hesaplar da arkadaş olabilir; tekrar ödül verilmez.</Text>
         </>}
-        {!!error && <><Text accessibilityRole="alert" style={s.error}>{error}</Text>{!link && <Button3D title="TEKRAR DENE" variant="purple" onPress={loadLink} />}</>}
+        {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
+        {linkError && !link && <><Text accessibilityRole="alert" style={s.error}>Bağlantı hazırlanamadı. Tekrar dene.</Text>
+          <Button3D title="TEKRAR DENE" variant="purple" onPress={() => void read(true).catch(() => {})} /></>}
       </View>}
     </View>
     {!!notice && <Text accessibilityLiveRegion="polite" style={s.success}>{notice}</Text>}

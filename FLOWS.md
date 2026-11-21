@@ -153,3 +153,11 @@
 - Enter the code and matching new passwords, then select “ŞİFREMİ YENİLE”. Expect a return to login with confirmation, no automatic login, and successful sign-in with the new password only.
 - Check service unavailable, wrong code, five failed attempts, expired/used codes, repeat send, and email change. A resend has a 60-second account-level cooldown. The reset and its confirmation must work across separate app instances; an account-deletion code cannot reset a password.
 - Run the web flow on desktop and 375px mobile, then recheck login/register switching and guest exploration. Use an isolated account, mock delivery locally, and only send real mail to an authorized test inbox after production configuration.
+
+## Player page data reuse (web and Android)
+
+- Open Keşfet, open a category and return, then open the category list in Özel Oda. Question counts should stay visible and come from one shared snapshot.
+- Open Liderlik and Pro Lig in turn, switch ranking tabs, inspect a player and return. Re-entry should show the last successful list without blocking while a stale list refreshes.
+- Open Arkadaşlar, lobby invitations, Etkinlikler and Bildirimler, then revisit. Check fresh cache reuse, an empty result, a failed refresh and a successful mutation or socket event without stale results replacing newer data.
+- Check public rooms with and without a realtime room snapshot, and leave/re-enter. Timers, live room data, gameplay, authentication, purchases and wallet writes must not be served from a page cache.
+- Open support cases and referral panels twice, then switch accounts. No private result or pending response may carry over to the next account.
