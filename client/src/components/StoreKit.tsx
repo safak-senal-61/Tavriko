@@ -50,6 +50,9 @@ export const STORE_IMG = {
   badgeVeteran: cdnImage('images/store/badge_veteran.png'),
   badgeSeasonChamp: cdnImage('images/store/badge_season_1_champ.png'),
   badgeGenius: cdnImage('images/store/badge_genius.png'),
+  // Bundle the two task badges so this release does not depend on a separate CDN upload.
+  badgeSocial: require('../../bundled/reward-badges/badge_social_player.png') as ImageSourcePropType,
+  badgeConsistent: require('../../bundled/reward-badges/badge_consistent_player.png') as ImageSourcePropType,
   gemsS: cdnImage('images/store/gems_s.png'),
   gemsM: cdnImage('images/store/gems_m.png'),
   gemsL: cdnImage('images/store/gems_l.png'),
@@ -139,7 +142,8 @@ export const storeImageFor = (id: string, category?: string): ImageSourcePropTyp
     return k.includes('24h') ? STORE_IMG.booster24h : STORE_IMG.booster;
   }
   if (c.startsWith('badge') || k.includes('badge')) {
-    if (k === 'badge_social_player' || k === 'badge_consistent_player') return null;
+    if (k === 'badge_social_player') return STORE_IMG.badgeSocial;
+    if (k === 'badge_consistent_player') return STORE_IMG.badgeConsistent;
     // Her rozet kendi görselini kullanır (aynı görselin tekrarı yok)
     if (k.includes('season') && k.includes('champ')) return STORE_IMG.badgeSeasonChamp;
     if (k.includes('speed')) return STORE_IMG.badgeSpeed;

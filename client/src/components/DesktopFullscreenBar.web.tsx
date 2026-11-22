@@ -53,7 +53,11 @@ const styles = `
   }
 `;
 
-export function DesktopFullscreenBar({ hidden }: { hidden?: boolean }) {
+export function DesktopFullscreenBar({ enabled, targetId, onFullscreenChange }: {
+  enabled: boolean;
+  targetId: string;
+  onFullscreenChange: (active: boolean) => void;
+}) {
   const [available, setAvailable] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [error, setError] = useState(false);
@@ -62,35 +66,49 @@ export function DesktopFullscreenBar({ hidden }: { hidden?: boolean }) {
   useEffect(() => {
     const desktop = window.matchMedia(DESKTOP);
     const sync = () => {
+      const target = document.getElementById(targetId);
       setAvailable(desktop.matches && document.fullscreenEnabled &&
-        typeof document.documentElement.requestFullscreen === 'function' &&
+        typeof target?.requestFullscreen === 'function' &&
         typeof document.exitFullscreen === 'function');
-      setFullscreen(document.fullscreenElement === document.documentElement);
+      const active = !!target && document.fullscreenElement === target;
+      setFullscreen(active);
+      onFullscreenChange(active);
     };
-    const onFullscreenChange = () => {
+    const handleFullscreenChange = () => {
       setError(false);
       sync();
     };
     sync();
     desktop.addEventListener('change', sync);
-    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       desktop.removeEventListener('change', sync);
-      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, []);
+  }, [targetId, onFullscreenChange]);
 
-  if (!fullscreen && (hidden || !available)) return null;
+  useEffect(() => {
+    if (enabled) return;
+    setError(false);
+    // Do not leave menu screens or body-level result dialogs behind the fullscreen layer.
+    const target = document.getElementById(targetId);
+    if (target && document.fullscreenElement === target) {
+      void document.exitFullscreen().catch(() => {});
+    }
+  }, [enabled, fullscreen, targetId]);
+
+  if (!enabled || (!fullscreen && !available)) return null;
 
   const toggle = async () => {
-    if (inFlight.current) return;
+    const target = document.getElementById(targetId);
+    if (!target || inFlight.current) return;
     inFlight.current = true;
     setError(false);
     try {
-      if (document.fullscreenElement === document.documentElement) {
+      if (document.fullscreenElement === target) {
         await document.exitFullscreen();
       } else {
-        await document.documentElement.requestFullscreen();
+        await target.requestFullscreen();
       }
     } catch {
       setError(true);

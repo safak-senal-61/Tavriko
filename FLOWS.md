@@ -2,14 +2,15 @@
 
 ## Desktop web fullscreen
 
-- On desktop `/app`, find “Tam ekran” above the login screen, open it, then leave with “Tam ekrandan çık” or the browser’s Esc command. The control returns to “Tam ekran”; login tabs and any text already entered stay intact.
-- Enter as a guest, open a category, and continue to practice. The control stays reachable on Keşfet and during play without overlaying answers or restarting the round. Also check the control with a short desktop viewport.
-- Resize the same tab desktop → 375px → desktop. The fullscreen bar stays hidden on narrow or touch-only layouts and returns on desktop. A disabled Fullscreen API must not add a blank bar; a rejected request should show a brief explanation without affecting the game.
+- On desktop `/app`, verify no “Tam ekran” control on login, Keşfet, difficulty selection, menus or results. Start a practice question and enter fullscreen from the game toolbar; only the arena fills the screen and the current question, timer and selection stay intact.
+- While playing, check “Tam ekrandan çık” and browser-initiated fullscreen exit. In a multiplayer round, keep fullscreen across the intermission; leave it automatically on the results screen or if the player exits to a menu. The solo and daily-challenge summary dialogs must be reachable after automatic exit.
+- Check a short desktop viewport, a 375px screen and a wide touch-only screen. Answers must remain reachable; only a supported desktop game should show the toolbar. A rejected fullscreen request should show a brief explanation without affecting the game.
 
 ## Gameplay rewards
 
 - Baseline: sign-in opens Oyna; Mağaza previously opened on Sandıklar with Anahtarlar and Rozetler tabs. Envanter is where owned items are opened or equipped.
 - From Oyna → Ödüller, check all four chest progress bars, switch to Rozetler and check the friend, match and answer tasks. Verify locked, ready, claimed, network failure/retry and no duplicate claim.
+- Check the original armor, owl-and-book, and emerald brain artwork on their matching tasks, plus the new handshake for the friend task and calendar for the play-days task. Verify that newly earned and equipped badges show the same artwork in Envanter and Profil.
 - Claim a ready chest and open Envanter; the chest and matching earned key must both be present. Claim a badge, equip it, switch to another badge and re-equip the first; permanent copies are not consumed.
 - Check that Mağaza no longer offers chests, keys or badges, including bundles, while the permanent navigation, frames, gold and boosters still open. Verify the premium season track gives fixed rewards, never chests or keys.
 - Test synthetic users only. Check verified match and friend progress, concurrent claims and reopening from another session. Check phone (320/375 px), desktop, error states and console.

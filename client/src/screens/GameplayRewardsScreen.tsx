@@ -139,8 +139,13 @@ export function GameplayRewardsScreen({ user, apiBaseUrl, onUpdateUser, onBack, 
               return (
                 <View key={item.id} style={[styles.card, columns > 1 && { width: columns === 2 ? '49%' : '32.3%' }]}>
                   <View style={styles.row}>
-                    {item.category === 'badge' ? <BadgeVisual badgeId={item.id} size={54} /> :
-                      art && <Image source={art} style={styles.art} resizeMode="contain" />}
+                    {art ? (
+                      <Image
+                        source={art}
+                        style={item.category === 'badge' ? styles.badgeArt : styles.art}
+                        resizeMode="contain"
+                      />
+                    ) : item.category === 'badge' && <BadgeVisual badgeId={item.id} size={62} />}
                     <View style={styles.details}>
                       <Text style={styles.name}>{item.name}</Text>
                       <Text style={styles.copy}>{task}</Text>
@@ -194,6 +199,7 @@ const styles = StyleSheet.create({
   card: { width: '100%', backgroundColor: '#211341', borderColor: '#5D427B', borderWidth: 1, borderRadius: 16, padding: 12, gap: 8 },
   row: { flexDirection: 'row', gap: 10, alignItems: 'center', minHeight: 56 },
   art: { width: 54, height: 54 },
+  badgeArt: { width: 62, height: 62 },
   details: { flex: 1, minWidth: 0, gap: 2 },
   name: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
   progressLabel: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 6 },
