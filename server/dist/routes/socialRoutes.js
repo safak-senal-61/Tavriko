@@ -5,6 +5,8 @@ const auth_1 = require("../middleware/auth");
 const prismaClient_1 = require("../db/prismaClient");
 const presenceManager_1 = require("../services/presenceManager");
 const shared_1 = require("@trivia/shared");
+const rewardedAdRoutes_1 = require("./rewardedAdRoutes");
+const gameplayRewardRoutes_1 = require("./gameplayRewardRoutes");
 const router = (0, express_1.Router)();
 router.get('/leaderboard', async (req, res) => {
     try {
@@ -249,9 +251,9 @@ router.post('/shop/purchase', auth_1.requireUserAuth, async (req, res) => {
 router.post('/inventory/use', auth_1.requireUserAuth, async (req, res) => {
     try {
         const userId = req.authUserId;
-        const { itemId } = req.body;
-        if (!userId || !itemId) {
-            res.status(400).json({ error: 'userId ve itemId gerekli' });
+        const { itemId } = req.body || {};
+        if (!userId || typeof itemId !== 'string' || !itemId) {
+            res.status(400).json({ error: 'Geçerli bir eşya seç.' });
             return;
         }
         const result = await prismaClient_1.db.useInventoryItem(userId, itemId);
@@ -264,12 +266,12 @@ router.post('/inventory/use', auth_1.requireUserAuth, async (req, res) => {
 router.post('/inventory/open-chest', auth_1.requireUserAuth, async (req, res) => {
     try {
         const userId = req.authUserId;
-        const { chestId, keyId } = req.body;
-        if (!userId || !chestId) {
-            res.status(400).json({ error: 'userId ve chestId gereklidir.' });
+        const { chestId } = req.body || {};
+        if (!userId || typeof chestId !== 'string' || !chestId) {
+            res.status(400).json({ error: 'Geçerli bir sandık seç.' });
             return;
         }
-        const result = await prismaClient_1.db.openChest(userId, chestId, keyId);
+        const result = await prismaClient_1.db.openChest(userId, chestId);
         res.json({ success: true, ...result });
     }
     catch (err) {
@@ -522,4 +524,6 @@ router.post('/daily-challenge/complete', auth_1.requireUserAuth, async (req, res
         res.status(500).json({ error: err.message });
     }
 });
+router.use('/ads/rewarded', rewardedAdRoutes_1.rewardedAdRoutes);
+router.use('/rewards', gameplayRewardRoutes_1.gameplayRewardRoutes);
 exports.default = router;

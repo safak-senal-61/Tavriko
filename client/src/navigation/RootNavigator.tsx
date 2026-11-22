@@ -73,6 +73,7 @@ import { SeasonScreen } from '../screens/SeasonScreen';
 import { ShopScreen } from '../screens/ShopScreen';
 import { EventsScreen } from '../screens/EventsScreen';
 import { InventoryScreen } from '../screens/InventoryScreen';
+import { GameplayRewardsScreen } from '../screens/GameplayRewardsScreen';
 import { ProLeagueScreen } from '../screens/ProLeagueScreen';
 import { compressAvatarImageAsync } from '../utils/avatarImage';
 import { applyStoredPreferencesOnBoot, syncPreferencesFromAccount, loadStoredPreferences } from '../store/appPrefs';
@@ -1744,6 +1745,7 @@ export const RootNavigator: React.FC = () => {
               requireAuth(() => navigateTo('season'), 'Sezon 1 Pass')
             }
             onShop={() => requireAuth(() => navigateTo('shop'), 'Mağaza')}
+            onRewards={() => requireAuth(() => navigateTo('gameplay_rewards'), 'Ödüller')}
             onEvents={() =>
               requireAuth(() => navigateTo('events'), 'Etkinlikler')
             }
@@ -2281,11 +2283,23 @@ export const RootNavigator: React.FC = () => {
             }}
           />
         )}
+        {currentScreen === 'gameplay_rewards' && user && !isGuest && (
+          <GameplayRewardsScreen
+            key={user.id}
+            user={user}
+            apiBaseUrl={API_BASE}
+            onUpdateUser={syncWithFreshUser}
+            onBack={() => navigateTo('home')}
+            onInventory={() => navigateTo('inventory')}
+            onFriends={() => navigateTo('friends')}
+          />
+        )}
         {currentScreen === 'inventory' && (
           <InventoryScreen
             user={user || undefined}
             apiBaseUrl={API_BASE}
             onUpdateUser={(u) => setUser(u)}
+            onRewards={() => navigateTo('gameplay_rewards')}
             onBack={() => navigateTo('home')}
             onNotifications={() => navigateTo('notifications')}
             onProfile={() => navigateTo('profile')}

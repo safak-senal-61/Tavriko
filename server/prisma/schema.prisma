@@ -111,10 +111,21 @@ model User {
   referralReceived          ReferralRedemption? @relation("ReferralInvitee")
   referralsSent             ReferralRedemption[] @relation("ReferralInviter")
   rewardedAds               RewardedAdAttempt[]
+  gameplayRewardClaims      GameplayRewardClaim[]
 
   @@index([rankPoints(sort: Desc)])
   @@index([xp(sort: Desc)])
   @@map("users")
+}
+
+model GameplayRewardClaim {
+  userId    String
+  rewardId  String
+  claimedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, rewardId])
+  @@map("gameplay_reward_claims")
 }
 
 model RewardedAdAttempt {
@@ -137,7 +148,7 @@ model UserInventoryItem {
   name      String
   desc      String
   qty       Int      @default(1)
-  /// Süreli kozmetik kopyasının kuşanım süresi (saat); 1 saat - 30 gün seçilebilir
+  /// Kozmetik süresi (saat). Görev rozetlerinde 0 kalıcı kuşanımı belirtir.
   durationHours Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

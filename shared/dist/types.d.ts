@@ -417,7 +417,7 @@ export interface SeasonTierItem {
 }
 export declare function generateSeason1Tiers(): SeasonTierItem[];
 export declare const SEASON_1_TIERS: SeasonTierItem[];
-export type ShopProductCategory = 'featured' | 'diamonds' | 'gold' | 'chests' | 'keys' | 'avatars' | 'frames' | 'badges' | 'name_effects' | 'boosters' | 'backgrounds';
+export type ShopProductCategory = 'featured' | 'diamonds' | 'gold' | 'avatars' | 'frames' | 'name_effects' | 'boosters' | 'backgrounds';
 export interface ShopProduct {
     id: string;
     name: string;

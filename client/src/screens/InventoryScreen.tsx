@@ -11,7 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { LoadingShimmer } from '../components/LoadingShimmer';
-import { UserProfile, InventoryItem, ItemCategory, COSMETIC_RENTAL_MS, getCosmeticDef } from '@trivia/shared';
+import { UserProfile, InventoryItem, ItemCategory, COSMETIC_RENTAL_MS, getCosmeticDef, getChestOpening, isPermanentGameplayBadge } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
@@ -58,6 +58,7 @@ interface InventoryScreenProps {
   onNavigateSecondary?: (tab: SecondaryNavTab) => void;
   onNotifications?: () => void;
   onProfile?: () => void;
+  onRewards?: () => void;
 }
 
 type InvTabType = 'all' | 'chests' | 'keys' | 'boosters' | 'cosmetics' | 'badges' | 'avatars';
@@ -167,6 +168,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   onNavigateSecondary,
   onNotifications,
   onProfile,
+  onRewards,
 }) => {
   const page = usePlayerWebLayout();
   const threeItems = page?.columns === 3;
@@ -177,6 +179,8 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   const [isError, setIsError] = useState<boolean>(false);
   const [selectedChest, setSelectedChest] = useState<InventoryItem | null>(null);
   const [isOpeningChest, setIsOpeningChest] = useState<boolean>(false);
+  const openingInFlight = useRef(false);
+  const [chestError, setChestError] = useState('');
   const [chestRewards, setChestRewards] = useState<any[] | null>(null);
 
   // Animation values for chest opening & smooth tab transitions
@@ -210,7 +214,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 
   const filteredItems = userInventory.filter((item) => {
     if (activeTab === 'all') return true;
-    if (activeTab === 'chests') return item.category === 'chest' || item.id.includes('chest');
+    if (activeTab === 'chests') return !!getChestOpening(item.id);
     if (activeTab === 'keys') return item.category === 'key' || item.id.includes('key');
     if (activeTab === 'boosters') return item.category === 'booster' || item.id.includes('bolt') || item.id.includes('flame');
     if (activeTab === 'badges') return item.category === 'badge' || item.id.includes('badge');
@@ -221,40 +225,30 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 
   const totalQty = userInventory.reduce((acc, it) => acc + (it.qty || 0), 0);
 
-  // Determine key needed for a chest (hediye kutusu anahtar gerektirmez)
-  const getRequiredKey = (chestId: string): { id: string; name: string } | null => {
-    if (chestId.includes('gift')) {
-      return null;
-    }
-    if (chestId.includes('legendary') || chestId.includes('mythic')) {
-      return { id: 'key_diamond', name: 'Elmas Anahtar' };
-    }
-    if (chestId.includes('gold')) {
-      return { id: 'key_gold', name: 'Altın Anahtar' };
-    }
-    return { id: 'key_silver', name: 'Gümüş Anahtar' };
-  };
+  const selectedOpening = selectedChest ? getChestOpening(selectedChest.id) : undefined;
 
   const handleOpenChestClick = (item: InventoryItem) => {
     sound.playSound('tap');
     setSelectedChest(item);
     setChestRewards(null);
+    setChestError('');
   };
 
   const triggerChestOpeningAnimation = async () => {
-    if (!selectedChest || !user) return;
-    const reqKey = getRequiredKey(selectedChest.id);
-    const keyInInv = reqKey ? userInventory.find((i) => i.id === reqKey.id) : undefined;
-    const hasKey = !reqKey || (keyInInv?.qty || 0) > 0;
+    if (!selectedChest || !user || !selectedOpening || openingInFlight.current || chestRewards) return;
+    const reqKey = selectedOpening.key;
+    const hasKey = !reqKey || userInventory.some(i => i.qty > 0 &&
+      (i.id === reqKey.id || selectedOpening.alternateKeyIds?.includes(i.id)));
 
     if (!hasKey && reqKey) {
       sound.playSound('wrong');
       sound.triggerHaptic('error');
-      setIsError(true);
-      setStatusMessage(`⚠️ ${selectedChest.name} açmak için 1x ${reqKey.name} gereklidir!`);
+      setChestError(`${selectedChest.name} için 1 ${reqKey.name} gerekli.`);
       return;
     }
 
+    openingInFlight.current = true;
+    setChestError('');
     setIsOpeningChest(true);
     sound.playSound('tap');
     sound.triggerHaptic('medium');
@@ -275,11 +269,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
       const res = await fetch(`${base}/social/inventory/open-chest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({
-          userId: user.id,
-          chestId: selectedChest.id,
-          keyId: reqKey ? reqKey.id : undefined,
-        }),
+        body: JSON.stringify({ chestId: selectedChest.id }),
       });
 
       const data = await res.json();
@@ -287,8 +277,8 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
         sound.playSound('wrong');
         sound.triggerHaptic('error');
         setIsOpeningChest(false);
-        setIsError(true);
-        setStatusMessage(data.error || 'Sandık açılamadı.');
+        openingInFlight.current = false;
+        setChestError(data.error || 'Sandık açılamadı.');
         return;
       }
 
@@ -301,6 +291,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
         sound.triggerHaptic('success');
         setIsOpeningChest(false);
         setChestRewards(data.rewards || []);
+        openingInFlight.current = false;
         if (data.user && onUpdateUser) {
           onUpdateUser(data.user);
         }
@@ -308,8 +299,8 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     } catch {
       sound.playSound('wrong');
       setIsOpeningChest(false);
-      setIsError(true);
-      setStatusMessage('Sunucu bağlantı hatası oluştu.');
+      openingInFlight.current = false;
+      setChestError('Sunucuya bağlanılamadı.');
     }
   };
 
@@ -550,12 +541,9 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
           <KitEmpty
             source={STORE_IMG.inventoryEmpty}
             title="Envanterin boş"
-            desc="Mağazadan sandık ve güçlendirici alabilir, Sezon Pass'te seviye atlayarak ödül kazanabilirsin."
-            actionLabel={onNavigateSecondary ? 'Mağazaya git' : undefined}
-            onAction={() => {
-              sound.playSound('tap');
-              onNavigateSecondary && onNavigateSecondary('shop');
-            }}
+            desc="Maç oynayıp sandık, görevleri tamamlayıp rozet kazanabilirsin."
+            actionLabel={onRewards ? 'Ödüllere git' : undefined}
+            onAction={onRewards}
           />
         ) : filteredItems.length === 0 ? (
           <KitEmpty
@@ -567,7 +555,9 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
           <View style={[styles.grid, threeItems && styles.webGrid]}>
             {filteredItems.map((item, index) => {
               const rarityColor = RARITY_COLORS[item.rarity || 'common'];
-              const isChest = item.category === 'chest' || item.id.includes('chest');
+              const isChest = !!getChestOpening(item.id);
+              const permanent = isPermanentGameplayBadge(item.id, item.durationHours);
+              const equipped = permanent && user?.equippedBadge === item.id && !user?.equippedBadgeExpiresAt;
 
               return (
                 <Reanimated.View
@@ -580,7 +570,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                   activeOpacity={0.8}
                   onPress={() => {
                     if (isChest) handleOpenChestClick(item);
-                    else if (isEquippable(item)) handleEquipItem(item);
+                    else if (isEquippable(item) && !equipped) handleEquipItem(item);
                     else if (previewKindOf(item)) {
                       sound.playSound('tap');
                       setPreviewItem(item);
@@ -589,7 +579,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                 >
                   <View style={[styles.rarityBar, { backgroundColor: rarityColor }]} />
                   <View style={styles.qtyBadge}>
-                    <Text style={styles.qtyText}>x{item.qty}</Text>
+                    <Text style={styles.qtyText}>{permanent ? 'Kalıcı' : `x${item.qty}`}</Text>
                   </View>
                   <View style={[styles.iconWrap, roomy && { height: 2.15 * itemArt }]}>
                     {renderItemVisual(item, itemArt)}
@@ -604,7 +594,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                   {isEquippable(item) && (
                     <View style={[styles.openPill, roomy && styles.webOpenPill]}>
                       <Text style={[styles.openPillText, roomy && { fontSize: 14 }]}>
-                        {equippingItemId === item.id ? 'Uygulanıyor...' : 'Kuşan'}
+                        {equippingItemId === item.id ? 'Uygulanıyor...' : equipped ? 'Kuşanıldı' : 'Kuşan'}
                       </Text>
                     </View>
                   )}
@@ -717,12 +707,11 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                       <View style={styles.keyReqRow}>
                         <KeyIcon size={18} />
                         <Text style={styles.keyReqText}>
-                          {getRequiredKey(selectedChest.id)
-                            ? `1x ${getRequiredKey(selectedChest.id)!.name}`
-                            : 'Anahtar gerekmez — hediye kutusu'}
+                          {selectedOpening?.key ? `1x ${selectedOpening.key.name}` : 'Anahtar gerekmez'}
                         </Text>
                       </View>
                     </View>
+                    {!!chestError && <Text accessibilityLiveRegion="polite" style={styles.statusTextError}>{chestError}</Text>}
 
                     <View style={styles.modalActions}>
                       <TouchableOpacity

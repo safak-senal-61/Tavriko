@@ -31,6 +31,7 @@ export const WEB_PAGES = {
   shop: { mode: 'workspace', maxWidth: 1280 },
   events: { mode: 'workspace', maxWidth: 1280 },
   inventory: { mode: 'workspace', maxWidth: 1280 },
+  gameplay_rewards: { mode: 'workspace', maxWidth: 1120 },
   pro_league: { mode: 'workspace', maxWidth: 1280 },
   developer: { mode: 'workspace', maxWidth: 1240 },
   matchmaking: { mode: 'focus', maxWidth: 960 },

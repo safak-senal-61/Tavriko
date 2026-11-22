@@ -361,14 +361,14 @@ export const NAME_EFFECT_DEFS: CosmeticDef[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// ROZETLER (satın alınabilir, 1 saatlik)
+// ROZETLER (görev ödülleri ve daha önce dağıtılan rozetler)
 // ---------------------------------------------------------------------------
 export const BADGE_DEFS: CosmeticDef[] = [
   {
     id: 'badge_trivia_master',
     kind: 'badge',
     name: 'Bilgi Efendisi Rozeti',
-    desc: 'Prestijli altın bilgi şövalyesi mührü. 1 saat geçerlidir.',
+    desc: 'Prestijli altın bilgi şövalyesi mührü.',
     rarity: 'epic',
     visual: { icon: '🛡️' },
   },
@@ -400,7 +400,7 @@ export const BADGE_DEFS: CosmeticDef[] = [
     id: 'badge_veteran',
     kind: 'badge',
     name: 'Kıdemli Oyuncu Rozeti',
-    desc: 'Bronz-vintage kıdem madalyası. 1 saat geçerlidir.',
+    desc: 'Bronz-vintage kıdem madalyası.',
     rarity: 'rare',
     visual: { icon: '🎖️' },
   },
@@ -408,9 +408,25 @@ export const BADGE_DEFS: CosmeticDef[] = [
     id: 'badge_genius',
     kind: 'badge',
     name: 'Dahi Beyin Rozeti',
-    desc: 'Sinaps parıltılı turkuaz-beyaz dahi mührü. 1 saat geçerlidir.',
+    desc: 'Sinaps parıltılı turkuaz-beyaz dahi mührü.',
     rarity: 'epic',
     visual: { icon: '🧠' },
+  },
+  {
+    id: 'badge_social_player',
+    kind: 'badge',
+    name: 'Sosyal Oyuncu Rozeti',
+    desc: 'Tavriko’da ilk arkadaşlığını kuranlara özel.',
+    rarity: 'rare',
+    visual: { icon: '🤝' },
+  },
+  {
+    id: 'badge_consistent_player',
+    kind: 'badge',
+    name: 'İstikrarlı Oyuncu Rozeti',
+    desc: 'Farklı günlerde arenaya geri dönenlere özel.',
+    rarity: 'rare',
+    visual: { icon: '📅' },
   },
   {
     id: 'badge_season_1_champ',

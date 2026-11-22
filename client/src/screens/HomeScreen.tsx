@@ -29,7 +29,7 @@ import {
   StreakFlameIcon,
 } from '../components/TavrikoIcons';
 import { GradientFill, formatNumberTR } from '../components/TavrikoGradient';
-import { UI_IMG } from '../components/StoreKit';
+import { STORE_IMG, UI_IMG } from '../components/StoreKit';
 import { NotificationBell } from '../components/NotificationUI';
 import { InfoHint } from '../components/InfoHint';
 import { useUnreadCount } from '../store/notificationStore';
@@ -66,6 +66,7 @@ interface HomeScreenProps {
   onShop?: () => void;
   onEvents?: () => void;
   onInventory?: () => void;
+  onRewards?: () => void;
   onProLeague?: () => void;
   onLoginPrompt?: () => void;
 }
@@ -168,6 +169,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onShop,
   onEvents,
   onInventory,
+  onRewards,
   onProLeague,
   onLoginPrompt,
 }) => {
@@ -565,6 +567,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               />
             )}
           </View>
+          {onRewards && (
+            <TouchableOpacity accessibilityRole="button" style={styles.rewardsBanner} onPress={onRewards}>
+              <Image source={STORE_IMG.chestGold} style={styles.rewardsArt} resizeMode="contain" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rewardsTitle}>Ödüller</Text>
+                <Text style={styles.rewardsSubtitle}>Maçlarla sandık, görevlerle rozet kazan</Text>
+              </View>
+              <Text style={styles.rewardsArrow} accessible={false}>›</Text>
+            </TouchableOpacity>
+          )}
           </Reanimated.View>
         </Animated.View>
       </ScrollView>
@@ -603,6 +615,11 @@ const glow = (color: string, radius = 14, opacity = 0.45) =>
   });
 
 const styles = StyleSheet.create({
+  rewardsBanner: { marginTop: 10, minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: '#85613B', backgroundColor: '#2D1744' },
+  rewardsArt: { height: 42, width: 50 },
+  rewardsTitle: { color: '#FFE28B', fontFamily: THEME.fonts.extraBold, fontSize: 17 },
+  rewardsSubtitle: { color: '#E4D5F5', fontSize: 12 },
+  rewardsArrow: { color: '#FFE28B', fontSize: 25, marginRight: 4 },
   scrollContent: {
     paddingBottom: 104,
   },

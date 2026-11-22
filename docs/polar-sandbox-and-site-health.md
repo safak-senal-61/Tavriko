@@ -17,6 +17,14 @@
 
 Checkout yalnızca yönetici portalı oturumuyla açılır. Demo için webhook, ücretli sipariş defteri veya oyuncuya ürün teslimi yoktur. Demo dışında TRY ürünlerinin satışı ve eski kart formu kapalıdır; katalogdaki altın/elmas ile alışveriş devam eder.
 
+## Oynayarak kazanılan ödüller
+
+Sandıklar, anahtarlar ve rozetler mağazada satılmaz. Premium Sezon Pass hattındaki sandık ve anahtarlar yerine miktarı önceden belli altın veya elmas gelir. Ücretsiz Sezon Pass ve etkinlik ödülleri ile önceden kazanılmış eşyalar korunur. Ücretsiz sandık içerikleri rastgele kalır ve Polar checkout'una bağlanmaz.
+
+Oyna → Ödüller ekranı, sunucunun doğruladığı ve oyuncunun en az bir doğru cevap verdiği tamamlanmış maçları sayar. Solo alıştırma ve istemci istatistikleri sayılmaz; geçmişteki doğrulanmış kayıtlar sayılır. Her sandık eşiği hesap başına bir kez alınır ve anahtarıyla birlikte envantere gider. Rozetler karşılıklı kabul edilmiş arkadaşlık, maç sayısı, toplam doğru cevap, farklı oyun günleri (Türkiye saati) ve kusursuz maç görevlerinden kazanılır. Görev rozetleri envanterden süresiz kuşanılır.
+
+Dağıtım sırası: önce hedef PostgreSQL ortamına `20261123100000_gameplay_reward_claims` migrasyonu, ardından API ve Pages/mobil derlemesi. Yeni migrasyon yalnızca kullanıcı başına tekil alım kaydını ekler. Yeni API'nin mağaza kataloğu eski istemcilerden gelen sandık satın alma isteklerini de reddeder. Polar ürünleri veya ödeme ayarları bu değişiklikle otomatik güncellenmez.
+
 ## Site Sağlığı
 
 Panel açıkken süreç ölçümleri 15, dağıtık ölçümler 30 saniyede yenilenir. CPU işlem süresinin geçen zamana oranıdır (%100 = bir çekirdek). Anlık RSS ve heap yalnızca yanıtlayan Node.js işlemine aittir; birleşik bölümde istek sırasında gözlenen en yüksek CPU/RSS ayrıca gösterilir, platform tahsis oranı veya boşta çalışan örneklerin ölçümü değildir.

@@ -45,6 +45,8 @@ import {
   FinalMatchSummary,
   isRankedMatch,
   uniqueQuestions,
+  getChestOpening,
+  isPermanentGameplayBadge,
 } from '@trivia/shared';
 import { ALL_CATEGORIES, QUESTION_BANK } from './questionsData';
 import { RICH_SEED_BANK } from '../ai/evrenLlmGenerator';
@@ -495,7 +497,7 @@ export class PrismaService {
   };
 
   private getItemCategory(itemId: string): ItemCategory {
-    if (itemId.includes('chest')) return 'chest';
+    if (getChestOpening(itemId) || itemId.includes('chest')) return 'chest';
     if (itemId.includes('key')) return 'key';
     if (itemId.includes('booster')) return 'booster';
     if (itemId.includes('frame')) return 'frame';
@@ -506,6 +508,8 @@ export class PrismaService {
   }
 
   private getItemRarity(itemId: string): ItemRarity {
+    const chest = getChestOpening(itemId);
+    if (chest) return chest.rarity;
     if (itemId.includes('legendary') || itemId.includes('mythic')) return 'mythic';
     if (itemId.includes('gold') || itemId.includes('epic')) return 'epic';
     if (itemId.includes('silver') || itemId.includes('rare')) return 'rare';
@@ -4963,6 +4967,34 @@ export class PrismaService {
     let record = await this.loadRecord(userId);
     if (!record) throw new Error('Kullanıcı bulunamadı.');
     if (!record.inventory) record.inventory = this.defaultInventory();
+    if (!record.isGuest && itemId.startsWith('badge_')) {
+      const accountId = record.id;
+      const { updated, rewardText } = await this.rawClient.$transaction(async tx => {
+        const [owner] = await tx.$queryRaw<{ id: string }[]>`
+          SELECT "id" FROM "users" WHERE "id" = ${accountId} FOR UPDATE`;
+        const where = { userId: accountId, itemId };
+        const badge = owner && await tx.userInventoryItem.findUnique({ where: { userId_itemId: where } });
+        if (!badge || badge.qty <= 0) throw new Error('Bu eşyadan envanterinizde kalmadı.');
+        const permanent = isPermanentGameplayBadge(itemId, badge.durationHours ?? undefined);
+        const hours = badge.durationHours && badge.durationHours > 0 ? badge.durationHours : 1;
+        if (!permanent) {
+          await tx.userInventoryItem.update({ where: { userId_itemId: where }, data: { qty: { decrement: 1 } } });
+          await tx.userInventoryItem.deleteMany({ where: { ...where, qty: 0 } });
+        }
+        const updated = await tx.user.update({
+          where: { id: accountId },
+          data: { equippedBadge: itemId, equippedBadgeExpiresAt: permanent ? null : BigInt(Date.now() + hours * 3_600_000) },
+          include: { inventoryItems: true },
+        });
+        const duration = hours >= 24 ? `${Math.round(hours / 24)} gün` : `${Math.round(hours)} saat`;
+        return { updated, rewardText: permanent ? `${badge.name} profiline takıldı.` : `${badge.name} profiline uygulandı! ${duration} boyunca aktif.` };
+      });
+      record = this.prismaUserToRecord(updated);
+      this.users.set(record.id, record);
+      if (record.username) this.users.set(record.username, record);
+      if (record.email) this.users.set(record.email.toLowerCase(), record);
+      return { user: this.toProfile(record), rewardText };
+    }
     const originalCoins = record.coins, originalGems = record.gems || 0;
 
     const item = record.inventory.find((i) => i.id === itemId);
@@ -4970,14 +5002,7 @@ export class PrismaService {
       throw new Error('Bu eşyadan envanterinizde kalmadı.');
     }
 
-    // Key requirement for chest
-    if (itemId === 'chest') {
-      const keyItem = record.inventory.find((i) => i.id === 'key');
-      if (!keyItem || keyItem.qty <= 0) {
-        throw new Error('Sandığı açmak için en az 1 adet Altın Anahtara ihtiyacın var! (Mevcut: 0 Anahtar).');
-      }
-      keyItem.qty -= 1;
-    }
+    if (getChestOpening(itemId)) throw new Error('Sandığı envanterdeki Sandığı Aç düğmesiyle açabilirsin.');
 
     // WePlay tarzı süreli model: kozmetikler de kuşanıldığında TÜKETİLİR (1 kopya
     // harcanır) ve kopyanın süresi başlar (satın alırken seçilen süreye göre 1
@@ -5007,11 +5032,6 @@ export class PrismaService {
       record.equippedBadge = itemId;
       record.equippedBadgeExpiresAt = Date.now() + rentalMs;
       rewardText = `${item.name} profilinize uygulandı! ${rentalLabel} boyunca aktif.`;
-    } else if (itemId === 'chest' || itemId === 'gift') {
-      record.coins += 200;
-      record.gems = (record.gems || 0) + 10;
-      record.xp += 50;
-      rewardText = 'Sandık açıldı: +200 Altın, +10 Elmas ve +50 XP kazandın!';
     } else if (itemId === 'gem') {
       record.gems = (record.gems || 0) + 10;
       rewardText = '+10 Elmas hesabına eklendi!';
@@ -5066,11 +5086,9 @@ export class PrismaService {
               gems: { increment: (record.gems || 0) - originalGems },
               xp: record.xp, level: record.level, settings: (record.settings || {}) as any,
               equippedFrame: record.equippedFrame ?? null,
-              equippedBadge: record.equippedBadge ?? null,
               equippedNameEffect: record.equippedNameEffect ?? null,
               equippedBackground: record.equippedBackground ?? null,
               equippedFrameExpiresAt: this.toBigIntSafe(record.equippedFrameExpiresAt),
-              equippedBadgeExpiresAt: this.toBigIntSafe(record.equippedBadgeExpiresAt),
               equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
               equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
             },
@@ -5508,7 +5526,6 @@ export class PrismaService {
   public async openChest(
     userId: string,
     chestId: string,
-    keyId?: string
   ): Promise<{
     user: UserProfile;
     rewards: Array<{ type: 'coins' | 'gems' | 'xp' | 'item'; amount: number; label?: string; rarity?: string }>;
@@ -5523,42 +5540,10 @@ export class PrismaService {
   }> {
     let record = await this.loadRecord(userId);
     if (!record) throw new Error('Kullanıcı bulunamadı.');
-    if (!record.inventory) record.inventory = [];
-
-    const chestItem = record.inventory.find((i) => i.id === chestId);
-    if (!chestItem || chestItem.qty <= 0) {
-      throw new Error('Açılacak sandık envanterinizde bulunamadı.');
-    }
-
-    // Hediye kutusu (7 günlük meydan okuma ödülü) anahtar gerektirmez
-    const isGiftBox = chestId.includes('gift');
-    let requiredKeyId = 'key_silver';
-    let chestRarity: ItemRarity = 'common';
-    if (isGiftBox) {
-      chestRarity = 'epic';
-    } else if (chestId.includes('silver')) {
-      requiredKeyId = 'key_silver';
-      chestRarity = 'rare';
-    } else if (chestId.includes('gold')) {
-      requiredKeyId = 'key_gold';
-      chestRarity = 'epic';
-    } else if (chestId.includes('legendary') || chestId.includes('diamond')) {
-      requiredKeyId = 'key_diamond';
-      chestRarity = 'mythic';
-    }
-
-    const actualKeyId = keyId || requiredKeyId;
-    const keyItem = isGiftBox
-      ? undefined
-      : record.inventory.find((i) => i.id === actualKeyId || i.id === 'key_master');
-    if (!isGiftBox && (!keyItem || keyItem.qty <= 0)) {
-      throw new Error(`Bu sandığı açmak için ${requiredKeyId.replace('key_', '').toUpperCase()} Anahtar gereklidir!`);
-    }
-
-    // Atomically consume key & chest
-    chestItem.qty -= 1;
-    if (keyItem) keyItem.qty -= 1;
-    record.inventory = record.inventory.filter((i) => i.qty > 0);
+    const opening = getChestOpening(chestId);
+    if (!opening) throw new Error('Geçerli bir sandık seç.');
+    const isGiftBox = !opening.key;
+    const chestRarity = opening.rarity;
 
     // Ağırlıklı rastgele ödül tabloları: çoğunlukla düşük, ara sıra orta, nadiren yüksek.
     // Elmas her sandıktan çıkmaz (elmas ekonomisini zorlaştırmak için düşüş şansı sınırlı).
@@ -5603,7 +5588,7 @@ export class PrismaService {
         },
       ];
       bonusItem = giftBonusPool[Math.floor(Math.random() * giftBonusPool.length)];
-    } else if (chestId.includes('legendary')) {
+    } else if (chestId === 'chest_legendary' || chestId === 'chest_diamond') {
       const t = rollTier(0.45, 0.38);
       coins = bracket(t, [1000, 2000], [2000, 4000], [4000, 6500]);
       gems = Math.random() < 0.45 ? randInt(50, 110) : 0;
@@ -5642,85 +5627,72 @@ export class PrismaService {
       xp = bracket(t, [10, 20], [20, 35], [35, 50]);
     }
 
-    record.coins += coins;
-    record.gems = (record.gems || 0) + gems;
-    record.xp += xp;
-
-    if (bonusItem) {
-      const existing = record.inventory.find((i) => i.id === bonusItem!.id);
-      if (existing) {
-        existing.qty += bonusItem.qty;
-      } else {
-        record.inventory.push(bonusItem);
+    const accountId = record.id;
+    const candidateKeys = opening.key ? [opening.key.id, ...(opening.alternateKeyIds ?? [])] : [];
+    const missingChest = 'Açılacak sandık envanterinde bulunamadı.';
+    const missingKey = `Bu sandığı açmak için ${opening.key?.name} gerekli.`;
+    if (record.isGuest) {
+      const inventory = record.inventory ?? [];
+      const chestItem = inventory.find(i => i.id === chestId && i.qty > 0);
+      if (!chestItem) throw new Error(missingChest);
+      const key = candidateKeys.map(id => inventory.find(i => i.id === id && i.qty > 0)).find(Boolean);
+      if (opening.key && !key) throw new Error(missingKey);
+      chestItem.qty -= 1;
+      if (key) key.qty -= 1;
+      record.inventory = inventory.filter(i => i.qty > 0);
+      if (bonusItem) {
+        const existing = record.inventory.find(i => i.id === bonusItem!.id);
+        if (existing) existing.qty += bonusItem.qty;
+        else record.inventory.push(bonusItem);
       }
+      record.coins += coins;
+      record.gems += gems;
+      record.xp += xp;
+      const { level, rankTitle } = calculateLevelFromXp(record.xp);
+      record.level = level;
+      record.rankTitle = rankTitle;
+    } else {
+      const updated = await this.rawClient.$transaction(async tx => {
+        const [owner] = await tx.$queryRaw<{ xp: number }[]>`
+          SELECT "xp" FROM "users" WHERE "id" = ${accountId} FOR UPDATE`;
+        if (!owner) throw new Error('Kullanıcı bulunamadı.');
+        const consume = async (itemId: string) => {
+          const where = { userId: accountId, itemId };
+          const result = await tx.userInventoryItem.updateMany({
+            where: { ...where, qty: { gt: 0 } }, data: { qty: { decrement: 1 } },
+          });
+          if (!result.count) return false;
+          await tx.userInventoryItem.deleteMany({ where: { ...where, qty: 0 } });
+          return true;
+        };
+        if (!await consume(chestId)) throw new Error(missingChest);
+        if (opening.key) {
+          let usedKey = false;
+          for (const id of candidateKeys) {
+            if (await consume(id)) { usedKey = true; break; }
+          }
+          if (!usedKey) throw new Error(missingKey);
+        }
+        if (bonusItem) {
+          const { id: itemId, name, desc, qty } = bonusItem;
+          await tx.userInventoryItem.upsert({
+            where: { userId_itemId: { userId: accountId, itemId } },
+            update: { qty: { increment: qty } },
+            create: { userId: accountId, itemId, name, desc, qty },
+          });
+        }
+        const { level, rankTitle } = calculateLevelFromXp(owner.xp + xp);
+        return tx.user.update({
+          where: { id: accountId },
+          data: { coins: { increment: coins }, gems: { increment: gems }, xp: { increment: xp }, level, rankTitle },
+          include: { inventoryItems: true },
+        });
+      });
+      record = this.prismaUserToRecord(updated);
     }
-
-    const prog = calculateLevelFromXp(record.xp);
-    record.level = prog.level;
-    record.rankTitle = prog.rankTitle;
-
-    this.users.set(userId, record);
     this.users.set(record.id, record);
     if (record.username) this.users.set(record.username, record);
     if (record.email) this.users.set(record.email.toLowerCase(), record);
-
-    if (!record.isGuest) {
-      this.savePersistedUsers();
-      try {
-        // Consumed chest in PostgreSQL
-        if (chestItem.qty <= 0) {
-          await this.rawClient.userInventoryItem.deleteMany({
-            where: { userId: record.id, itemId: chestId },
-          }).catch(() => {});
-        } else {
-          await this.rawClient.userInventoryItem.update({
-            where: { userId_itemId: { userId: record.id, itemId: chestId } },
-            data: { qty: chestItem.qty, updatedAt: new Date() },
-          }).catch(() => {});
-        }
-
-        // Consumed key in PostgreSQL (hediye kutusunda anahtar harcanmaz)
-        if (keyItem && keyItem.qty <= 0) {
-          await this.rawClient.userInventoryItem.deleteMany({
-            where: { userId: record.id, itemId: actualKeyId },
-          }).catch(() => {});
-        } else if (keyItem) {
-          await this.rawClient.userInventoryItem.update({
-            where: { userId_itemId: { userId: record.id, itemId: actualKeyId } },
-            data: { qty: keyItem.qty, updatedAt: new Date() },
-          }).catch(() => {});
-        }
-
-        // Bonus item in PostgreSQL
-        if (bonusItem) {
-          await this.rawClient.userInventoryItem.upsert({
-            where: { userId_itemId: { userId: record.id, itemId: bonusItem.id } },
-            update: { qty: { increment: bonusItem.qty }, updatedAt: new Date() },
-            create: {
-              userId: record.id,
-              itemId: bonusItem.id,
-              name: bonusItem.name,
-              desc: bonusItem.desc,
-              qty: bonusItem.qty,
-            },
-          }).catch(() => {});
-        }
-
-        await this.rawClient.user.update({
-          where: { id: record.id },
-          data: {
-            coins: { increment: coins },
-            gems: { increment: gems },
-            xp: record.xp,
-            level: record.level,
-            rankTitle: record.rankTitle,
-            updatedAt: new Date(),
-          },
-        });
-      } catch (err) {
-        console.error('[openChest] DB update error:', err);
-      }
-    }
 
     const rewardText = `🎉 Sandık açıldı: +${coins} Altın, +${gems} Elmas ve +${xp} XP kazandınız!${bonusItem ? ` Bonus: ${bonusItem.name}!` : ''}`;
 

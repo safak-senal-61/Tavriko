@@ -4,6 +4,7 @@ import { db } from '../db/prismaClient';
 import { presenceManager } from '../services/presenceManager';
 import { SHOP_CATALOG, SEASON_1_TIERS, EVENT_DEFINITIONS } from '@trivia/shared';
 import { rewardedAdRoutes } from './rewardedAdRoutes';
+import { gameplayRewardRoutes } from './gameplayRewardRoutes';
 
 const router = Router();
 
@@ -275,9 +276,9 @@ router.post('/shop/purchase', requireUserAuth, async (req: Request, res: Respons
 router.post('/inventory/use', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.authUserId;
-    const { itemId } = req.body;
-    if (!userId || !itemId) {
-      res.status(400).json({ error: 'userId ve itemId gerekli' });
+    const { itemId } = req.body || {};
+    if (!userId || typeof itemId !== 'string' || !itemId) {
+      res.status(400).json({ error: 'Geçerli bir eşya seç.' });
       return;
     }
     const result = await db.useInventoryItem(userId, itemId);
@@ -290,12 +291,12 @@ router.post('/inventory/use', requireUserAuth, async (req: Request, res: Respons
 router.post('/inventory/open-chest', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.authUserId;
-    const { chestId, keyId } = req.body;
-    if (!userId || !chestId) {
-      res.status(400).json({ error: 'userId ve chestId gereklidir.' });
+    const { chestId } = req.body || {};
+    if (!userId || typeof chestId !== 'string' || !chestId) {
+      res.status(400).json({ error: 'Geçerli bir sandık seç.' });
       return;
     }
-    const result = await db.openChest(userId, chestId, keyId);
+    const result = await db.openChest(userId, chestId);
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -551,5 +552,6 @@ router.post('/daily-challenge/complete', requireUserAuth, async (req: Request, r
 });
 
 router.use('/ads/rewarded', rewardedAdRoutes);
+router.use('/rewards', gameplayRewardRoutes);
 
 export default router;

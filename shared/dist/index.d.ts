@@ -5,6 +5,7 @@ export * from './categories';
 export * from './cosmetics';
 export * from './legal';
 export * from './rewards';
+export * from './gameplayRewards';
 export * from './questionSelection';
 export * from './lobbyChat';
 export * from './posthogConfig';

@@ -138,7 +138,7 @@ function generateSeason1Tiers() {
             premiumReward = { type: 'frame', amount: 1, title: 'Sezon 1 Neon Çerçeve', itemId: 'frame_neon', rarity: 'epic' };
         }
         else if (i === 5) {
-            premiumReward = { type: 'chest', amount: 1, title: 'Altın Sandık', itemId: 'chest_gold', rarity: 'epic' };
+            premiumReward = { type: 'coin', amount: 2200, title: '2.200 Altın', rarity: 'epic' };
         }
         else if (i === 10) {
             premiumReward = { type: 'name_effect', amount: 1, title: 'Altın İsim Parıltısı', itemId: 'name_glow_gold', rarity: 'epic' };
@@ -150,25 +150,25 @@ function generateSeason1Tiers() {
             premiumReward = { type: 'frame', amount: 1, title: 'Kraliyet Altın Çerçeve', itemId: 'frame_gold', rarity: 'legendary' };
         }
         else if (i === 25) {
-            premiumReward = { type: 'key', amount: 1, title: 'Elmas Anahtar', itemId: 'key_diamond', rarity: 'legendary' };
+            premiumReward = { type: 'gem', amount: 50, title: '50 Elmas', rarity: 'legendary' };
         }
         else if (i === 30) {
             premiumReward = { type: 'background', amount: 1, title: 'Nebula Profil Arka Planı', itemId: 'bg_nebula', rarity: 'legendary' };
         }
         else if (i === 35) {
-            premiumReward = { type: 'chest', amount: 1, title: 'Elmas Sandık', itemId: 'chest_diamond', rarity: 'legendary' };
+            premiumReward = { type: 'gem', amount: 120, title: '120 Elmas', rarity: 'legendary' };
         }
         else if (i === 40) {
             premiumReward = { type: 'name_effect', amount: 1, title: 'Ateş Gradyan İsim', itemId: 'name_gradient_fire', rarity: 'legendary' };
         }
         else if (i === 45) {
-            premiumReward = { type: 'chest', amount: 1, title: 'Efsanevi Sandık', itemId: 'chest_legendary', rarity: 'mythic' };
+            premiumReward = { type: 'coin', amount: 8000, title: '8.000 Altın', rarity: 'mythic' };
         }
         else if (i === 50) {
             premiumReward = { type: 'frame', amount: 1, title: 'Alev Çerçevesi (Mitolojik)', itemId: 'frame_flame', rarity: 'mythic' };
         }
         else if (i % 4 === 0) {
-            premiumReward = { type: 'key', amount: 1, title: 'Altın Anahtar', itemId: 'key_gold', rarity: 'epic' };
+            premiumReward = { type: 'coin', amount: 1500 + i * 40, title: `${(1500 + i * 40).toLocaleString('tr-TR')} Altın`, rarity: 'epic' };
         }
         else if (i % 2 === 0) {
             premiumReward = { type: 'gem', amount: 35 + i * 2, title: `${35 + i * 2} Elmas`, rarity: 'rare' };
@@ -229,43 +229,11 @@ exports.SHOP_CATALOG = [
         badge: 'EN POPÜLER',
         grantPremiumPass: true,
     },
-    {
-        id: 'pack_starter',
-        name: 'Başlangıç Paketi',
-        desc: '2.000 Altın, 100 Elmas, 1x Altın Sandık ve 1x Altın Anahtar!',
-        category: 'featured',
-        price: 59.99,
-        currency: 'try',
-        rarity: 'epic',
-        badge: '%70 İNDİRİM',
-        grantCoins: 2000,
-        grantGems: 100,
-        grantItems: [
-            { id: 'chest_gold', name: 'Altın Sandık', desc: 'Altın anahtar ile açılır', qty: 1, category: 'chest', rarity: 'epic' },
-            { id: 'key_gold', name: 'Altın Anahtar', desc: 'Altın sandıkları açar', qty: 1, category: 'key', rarity: 'epic' },
-        ],
-    },
-    {
-        id: 'pack_mega_bundle',
-        name: 'Efsanevi Kaşif Paketi',
-        desc: '1x Efsanevi Sandık, 2x Elmas Anahtar, 10.000 Altın ve Alev Çerçevesi!',
-        category: 'featured',
-        price: 199.99,
-        currency: 'try',
-        rarity: 'mythic',
-        badge: 'MEGA FIRSAT',
-        grantCoins: 10000,
-        grantItems: [
-            { id: 'chest_legendary', name: 'Efsanevi Sandık', desc: 'Elmas anahtar ile açılır', qty: 1, category: 'chest', rarity: 'mythic' },
-            { id: 'key_diamond', name: 'Elmas Anahtar', desc: 'Efsanevi sandıkları açar', qty: 2, category: 'key', rarity: 'legendary' },
-            { id: 'frame_flame', name: 'Alev Çerçevesi', desc: 'Profilinize ateşli alev efekti ekler', qty: 1, category: 'frame', rarity: 'mythic' },
-        ],
-    },
     // --- Diamonds (Real Money) ---
     {
         id: 'gems_100',
         name: '100 Elmas',
-        desc: 'Hızlı kozmetik ve anahtar alımı için ideal başlangıç',
+        desc: 'Kozmetik alışverişi için başlangıç paketi',
         category: 'diamonds',
         price: 39.99,
         currency: 'try',
@@ -310,7 +278,7 @@ exports.SHOP_CATALOG = [
     {
         id: 'coins_1000',
         name: '1.000 Altın',
-        desc: 'Oda kurma ve sandık alımları için altın kesesi',
+        desc: 'Oda kurmak ve mağazada kullanmak için altın kesesi',
         category: 'gold',
         price: 10,
         currency: 'gems',
@@ -349,79 +317,6 @@ exports.SHOP_CATALOG = [
         rarity: 'legendary',
         bonusText: '+10.000 BONUS',
         grantCoins: 40000,
-    },
-    // --- Chests ---
-    {
-        id: 'chest_wood',
-        name: 'Ahşap Sandık',
-        desc: 'Gümüş anahtar ile açılır. 200-400 Altın ve sürpriz eşyalar içerir.',
-        category: 'chests',
-        price: 150,
-        currency: 'coins',
-        rarity: 'common',
-        grantItems: [{ id: 'chest_wood', name: 'Ahşap Sandık', desc: 'Gümüş anahtar ile açılır', qty: 1, category: 'chest', rarity: 'common' }],
-    },
-    {
-        id: 'chest_silver',
-        name: 'Gümüş Sandık',
-        desc: 'Gümüş anahtar ile açılır. 500-1.200 Altın ve 15-30 Elmas içerir.',
-        category: 'chests',
-        price: 450,
-        currency: 'coins',
-        rarity: 'rare',
-        grantItems: [{ id: 'chest_silver', name: 'Gümüş Sandık', desc: 'Gümüş anahtar ile açılır', qty: 1, category: 'chest', rarity: 'rare' }],
-    },
-    {
-        id: 'chest_gold',
-        name: 'Altın Sandık',
-        desc: 'Altın anahtar ile açılır. 1.500-3.000 Altın, 40-80 Elmas ve kozmetik şansı.',
-        category: 'chests',
-        price: 1200,
-        currency: 'coins',
-        rarity: 'epic',
-        grantItems: [{ id: 'chest_gold', name: 'Altın Sandık', desc: 'Altın anahtar ile açılır', qty: 1, category: 'chest', rarity: 'epic' }],
-    },
-    {
-        id: 'chest_legendary',
-        name: 'Efsanevi Sandık',
-        desc: 'Elmas anahtar ile açılır. Garantili destansı/efsanevi kozmetik ve büyük ödül!',
-        category: 'chests',
-        price: 120,
-        currency: 'gems',
-        rarity: 'mythic',
-        badge: 'MİTOLOJİK',
-        grantItems: [{ id: 'chest_legendary', name: 'Efsanevi Sandık', desc: 'Elmas anahtar ile açılır', qty: 1, category: 'chest', rarity: 'mythic' }],
-    },
-    // --- Keys ---
-    {
-        id: 'key_silver',
-        name: 'Gümüş Anahtar',
-        desc: 'Ahşap ve Gümüş sandıkları açmak için kullanılır.',
-        category: 'keys',
-        price: 200,
-        currency: 'coins',
-        rarity: 'rare',
-        grantItems: [{ id: 'key_silver', name: 'Gümüş Anahtar', desc: 'Sandıkları açar', qty: 1, category: 'key', rarity: 'rare' }],
-    },
-    {
-        id: 'key_gold',
-        name: 'Altın Anahtar',
-        desc: 'Altın ve Sezon sandıklarının kilitlerini açar.',
-        category: 'keys',
-        price: 500,
-        currency: 'coins',
-        rarity: 'epic',
-        grantItems: [{ id: 'key_gold', name: 'Altın Anahtar', desc: 'Altın sandıkları açar', qty: 1, category: 'key', rarity: 'epic' }],
-    },
-    {
-        id: 'key_diamond',
-        name: 'Elmas Anahtar',
-        desc: 'Efsanevi ve Mitolojik sandıkları açan en nadir anahtar.',
-        category: 'keys',
-        price: 45,
-        currency: 'gems',
-        rarity: 'legendary',
-        grantItems: [{ id: 'key_diamond', name: 'Elmas Anahtar', desc: 'Efsanevi sandıkları açar', qty: 1, category: 'key', rarity: 'legendary' }],
     },
     // --- Frames ---
     {
@@ -476,73 +371,6 @@ exports.SHOP_CATALOG = [
         rarity: 'legendary',
         badge: 'YENİ',
         grantItems: [{ id: 'frame_steampunk', name: 'Buhar Zırhı Çerçevesi', desc: 'Pirinç ve çelik profil çerçevesi', qty: 1, category: 'frame', rarity: 'legendary' }],
-    },
-    // --- Badges ---
-    {
-        id: 'badge_trivia_master',
-        name: 'Bilgi Efendisi Rozeti',
-        desc: 'Profilinizde yer alacak prestijli altın bilgi şövalyesi mührü.',
-        category: 'badges',
-        price: 50,
-        currency: 'gems',
-        rarity: 'epic',
-        badge: 'SÜRELİ',
-        grantItems: [{ id: 'badge_trivia_master', name: 'Bilgi Efendisi Rozeti', desc: 'Prestijli bilgi rozeti', qty: 1, category: 'badge', rarity: 'epic' }],
-    },
-    {
-        id: 'badge_speed_demon',
-        name: 'Hız Canavarı Rozeti',
-        desc: 'Saniyenin altında cevap veren refleks ustalarına özel rozet.',
-        category: 'badges',
-        price: 50,
-        currency: 'gems',
-        rarity: 'epic',
-        badge: 'SÜRELİ',
-        grantItems: [{ id: 'badge_speed_demon', name: 'Hız Canavarı Rozeti', desc: 'Hızlı refleks rozeti', qty: 1, category: 'badge', rarity: 'epic' }],
-    },
-    {
-        id: 'badge_champion',
-        name: 'Şampiyon Kupası Rozeti',
-        desc: 'Kupa ile taçlanmış, zirvedeki oyuncuların kızıl-altın şampiyonluk mührü.',
-        category: 'badges',
-        price: 65,
-        currency: 'gems',
-        rarity: 'legendary',
-        badge: 'SÜRELİ',
-        grantItems: [{ id: 'badge_champion', name: 'Şampiyon Kupası Rozeti', desc: 'Şampiyonluk rozeti', qty: 1, category: 'badge', rarity: 'legendary' }],
-    },
-    {
-        id: 'badge_night_owl',
-        name: 'Gece Kuşu Rozeti',
-        desc: 'Gece yarısı maçları sevenlere özel, ay ve yıldızlı gece mavisi mühür.',
-        category: 'badges',
-        price: 40,
-        currency: 'gems',
-        rarity: 'rare',
-        badge: 'SÜRELİ',
-        grantItems: [{ id: 'badge_night_owl', name: 'Gece Kuşu Rozeti', desc: 'Gece kuşu rozeti', qty: 1, category: 'badge', rarity: 'rare' }],
-    },
-    {
-        id: 'badge_veteran',
-        name: 'Kıdemli Oyuncu Rozeti',
-        desc: 'Yıllara meydan okuyan oyunculara verilmiş bronz-vintage madalya.',
-        category: 'badges',
-        price: 35,
-        currency: 'gems',
-        rarity: 'rare',
-        badge: 'SÜRELİ',
-        grantItems: [{ id: 'badge_veteran', name: 'Kıdemli Oyuncu Rozeti', desc: 'Kıdemli oyuncu rozeti', qty: 1, category: 'badge', rarity: 'rare' }],
-    },
-    {
-        id: 'badge_genius',
-        name: 'Dahi Beyin Rozeti',
-        desc: 'Zeka küpü oyuncular için sinaps parıltılı turkuaz-beyaz dahi mührü.',
-        category: 'badges',
-        price: 55,
-        currency: 'gems',
-        rarity: 'epic',
-        badge: 'SÜRELİ',
-        grantItems: [{ id: 'badge_genius', name: 'Dahi Beyin Rozeti', desc: 'Dahi beyin rozeti', qty: 1, category: 'badge', rarity: 'epic' }],
     },
     // --- Name Effects ---
     {

@@ -118,7 +118,7 @@ export const storeImageFor = (id: string, category?: string): ImageSourcePropTyp
   const k = (id || '').toLowerCase();
   const c = (category || '').toLowerCase();
   if (c.startsWith('chest') || k.includes('chest')) {
-    if (k.includes('legendary') || k.includes('mythic')) return STORE_IMG.chestLegendary;
+    if (k.includes('legendary') || k.includes('mythic') || k.includes('diamond')) return STORE_IMG.chestLegendary;
     if (k.includes('gold')) return STORE_IMG.chestGold;
     if (k.includes('silver')) return STORE_IMG.chestSilver;
     return STORE_IMG.chestWood;
@@ -139,6 +139,7 @@ export const storeImageFor = (id: string, category?: string): ImageSourcePropTyp
     return k.includes('24h') ? STORE_IMG.booster24h : STORE_IMG.booster;
   }
   if (c.startsWith('badge') || k.includes('badge')) {
+    if (k === 'badge_social_player' || k === 'badge_consistent_player') return null;
     // Her rozet kendi görselini kullanır (aynı görselin tekrarı yok)
     if (k.includes('season') && k.includes('champ')) return STORE_IMG.badgeSeasonChamp;
     if (k.includes('speed')) return STORE_IMG.badgeSpeed;
@@ -241,6 +242,8 @@ export const BADGE_DESIGNS: Record<string, { c1: string; c2: string; glow: strin
   badge_night_owl: { c1: '#A5B4FC', c2: '#3730A3', glow: '#818CF8', icon: 'moon' },
   badge_veteran: { c1: '#D6A97C', c2: '#92400E', glow: '#C08552', icon: 'medal' },
   badge_genius: { c1: '#99F6E4', c2: '#0F766E', glow: '#5EEAD4', icon: 'spark' },
+  badge_social_player: { c1: '#F9A8D4', c2: '#9D174D', glow: '#FB7185', icon: 'friends' },
+  badge_consistent_player: { c1: '#BFDBFE', c2: '#1D4ED8', glow: '#93C5FD', icon: 'calendar' },
   badge_7day_legend: { c1: '#FDE68A', c2: '#9333EA', glow: '#F0ABFC', icon: 'star' },
 };
 
@@ -305,6 +308,8 @@ export const BadgeVisual: React.FC<{ badgeId: string; size?: number }> = ({ badg
           {inner === 'star' && (
             <Path d="M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6-5.4-2.9-5.4 2.9 1.1-6L3.2 9.4l6.1-.8z" fill="#FFFFFF" stroke="none" />
           )}
+          {inner === 'friends' && <Path d="M2 19v-2a4 4 0 0 1 4-4h5a4 4 0 0 1 4 4v2m3-6a4 4 0 0 1 4 4v2M12 7a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0zm4-3a3.5 3.5 0 0 1 0 7" />}
+          {inner === 'calendar' && <Path d="M4 5h16v15H4zM4 9h16M8 3v4m8-4v4m-7 8 2 2 4-4" />}
         </Svg>
       </View>
     </View>
@@ -1222,11 +1227,13 @@ export const KitChips = <T extends string>({
   active,
   onChange,
   scrollRef,
+  accessibleToggle,
 }: {
   tabs: { id: T; label: string }[];
   active: T;
   onChange: (id: T, idx: number) => void;
   scrollRef?: React.RefObject<any>;
+  accessibleToggle?: boolean;
 }) => (
   <ScrollView
     ref={scrollRef}
@@ -1240,6 +1247,8 @@ export const KitChips = <T extends string>({
       return (
         <TouchableOpacity
           key={t.id}
+          accessibilityRole={accessibleToggle ? 'button' : undefined}
+          aria-pressed={accessibleToggle ? on : undefined}
           activeOpacity={0.85}
           onPress={() => onChange(t.id, i)}
           style={[kit.chip, on && kit.chipOn]}

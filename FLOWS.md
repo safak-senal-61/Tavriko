@@ -1,5 +1,13 @@
 # Visual refresh acceptance and regression checks
 
+## Gameplay rewards
+
+- Baseline: sign-in opens Oyna; Mağaza previously opened on Sandıklar with Anahtarlar and Rozetler tabs. Envanter is where owned items are opened or equipped.
+- From Oyna → Ödüller, check all four chest progress bars, switch to Rozetler and check the friend, match and answer tasks. Verify locked, ready, claimed, network failure/retry and no duplicate claim.
+- Claim a ready chest and open Envanter; the chest and matching earned key must both be present. Claim a badge, equip it, switch to another badge and re-equip the first; permanent copies are not consumed.
+- Check that Mağaza no longer offers chests, keys or badges, including bundles, while the permanent navigation, frames, gold and boosters still open. Verify the premium season track gives fixed rewards, never chests or keys.
+- Test synthetic users only. Check verified match and friend progress, concurrent claims and reopening from another session. Check phone (320/375 px), desktop, error states and console.
+
 ## Cloudflare Pages web preview
 
 - Open `/` and `/app` in a fresh browser session. Check “Giriş Yap”, “Kayıt Ol”, “Şifremi Unuttum?” and “Misafir olarak göz at” at desktop and 375px. Guest exploration and an isolated signed-in session should survive a reload on the same origin.
