@@ -6,10 +6,10 @@ export const adsSupported = false;
 
 export type RewardedAdResult = 'earned' | 'dismissed' | 'unavailable';
 
-export function initAds(): Promise<boolean> {
-  return Promise.resolve(false);
-}
+export async function refreshAdsConsent(): Promise<void> {}
+export async function hasAdPrivacyOptions(): Promise<boolean> { return false; }
+export async function openAdPrivacyOptions(): Promise<void> {}
 
-export function showRewardedAd(): Promise<RewardedAdResult> {
+export function showRewardedAd(_attemptId: string): Promise<RewardedAdResult> {
   return Promise.resolve('unavailable');
 }

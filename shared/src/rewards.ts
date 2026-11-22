@@ -131,7 +131,7 @@ export function isRankedMatch(input: { mode?: string; roomCode?: string; playerI
 // ---------------------------------------------------------------------------
 // Ödüllü reklam ("Reklam izle, jeton kazan") — TEK DOĞRULUK KAYNAĞI
 // ---------------------------------------------------------------------------
-// Ödülü her zaman sunucu verir; istemci yalnızca reklamın izlendiğini bildirir.
+// Ödülü yalnızca doğrulanmış AdMob sunucu bildirimi üzerine sunucu verir.
 // Kötüye kullanımı sınırlamak için günlük üst sınır ve iki izleme arası bekleme
 // süresi sunucuda uygulanır. Gün sınırı UTC tarihine göre sıfırlanır.
 export const REWARDED_AD_COINS = 25;

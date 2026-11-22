@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { REWARDED_AD_COINS, REWARDED_AD_DAILY_LIMIT, RewardedAdStatus, UserProfile } from '@trivia/shared';
-import { adsSupported, initAds, showRewardedAd } from '../services/ads';
+import { adsSupported, showRewardedAd } from '../services/ads';
 import { getApiBaseUrl } from '../config';
 import { authHeaders } from '../utils/apiAuth';
 import { sound } from '../services/soundService';
@@ -20,6 +20,7 @@ interface RewardedAdCardProps {
 /** Mağazadaki "Reklam izle, jeton kazan" kartı. Ödülü sunucu verir ve sınırlar. */
 export const RewardedAdCard: React.FC<RewardedAdCardProps> = ({ user, apiBaseUrl, onUpdateUser, onMessage }) => {
   const [status, setStatus] = useState<RewardedAdStatus | null>(null);
+  const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const base = apiBaseUrl || getApiBaseUrl();
@@ -33,11 +34,14 @@ export const RewardedAdCard: React.FC<RewardedAdCardProps> = ({ user, apiBaseUrl
 
   useEffect(() => {
     if (!adsSupported || isGuest) return;
-    initAds().catch(() => {});
     let active = true;
     fetch(`${base}/social/ads/rewarded/status`, { headers: { ...authHeaders() } })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => active && d?.status && applyStatus(d.status))
+      .then((d) => {
+        if (!active) return;
+        setEnabled(d?.enabled === true);
+        applyStatus(d?.status);
+      })
       .catch(() => {});
     return () => {
       active = false;
@@ -50,7 +54,7 @@ export const RewardedAdCard: React.FC<RewardedAdCardProps> = ({ user, apiBaseUrl
     return () => clearTimeout(t);
   }, [cooldown]);
 
-  if (!adsSupported || isGuest) return null;
+  if (!adsSupported || isGuest || !enabled) return null;
 
   const remaining = status?.remainingToday ?? REWARDED_AD_DAILY_LIMIT;
   const limit = status?.dailyLimit ?? REWARDED_AD_DAILY_LIMIT;
@@ -61,7 +65,17 @@ export const RewardedAdCard: React.FC<RewardedAdCardProps> = ({ user, apiBaseUrl
     if (disabled) return;
     setBusy(true);
     try {
-      const result = await showRewardedAd();
+      const start = await fetch(`${base}/social/ads/rewarded/start`, {
+        method: 'POST',
+        headers: { ...authHeaders() },
+      });
+      const attempt = await start.json().catch(() => ({}));
+      applyStatus(attempt?.status);
+      if (!start.ok || !attempt.attemptId) {
+        onMessage?.('Şu anda ödüllü reklam başlatılamadı. Biraz sonra tekrar dene.', true);
+        return;
+      }
+      const result = await showRewardedAd(attempt.attemptId);
       if (result === 'unavailable') {
         onMessage?.('Şu anda reklam bulunamadı. Biraz sonra tekrar dene.', true);
         return;
@@ -70,22 +84,23 @@ export const RewardedAdCard: React.FC<RewardedAdCardProps> = ({ user, apiBaseUrl
         onMessage?.('Jeton kazanmak için reklamı sonuna kadar izlemelisin.', true);
         return;
       }
-      const res = await fetch(`${base}/social/ads/rewarded/claim`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json().catch(() => ({}));
-      applyStatus(data?.status);
-      if (data?.user && onUpdateUser) onUpdateUser(data.user);
-      if (!res.ok) {
-        sound.playSound('wrong');
-        onMessage?.(data?.error || 'Reklam ödülü alınamadı.', true);
-        return;
+      for (let poll = 0; poll < 7; poll++) {
+        if (poll) await new Promise(resolve => setTimeout(resolve, 1500));
+        const res = await fetch(`${base}/social/ads/rewarded/status?attemptId=${encodeURIComponent(attempt.attemptId)}`, {
+          headers: { ...authHeaders() },
+        });
+        const data = await res.json().catch(() => ({}));
+        applyStatus(data?.status);
+        if (res.ok && data.rewarded && typeof data.coins === 'number') {
+          if (user) onUpdateUser?.({ ...user, coins: data.coins });
+          sound.playSound('reward');
+          sound.triggerHaptic('success');
+          onMessage?.(`+${coins} jeton kazandın!`, false);
+          return;
+        }
+        if (data?.enabled === false) break;
       }
-      sound.playSound('reward');
-      sound.triggerHaptic('success');
-      onMessage?.(`+${data.coinsAwarded ?? coins} jeton kazandın!`, false);
+      onMessage?.('Ödül doğrulanıyor. Onaylanırsa jetonlar hesabına otomatik eklenir.', false);
     } catch {
       onMessage?.('Bağlantı hatası oluştu.', true);
     } finally {
@@ -139,7 +154,7 @@ const styles = StyleSheet.create({
   sub: { color: KIT.muted, fontSize: 12, marginTop: 2, fontFamily: THEME.fonts.bold },
   button: {
     minWidth: 84,
-    height: 36,
+    minHeight: 48,
     paddingHorizontal: 14,
     borderRadius: 11,
     backgroundColor: KIT.gold,

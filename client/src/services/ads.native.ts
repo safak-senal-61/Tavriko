@@ -1,10 +1,12 @@
 import mobileAds, {
   AdEventType,
   AdsConsent,
+  AdsConsentPrivacyOptionsRequirementStatus,
   RewardedAd,
   RewardedAdEventType,
   TestIds,
 } from 'react-native-google-mobile-ads';
+import { Platform } from 'react-native';
 
 /** "Reklam izle, jeton kazan" ödüllü reklam birimi (AdMob). */
 const REWARDED_AD_UNIT_ID = 'ca-app-pub-9520105697678442/5338495031';
@@ -12,41 +14,51 @@ const REWARDED_AD_UNIT_ID = 'ca-app-pub-9520105697678442/5338495031';
 /** Geliştirmede gerçek reklam istenmez; AdMob politikası gereği test kimliği kullanılır. */
 const rewardedUnitId = __DEV__ ? TestIds.REWARDED : REWARDED_AD_UNIT_ID;
 
-export const adsSupported = true;
+export const adsSupported = Platform.OS === 'android';
 
-let initPromise: Promise<boolean> | null = null;
+let consentUpdate: ReturnType<typeof AdsConsent.requestInfoUpdate> | undefined;
+let initPromise: Promise<unknown> | undefined;
 
-/**
- * Reklam iznini (UMP / GDPR) toplar ve Mobile Ads SDK'yı başlatır. Bir kez çalışır.
- * Dönüş: reklam istenebilir mi (canRequestAds).
- */
-export function initAds(): Promise<boolean> {
-  if (!initPromise) {
-    initPromise = (async () => {
-      let canRequestAds = true;
-      try {
-        const info = await AdsConsent.gatherConsent();
-        canRequestAds = info.canRequestAds;
-      } catch (err) {
-        // İzin formu yüklenemezse önceki oturumdan kalan izin durumu kullanılır.
-        console.warn('[ads] consent error', err);
-        try {
-          canRequestAds = (await AdsConsent.getConsentInfo()).canRequestAds;
-        } catch {
-          canRequestAds = false;
-        }
-      }
-      if (canRequestAds) {
-        await mobileAds().initialize();
-      }
-      return canRequestAds;
-    })().catch((err) => {
-      console.warn('[ads] init error', err);
-      initPromise = null;
-      return false;
+export function refreshAdsConsent() {
+  if (!consentUpdate) {
+    consentUpdate = AdsConsent.requestInfoUpdate().catch(error => {
+      consentUpdate = undefined;
+      throw error;
     });
   }
-  return initPromise;
+  return consentUpdate;
+}
+
+export async function hasAdPrivacyOptions() {
+  if (!adsSupported) return false;
+  try {
+    await refreshAdsConsent();
+    const info = await AdsConsent.getConsentInfo();
+    return info.privacyOptionsRequirementStatus === AdsConsentPrivacyOptionsRequirementStatus.REQUIRED;
+  } catch {
+    return false;
+  }
+}
+
+export async function openAdPrivacyOptions() {
+  await AdsConsent.showPrivacyOptionsForm();
+}
+
+/**
+ * Her reklamdan önce güncel UMP izin durumunu kontrol et. SDK bir kez başlatılır.
+ */
+async function initAds(): Promise<boolean> {
+  if (!adsSupported) return false;
+  try {
+    await refreshAdsConsent();
+    const { canRequestAds } = await AdsConsent.loadAndShowConsentFormIfRequired();
+    if (!canRequestAds) return false;
+    await (initPromise ??= mobileAds().initialize());
+    return true;
+  } catch {
+    initPromise = undefined;
+    return false;
+  }
 }
 
 export type RewardedAdResult = 'earned' | 'dismissed' | 'unavailable';
@@ -55,11 +67,13 @@ export type RewardedAdResult = 'earned' | 'dismissed' | 'unavailable';
  * Ödüllü reklamı yükleyip gösterir. Kullanıcı reklamı ödül alacak kadar izlerse
  * 'earned', erken kapatırsa 'dismissed', reklam yüklenemezse 'unavailable' döner.
  */
-export async function showRewardedAd(timeoutMs = 15000): Promise<RewardedAdResult> {
+export async function showRewardedAd(attemptId: string, timeoutMs = 15000): Promise<RewardedAdResult> {
   const canRequest = await initAds();
   if (!canRequest) return 'unavailable';
 
-  const ad = RewardedAd.createForAdRequest(rewardedUnitId);
+  const ad = RewardedAd.createForAdRequest(rewardedUnitId, {
+    serverSideVerificationOptions: { customData: attemptId },
+  });
 
   return new Promise<RewardedAdResult>((resolve) => {
     let earned = false;

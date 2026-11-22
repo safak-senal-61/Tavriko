@@ -25,10 +25,6 @@ import {
   NotificationItem,
   calculateLevelFromXp,
   calculateMatchRewards,
-  getRewardedAdStatus,
-  REWARDED_AD_COINS,
-  RewardedAdState,
-  RewardedAdStatus,
   calculateLeagueChange,
   applyLeagueChange,
   LEAGUE_START_POINTS,
@@ -2688,92 +2684,6 @@ export class PrismaService {
       (u) => u && u.friendCode && u.friendCode.toUpperCase() === clean
     );
     return record ? this.toProfile(record) : null;
-  }
-
-  /** Ödüllü reklam durumunu döndürür (kalan hak, bekleme süresi). */
-  public async getRewardedAdStatusForUser(userId: string): Promise<RewardedAdStatus | null> {
-    const record = await this.loadRecord(userId);
-    if (!record) return null;
-    return getRewardedAdStatus((record.categoryMastery as any)?.rewardedAds);
-  }
-
-  /**
-   * Ödüllü reklam izlendikten sonra jeton verir. Günlük limit ve bekleme süresi
-   * sunucuda uygulanır; durum categoryMastery.rewardedAds altında saklanır
-   * (dailyChallenge ile aynı desen, şema değişikliği gerekmez).
-   */
-  public async claimRewardedAd(
-    userId: string
-  ): Promise<{ success: boolean; user: UserProfile | null; error?: string; status?: RewardedAdStatus; coinsAwarded?: number }> {
-    const record = await this.loadRecord(userId);
-    if (!record) return { success: false, user: null, error: 'Kullanıcı bulunamadı' };
-    if (record.isGuest) {
-      return { success: false, user: this.toProfile(record), error: 'Reklam ödülü için giriş yapmalısın.' };
-    }
-
-    const now = Date.now();
-    const today = new Date(now).toISOString().slice(0, 10);
-    const check = (state: Partial<RewardedAdState> | undefined): string | null => {
-      const st = getRewardedAdStatus(state, now);
-      if (st.remainingToday <= 0) return 'Bugünkü reklam hakkın doldu. Yarın tekrar gel!';
-      if (st.cooldownSec > 0) return `Bir sonraki reklam için ${st.cooldownSec} sn bekle.`;
-      return null;
-    };
-    const nextState = (state: Partial<RewardedAdState> | undefined): RewardedAdState => ({
-      date: today,
-      count: (state && state.date === today ? Number(state.count) || 0 : 0) + 1,
-      lastAt: now,
-    });
-
-    if (!record.categoryMastery) record.categoryMastery = {};
-    const memState = (record.categoryMastery as any).rewardedAds as Partial<RewardedAdState> | undefined;
-    const memErr = check(memState);
-    if (memErr) {
-      return { success: false, user: this.toProfile(record), error: memErr, status: getRewardedAdStatus(memState, now) };
-    }
-
-    if (process.env.DATABASE_URL || process.env.DIRECT_URL) {
-      try {
-        await this.rawClient.$transaction(async tx => {
-          const [locked] = await tx.$queryRaw<{ categoryMastery: any }[]>`
-            SELECT "categoryMastery" FROM "users" WHERE "id" = ${record.id} FOR UPDATE`;
-          if (!locked) throw new Error('Kullanıcı bulunamadı');
-          const mastery = (locked.categoryMastery as any) || {};
-          const dbErr = check(mastery.rewardedAds);
-          if (dbErr) throw new Error(dbErr);
-          mastery.rewardedAds = nextState(mastery.rewardedAds);
-          const updated = await tx.user.update({
-            where: { id: record.id },
-            data: { coins: { increment: REWARDED_AD_COINS }, categoryMastery: mastery },
-            select: { coins: true },
-          });
-          record.coins = updated.coins;
-          record.categoryMastery = mastery;
-        });
-      } catch (err: any) {
-        const fresh = await this.loadRecord(userId).catch(() => null);
-        return {
-          success: false,
-          user: fresh ? this.toProfile(fresh) : null,
-          error: err?.message || 'Reklam ödülü işlenemedi.',
-          status: getRewardedAdStatus((fresh?.categoryMastery as any)?.rewardedAds, now),
-        };
-      }
-    } else {
-      (record.categoryMastery as any).rewardedAds = nextState(memState);
-      record.coins += REWARDED_AD_COINS;
-    }
-
-    record.updatedAt = now;
-    this.users.set(record.id, record);
-    this.savePersistedUsers();
-
-    return {
-      success: true,
-      user: this.toProfile(record),
-      coinsAwarded: REWARDED_AD_COINS,
-      status: getRewardedAdStatus((record.categoryMastery as any).rewardedAds, now),
-    };
   }
 
   public async recordDailyChallengeCompletion(

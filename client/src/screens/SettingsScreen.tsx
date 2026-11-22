@@ -29,6 +29,7 @@ import { LegalDocumentList, LegalDocumentModal, LegalWebLink } from '../componen
 import { getLegalConsent } from '../utils/legalConsent';
 import { SupportCases } from '../components/SupportCases';
 import { DuelFunnelPreference } from '../components/DuelFunnelPreference';
+import { hasAdPrivacyOptions, openAdPrivacyOptions } from '../services/ads';
 import Constants from 'expo-constants';
 import {
   TavrikoScreen,
@@ -135,6 +136,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<'sound' | 'game' | 'privacy' | 'account' | 'legal'>('sound');
+  const [adPrivacyOptions, setAdPrivacyOptions] = useState(false);
+  const [adPrivacyError, setAdPrivacyError] = useState(false);
+  useEffect(() => {
+    if (settingsTab !== 'privacy') return;
+    let active = true;
+    void hasAdPrivacyOptions().then(required => { if (active) setAdPrivacyOptions(required); });
+    return () => { active = false; };
+  }, [settingsTab]);
   const [openLegalDoc, setOpenLegalDoc] = useState<LegalDocumentId | null>(null);
 
   // Audio & Haptics
@@ -738,6 +747,23 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </View>
 
         <View style={styles.groupCard}>
+          {adPrivacyOptions && (
+            <TouchableOpacity
+              accessibilityRole="button"
+              style={styles.itemRow}
+              onPress={() => {
+                setAdPrivacyError(false);
+                void openAdPrivacyOptions().catch(() => setAdPrivacyError(true));
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itemLabel}>Reklam gizliliği tercihleri</Text>
+                <Text style={styles.itemSub}>
+                  {adPrivacyError ? 'Tercihler açılamadı. Lütfen tekrar dene.' : 'Reklamlarla ilgili gizlilik tercihlerini yönet.'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
           {/* Online Presence (Connected to Cloudflare Worker + Postgres) */}
           <View style={styles.itemRow}>
             <View style={{ flex: 1, paddingRight: 12 }}>
