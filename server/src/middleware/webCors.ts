@@ -16,7 +16,8 @@ export function makeWebCorsPolicy(configured = process.env.TAVRIKO_WEB_ORIGINS ?
     const origin = entry.trim();
     try {
       const url = new URL(origin);
-      if (url.protocol === 'https:' && (origin === url.origin || origin === `${url.origin}/`)) {
+      if (url.protocol === 'https:' && !url.hostname.includes('*') &&
+          (origin === url.origin || origin === `${url.origin}/`)) {
         webOrigins.add(url.origin);
       }
     } catch {

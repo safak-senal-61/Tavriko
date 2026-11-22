@@ -17,7 +17,7 @@ describe('web CORS allowlist', () => {
     expect(policy(preview, path)).toBe(false);
   });
 
-  it.each(['https://other.pages.dev', `${preview}.example`, 'https://bad.example', 'http://insecure.example', 'null'])(
+  it.each(['https://other.pages.dev', 'https://*.pages.dev', `${preview}.example`, 'https://bad.example', 'http://insecure.example', 'null'])(
     'does not trust %s', (origin) => {
       expect(policy(origin, '/api/auth/login')).toBe(false);
     },

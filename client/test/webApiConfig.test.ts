@@ -25,6 +25,13 @@ describe('separately hosted web API', () => {
     expect(DEFAULT_API_BASE).toBe(CLOUD_API_URL);
   });
 
+  it('rejects a wildcard web API host', async () => {
+    vi.stubEnv('EXPO_PUBLIC_WEB_API_ORIGIN', 'https://*.vercel.app');
+    vi.stubGlobal('window', { location: { origin: 'http://localhost:3000' } });
+    const { getApiBaseUrl } = await import('../src/config');
+    expect(getApiBaseUrl()).toBe('http://localhost:3000/api');
+  });
+
   it('ignores a web export override on native', async () => {
     vi.stubEnv('EXPO_PUBLIC_WEB_API_ORIGIN', 'https://tavriko-preview.vercel.app');
     const original = Platform.OS;

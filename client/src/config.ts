@@ -18,7 +18,8 @@ const getWebApiOrigin = (): string | undefined => {
   if (!configured) return;
   try {
     const url = new URL(configured);
-    if (url.protocol === 'https:' && (configured === url.origin || configured === `${url.origin}/`)) {
+    if (url.protocol === 'https:' && !url.hostname.includes('*') &&
+        (configured === url.origin || configured === `${url.origin}/`)) {
       return url.origin;
     }
   } catch {

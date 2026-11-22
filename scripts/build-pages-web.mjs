@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 const root = new URL('../', import.meta.url);
 const apiOrigin = (process.env.EXPO_PUBLIC_WEB_API_ORIGIN || 'https://tavriko-app.vercel.app').trim();
 const api = URL.parse(apiOrigin);
-if (!api || api.protocol !== 'https:' || (apiOrigin !== api.origin && apiOrigin !== `${api.origin}/`)) {
+if (!api || api.protocol !== 'https:' || api.hostname.includes('*') ||
+    (apiOrigin !== api.origin && apiOrigin !== `${api.origin}/`)) {
   throw new Error('EXPO_PUBLIC_WEB_API_ORIGIN must be a complete HTTPS origin, without a path or wildcard.');
 }
 
