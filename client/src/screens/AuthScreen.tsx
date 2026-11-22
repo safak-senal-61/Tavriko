@@ -408,7 +408,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const currentUrl = window.location.href;
       if (/(?:[?#&])(?:code|error)=/.test(currentUrl)) {
-        try { window.history.replaceState(null, '', window.location.pathname); } catch {}
+        const path = window.location.pathname === '/api/auth/google/callback'
+          ? '/app'
+          : window.location.pathname;
+        try { window.history.replaceState(null, '', path); } catch {}
         void handleAuthRedirectUrl(currentUrl);
       }
       return;

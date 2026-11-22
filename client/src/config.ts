@@ -10,6 +10,22 @@ export const CLOUD_HOST = 'tavriko-app.vercel.app';
 export const CLOUD_BASE_URL = `https://${CLOUD_HOST}`;
 export const CLOUD_API_URL = `${CLOUD_BASE_URL}/api`;
 
+// Expo inlines this only for a separately hosted web export. Native builds and
+// the existing Vercel export keep their original endpoint behavior.
+const getWebApiOrigin = (): string | undefined => {
+  if (Platform.OS !== 'web') return;
+  const configured = process.env.EXPO_PUBLIC_WEB_API_ORIGIN?.trim();
+  if (!configured) return;
+  try {
+    const url = new URL(configured);
+    if (url.protocol === 'https:' && (configured === url.origin || configured === `${url.origin}/`)) {
+      return url.origin;
+    }
+  } catch {
+    // The Pages build validates the value before exporting.
+  }
+};
+
 /**
  * Cloudflare Real-Time WebSocket Gateway URL
  * wss:// in production, ws:// in local dev
@@ -56,6 +72,8 @@ export const getRealtimeUrl = (): string => {
 };
 
 export const getApiBaseUrl = (): string => {
+  const hostedApi = getWebApiOrigin();
+  if (hostedApi) return `${hostedApi}/api`;
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location && window.location.origin) {
     // In web browser, use current host origin to ensure SSL and zero CORS issues
     return `${window.location.origin}/api`;
@@ -70,5 +88,5 @@ export const getSocketBaseUrl = (): string => {
   return CLOUD_BASE_URL;
 };
 
-// Default to 100% Cloud 24/7 URL for both mobile Expo and Web
-export const DEFAULT_API_BASE = CLOUD_API_URL;
+const webApiOrigin = getWebApiOrigin();
+export const DEFAULT_API_BASE = webApiOrigin ? `${webApiOrigin}/api` : CLOUD_API_URL;

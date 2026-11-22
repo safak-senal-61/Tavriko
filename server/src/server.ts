@@ -45,6 +45,7 @@ import { createFleetStore, fleetMiddleware } from './services/fleetTelemetry';
 import { checkPlayerAccess, socketIdentity, validPlayerId } from './services/playerAccess';
 import { restrictionsEnabled } from './services/adminAccountOperations';
 import { recordCompletedPlayers } from './services/playerAnalytics';
+import { makeWebCorsPolicy } from './middleware/webCors';
 
 function getLocalIpAddress(): string {
   const interfaces = os.networkInterfaces();
@@ -86,19 +87,10 @@ export function createApp() {
   app.use(fleetMiddleware(fleetStore));
   // SECURITY: CORS yalnızca Tavriko kaynaklarına açık. Origin göndermeyen
   // istekler (mobil uygulama, sunucudan sunucuya) tarayıcı kısıtına takılmaz.
-  const CORS_ALLOWED_ORIGINS = new Set([
-    'https://tavriko-app.vercel.app',
-    'http://localhost:8080',
-    'http://localhost:8081',
-    'http://localhost:19006',
-    'http://localhost:3000',
-  ]);
+  const allowWebCors = makeWebCorsPolicy();
   app.use(
-    cors({
-      origin: (origin, callback) => {
-        if (!origin || CORS_ALLOWED_ORIGINS.has(origin)) return callback(null, true);
-        return callback(null, false);
-      },
+    cors((req: express.Request, callback) => {
+      callback(null, { origin: allowWebCors(req.get('Origin'), req.path) });
     })
   );
   app.use(express.json({ limit: '15mb' }));
