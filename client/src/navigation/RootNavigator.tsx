@@ -93,6 +93,7 @@ import { ConnectionStatusOverlay } from '../components/ConnectionStatusOverlay';
 import { AnalyticsConsentBanner } from '../components/AnalyticsConsentBanner';
 import { useAnalyticsConsent } from '../services/analyticsConsent';
 import { PushPermissionReminder } from '../components/PushPermissionReminder';
+import { DesktopFullscreenBar } from '../components/DesktopFullscreenBar';
 import { pushSupported } from '../services/pushNotifications';
 import { usePushPermission } from '../services/usePushPermission';
 import { useNetStatus, OFFLINE_GAME_GRACE_MS } from '../store/netStatus';
@@ -1661,9 +1662,10 @@ export const RootNavigator: React.FC = () => {
   const handleTimeExpired = () => {
     if (!activeRoom) void evaluatePracticeAnswer(null, 0);
   };
-  return (
+  const playerFrame = (
     <View style={[
       styles.outerWrapper,
+      isWeb && styles.webContent,
       isNativeTablet && styles.tabletOuter,
       webLayout.roomy && [styles.webOuter, { paddingHorizontal: webLayout.frameGutter }],
     ]}>
@@ -2465,6 +2467,13 @@ export const RootNavigator: React.FC = () => {
       )}
     </View>
   );
+
+  return isWeb ? (
+    <View style={styles.outerWrapper}>
+      <DesktopFullscreenBar hidden={currentScreen === 'splash'} />
+      {playerFrame}
+    </View>
+  ) : playerFrame;
 };
 
 const styles = StyleSheet.create({
@@ -2473,6 +2482,10 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.background,
     width: '100%',
     height: '100%',
+  },
+  webContent: {
+    height: 'auto',
+    minHeight: 0,
   },
   tabletOuter: {
     backgroundColor: '#090414',

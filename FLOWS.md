@@ -1,5 +1,11 @@
 # Visual refresh acceptance and regression checks
 
+## Desktop web fullscreen
+
+- On desktop `/app`, find “Tam ekran” above the login screen, open it, then leave with “Tam ekrandan çık” or the browser’s Esc command. The control returns to “Tam ekran”; login tabs and any text already entered stay intact.
+- Enter as a guest, open a category, and continue to practice. The control stays reachable on Keşfet and during play without overlaying answers or restarting the round. Also check the control with a short desktop viewport.
+- Resize the same tab desktop → 375px → desktop. The fullscreen bar stays hidden on narrow or touch-only layouts and returns on desktop. A disabled Fullscreen API must not add a blank bar; a rejected request should show a brief explanation without affecting the game.
+
 ## Gameplay rewards
 
 - Baseline: sign-in opens Oyna; Mağaza previously opened on Sandıklar with Anahtarlar and Rozetler tabs. Envanter is where owned items are opened or equipped.
