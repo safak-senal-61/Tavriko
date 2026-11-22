@@ -101,8 +101,8 @@ export function makeOpsTelemetry(clock = Date.now) {
   return { middleware, record, traffic, runtime };
 }
 
-type ProbeState = 'ok' | 'failed' | 'timeout' | 'unconfigured' | 'unknown';
-export type Probe = { name: string; detail: string; check?: () => Promise<boolean>; unset?: 'unconfigured' | 'unknown'; optional?: boolean };
+type ProbeState = 'ok' | 'failed' | 'timeout' | 'unconfigured' | 'unknown' | 'initialized';
+export type Probe = { name: string; detail: string; check?: () => Promise<boolean>; unset?: Exclude<ProbeState, 'ok' | 'timeout'>; optional?: boolean };
 export function makeProbeSampler(getProbes: () => Probe[], timeoutMs = 3000, maxAgeMs = 30_000) {
   let cache: Awaited<ReturnType<typeof sample>> | undefined;
   let pending: ReturnType<typeof sample> | undefined;

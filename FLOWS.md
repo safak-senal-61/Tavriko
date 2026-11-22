@@ -1,5 +1,12 @@
 # Visual refresh acceptance and regression checks
 
+## Production service checks
+
+- Site Sağlığı: test refresh, pause/resume and mobile-width layout. The Firebase card distinguishes Google API validation from device delivery; the Sentry card distinguishes SDK initialization from a manually sent test event. Polar stays disabled when it is not configured.
+- In an owner session, select “Sentry test olayı gönder”. Check the returned event ID in the separate server project; verify unauthenticated, wrong-origin, and repeated requests are rejected.
+- Web `/` and `/app` still show the sign-in flow without starting analytics or an ad script. `/ads.txt` serves the verified web publisher entry as plain text; `/app-ads.txt` stays unchanged.
+- For synthetic signed-in sessions, check consent granted, withdrawal, login switch and SDK startup failure followed by retry. Never transmit synthetic player data to the live analytics project.
+
 ## Responsive player web app
 - At 1032×1376 (13-inch iPad Pro in portrait), Home shows a full-width game banner above the four mode cards. Rotate to landscape: the banner and modes sit side by side. The fixed bottom row must not cover scrollable content in either orientation.
 - At 768px, 1032px, 1376px, and 1920px, switch through Oyna, Keşfet, Liderler, Arkadaşlar, and Profil: the outer frame and bottom navigation must keep the same horizontal and vertical position. Test the Lig Puanı and Toplam XP tabs and scroll to the last player. At desktop width check both columns; portrait tablet keeps the list below the podium.

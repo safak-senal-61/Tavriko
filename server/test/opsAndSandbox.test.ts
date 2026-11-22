@@ -10,7 +10,8 @@ vi.mock('../src/db/prismaClient', () => ({ db: {
 } }));
 vi.mock('../src/db/supabaseClient', () => ({ supabaseService: { getClient: () => null } }));
 vi.mock('../src/cache/redisClient', () => ({ cacheService: { isAvailable: () => false } }));
-vi.mock('../src/services/fcmService', () => ({ getFcmStatus: () => ({ enabled: false }) }));
+vi.mock('../src/services/fcmService', () => ({ getFcmStatus: vi.fn(), verifyFcmApi: vi.fn() }));
+vi.mock('../src/utils/errorMonitor', () => ({ getErrorMonitorStatus: vi.fn(), sendErrorMonitorTest: vi.fn() }));
 vi.mock('../src/services/inviteDelivery', () => ({ DEFAULT_REALTIME_URL: 'https://worker.invalid' }));
 vi.mock('../src/services/presenceManager', () => ({ presenceManager: {} }));
 
@@ -20,6 +21,8 @@ import { createOpsRouter } from '../src/routes/opsRoutes';
 import { ADMIN_SESSION_COOKIE, issueAdminSessionToken } from '../src/middleware/auth';
 import social from '../src/routes/socialRoutes';
 import { db } from '../src/db/prismaClient';
+import { getFcmStatus, verifyFcmApi } from '../src/services/fcmService';
+import { getErrorMonitorStatus, sendErrorMonitorTest } from '../src/utils/errorMonitor';
 
 const product = '9a95b314-825f-42cd-970a-70e4c78530bf';
 const id = '3479bf21-7bb2-4879-976f-a170ef8c64b9';
@@ -125,6 +128,8 @@ describe('Admin and storefront routes', () => {
     vi.stubEnv('DATABASE_URL', '');
     vi.stubEnv('DIRECT_URL', '');
     vi.stubEnv('POLAR_SANDBOX_ENABLED', 'false');
+    vi.mocked(getFcmStatus).mockReturnValue({ enabled:false, reason:'' });
+    vi.mocked(getErrorMonitorStatus).mockReturnValue('unconfigured');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ status:'ok', service:'Tavriko Real-time Multiplayer Gateway' })));
   });
   const cookie = () => `${ADMIN_SESSION_COOKIE}=${issueAdminSessionToken(email, 'owner', false, 'c82b0f7a-0fa9-4ce0-ac11-8849b26c34a9')}`;
@@ -141,6 +146,35 @@ describe('Admin and storefront routes', () => {
     expect(snapshot.status).toBe(200);
     expect(snapshot.headers['cache-control']).toContain('no-store');
     expect(snapshot.body).toMatchObject({ status:'warning', traffic: { serverErrors:1 }, sandboxEnabled:false });
+  });
+  it('distinguishes FCM API reachability, Sentry SDK startup and disabled Polar', async () => {
+    vi.mocked(getFcmStatus).mockReturnValue({ enabled: true, reason:'' });
+    vi.mocked(verifyFcmApi).mockResolvedValue(true);
+    vi.mocked(getErrorMonitorStatus).mockReturnValue('initialized');
+    const app = express().use(createOpsRouter(makeOpsTelemetry()));
+    const { body } = await request(app).get('/api/admin/ops/snapshot').set('Cookie', cookie());
+    expect(body.sentryTestEnabled).toBe(true);
+    expect(body.services).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name:'Firebase FCM API', state:'ok' }),
+      expect.objectContaining({ name:'Sentry / GlitchTip (sunucu)', state:'initialized' }),
+      expect.objectContaining({ name:'Polar Sandbox', state:'unconfigured', optional:true }),
+    ]));
+    expect(verifyFcmApi).toHaveBeenCalledOnce();
+    expect(sendErrorMonitorTest).not.toHaveBeenCalled();
+  });
+
+  it('restricts Sentry test events to a same-origin owner session and throttles repeats', async () => {
+    vi.mocked(getErrorMonitorStatus).mockReturnValue('initialized');
+    const eventId = 'ab'.repeat(16);
+    vi.mocked(sendErrorMonitorTest).mockResolvedValue(eventId);
+    const app = express().use(express.json()).use(createOpsRouter(makeOpsTelemetry()));
+    const send = () => request(app).post('/api/admin/ops/sentry/test').set('Host', 'example.test');
+    expect((await send().set('Origin', 'https://example.test').send({})).status).toBe(401);
+    expect((await send().set('x-internal-secret', 'ops-fixture').set('Origin', 'https://example.test').send({})).status).toBe(403);
+    expect((await send().set('Cookie', cookie()).set('Origin', 'https://other.test').send({})).status).toBe(403);
+    expect((await send().set('Cookie', cookie()).set('Origin', 'https://example.test').send({})).body).toEqual({ eventId });
+    expect((await send().set('Cookie', cookie()).set('Origin', 'https://example.test').send({})).status).toBe(429);
+    expect(sendErrorMonitorTest).toHaveBeenCalledOnce();
   });
   it('enforces portal session, configured origin and checkout rate limit', async () => {
     vi.stubEnv('POLAR_SANDBOX_ENABLED','true');

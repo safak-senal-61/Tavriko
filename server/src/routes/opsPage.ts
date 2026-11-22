@@ -53,7 +53,8 @@ ${renderAdminHeader('health')}
 <p><a href="/admin/loglar">Canlı loglar ve hataları aç</a></p>
 <p>Bu bölüm tek Node.js örneğini ölçer. Birleşik trafik, CDN ve tarayıcı sinyalleri Dağıtık izleme bölümündedir.</p></section>
 </div><div class="stack">
-<section class="panel"><h2>Servis kontrolleri</h2><p>Panel açıkken alınır. Her örnekte 30 saniye önbelleklenir.</p><div id="services"></div></section>
+<section class="panel"><h2>Servis kontrolleri</h2><p>Panel açıkken alınır. Her örnekte 30 saniye önbelleklenir.</p><div id="services"></div>
+<div class="tools"><button id="sentry-test" type="button" disabled>Sentry test olayı gönder</button></div><p id="sentry-result" role="status"></p></section>
 <section class="panel sandbox"><div class="kicker">TEST ORTAMI · GERÇEK TAHSİLAT YOK</div><h2>Polar Sandbox</h2><p>Tek seferlik test ürünü; oyuncu bakiyesi ve envanteri değişmez. Gerçek kart bilgisi girmeyin.</p>
 <p>Test kartı: <code>4242 4242 4242 4242</code>, ileri tarih ve herhangi bir üç haneli CVC.</p>
 <div class="tools"><button type="button" class="primary" id="checkout" disabled>Test ödemesi başlat</button><button type="button" id="verify" hidden>Durumu tekrar sorgula</button></div>
@@ -68,7 +69,8 @@ const p95 = d => d.p95OverLimit ? '> 5 sn' : d.p95Ms == null ? '—' : '≤ ' + 
 const api = '/api/admin/ops';
 let sample, paused = false, busy = false, stale = false, lastInstance, instanceChanged = false, needsLogin = false, paymentBusy = false, paymentMessage = false;
 let fleetBusy = false, fleetObserved = 0;
-const probeLabels = {ok:['Yanıt veriyor','good'],failed:['Kontrol başarısız','bad'],timeout:['Zaman aşımı','warn'],unconfigured:['Yapılandırılmadı','warn'],unknown:['Doğrulanmadı','']};
+let sentryBusy = false;
+const probeLabels = {ok:['Yanıt veriyor','good'],failed:['Kontrol başarısız','bad'],timeout:['Zaman aşımı','warn'],unconfigured:['Yapılandırılmadı','warn'],unknown:['Doğrulanmadı',''],initialized:['SDK başlatıldı','good']};
 const groupLabels = {auth:'Kimlik doğrulama',trivia:'Oyun API',social:'Sosyal / mağaza',push:'Bildirim',realtime:'Realtime HTTP',api:'Diğer API',web:'Web'};
 const initial = new URLSearchParams(location.search).get('checkout_id');
 const checkoutId = /^[0-9a-f-]{36}$/i.test(initial || '') ? initial : null;
@@ -180,6 +182,7 @@ function render(d) {
   if (!t.requests) notes.append(el('li', 'Bu örneğe ulaşan tamamlanmış istek yok. Trafik gözlenmemesi sistemin sağlıklı olduğunu göstermez.'));
   if (!notes.children.length) notes.append(el('li', 'Bu örnekte 5xx veya zorunlu servis uyarısı gözlenmedi.'));
   by('checkout').disabled = !d.sandboxEnabled || paymentBusy || needsLogin;
+  by('sentry-test').disabled = !d.sentryTestEnabled || sentryBusy || needsLogin;
   if (!checkoutId && !paymentMessage) put('payment', d.sandboxEnabled ? 'Test işlemi başlatılabilir.' : 'Sandbox kapalı veya sunucu yapılandırması eksik.');
 }
 async function refresh() {
@@ -189,12 +192,21 @@ async function refresh() {
   catch (error) {
     stale = true; freshness();
     if (!sample) { badge(needsLogin ? 'Oturum gerekli' : 'Ölçüm alınamadı', 'bad'); put('fresh', error.message); }
-    if (needsLogin) by('checkout').disabled = true;
+    if (needsLogin) { by('checkout').disabled = true; by('sentry-test').disabled = true; }
   } finally { busy = false; by('reload').disabled = needsLogin; }
 }
 const renew = () => { refresh(); refreshFleet(); };
 by('pause').addEventListener('click', () => { paused = !paused; put('pause', paused ? 'Devam et' : 'Durdur'); freshness(); if (!paused) renew(); });
 by('reload').addEventListener('click', renew);
+by('sentry-test').addEventListener('click', async () => {
+  sentryBusy = true; by('sentry-test').disabled = true;
+  put('sentry-result', 'Test olayı gönderiliyor…');
+  try {
+    const result = await read(api + '/sentry/test', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+    put('sentry-result', 'Olay kimliği: ' + result.eventId + '. Alımı Sentry projesinde kontrol edin.');
+  } catch (error) { put('sentry-result', error.message); }
+  finally { sentryBusy = false; by('sentry-test').disabled = needsLogin || !sample?.sentryTestEnabled; }
+});
 setInterval(() => { if (!paused && !document.hidden) refresh(); }, 15000);
 setInterval(() => { if (!paused && !document.hidden) refreshFleet(); }, 30000);
 setInterval(freshness, 3000);

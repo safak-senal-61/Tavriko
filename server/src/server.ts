@@ -608,6 +608,7 @@ export function createApp() {
       'manifest.json',
       'robots.txt',
       'app-ads.txt',
+      'ads.txt',
       'sitemap.xml',
     ];
     app.get(brandStaticFiles.map((name) => `/${name}`), (req, res, next) => {
@@ -3830,7 +3831,7 @@ export function createApp() {
 
       return res.json({ success: true });
     } catch (err: any) {
-      captureError(err);
+      await captureError(err);
       logger.error('SOCKET', `Maç sonucu kaydetme hatası: ${err.message}`, err);
       return res.status(500).json({ success: false, error: err.message });
     }
@@ -4010,6 +4011,12 @@ export function createApp() {
     // Browser navigation gets the animated page
     res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(renderNotFoundHtml());
+  });
+
+  app.use(async (err: unknown, _req: express.Request, _res: express.Response, next: express.NextFunction) => {
+    const status = (err as { status?: unknown } | null)?.status;
+    if (typeof status !== 'number' || status >= 500) await captureError(err);
+    next(err);
   });
 
   return { app, httpServer, io, roomManager, matchmaker, telegramBot, close };

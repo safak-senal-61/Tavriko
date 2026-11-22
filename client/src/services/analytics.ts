@@ -26,22 +26,13 @@ let initPromise: Promise<PostHog | null> | null = null;
 let requestedPlayer: string | null = null;
 let activePlayer: string | null = null;
 let sessionRevision = 0;
+let transition: Promise<void> = Promise.resolve();
 
 /** Eşleşme kuyruğuna girme anı — matchmaking_time hesabı için */
 let matchmakingStartedAt: number | null = null;
 
 /** Each eligible sign-in emits one identified session event, even on first consent. */
-export async function syncAnalyticsSession(playerId: string | null): Promise<void> {
-  const next = getAnalyticsConsent() === 'granted' ? playerId : null;
-  if (next === requestedPlayer) return;
-  requestedPlayer = next;
-  activePlayer = null;
-  matchmakingStartedAt = null;
-  const revision = ++sessionRevision;
-  if (!next || !POSTHOG_KEY) {
-    if (client) await client.optOut().catch(() => {});
-    return;
-  }
+function loadClient(): Promise<PostHog | null> {
   initPromise ??= (async () => {
     try {
       const ph = new PostHog(POSTHOG_KEY, {
@@ -57,26 +48,45 @@ export async function syncAnalyticsSession(playerId: string | null): Promise<voi
       console.warn('[analytics] PostHog başlatılamadı, analitik kapalı:', err);
       return null;
     }
-  })();
-  try {
-    const ph = await initPromise;
-    if (!ph || revision !== sessionRevision || getAnalyticsConsent() !== 'granted') return;
-    client = ph;
-    if (ph.getDistinctId() !== next) ph.reset();
-    await ph.optIn();
-    if (revision !== sessionRevision || getAnalyticsConsent() !== 'granted') {
-      if (!requestedPlayer || getAnalyticsConsent() !== 'granted') await ph.optOut();
+  })().then(ph => {
+    if (!ph) initPromise = null;
+    return ph;
+  });
+  return initPromise;
+}
+
+export async function syncAnalyticsSession(playerId: string | null): Promise<void> {
+  const next = getAnalyticsConsent() === 'granted' && POSTHOG_KEY ? playerId : null;
+  if (next === requestedPlayer) return;
+  requestedPlayer = next;
+  activePlayer = null;
+  matchmakingStartedAt = null;
+  const revision = ++sessionRevision;
+  // Never make logout wait for SDK startup. Once ready, serialize the SDK's
+  // opt-in/out and identity transitions so an old action cannot win a race.
+  const ph = next ? await loadClient() : client;
+  if (revision !== sessionRevision) return;
+  if (!ph) { requestedPlayer = null; return; }
+  client = ph;
+  transition = transition.then(async () => {
+    if (revision !== sessionRevision) return;
+    if (!next || getAnalyticsConsent() !== 'granted') {
+      await ph.optOut();
       return;
     }
+    if (ph.getDistinctId() !== next) ph.reset();
+    await ph.optIn();
+    if (revision !== sessionRevision || getAnalyticsConsent() !== 'granted') return;
     ph.identify(next);
     activePlayer = next;
     trackEvent('session_start', {
       platform: Platform.OS,
       version: process.env.EXPO_PUBLIC_APP_VERSION || Constants.expoConfig?.version || 'dev',
     });
-  } catch {
-    // Telemetry must never break gameplay.
-  }
+  }).catch(() => {
+    if (revision === sessionRevision && next) requestedPlayer = null;
+  });
+  await transition;
 }
 
 export function trackEvent(event: string, props?: Record<string, any>): void {

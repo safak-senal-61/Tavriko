@@ -3,7 +3,7 @@
  * @sentry/node paketi kurulu degilse veya SENTRY_DSN yoksa sessizce no-op calisir.
  */
 
-let Sentry: any = null;
+let Sentry: typeof import('@sentry/node') | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   Sentry = require('@sentry/node');
@@ -13,33 +13,78 @@ try {
 
 let initialized = false;
 
+function readDsn() {
+  return process.env.SENTRY_DSN?.trim() || process.env.GLITCHTIP_DSN?.trim();
+}
+
 export function initErrorMonitor() {
-  const dsn = process.env.SENTRY_DSN || process.env.GLITCHTIP_DSN;
+  const dsn = readDsn();
   if (!dsn || initialized || !Sentry) {
     return initialized;
   }
   try {
     Sentry.init({
       dsn,
-      environment: process.env.NODE_ENV || 'development',
+      environment: process.env.VERCEL_ENV || process.env.NODE_ENV || 'development',
       serverName: 'tavriko-server',
-      tracesSampleRate: 0.2,
+      dataCollection: {
+        userInfo: false,
+        cookies: false,
+        httpHeaders: false,
+        httpBodies: [],
+        urlQueryParams: false,
+        databaseQueryData: false,
+        stackFrameVariables: false,
+        frameContextLines: 0,
+      },
+      tracesSampleRate: 0,
+      beforeSend(event) {
+        // Do not export request contents, identity, app breadcrumbs or raw exception
+        // messages (which can include database values or upstream payloads).
+        delete event.request;
+        delete event.user;
+        delete event.breadcrumbs;
+        delete event.extra;
+        for (const error of event.exception?.values ?? []) {
+          error.value = 'Tavriko server exception';
+        }
+        return event;
+      },
     });
-    initialized = true;
-    console.log('[errorMonitor] GlitchTip/Sentry icin hata izleme aktif');
-  } catch (err) {
-    console.warn('[errorMonitor] hata izleme baslatilamadi:', err);
+    initialized = Boolean(Sentry.getClient()?.getDsn());
+    if (initialized) console.log('[errorMonitor] Sunucu hata izleme aktif');
+  } catch {
+    console.warn('[errorMonitor] Sunucu hata izleme başlatılamadı.');
   }
   return initialized;
 }
 
-export function captureError(err: unknown) {
+export function getErrorMonitorStatus(): 'unconfigured' | 'initialized' | 'failed' {
+  return initialized ? 'initialized' : readDsn() ? 'failed' : 'unconfigured';
+}
+
+export async function captureError(err: unknown): Promise<void> {
   if (initialized && Sentry) {
     try {
       Sentry.captureException(err);
+      // Vercel may freeze the instance after the response. Flush before replying.
+      await Sentry.flush(1500);
     } catch {
       // ignore
     }
+  }
+}
+
+export async function sendErrorMonitorTest(): Promise<string | null> {
+  if (!initialized || !Sentry) return null;
+  try {
+    const eventId = Sentry.captureMessage('Tavriko server monitoring test', {
+      level: 'info',
+      tags: { ops_test: 'true' },
+    });
+    return await Sentry.flush(2500) ? eventId : null;
+  } catch {
+    return null;
   }
 }
 

@@ -21,7 +21,11 @@ Checkout yalnızca yönetici portalı oturumuyla açılır. Demo için webhook, 
 
 Panel açıkken süreç ölçümleri 15, dağıtık ölçümler 30 saniyede yenilenir. CPU işlem süresinin geçen zamana oranıdır (%100 = bir çekirdek). Anlık RSS ve heap yalnızca yanıtlayan Node.js işlemine aittir; birleşik bölümde istek sırasında gözlenen en yüksek CPU/RSS ayrıca gösterilir, platform tahsis oranı veya boşta çalışan örneklerin ölçümü değildir.
 
-PostgreSQL `SELECT 1`, Supabase `categories` okuması, Redis `PING`, Cloudflare Worker HTTPS `/health` ve etkinse Polar Sandbox ürün okuması panel kontrolleridir. FCM ve Sentry/GlitchTip için yalnızca yapılandırma bilgisi gösterilir. Dağıtık toplama ve dış kontroller ayrıca kurulur.
+PostgreSQL `SELECT 1`, Supabase `categories` okuması, Redis `PING`, Cloudflare Worker HTTPS `/health` ve etkinse Polar Sandbox ürün okuması panel kontrolleridir. Firebase FCM API kontrolü Google’a yalnızca doğrulama amaçlı bir istek gönderir; cihaz token’ı kullanmaz ve gerçek teslimatı ölçmez. Sentry satırı sunucu SDK durumunu gösterir. Sahip oturumu ile “Sentry test olayı gönder” üzerinden olay kimliğini alın ve Sentry’de sunucu projesinde arayın. Mobil Sentry projesi ayrıdır. Dağıtık toplama ve dış kontroller ayrıca kurulur.
+
+## Web AdSense
+
+Site kökündeki `/ads.txt` ve HTML’deki `google-adsense-account` meta etiketi, web sitesinin hesabını doğrulamak içindir. Mobil `/app-ads.txt` ayrıdır. Web sitesi Google tarafından onaylanıncaya ve uygulanabilir reklam rızası akışı (Google sertifikalı CMP dahil) kuruluncaya kadar reklam JavaScript’i yüklenmez. PostHog analitik izni reklam izni değildir. [Site doğrulama](https://support.google.com/adsense/answer/7584263) ve [Google CMP koşulları](https://support.google.com/adsense/answer/13554020).
 
 ### Dağıtık toplama kurulumu
 

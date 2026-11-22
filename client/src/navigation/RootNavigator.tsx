@@ -308,8 +308,14 @@ export const RootNavigator: React.FC = () => {
   const push = usePushPermission(signedInPlayer, realSessionToken);
 
   useEffect(() => {
-    void syncAnalyticsSession(consent === 'granted' ? signedInPlayer : null);
-  }, [signedInPlayer, consent]);
+    const player = consent === 'granted' ? signedInPlayer : null;
+    void syncAnalyticsSession(player);
+    if (!player) return;
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void syncAnalyticsSession(player);
+    });
+    return () => subscription.remove();
+  }, [signedInPlayer, consent, netOnline]);
 
   const acceptLegal = useCallback(
     async (method: 'google' | 'in_app') => {
