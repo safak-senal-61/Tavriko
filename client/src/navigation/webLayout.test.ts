@@ -38,17 +38,21 @@ describe('player web layout', () => {
     });
   });
 
-  it('expands only the gameplay frame while fullscreen is active', () => {
-    for (const screen of ['quiz_arena', 'intermission'] as const) {
-      expect(getWebLayout(1920, 870, screen, true, true)).toMatchObject({
-        fullscreenGame: true, frameWidth: 1920, frameGutter: 0, contentWidth: 1320, showUtility: false,
-      });
+  it('expands every desktop app route while fullscreen is active', () => {
+    for (const screen of allPages.filter((page) => page !== 'splash')) {
+      for (const width of [760, 1280, 1920, 2560]) {
+        const normal = getWebLayout(width, 620, screen, true);
+        const full = getWebLayout(width, 620, screen, true, true);
+        expect(full, screen).toMatchObject({
+          fullscreen: true, frameWidth: width, frameMaxWidth: width, frameGutter: 0,
+          contentWidth: width - 48, showUtility: false,
+        });
+        expect(full.contentWidth, screen).toBeGreaterThan(normal.contentWidth);
+      }
     }
-    for (const screen of ['home', 'auth', 'shop', 'match_result', 'gameplay_rewards'] as const) {
-      expect(getWebLayout(1920, 870, screen, true, true)).toEqual(getWebLayout(1920, 870, screen, true));
-    }
-    expect(getWebLayout(375, 812, 'quiz_arena', true, true).fullscreenGame).toBe(false);
-    expect(getWebLayout(1200, 870, 'quiz_arena', false, true).fullscreenGame).toBe(false);
+    expect(getWebLayout(375, 812, 'home', true, true)).toEqual(getWebLayout(375, 812, 'home', true));
+    expect(getWebLayout(1200, 870, 'quiz_arena', false, true)).toEqual(getWebLayout(1200, 870, 'quiz_arena', false));
+    expect(getWebLayout(1920, 870, 'splash', true, true)).toEqual(getWebLayout(1920, 870, 'splash', true));
   });
 
   it('gives every desktop workspace the same frame, useful width and visible utility', () => {

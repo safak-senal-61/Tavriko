@@ -244,6 +244,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
   const page = usePlayerWebLayout();
   const webProfile = page?.roomy;
+  const webProfileWidth = webProfile && [styles.webProfileWidth, page.fullscreen && { maxWidth: page.contentWidth }];
   const fourStats = webProfile && page.contentWidth >= 920;
   const ui = webProfile ? page.ui : undefined;
   const twoCollections = webProfile && page.contentWidth >= 840;
@@ -677,7 +678,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           ['account', 'Hesap'],
         ];
     return (
-    <View accessibilityRole="tablist" style={[styles.tabRow, webProfile && styles.webProfileWidth]}>
+    <View accessibilityRole="tablist" style={[styles.tabRow, webProfileWidth]}>
       {tabs.map(([tKey, label]) => {
         const isActive = activeTab === tKey;
         return (
@@ -722,7 +723,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Unified Compact Hero Identity Card */}
-        <View style={[styles.heroCard, webProfile && styles.webProfileWidth]}>
+        <View style={[styles.heroCard, webProfileWidth]}>
           {/* Kuşanılmış arka plan: profil kartının içinde görünür */}
           {activeBg && (
             <View style={[StyleSheet.absoluteFill, { borderRadius: styles.heroCard.borderRadius, overflow: 'hidden' }]} pointerEvents="none">
@@ -1040,7 +1041,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             alignItems: 'center',
             opacity: tabContentOpacity,
             transform: [{ translateY: tabContentTranslateY }],
-          }, webProfile && styles.webProfileWidth]}
+          }, webProfileWidth]}
         >
         {/* TAB 1: Overview */}
         {activeTab === 'overview' && (

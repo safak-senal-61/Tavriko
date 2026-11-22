@@ -2,9 +2,9 @@
 
 ## Desktop web fullscreen
 
-- On desktop `/app`, verify no “Tam ekran” control on login, Keşfet, difficulty selection, menus or results. Start a practice question and enter fullscreen from the game toolbar; only the arena fills the screen and the current question, timer and selection stay intact.
-- While playing, check “Tam ekrandan çık” and browser-initiated fullscreen exit. In a multiplayer round, keep fullscreen across the intermission; leave it automatically on the results screen or if the player exits to a menu. The solo and daily-challenge summary dialogs must be reachable after automatic exit.
-- Check a short desktop viewport, a 375px screen and a wide touch-only screen. Answers must remain reachable; only a supported desktop game should show the toolbar. A rejected fullscreen request should show a brief explanation without affecting the game.
+- On desktop `/app`, open “Tam ekran” from login, then navigate through Keşfet, difficulty, a quiz and its summary without losing fullscreen. The shared application frame, not just the question, becomes flush with the viewport; form text, selected answers and the timer are not reset by toggling.
+- In a signed-in session, navigate from Oyna to Mağaza, Ödüller/Rozetler and Profil. Check that the normal width limits and QR side rail do not constrain fullscreen content, and that results and dialogs stay accessible in fullscreen. Leave through “Tam ekrandan çık” or a browser-initiated exit, and verify the normal layout returns on the same page.
+- Check a short desktop viewport, a 375px screen, a wide touch-only screen and browsers without the Fullscreen API. Mobile layout and form controls remain reachable. A rejected fullscreen request should show a brief explanation without affecting navigation.
 
 ## Gameplay rewards
 

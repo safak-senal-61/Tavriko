@@ -808,7 +808,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const narrowHeader = isGroup && windowWidth < 380;
   // 5+ kişi: soru kartı, şıklar ve yarış kartı sıkışık modda render edilir.
   const denseLayout = playerCount >= 5;
-  const roomyFullscreen = webLayout?.fullscreenGame && windowHeight >= 760 && !denseLayout;
+  const roomyFullscreen = webLayout?.fullscreen && windowHeight >= 760 && !denseLayout;
   const multiLeaderScore = multiPlayers.reduce(
     (acc, p) =>
       Math.max(acc, p.isMe ? myScore : formatCleanScore(p.score || 0, p.correctAnswers, totalRounds)),

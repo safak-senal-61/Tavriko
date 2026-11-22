@@ -53,9 +53,7 @@ const styles = `
   }
 `;
 
-export function DesktopFullscreenBar({ enabled, targetId, onFullscreenChange }: {
-  enabled: boolean;
-  targetId: string;
+export function DesktopFullscreenBar({ onFullscreenChange }: {
   onFullscreenChange: (active: boolean) => void;
 }) {
   const [available, setAvailable] = useState(false);
@@ -66,11 +64,10 @@ export function DesktopFullscreenBar({ enabled, targetId, onFullscreenChange }: 
   useEffect(() => {
     const desktop = window.matchMedia(DESKTOP);
     const sync = () => {
-      const target = document.getElementById(targetId);
       setAvailable(desktop.matches && document.fullscreenEnabled &&
-        typeof target?.requestFullscreen === 'function' &&
+        typeof document.documentElement.requestFullscreen === 'function' &&
         typeof document.exitFullscreen === 'function');
-      const active = !!target && document.fullscreenElement === target;
+      const active = document.fullscreenElement === document.documentElement;
       setFullscreen(active);
       onFullscreenChange(active);
     };
@@ -85,30 +82,20 @@ export function DesktopFullscreenBar({ enabled, targetId, onFullscreenChange }: 
       desktop.removeEventListener('change', sync);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, [targetId, onFullscreenChange]);
+  }, [onFullscreenChange]);
 
-  useEffect(() => {
-    if (enabled) return;
-    setError(false);
-    // Do not leave menu screens or body-level result dialogs behind the fullscreen layer.
-    const target = document.getElementById(targetId);
-    if (target && document.fullscreenElement === target) {
-      void document.exitFullscreen().catch(() => {});
-    }
-  }, [enabled, fullscreen, targetId]);
-
-  if (!enabled || (!fullscreen && !available)) return null;
+  if (!fullscreen && !available) return null;
 
   const toggle = async () => {
-    const target = document.getElementById(targetId);
-    if (!target || inFlight.current) return;
+    if (inFlight.current) return;
     inFlight.current = true;
     setError(false);
     try {
-      if (document.fullscreenElement === target) {
+      // Fullscreen the document so navigation and body-level modal portals stay visible.
+      if (document.fullscreenElement === document.documentElement) {
         await document.exitFullscreen();
       } else {
-        await target.requestFullscreen();
+        await document.documentElement.requestFullscreen();
       }
     } catch {
       setError(true);

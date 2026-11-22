@@ -98,7 +98,7 @@ import { pushSupported } from '../services/pushNotifications';
 import { usePushPermission } from '../services/usePushPermission';
 import { useNetStatus, OFFLINE_GAME_GRACE_MS } from '../store/netStatus';
 import { netMonitor } from '../services/netMonitor';
-import { getWebLayout, isFullscreenGameRoute, WEB_FRAME_GAP, WEB_UTILITY_WIDTH } from './webLayout';
+import { getWebLayout, WEB_FRAME_GAP, WEB_UTILITY_WIDTH } from './webLayout';
 import type { ScreenName } from './webLayout';
 import { PlayerWebLayoutContext } from './PlayerWebLayoutContext';
 export type { ScreenName } from './webLayout';
@@ -113,7 +113,6 @@ import {
 } from '../utils/legalConsent';
 
 const API_BASE = DEFAULT_API_BASE;
-const WEB_GAME_SURFACE_ID = 'tavriko-web-game-surface';
 // 1v1 düello her zaman tüm kategorilerden karışık ve 15 soruluk oynanır. Keşfet'te en son
 // seçilen kategori (selectedCategory) düelloya taşınmamalı.
 const DUEL_CATEGORY: CategoryId = 'mixed';
@@ -156,10 +155,10 @@ export const RootNavigator: React.FC = () => {
     : 'splash';
 
   const [currentScreen, setCurrentScreen] = useState<ScreenName>(initialScreen);
-  const [gameFullscreen, setGameFullscreen] = useState(false);
+  const [webFullscreen, setWebFullscreen] = useState(false);
   const webLayout = useMemo(
-    () => getWebLayout(windowWidth, windowHeight, currentScreen, isWeb, gameFullscreen),
-    [windowWidth, windowHeight, currentScreen, isWeb, gameFullscreen],
+    () => getWebLayout(windowWidth, windowHeight, currentScreen, isWeb, webFullscreen),
+    [windowWidth, windowHeight, currentScreen, isWeb, webFullscreen],
   );
   /* KVKK: arkadaşın tam profili (salt okunur) — ayarlar/hesap bölümleri gizli */
   const [viewingProfile, setViewingProfile] = useState<UserProfile | null>(null);
@@ -1664,34 +1663,21 @@ export const RootNavigator: React.FC = () => {
   const handleTimeExpired = () => {
     if (!activeRoom) void evaluatePracticeAnswer(null, 0);
   };
-  const canFullscreenGame = isFullscreenGameRoute(currentScreen) &&
-    (currentScreen === 'quiz_arena' ? !!currentQuestion : !!lastRoundResult && !!user) &&
-    !isPracticeSummaryVisible && !dailyResultModal?.visible &&
-    !gameAlert && !sharedProfile && !sharedProfileLoading && !showLegalGate;
-
-  return (
+  const playerFrame = (
     <View style={[
       styles.outerWrapper,
+      isWeb && styles.webContent,
       isNativeTablet && styles.tabletOuter,
       webLayout.roomy && [styles.webOuter, { paddingHorizontal: webLayout.frameGutter }],
+      webLayout.fullscreen && styles.fullscreenOuter,
     ]}>
       <StatusBar hidden={true} animated={false} />
 
-      <View
-        nativeID={isWeb ? WEB_GAME_SURFACE_ID : undefined}
-        style={[
-          styles.appFrame,
-          isNativeTablet && styles.nativeTabletFrame,
-          webLayout.roomy && !webLayout.fullscreenGame && [styles.webFrame, { maxWidth: webLayout.frameMaxWidth }],
-        ]}
-      >
-        {isWeb && (
-          <DesktopFullscreenBar
-            enabled={canFullscreenGame}
-            targetId={WEB_GAME_SURFACE_ID}
-            onFullscreenChange={setGameFullscreen}
-          />
-        )}
+      <View style={[
+        styles.appFrame,
+        isNativeTablet && styles.nativeTabletFrame,
+        webLayout.roomy && !webLayout.fullscreen && [styles.webFrame, { maxWidth: webLayout.frameMaxWidth }],
+      ]}>
         <Animated.View
           testID={isWeb ? 'player-web-content' : undefined}
           nativeID={isWeb ? `player-screen-${currentScreen}` : undefined}
@@ -2483,6 +2469,13 @@ export const RootNavigator: React.FC = () => {
       )}
     </View>
   );
+
+  return isWeb ? (
+    <View style={styles.outerWrapper}>
+      <DesktopFullscreenBar onFullscreenChange={setWebFullscreen} />
+      {playerFrame}
+    </View>
+  ) : playerFrame;
 };
 
 const styles = StyleSheet.create({
@@ -2492,6 +2485,8 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  webContent: { height: 'auto', minHeight: 0 },
+  fullscreenOuter: { paddingVertical: 0 },
   tabletOuter: {
     backgroundColor: '#090414',
     flexDirection: 'row',
