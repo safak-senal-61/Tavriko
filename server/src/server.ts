@@ -169,6 +169,7 @@ export function createApp() {
     // Express may strip a mounted router's prefix from req.path before finish.
     const requestPath = req.path;
     const isAccountSecurity = /^\/api\/auth\/(?:(?:forgot|reset)-password|request-delete-code|confirm-delete|delete-account(?:\/request)?)\/?$/i.test(requestPath);
+    const omitRequestDetails = isAccountSecurity || /^\/api\/social\/ads\/rewarded(?:\/|$)/i.test(requestPath);
     res.on('finish', () => {
       const duration = Date.now() - start;
       const lvl = res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'INFO';
@@ -187,12 +188,12 @@ export function createApp() {
       logger.log(
         cat,
         lvl,
-        `${req.method} ${isAccountSecurity ? requestPath : req.originalUrl} -> ${res.statusCode} (${duration}ms)`,
+        `${req.method} ${omitRequestDetails ? requestPath : req.originalUrl} -> ${res.statusCode} (${duration}ms)`,
         {
           ip: req.ip,
-          query: !isAccountSecurity && Object.keys(req.query).length ? redactSensitiveBody(req.query) : undefined,
+          query: !omitRequestDetails && Object.keys(req.query).length ? redactSensitiveBody(req.query) : undefined,
           body: req.method !== 'GET' &&
-            !isAccountSecurity &&
+            !omitRequestDetails &&
             Object.keys(req.body || {}).length ? redactSensitiveBody(req.body) : undefined,
         }
       );
@@ -607,6 +608,7 @@ export function createApp() {
       'og-image.png',
       'manifest.json',
       'robots.txt',
+      'app-ads.txt',
       'sitemap.xml',
     ];
     app.get(brandStaticFiles.map((name) => `/${name}`), (req, res, next) => {

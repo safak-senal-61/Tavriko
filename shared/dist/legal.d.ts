@@ -11,7 +11,7 @@
  * LEGAL_OPERATOR alanlarındaki köşeli parantezli değerler gerçek veri sorumlusu
  * bilgileriyle (ad/unvan, adres, iletişim e-postası) doldurulmalıdır.
  */
-export declare const LEGAL_VERSION = "2026-11-11";
+export declare const LEGAL_VERSION = "2026-11-22";
 export declare const LEGAL_OPERATOR: {
     appName: string;
     controllerName: string;

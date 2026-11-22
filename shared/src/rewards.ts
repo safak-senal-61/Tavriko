@@ -127,3 +127,42 @@ export function isRankedMatch(input: { mode?: string; roomCode?: string; playerI
   const friendDuel = String(input.roomCode || '').toUpperCase().startsWith('DUEL-');
   return modeOk && ids.length >= 2 && !hasBot && !friendDuel;
 }
+
+// ---------------------------------------------------------------------------
+// Ödüllü reklam ("Reklam izle, jeton kazan") — TEK DOĞRULUK KAYNAĞI
+// ---------------------------------------------------------------------------
+// Ödülü yalnızca doğrulanmış AdMob sunucu bildirimi üzerine sunucu verir.
+// Kötüye kullanımı sınırlamak için günlük üst sınır ve iki izleme arası bekleme
+// süresi sunucuda uygulanır. Gün sınırı UTC tarihine göre sıfırlanır.
+export const REWARDED_AD_COINS = 25;
+export const REWARDED_AD_DAILY_LIMIT = 5;
+export const REWARDED_AD_COOLDOWN_SEC = 30;
+
+export interface RewardedAdState {
+  /** UTC tarih (YYYY-MM-DD) */
+  date: string;
+  count: number;
+  /** Son ödülün zamanı (ms epoch) */
+  lastAt: number;
+}
+
+export interface RewardedAdStatus {
+  coinsPerAd: number;
+  dailyLimit: number;
+  remainingToday: number;
+  /** Bir sonraki izlemeye kalan saniye (0 = hemen izlenebilir) */
+  cooldownSec: number;
+}
+
+export function getRewardedAdStatus(state: Partial<RewardedAdState> | null | undefined, now = Date.now()): RewardedAdStatus {
+  const today = new Date(now).toISOString().slice(0, 10);
+  const count = state && state.date === today ? Math.max(0, Number(state.count) || 0) : 0;
+  const lastAt = Number(state?.lastAt) || 0;
+  const cooldownSec = Math.max(0, Math.ceil((lastAt + REWARDED_AD_COOLDOWN_SEC * 1000 - now) / 1000));
+  return {
+    coinsPerAd: REWARDED_AD_COINS,
+    dailyLimit: REWARDED_AD_DAILY_LIMIT,
+    remainingToday: Math.max(0, REWARDED_AD_DAILY_LIMIT - count),
+    cooldownSec,
+  };
+}

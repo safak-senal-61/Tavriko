@@ -62,3 +62,21 @@ export declare function isRankedMatch(input: {
     roomCode?: string;
     playerIds: string[];
 }): boolean;
+export declare const REWARDED_AD_COINS = 25;
+export declare const REWARDED_AD_DAILY_LIMIT = 5;
+export declare const REWARDED_AD_COOLDOWN_SEC = 30;
+export interface RewardedAdState {
+    /** UTC tarih (YYYY-MM-DD) */
+    date: string;
+    count: number;
+    /** Son ödülün zamanı (ms epoch) */
+    lastAt: number;
+}
+export interface RewardedAdStatus {
+    coinsPerAd: number;
+    dailyLimit: number;
+    remainingToday: number;
+    /** Bir sonraki izlemeye kalan saniye (0 = hemen izlenebilir) */
+    cooldownSec: number;
+}
+export declare function getRewardedAdStatus(state: Partial<RewardedAdState> | null | undefined, now?: number): RewardedAdStatus;

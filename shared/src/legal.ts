@@ -12,7 +12,7 @@
  * bilgileriyle (ad/unvan, adres, iletişim e-postası) doldurulmalıdır.
  */
 
-export const LEGAL_VERSION = '2026-11-11';
+export const LEGAL_VERSION = '2026-11-22';
 
 export const LEGAL_OPERATOR = {
   appName: 'Tavriko',
@@ -143,6 +143,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
           'Google ile giriş: Google hesabındaki e-posta adresin, adın ve profil fotoğrafın. Google şifren bize hiçbir zaman iletilmez.',
           'Oyun verileri: maç geçmişi, puanlar, seviye, sıralamalar, kategori başarıları, günlük görevler, envanter, altın/elmas bakiyesi, arkadaş listesi, davetler, engellenen kullanıcılar ve bildirimler.',
           'Teknik veriler: IP adresi, cihaz ve tarayıcı bilgisi, çevrim içi durumu, oturum anahtarları, hata ve erişim kayıtları.',
+          'Android ödüllü reklamları: Google Mobile Ads SDK, izin ve cihaz ayarlarına göre IP adresini, reklam kimliğini veya diğer cihaz tanımlayıcılarını, reklam etkileşimlerini ve tanılama verilerini işleyebilir. Tavriko, jetonun doğru hesaba ve yalnızca bir kez eklenmesi için reklam girişimi ve işlem kimliklerini ödül kaydıyla ilişkilendirir.',
           'Satın alma kayıtları: satın alınan paket, tarih, kart üzerindeki ad ve kartın son 4 hanesi. Tam kart numarası ve CVV bilgisi sunucularımızda saklanmaz.',
         ],
       },
@@ -159,7 +160,8 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
       {
         heading: '3. Verilerin Paylaşılması',
         paragraphs: [
-          'Verilerini satmayız ve reklam amacıyla üçüncü kişilere vermeyiz.',
+          'Android’de isteğe bağlı ödüllü reklamları sunmak, ölçmek ve kötüye kullanımı önlemek için Google AdMob kullanırız. Ödül doğrulamasında Google’a hesap kimliğin veya e-posta adresin değil, rastgele bir reklam girişimi kimliği gönderilir. Google’ın reklam verilerini nasıl kullandığını https://policies.google.com/technologies/partner-sites adresinden inceleyebilirsin.',
+          'Reklam gizliliği tercihlerini, seçenek sunulduğunda Ayarlar > Gizlilik > Reklam gizliliği tercihleri bölümünden değiştirebilirsin. Android cihazının ayarlarından reklam kimliğini de yönetebilirsin.',
           'Hizmeti sunabilmek için altyapı sağlayıcılarıyla çalışırız: barındırma ve sunucu (Vercel), veritabanı ve kimlik doğrulama (Supabase), gerçek zamanlı bağlantılar (Cloudflare), önbellek (Upstash), hata izleme (Sentry) ve Google ile giriş için Google. Bu sağlayıcıların sunucuları yurt dışında bulunabilir.',
           'Kanunen yetkili kamu kurum ve kuruluşlarının talebi halinde veriler mevzuata uygun şekilde paylaşılabilir.',
           'Kullanıcı adın, avatarın, ünvanın, seviyen ve skorların oyunun doğası gereği diğer oyuncular tarafından görülebilir. Profil gizliliğini Ayarlar > Gizlilik bölümünden yönetebilirsin.',
@@ -210,6 +212,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
         heading: '2. İşlenen Kişisel Veri Kategorileri',
         paragraphs: [
           'Kimlik (ad soyad, kullanıcı adı, doğum tarihi, cinsiyet), iletişim (e-posta, telefon), müşteri işlem (oyun geçmişi, envanter, bakiye, satın alma kayıtları), işlem güvenliği (IP adresi, oturum ve erişim kayıtları, şifre özeti), görsel (profil fotoğrafı) ve pazarlama dışı tercih verileri (ayarlar, gizlilik tercihleri).',
+          'İsteğe bağlı Android ödüllü reklamlarında reklam etkileşimi, cihaz veya reklam tanımlayıcıları, teknik tanılama ve ödül doğrulama işlemi verileri, ilgili izin ve cihaz ayarlarına göre işlenebilir.',
         ],
       },
       {
@@ -232,6 +235,7 @@ export const LEGAL_DOCUMENTS: LegalDocument[] = [
         paragraphs: [
           'Kişisel verilerin; hizmetin sunulması için zorunlu olan barındırma, veritabanı, gerçek zamanlı iletişim, önbellek, hata izleme ve kimlik doğrulama hizmet sağlayıcılarına (Vercel, Supabase, Cloudflare, Upstash, Sentry, Google) ve kanunen yetkili kamu kurumlarına aktarılabilir.',
           'Bu hizmet sağlayıcıların sunucularının yurt dışında bulunması nedeniyle yapılan aktarımlar KVKK m.9’da öngörülen şartlara (standart sözleşme ve diğer uygun güvenceler) uygun olarak gerçekleştirilir.',
+          'İsteğe bağlı Android ödüllü reklamlarında Google AdMob, reklam sunumu, ölçümü, kötüye kullanımı önleme ve ödül doğrulaması için kullanılır. Bu akış ve tercih yönetimi Gizlilik Politikası’nda açıklanır.',
         ],
       },
       {

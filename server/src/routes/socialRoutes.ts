@@ -3,6 +3,7 @@ import { requireUserAuth } from '../middleware/auth';
 import { db } from '../db/prismaClient';
 import { presenceManager } from '../services/presenceManager';
 import { SHOP_CATALOG, SEASON_1_TIERS, EVENT_DEFINITIONS } from '@trivia/shared';
+import { rewardedAdRoutes } from './rewardedAdRoutes';
 
 const router = Router();
 
@@ -548,5 +549,7 @@ router.post('/daily-challenge/complete', requireUserAuth, async (req: Request, r
     res.status(500).json({ error: err.message });
   }
 });
+
+router.use('/ads/rewarded', rewardedAdRoutes);
 
 export default router;

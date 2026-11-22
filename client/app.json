@@ -28,17 +28,19 @@
     },
     "android": {
       "package": "com.tavriko.app",
-      "versionCode": 2,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#10029F"
       },
       "permissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+        "com.google.android.gms.permission.AD_ID"
+      ],
+      "blockedPermissions": [
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW"
       ]
     },
     "splash": {
@@ -75,7 +77,14 @@
       "expo-asset",
       "expo-font",
       "./plugins/notification-sound",
-      "expo-audio",
+      "./plugins/optional-hardware-features",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": false,
+          "recordAudioAndroid": false
+        }
+      ],
       "expo-web-browser",
       "@react-native-community/datetimepicker",
       [
@@ -90,7 +99,14 @@
       "@sentry/react-native",
       "expo-secure-store",
       "expo-localization",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-9520105697678442~7884767327",
+          "delayAppMeasurementInit": true
+        }
+      ]
     ],
     "backgroundColor": "#1A0B4D",
     "extra": {

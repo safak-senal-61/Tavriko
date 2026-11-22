@@ -61,6 +61,7 @@ import {
   backgroundFor,
   BadgeVisual,
 } from '../components/StoreKit';
+import { RewardedAdCard } from '../components/RewardedAdCard';
 
 interface ShopScreenProps {
   user?: UserProfile;
@@ -78,8 +79,12 @@ interface CategoryTabItem {
   icon: string;
 }
 
+// Gerçek para (TL) ürünleri Play Billing entegre edilene kadar gösterilmez;
+// çalışmayan satın alma düğmeleri mağaza incelemesinde sorun çıkarır.
+const SELLABLE_CATALOG = SHOP_CATALOG.filter((p) => p.currency !== 'try');
+
 // Tavriko UI Kit 7 Mağaza Alt Sayfası + Öne Çıkanlar
-const CATEGORY_TABS: CategoryTabItem[] = [
+const ALL_CATEGORY_TABS: CategoryTabItem[] = [
   { id: 'featured', name: 'Paketler', icon: '🎁' },
   { id: 'chests', name: 'Sandıklar', icon: '📦' },
   { id: 'keys', name: 'Anahtarlar', icon: '🗝️' },
@@ -91,6 +96,7 @@ const CATEGORY_TABS: CategoryTabItem[] = [
   { id: 'diamonds', name: 'Elmas', icon: '💎' },
   { id: 'gold', name: 'Altın', icon: '🪙' },
 ];
+const CATEGORY_TABS = ALL_CATEGORY_TABS.filter((tab) => SELLABLE_CATALOG.some((p) => p.category === tab.id));
 
 const FEATURED_CHEST = SHOP_CATALOG.find((p) => p.id === 'chest_legendary');
 
@@ -435,7 +441,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     ]).start();
   };
 
-  const filteredProducts = SHOP_CATALOG.filter((p) => p.category === activeTab);
+  const filteredProducts = SELLABLE_CATALOG.filter((p) => p.category === activeTab);
 
   // 2x XP artırıcı aktif mi? Kalan süre (ms) yoksa null.
   const boosterExp = user?.activeBoosterExpiresAt ?? 0;
@@ -574,6 +580,16 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             <Text style={styles.heroCtaText}>Sandıklara bak</Text>
           </TouchableOpacity>
         </KitHero>
+
+        <RewardedAdCard
+          user={user}
+          apiBaseUrl={apiBaseUrl}
+          onUpdateUser={onUpdateUser}
+          onMessage={(message, error) => {
+            setIsError(error);
+            setStatusMessage(message);
+          }}
+        />
 
         <KitChips
           tabs={CATEGORY_TABS.map((c) => ({ id: c.id, label: c.name }))}

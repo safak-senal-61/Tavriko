@@ -110,10 +110,24 @@ model User {
   referralLink              ReferralLink?
   referralReceived          ReferralRedemption? @relation("ReferralInvitee")
   referralsSent             ReferralRedemption[] @relation("ReferralInviter")
+  rewardedAds               RewardedAdAttempt[]
 
   @@index([rankPoints(sort: Desc)])
   @@index([xp(sort: Desc)])
   @@map("users")
+}
+
+model RewardedAdAttempt {
+  id            String    @id @db.Uuid
+  userId        String
+  createdAt     DateTime  @default(now())
+  rewardedAt    DateTime?
+  transactionId String?   @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, rewardedAt])
+  @@index([userId, createdAt])
+  @@map("rewarded_ad_attempts")
 }
 
 model UserInventoryItem {

@@ -1,10 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LP_MIN_WIN_GAIN = exports.LP_WRONG_ANSWER_PENALTY = exports.LP_LOSS = exports.LP_PER_CORRECT_ON_WIN = exports.LP_WIN_BASE = exports.LEAGUE_START_POINTS = exports.MAX_MATCH_XP_SOLO = exports.MAX_MATCH_XP_MULTIPLAYER = exports.DIFFICULTY_XP_LABEL = exports.DIFFICULTY_XP_MULTIPLIER = void 0;
+exports.REWARDED_AD_COOLDOWN_SEC = exports.REWARDED_AD_DAILY_LIMIT = exports.REWARDED_AD_COINS = exports.LP_MIN_WIN_GAIN = exports.LP_WRONG_ANSWER_PENALTY = exports.LP_LOSS = exports.LP_PER_CORRECT_ON_WIN = exports.LP_WIN_BASE = exports.LEAGUE_START_POINTS = exports.MAX_MATCH_XP_SOLO = exports.MAX_MATCH_XP_MULTIPLAYER = exports.DIFFICULTY_XP_LABEL = exports.DIFFICULTY_XP_MULTIPLIER = void 0;
 exports.calculateMatchRewards = calculateMatchRewards;
 exports.calculateLeagueChange = calculateLeagueChange;
 exports.applyLeagueChange = applyLeagueChange;
 exports.isRankedMatch = isRankedMatch;
+exports.getRewardedAdStatus = getRewardedAdStatus;
 /** Zorluk çarpanları (Zorluk seçim ekranındaki etiketlerle birebir aynı) */
 exports.DIFFICULTY_XP_MULTIPLIER = {
     easy: 1,
@@ -88,4 +89,25 @@ function isRankedMatch(input) {
     const hasBot = ids.some((id) => String(id).startsWith('bot_'));
     const friendDuel = String(input.roomCode || '').toUpperCase().startsWith('DUEL-');
     return modeOk && ids.length >= 2 && !hasBot && !friendDuel;
+}
+// ---------------------------------------------------------------------------
+// Ödüllü reklam ("Reklam izle, jeton kazan") — TEK DOĞRULUK KAYNAĞI
+// ---------------------------------------------------------------------------
+// Ödülü yalnızca doğrulanmış AdMob sunucu bildirimi üzerine sunucu verir.
+// Kötüye kullanımı sınırlamak için günlük üst sınır ve iki izleme arası bekleme
+// süresi sunucuda uygulanır. Gün sınırı UTC tarihine göre sıfırlanır.
+exports.REWARDED_AD_COINS = 25;
+exports.REWARDED_AD_DAILY_LIMIT = 5;
+exports.REWARDED_AD_COOLDOWN_SEC = 30;
+function getRewardedAdStatus(state, now = Date.now()) {
+    const today = new Date(now).toISOString().slice(0, 10);
+    const count = state && state.date === today ? Math.max(0, Number(state.count) || 0) : 0;
+    const lastAt = Number(state?.lastAt) || 0;
+    const cooldownSec = Math.max(0, Math.ceil((lastAt + exports.REWARDED_AD_COOLDOWN_SEC * 1000 - now) / 1000));
+    return {
+        coinsPerAd: exports.REWARDED_AD_COINS,
+        dailyLimit: exports.REWARDED_AD_DAILY_LIMIT,
+        remainingToday: Math.max(0, exports.REWARDED_AD_DAILY_LIMIT - count),
+        cooldownSec,
+    };
 }

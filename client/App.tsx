@@ -16,6 +16,7 @@ import { useGameStore } from './src/store/gameStore';
 import { initAnalytics, trackSessionStart } from './src/services/analytics';
 import { initPushNotifications, registerForPushNotifications } from './src/services/pushNotifications';
 import { checkAndApplyOtaUpdate } from './src/services/otaUpdates';
+import { adsSupported, refreshAdsConsent } from './src/services/ads';
 import {
   getAnalyticsConsent,
   hydrateAnalyticsConsent,
@@ -89,6 +90,9 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 function AppInner() {
+  useEffect(() => {
+    if (adsSupported) void refreshAdsConsent().catch(() => {});
+  }, []);
   const [fontsLoaded] = useFonts({
     Nunito_400Regular,
     Nunito_600SemiBold,
