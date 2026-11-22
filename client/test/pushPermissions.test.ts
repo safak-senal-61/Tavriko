@@ -27,7 +27,7 @@ vi.mock('../src/store/gameStore', () => ({ useGameStore: { getState: () => mocks
 vi.mock('../src/utils/apiAuth', () => ({ authHeaders: () => ({ Authorization: 'Bearer session' }) }));
 vi.mock('../src/services/notificationRouter', () => ({ handleNotificationResponse: vi.fn() }));
 
-import { enablePushFromUserAction, registerForPushNotifications } from '../src/services/pushNotifications';
+import { enablePushFromUserAction, getPushPermission, registerForPushNotifications } from '../src/services/pushNotifications';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -57,6 +57,30 @@ describe('push permission and registration', () => {
       expect(fetch).toHaveBeenCalledWith('https://example.invalid/api/push/register', expect.objectContaining({
         body: JSON.stringify({ token: 'fcm-device', platform: 'android' }),
       }));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('registers the same token again after permission is restored in device settings', async () => {
+    const granted = { granted: true, status: 'granted', canAskAgain: true };
+    mocks.getPermissions.mockResolvedValue(granted);
+    mocks.getDeviceToken.mockResolvedValue({ data: 'restored-device' });
+    const fetch = vi.fn(async () => ({ ok: true }));
+    vi.stubGlobal('fetch', fetch);
+    try {
+      await registerForPushNotifications('player');
+      mocks.getPermissions.mockResolvedValue({ granted: false, status: 'denied', canAskAgain: false });
+      expect(await getPushPermission()).toBe('blocked');
+      expect(await enablePushFromUserAction()).toBe('blocked');
+
+      mocks.getPermissions.mockResolvedValue(granted);
+      expect(await getPushPermission()).toBe('granted');
+      await Promise.all([registerForPushNotifications('player'), registerForPushNotifications('player')]);
+      await registerForPushNotifications('player');
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(fetch.mock.calls[0]).toEqual(fetch.mock.calls[1]);
+      expect(mocks.requestPermissions).not.toHaveBeenCalled();
     } finally {
       vi.unstubAllGlobals();
     }

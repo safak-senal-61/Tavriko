@@ -35,8 +35,8 @@ const ANDROID_CHANNEL_ID = 'default';
 const ANDROID_CHANNEL_NAME = 'Genel';
 
 let initialized = false;
-let lastRegisteredUserId: string | null = null;
-let lastRegisteredToken: string | null = null;
+let permissionRevision = 0;
+let lastRegistration: { token: string; session: string; permissionRevision: number } | null = null;
 
 function getEasProjectId(): string | undefined {
   const extra = (Constants.expoConfig as any)?.extra as { eas?: { projectId?: string } } | undefined;
@@ -162,6 +162,9 @@ export const pushSupported = Platform.OS === 'android' || Platform.OS === 'ios';
 
 function permissionState(status: Awaited<ReturnType<typeof Notifications.getPermissionsAsync>>): PushPermission {
   if (status.granted && status.status === 'granted') return 'granted';
+  // Re-register after an observed denial even if the device token has not changed.
+  // Keep the last token available for logout; only invalidate deduplication here.
+  permissionRevision += 1;
   if (Platform.OS === 'android' && Number(Platform.Version) < 33) return 'blocked';
   return status.canAskAgain ? 'requestable' : 'blocked';
 }
@@ -202,14 +205,14 @@ export async function openPushSettings(): Promise<void> {
 
 /**
  * Kullanıcının push token'ını sunucuya kaydeder. Aynı oturumda tekrar
- * çağrılırsa (ekran değişimi vb.) atlanır; token değişirse yeniden gönderilir.
+ * çağrılırsa atlanır; token değişirse veya izin yeniden açılırsa gönderilir.
  *
  * Android: FCM device token (backend firebase-admin ile doğrudan FCM'ye
  * gönderir; Expo push servisine bağımlı değildir). Token alınamazsa
  * (Expo Go vb.) Expo push token'a düşer.
  * iOS: Expo push token (APNs teslimi Expo/EAS üzerinden).
  */
-const registrations = new Map<string, Promise<void>>();
+const registrations = new Map<string, { permissionRevision: number; promise: Promise<void> }>();
 
 export function registerForPushNotifications(userId: string): Promise<void> {
   if (!pushSupported) return Promise.resolve();
@@ -218,14 +221,17 @@ export function registerForPushNotifications(userId: string): Promise<void> {
     return Promise.resolve();
   }
   const session = active.token;
+  const revision = permissionRevision;
   const pending = registrations.get(session);
-  if (pending) return pending;
-  const registration = registerGrantedDevice(userId, session).finally(() => registrations.delete(session));
-  registrations.set(session, registration);
-  return registration;
+  if (pending?.permissionRevision === revision) return pending.promise;
+  const promise = registerGrantedDevice(userId, session, revision).finally(() => {
+    if (registrations.get(session)?.promise === promise) registrations.delete(session);
+  });
+  registrations.set(session, { permissionRevision: revision, promise });
+  return promise;
 }
 
-async function registerGrantedDevice(userId: string, session: string): Promise<void> {
+async function registerGrantedDevice(userId: string, session: string, revision: number): Promise<void> {
   initPushNotifications();
 
   try {
@@ -250,7 +256,9 @@ async function registerGrantedDevice(userId: string, session: string): Promise<v
       token = data;
     }
 
-    if (!token || (token === lastRegisteredToken && userId === lastRegisteredUserId)) return;
+    if (!token || revision !== permissionRevision) return;
+    if (lastRegistration?.token === token && lastRegistration.session === session &&
+        lastRegistration.permissionRevision === revision) return;
     const current = useGameStore.getState();
     if (current.user?.id !== userId || current.token !== session) return;
 
@@ -259,9 +267,8 @@ async function registerGrantedDevice(userId: string, session: string): Promise<v
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ token, platform: Platform.OS }),
     });
-    if (res.ok && useGameStore.getState().token === session) {
-      lastRegisteredToken = token;
-      lastRegisteredUserId = userId;
+    if (res.ok && revision === permissionRevision && useGameStore.getState().token === session) {
+      lastRegistration = { token, session, permissionRevision: revision };
     }
   } catch {
     // İzin reddedilmiş, ağ hatası vb. — sessiz geç.
@@ -270,18 +277,17 @@ async function registerGrantedDevice(userId: string, session: string): Promise<v
 
 /** Çıkışta / bildirim kapatmada token'ı sunucudan kaldırır. */
 export async function unregisterPushNotifications(): Promise<void> {
-  if (Platform.OS === 'web' || !lastRegisteredToken) return;
-  const token = lastRegisteredToken;
+  const registration = lastRegistration;
+  if (Platform.OS === 'web' || !registration) return;
   try {
     await fetch(`${DEFAULT_API_BASE}/push/unregister`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ token }),
+      body: JSON.stringify({ token: registration.token }),
     });
   } catch {
     // sessiz geç
   } finally {
-    lastRegisteredToken = null;
-    lastRegisteredUserId = null;
+    if (lastRegistration === registration) lastRegistration = null;
   }
 }
