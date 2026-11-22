@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { db } from '../db/prismaClient';
 import { requireUserAuth } from '../middleware/auth';
 import { OperationError, uuidPattern } from '../services/adminAccountOperations';
@@ -39,6 +40,34 @@ export function createSupportRouter(client = db.rawClient) {
     } catch (error) {
       if (error instanceof OperationError) return res.status(error.status).json({ error: error.message });
       res.status(503).json({ error: 'Talep kaydedilemedi. Yeniden göndermeden önce listeyi yenileyin.' });
+    }
+  });
+  const playerReportLimit = rateLimit({
+    windowMs: 60_000, limit: 10,
+    keyGenerator: req => req.authUserId!,
+    standardHeaders: 'draft-8', legacyHeaders: false,
+    message: { error: 'Çok fazla bildirim denemesi. Lütfen biraz bekle.' },
+  });
+  router.post('/player-report', playerReportLimit, async (req, res) => {
+    if (!req.is('application/json')) return res.status(415).json({ error: 'JSON gerekli.' });
+    const { targetUserId, reason } = req.body || {};
+    if (typeof targetUserId !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(targetUserId) ||
+      targetUserId === req.authUserId || isGuestIdentity(targetUserId) ||
+      (reason !== 'profile' && reason !== 'behavior')) {
+      return res.status(400).json({ error: 'Oyuncu veya bildirim nedeni geçersiz.' });
+    }
+    try {
+      const target = await client.user.findUnique({ where: { id: targetUserId }, select: { id: true } });
+      if (!target) return res.status(404).json({ error: 'Oyuncu bulunamadı.' });
+      const label = reason === 'profile' ? 'Uygunsuz profil (ad veya görsel)' : 'Uygunsuz oyuncu davranışı';
+      const saved = await openCase(client, req.authUserId!, {
+        kind: 'support', subject: 'Oyuncu bildirimi',
+        message: `Bildirilen oyuncu kimliği: ${target.id}\nNeden: ${label}`, moderationId: null,
+      });
+      return res.status(201).json({ id: saved.id });
+    } catch (error) {
+      if (error instanceof OperationError) return res.status(error.status).json({ error: error.message });
+      return res.status(503).json({ error: 'Bildirim kaydedilemedi.' });
     }
   });
   router.get('/:id/replies', async (req, res) => {

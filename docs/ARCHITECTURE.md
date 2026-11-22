@@ -12,7 +12,7 @@ Tavriko is a TypeScript NPM-workspace monorepo (`package.json` workspaces: `shar
 ## 2. Runtime Boundaries & End-to-End Data Flows
 
 ### A. Authentication & Profile Flow
-1. **UI**: [`AuthScreen.tsx`](file:///c:/Users/%C3%96mer%20faruk%20%C5%9Fener/.gemini/antigravity/scratch/gmae/client/src/screens/AuthScreen.tsx) & [`RootNavigator.tsx`](file:///c:/Users/%C3%96mer%20faruk%20%C5%9Fener/.gemini/antigravity/scratch/gmae/client/src/navigation/RootNavigator.tsx) support Email/Username + Password login/registration, Google OAuth (via Supabase OAuth polling session `/api/auth/google/init-session` -> `/api/auth/google/complete-session`), and Guest play.
+1. **UI**: [`AuthScreen.tsx`](../client/src/screens/AuthScreen.tsx) and [`RootNavigator.tsx`](../client/src/navigation/RootNavigator.tsx) support Email/Username + Password login/registration, Google OAuth through Supabase PKCE and `/api/auth/google`, and Guest play. The Tavriko server accepts only project-verified Supabase sessions with a matching verified Google identity, not raw Google tokens.
 2. **API**: [`server/src/routes/authRoutes.ts`](file:///c:/Users/%C3%96mer%20faruk%20%C5%9Fener/.gemini/antigravity/scratch/gmae/server/src/routes/authRoutes.ts) validates credentials, hashes passwords (`bcryptjs`), issues JWTs (`jsonwebtoken`), and persists users via [`db` (`PrismaDatabaseService`)](file:///c:/Users/%C3%96mer%20faruk%20%C5%9Fener/.gemini/antigravity/scratch/gmae/server/src/db/prismaClient.ts).
 3. **Persistence**: Primary user records live in Supabase PostgreSQL (`public.users` via Prisma), mirrored in memory (`this.users`) and synced to Supabase `profiles` / Storage (`supabaseClient.ts`).
 

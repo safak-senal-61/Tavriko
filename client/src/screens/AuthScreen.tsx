@@ -18,8 +18,8 @@ import { LoadingShimmer } from '../components/LoadingShimmer';
 import * as ImagePicker from 'expo-image-picker';
 import { compressAvatarImageAsync } from '../utils/avatarImage';
 import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
-import { createClient } from '@supabase/supabase-js';
+import * as SecureStore from 'expo-secure-store';
+import * as Crypto from 'expo-crypto';
 import Svg, { Path, Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 // Doğum tarihi için şık takvim seçici (native). Web'de takvim girişi metin
 // alanıyla korunur; modül yalnızca native'de yüklenir (web'de import
@@ -33,18 +33,25 @@ if (Platform.OS !== 'web') {
   }
 }
 WebBrowser.maybeCompleteAuthSession();
-const clientSupabase = createClient(
-  'https://rjvbgofzsfescnfohzgu.supabase.co',
-  'sb_publishable_ix4qzOkTfA-bFTKvsJ-tSA_rEs0YeEf',
-  {
-    auth: {
-      flowType: 'implicit',
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  }
-);
+const supabaseAuthUrl = 'https://rjvbgofzsfescnfohzgu.supabase.co/auth/v1';
+const supabasePublishableKey = 'sb_publishable_ix4qzOkTfA-bFTKvsJ-tSA_rEs0YeEf';
+const verifierKey = 'tavriko-google-code-verifier';
+const web = Platform.OS === 'web';
+
+async function saveVerifier(verifier: string) {
+  const value = JSON.stringify({ verifier, expiresAt: Date.now() + 10 * 60_000 });
+  if (web) window.sessionStorage.setItem(verifierKey, value);
+  else await SecureStore.setItemAsync(verifierKey, value);
+}
+
+async function takeVerifier(): Promise<string | null> {
+  const value = web ? window.sessionStorage.getItem(verifierKey) : await SecureStore.getItemAsync(verifierKey);
+  if (web) window.sessionStorage.removeItem(verifierKey);
+  else await SecureStore.deleteItemAsync(verifierKey);
+  if (!value) return null;
+  const { verifier, expiresAt } = JSON.parse(value);
+  return typeof verifier === 'string' && expiresAt > Date.now() ? verifier : null;
+}
 import { UserProfile, LEGAL_VERSION, LegalDocumentId } from '@trivia/shared';
 import {
   LegalConsentCheckbox,
@@ -83,8 +90,6 @@ function parseBirthDateTR(value: string): Date | null {
   const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
   return Number.isNaN(d.getTime()) ? null : d;
 }
-const GOOGLE_CLIENT_ID =
-  '411578437442-gs1rck2124rgr516fe9dn9tuu15ge9ig.apps.googleusercontent.com';
 interface AuthScreenProps {
   wideLayout?: boolean;
   onSuccess: (user: UserProfile, token: string) => void;
@@ -200,7 +205,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   // Google'dan dönüşte (adres çubuğunda token/code varsa) giriş formu yerine "oturum açılıyor" göster
   const [finishingOAuth, setFinishingOAuth] = useState(() =>
     Platform.OS === 'web' && typeof window !== 'undefined' &&
-    (window.location.hash.includes('access_token') || window.location.search.includes('access_token') || window.location.search.includes('code=')));
+    /(?:[?#&])(?:code|error)=/.test(window.location.href));
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   useEffect(() => {
     if (!finishingOAuth) return;
@@ -352,280 +357,103 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       setLoading(false);
     }
   };
-  const submitGoogleAuth = async (payload: {
-    idToken?: string;
-    accessToken?: string;
-    email?: string;
-    displayName?: string;
-    fullName?: string;
-    avatarUrl?: string;
-  }) => {
+  const lastProcessedCode = useRef<string | null>(null);
+  const handleAuthRedirectUrl = async (raw: string) => {
+    // React Native's URL polyfill does not expose hostname for custom schemes.
+    const nativeLink = /^tavriko:\/\/auth-callback\/?(?=[?#]|$)/i;
+    if (!web && !nativeLink.test(raw)) return;
+    let code: string | null;
+    let hasError: boolean;
+    try {
+      const url = new URL(web ? raw : raw.replace(nativeLink, 'https://callback.invalid/'));
+      const hash = new URLSearchParams(url.hash.slice(1));
+      code = url.searchParams.get('code') || hash.get('code');
+      hasError = hash.has('error') || url.searchParams.has('error');
+    } catch { return; }
+    if (!code && !hasError) return;
+    if (code && lastProcessedCode.current === code) return;
+    lastProcessedCode.current = code;
     setLoading(true);
     try {
-      const res = await fetch(`${apiBaseUrl}/auth/google`, {
+      if (!code || !/^[a-zA-Z0-9_-]{8,128}$/.test(code)) throw new Error('Google OAuth tamamlanmadı.');
+      const verifier = await takeVerifier();
+      if (!verifier) throw new Error('Google oturumu doğrulanamadı.');
+      const exchange = await fetch(`${supabaseAuthUrl}/token?grant_type=pkce`, {
+        method: 'POST',
+        headers: { apikey: supabasePublishableKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auth_code: code, code_verifier: verifier }),
+      });
+      if (!exchange.ok) throw new Error('Google oturumu doğrulanamadı.');
+      const { access_token: accessToken } = await exchange.json();
+      if (typeof accessToken !== 'string' || !accessToken) throw new Error('Google oturumu doğrulanamadı.');
+      const response = await fetch(`${apiBaseUrl}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...payload,
-          clientId: GOOGLE_CLIENT_ID,
-          country: `${selectedCountry.flag} ${selectedCountry.name}`,
-        }),
+        body: JSON.stringify({ accessToken }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Google ile oturum açma başarısız oldu.');
-      }
+      if (!response.ok) throw new Error('Google girişi reddedildi.');
+      const result = await response.json();
       sound.playSound('victory');
       sound.triggerHaptic('success');
-      onSuccess(data.user, data.token);
-    } catch (err: any) {
+      onSuccess(result.user, result.token);
+    } catch {
       sound.playSound('wrong');
-      setErrorMsg(err.message || 'Google ile giriş yapılamadı.');
+      setErrorMsg('Google girişi tamamlanamadı. Lütfen yeniden dene.');
     } finally {
-      setLoading(false);
-    }
-  };
-  const lastProcessedAuthUrl = useRef<string | null>(null);
-  const googlePollInterval = useRef<any>(null);
-  const sendClientLog = (level: 'INFO' | 'SUCCESS' | 'WARN' | 'ERROR', message: string, details?: any) => {
-    fetch(`${apiBaseUrl}/logs/ingest`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ level, category: 'CLIENT', message, details }),
-    }).catch(() => {});
-  };
-  useEffect(() => {
-    return () => {
-      if (googlePollInterval.current) {
-        clearInterval(googlePollInterval.current);
-        googlePollInterval.current = null;
-      }
-    };
-  }, []);
-  const handleAuthRedirectUrl = async (urlStr: string) => {
-    if (!urlStr) return;
-    if (lastProcessedAuthUrl.current === urlStr) return;
-    lastProcessedAuthUrl.current = urlStr;
-    sendClientLog('INFO', 'Deep link URL yakalandı', { url: urlStr });
-    try {
-      setLoading(true);
-      let rawParams = '';
-      if (urlStr.includes('#')) {
-        rawParams = urlStr.split('#')[1];
-      } else if (urlStr.includes('?')) {
-        rawParams = urlStr.split('?')[1];
-      }
-      const params = new URLSearchParams(rawParams);
-      let accessToken = params.get('access_token');
-      const code = params.get('code');
-      if (!accessToken && code) {
-        sendClientLog('INFO', 'OAuth code yakalandı, Supabase ile oturuma dönüştürülüyor...', { code });
-        try {
-          const { data: exchangeData, error: exchangeError } = await clientSupabase.auth.exchangeCodeForSession(code);
-          if (exchangeData?.session?.access_token) {
-            accessToken = exchangeData.session.access_token;
-            sendClientLog('SUCCESS', 'Code başarıyla token\'a dönüştürüldü');
-          } else if (exchangeError) {
-            sendClientLog('WARN', 'exchangeCodeForSession uyarısı: ' + exchangeError.message);
-          }
-        } catch (exErr: any) {
-          sendClientLog('WARN', 'exchangeCodeForSession hatası: ' + exErr.message);
-        }
-      }
-      if (accessToken) {
-        sendClientLog('INFO', 'Access token alındı, Supabase kullanıcısı sorgulanıyor...');
-        // Fetch authentic Google user details from Supabase using the access token
-        let userEmail = '';
-        let userName = 'Oyuncu';
-        let userAvatar = 'av1';
-        let userFullName = 'Oyuncu';
-
-        try {
-          const { data: userData } = await clientSupabase.auth.getUser(accessToken);
-          if (userData?.user) {
-            const sbUser = userData.user;
-            userEmail = sbUser.email || '';
-            const meta = sbUser.user_metadata || {};
-            userName = meta.full_name || meta.name || userEmail.split('@')[0] || 'Oyuncu';
-            userFullName = meta.full_name || userName;
-            userAvatar = meta.avatar_url || meta.picture || 'av1';
-          }
-        } catch (fetchErr: any) {
-          sendClientLog('WARN', 'getUser istemcide atlandi, sunucuda cozumlenecek', { err: fetchErr.message });
-        }
-
-        sendClientLog('INFO', 'Kullanıcı bilgileri sunucuya gönderiliyor', { email: userEmail, userName });
-        await submitGoogleAuth({
-          accessToken,
-          email: userEmail || undefined,
-          displayName: userName,
-          fullName: userFullName,
-          avatarUrl: userAvatar,
-        });
-      } else {
-        const errorDesc = params.get('error_description') || params.get('error');
-        if (errorDesc) {
-          sendClientLog('ERROR', 'OAuth callback hata döndü', { errorDesc });
-          setErrorMsg(decodeURIComponent(errorDesc));
-          setLoading(false);
-        }
-      }
-    } catch (err: any) {
-      sendClientLog('ERROR', 'handleAuthRedirectUrl hatası', { error: err.message });
-      sound.playSound('wrong');
-      setErrorMsg(err.message || 'Google girişi tamamlanamadı.');
+      setFinishingOAuth(false);
       setLoading(false);
     }
   };
   useEffect(() => {
-    // 1. Web direct redirect return & message listener
-    let removeWebMessageListener: (() => void) | undefined;
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const currentUrl = window.location.href;
-      if (currentUrl.includes('access_token') || currentUrl.includes('code=')) {
-        sendClientLog('INFO', 'Web baslangic URL oturum parametresi algilandi', { currentUrl });
-        handleAuthRedirectUrl(currentUrl);
-        try {
-          window.history.replaceState(null, '', window.location.pathname);
-        } catch {}
+      if (/(?:[?#&])(?:code|error)=/.test(currentUrl)) {
+        try { window.history.replaceState(null, '', window.location.pathname); } catch {}
+        void handleAuthRedirectUrl(currentUrl);
       }
-
-      const onWindowMessage = (event: MessageEvent) => {
-        if (event.data?.type === 'TAVRIKO_GOOGLE_AUTH') {
-          sendClientLog('INFO', 'window.postMessage uzerinden Google yetkisi alindi', event.data);
-          if (event.data.user && event.data.token) {
-            sound.playSound('victory');
-            sound.triggerHaptic('success');
-            setLoading(false);
-            onSuccess(event.data.user, event.data.token);
-          } else if (event.data.payload) {
-            handleAuthRedirectUrl(event.data.payload);
-          }
-        }
-      };
-      window.addEventListener('message', onWindowMessage);
-      removeWebMessageListener = () => window.removeEventListener('message', onWindowMessage);
+      return;
     }
-
-    // 2. Mobile initial URL check (cold start)
-    Linking.getInitialURL().then((initUrl) => {
-      if (initUrl && (initUrl.includes('auth-callback') || initUrl.includes('access_token') || initUrl.includes('code='))) {
-        handleAuthRedirectUrl(initUrl);
-      }
+    Linking.getInitialURL().then((url) => {
+      if (url) void handleAuthRedirectUrl(url);
     }).catch(() => {});
-
-    // 3. Mobile deep link event listener (warm resume)
-    const sub = Linking.addEventListener('url', (event) => {
-      if (event.url && (event.url.includes('auth-callback') || event.url.includes('access_token') || event.url.includes('code='))) {
-        handleAuthRedirectUrl(event.url);
-      }
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      if (url) void handleAuthRedirectUrl(url);
     });
-    return () => {
-      sub.remove();
-      if (removeWebMessageListener) {
-        removeWebMessageListener();
-      }
-    };
+    return () => subscription.remove();
   }, []);
-  // Authentic Google Sign-In: Always displays Google Account Chooser
+
   const handleRealGoogleSignIn = async () => {
     sound.playSound('tap');
     sound.triggerHaptic('medium');
     setErrorMsg(null);
     setLoading(true);
-    // Google butonunun altındaki yasal metin bildirimiyle devam edildiğini kaydet;
-    // giriş tamamlanınca onay sunucuya 'google' yöntemiyle yazılır.
     markGoogleLegalAcknowledged();
-    sendClientLog('INFO', 'Google ile Giriş Yap butonuna tıklandı');
-
-    const redirectUri = `${apiBaseUrl}/auth/google/callback`;
-
-    // On Web browsers: Direct full-page redirect! Zero popups, zero popup blockers, 100% reliable!
-    if (Platform.OS === 'web' || (typeof window !== 'undefined' && typeof window.location !== 'undefined')) {
-      const directOAuthUrl = `https://rjvbgofzsfescnfohzgu.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUri)}&prompt=select_account`;
-      sendClientLog('INFO', 'Web doğrudan Google OAuth sayfasına yönlendiriliyor (Popup engeli bypass edildi)...', { redirectUri, directOAuthUrl });
-      window.location.href = directOAuthUrl;
-      return;
-    }
-
-    if (googlePollInterval.current) {
-      clearInterval(googlePollInterval.current);
-      googlePollInterval.current = null;
-    }
-    // Safety timeout: Only release the button after 20 seconds; polling continues in background
-    const safetyTimer = setTimeout(() => {
-      setLoading(false);
-      sendClientLog('WARN', 'Google giriş butonu serbest bırakıldı (oturum arka planda bekleniyor).');
-    }, 20000);
+    lastProcessedCode.current = null;
     try {
-      // 1. Clear any prior browser session state
-      try {
-        WebBrowser.dismissAuthSession();
-      } catch {}
-      lastProcessedAuthUrl.current = null;
-      // 2. Request OAuth URL from Supabase with prompt: 'select_account' (Preserve Supabase OAuth state)
-      const queryParams: Record<string, string> = {
-        prompt: 'select_account',
-      };
-      // Mobilde artık web sayfası yok: Supabase doğrudan uygulamanın derin
-      // bağlantısına (tavriko://auth-callback) yönlendirir. Google hesabı
-      // tarayıcıda seçilir, akışın geri kalanı uygulama içinde tamamlanır.
-      // Not: bu adresin Supabase Authentication -> URL Configuration ->
-      // Redirect URLs listesinde tanımlı olması gerekir.
-      const oauthRedirectTo = 'tavriko://auth-callback';
-
-      sendClientLog('INFO', 'Supabase OAuth URL isteniyor...', { redirectUri: oauthRedirectTo });
-      const { data, error } = await clientSupabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: oauthRedirectTo,
-          queryParams,
-          skipBrowserRedirect: true,
-        },
+      const redirectTo = Platform.OS === 'web'
+        ? `${window.location.origin}/api/auth/google/callback`
+        : 'tavriko://auth-callback';
+      const verifier = Array.from(await Crypto.getRandomBytesAsync(32),
+        byte => byte.toString(16).padStart(2, '0')).join('');
+      const digest = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, verifier,
+        { encoding: Crypto.CryptoEncoding.BASE64 });
+      const challenge = digest.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      await saveVerifier(verifier);
+      const params = new URLSearchParams({
+        provider: 'google', redirect_to: redirectTo, prompt: 'select_account',
+        code_challenge: challenge, code_challenge_method: 's256',
       });
-      if (error || !data?.url) {
-        if (googlePollInterval.current) {
-          clearInterval(googlePollInterval.current);
-          googlePollInterval.current = null;
-        }
-        clearTimeout(safetyTimer);
-        sendClientLog('ERROR', 'Supabase OAuth URL hatası', { error });
-        throw new Error(error?.message || 'Google yetkilendirme linki oluşturulamadı.');
-      }
-      sendClientLog('INFO', 'WebBrowser açılıyor...', { oauthUrl: data.url });
-      // 5. Open authentic Google account selector in system browser sheet (Mobile Native).
-      // Dönüş adresi uygulamanın şeması: tarayıcı tavriko://auth-callback'e
-      // ulaşınca oturum kapanır ve uygulama token ile devam eder.
-      const result = await WebBrowser.openAuthSessionAsync(data.url, oauthRedirectTo);
-      sendClientLog('INFO', 'WebBrowser kapandı/döndü', { resultType: result.type });
-      if (result.type === 'success' && result.url) {
-        clearTimeout(safetyTimer);
-        await handleAuthRedirectUrl(result.url);
-      } else if (result.type === 'dismiss' || result.type === 'cancel') {
-        // Tarayıcı kapatıldı: butonu serbest bırak ama arka plan yoklaması sürsün —
-        // kullanıcı Google akışını tamamladığında oturum hazır olur ve giriş otomatik gerçekleşir.
-        setTimeout(() => {
-          if (!lastProcessedAuthUrl.current) {
-            setLoading(false);
-            sendClientLog('INFO', 'Tarayıcı kapatıldı, oturum arka planda izleniyor.');
-          }
-        }, 2500);
-      }
-    } catch (err: any) {
-      if (googlePollInterval.current) {
-        clearInterval(googlePollInterval.current);
-        googlePollInterval.current = null;
-      }
-      clearTimeout(safetyTimer);
-      sendClientLog('ERROR', 'handleRealGoogleSignIn genel hatası', { message: err.message });
-      // Graceful fallback for web if popup was blocked
-      if (typeof window !== 'undefined' && err?.message && err.message.toLowerCase().includes('popup')) {
-        const directOAuthUrl = `https://rjvbgofzsfescnfohzgu.supabase.co/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUri)}&prompt=select_account`;
-        window.location.href = directOAuthUrl;
+      const authorizationUrl = `${supabaseAuthUrl}/authorize?${params.toString()}`;
+      if (Platform.OS === 'web') {
+        window.location.assign(authorizationUrl);
         return;
       }
+      const result = await WebBrowser.openAuthSessionAsync(authorizationUrl, redirectTo);
+      if (result.type === 'success' && result.url) await handleAuthRedirectUrl(result.url);
+      if (!lastProcessedCode.current) setLoading(false);
+    } catch {
       sound.playSound('wrong');
-      setErrorMsg(err.message || 'Google ile giriş yapılamadı.');
+      setErrorMsg('Google ile giriş yapılamadı. Lütfen yeniden dene.');
       setLoading(false);
     }
   };

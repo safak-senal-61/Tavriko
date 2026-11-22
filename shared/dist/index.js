@@ -22,3 +22,4 @@ __exportStar(require("./cosmetics"), exports);
 __exportStar(require("./legal"), exports);
 __exportStar(require("./rewards"), exports);
 __exportStar(require("./questionSelection"), exports);
+__exportStar(require("./lobbyChat"), exports);

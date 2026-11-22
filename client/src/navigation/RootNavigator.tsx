@@ -131,9 +131,7 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
   const isWebOAuthReturn =
     isWeb &&
     typeof window !== 'undefined' &&
-    (window.location.hash.includes('access_token') ||
-      window.location.search.includes('access_token') ||
-      window.location.search.includes('code='));
+    /(?:[?#&])(?:code|error)=/.test(window.location.href);
 
   const isWebDeveloperReturn =
     isWeb &&
