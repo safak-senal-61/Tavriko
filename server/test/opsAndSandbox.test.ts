@@ -16,6 +16,7 @@ vi.mock('../src/services/inviteDelivery', () => ({ DEFAULT_REALTIME_URL: 'https:
 vi.mock('../src/services/presenceManager', () => ({ presenceManager: {} }));
 
 import { makeOpsTelemetry, makeProbeSampler, requestFamily } from '../src/services/opsTelemetry';
+import { posthogHealthProbe } from '../src/services/posthogHealth';
 import { buildPolarSandbox, sandboxConfig } from '../src/services/polarSandbox';
 import { createOpsRouter } from '../src/routes/opsRoutes';
 import { ADMIN_SESSION_COOKIE, issueAdminSessionToken } from '../src/middleware/auth';
@@ -30,6 +31,8 @@ const config = { product, token: 'fake-sandbox-only', origin: 'https://preview.e
 const email = 'admin@example.test';
 const ownership = createHmac('sha256', config.token).update(`tavriko-sandbox:${email}`).digest('hex');
 const json = (data: object, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
+const posthogConfig = { analytics: { endpoint: '/i/v0/e/' } };
+const posthogToken = 'phc_fixture';
 const session = { id, product_id: product, url: 'https://sandbox.polar.sh/checkout/polar_c_fake', status: 'open',
   metadata: { tavriko_sandbox_owner: ownership }, amount: 500, currency: 'usd', client_secret: 'never-return-this' };
 const testProduct = { id: product, visibility:'private', is_archived:false, is_recurring:false, benefits:[],
@@ -120,6 +123,46 @@ describe('Ops telemetry', () => {
   });
 });
 
+describe('PostHog health probe', () => {
+  it('reads the selected project config without forwarding user data or sending an event', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json(posthogConfig));
+    vi.stubGlobal('fetch', fetcher);
+    const probe = posthogHealthProbe({
+      EXPO_PUBLIC_POSTHOG_KEY: posthogToken,
+      EXPO_PUBLIC_POSTHOG_HOST: 'https://eu.i.posthog.com/',
+    });
+    const result = await makeProbeSampler(() => [probe])();
+    expect(result).toEqual([expect.objectContaining({ name: 'PostHog', state: 'ok' })]);
+    expect(fetcher).toHaveBeenCalledExactlyOnceWith(
+      `https://eu-assets.i.posthog.com/array/${posthogToken}/config`,
+      { method: 'GET', headers: { Accept: 'application/json' }, redirect: 'error', signal: expect.any(AbortSignal) },
+    );
+    expect(JSON.stringify(result)).not.toContain(posthogToken);
+  });
+
+  it.each([
+    ['unknown project', () => json({}, 404)],
+    ['HTML response', () => new Response('<html></html>', { headers: { 'content-type': 'text/html' } })],
+    ['unrelated JSON', () => json({ status: 'ok' })],
+    ['invalid JSON', () => new Response('{', { headers: { 'content-type': 'application/json' } })],
+  ])('does not show connected for %s', async (_label, response) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response()));
+    const [result] = await makeProbeSampler(() => [posthogHealthProbe({ EXPO_PUBLIC_POSTHOG_KEY: posthogToken })])();
+    expect(result.state).toBe('failed');
+  });
+
+  it('distinguishes invalid tokens and unsupported hosts without a request', async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal('fetch', fetcher);
+    const sample = makeProbeSampler(() => [
+      posthogHealthProbe({ EXPO_PUBLIC_POSTHOG_KEY: 'not-a-project-token' }),
+      posthogHealthProbe({ EXPO_PUBLIC_POSTHOG_HOST: 'https://us.i.posthog.com.example.test' }),
+    ]);
+    expect((await sample()).map((probe) => probe.state)).toEqual(['unconfigured', 'unknown']);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+
 describe('Admin and storefront routes', () => {
   beforeEach(() => {
     vi.stubEnv('PORTAL_ADMIN_EMAIL', email);
@@ -128,9 +171,12 @@ describe('Admin and storefront routes', () => {
     vi.stubEnv('DATABASE_URL', '');
     vi.stubEnv('DIRECT_URL', '');
     vi.stubEnv('POLAR_SANDBOX_ENABLED', 'false');
+    vi.stubEnv('EXPO_PUBLIC_POSTHOG_KEY', posthogToken);
+    vi.stubEnv('EXPO_PUBLIC_POSTHOG_HOST', 'https://us.i.posthog.com');
     vi.mocked(getFcmStatus).mockReturnValue({ enabled:false, reason:'' });
     vi.mocked(getErrorMonitorStatus).mockReturnValue('unconfigured');
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ status:'ok', service:'Tavriko Real-time Multiplayer Gateway' })));
+    vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(url.startsWith('https://us-assets.i.posthog.com/')
+      ? json(posthogConfig) : json({ status:'ok', service:'Tavriko Real-time Multiplayer Gateway' }))));
   });
   const cookie = () => `${ADMIN_SESSION_COOKIE}=${issueAdminSessionToken(email, 'owner', false, 'c82b0f7a-0fa9-4ce0-ac11-8849b26c34a9')}`;
   it('protects the HTML and JSON, and keeps snapshots private', async () => {
@@ -141,13 +187,14 @@ describe('Admin and storefront routes', () => {
     expect(anon.status).toBe(302);
     expect(anon.headers.location).toMatch(/^\/admin\/login/);
     expect((await request(app).get('/api/admin/ops/snapshot').set('Authorization','Bearer player')).status).toBe(401);
+    expect(fetch).not.toHaveBeenCalled();
     expect((await request(app).get('/admin/health').set('Cookie', cookie())).text).toContain('Site Sağlığı');
     const snapshot = await request(app).get('/api/admin/ops/snapshot').set('Cookie', cookie());
     expect(snapshot.status).toBe(200);
     expect(snapshot.headers['cache-control']).toContain('no-store');
     expect(snapshot.body).toMatchObject({ status:'warning', traffic: { serverErrors:1 }, sandboxEnabled:false });
   });
-  it('distinguishes FCM API reachability, Sentry SDK startup and disabled Polar', async () => {
+  it('distinguishes FCM and PostHog reachability, Sentry SDK startup and disabled Polar', async () => {
     vi.mocked(getFcmStatus).mockReturnValue({ enabled: true, reason:'' });
     vi.mocked(verifyFcmApi).mockResolvedValue(true);
     vi.mocked(getErrorMonitorStatus).mockReturnValue('initialized');
@@ -158,7 +205,9 @@ describe('Admin and storefront routes', () => {
       expect.objectContaining({ name:'Firebase FCM API', state:'ok' }),
       expect.objectContaining({ name:'Sentry / GlitchTip (sunucu)', state:'initialized' }),
       expect.objectContaining({ name:'Polar Sandbox', state:'unconfigured', optional:true }),
+      expect.objectContaining({ name:'PostHog', state:'ok' }),
     ]));
+    expect(JSON.stringify(body)).not.toContain(posthogToken);
     expect(verifyFcmApi).toHaveBeenCalledOnce();
     expect(sendErrorMonitorTest).not.toHaveBeenCalled();
   });

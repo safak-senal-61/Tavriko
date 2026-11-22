@@ -1,8 +1,8 @@
 /**
  * Ürün analitiği — PostHog (OPTIONAL).
  * posthog-react-native SDK'ı Expo Go ile uyumlu çalışır.
- * EXPO_PUBLIC_POSTHOG_KEY tanımsızsa veya init başarısız olursa
- * tüm fonksiyonlar sessizce no-op çalışır; uygulama akışı etkilenmez.
+ * Ortam değişkeni yoksa varsayılan Tavriko projesi kullanılır.
+ * SDK başlatılamazsa uygulama akışı etkilenmez.
  *
  * Event şeması ARAC_PLANI.md §2'de tanımlıdır:
  * match_started, match_completed, question_answered, matchmaking_time,
@@ -11,15 +11,11 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import PostHog from 'posthog-react-native';
+import { DEFAULT_POSTHOG_INGEST_HOST, DEFAULT_POSTHOG_PROJECT_TOKEN } from '@trivia/shared';
 import { getAnalyticsConsent } from './analyticsConsent';
 
-// PostHog istemci anahtarı gizli değildir (Sentry DSN gibi her bundle'da
-// görünür), yalnızca olay GÖNDERME izni verir. Ortam değişkeni
-// EXPO_PUBLIC_POSTHOG_KEY tanımlıysa o önceliklidir.
-const DEFAULT_POSTHOG_KEY = 'phc_qvhJD5HHkCcyteqSLoKaidHPiJ5jgKRpWmvZhp5o7dPE';
-const POSTHOG_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY || DEFAULT_POSTHOG_KEY;
-// Proje US PostHog bulutunda; istenirse EXPO_PUBLIC_POSTHOG_HOST ile değiştirilebilir
-const POSTHOG_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
+const POSTHOG_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY || DEFAULT_POSTHOG_PROJECT_TOKEN;
+const POSTHOG_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST || DEFAULT_POSTHOG_INGEST_HOST;
 
 let client: PostHog | null = null;
 let initPromise: Promise<PostHog | null> | null = null;
