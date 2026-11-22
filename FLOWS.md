@@ -1,9 +1,16 @@
 # Visual refresh acceptance and regression checks
 
+## Desktop web fullscreen
+
+- On desktop `/app`, open “Tam ekran” from login, then navigate through Keşfet, difficulty, a quiz and its summary without losing fullscreen. The shared application frame, not just the question, becomes flush with the viewport; form text, selected answers and the timer are not reset by toggling.
+- In a signed-in session, navigate from Oyna to Mağaza, Ödüller/Rozetler and Profil. Check that the normal width limits and QR side rail do not constrain fullscreen content, and that results and dialogs stay accessible in fullscreen. Leave through “Tam ekrandan çık” or a browser-initiated exit, and verify the normal layout returns on the same page.
+- Check a short desktop viewport, a 375px screen, a wide touch-only screen and browsers without the Fullscreen API. Mobile layout and form controls remain reachable. A rejected fullscreen request should show a brief explanation without affecting navigation.
+
 ## Gameplay rewards
 
 - Baseline: sign-in opens Oyna; Mağaza previously opened on Sandıklar with Anahtarlar and Rozetler tabs. Envanter is where owned items are opened or equipped.
 - From Oyna → Ödüller, check all four chest progress bars, switch to Rozetler and check the friend, match and answer tasks. Verify locked, ready, claimed, network failure/retry and no duplicate claim.
+- Check the original armor, owl-and-book, and emerald brain artwork on their matching tasks, plus the new handshake for the friend task and calendar for the play-days task. Verify that newly earned and equipped badges show the same artwork in Envanter and Profil.
 - Claim a ready chest and open Envanter; the chest and matching earned key must both be present. Claim a badge, equip it, switch to another badge and re-equip the first; permanent copies are not consumed.
 - Check that Mağaza no longer offers chests, keys or badges, including bundles, while the permanent navigation, frames, gold and boosters still open. Verify the premium season track gives fixed rewards, never chests or keys.
 - Test synthetic users only. Check verified match and friend progress, concurrent claims and reopening from another session. Check phone (320/375 px), desktop, error states and console.

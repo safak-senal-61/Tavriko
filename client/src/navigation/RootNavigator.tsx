@@ -93,6 +93,7 @@ import { ConnectionStatusOverlay } from '../components/ConnectionStatusOverlay';
 import { AnalyticsConsentBanner } from '../components/AnalyticsConsentBanner';
 import { useAnalyticsConsent } from '../services/analyticsConsent';
 import { PushPermissionReminder } from '../components/PushPermissionReminder';
+import { DesktopFullscreenBar } from '../components/DesktopFullscreenBar';
 import { pushSupported } from '../services/pushNotifications';
 import { usePushPermission } from '../services/usePushPermission';
 import { useNetStatus, OFFLINE_GAME_GRACE_MS } from '../store/netStatus';
@@ -154,9 +155,10 @@ export const RootNavigator: React.FC = () => {
     : 'splash';
 
   const [currentScreen, setCurrentScreen] = useState<ScreenName>(initialScreen);
+  const [webFullscreen, setWebFullscreen] = useState(false);
   const webLayout = useMemo(
-    () => getWebLayout(windowWidth, windowHeight, currentScreen, isWeb),
-    [windowWidth, windowHeight, currentScreen, isWeb],
+    () => getWebLayout(windowWidth, windowHeight, currentScreen, isWeb, webFullscreen),
+    [windowWidth, windowHeight, currentScreen, isWeb, webFullscreen],
   );
   /* KVKK: arkadaşın tam profili (salt okunur) — ayarlar/hesap bölümleri gizli */
   const [viewingProfile, setViewingProfile] = useState<UserProfile | null>(null);
@@ -1661,18 +1663,20 @@ export const RootNavigator: React.FC = () => {
   const handleTimeExpired = () => {
     if (!activeRoom) void evaluatePracticeAnswer(null, 0);
   };
-  return (
+  const playerFrame = (
     <View style={[
       styles.outerWrapper,
+      isWeb && styles.webContent,
       isNativeTablet && styles.tabletOuter,
       webLayout.roomy && [styles.webOuter, { paddingHorizontal: webLayout.frameGutter }],
+      webLayout.fullscreen && styles.fullscreenOuter,
     ]}>
       <StatusBar hidden={true} animated={false} />
 
       <View style={[
         styles.appFrame,
         isNativeTablet && styles.nativeTabletFrame,
-        webLayout.roomy && [styles.webFrame, { maxWidth: webLayout.frameMaxWidth }],
+        webLayout.roomy && !webLayout.fullscreen && [styles.webFrame, { maxWidth: webLayout.frameMaxWidth }],
       ]}>
         <Animated.View
           testID={isWeb ? 'player-web-content' : undefined}
@@ -2465,6 +2469,13 @@ export const RootNavigator: React.FC = () => {
       )}
     </View>
   );
+
+  return isWeb ? (
+    <View style={styles.outerWrapper}>
+      <DesktopFullscreenBar onFullscreenChange={setWebFullscreen} />
+      {playerFrame}
+    </View>
+  ) : playerFrame;
 };
 
 const styles = StyleSheet.create({
@@ -2474,6 +2485,8 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  webContent: { height: 'auto', minHeight: 0 },
+  fullscreenOuter: { paddingVertical: 0 },
   tabletOuter: {
     backgroundColor: '#090414',
     flexDirection: 'row',

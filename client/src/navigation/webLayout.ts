@@ -60,26 +60,29 @@ export function getWebUiSizing(contentWidth: number, height: number, roomy: bool
   };
 }
 
-export function getWebLayout(width: number, height: number, screen: ScreenName, isWeb: boolean) {
+export function getWebLayout(width: number, height: number, screen: ScreenName, isWeb: boolean, fullscreenActive = false) {
   const page: PageLayout = WEB_PAGES[screen];
   const roomy = isWeb && width >= TABLET_WIDTH && page.mode !== 'splash';
+  const fullscreen = roomy && fullscreenActive;
   const landscape = width >= height;
-  const showUtility = roomy && landscape && width >= UTILITY_WIDTH && page.mode !== 'focus';
-  const frameGutter = Math.round(Math.min(32, Math.max(12, width * 0.017)));
-  const frameWidth = roomy
+  const showUtility = roomy && !fullscreen && landscape && width >= UTILITY_WIDTH && page.mode !== 'focus';
+  const frameGutter = fullscreen ? 0 : Math.round(Math.min(32, Math.max(12, width * 0.017)));
+  const frameWidth = roomy && !fullscreen
     ? Math.min(FRAME_MAX_WIDTH, width - frameGutter * 2 - (showUtility ? WEB_UTILITY_WIDTH + WEB_FRAME_GAP : 0)) - 2
     : width;
   const minInset = frameWidth >= WEB_TAB_WIDE_WIDTH ? 24 : 16;
-  const pageInset = roomy ? Math.max(minInset, (frameWidth - (page.maxWidth ?? frameWidth)) / 2) : 16;
+  const pageMaxWidth = fullscreen ? frameWidth : page.maxWidth ?? frameWidth;
+  const pageInset = roomy ? Math.max(minInset, (frameWidth - pageMaxWidth) / 2) : 16;
   const contentWidth = Math.max(0, frameWidth - pageInset * 2);
 
   return {
     roomy,
+    fullscreen,
     split: roomy && contentWidth >= 690 && (screen === 'auth' || screen === 'home' || screen === 'categories'),
     leaderboardColumns: roomy && contentWidth >= 980 && landscape,
     reserveUtility: showUtility,
     showUtility,
-    frameMaxWidth: FRAME_MAX_WIDTH,
+    frameMaxWidth: fullscreen ? width : FRAME_MAX_WIDTH,
     frameGutter,
     frameWidth,
     pageInset,

@@ -69,6 +69,7 @@ import {
   EyeOffIcon,
 } from '../components/TavrikoIcons';
 import { GuestDiscoveryCard } from '../components/DiscoveryArtwork';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import Reanimated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { sound } from '../services/soundService';
 
@@ -141,6 +142,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   apiBaseUrl,
   redirectNotice,
 }) => {
+  const page = usePlayerWebLayout();
+  const wideFullscreen = wideLayout && page?.fullscreen;
   const resetApiBase = Platform.OS === 'web' ? getApiBaseUrl() : apiBaseUrl;
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [regStep, setRegStep] = useState<1 | 2 | 3 | 4>(1);
@@ -599,11 +602,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           compact && styles.scrollContentCompact,
           tiny && styles.scrollContentTiny,
           wideLayout && styles.scrollContentWide,
+          wideFullscreen && styles.scrollContentFullscreen,
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={wideLayout && styles.authIntro}>
+        <View style={[wideLayout && styles.authIntro, wideFullscreen && styles.authIntroFullscreen]}>
         {/* Clean Modern Brand Header (3D Crown) — sabit, animasyonsuz */}
         <View style={[styles.heroWrap, compact && styles.heroWrapCompact, tiny && styles.heroWrapTiny, wideLayout && styles.heroWrapWide]}>
           <View style={[styles.heroCrownWrap, compact && styles.heroCrownWrapCompact, tiny && styles.heroCrownWrapTiny]}>
@@ -634,7 +638,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           )}
         </View>
         {/* Main Glass Auth Card */}
-        <Reanimated.View entering={FadeInDown.delay(220).duration(500).springify().damping(16)} style={[styles.card, compact && styles.cardCompact, tiny && styles.cardTiny, wideLayout && styles.cardWide]}>
+        <Reanimated.View entering={FadeInDown.delay(220).duration(500).springify().damping(16)} style={[
+          styles.card, compact && styles.cardCompact, tiny && styles.cardTiny,
+          wideLayout && styles.cardWide, wideFullscreen && styles.cardFullscreen,
+        ]}>
           {redirectNotice ? (
             <View style={styles.redirectNoticeBanner}>
               <Text style={styles.errorText}>🔒 {redirectNotice}</Text>
@@ -1370,6 +1377,8 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   authIntro: { flex: 1, minWidth: 0, maxWidth: 464 },
+  scrollContentFullscreen: { maxWidth: 1376, columnGap: 32 },
+  authIntroFullscreen: { maxWidth: 660 },
   heroWrapWide: { flexDirection: 'row', gap: 12, marginBottom: 14 },
   arenaPreview: {
     minHeight: 180,
@@ -1385,6 +1394,7 @@ const styles = StyleSheet.create({
   arenaTitle: { color: '#FFFFFF', fontFamily: THEME.fonts.display, fontSize: 23 },
   arenaSubtitle: { color: '#E2D7F5', fontFamily: THEME.fonts.bold, fontSize: 13, marginTop: 2 },
   cardWide: { flex: 1, minWidth: 0, width: 'auto', padding: 20 },
+  cardFullscreen: { maxWidth: 620 },
   // ---- Mobil kompakt yerleşim: küçük ekranlarda kaydırmasız sığdırma ----
   // Logo ekranın en tepesine yapışmasın: üstte nefes payı bırak (status bar).
   scrollContentCompact: {

@@ -40,6 +40,7 @@ import {
 } from '../components/TavrikoIcons';
 import { GradientFill } from '../components/TavrikoGradient';
 import { DISCOVER_CATEGORY_IMG, DISCOVER_SUBCATEGORY_IMG } from '../components/DiscoverArtwork';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 export type QuestionAnswerState =
   | 'answerable'
   | 'submitting'
@@ -757,6 +758,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     secondsLeft <= 0;
   const totalRounds = question.totalRounds || 10;
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const webLayout = usePlayerWebLayout();
   const compact = windowHeight < 800;
   const tiny = windowHeight < 690;
   const wideAnswers = Platform.OS === 'web' && windowWidth >= 700;
@@ -806,6 +808,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const narrowHeader = isGroup && windowWidth < 380;
   // 5+ kişi: soru kartı, şıklar ve yarış kartı sıkışık modda render edilir.
   const denseLayout = playerCount >= 5;
+  const roomyFullscreen = webLayout?.fullscreen && windowHeight >= 760 && !denseLayout;
   const multiLeaderScore = multiPlayers.reduce(
     (acc, p) =>
       Math.max(acc, p.isMe ? myScore : formatCleanScore(p.score || 0, p.correctAnswers, totalRounds)),
@@ -987,6 +990,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           styles.questionCard,
           compact && styles.questionCardCompact,
           (tiny || denseLayout) && styles.questionCardTiny,
+          roomyFullscreen && styles.questionCardFullscreen,
         ]}
       >
         <GradientFill
@@ -1009,6 +1013,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
             styles.questionText,
             compact && styles.questionTextCompact,
             isLargeText && styles.questionTextLarge,
+            roomyFullscreen && (isLargeText ? styles.questionTextFullscreenLarge : styles.questionTextFullscreen),
           ]}
           numberOfLines={5}
           adjustsFontSizeToFit
@@ -1038,6 +1043,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   styles.optCard,
                   compact && styles.optCardCompact,
                   (tiny || denseLayout) && styles.optCardTiny,
+                  roomyFullscreen && styles.optCardFullscreen,
                   !feedback && isMyChoice && styles.optCardSelected,
                   feedback && isCorrectChoice && styles.optCardCorrect,
                   feedback && isWrongChoice && styles.optCardWrong,
@@ -1085,7 +1091,10 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   </Text>
                 </View>
 
-                <Text style={[styles.optText, compact && styles.optTextCompact, isLargeText && styles.optTextLarge]} numberOfLines={2}>
+                <Text style={[
+                  styles.optText, compact && styles.optTextCompact, isLargeText && styles.optTextLarge,
+                  roomyFullscreen && { fontSize: isLargeText ? 23 : 21 },
+                ]} numberOfLines={2}>
                   {opt.text}
                 </Text>
 
@@ -1588,6 +1597,7 @@ const styles = StyleSheet.create({
     minHeight: 80,
     paddingVertical: 8,
   },
+  questionCardFullscreen: { minHeight: 152, paddingVertical: 16 },
   questionCardInner: {
     position: 'absolute',
     top: 5,
@@ -1620,6 +1630,8 @@ const styles = StyleSheet.create({
     fontSize: 25,
     lineHeight: 32,
   },
+  questionTextFullscreen: { fontSize: 28, lineHeight: 36 },
+  questionTextFullscreenLarge: { fontSize: 32, lineHeight: 40 },
   // ---- Şıklar ----
   optionsContainer: {
     gap: 10,
@@ -1647,6 +1659,7 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: 23,
   },
+  optCardFullscreen: { minHeight: 68, borderRadius: 32 },
   optCardSelected: {
     borderColor: '#FFC43D',
     borderWidth: 2,
