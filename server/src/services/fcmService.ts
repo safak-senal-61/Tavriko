@@ -27,6 +27,7 @@ interface FcmSendResult {
 const FCM_CHUNK_SIZE = 500;
 
 interface MessagingLike {
+  send(message: import('firebase-admin/messaging').Message, dryRun: true): Promise<string>;
   sendEach(messages: Array<Record<string, unknown>>): Promise<{
     responses: Array<{ success: boolean; error?: { code?: string; message?: string } }>;
   }>;
@@ -132,6 +133,18 @@ export function isFcmEnabled(): boolean {
 export function getFcmStatus(): { enabled: boolean; reason: string } {
   const enabled = getMessagingInstance() !== null;
   return { enabled, reason: enabled ? '' : disabledReason };
+}
+
+/** Exercise provider authentication and message validation without using any device token. */
+export async function verifyFcmApi(): Promise<boolean> {
+  const fcm = getMessagingInstance();
+  if (!fcm) return false;
+  const name = await fcm.send({
+    topic: 'tavriko-health-validation',
+    data: { title: 'Tavriko', message: 'FCM API validation' },
+    android: { priority: 'high' },
+  }, true);
+  return typeof name === 'string' && name.length > 0;
 }
 
 /** FCM data payload değerleri string olmalı; objeler JSON'a çevrilir. */

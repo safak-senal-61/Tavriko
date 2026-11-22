@@ -83,4 +83,41 @@ describe('analytics session', () => {
     expect(mock.identify).not.toHaveBeenCalled();
     expect(mock.capture).not.toHaveBeenCalled();
   });
+
+  it('recovers from a transient startup error without recording a duplicate session', async () => {
+    mock.ready.mockRejectedValueOnce(new Error('temporarily unavailable'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const analytics = await import('../src/services/analytics');
+      mock.consent = 'granted';
+      await analytics.syncAnalyticsSession('player');
+      expect(mock.capture).not.toHaveBeenCalled();
+      await analytics.syncAnalyticsSession('player');
+      await analytics.syncAnalyticsSession('player');
+      expect(mock.initialize).toHaveBeenCalledTimes(2);
+      expect(mock.capture).toHaveBeenCalledTimes(1);
+    } finally { warn.mockRestore(); }
+  });
+
+  it('finishes a pending opt-in before applying withdrawal and does not identify the player', async () => {
+    const analytics = await import('../src/services/analytics');
+    let resolveOptIn!: () => void;
+    let entered!: () => void;
+    const optInBegan = new Promise<void>(resolve => { entered = resolve; });
+    mock.optIn.mockImplementationOnce(() => {
+      entered();
+      return new Promise<void>(resolve => { resolveOptIn = resolve; });
+    });
+    mock.consent = 'granted';
+    const start = analytics.syncAnalyticsSession('player');
+    await optInBegan;
+    mock.consent = 'denied';
+    const stop = analytics.syncAnalyticsSession(null);
+    expect(mock.optOut).not.toHaveBeenCalled();
+    resolveOptIn();
+    await Promise.all([start, stop]);
+    expect(mock.optOut).toHaveBeenCalledOnce();
+    expect(mock.identify).not.toHaveBeenCalled();
+    expect(mock.capture).not.toHaveBeenCalled();
+  });
 });

@@ -3,7 +3,8 @@ import { getAdminSessionFromRequest, requireAdminAuth } from '../middleware/auth
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
 import { cacheService } from '../cache/redisClient';
-import { getFcmStatus } from '../services/fcmService';
+import { getFcmStatus, verifyFcmApi } from '../services/fcmService';
+import { getErrorMonitorStatus, sendErrorMonitorTest } from '../utils/errorMonitor';
 import { DEFAULT_REALTIME_URL } from '../services/inviteDelivery';
 import { makeOpsTelemetry, makeProbeSampler } from '../services/opsTelemetry';
 import { buildPolarSandbox, PolarSandboxError, sandboxConfig } from '../services/polarSandbox';
@@ -14,6 +15,8 @@ export function createOpsRouter(telemetry: ReturnType<typeof makeOpsTelemetry>, 
   const probes = makeProbeSampler(() => {
     const supabase = supabaseService.getClient();
     const polar = sandboxConfig();
+    const fcm = getFcmStatus().enabled;
+    const sentry = getErrorMonitorStatus();
     return [
       {
         name: 'PostgreSQL / Prisma', detail: 'Gerçek bağlantı: salt okunur SELECT 1. Şema ve replikasyon ölçülmez.',
@@ -47,12 +50,12 @@ export function createOpsRouter(telemetry: ReturnType<typeof makeOpsTelemetry>, 
         check: polar ? () => makePolar(polar).productAvailable() : undefined, optional: process.env.POLAR_SANDBOX_ENABLED !== 'true',
       },
       {
-        name: 'Firebase FCM', detail: 'Yalnızca uygulama yapılandırması. Cihaza teslimat doğrulanmaz.',
-        unset: getFcmStatus().enabled ? 'unknown' as const : 'unconfigured' as const, optional: true,
+        name: 'Firebase FCM API', detail: 'Google API kimlik doğrulaması ve deneme isteği. Cihaza bildirim gönderilmez.',
+        check: fcm ? verifyFcmApi : undefined, optional: !fcm,
       },
       {
-        name: 'Sentry / GlitchTip', detail: 'Yalnızca DSN yapılandırması. Hata alımı ve saklama doğrulanmaz.',
-        unset: (process.env.SENTRY_DSN || process.env.GLITCHTIP_DSN) ? 'unknown' as const : 'unconfigured' as const, optional: true,
+        name: 'Sentry / GlitchTip (sunucu)', detail: 'Sunucu SDK durumu. Mobil Sentry ayrıdır; olay alımı Sentry’den doğrulanır.',
+        unset: sentry, optional: sentry !== 'failed',
       },
     ];
   });
@@ -73,7 +76,28 @@ export function createOpsRouter(telemetry: ReturnType<typeof makeOpsTelemetry>, 
         observedAt: new Date().toISOString(), runtime: telemetry.runtime(), traffic, services,
         status: warning ? 'warning' : traffic.requests > 0 ? 'observed' : 'no-traffic',
         sandboxEnabled: Boolean(sandboxConfig()),
+        sentryTestEnabled: getErrorMonitorStatus() === 'initialized',
       });
+    } catch (error) { next(error); }
+  });
+
+  let lastSentryTest = -Infinity;
+  router.post('/api/admin/ops/sentry/test', async (req, res, next) => {
+    try {
+      const session = await getAdminSessionFromRequest(req, db.rawClient, true);
+      if (session?.role !== 'owner') { res.status(403).json({ error: 'Sahip oturumu gerekli.' }); return; }
+      const host = req.get('host');
+      const origin = req.get('origin');
+      const loopback = /^(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(host || '');
+      if (!host || (origin !== `https://${host}` && !(loopback && origin === `http://${host}`)) || !req.is('application/json')) {
+        res.status(403).json({ error: 'Test yalnızca aynı yönetim sayfasından başlatılabilir.' }); return;
+      }
+      if (getErrorMonitorStatus() !== 'initialized') { res.status(503).json({ error: 'Sunucu hata izleme hazır değil.' }); return; }
+      if (Date.now() - lastSentryTest < 60_000) { res.status(429).json({ error: 'Yeni test için bir dakika bekleyin.' }); return; }
+      lastSentryTest = Date.now();
+      const eventId = await sendErrorMonitorTest();
+      if (!eventId) { res.status(502).json({ error: 'Test olayı gönderilemedi.' }); return; }
+      res.json({ eventId });
     } catch (error) { next(error); }
   });
 
