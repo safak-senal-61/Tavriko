@@ -1,48 +1,24 @@
 /**
  * Analitik onay bandı — KVKK uyumu.
  *
- * İlk açılışta (onay kararı yokken) belirir. "Kabul Et"
- * denene kadar PostHog hiçbir olay göndermez; "Reddet" kalıcı olarak
- * kapatır. Gizlilik Politikası dokümanı bandın içinden açılabilir.
+ * Oturum açıldıktan sonra, henüz bir tercih yoksa gösterilir.
+ * Gizlilik Politikası dokümanı bandın içinden açılabilir.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { FileText, ShieldCheck } from 'lucide-react-native';
-import {
-  getAnalyticsConsent,
-  setAnalyticsConsent,
-  hydrateAnalyticsConsent,
-  type AnalyticsConsentValue,
-} from '../services/analyticsConsent';
+import { setAnalyticsConsent } from '../services/analyticsConsent';
 import { LegalDocumentModal } from './LegalDocuments';
 import type { LegalDocumentId } from '@trivia/shared';
 
-interface Props {
-  /** Kullanıcı karar verdiğinde tetiklenir (onayda analitik başlatılır). */
-  onDecide?: (value: AnalyticsConsentValue) => void;
-}
-
-export const AnalyticsConsentBanner: React.FC<Props> = ({ onDecide }) => {
-  const [visible, setVisible] = useState(false);
+export const AnalyticsConsentBanner: React.FC = () => {
   const [openDoc, setOpenDoc] = useState<LegalDocumentId | null>(null);
   const { height } = useWindowDimensions();
   const shortWeb = Platform.OS === 'web' && height <= 420;
 
-  useEffect(() => {
-    void hydrateAnalyticsConsent().then(() => {
-      if (getAnalyticsConsent() === null) setVisible(true);
-    });
-  }, []);
-
-  const decide = (value: AnalyticsConsentValue) => {
-    setAnalyticsConsent(value);
-    setVisible(false);
-    onDecide?.(value);
-  };
-
   return (
     <>
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={() => {}}>
+      <Modal visible transparent animationType="fade" onRequestClose={() => setAnalyticsConsent('denied')}>
         <View style={styles.backdrop} pointerEvents="auto">
           <ScrollView
             style={styles.scroll}
@@ -55,9 +31,9 @@ export const AnalyticsConsentBanner: React.FC<Props> = ({ onDecide }) => {
             </View>
             <Text style={styles.title}>Deneyimini geliştirmemize yardım et</Text>
             <Text style={[styles.body, shortWeb && styles.bodyShort]}>
-              Tavriko’yu daha iyi hale getirmek için oyun içi etkileşimleri anonim olarak ölçüyoruz
-              (PostHog). Veriler hiçbir şekilde üçüncü kişilerle paylaşılmaz; ne topladığımızı
-              Gizlilik Politikası’mızda okuyabilirsin.
+              İzin verirsen, Tavriko’yu iyileştirmek için maç başlatma ve tamamlama gibi oyun içi
+              etkileşimleri ölçeriz. Bu olaylar, hesap tanımlayıcınla birlikte ölçüm hizmeti
+              tarafından işlenir. Oyuncu adın ve e-posta adresin bu ölçüme gönderilmez.
             </Text>
             <Pressable
               style={[styles.docLink, shortWeb && styles.docLinkShort]}
@@ -70,7 +46,7 @@ export const AnalyticsConsentBanner: React.FC<Props> = ({ onDecide }) => {
             </Pressable>
             <Pressable
               style={styles.acceptBtn}
-              onPress={() => decide('granted')}
+              onPress={() => setAnalyticsConsent('granted')}
               accessibilityRole="button"
               accessibilityLabel="Analitik onayını kabul et"
             >
@@ -78,13 +54,13 @@ export const AnalyticsConsentBanner: React.FC<Props> = ({ onDecide }) => {
             </Pressable>
             <Pressable
               style={styles.denyBtn}
-              onPress={() => decide('denied')}
+              onPress={() => setAnalyticsConsent('denied')}
               accessibilityRole="button"
               accessibilityLabel="Analitiği reddet"
             >
               <Text style={styles.denyText}>Şimdilik Reddet</Text>
             </Pressable>
-            <Text style={[styles.hint, shortWeb && styles.hintShort]}>Reddetmek oyunu etkilemez; tercihini Ayarlar’dan her zaman değiştirebilirsin.</Text>
+            <Text style={[styles.hint, shortWeb && styles.hintShort]}>Reddetmek oyunu etkilemez. Tercihini Ayarlar › Gizlilik › Kullanım Analitiği bölümünden değiştirebilirsin.</Text>
           </View>
           </ScrollView>
         </View>

@@ -5,9 +5,9 @@
  *  1. `initPushNotifications()` — uygulama açılışında bir kez çağrılır:
  *     bildirim kategorilerini (eylem butonları) kaydeder, Android'de
  *     bildirim kanallarını kurar ve bildirim dokunuşlarını yönlendirir.
- *  2. `registerForPushNotifications(userId)` — kullanıcı oturum açtığında
- *     çağrılır: izin ister, Expo push token'ı alır ve sunucuya kaydeder
- *     (POST /api/push/register). Web'de tamamen no-op'tur.
+ *  2. İzin yalnızca kullanıcının açık eylemiyle istenir.
+ *     Mevcut izin varsa `registerForPushNotifications` token'ı kaydeder.
+ *     Web'de tamamen no-op'tur.
  *
  * Bildirimler uygulama ön plandayken de banner + ses ile gösterilir —
  * arkadaş/oda davetleri karşı taraf oyundayken anında görünülsün diye.
@@ -23,7 +23,7 @@
  *
  * Hatalar sessizce yutulur — bildirim altyapısı oyun akışını asla bozmaz.
  */
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { DEFAULT_API_BASE } from '../config';
@@ -157,16 +157,47 @@ export function initPushNotifications(): void {
   }
 }
 
-async function acquirePermission(): Promise<boolean> {
+export type PushPermission = 'unknown' | 'granted' | 'requestable' | 'blocked';
+export const pushSupported = Platform.OS === 'android' || Platform.OS === 'ios';
+
+function permissionState(status: Awaited<ReturnType<typeof Notifications.getPermissionsAsync>>): PushPermission {
+  if (status.granted && status.status === 'granted') return 'granted';
+  if (Platform.OS === 'android' && Number(Platform.Version) < 33) return 'blocked';
+  return status.canAskAgain ? 'requestable' : 'blocked';
+}
+
+export async function getPushPermission(): Promise<PushPermission> {
+  if (!pushSupported) return 'unknown';
   try {
-    const current = await Notifications.getPermissionsAsync();
-    if (current.granted) return true;
-    if (current.canAskAgain === false) return false;
-    const requested = await Notifications.requestPermissionsAsync();
-    return requested.granted;
+    return permissionState(await Notifications.getPermissionsAsync());
   } catch {
-    return false;
+    return 'unknown';
   }
+}
+
+/** Must only be called by an explicit button press, never by foreground sync. */
+export async function enablePushFromUserAction(): Promise<PushPermission> {
+  if (!pushSupported) return 'unknown';
+  const current = await getPushPermission();
+  if (current === 'requestable') return permissionState(await Notifications.requestPermissionsAsync());
+  if (current === 'blocked') await openPushSettings();
+  return current;
+}
+
+export async function openPushSettings(): Promise<void> {
+  if (!pushSupported) return;
+  const packageName = Constants.expoConfig?.android?.package;
+  if (Platform.OS === 'android' && Number(Platform.Version) >= 26 && packageName) {
+    try {
+      await Linking.sendIntent('android.settings.APP_NOTIFICATION_SETTINGS', [
+        { key: 'android.provider.extra.APP_PACKAGE', value: packageName },
+      ]);
+      return;
+    } catch {
+      // Some devices only expose the app details screen.
+    }
+  }
+  await Linking.openSettings();
 }
 
 /**
@@ -178,15 +209,27 @@ async function acquirePermission(): Promise<boolean> {
  * (Expo Go vb.) Expo push token'a düşer.
  * iOS: Expo push token (APNs teslimi Expo/EAS üzerinden).
  */
-export async function registerForPushNotifications(userId: string): Promise<void> {
-  if (Platform.OS === 'web' || !userId) return;
+const registrations = new Map<string, Promise<void>>();
+
+export function registerForPushNotifications(userId: string): Promise<void> {
+  if (!pushSupported) return Promise.resolve();
   const active = useGameStore.getState();
-  if (active.user?.id !== userId || !active.token) return;
+  if (active.user?.id !== userId || active.user.isGuest || !active.token || active.token === 'mock_token') {
+    return Promise.resolve();
+  }
+  const session = active.token;
+  const pending = registrations.get(session);
+  if (pending) return pending;
+  const registration = registerGrantedDevice(userId, session).finally(() => registrations.delete(session));
+  registrations.set(session, registration);
+  return registration;
+}
+
+async function registerGrantedDevice(userId: string, session: string): Promise<void> {
   initPushNotifications();
 
   try {
-    const granted = await acquirePermission();
-    if (!granted) return;
+    if (await getPushPermission() !== 'granted') return;
 
     let token: string | undefined;
 
@@ -209,14 +252,14 @@ export async function registerForPushNotifications(userId: string): Promise<void
 
     if (!token || (token === lastRegisteredToken && userId === lastRegisteredUserId)) return;
     const current = useGameStore.getState();
-    if (current.user?.id !== userId || current.token !== active.token) return;
+    if (current.user?.id !== userId || current.token !== session) return;
 
     const res = await fetch(`${DEFAULT_API_BASE}/push/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ token, platform: Platform.OS }),
     });
-    if (res.ok) {
+    if (res.ok && useGameStore.getState().token === session) {
       lastRegisteredToken = token;
       lastRegisteredUserId = userId;
     }
