@@ -7,6 +7,7 @@ import { getFcmStatus, verifyFcmApi } from '../services/fcmService';
 import { getErrorMonitorStatus, sendErrorMonitorTest } from '../utils/errorMonitor';
 import { DEFAULT_REALTIME_URL } from '../services/inviteDelivery';
 import { makeOpsTelemetry, makeProbeSampler } from '../services/opsTelemetry';
+import { posthogHealthProbe } from '../services/posthogHealth';
 import { buildPolarSandbox, PolarSandboxError, sandboxConfig } from '../services/polarSandbox';
 import { renderOpsPage } from './opsPage';
 
@@ -57,6 +58,7 @@ export function createOpsRouter(telemetry: ReturnType<typeof makeOpsTelemetry>, 
         name: 'Sentry / GlitchTip (sunucu)', detail: 'Sunucu SDK durumu. Mobil Sentry ayrıdır; olay alımı Sentry’den doğrulanır.',
         unset: sentry, optional: sentry !== 'failed',
       },
+      posthogHealthProbe(),
     ];
   });
 

@@ -23,3 +23,4 @@ __exportStar(require("./legal"), exports);
 __exportStar(require("./rewards"), exports);
 __exportStar(require("./questionSelection"), exports);
 __exportStar(require("./lobbyChat"), exports);
+__exportStar(require("./posthogConfig"), exports);

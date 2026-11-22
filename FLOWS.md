@@ -3,6 +3,7 @@
 ## Production service checks
 
 - Site Sağlığı: test refresh, pause/resume and mobile-width layout. The Firebase card distinguishes Google API validation from device delivery; the Sentry card distinguishes SDK initialization from a manually sent test event. Polar stays disabled when it is not configured.
+- Under “Servis kontrolleri”, the PostHog row reports “Yanıt veriyor” only when the configured US/EU project returns a valid remote configuration. Check failed/unverified states with fixtures. No analytics event is sent or counted by the health probe.
 - In an owner session, select “Sentry test olayı gönder”. Check the returned event ID in the separate server project; verify unauthenticated, wrong-origin, and repeated requests are rejected.
 - Web `/` and `/app` still show the sign-in flow without starting analytics or an ad script. `/ads.txt` serves the verified web publisher entry as plain text; `/app-ads.txt` stays unchanged.
 - For synthetic signed-in sessions, check consent granted, withdrawal, login switch and SDK startup failure followed by retry. Never transmit synthetic player data to the live analytics project.
