@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   Modal,
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   ScrollView,
   Image,
 } from 'react-native';
+import { PageShimmer } from './LoadingShimmer';
 import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { DEFAULT_API_BASE } from '../config';
@@ -17,6 +17,10 @@ import { sound } from '../services/soundService';
 import { useGameStore } from '../store/gameStore';
 import { InfoHint } from './InfoHint';
 import { PROFILE_IMG } from './DiscoveryArtwork';
+import { PageLoadError } from './PageLoadError';
+import { PAGE_TTL } from '../utils/pageDataCache';
+import { profileUrl } from '../utils/pageResources';
+import { usePageData } from '../utils/usePageData';
 
 interface UserProfileModalProps {
   visible: boolean;
@@ -33,46 +37,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onClose,
   apiBaseUrl,
 }) => {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!visible || !userId) {
-      setProfile(null);
-      setError(null);
-      return;
-    }
-
-    const base = apiBaseUrl || DEFAULT_API_BASE;
-    let isMounted = true;
-    setLoading(true);
-    setError(null);
-
-    const token = useGameStore.getState().token;
-    fetch(`${base}/social/profile/${encodeURIComponent(userId)}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new Error('Profil yüklenemedi');
-        return res.json();
-      })
-      .then((data) => {
-        if (!isMounted) return;
-        setProfile(data);
-      })
-      .catch((err) => {
-        if (!isMounted) return;
-        setError(err.message || 'Profil yüklenemedi');
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [visible, userId, apiBaseUrl]);
+  const me = useGameStore(state => state.user);
+  const viewer = me?.id;
+  const token = useGameStore(state => state.token);
+  const { data, loading, read } = usePageData<UserProfile>(
+    visible && userId && viewer && userId !== viewer ? profileUrl(apiBaseUrl || DEFAULT_API_BASE, userId) : null,
+    PAGE_TTL.profile, viewer, token);
+  const profile = userId === viewer ? me : data;
 
   if (!visible) return null;
 
@@ -115,14 +86,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           </View>
 
           {loading ? (
-            <View style={styles.loadingWrap}>
-              <ActivityIndicator color="#FFC43D" size="large" />
-              <Text style={styles.loadingText}>Profil yükleniyor...</Text>
-            </View>
-          ) : error || !profile ? (
-            <View style={styles.errorWrap}>
-              <Text style={styles.errorText}>{error || 'Profil bulunamadı'}</Text>
-            </View>
+            <PageShimmer label="Profil yükleniyor" shape="profile" />
+          ) : !profile ? (
+            <PageLoadError onRetry={() => void read(true).catch(() => {})} />
           ) : (
             <ScrollView
               contentContainerStyle={styles.scrollContent}
@@ -292,16 +258,6 @@ const styles = StyleSheet.create({
   closeBtnText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontFamily: THEME.fonts.bold,
-  },
-  loadingWrap: {
-    paddingVertical: 40,
-    alignItems: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    color: '#D9CDF5',
-    fontSize: 13,
     fontFamily: THEME.fonts.bold,
   },
   errorWrap: {

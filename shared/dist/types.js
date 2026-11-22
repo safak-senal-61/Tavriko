@@ -455,6 +455,28 @@ exports.SHOP_CATALOG = [
         badge: 'ÖZEL',
         grantItems: [{ id: 'frame_flame', name: 'Alev Çerçevesi', desc: 'Ateşli profil çerçevesi', qty: 1, category: 'frame', rarity: 'mythic' }],
     },
+    {
+        id: 'frame_dragon_phoenix',
+        name: 'Ejderha ve Anka Çerçevesi',
+        desc: 'Kadim ejderha ile alevden anka avatarını çevreler.',
+        category: 'frames',
+        price: 150,
+        currency: 'gems',
+        rarity: 'mythic',
+        badge: 'YENİ',
+        grantItems: [{ id: 'frame_dragon_phoenix', name: 'Ejderha ve Anka Çerçevesi', desc: 'Ejderha ve anka motifli profil çerçevesi', qty: 1, category: 'frame', rarity: 'mythic' }],
+    },
+    {
+        id: 'frame_steampunk',
+        name: 'Buhar Zırhı Çerçevesi',
+        desc: 'Pirinç dişliler ve mavi ışıklarla işlenmiş zırhlı kanatlar.',
+        category: 'frames',
+        price: 90,
+        currency: 'gems',
+        rarity: 'legendary',
+        badge: 'YENİ',
+        grantItems: [{ id: 'frame_steampunk', name: 'Buhar Zırhı Çerçevesi', desc: 'Pirinç ve çelik profil çerçevesi', qty: 1, category: 'frame', rarity: 'legendary' }],
+    },
     // --- Badges ---
     {
         id: 'badge_trivia_master',
@@ -591,7 +613,7 @@ exports.SHOP_CATALOG = [
     {
         id: 'frame_ice',
         name: 'Buz Kristal Çerçeve',
-        desc: 'Kutup soğuğunda parlayan buz mavisi kristal halka. Seçtiğin süre boyunca aktif.',
+        desc: 'Buz mavisi ve mor kristaller avatarının çevresinde parıldar.',
         category: 'frames',
         price: 55,
         currency: 'gems',

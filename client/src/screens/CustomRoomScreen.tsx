@@ -1,5 +1,6 @@
 import { cdnImage } from '../utils/cdn';
-import React, { useState, useRef, useEffect } from 'react';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,10 +11,11 @@ import {
   ScrollView,
   Switch,
   Platform,
-  ActivityIndicator,
   Modal,
   KeyboardAvoidingView,
+  AppState,
 } from 'react-native';
+import { PageShimmer } from '../components/LoadingShimmer';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { ArrowRight, Clipboard as ClipboardIcon, RefreshCw } from 'lucide-react-native';
 import { DISCOVERY_IMG, DiscoveryArtwork } from '../components/DiscoveryArtwork';
@@ -24,6 +26,9 @@ import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
 import { getApiBaseUrl, getRealtimeUrl } from '../config';
+import { fetchPageJson, PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
+import { usePageData } from '../utils/usePageData';
+import { PageLoadError } from '../components/PageLoadError';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -105,6 +110,27 @@ const FAKE_ROOM_CODES = new Set([
   'GLX883',
 ]);
 
+function normalizeRoomItem(r: any): PublicRoomItem | null {
+  const code = String(r?.code || '').trim().toUpperCase();
+  if (!code || FAKE_ROOM_CODES.has(code)) return null;
+  const players = Number(r?.players ?? r?.playerCount ?? 0);
+  const maxPlayers = Math.max(2, Number(r?.maxPlayers ?? 4));
+  if (players <= 0 || players >= maxPlayers) return null;
+  const rawCat = String(r?.category || r?.categoryId || 'genel_kultur');
+  return {
+    id: code, code, title: r?.name || `${r?.hostName || r?.host || 'Oyuncu'} Odası`,
+    categoryKey: rawCat,
+    categoryName: CATEGORY_LABELS[rawCat] || CATEGORY_LABELS[String(r?.categoryName || '').toLowerCase()] || r?.categoryName || 'Genel Kültür',
+    totalRounds: Math.max(1, Number(r?.totalRounds ?? r?.rounds ?? 7)),
+    timeSec: Math.max(5, Number(r?.questionTimeSec ?? r?.timeSec ?? 20)),
+    players, maxPlayers, hasPassword: Boolean(r?.hasPassword || r?.password),
+  };
+}
+
+const publicRoomRows = (rooms: unknown[]) => Array.from(new Map(
+  rooms.map(normalizeRoomItem).filter((room): room is PublicRoomItem => room !== null).map(room => [room.code, room]),
+).values());
+
 export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   onBack,
   onCreateRoom,
@@ -114,6 +140,12 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   gems,
   apiBaseUrl,
 }) => {
+  const page = usePlayerWebLayout();
+  const webRoom = page?.roomy;
+  const roomColumns = webRoom && page.contentWidth >= 860;
+  const roomArt = Math.round(96 * Math.min(1.17, page?.ui.art ?? 1));
+  const webChoice = webRoom && styles.webChoice;
+  const webChoiceText = webRoom && styles.webChoiceText;
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
 
   // Katılma Kodu State
@@ -143,105 +175,47 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   const [selectedSub, setSelectedSub] = useState<SelectedSubCategory | null>(null);
   const [isCategoryModalVisible, setCategoryModalVisible] = useState(false);
 
-  // Canlı Veritabanı ve WebSocket Odaları (Sahte/mock odalar kaldırıldı)
-  const [publicRooms, setPublicRooms] = useState<PublicRoomItem[]>([]);
-  const [isLoadingPublicRooms, setIsLoadingPublicRooms] = useState(false);
-
-  const normalizeRoomItem = (r: any): PublicRoomItem | null => {
-    const code = String(r?.code || '').trim().toUpperCase();
-    if (!code || FAKE_ROOM_CODES.has(code)) return null;
-    const players = Number(r?.players ?? r?.playerCount ?? 0);
-    const maxPlayers = Math.max(2, Number(r?.maxPlayers ?? 4));
-    if (players <= 0 || players >= maxPlayers) return null;
-    const rawCat = String(r?.category || r?.categoryId || 'genel_kultur');
-    const categoryName =
-      CATEGORY_LABELS[rawCat] ||
-      CATEGORY_LABELS[String(r?.categoryName || '').toLowerCase()] ||
-      r?.categoryName ||
-      'Genel Kültür';
-    const hostName = r?.hostName || r?.host || 'Oyuncu';
-    const hasPassword = Boolean(r?.hasPassword || r?.password);
-    return {
-      id: code,
-      code,
-      title: r?.name || `${hostName} Odası`,
-      categoryKey: rawCat,
-      categoryName,
-      totalRounds: Math.max(1, Number(r?.totalRounds ?? r?.rounds ?? 7)),
-      timeSec: Math.max(5, Number(r?.questionTimeSec ?? r?.timeSec ?? 20)),
-      players,
-      maxPlayers,
-      hasPassword,
-    };
-  };
-
-  const fetchPublicRooms = async () => {
-    try {
-      setIsLoadingPublicRooms(true);
-      const base = apiBaseUrl || getApiBaseUrl();
-      const cleanBase = base.replace(/\/+$/, '');
-      const rtUrl = getRealtimeUrl()
-        .replace(/^wss:\/\//i, 'https://')
-        .replace(/^ws:\/\//i, 'http://')
-        .replace(/\/+$/, '');
-
-      const [apiRes, rtRes] = await Promise.all([
-        fetch(`${cleanBase}/trivia/rooms/public`).catch(() => null),
-        fetch(`${rtUrl}/rooms/public`).catch(() => null),
-      ]);
-
-      const byCode = new Map<string, PublicRoomItem>();
-
-      if (rtRes && rtRes.ok) {
-        const rtData = await rtRes.json().catch(() => null);
-        if (rtData && Array.isArray(rtData.rooms)) {
-          for (const r of rtData.rooms) {
-            const item = normalizeRoomItem(r);
-            if (item) byCode.set(item.code, item);
-          }
-        }
-      }
-
-      if (apiRes && apiRes.ok) {
-        const apiData = await apiRes.json().catch(() => null);
-        if (apiData && Array.isArray(apiData.rooms)) {
-          for (const r of apiData.rooms) {
-            const item = normalizeRoomItem(r);
-            if (item && !byCode.has(item.code)) {
-              byCode.set(item.code, item);
-            }
-          }
-        }
-      }
-
-      setPublicRooms(Array.from(byCode.values()));
-    } catch {
-      setPublicRooms([]);
-    } finally {
-      setIsLoadingPublicRooms(false);
-    }
-  };
+  const fallbackUrl = `${(apiBaseUrl || getApiBaseUrl()).replace(/\/+$/, '')}/trivia/rooms/public`;
+  const rtUrl = `${getRealtimeUrl().replace(/^wss:/i, 'https:').replace(/^ws:/i, 'http:').replace(/\/+$/, '')}/rooms/public`;
+  const loadRooms = useCallback(async (signal: AbortSignal) => {
+    const readRooms = (url: string) => fetchPageJson<{ rooms: unknown[] }>(url, signal)
+      .then(data => Array.isArray(data?.rooms) ? data.rooms : undefined).catch(() => undefined);
+    const [secondary, gateway] = await Promise.all([readRooms(fallbackUrl), readRooms(rtUrl)]);
+    if (!secondary && !gateway) throw new Error('Açık odalar alınamadı.');
+    // Keep legacy/server-hosted rooms discoverable; the gateway wins duplicate codes.
+    return publicRoomRows([...(secondary ?? []), ...(gateway ?? [])]);
+  }, [rtUrl, fallbackUrl]);
+  const { data: roomRows, loading: isLoadingPublicRooms, error: roomsError, read: fetchPublicRooms } =
+    usePageData<PublicRoomItem[]>(activeTab === 'join' ? rtUrl : null, PAGE_TTL.rooms, undefined, undefined, loadRooms);
+  const publicRooms = roomRows ?? [];
 
   useEffect(() => {
-    if (activeTab === 'join') {
-      fetchPublicRooms();
-      const interval = setInterval(fetchPublicRooms, 4000);
-      const unsub = socketService.onPublicRoomsUpdate((rooms) => {
-        if (Array.isArray(rooms)) {
-          const valid = rooms
-            .map((r: any) => normalizeRoomItem(r))
-            .filter((item): item is PublicRoomItem => Boolean(item));
-          setPublicRooms(valid);
-        }
-      });
+    if (activeTab !== 'join') return;
+    let lastSocketUpdate: number | undefined;
+    const unsub = socketService.onPublicRoomsUpdate(rooms => {
+      if (!Array.isArray(rooms)) return;
+      lastSocketUpdate = Date.now();
+      // Supersedes in-flight HTTP and keeps a short-lived snapshot for re-entry.
+      pageDataCache.seed(rtUrl, publicRoomRows(rooms));
+    });
+    const refreshVisible = () => {
+      if (Platform.OS === 'web' ? typeof document !== 'undefined' && document.hidden : AppState.currentState === 'background') return;
       socketService.getPublicRooms();
-
-      return () => {
-        clearInterval(interval);
-        unsub();
-      };
-    }
-  }, [activeTab, apiBaseUrl]);
+      if (lastSocketUpdate === undefined || Date.now() - lastSocketUpdate > 45_000) {
+        void fetchPublicRooms().catch(() => {});
+      }
+    };
+    refreshVisible();
+    const interval = setInterval(refreshVisible, 30_000);
+    const activity = AppState.addEventListener('change', state => { if (state === 'active') refreshVisible(); });
+    if (Platform.OS === 'web') document.addEventListener('visibilitychange', refreshVisible);
+    return () => {
+      clearInterval(interval);
+      activity.remove();
+      if (Platform.OS === 'web') document.removeEventListener('visibilitychange', refreshVisible);
+      unsub();
+    };
+  }, [activeTab, rtUrl, fetchPublicRooms]);
 
   const digits = Array.from({ length: 6 }).map((_, idx) => roomCode[idx] || '');
 
@@ -291,7 +265,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
   };
 
   return (
-    <TavrikoScreen style={styles.customScreenRoot}>
+    <TavrikoScreen style={webRoom ? undefined : styles.customScreenRoot}>
       <TavrikoTopBar
         leftType="back"
         onLeftPress={onBack}
@@ -318,13 +292,13 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               : 'Davet kodunu gir, arkadaşlarının oyununa hemen dahil ol.'}</Text>
           </View>
           <DiscoveryArtwork source={activeTab === 'create'
-            ? cdnImage('images/modes/custom_room.png') : DISCOVERY_IMG.social} size={96} />
+            ? cdnImage('images/modes/custom_room.png') : DISCOVERY_IMG.social} size={roomArt} />
         </View>
-        <View style={styles.tabToggleRow} accessibilityRole="tablist">
+        <View style={[styles.tabToggleRow, webRoom && styles.webRoomWidth]} accessibilityRole="tablist">
           <TouchableOpacity
             accessibilityRole="tab" aria-selected={activeTab === 'create'}
             accessibilityState={{ selected: activeTab === 'create' }}
-            style={[styles.tabButton, activeTab === 'create' && styles.tabButtonActiveCreate]}
+            style={[styles.tabButton, webChoice, activeTab === 'create' && styles.tabButtonActiveCreate]}
             activeOpacity={0.85}
             onPress={() => {
               sound.playSound('tap');
@@ -338,7 +312,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               <Circle cx="32" cy="36" r="17" fill="#fff" opacity={0.18} />
               <Path d="M36 21L24 38h8l-3 13 14-19h-8z" fill="#FFC43D" />
             </Svg>
-            <Text style={[styles.tabButtonText, activeTab === 'create' && styles.tabButtonTextActive]}>
+            <Text style={[styles.tabButtonText, webChoiceText, activeTab === 'create' && styles.tabButtonTextActive]}>
               ODA KUR
             </Text>
           </TouchableOpacity>
@@ -346,7 +320,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
           <TouchableOpacity
             accessibilityRole="tab" aria-selected={activeTab === 'join'}
             accessibilityState={{ selected: activeTab === 'join' }}
-            style={[styles.tabButton, activeTab === 'join' && styles.tabButtonActiveJoin]}
+            style={[styles.tabButton, webChoice, activeTab === 'join' && styles.tabButtonActiveJoin]}
             activeOpacity={0.85}
             onPress={() => {
               sound.playSound('tap');
@@ -359,7 +333,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               <Path d="M29 29l24 24M43 43l7-7M50 50l6-6" stroke="#f5a300" strokeWidth="7" strokeLinecap="round" fill="none" />
               <Path d="M12 14a10 10 0 016-4" stroke="#fff" strokeWidth="3" strokeLinecap="round" fill="none" opacity={0.7} />
             </Svg>
-            <Text style={[styles.tabButtonText, activeTab === 'join' && styles.tabButtonTextActive]}>
+            <Text style={[styles.tabButtonText, webChoiceText, activeTab === 'join' && styles.tabButtonTextActive]}>
               ODAYA KATIL
             </Text>
           </TouchableOpacity>
@@ -367,7 +341,9 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 
         {activeTab === 'create' ? (
           /* TAVRİKO ÖZGÜN ODA KURMA KARTI */
-          <View style={styles.roomSetupCard}>
+          <View style={[styles.roomSetupCard, webRoom && styles.webRoomWidth]}>
+            <View style={roomColumns && styles.roomColumns}>
+            <View testID="room-rules" style={roomColumns && styles.roomMainColumn}>
             <View style={styles.setupIntro}>
               <Text style={styles.setupTitle}>Oyun senin, kurallar senin.</Text>
               <Text style={styles.setupSubtitle}>Kategorini seç, masanı hazırla.</Text>
@@ -469,7 +445,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                     return (
                       <TouchableOpacity
                         key={q}
-                        style={[styles.chipPill, isSelected && styles.chipPillActive]}
+                        style={[styles.chipPill, webChoice, isSelected && styles.chipPillActive]}
                         activeOpacity={0.85}
                         onPress={() => {
                           sound.playSound('tap');
@@ -477,7 +453,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                           setTotalRounds(q);
                         }}
                       >
-                        <Text style={[styles.chipPillText, isSelected && styles.chipPillTextActive]}>
+                        <Text style={[styles.chipPillText, webChoiceText, isSelected && styles.chipPillTextActive]}>
                           {q}
                         </Text>
                       </TouchableOpacity>
@@ -495,7 +471,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                     return (
                       <TouchableOpacity
                         key={sec}
-                        style={[styles.chipPill, isSelected && styles.chipPillActive]}
+                        style={[styles.chipPill, webChoice, isSelected && styles.chipPillActive]}
                         activeOpacity={0.85}
                         onPress={() => {
                           sound.playSound('tap');
@@ -503,7 +479,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                           setQuestionTimeSec(sec);
                         }}
                       >
-                        <Text style={[styles.chipPillText, isSelected && styles.chipPillTextActive]}>
+                        <Text style={[styles.chipPillText, webChoiceText, isSelected && styles.chipPillTextActive]}>
                           {sec}sn
                         </Text>
                       </TouchableOpacity>
@@ -521,7 +497,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 return (
                   <TouchableOpacity
                     key={num}
-                    style={[styles.chipPillSmall, isSelected && styles.chipPillActive]}
+                    style={[styles.chipPillSmall, webChoice, isSelected && styles.chipPillActive]}
                     activeOpacity={0.85}
                     onPress={() => {
                       sound.playSound('tap');
@@ -529,7 +505,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                       setMaxPlayers(num);
                     }}
                   >
-                    <Text style={[styles.chipPillText, isSelected && styles.chipPillTextActive]}>
+                    <Text style={[styles.chipPillText, webChoiceText, isSelected && styles.chipPillTextActive]}>
                       {num} Kişi
                     </Text>
                   </TouchableOpacity>
@@ -545,7 +521,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 return (
                   <TouchableOpacity
                     key={diff.id}
-                    style={[styles.chipPillSmall, isSelected && styles.chipPillActive]}
+                    style={[styles.chipPillSmall, webChoice, isSelected && styles.chipPillActive]}
                     activeOpacity={0.85}
                     onPress={() => {
                       sound.playSound('tap');
@@ -553,7 +529,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                       setDifficulty(diff.id);
                     }}
                   >
-                    <Text style={[styles.chipPillText, isSelected && styles.chipPillTextActive]}>
+                    <Text style={[styles.chipPillText, webChoiceText, isSelected && styles.chipPillTextActive]}>
                       {diff.label}
                     </Text>
                   </TouchableOpacity>
@@ -561,7 +537,10 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               })}
             </View>
 
+            </View>
+            <View testID="room-privacy" style={roomColumns && styles.roomSideColumn}>
             {/* 5. GİZLİLİK & CEZA AYARLARI */}
+            {roomColumns && <Text accessibilityRole="header" style={styles.roomSideHeading}>Oda ayarları</Text>}
           <View style={styles.switchRow}>
               <View style={{ flex: 1, paddingRight: 8 }}>
                 <Text style={styles.switchLabel}>Oda Gizliliği</Text>
@@ -570,6 +549,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 </Text>
               </View>
               <Switch
+                accessibilityLabel="Oda gizliliği"
                 value={privacy === 'public'}
                 onValueChange={(val) => {
                   sound.playSound('tap');
@@ -586,6 +566,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 <Text style={styles.switchSub}>Yanlış cevaplarda -50 puan düşer</Text>
               </View>
               <Switch
+                accessibilityLabel="Yanlış cevap cezası"
                 value={penaltyForWrong}
                 onValueChange={(val) => {
                   sound.playSound('tap');
@@ -605,6 +586,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                 </Text>
               </View>
               <Switch
+                accessibilityLabel="Oda şifresi"
                 value={hasRoomPassword}
                 onValueChange={(val) => {
                   sound.playSound('tap');
@@ -639,10 +621,13 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               variant="gold"
               style={{ height: 60, marginTop: 14 }}
             />
+            </View>
+            </View>
           </View>
         ) : (
           /* ODAYA KATIL KARTI (Tavriko UI Kit Screen 08) */
-            <View style={styles.roomSetupCard}>
+            <View style={[styles.roomSetupCard, webRoom && styles.webRoomWidth, roomColumns && styles.roomColumns]}>
+            <View testID="room-join-code" style={roomColumns && styles.roomSideColumn}>
             <View style={styles.joinCodeHeaderRow}>
               <ModeSquircleIcon mode="custom_room" size={38} />
               <View style={styles.joinCodeHeaderTextCol}>
@@ -735,31 +720,35 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               </TouchableOpacity>
             </View>
 
+            </View>
+            <View testID="room-public-list" style={roomColumns && styles.roomMainColumn}>
             {/* HERKESE AÇIK ODALAR (Canlı Veritabanı & WebSocket Senkronizasyonu) */}
             <View style={styles.publicRoomsHeaderRow}>
               <View style={styles.publicRoomsDivider} />
               <Text style={styles.publicRoomsSectionTitle}>HERKESE AÇIK ODALAR</Text>
               <TouchableOpacity
                 accessibilityRole="button" accessibilityLabel="Açık odaları yenile"
-                onPress={fetchPublicRooms}
+                onPress={() => { socketService.getPublicRooms(); void fetchPublicRooms(true).catch(() => {}); }}
                 style={styles.refreshIconBtn}
                 activeOpacity={0.7}
+                disabled={isLoadingPublicRooms}
+                accessibilityState={{ busy: isLoadingPublicRooms, disabled: isLoadingPublicRooms }}
               >
-                {isLoadingPublicRooms ? (
-                  <ActivityIndicator size="small" color="#5ADBB5" />
-                ) : (
-                  <RefreshCw size={18} color="#ADF0D8" />
-                )}
+                <RefreshCw size={18} color={isLoadingPublicRooms ? '#819B98' : '#ADF0D8'} />
               </TouchableOpacity>
               <View style={styles.publicRoomsDivider} />
             </View>
 
             <View style={styles.publicRoomsList}>
-              {publicRooms.length === 0 ? (
+              {isLoadingPublicRooms ? (
+                <PageShimmer label="Açık odalar yükleniyor" shape="cards" rows={2} />
+              ) : roomsError && !roomRows ? (
+                <PageLoadError onRetry={() => void fetchPublicRooms(true).catch(() => {})} />
+              ) : publicRooms.length === 0 ? (
                 <View style={styles.emptyPublicRoomsBox}>
                   <DiscoveryArtwork source={DISCOVERY_IMG.social} size={100} />
                   <Text style={styles.emptyPublicRoomsTitle}>
-                    {isLoadingPublicRooms ? 'Aktif Odalar Taranıyor...' : 'Şu An Açık Oda Yok'}
+                    Şu An Açık Oda Yok
                   </Text>
                   <Text style={styles.emptyPublicRoomsSub}>
                     Herkese açık bekleyen bir oda bulunmuyor. Kendi odanı kurup diğer oyuncuları bekleyebilirsin!
@@ -827,6 +816,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                   </View>
                 ))
               )}
+            </View>
             </View>
           </View>
         )}
@@ -916,6 +906,19 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  webRoomWidth: { maxWidth: '100%' },
+  roomColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 20 },
+  roomMainColumn: { flex: 1.25, minWidth: 0 },
+  roomSideColumn: {
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: 'rgba(15, 10, 36, 0.35)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 14,
+  },
+  roomSideHeading: { color: '#FFF', fontFamily: THEME.fonts.extraBold, fontSize: 17, marginBottom: 12 },
   roomHero: { width: '100%', flexDirection: 'row', alignItems: 'center', borderRadius: 24, borderWidth: 1, borderColor: '#78578F', padding: 16, marginBottom: 18, overflow: 'hidden', backgroundColor: '#302045' },
   heroBackdrop: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.18 },
   heroCopy: { flex: 1, minWidth: 0, paddingRight: 4 },
@@ -1102,6 +1105,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  webChoice: { minHeight: 44 },
+  webChoiceText: { fontSize: 16 },
   chipPillActive: {
     backgroundColor: '#F59E0B',
     ...Platform.select({

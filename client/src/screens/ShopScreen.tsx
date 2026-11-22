@@ -1,15 +1,17 @@
 import React, { useState, useRef } from 'react';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
+  useWindowDimensions,
   Modal,
   Platform,
   Animated,
 } from 'react-native';
+import { LoadingShimmer } from '../components/LoadingShimmer';
 import Svg, {
   Defs,
   LinearGradient,
@@ -108,41 +110,48 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
   name,
 }) => {
   const pId = product.id;
-  // Animasyonlu çerçeveler: renkli geçişli pulse halkaları
-  if (ANIMATED_FRAME_COLORS[pId]) {
+  const page = usePlayerWebLayout();
+  const { width } = useWindowDimensions();
+  const art = page?.ui.art ?? 1;
+  const size = (base: number) => Math.round(base * art);
+  const previewHeight = art > 1 && { height: size(108) };
+  const visualSize = size(92);
+  if ((product.category === 'frames' || pId.includes('frame')) && frameFor(pId)) {
+    const frameSize = size(Math.min(124, Math.round(width * 0.34)));
     return (
-      <View style={styles.visualTall}>
-        <AnimatedFrame frameId={pId} seed={seed} size={100} />
+      <View style={[styles.visualTall, { height: frameSize + 10 }]}>
+        <FramedAvatar frameId={pId} seed={seed} size={frameSize} />
       </View>
     );
   }
-  if ((product.category === 'frames' || pId.includes('frame')) && frameFor(pId)) {
+  // Eski, vektör tabanlı çerçeveler.
+  if (ANIMATED_FRAME_COLORS[pId]) {
     return (
-      <View style={styles.visualTall}>
-        <FramedAvatar frameId={pId} seed={seed} size={100} />
+      <View style={[styles.visualTall, previewHeight]}>
+        <AnimatedFrame frameId={pId} seed={seed} size={size(100)} />
       </View>
     );
   }
   // Arka planlar: önce gerçek üretilmiş görsel (varsa), yoksa animasyonlu sahne
   if ((product.category === 'backgrounds' || pId.startsWith('bg_')) && backgroundFor(pId)) {
     return (
-      <View style={styles.visualTall}>
-        <BackgroundThumb bgId={pId} seed={seed} name={name} width={64} />
+      <View style={[styles.visualTall, previewHeight]}>
+        <BackgroundThumb bgId={pId} seed={seed} name={name} width={size(64)} />
       </View>
     );
   }
   // Animasyonlu arka planlar: nefes alan renk katmanları
   if (ANIMATED_BG_LAYERS[pId]) {
     return (
-      <View style={styles.visualTall}>
-        <AnimatedBackgroundThumb bgId={pId} seed={seed} name={name} width={64} />
+      <View style={[styles.visualTall, previewHeight]}>
+        <AnimatedBackgroundThumb bgId={pId} seed={seed} name={name} width={size(64)} />
       </View>
     );
   }
   // Animasyonlu isim efektleri: renk döngüsü
   if (ANIMATED_NAME_COLORS[pId]) {
     return (
-      <View style={styles.visualTall}>
+      <View style={[styles.visualTall, previewHeight]}>
         <View style={styles.namePlate}>
           <AnimatedNameText effectId={pId} style={styles.namePlateText} numberOfLines={1}>
             {name || 'Tavriko'}
@@ -154,7 +163,7 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
   if ((product.category as string) === 'name_effects' || pId.includes('name_') || pId.includes('effect')) {
     const isFire = pId.includes('fire');
     return (
-      <View style={styles.visualTall}>
+      <View style={[styles.visualTall, previewHeight]}>
         <View style={styles.namePlate}>
           <Text
             style={[styles.namePlateText, isFire ? styles.nameEffectFire : styles.nameEffectGold]}
@@ -177,9 +186,9 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
     // Rozetlerin arkasında daire/parıltı olmaz; görsel doğrudan kartın üzerinde durur
     const isBadgeArt = product.category === 'badges' || pId.includes('badge');
     return (
-      <View style={[styles.visualBox, isBadgeArt && { backgroundColor: 'transparent' }]}>
+      <View style={[styles.visualBox, art > 1 && { width: visualSize, height: visualSize, borderRadius: visualSize / 2 }, isBadgeArt && { backgroundColor: 'transparent' }]}>
         {!isBadgeArt && <View style={[styles.visualGlow, { backgroundColor: tint }]} />}
-        <Image source={img} style={styles.visualImg} resizeMode="contain" />
+        <Image source={img} style={[styles.visualImg, art > 1 && { width: visualSize, height: visualSize }]} resizeMode="contain" />
       </View>
     );
   }
@@ -374,6 +383,9 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   onNotifications,
   onProfile,
 }) => {
+  const page = usePlayerWebLayout();
+  const threeProducts = page?.columns === 3;
+  const roomy = page?.roomy;
   const [activeTab, setActiveTab] = useState<ShopProductCategory>('chests');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
@@ -594,6 +606,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         <Animated.View
           style={[
             styles.productGrid,
+            threeProducts && styles.webProductGrid,
             {
               opacity: contentOpacity,
               transform: [{ translateX: contentTranslateX }],
@@ -609,7 +622,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               <Reanimated.View
                 key={`${activeTab}-${item.id}`}
                 entering={FadeInDown.delay(Math.min(index, 8) * 55).duration(360)}
-                style={[styles.productCard, owned && styles.productCardOwned]}
+                style={[styles.productCard, threeProducts && styles.webProductCard, owned && styles.productCardOwned]}
               >
                 <View style={[styles.rarityBar, { backgroundColor: rarityColor }]} />
                 {/* Rozetler */}
@@ -630,6 +643,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                 {previewKind(item) ? (
                   <TouchableOpacity
                     activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.name} önizlemesini aç`}
                     onPress={() => {
                       sound.playSound('tap');
                       setPreviewProduct(item);
@@ -645,8 +660,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                 )}
 
                 {/* İsim & Açıklama */}
-                <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.productDesc} numberOfLines={2}>{item.desc}</Text>
+                <Text style={[styles.productName, roomy && { fontSize: 17 }]} numberOfLines={roomy || item.category === 'frames' ? 2 : 1}>{item.name}</Text>
+                <Text style={[styles.productDesc, roomy && { fontSize: 13, lineHeight: 18 }]} numberOfLines={2}>{item.desc}</Text>
 
                 {/* 2x XP Artırıcı Aktifse: Kalan Süre Barı */}
                 {(item.category === 'boosters' || item.id.includes('booster')) &&
@@ -673,6 +688,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                 <TouchableOpacity
                   style={[
                     styles.priceBtn,
+                    roomy && styles.webPriceButton,
                     owned || item.currency === 'try' ? styles.priceBtnOwned : styles.priceBtnActive,
                   ]}
                   disabled={owned || isBuying || item.currency === 'try'}
@@ -680,7 +696,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                   onPress={() => handleInitiatePurchase(item)}
                 >
                   {isBuying ? (
-                    <ActivityIndicator color="#12052C" size="small" />
+                    <LoadingShimmer label="Satın alma işleniyor" ink />
                   ) : owned ? (
                     <Text style={styles.priceBtnTextOwned}>SAHİPSİN</Text>
                   ) : item.currency === 'try' ? (
@@ -817,7 +833,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 160,
+    paddingBottom: Platform.OS === 'web' ? 20 : 160,
     paddingHorizontal: 4,
   },
   heroWrap: {
@@ -899,6 +915,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 8,
   },
+  webProductGrid: { justifyContent: 'flex-start' },
+  webProductCard: { width: '32%' },
+  webPriceButton: { minHeight: 46, width: '100%' },
   productCard: {
     width: '48%',
     backgroundColor: KIT.card,

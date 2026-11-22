@@ -7,13 +7,12 @@ import {
   ScrollView,
   Platform,
   Modal,
-  ActivityIndicator,
   TextInput,
-  Linking,
+  KeyboardAvoidingView,
 } from 'react-native';
+import { LoadingShimmer } from '../components/LoadingShimmer';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
-import { ExternalLink } from 'lucide-react-native';
-import { CLOUD_BASE_URL, getApiBaseUrl } from '../config';
+import { getApiBaseUrl } from '../config';
 import { UserProfile, UserSettings } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -26,7 +25,7 @@ import { savePreferences, loadStoredPreferences } from '../store/appPrefs';
 import { InfoHint } from '../components/InfoHint';
 import { Volume2, Gamepad2, ShieldCheck, UserRound, Sparkles, FileText } from 'lucide-react-native';
 import type { LegalDocumentId } from '@trivia/shared';
-import { LegalDocumentList, LegalDocumentModal } from '../components/LegalDocuments';
+import { LegalDocumentList, LegalDocumentModal, LegalWebLink } from '../components/LegalDocuments';
 import { getLegalConsent } from '../utils/legalConsent';
 import { SupportCases } from '../components/SupportCases';
 import { DuelFunnelPreference } from '../components/DuelFunnelPreference';
@@ -98,7 +97,7 @@ interface SettingsScreenProps {
   apiBaseUrl?: string;
   onBack: () => void;
   onLogout: () => void;
-  onDeleteAccount: () => Promise<void>;
+  onAccountRemoved: () => void;
   onDeveloper?: () => void;
   onSyncWallet?: () => Promise<void>;
   token?: string | null;
@@ -122,7 +121,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   apiBaseUrl,
   onBack,
   onLogout,
-  onDeleteAccount,
+  onAccountRemoved,
   onDeveloper,
   onSyncWallet,
   token,
@@ -178,7 +177,21 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   // Delete modal
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<'intro' | 'code'>('intro');
+  const [deleteCode, setDeleteCode] = useState('');
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteDelivery, setDeleteDelivery] = useState('');
+  const [deleteAction, setDeleteAction] = useState<'send' | 'confirm' | null>(null);
+  const deleteLock = useRef(false);
+  const [deleteResendAt, setDeleteResendAt] = useState(0);
+  const [deleteResendIn, setDeleteResendIn] = useState(0);
+  useEffect(() => {
+    if (!deleteModalVisible || !deleteResendAt) return;
+    const update = () => setDeleteResendIn(Math.max(0, Math.ceil((deleteResendAt - Date.now()) / 1000)));
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [deleteResendAt, deleteModalVisible]);
 
   // Aggregate current settings
   const currentSettings: UserSettings = {
@@ -311,13 +324,58 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     }
   };
 
-  const handleConfirmDelete = async () => {
-    setIsDeleting(true);
+  const closeDelete = () => {
+    if (deleteLock.current) return;
+    setDeleteModalVisible(false);
+    setDeleteCode('');
+    setDeleteError('');
+    setDeleteDelivery('');
+    setDeleteStep('intro');
+  };
+
+  const handleDeleteAction = async (action: 'send' | 'confirm') => {
+    if (deleteLock.current || (action === 'confirm' && !/^[0-9]{6}$/.test(deleteCode))) return;
+    if (!token) {
+      setDeleteError('Oturumunuzu doğrulamak için yeniden giriş yapın.');
+      return;
+    }
+    deleteLock.current = true;
+    setDeleteAction(action);
+    setDeleteError('');
     try {
-      await onDeleteAccount();
+      const base = Platform.OS === 'web' ? getApiBaseUrl() : apiBaseUrl || getApiBaseUrl();
+      const response = await fetch(`${base}/auth/delete-account${action === 'send' ? '/request' : ''}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(action === 'send' ? {} : { code: deleteCode }),
+      });
+      const data = await response.json().catch(() => null);
+      const deliveryUnconfirmed = action === 'send' && response.status === 503 && data?.delivery === 'unconfirmed';
+      if ((!response.ok || !data?.success) && !deliveryUnconfirmed) {
+        setDeleteError(data?.error || 'İşlem tamamlanamadı. Lütfen tekrar deneyin.');
+        if (action === 'confirm') setDeleteCode('');
+        return;
+      }
+      setDeleteCode('');
+      if (action === 'send') {
+        setDeleteDelivery(deliveryUnconfirmed
+          ? 'E-posta gönderimi doğrulanamadı. Kod ulaşırsa kullanabilir, ulaşmazsa süre dolunca yeniden isteyebilirsin.'
+          : data.delivery === 'previous-request'
+            ? 'Yakın zamanda bir kod istendi. Gelen kutunu ve spam klasörünü kontrol et.'
+            : '');
+        const seconds = Number(data.resendAfterSeconds) || 60;
+        setDeleteResendIn(seconds);
+        setDeleteResendAt(Date.now() + seconds * 1000);
+        setDeleteStep('code');
+      } else {
+        setDeleteModalVisible(false);
+        onAccountRemoved();
+      }
     } catch {
-      setIsDeleting(false);
-      setDeleteModalVisible(false);
+      setDeleteError('Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.');
+    } finally {
+      deleteLock.current = false;
+      setDeleteAction(null);
     }
   };
 
@@ -355,7 +413,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 saveStatus === 'error' && styles.saveIndicatorError,
               ]}
             >
-              {saveStatus === 'saving' && <ActivityIndicator size="small" color="#FFC43D" />}
+              {saveStatus === 'saving' && <LoadingShimmer />}
               <Text
                 style={[
                   styles.saveIndicatorText,
@@ -781,7 +839,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </Text>
 
           {/* Delete Account */}
-          <TouchableOpacity
+          {user && !user.isGuest && <TouchableOpacity
             style={styles.deleteAccountBtn}
             onPress={() => {
               sound.playSound('wrong');
@@ -789,12 +847,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               setDeleteModalVisible(true);
             }}
             activeOpacity={0.8}
+            accessibilityRole="button"
           >
             <Text style={styles.deleteAccountBtnText}>Hesabımı Kalıcı Olarak Sil</Text>
-          </TouchableOpacity>
+          </TouchableOpacity>}
         </View>
         {user && !(user as any).isGuest && token &&
-          <SupportCases key={user.id + ':' + token} api={Platform.OS === 'web' ? getApiBaseUrl() : apiBaseUrl || getApiBaseUrl()} token={token} />}
+          <SupportCases key={user.id + ':' + token} api={Platform.OS === 'web' ? getApiBaseUrl() : apiBaseUrl || getApiBaseUrl()} token={token} owner={user.id} />}
         </>}
 
         {settingsTab === 'legal' && <>
@@ -805,20 +864,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         <View style={styles.groupCard}>
           <LegalDocumentList onOpen={setOpenLegalDoc} acceptedAt={getLegalConsent(user)?.acceptedAt ?? null} />
           {/* KVKK: web üzerinden hesap silme sayfası */}
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12, marginTop: 4 }}
-            onPress={() => {
-              const url = `${CLOUD_BASE_URL}/remove-account`;
-              if (Platform.OS === 'web' && typeof window !== 'undefined') window.open(url, '_blank', 'noopener');
-              else Linking.openURL(url).catch(() => {});
-            }}
-            accessibilityRole="link"
-          >
-            <ExternalLink size={14} color="#F87171" />
-            <Text style={{ color: '#FCA5A5', fontSize: 13, fontFamily: THEME.fonts.bold }}>
-              Hesabımı ve tüm verilerimi sil (web)
-            </Text>
-          </TouchableOpacity>
+          <LegalWebLink path="/remove-account" label="Hesabımı ve tüm verilerimi sil (web)" danger />
         </View>
         </>}
         <LegalDocumentModal documentId={openLegalDoc} onClose={() => setOpenLegalDoc(null)} />
@@ -915,36 +961,64 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         visible={deleteModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setDeleteModalVisible(false)}
+        onRequestClose={closeDelete}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.deleteModalTitle}>Hesabı Kalıcı Olarak Sil</Text>
-            <Text style={styles.modalDesc}>
-              Bu işlem geri alınamaz. Kazandığınız tüm altınlar, elmaslar, başarımlar ve arkadaş listeniz veritabanından tamamen silinecektir.
-            </Text>
-
-            <View style={styles.modalBtnRow}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView style={styles.deleteModalScroll} contentContainerStyle={styles.deleteModalContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.modalCard} accessibilityViewIsModal>
+            <Text style={styles.deleteModalTitle}>{deleteStep === 'intro' ? 'Hesabı Kalıcı Olarak Sil' : 'E-postanı Doğrula'}</Text>
+            <Text style={styles.modalDesc}>{deleteStep === 'intro'
+              ? 'Hesabındaki oyun ilerlemesi, bakiye ve envanter kalıcı olarak silinir. Devam edersen önce kayıtlı e-posta adresine bir kod gönderilir; hesabın henüz silinmez.'
+              : 'Kayıtlı e-posta adresine gelen 6 haneli kodu gir. Kod 15 dakika geçerlidir. Hesabını sildiğinde bu işlem geri alınamaz.'}</Text>
+            {!!deleteDelivery && <Text accessibilityLiveRegion="polite" style={styles.modalDesc}>{deleteDelivery}</Text>}
+            {deleteStep === 'code' && <>
+              <TextInput
+                style={[styles.modalInput, { letterSpacing: 5, textAlign: 'center', marginBottom: 8 }]}
+                accessibilityLabel="E-postadaki 6 haneli kod"
+                testID="delete-account-code"
+                keyboardType="number-pad"
+                autoComplete="one-time-code"
+                textContentType="oneTimeCode"
+                value={deleteCode}
+                onChangeText={(value) => setDeleteCode(value.replace(/[^0-9]/g, '').slice(0, 6))}
+                editable={!deleteAction}
+                maxLength={6}
+              />
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={!!deleteAction || deleteResendIn > 0}
+                accessibilityState={{ disabled: !!deleteAction || deleteResendIn > 0 }}
+                onPress={() => { void handleDeleteAction('send'); }}
+                style={{ minHeight: 44, justifyContent: 'center' }}
+              >
+                <Text style={{ color: deleteResendIn > 0 ? '#D2BFE8' : '#FFD76C', fontFamily: THEME.fonts.bold }}>
+                  {deleteResendIn > 0 ? `Yeniden gönder (${deleteResendIn} sn)` : 'Kodu yeniden gönder'}
+                </Text>
+              </TouchableOpacity>
+            </>}
+            {!!deleteError && <Text accessibilityRole="alert" style={{ color: '#FFB5C3', marginBottom: 10 }}>{deleteError}</Text>}
+            <View style={styles.deleteModalActions}>
+              <Button3D
+                title={deleteStep === 'intro' ? 'EVET, KOD GÖNDER' : 'DOĞRULA VE SİL'}
+                variant="red"
+                disabled={!!deleteAction || (deleteStep === 'code' && deleteCode.length !== 6)}
+                onPress={() => { void handleDeleteAction(deleteStep === 'intro' ? 'send' : 'confirm'); }}
+                style={styles.deleteModalButton}
+                textStyle={{ fontSize: 13 }}
+              />
               <Button3D
                 title="VAZGEÇ"
                 variant="gold"
-                disabled={isDeleting}
-                onPress={() => setDeleteModalVisible(false)}
-                style={{ flex: 1, minHeight: 44 }}
-                textStyle={{ fontSize: 13 }}
-              />
-              <Button3D
-                title={isDeleting ? 'SİLİNİYOR...' : 'EVET, SİL'}
-                variant="red"
-                disabled={isDeleting}
-                onPress={handleConfirmDelete}
-                style={{ flex: 1, minHeight: 44 }}
+                disabled={!!deleteAction}
+                onPress={closeDelete}
+                style={styles.deleteModalButton}
                 textStyle={{ fontSize: 13 }}
               />
             </View>
-            {isDeleting && <ActivityIndicator color="#FF5A6A" style={{ marginTop: 12 }} />}
+            {deleteAction && <LoadingShimmer wide label={deleteAction === 'send' ? 'Doğrulama kodu gönderiliyor' : 'Hesap silme isteği işleniyor'} />}
           </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </TavrikoScreen>
   );
@@ -1326,7 +1400,7 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.display,
   },
   deleteModalTitle: {
-    color: '#EF4444',
+    color: '#FFB5C3',
     fontSize: 18,
     fontFamily: THEME.fonts.display,
     marginBottom: 6,
@@ -1360,4 +1434,8 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 8,
   },
+  deleteModalScroll: { width: '100%' },
+  deleteModalContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center' },
+  deleteModalActions: { gap: 8, marginTop: 8 },
+  deleteModalButton: { minHeight: 44, width: '100%' },
 });

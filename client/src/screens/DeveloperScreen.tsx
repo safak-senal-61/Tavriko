@@ -5,18 +5,22 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   Platform,
   Linking,
   Modal,
   TextInput,
 } from 'react-native';
+import { LoadingShimmer } from '../components/LoadingShimmer';
 import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
 import { DEFAULT_API_BASE, REALTIME_WS_BASE } from '../config';
 import { authHeaders } from '../utils/apiAuth';
+import { useGameStore } from '../store/gameStore';
+import { PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
+import { friendsChanged } from '../utils/pageResources';
+import { usePageData } from '../utils/usePageData';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -59,7 +63,6 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
   // --- Block user ---
   const [blockModal, setBlockModal] = useState<boolean>(false);
   const [blockInput, setBlockInput] = useState<string>('');
-  const [blockedUsers, setBlockedUsers] = useState<Array<{ id: string; username?: string; displayName?: string }>>([]);
   const [blockLoading, setBlockLoading] = useState<boolean>(false);
 
   // --- Send notification ---
@@ -82,6 +85,17 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
   const [productStatus, setProductStatus] = useState<string | null>(null);
 
   const base = apiBaseUrl || DEFAULT_API_BASE;
+  const token = useGameStore(state => state.token);
+  const owner = !user?.isGuest ? user?.id : undefined;
+  const blockedUrl = owner ? `${base.replace(/\/+$/, '')}/social/blocked/${encodeURIComponent(owner)}` : null;
+  const { data: blockedData, error: blockedError, read: readBlocked } =
+    usePageData<{ blockedUsers: Array<{ id: string; username?: string; displayName?: string }> }>(blockedUrl, PAGE_TTL.friends, owner, token);
+  const blockedUsers = blockedData?.blockedUsers ?? [];
+  const refreshAfterBlockChange = (removedId?: string) => {
+    if (!blockedUrl || !owner || useGameStore.getState().user?.id !== owner || useGameStore.getState().token !== token) return;
+    pageDataCache.invalidate(blockedUrl, owner);
+    friendsChanged(base, owner, removedId);
+  };
 
   useEffect(() => {
     checkApiLatency();
@@ -94,12 +108,6 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
     }, 2000);
     return () => clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    if (user?.id && !user?.isGuest) {
-      loadBlockedUsers();
-    }
-  }, [user?.id]);
 
   const checkApiLatency = async () => {
     setIsPinging(true);
@@ -241,17 +249,6 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
   };
 
   // --- Block system ---
-  const loadBlockedUsers = async () => {
-    if (!user?.id) return;
-    try {
-      const res = await fetch(`${base}/social/blocked/${user.id}`, { headers: authHeaders() });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success) setBlockedUsers(data.blockedUsers || []);
-      }
-    } catch {}
-  };
-
   const handleBlockUser = async () => {
     if (!user?.id || !blockInput.trim()) return;
     setBlockLoading(true);
@@ -266,7 +263,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
         notify(`Kullanıcı engellendi!`);
         setBlockInput('');
         setBlockModal(false);
-        loadBlockedUsers();
+        refreshAfterBlockChange(blockInput.trim());
       } else {
         notify(`Hata: ${data.error}`);
       }
@@ -288,7 +285,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
       const data = await res.json();
       if (data.success) {
         notify('Engel kaldırıldı!');
-        loadBlockedUsers();
+        refreshAfterBlockChange();
       }
     } catch (e: any) {
       notify(`Hata: ${e.message}`);
@@ -409,7 +406,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
               </View>
               <TouchableOpacity style={styles.pingBtn} onPress={checkApiLatency} disabled={isPinging}>
                 {isPinging ? (
-                  <ActivityIndicator size="small" color="#FFC43D" />
+                  <LoadingShimmer label="API yanıt süresi ölçülüyor" />
                 ) : (
                   <Text style={styles.pingText}>{apiPing !== null ? `${apiPing} ms` : 'Ping'}</Text>
                 )}
@@ -480,7 +477,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
 
             <TouchableOpacity
               style={styles.moderationBtn}
-              onPress={() => { sound.playSound('tap'); setBlockModal(true); loadBlockedUsers(); }}
+              onPress={() => { sound.playSound('tap'); setBlockModal(true); }}
               activeOpacity={0.8}
             >
               <Text style={{ fontSize: 18 }}>🚫</Text>
@@ -506,6 +503,10 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
             </TouchableOpacity>
 
             {/* Blocked users list */}
+            {blockedError && !blockedData && <TouchableOpacity accessibilityRole="button" style={styles.moderationBtn}
+              onPress={() => void readBlocked(true).catch(() => {})}>
+              <Text style={styles.moderationBtnText}>Engelli kullanıcılar yüklenemedi. Tekrar dene</Text>
+            </TouchableOpacity>}
             {blockedUsers.length > 0 && (
               <View style={styles.blockedList}>
                 <Text style={styles.blockedListHeader}>ENGELLİ KULLANICILAR ({blockedUsers.length})</Text>
@@ -562,7 +563,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
                 activeOpacity={0.8}
               >
                 {tgTesting ? (
-                  <ActivityIndicator size="small" color="#38BDF8" />
+                  <LoadingShimmer label="Telegram bağlantısı sınanıyor" />
                 ) : (
                   <>
                     <Text style={{ fontSize: 15 }}>⚡</Text>
@@ -663,7 +664,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
                 activeOpacity={0.8}
               >
                 {blockLoading ? (
-                  <ActivityIndicator size="small" color="#FF8598" />
+                  <LoadingShimmer label="Engelleme uygulanıyor" />
                 ) : (
                   <Text style={[styles.modalBtnText, { color: '#FF8598' }]}>ENGELLE</Text>
                 )}
@@ -723,7 +724,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
                 activeOpacity={0.8}
               >
                 {notifSending ? (
-                  <ActivityIndicator size="small" color="#5ADBB5" />
+                  <LoadingShimmer label="Bildirim gönderiliyor" />
                 ) : (
                   <Text style={[styles.modalBtnText, { color: '#5ADBB5' }]}>GÖNDER</Text>
                 )}
@@ -826,7 +827,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
                 activeOpacity={0.8}
               >
                 {productAdding ? (
-                  <ActivityIndicator size="small" color="#FFC43D" />
+                  <LoadingShimmer label="Ürün ekleniyor" />
                 ) : (
                   <Text style={[styles.modalBtnText, { color: '#FFC43D' }]}>ÜRÜNÜ EKLE</Text>
                 )}

@@ -19,12 +19,16 @@ describe('Auth & Default Questions', () => {
 
   it('provides rich fallback questions per category', () => {
     const geoQuestions = getFallbackQuestions('geography', 'easy', 3);
-    expect(geoQuestions.length).toBe(3);
+    expect(geoQuestions.length).toBe(2);
+    expect(geoQuestions.every((question) => question.categoryId === 'geography')).toBe(true);
     expect(geoQuestions[0].options.length).toBe(4);
     expect(geoQuestions[0].correctOptionId).toBeDefined();
 
     const mixedQuestions = getFallbackQuestions('mixed', 'medium', 5);
     expect(mixedQuestions.length).toBe(5);
+    const exhausted = getFallbackQuestions('mixed', 'medium', 50);
+    expect(exhausted).toHaveLength(DEFAULT_QUESTIONS.length);
+    expect(new Set(exhausted.map((question) => question.text)).size).toBe(exhausted.length);
   });
 
   it('ensures all default questions have valid structure', () => {

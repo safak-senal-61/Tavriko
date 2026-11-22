@@ -8,6 +8,7 @@ import {
   AppStateStatus,
   useWindowDimensions,
   Image,
+  Platform,
   ScrollView,
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Stop, Circle } from 'react-native-svg';
@@ -48,6 +49,7 @@ export type QuestionAnswerState =
 export interface RoundFeedback {
   isCorrect: boolean;
   isTimeout: boolean;
+  unavailable?: boolean;
   correctOptionId: string;
   explanation: string;
   pointsAwarded: number;
@@ -58,6 +60,7 @@ interface QuizArenaScreenProps {
   question: ClientQuestion;
   selectedOptionId: string | null;
   isLocked: boolean;
+  isMultiplayer?: boolean;
   streak: number;
   currentScore: number;
   feedback?: RoundFeedback | null;
@@ -568,6 +571,8 @@ const MiniPlayerBlock: React.FC<{
 export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   question,
   selectedOptionId,
+  isLocked,
+  isMultiplayer = false,
   streak,
   currentScore,
   feedback,
@@ -605,8 +610,8 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   );
   const [answerState, setAnswerState] =
     useState<QuestionAnswerState>('answerable');
-  const [endTime, setEndTime] = useState<number>(() => Date.now() + totalMs);
-  const endTimeRef = useRef<number>(Date.now() + totalMs);
+  const [endTime, setEndTime] = useState<number>(() => Date.now() + (question.timeRemainingMs ?? totalMs));
+  const endTimeRef = useRef<number>(endTime);
   const hasExpiredRef = useRef<boolean>(false);
   const onTimeExpiredRef = useRef(onTimeExpired);
   onTimeExpiredRef.current = onTimeExpired;
@@ -628,7 +633,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         setAnswerState('incorrect');
       }
       // PostHog: soru bazlı başarı — zorluk dengesinin ana veri kaynağı
-      trackEvent('question_answered', {
+      if (!feedback.unavailable) trackEvent('question_answered', {
         question_id: question.id,
         category: question.categoryId,
         correct: feedback.isCorrect,
@@ -642,12 +647,21 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   useEffect(() => {
     hasExpiredRef.current = false;
     setLocalSelectedOptionId(null);
-    const newEndTime = Date.now() + totalMs;
+    const remainingMs = question.timeRemainingMs ?? totalMs;
+    const newEndTime = Date.now() + remainingMs;
     endTimeRef.current = newEndTime;
     setEndTime(newEndTime);
-    setSecondsLeft(Math.ceil(totalMs / 1000));
+    setSecondsLeft(Math.ceil(remainingMs / 1000));
     setAnswerState('answerable');
-  }, [question.id, totalMs]);
+  }, [question.id, question.roundNumber, totalMs]);
+  useEffect(() => {
+    if (question.timeRemainingMs === undefined) return;
+    // A replay after reconnect can shorten the timer but must not restart it.
+    const syncedEnd = Math.min(endTimeRef.current, Date.now() + question.timeRemainingMs);
+    endTimeRef.current = syncedEnd;
+    setEndTime(syncedEnd);
+    setSecondsLeft(Math.ceil(Math.max(0, syncedEnd - Date.now()) / 1000));
+  }, [question.timeRemainingMs]);
   // AppState background/foreground synchronization
   useEffect(() => {
     const subscription = AppState.addEventListener(
@@ -698,6 +712,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const handleSelect = (optionId: string) => {
     if (
       answerState !== 'answerable' ||
+      isLocked ||
       feedback ||
       hasExpiredRef.current ||
       secondsLeft <= 0
@@ -736,6 +751,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const optionLabels = ['A', 'B', 'C', 'D'];
   const isOptionsDisabled =
     answerState !== 'answerable' ||
+    isLocked ||
     !!feedback ||
     hasExpiredRef.current ||
     secondsLeft <= 0;
@@ -743,6 +759,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const compact = windowHeight < 800;
   const tiny = windowHeight < 690;
+  const wideAnswers = Platform.OS === 'web' && windowWidth >= 700;
   const myRacer = activeRacers.find((r) => r.isMe);
   const myScore = formatCleanScore(currentScore, myRacer?.correctAnswers || 0, totalRounds);
   const rightPlayer = useMemo(() => {
@@ -813,7 +830,8 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const subCategoryLabel = subCategoryObj?.name || subCategoryName;
   const difficultyLabel = (diffMap[question.difficulty] || 'Orta').toLocaleUpperCase('tr-TR');
   const difficultyColor = DIFFICULTY_COLORS[question.difficulty] || DIFFICULTY_COLORS.medium;
-  const ArenaBody = isGroup ? ScrollView : View;
+  const scrollArena = isGroup || Platform.OS === 'web';
+  const ArenaBody = scrollArena ? ScrollView : View;
 
   return (
     <TavrikoScreen style={styles.screenContainer}>
@@ -849,7 +867,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           <CircularTimer
             totalMs={totalMs}
             endTime={endTime}
-            isActive={answerState === 'answerable'}
+            isActive={!feedback && (answerState === 'answerable' || (isMultiplayer && answerState === 'submitting'))}
             secondsLeft={secondsLeft}
             onTimeExpired={handleTimeExpiredInternal}
             onSecondChange={handleSecondChange}
@@ -858,8 +876,11 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         )}
       </View>
       <ArenaBody
-        style={isGroup ? styles.groupArenaScroll : styles.arenaBody}
-        {...(isGroup ? { contentContainerStyle: styles.groupArenaBody, showsVerticalScrollIndicator: false } : {})}
+        style={scrollArena ? styles.arenaScroll : styles.arenaBody}
+        {...(scrollArena ? {
+          contentContainerStyle: isGroup ? styles.groupArenaBody : styles.webArenaBody,
+          showsVerticalScrollIndicator: !isGroup,
+        } : {})}
       >
       {/* Günlük Meydan Okuma bilgisi */}
       {dailyChallengeInfo && (
@@ -910,7 +931,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         <CircularTimer
           totalMs={totalMs}
           endTime={endTime}
-          isActive={answerState === 'answerable'}
+          isActive={!feedback && (answerState === 'answerable' || (isMultiplayer && answerState === 'submitting'))}
           secondsLeft={secondsLeft}
           onTimeExpired={handleTimeExpiredInternal}
           onSecondChange={handleSecondChange}
@@ -998,19 +1019,19 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       </Animated.View>
 
       {/* 5. Şıklar */}
-      <View style={[styles.optionsContainer, compact && { gap: 7 }, denseLayout && { gap: 5 }]}>
+      <View style={[styles.optionsContainer, compact && { gap: 7 }, denseLayout && { gap: 5 }, wideAnswers && styles.optionsWide]}>
         {question.options.map((opt, index) => {
           const activeSelectedId = selectedOptionId || localSelectedOptionId;
           const isMyChoice = activeSelectedId === opt.id;
           const isCorrectChoice = !!feedback && feedback.correctOptionId === opt.id;
-          const isWrongChoice = !!feedback && isMyChoice && !isCorrectChoice;
+          const isWrongChoice = !!feedback && !feedback.unavailable && isMyChoice && !isCorrectChoice;
           const showPoints = !!feedback && feedback.isCorrect && isMyChoice && isCorrectChoice && feedback.pointsAwarded > 0;
 
           return (
             <Animated.View
               key={`${question.id}-${question.roundNumber}-${opt.id}`}
               entering={FadeInDown.delay(90 + index * 70).duration(360).springify().damping(16)}
-              style={styles.optWrap}
+              style={[styles.optWrap, wideAnswers && styles.optWrapWide]}
             >
               <TouchableOpacity
                 style={[
@@ -1109,7 +1130,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
             style={[
               styles.inlineFeedbackCard,
               {
-                borderColor: feedback.isTimeout
+                borderColor: feedback.isTimeout || feedback.unavailable
                   ? 'rgba(255, 196, 61, 0.6)'
                   : feedback.isCorrect
                   ? 'rgba(63, 208, 138, 0.6)'
@@ -1121,7 +1142,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
               style={[
                 styles.inlineFeedbackTitle,
                 {
-                  color: feedback.isTimeout
+                  color: feedback.isTimeout || feedback.unavailable
                     ? '#FFC43D'
                     : feedback.isCorrect
                     ? '#7CFC8A'
@@ -1129,7 +1150,9 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                 },
               ]}
             >
-              {feedback.isTimeout
+              {feedback.unavailable
+                ? 'CEVAP DOĞRULANAMADI'
+                : feedback.isTimeout
                 ? 'SÜRE DOLDU!'
                 : feedback.isCorrect
                 ? `DOĞRU! +${feedback.pointsAwarded} puan`
@@ -1159,8 +1182,10 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
               </TouchableOpacity>
             ) : null}
           </Animated.View>
-        ) : answerState === 'submitting' ? (
-          <Text style={styles.bottomHintText}>Cevabın kilitlendi, rakipler bekleniyor...</Text>
+        ) : answerState === 'submitting' || (isMultiplayer && isLocked) ? (
+          <Text style={styles.bottomHintText}>
+            {isMultiplayer ? 'Cevabın seçildi. Turun bitmesi bekleniyor...' : 'Cevabın kontrol ediliyor...'}
+          </Text>
         ) : answerState === 'timed_out' ? (
           <Text style={[styles.bottomHintText, { color: '#FFC43D' }]}>
             Süre doldu! Sonuçlar hesaplanıyor...
@@ -1189,8 +1214,11 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   arenaBody: { flex: 1, justifyContent: 'space-between' },
-  groupArenaScroll: { flex: 1 },
+  arenaScroll: { flex: 1, minHeight: 0 },
   groupArenaBody: { flexGrow: 1, justifyContent: 'space-between', paddingVertical: 6, gap: 6 },
+  webArenaBody: { flexGrow: 1, justifyContent: 'space-between', paddingBottom: 5, gap: 8 },
+  optionsWide: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
+  optWrapWide: { width: '49%' },
   // ---- Üst Bar ----
   topRow: {
     flexDirection: 'row',

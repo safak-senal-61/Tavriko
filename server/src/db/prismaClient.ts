@@ -48,6 +48,7 @@ import {
   SEASON_REWARD_HOURS,
   FinalMatchSummary,
   isRankedMatch,
+  uniqueQuestions,
 } from '@trivia/shared';
 import { ALL_CATEGORIES, QUESTION_BANK } from './questionsData';
 import { RICH_SEED_BANK } from '../ai/evrenLlmGenerator';
@@ -69,6 +70,7 @@ if (!JWT_SECRET && process.env.NODE_ENV !== 'test') {
 }
 const PRISMA_DATA_DIR = path.join(__dirname, '..', '..', 'data', 'prisma');
 const USERS_DB_FILE = path.join(__dirname, '..', '..', 'supabase_users_store.json');
+const USE_PERSISTED_ACCOUNTS_ONLY = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
 const QUESTIONS_DB_FILE = path.join(__dirname, '..', '..', 'supabase_questions_store.json');
 
 export function computeQuestionHash(text: string, options: { text: string }[]): string {
@@ -94,9 +96,6 @@ export interface UserRecord {
   bio?: string;
   passwordHash?: string;
   googleId?: string;
-  resetOtpCode?: string;
-  resetOtpExpiresAt?: number;
-  resetOtpAttempts?: number;
   avatarUrl: string;
   friendCode?: string;
   isGuest: boolean;
@@ -736,7 +735,8 @@ export class PrismaService {
     } catch {
       // DB yok/erişilemez (test ortamı, kesinti) → önbelleğe düş
     }
-    return this.users.get(userId) || null;
+    const cached = this.users.get(userId);
+    return cached && (!USE_PERSISTED_ACCOUNTS_ONLY || cached.isGuest) ? cached : null;
   }
 
   public readonly user = {
@@ -1825,7 +1825,7 @@ export class PrismaService {
       },
     }).catch(() => null);
 
-    if (!dbUser) {
+    if (!dbUser && !USE_PERSISTED_ACCOUNTS_ONLY) {
       const memUser = Array.from(this.users.values()).find(
         (u) => !u.isGuest && (u.username === cleanId || (u.email && u.email.toLowerCase() === cleanId))
       );
@@ -1921,13 +1921,14 @@ export class PrismaService {
         console.error('[loginOrRegisterGoogle] DB update error:', err);
       }
     } else {
-      // Check in-memory fallback
-      existingRecord = Array.from(this.users.values()).find(
-        (u) =>
-          !u.isGuest &&
-          ((u.email && u.email.trim().toLowerCase() === cleanEmail) ||
-            (payload.googleId && u.googleId === payload.googleId))
-      ) || null;
+      // A deleted PostgreSQL account must not sign in from a stale snapshot.
+      if (!USE_PERSISTED_ACCOUNTS_ONLY) {
+        existingRecord = Array.from(this.users.values()).find(
+          (u) => !u.isGuest &&
+            ((u.email && u.email.trim().toLowerCase() === cleanEmail) ||
+              (payload.googleId && u.googleId === payload.googleId))
+        ) || null;
+      }
 
     if (!existingRecord) {
       // Truly a brand new user
@@ -2073,246 +2074,17 @@ export class PrismaService {
     return { token, user: this.toProfile(existingRecord), isNewUser };
   }
 
-  public async deleteAccount(userId: string): Promise<{ success: boolean; message: string }> {
-    // KVKK: hesap silme isteği, bellekte kullanıcı olmasa bile (sunucusuz
-    // ortamda her cold start boş bellekle başlar) PostgreSQL'den tüm verileri
-    // kalıcı olarak silmelidir. Veritabanı esas kaynaktır.
-    let dbExisted = false;
-    let dbDeleted = false;
-    try {
-      const dbUser = await this.rawClient.user.findUnique({
-        where: { id: userId },
-        select: { id: true, email: true },
-      });
-      if (dbUser) {
-        dbExisted = true;
-        // 1. Maç geçmişi satırları FK kısıtına takılmasın diye önce silinir
-        await this.rawClient.matchHistory.deleteMany({ where: { userId } }).catch(() => null);
-        // 2. Şifre sıfırlama kodları temizlenir
-        await this.rawClient.passwordResetToken
-          .deleteMany({ where: { email: dbUser.email } })
-          .catch(() => null);
-        // 3. Diğer kullanıcıların arkadaş/engel listelerinden çıkarılır (jsonb)
-        await this.rawClient
-          .$executeRaw`UPDATE users SET "friendIds" = ("friendIds" - ${userId}), "blockedUserIds" = ("blockedUserIds" - ${userId}) WHERE "friendIds" ? ${userId} OR "blockedUserIds" ? ${userId}`
-          .catch(() => null);
-        // 4. Kullanıcı satırı silinir (envanter/bildirim/referral cascade ile gider)
-        await this.rawClient.user.delete({ where: { id: userId } });
-        dbDeleted = true;
+  /** Drop process-local aliases only after the database transaction commits. */
+  public forgetDeletedAccount(userId: string): void {
+    for (const [key, record] of this.users) {
+      if (record.id === userId) this.users.delete(key);
+      else {
+        record.friendIds = record.friendIds?.filter((id) => id !== userId) ?? [];
+        record.blockedUserIds = record.blockedUserIds?.filter((id) => id !== userId) ?? [];
       }
-    } catch (err) {
-      console.error('[deleteAccount] DB delete error:', err);
     }
-
-    // Bellekteki kopya da temizlenir (varsa)
-    const memUser = this.users.get(userId);
-    if (memUser) {
-      this.users.delete(userId);
-      this.store.users.delete(userId);
-      for (const otherUser of this.users.values()) {
-        if (otherUser.friendIds && otherUser.friendIds.includes(userId)) {
-          otherUser.friendIds = otherUser.friendIds.filter((id) => id !== userId);
-        }
-      }
-      this.savePersistedUsers();
-    }
-
-    if (dbDeleted) {
-      return {
-        success: true,
-        message: 'Hesabınız ve tüm oyun verileriniz kalıcı olarak silindi.',
-      };
-    }
-    if (!dbExisted && memUser) {
-      return {
-        success: true,
-        message: 'Hesabınız ve tüm oyun verileriniz kalıcı olarak silindi.',
-      };
-    }
-    if (!dbExisted && !memUser) {
-      // Hesap zaten yok — sessizce başarı dönmek yerine durumu bildir
-      return { success: false, message: 'Kullanıcı bulunamadı veya hesap zaten silinmiş.' };
-    }
-    return {
-      success: false,
-      message: 'Hesap silinirken bir hata oluştu. Lütfen tekrar deneyin.',
-    };
-  }
-
-  /* KVKK: /remove-account web sayfası için e-posta ile hesap silme akışı.
-     E-posta altyapısı olmadığından doğrulama kodu istemciye gösterilir
-     (mevcut şifre sıfırlama akışıyla aynı desen). */
-  public async requestAccountDeletionCode(
-    email: string
-  ): Promise<{ success: boolean; message: string; code?: string }> {
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      return { success: false, message: 'Geçerli bir e-posta adresi girin.' };
-    }
-    // Önce PostgreSQL (esas kaynak), yoksa bellek
-    let userId: string | null = null;
-    try {
-      const dbUser = await this.rawClient.user.findFirst({ where: { email: cleanEmail }, select: { id: true } });
-      if (dbUser) userId = dbUser.id;
-    } catch {}
-    if (!userId) {
-      const mem = Array.from(this.users.values()).find(
-        (u) => !u.isGuest && u.email && u.email.trim().toLowerCase() === cleanEmail
-      );
-      if (mem) userId = mem.id;
-    }
-    if (!userId) {
-      // SECURITY: kullanıcı sayımını engellemek için genel mesaj
-      return { success: true, message: 'Bu e-posta ile kayıtlı bir hesap bulunamadı.' };
-    }
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    try {
-      await this.rawClient.passwordResetToken.create({
-        data: { email: cleanEmail, code, expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
-      });
-    } catch (err) {
-      console.error('[requestAccountDeletionCode] DB error:', err);
-      return { success: false, message: 'Kod oluşturulamadı. Lütfen tekrar deneyin.' };
-    }
-    return {
-      success: true,
-      message: 'Hesap silme doğrulama kodunuz oluşturuldu (15 dakika geçerli).',
-      code,
-    };
-  }
-
-  public async confirmAccountDeletion(
-    email: string,
-    code: string
-  ): Promise<{ success: boolean; message: string }> {
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !code || !code.trim()) {
-      return { success: false, message: 'E-posta ve doğrulama kodu zorunludur.' };
-    }
-    let tokens: Array<{ id: string; code: string; expiresAt: Date; used: boolean }> = [];
-    try {
-      tokens = await this.rawClient.passwordResetToken.findMany({
-        where: { email: cleanEmail, used: false },
-        orderBy: { createdAt: 'desc' },
-        take: 5,
-      });
-    } catch (err) {
-      console.error('[confirmAccountDeletion] DB error:', err);
-      return { success: false, message: 'Doğrulama yapılamadı. Lütfen tekrar deneyin.' };
-    }
-    const match = tokens.find((t) => t.code === code.trim() && t.expiresAt.getTime() > Date.now());
-    if (!match) {
-      return { success: false, message: 'Doğrulama kodu hatalı veya süresi dolmuş.' };
-    }
-    await this.rawClient.passwordResetToken
-      .update({ where: { id: match.id }, data: { used: true } })
-      .catch(() => null);
-    // E-postadan kullanıcı bulunur ve kalıcı silme çalıştırılır
-    let userId: string | null = null;
-    try {
-      const dbUser = await this.rawClient.user.findFirst({ where: { email: cleanEmail }, select: { id: true } });
-      if (dbUser) userId = dbUser.id;
-    } catch {}
-    if (!userId) {
-      const mem = Array.from(this.users.values()).find(
-        (u) => !u.isGuest && u.email && u.email.trim().toLowerCase() === cleanEmail
-      );
-      if (mem) userId = mem.id;
-    }
-    if (!userId) {
-      return { success: false, message: 'Hesap bulunamadı veya zaten silinmiş.' };
-    }
-    return this.deleteAccount(userId);
-  }
-
-  public async requestPasswordReset(identifier: string): Promise<{
-    success: boolean;
-    message: string;
-    demoResetCode: string;
-    emailMasked: string;
-  }> {
-    const cleanId = identifier.trim().toLowerCase();
-    const record = Array.from(this.users.values()).find(
-      (u) => !u.isGuest && (u.username === cleanId || (u.email && u.email.toLowerCase() === cleanId))
-    );
-
-    if (!record) {
-      // SECURITY: generic error to prevent user enumeration via reset endpoint
-      throw new Error('Doğrulama kodu gönderilemedi. Lütfen bilgilerinizi kontrol edin.');
-    }
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    record.resetOtpCode = otp;
-    record.resetOtpExpiresAt = Date.now() + 15 * 60 * 1000;
-    record.resetOtpAttempts = 0;
+    this.store.users.delete(userId);
     this.savePersistedUsers();
-
-    const emailStr = record.email || `${record.username}@tavriko.app`;
-    return {
-      success: true,
-      message: `Şifre sıfırlama doğrulama kodu (${emailStr}) hesabınız için oluşturuldu.`,
-      demoResetCode: otp,
-      emailMasked: emailStr,
-    };
-  }
-
-  public async confirmPasswordReset(
-    identifier: string,
-    otpCode: string,
-    newPassword: string
-  ): Promise<{ success: boolean; message: string; token: string; user: UserProfile }> {
-    const cleanId = identifier.trim().toLowerCase();
-    const record = Array.from(this.users.values()).find(
-      (u) => !u.isGuest && (u.username === cleanId || (u.email && u.email.toLowerCase() === cleanId))
-    );
-
-    if (!record) {
-      // SECURITY: generic error to prevent user enumeration via reset endpoint
-      throw new Error('Doğrulama başarısız. Lütfen bilgilerinizi kontrol edin.');
-    }
-
-    // SECURITY: brute-force protection — after 5 failed attempts the OTP is
-    // invalidated and the user must request a new code.
-    const MAX_OTP_ATTEMPTS = 5;
-    if ((record.resetOtpAttempts || 0) >= MAX_OTP_ATTEMPTS) {
-      record.resetOtpCode = undefined;
-      record.resetOtpExpiresAt = undefined;
-      this.savePersistedUsers();
-      throw new Error('Çok fazla hatalı deneme. Lütfen yeni bir doğrulama kodu isteyin.');
-    }
-
-    if (!record.resetOtpCode || record.resetOtpCode !== otpCode.trim()) {
-      record.resetOtpAttempts = (record.resetOtpAttempts || 0) + 1;
-      if (record.resetOtpAttempts >= MAX_OTP_ATTEMPTS) {
-        record.resetOtpCode = undefined;
-        record.resetOtpExpiresAt = undefined;
-      }
-      this.savePersistedUsers();
-      throw new Error('Girdiğiniz 6 haneli doğrulama kodu geçersiz.');
-    }
-
-    if (record.resetOtpExpiresAt && Date.now() > record.resetOtpExpiresAt) {
-      throw new Error('Doğrulama kodunun süresi dolmuş. Lütfen yeni kod isteyin.');
-    }
-
-    if (!newPassword || newPassword.length < 8) {
-      throw new Error('Yeni şifreniz en az 8 karakter olmalıdır.');
-    }
-
-    record.passwordHash = await bcrypt.hash(newPassword, 10);
-    record.resetOtpCode = undefined;
-    record.resetOtpExpiresAt = undefined;
-    record.resetOtpAttempts = 0;
-    this.savePersistedUsers();
-    supabaseService.upsertUser(record).catch(() => {});
-
-    const token = jwt.sign({ userId: record.id, username: record.username }, JWT_SECRET, { expiresIn: '30d' });
-    return {
-      success: true,
-      message: 'Şifreniz başarıyla yenilendi!',
-      token,
-      user: this.toProfile(record),
-    };
   }
 
   public async updateUserProfile(
@@ -2320,7 +2092,6 @@ export class PrismaService {
     updates: Partial<{
       displayName: string;
       fullName: string;
-      email: string;
       countryCode: string;
       countryName: string;
       phone: string;
@@ -2349,7 +2120,6 @@ export class PrismaService {
       record.displayName = updates.displayName.trim();
     }
     if (updates.fullName !== undefined) record.fullName = updates.fullName.trim();
-    if (updates.email !== undefined) record.email = updates.email.trim().toLowerCase();
     if (updates.countryCode !== undefined) record.countryCode = updates.countryCode;
     if (updates.countryName !== undefined) record.countryName = updates.countryName;
     if (updates.phone !== undefined) record.phone = updates.phone.trim();
@@ -2390,7 +2160,6 @@ export class PrismaService {
           data: {
             displayName: record.displayName,
             fullName: record.fullName,
-            email: record.email,
             avatarUrl: record.avatarUrl,
             countryCode: record.countryCode,
             countryName: record.countryName,
@@ -2417,8 +2186,12 @@ export class PrismaService {
         console.error(`⚠️ [updateUserProfile] Prisma PostgreSQL güncelleme hatası:`, dbErr);
       }
 
-      await this.syncUserToPrisma(record).catch(() => {});
-      supabaseService.upsertUser(record).catch(() => {});
+      // PostgreSQL was updated above; do not upsert a stale profile snapshot
+      // back into a row another instance may have just removed.
+      if (!USE_PERSISTED_ACCOUNTS_ONLY) {
+        await this.syncUserToPrisma(record).catch(() => {});
+        supabaseService.upsertUser(record).catch(() => {});
+      }
     }
 
     return this.toProfile(record);
@@ -2891,7 +2664,7 @@ export class PrismaService {
       console.error('[getUserProfileAsync] Error querying Prisma:', err);
     }
     const record = this.users.get(userId);
-    return record ? this.toProfile(record) : null;
+    return record && (!USE_PERSISTED_ACCOUNTS_ONLY || record.isGuest) ? this.toProfile(record) : null;
   }
 
   /** Arkadaşlık koduna göre herkese açık profil getirir (profil paylaşım bağlantıları için). */
@@ -3494,7 +3267,7 @@ export class PrismaService {
   ): Question[] {
     const canonCat = canonicalCategoryId(category);
     const allPublished = this.questions.filter((q) => q.reviewStatus === 'published');
-    const pickedMap = new Map<string, Question>();
+    const seen = new Set(seenIds);
 
     const categoryPool =
       canonCat === 'mixed'
@@ -3504,7 +3277,6 @@ export class PrismaService {
     // Alt kategori filtresi KATIDIR: "Rol Yapma Oyunları" seçildiyse yalnızca o alt
     // kategorinin soruları gelir. Önceden eşleşme az/boş olduğunda üst kategorinin
     // tamamından (ör. FPS soruları) doldurma yapılıyordu.
-    let effectivePool = categoryPool;
     const requestedSub = subCategory ? subCategory.trim().toLowerCase() : '';
     if (requestedSub) {
       const catDef = ALL_CATEGORIES.find((c) => c.id === canonCat);
@@ -3520,19 +3292,17 @@ export class PrismaService {
         (q) => q.subCategory && acceptedNames.has(q.subCategory.trim().toLowerCase())
       );
       const shuffledSub = [...subPool].sort(() => 0.5 - Math.random());
-      let subPicked = shuffledSub.filter((q) => !seenIds.includes(q.id));
+      let subPicked = shuffledSub.filter((q) => !seen.has(q.id));
       if (difficulty && (difficulty as any) !== 'mixed') {
         const withDiff = subPicked.filter((q) => q.difficulty === difficulty);
         const others = subPicked.filter((q) => q.difficulty !== difficulty);
         subPicked = [...withDiff, ...others];
       }
-      if (subPicked.length < count) {
-        subPicked = [...subPicked, ...shuffledSub.filter((q) => !subPicked.includes(q))];
-      }
-      return subPicked.slice(0, count);
+      return uniqueQuestions([...subPicked, ...shuffledSub.filter((q) => seen.has(q.id))], count);
     }
 
-    let primaryPool = effectivePool.length > 0 ? effectivePool : allPublished;
+    const effectivePool = categoryPool.length > 0 ? categoryPool : allPublished;
+    let primaryPool = effectivePool;
     if (difficulty && (difficulty as any) !== 'mixed') {
       const withDiff = primaryPool.filter((q) => q.difficulty === difficulty);
       if (withDiff.length > 0) {
@@ -3545,69 +3315,14 @@ export class PrismaService {
         ? this.spreadAcrossCategories(primaryPool)
         : [...primaryPool].sort(() => 0.5 - Math.random());
 
-    for (const q of shuffledPrimary) {
-      if (pickedMap.size >= count) break;
-      if (!seenIds.includes(q.id)) {
-        pickedMap.set(q.id, q);
-      }
-    }
-
-    if (pickedMap.size < count) {
-      const sameCategoryUnseen = effectivePool
-        .filter((q) => !pickedMap.has(q.id) && !seenIds.includes(q.id))
-        .sort(() => 0.5 - Math.random());
-      for (const q of sameCategoryUnseen) {
-        if (pickedMap.size >= count) break;
-        pickedMap.set(q.id, q);
-      }
-    }
-
-    if (pickedMap.size < count) {
-      for (const q of shuffledPrimary) {
-        if (pickedMap.size >= count) break;
-        if (!pickedMap.has(q.id)) {
-          pickedMap.set(q.id, q);
-        }
-      }
-    }
-
-    if (pickedMap.size < count) {
-      const sameCategoryAny = [...effectivePool].sort(() => 0.5 - Math.random());
-      for (const q of sameCategoryAny) {
-        if (pickedMap.size >= count) break;
-        if (!pickedMap.has(q.id)) {
-          pickedMap.set(q.id, q);
-        }
-      }
-    }
-
-    if (pickedMap.size < count && (canonCat === 'mixed' || effectivePool.length === 0)) {
-      const fallbackPool = allPublished
-        .filter((q) => !pickedMap.has(q.id))
-        .sort(() => 0.5 - Math.random());
-
-      for (const q of fallbackPool) {
-        if (pickedMap.size >= count) break;
-        pickedMap.set(q.id, q);
-      }
-    }
-
-    const pickedList: Question[] = Array.from(pickedMap.values());
-    const poolForFill = categoryPool.length > 0 ? categoryPool : allPublished;
-    if (pickedList.length < count && poolForFill.length > 0) {
-      let cycleIdx = 1;
-      while (pickedList.length < count) {
-        for (const baseQ of poolForFill) {
-          if (pickedList.length >= count) break;
-          pickedList.push({
-            ...baseQ,
-            id: `${baseQ.id}_cycle_${cycleIdx++}`,
-          });
-        }
-      }
-    }
-
-    return pickedList.sort(() => 0.5 - Math.random());
+    const primaryIds = new Set(primaryPool.map((q) => q.id));
+    const otherDifficulty = effectivePool.filter((q) => !primaryIds.has(q.id)).sort(() => 0.5 - Math.random());
+    return uniqueQuestions([
+      ...shuffledPrimary.filter((q) => !seen.has(q.id)),
+      ...otherDifficulty.filter((q) => !seen.has(q.id)),
+      ...shuffledPrimary.filter((q) => seen.has(q.id)),
+      ...otherDifficulty.filter((q) => seen.has(q.id)),
+    ], count).sort(() => 0.5 - Math.random());
   }
 
   public getDailyChallenge(): { date: string; questions: Question[] } {
@@ -3615,15 +3330,10 @@ export class PrismaService {
     const dedicated = this.questions.filter(
       (q) => (q.targetPool === 'daily_challenge' || q.isDailyChallenge) && q.reviewStatus === 'published'
     );
-    let selected: Question[] = [];
-    if (dedicated.length >= 5) {
-      selected = [...dedicated].sort(() => 0.5 - Math.random()).slice(0, 5);
-    } else if (dedicated.length > 0) {
-      const rest = this.getQuestions('mixed', undefined, 5 - dedicated.length);
-      selected = [...dedicated, ...rest];
-    } else {
-      selected = this.getQuestions('mixed', undefined, 5);
-    }
+    const preferred = uniqueQuestions(dedicated.sort(() => 0.5 - Math.random()), 5);
+    const selected = preferred.length === 5
+      ? preferred
+      : uniqueQuestions([...preferred, ...this.getQuestions('mixed', undefined, 5)], 5);
     return {
       date: today,
       questions: selected,
@@ -4563,49 +4273,38 @@ export class PrismaService {
     friend?: any;
     message?: string;
     error?: string;
+    code?: 'SESSION_REQUIRED' | 'UNAVAILABLE';
   }> {
-    let me = this.users.get(userId);
-    try {
-      const dbMe = await this.rawClient.user.findFirst({
-        where: { OR: [{ id: userId }, { username: userId }] },
-      });
-      if (dbMe) {
-        me = this.prismaUserToRecord(dbMe);
-        this.users.set(me.id, me);
-      }
-    } catch {}
-    if (!me) return { success: false, error: 'Kullanıcı bulunamadı.' };
-
-    const clean = targetCodeOrUsername.trim().toUpperCase();
-    const cleanLower = targetCodeOrUsername.trim().toLowerCase();
-
-    // 1. Find target user in PostgreSQL or memory
+    let me: UserRecord | undefined;
     let target: UserRecord | undefined;
+    const unavailable = { success: false, code: 'UNAVAILABLE' as const, error: 'Arkadaşlık isteği şu anda gönderilemedi. Lütfen tekrar deneyin.' };
     try {
-      const dbTarget = await this.rawClient.user.findFirst({
+      const dbMe = await this.rawClient.user.findUnique({ where: { id: userId } });
+      if (!dbMe) {
+        return { success: false, code: 'SESSION_REQUIRED', error: 'Arkadaş eklemek için hesabınıza tekrar giriş yapın.' };
+      }
+      me = this.prismaUserToRecord(dbMe);
+
+      const candidates = await this.rawClient.user.findMany({
         where: {
           OR: [
-            { friendCode: { equals: clean, mode: 'insensitive' } },
-            { username: { equals: cleanLower, mode: 'insensitive' } },
-            { displayName: { equals: targetCodeOrUsername.trim(), mode: 'insensitive' } },
+            { friendCode: { equals: targetCodeOrUsername, mode: 'insensitive' } },
+            { username: { equals: targetCodeOrUsername, mode: 'insensitive' } },
+            { displayName: { equals: targetCodeOrUsername, mode: 'insensitive' } },
           ],
         },
       });
-      if (dbTarget) {
-        target = this.prismaUserToRecord(dbTarget);
-        this.users.set(target.id, target);
+      const clean = targetCodeOrUsername.toLowerCase();
+      const codeMatches = candidates.filter((u) => u.friendCode.toLowerCase() === clean);
+      const usernameMatches = candidates.filter((u) => u.username.toLowerCase() === clean);
+      const matches = codeMatches.length ? codeMatches : usernameMatches.length ? usernameMatches : candidates;
+      if (matches.length > 1) {
+        return { success: false, error: 'Birden fazla oyuncu eşleşti. Arkadaşlık kodunu kullanın.' };
       }
-    } catch {}
-
-    if (!target) {
-      target = Array.from(this.users.values()).find(
-        (u) =>
-          u &&
-          !u.isGuest &&
-          ((u.friendCode && u.friendCode.toUpperCase() === clean) ||
-            u.username.toLowerCase() === cleanLower ||
-            (u.displayName && u.displayName.toLowerCase() === cleanLower))
-      );
+      if (matches[0]) target = this.prismaUserToRecord(matches[0]);
+    } catch (error) {
+      console.warn('[addFriend] Could not look up users:', error instanceof Error ? error.name : 'Unknown error');
+      return unavailable;
     }
 
     if (!target) {
@@ -4653,12 +4352,14 @@ export class PrismaService {
           error: `${target.displayName} oyuncusuna zaten arkadaşlık isteği gönderdiniz. Karşı tarafın kabul etmesi bekleniyor.`,
         };
       }
-    } catch {}
+    } catch {
+      return unavailable;
+    }
 
     // Create a PENDING friend request notification for target (handled: null)
     // Target will ONLY become a friend when they accept this notification!
     const notifItem: NotificationItem = {
-      id: 'notif_fr_' + Date.now(),
+      id: 'notif_fr_' + crypto.randomUUID(),
       type: 'friend_request',
       title: `${me.displayName} sana arkadaşlık isteği gönderdi!`,
       sub: 'Arkadaş olarak eklemek ve birlikte yarışmak için isteği kabul et.',
@@ -4686,11 +4387,13 @@ export class PrismaService {
         },
       });
     } catch (e: any) {
-      console.warn('[addFriend] DB notification error:', e.message);
+      console.warn('[addFriend] Could not save request:', e.code || e.name);
+      return unavailable;
     }
 
     if (!target.notifications) target.notifications = [];
     target.notifications.unshift(notifItem);
+    this.users.set(me.id, me);
     this.users.set(target.id, target);
     this.savePersistedUsers();
 
@@ -4919,6 +4622,7 @@ export class PrismaService {
     senderNotification?: NotificationItem;
     message: string;
     error?: string;
+    code?: 'UNAVAILABLE';
   }> {
     const finalHandled: 'accepted' | 'declined' = action === 'accept' ? 'accepted' : 'declined';
     let user = this.users.get(userId);
@@ -4950,13 +4654,76 @@ export class PrismaService {
       return { success: false, handled: 'accepted', error: 'Bu davet zaten kabul edildi.', message: '' };
     }
 
-    notif.handled = finalHandled;
     const newSub =
       action === 'accept'
         ? notif.type === 'match_invite' || notif.type === 'duel'
           ? 'Düello kabul edildi! Odaya aktarılıyorsunuz...'
           : 'Arkadaşlık isteği kabul edildi. Artık arkadaşsınız!'
         : 'İstek reddedildi.';
+
+    if (notif.type === 'friend_request' || notif.type === 'friend') {
+      const senderId = typeof notif.senderId === 'string' ? notif.senderId : undefined;
+      if (action === 'accept' && (!senderId || senderId === user.id)) {
+        return { success: false, handled: finalHandled, error: 'İsteği gönderen oyuncu bulunamadı.', message: '' };
+      }
+      const senderNotification: NotificationItem = {
+        id: 'notif_fra_' + crypto.randomUUID(),
+        type: 'system',
+        title: `${user.displayName} arkadaşlık isteğini kabul etti!`,
+        sub: 'Artık Arkadaşlarım listesinde görebilir ve 1v1 düelloya davet edebilirsin.',
+        timeText: 'Az önce',
+        createdAt: Date.now(),
+        handled: 'accepted',
+      };
+      try {
+        const applied = await this.rawClient.$transaction(async (tx) => {
+          const claim = await tx.userNotification.updateMany({
+            where: { id: notificationId, userId: user.id, handled: null },
+            data: { handled: finalHandled, sub: newSub },
+          });
+          if (!claim.count) {
+            const existing = await tx.userNotification.findUnique({ where: { id: notificationId, userId: user.id } });
+            return { handled: existing?.handled, players: [] };
+          }
+          const players: PrismaUser[] = [];
+          if (action === 'accept' && senderId) {
+            for (const [id, otherId] of [[user.id, senderId], [senderId, user.id]].sort(([a], [b]) => a.localeCompare(b))) {
+              const player = await tx.user.findUniqueOrThrow({ where: { id } });
+              const friends = Array.isArray(player.friendIds) ? player.friendIds.filter((id): id is string => typeof id === 'string') : [];
+              if (!friends.includes(otherId)) friends.push(otherId);
+              players.push(await tx.user.update({ where: { id }, data: { friendIds: friends } }));
+            }
+            await tx.userNotification.create({ data: {
+              id: senderNotification.id,
+              userId: senderId,
+              type: senderNotification.type,
+              title: senderNotification.title,
+              sub: senderNotification.sub,
+              timeText: senderNotification.timeText,
+              handled: 'accepted',
+            } });
+          }
+          return { handled: finalHandled, players };
+        }, { isolationLevel: 'Serializable' });
+        if (applied.handled !== finalHandled) {
+          return { success: false, handled: finalHandled, error: 'Bu arkadaşlık isteği artık beklemiyor.', message: '' };
+        }
+        for (const player of applied.players) this.users.set(player.id, this.prismaUserToRecord(player));
+        presenceManager.notifyUser(user.id, 'notification:update', { id: notificationId, handled: finalHandled });
+        if (senderId && applied.players.length) {
+          presenceManager.notifyUser(senderId, 'notification:new', senderNotification);
+          queuePushForNotification(senderId, senderNotification);
+          presenceManager.notifyUser(senderId, 'friends:update', { friendId: user.id });
+          presenceManager.notifyUser(user.id, 'friends:update', { friendId: senderId });
+          return { success: true, handled: finalHandled, senderId, senderNotification, message: newSub };
+        }
+        return { success: true, handled: finalHandled, senderId, message: newSub };
+      } catch {
+        return { success: false, handled: finalHandled, code: 'UNAVAILABLE', error: 'Arkadaşlık isteği şu anda güncellenemedi. Lütfen tekrar deneyin.', message: '' };
+      }
+    }
+
+    notif.handled = finalHandled;
     notif.sub = newSub;
 
     // Update in PostgreSQL
@@ -4967,73 +4734,6 @@ export class PrismaService {
       });
     } catch (err: any) {
       console.warn('[respondToNotification] DB update error:', err.message);
-    }
-
-    let createdSenderNotif: NotificationItem | undefined;
-
-    if (notif.type === 'friend_request' || notif.type === 'friend') {
-      if (action === 'accept' && notif.senderId) {
-        if (!user.friendIds) user.friendIds = [];
-        if (!user.friendIds.includes(notif.senderId)) user.friendIds.push(notif.senderId);
-
-        let sender = this.users.get(notif.senderId);
-        try {
-          const dbSender = await this.rawClient.user.findUnique({ where: { id: notif.senderId } });
-          if (dbSender) {
-            sender = this.prismaUserToRecord(dbSender);
-            this.users.set(sender.id, sender);
-          }
-        } catch {}
-
-        if (sender) {
-          if (!sender.friendIds) sender.friendIds = [];
-          if (!sender.friendIds.includes(user.id)) sender.friendIds.push(user.id);
-
-          try {
-            await this.rawClient.user.update({
-              where: { id: user.id },
-              data: { friendIds: user.friendIds },
-            });
-            await this.rawClient.user.update({
-              where: { id: sender.id },
-              data: { friendIds: sender.friendIds },
-            });
-          } catch {}
-
-          this.users.set(sender.id, sender);
-
-          const senderNotif: NotificationItem = {
-            id: 'notif_fra_' + Date.now(),
-            type: 'system',
-            title: `${user.displayName} arkadaşlık isteğini kabul etti!`,
-            sub: 'Artık Arkadaşlarım listesinde görebilir ve 1v1 düelloya davet edebilirsin.',
-            timeText: 'Az önce',
-            createdAt: Date.now(),
-            handled: 'accepted',
-          };
-          createdSenderNotif = senderNotif;
-
-          try {
-            await this.rawClient.userNotification.create({
-              data: {
-                id: senderNotif.id,
-                userId: sender.id,
-                type: senderNotif.type,
-                title: senderNotif.title,
-                sub: senderNotif.sub,
-                timeText: senderNotif.timeText,
-                handled: 'accepted',
-              },
-            });
-          } catch {}
-
-          // WebSocket notify sender & self
-          presenceManager.notifyUser(sender.id, 'notification:new', senderNotif);
-          queuePushForNotification(sender.id, senderNotif);
-          presenceManager.notifyUser(sender.id, 'friends:update', { friendId: user.id });
-          presenceManager.notifyUser(user.id, 'friends:update', { friendId: sender.id });
-        }
-      }
     }
 
     this.users.set(user.id, user);
@@ -5061,7 +4761,6 @@ export class PrismaService {
       success: true,
       handled: finalHandled,
       senderId: notif.senderId || undefined,
-      senderNotification: createdSenderNotif,
       message: action === 'accept' ? 'İşlem başarıyla onaylandı.' : 'İstek reddedildi.',
     };
   }

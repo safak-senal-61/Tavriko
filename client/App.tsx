@@ -8,7 +8,8 @@ import {
   Nunito_800ExtraBold,
   Nunito_900Black,
 } from '@expo-google-fonts/nunito';
-import { View, ActivityIndicator, AppState, Platform } from 'react-native';
+import { View, AppState, Platform } from 'react-native';
+import { LoadingShimmer } from './src/components/LoadingShimmer';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { hydrateAuthStorage, getStoredAuth } from './src/utils/authStorage';
 import { useGameStore } from './src/store/gameStore';
@@ -20,7 +21,6 @@ import {
   hydrateAnalyticsConsent,
   type AnalyticsConsentValue,
 } from './src/services/analyticsConsent';
-import { AnalyticsConsentBanner } from './src/components/AnalyticsConsentBanner';
 
 // Sentry hata izleme: DSN doğrudan koda gömülüdür. Client DSN'leri gizli
 // değildir (her tarayıcı/mobil bundle'ında görünür), yalnızca olay GÖNDERME
@@ -167,18 +167,12 @@ function AppInner() {
   if (!fontsLoaded || !authReady) {
     return (
       <View style={{ flex: 1, backgroundColor: '#180B34', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#FFC43D" />
+        <LoadingShimmer wide label="Tavriko yükleniyor" />
       </View>
     );
   }
 
-  return (
-    <>
-      <RootNavigator />
-      {/* KVKK: analitik yalnızca açık onayla başlar; karar yoksa bandı göster */}
-      <AnalyticsConsentBanner onDecide={setAnalyticsConsentState} />
-    </>
-  );
+  return <RootNavigator onAnalyticsDecide={setAnalyticsConsentState} />;
 }
 
 // Sentry.wrap, SDK kapalıyken bile bileşeni değiştirmeden geçirir.

@@ -16,6 +16,10 @@ import { CategoryId, CategoryInfo, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
+import { categoryCounts, subCountKey } from '../utils/categoryCounts';
+import { PAGE_TTL } from '../utils/pageDataCache';
+import { categoriesUrl } from '../utils/pageResources';
+import { usePageData } from '../utils/usePageData';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -23,6 +27,7 @@ import {
   Button3D,
 } from '../components/TavrikoIcons';
 import { GuestDiscoveryCard } from '../components/DiscoveryArtwork';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import {
   DISCOVER_CATEGORY_IMG,
   DISCOVER_SUBCATEGORY_IMG,
@@ -30,6 +35,7 @@ import {
 } from '../components/DiscoverArtwork';
 
 interface CategoryExploreScreenProps {
+  wideLayout?: boolean;
   onBack: () => void;
   onSelectCategory: (categoryId: CategoryId, subCategory?: string) => void;
   onNavigateTab?: (tab: 'play' | 'explore' | 'leaders' | 'friends' | 'profile') => void;
@@ -105,6 +111,7 @@ const withAlpha = (hex: string, alpha: number): string => {
 type CategoryWithCounts = CategoryInfo & { totalQuestions: number };
 
 export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
+  wideLayout = false,
   onBack,
   onSelectCategory,
   onNavigateTab,
@@ -116,13 +123,19 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   onLoginPrompt,
   apiBaseUrl,
 }) => {
+  const page = usePlayerWebLayout();
+  const artSize = Math.round(84 * (page?.ui.art ?? 1));
+  const webCategoryArt = page?.roomy && { width: artSize, height: artSize };
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
-  const [liveCounts, setLiveCounts] = useState<Record<string, number>>({});
-  const [liveSubCounts, setLiveSubCounts] = useState<Record<string, number>>({});
+  const countsQuery = usePageData<CategoryInfo[]>(categoriesUrl(apiBaseUrl || DEFAULT_API_BASE), PAGE_TTL.categories);
+  const { main: liveCounts, sub: liveSubCounts } = useMemo(
+    () => categoryCounts(Array.isArray(countsQuery.data) ? countsQuery.data : []), [countsQuery.data],
+  );
   // Canlı sayılar yüklenene kadar statik (yanıltıcı) değerler gösterilmez;
   // sayı rozetlerinde "…" yer tutucusu görünür.
-  const [countsLoaded, setCountsLoaded] = useState(false);
+  const countsLoaded = Array.isArray(countsQuery.data);
+  const countLabel = (count?: number) => count !== undefined ? `${count} soru` : countsQuery.loading ? '…' : 'Sayı bilinmiyor';
   const [searchQuery, setSearchQuery] = useState('');
   const [activeGroup, setActiveGroup] = useState<GroupTab>('all');
   // Alt kategori seçim sayfası (bottom sheet) için seçili bölüm
@@ -142,40 +155,6 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
       }),
     ]).start();
   }, [fadeAnim, slideAnim]);
-
-  useEffect(() => {
-    const base = apiBaseUrl || DEFAULT_API_BASE;
-    let isMounted = true;
-    fetch(`${base}/categories`)
-      .then((res) => res.json())
-      .then((data: CategoryInfo[]) => {
-        if (!isMounted || !Array.isArray(data)) return;
-        const map: Record<string, number> = {};
-        const subMap: Record<string, number> = {};
-        for (const c of data) {
-          if (c && c.id) {
-            map[c.id] = c.totalQuestions;
-            for (const sc of c.subCategories || []) {
-              if (sc && sc.name) {
-                subMap[c.id + '::' + sc.name.trim().toLowerCase()] =
-                  sc.questionCount ?? 0;
-              }
-            }
-          }
-        }
-        setLiveCounts(map);
-        setLiveSubCounts(subMap);
-        setCountsLoaded(true);
-      })
-      .catch(() => {
-        // Hata olsa bile arayüz "…" üzerinde takılı kalmasın; statik değerler
-        // artık gerçekçi olmadığı için 0 üzerinden render edilir.
-        setCountsLoaded(true);
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, [apiBaseUrl]);
 
   // Kategoriler canlı soru sayılarıyla
   const categoriesWithRealCounts = useMemo((): CategoryWithCounts[] => {
@@ -263,7 +242,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   };
 
   return (
-    <TavrikoScreen>
+    <TavrikoScreen mainTab>
       <TavrikoTopBar
         leftType="bell"
         onLeftPress={onNotifications || onBack}
@@ -278,6 +257,8 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
+          Platform.OS === 'web' && styles.scrollContentWeb,
+          wideLayout && styles.scrollContentWide,
           isGuest && { paddingBottom: 36 },
         ]}
         showsVerticalScrollIndicator={false}
@@ -307,7 +288,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
               <Text style={styles.heroTitle}>KEŞFET</Text>
               <Text style={styles.heroSubtitle} numberOfLines={2}>
                 {visibleSections.length} bölüm · {totalSubCount} kategori ·{' '}
-                {countsLoaded ? `${totalQuestionCount}+ soru` : 'soru sayıları yükleniyor…'}
+                {countsLoaded ? `${totalQuestionCount}+ soru` : countsQuery.loading ? 'soru sayıları yükleniyor…' : 'soru sayıları alınamadı'}
               </Text>
               <TouchableOpacity
                 style={styles.heroRandom}
@@ -368,8 +349,8 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
             })}
           </ScrollView>
 
-          {/* Kategori Kartları — 2 sütunlu modern ızgara */}
-          <View style={styles.grid}>
+          {/* Kategori kartları: telefonda iki, geniş web'de üç sütun. */}
+          <View style={[styles.grid, wideLayout && styles.gridWide]}>
             {visibleSections.map((cat, idx) => {
               const accent = cat.primaryColor || '#8B5CF6';
               const art = DISCOVER_CATEGORY_IMG[cat.id];
@@ -377,7 +358,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                 <Reanimated.View
                   key={`${activeGroup}-${cat.id}`}
                   entering={FadeInDown.delay(Math.min(idx, 10) * 45).duration(320)}
-                  style={styles.catCell}
+                  style={[styles.catCell, wideLayout && styles.catCellWide]}
                 >
                   <TouchableOpacity
                     style={[
@@ -397,20 +378,20 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                           { boxShadow: `0 0 20px ${withAlpha(accent, 0.55)}` },
                         ]}
                       >
-                        <Image source={art} style={styles.catArt} />
+                        <Image source={art} style={[styles.catArt, webCategoryArt]} />
                       </View>
                     ) : (
                       <Text style={styles.catEmojiFallback}>
                         {(cat.subCategories && cat.subCategories[0]?.emoji) || '🎯'}
                       </Text>
                     )}
-                    <Text style={styles.catName} numberOfLines={2}>
+                    <Text style={[styles.catName, page?.roomy && styles.webCatName]} numberOfLines={2}>
                       {cat.name}
                     </Text>
                     <View style={styles.catMetaRow}>
                       <View style={styles.catCountPill}>
                         <Text style={styles.catCountText}>
-                          {countsLoaded ? `${cat.totalQuestions} soru` : '…'}
+                          {countLabel(liveCounts[cat.id])}
                         </Text>
                       </View>
                       <Text style={styles.catSubCount}>
@@ -490,7 +471,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                 <View style={styles.sheetStatsRow}>
                   <View style={styles.sheetStatPill}>
                     <Text style={styles.sheetStatText}>
-                      {countsLoaded ? `${sheetCategory.totalQuestions} soru` : '…'}
+                      {countLabel(liveCounts[sheetCategory.id])}
                     </Text>
                   </View>
                   <View style={styles.sheetStatPill}>
@@ -557,7 +538,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                             {sc.name}
                           </Text>
                           <Text style={styles.subChipCount}>
-                            {countsLoaded ? `${sc.questionCount ?? 0}` : '…'}
+                            {liveSubCounts[subCountKey(sheetCategory.id, sc.name)] ?? (countsQuery.loading ? '…' : '—')}
                           </Text>
                         </TouchableOpacity>
                       ))}
@@ -588,6 +569,8 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
     paddingHorizontal: 12,
   },
+  scrollContentWeb: { paddingBottom: 12 },
+  scrollContentWide: { paddingHorizontal: 0 },
 
   // Kahraman başlık kartı
   hero: {
@@ -715,6 +698,8 @@ const styles = StyleSheet.create({
   catCell: {
     width: '48.6%',
   },
+  gridWide: { justifyContent: 'flex-start', columnGap: '2%' },
+  catCellWide: { width: '32%' },
   catCard: {
     borderRadius: 22,
     borderWidth: 1.4,
@@ -742,6 +727,7 @@ const styles = StyleSheet.create({
     height: 84,
     resizeMode: 'contain',
   },
+  webCatName: { fontSize: 16, lineHeight: 21 },
   catEmojiFallback: {
     fontSize: 40,
     lineHeight: 92,

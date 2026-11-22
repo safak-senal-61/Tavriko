@@ -1,9 +1,15 @@
 import { Router, Request, Response } from 'express';
+import { isIP } from 'node:net';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
+import { waitUntil } from '@vercel/functions';
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
 import { UserProfile, LEGAL_VERSION, REQUIRED_LEGAL_DOCUMENTS, LegalConsentRecord } from '@trivia/shared';
 import { logger } from '../utils/logger';
 import { requireUserAuth } from '../middleware/auth';
+import { getOneSignalEmailConfig, sendOneSignalAccountRemovalEmail, sendOneSignalPasswordResetEmail } from '../services/oneSignalEmail';
+import { confirmPasswordReset, getPasswordResetSecret, issuePasswordReset, PASSWORD_RESET_RESEND_SECONDS } from '../services/passwordReset';
+import { accountRemovalEmail, confirmAccountRemoval, issueAccountRemoval, REMOVAL_RESEND_SECONDS, type RemovalTarget } from '../services/accountRemoval';
 
 const LEGAL_CONSENT_REQUIRED_ERROR =
   'Devam etmek için Kullanım Koşulları, Gizlilik Politikası ve KVKK Aydınlatma Metni’ni onaylamalısın.';
@@ -18,6 +24,25 @@ function buildLegalConsent(method: LegalConsentRecord['method']): LegalConsentRe
 }
 
 const router = Router();
+
+// Vercel overwrites this header at its edge. Do not trust a client-supplied
+// forwarding header on standalone servers, or change Express trust globally.
+const rateLimitKey = (req: Request): string => {
+  const forwarded = process.env.VERCEL === '1' ? req.get('x-forwarded-for')?.trim() : undefined;
+  const ip = forwarded && isIP(forwarded) ? forwarded : req.ip || req.socket.remoteAddress;
+  return ip && isIP(ip) ? ipKeyGenerator(ip) : 'unknown';
+};
+const rateLimitOptions = {
+  keyGenerator: rateLimitKey,
+  standardHeaders: 'draft-8' as const,
+  legacyHeaders: false,
+  message: { error: 'Çok fazla istek. Lütfen birkaç dakika sonra tekrar deneyin.' },
+};
+const signedRemovalRequestLimit = rateLimit({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const publicRemovalRequestLimit = rateLimit({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const signedRemovalConfirmLimit = rateLimit({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const publicRemovalConfirmLimit = rateLimit({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const sessionProfileLimit = rateLimit({ ...rateLimitOptions, windowMs: 60_000, limit: 120 });
 
 const GOOGLE_CLIENT_ID =
   process.env.GOOGLE_CLIENT_ID ||
@@ -533,84 +558,171 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// SECURITY: account deletion requires the account owner's verified session token.
-router.post('/delete-account', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
+const REMOVAL_UNAVAILABLE = 'Hesap silme doğrulaması şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.';
+const REMOVAL_ACCEPTED = 'Bu adres bir Tavriko hesabına bağlıysa doğrulama kodu e-postayla gönderilir. Gelen kutunuzu ve spam klasörünüzü kontrol edin.';
+const INVALID_REMOVAL_CODE = 'Kod geçersiz, kullanılmış veya süresi dolmuş. Gerekirse yeni bir kod isteyin.';
+
+router.post('/delete-account/request', signedRemovalRequestLimit, requireUserAuth, async (req: Request, res: Response): Promise<void> => {
+  res.set('Cache-Control', 'no-store');
+  const config = getOneSignalEmailConfig();
+  const secret = getPasswordResetSecret();
+  if (!config || !secret) {
+    res.status(503).json({ error: REMOVAL_UNAVAILABLE });
+    return;
+  }
   try {
-    const userId = req.authUserId;
-    if (!userId) {
-      res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
+    // Ignore all client-supplied destinations and use the authenticated account.
+    const result = await issueAccountRemoval(db.rawClient, { id: req.authUserId! }, secret);
+    if (result.status === 'unavailable') {
+      res.status(400).json({ error: 'Doğrulama kodu için hesabınıza kayıtlı bir e-posta adresi olmalıdır.' });
       return;
     }
-    const result = await db.deleteAccount(userId);
-    res.json(result);
-  } catch (err) {
-    logger.error('AUTH', 'Hesap silme işlemi başarısız', { error: err instanceof Error ? err.name : 'unknown' });
-    res.status(500).json({ error: 'Hesap silme işlemi tamamlanamadı.' });
+    if (result.status === 'cooldown') {
+      res.json({ success: true, delivery: 'previous-request', resendAfterSeconds: result.remaining });
+      return;
+    }
+    if (!await sendOneSignalAccountRemovalEmail(config, result)) {
+      res.status(503).json({ delivery: 'unconfirmed', resendAfterSeconds: REMOVAL_RESEND_SECONDS });
+      return;
+    }
+    res.json({ success: true, delivery: 'accepted', resendAfterSeconds: REMOVAL_RESEND_SECONDS });
+  } catch {
+    logger.error('AUTH', 'Hesap silme kodu hazırlanamadı.');
+    res.status(503).json({ error: REMOVAL_UNAVAILABLE });
   }
 });
 
-// KVKK: /remove-account web sayfasının e-posta ile hesap silme akışı.
-// E-posta altyapısı olmadığından doğrulama kodu yanıtta gösterilir (şifre
-// sıfırlamadaki demoResetCode deseniyle aynı).
-router.post('/request-delete-code', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { email } = req.body || {};
-    const result = await db.requestAccountDeletionCode(String(email || ''));
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+// Public account removal does not disclose whether the address is registered.
+router.post('/request-delete-code', publicRemovalRequestLimit, (req: Request, res: Response): void => {
+  res.set('Cache-Control', 'no-store');
+  const email = accountRemovalEmail(req.body?.email);
+  if (!email) {
+    res.status(400).json({ error: 'Geçerli bir e-posta adresi girin.' });
+    return;
   }
+  const config = getOneSignalEmailConfig();
+  const secret = getPasswordResetSecret();
+  if (!config || !secret) {
+    res.status(503).json({ error: REMOVAL_UNAVAILABLE });
+    return;
+  }
+  const delivery = Promise.resolve().then(async () => {
+    const removal = await issueAccountRemoval(db.rawClient, { email }, secret);
+    if (removal.status === 'issued') await sendOneSignalAccountRemovalEmail(config, removal);
+  }).catch(() => { logger.error('AUTH', 'Hesap silme kodu hazırlanamadı.'); });
+  if (process.env.VERCEL) waitUntil(delivery);
+  res.json({ success: true, message: REMOVAL_ACCEPTED, resendAfterSeconds: REMOVAL_RESEND_SECONDS });
 });
 
-router.post('/confirm-delete', async (req: Request, res: Response): Promise<void> => {
+async function finishAccountRemoval(req: Request, res: Response, target: RemovalTarget): Promise<void> {
+  res.set('Cache-Control', 'no-store');
+  const code = req.body?.code;
+  if (typeof code !== 'string' || !/^[0-9]{6}$/.test(code.trim())) {
+    res.status(400).json({ error: 'E-postanızdaki 6 haneli doğrulama kodunu girin.' });
+    return;
+  }
+  const secret = getPasswordResetSecret();
+  if (!secret) {
+    res.status(503).json({ error: REMOVAL_UNAVAILABLE });
+    return;
+  }
   try {
-    const { email, code } = req.body || {};
-    const result = await db.confirmAccountDeletion(String(email || ''), String(code || ''));
-    if (!result.success) {
-      res.status(400).json(result);
+    const removed = await confirmAccountRemoval(db.rawClient, target, code.trim(), secret);
+    if (!removed) {
+      res.status(400).json({ error: INVALID_REMOVAL_CODE });
       return;
     }
-    res.json(result);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    db.forgetDeletedAccount(removed.id);
+    res.json({ success: true, message: 'Tavriko hesabınız kalıcı olarak silindi.' });
+  } catch {
+    logger.error('AUTH', 'Hesap silme doğrulaması tamamlanamadı.');
+    res.status(503).json({ error: REMOVAL_UNAVAILABLE });
   }
+}
+
+router.post('/delete-account', signedRemovalConfirmLimit, requireUserAuth, async (req, res) => {
+  await finishAccountRemoval(req, res, { id: req.authUserId! });
 });
+
+router.post('/confirm-delete', publicRemovalConfirmLimit, async (req, res) => {
+  const email = accountRemovalEmail(req.body?.email);
+  if (!email) {
+    res.set('Cache-Control', 'no-store').status(400).json({ error: 'Geçerli bir e-posta adresi girin.' });
+    return;
+  }
+  await finishAccountRemoval(req, res, { email });
+});
+
+const RESET_UNAVAILABLE = 'Şifre sıfırlama şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.';
+const RESET_ACCEPTED = 'Bu e-posta bir şifreli hesaba bağlıysa doğrulama kodu gönderilir. Gelen kutunuzu ve spam klasörünüzü kontrol edin.';
+
+function readResetIdentifier(body: Request['body']): string | null {
+  const value = body?.identifier ?? body?.email;
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || normalized.length > 254) return null;
+  return normalized;
+}
 
 router.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { identifier, email } = req.body;
-    const target = identifier || email;
-    if (!target) {
-      res.status(400).json({ error: 'Lütfen kayıtlı e-posta adresinizi veya kullanıcı adınızı girin.' });
-      return;
-    }
-
-    // SECURITY: the one-time code is delivered out-of-band (email), NEVER returned in
-    // the HTTP response. A generic response is sent whether or not the account exists
-    // to prevent user enumeration.
-    await db.requestPasswordReset(target).catch(() => undefined);
-    res.json({
-      success: true,
-      message: 'Şifre sıfırlama kodu kayıtlı e-posta adresinize gönderildi.',
-    });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
+  res.set('Cache-Control', 'no-store');
+  const target = readResetIdentifier(req.body);
+  if (!target) {
+    res.status(400).json({ error: 'Lütfen kayıtlı e-posta adresinizi veya kullanıcı adınızı girin.' });
+    return;
   }
+  const config = getOneSignalEmailConfig();
+  const secret = getPasswordResetSecret();
+  if (!config || !secret) {
+    res.status(503).json({ error: RESET_UNAVAILABLE });
+    return;
+  }
+  // Keep account lookup, the expensive OTP derivation and delivery out of the
+  // public response path, so eligibility is not revealed by processing time.
+  const delivery = Promise.resolve().then(async () => {
+    const reset = await issuePasswordReset(db.rawClient, target, secret);
+    if (reset) await sendOneSignalPasswordResetEmail(config, reset);
+  }).catch(() => {
+    logger.error('AUTH', 'Şifre sıfırlama kodu hazırlanamadı.');
+  });
+  if (process.env.VERCEL) waitUntil(delivery);
+  res.json({
+    success: true,
+    message: RESET_ACCEPTED,
+    resendAfterSeconds: PASSWORD_RESET_RESEND_SECONDS,
+  });
 });
 
 router.post('/reset-password', async (req: Request, res: Response): Promise<void> => {
+  res.set('Cache-Control', 'no-store');
+  const target = readResetIdentifier(req.body);
+  const { otpCode, code, newPassword } = req.body || {};
+  const finalCode = otpCode ?? code;
+  if (!target || typeof finalCode !== 'string' || !/^\d{6}$/.test(finalCode.trim())) {
+    res.status(400).json({ error: '6 haneli doğrulama kodunu eksiksiz girin.' });
+    return;
+  }
+  if (typeof newPassword !== 'string' || newPassword.length < 8 || Buffer.byteLength(newPassword) > 72) {
+    res.status(400).json({ error: 'Yeni şifre en az 8 karakter olmalı ve 72 baytı aşmamalıdır.' });
+    return;
+  }
+  const secret = getPasswordResetSecret();
+  if (!secret) {
+    res.status(503).json({ error: RESET_UNAVAILABLE });
+    return;
+  }
   try {
-    const { identifier, email, otpCode, code, newPassword } = req.body;
-    const target = identifier || email;
-    const finalCode = otpCode || code;
-    if (!target || !finalCode || !newPassword) {
-      res.status(400).json({ error: 'Tüm alanların doldurulması zorunludur.' });
+    const confirmed = await confirmPasswordReset(db.rawClient, {
+      identifier: target, code: finalCode.trim(), password: newPassword,
+    }, secret);
+    if (!confirmed) {
+      res.status(400).json({ error: 'Kod geçersiz, kullanılmış veya süresi dolmuş. Gerekirse yeni kod isteyin.' });
       return;
     }
-    const result = await db.confirmPasswordReset(target, finalCode, newPassword);
-    res.json(result);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    res.json({ success: true, message: 'Şifreniz başarıyla yenilendi!' });
+  } catch {
+    logger.error('AUTH', 'Şifre sıfırlama doğrulaması tamamlanamadı.');
+    res.status(503).json({ error: RESET_UNAVAILABLE });
   }
 });
 
@@ -625,6 +737,12 @@ router.put('/profile', requireUserAuth, async (req: Request, res: Response): Pro
       return;
     }
 
+    // The mailbox is the second factor for password reset and account removal.
+    // Profile editing must not let a session silently change that destination.
+    if (req.body?.email !== undefined) {
+      res.status(400).json({ error: 'Kayıtlı e-posta adresi profil düzenleme ekranından değiştirilemez.' });
+      return;
+    }
     logger.info('AUTH', `Profil güncelleme isteği: userId=${userId}, avatarUrl=${req.body.avatarUrl || 'değişmedi'}, displayName=${req.body.displayName || 'değişmedi'}`);
     const updated = await db.updateUserProfile(userId, req.body);
     logger.success('AUTH', `Profil başarıyla güncellendi ve veritabanına işlendi: ${userId} -> avatar: ${updated.avatarUrl}`);
@@ -775,7 +893,7 @@ router.post('/sync-wallet', requireUserAuth, async (req: Request, res: Response)
   }
 });
 
-router.get('/me', (req: Request, res: Response): void => {
+router.get('/me', sessionProfileLimit, async (req: Request, res: Response): Promise<void> => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Yetkilendirme başlığı eksik' });
@@ -789,7 +907,7 @@ router.get('/me', (req: Request, res: Response): void => {
     return;
   }
 
-  const profile = db.getUserProfile(payload.userId);
+  const profile = await db.getUserProfileAsync(payload.userId);
   if (!profile) {
     res.status(404).json({ error: 'Kullanıcı bulunamadı' });
     return;

@@ -63,34 +63,14 @@ const SENSITIVE_KEYS = /pass|token|secret|authorization|otp|code|cookie/i;
 // SECURITY: redact sensitive fields (passwords, tokens, OTP codes) before writing
 // request payloads to logs. Logs are readable from the admin portal and must never
 // contain credentials in plaintext.
-function redactSensitiveBody(body: any): any {
-  if (!body || typeof body !== 'object') return body;
+function redactSensitiveBody(body: unknown): unknown {
   try {
-    const clone: any = Array.isArray(body) ? [] : {};
-    for (const key of Object.keys(body)) {
-      const value = body[key];
-      if (SENSITIVE_KEYS.test(key)) {
-        clone[key] = '[REDACTED]';
-      } else if (value && typeof value === 'object') {
-        clone[key] = redactSensitiveBody(value);
-      } else {
-        clone[key] = value;
-      }
-    }
-    return clone;
-  } catch {
-    return '[redacted]';
-  }
-}
-
-function redactSensitiveQuery(query: any): any {
-  if (!query || typeof query !== 'object') return query;
-  try {
-    const clone: any = {};
-    for (const key of Object.keys(query)) {
-      clone[key] = SENSITIVE_KEYS.test(key) ? '[REDACTED]' : query[key];
-    }
-    return clone;
+    if (Array.isArray(body)) return body.map(redactSensitiveBody);
+    if (!body || typeof body !== 'object') return body;
+    // fromEntries defines own data properties instead of invoking inherited setters.
+    return Object.fromEntries(Object.entries(body).map(([key, value]) => [
+      key, SENSITIVE_KEYS.test(key) ? '[REDACTED]' : redactSensitiveBody(value),
+    ]));
   } catch {
     return '[redacted]';
   }
@@ -186,10 +166,13 @@ export function createApp() {
   // Global HTTP Request & Error Logger Middleware
   app.use((req, res, next) => {
     const start = Date.now();
+    // Express may strip a mounted router's prefix from req.path before finish.
+    const requestPath = req.path;
+    const isAccountSecurity = /^\/api\/auth\/(?:(?:forgot|reset)-password|request-delete-code|confirm-delete|delete-account(?:\/request)?)\/?$/i.test(requestPath);
     res.on('finish', () => {
       const duration = Date.now() - start;
       const lvl = res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'INFO';
-      const cat = req.path.includes('/auth') ? 'AUTH' : 'HTTP';
+      const cat = isAccountSecurity || req.path.includes('/auth') ? 'AUTH' : 'HTTP';
       if (
         /^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/(?:ops|accounts)(?:\/|$)/i.test(req.path) ||
         req.path === '/favicon.ico' ||
@@ -204,11 +187,13 @@ export function createApp() {
       logger.log(
         cat,
         lvl,
-        `${req.method} ${req.originalUrl} -> ${res.statusCode} (${duration}ms)`,
+        `${req.method} ${isAccountSecurity ? requestPath : req.originalUrl} -> ${res.statusCode} (${duration}ms)`,
         {
           ip: req.ip,
-          query: Object.keys(req.query).length ? redactSensitiveQuery(req.query) : undefined,
-          body: req.method !== 'GET' && Object.keys(req.body || {}).length ? redactSensitiveBody(req.body) : undefined,
+          query: !isAccountSecurity && Object.keys(req.query).length ? redactSensitiveBody(req.query) : undefined,
+          body: req.method !== 'GET' &&
+            !isAccountSecurity &&
+            Object.keys(req.body || {}).length ? redactSensitiveBody(req.body) : undefined,
         }
       );
     });

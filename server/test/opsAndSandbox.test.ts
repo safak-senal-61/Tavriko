@@ -167,4 +167,17 @@ describe('Admin and storefront routes', () => {
     expect((await purchase({ userId:'not-the-buyer', productId:'coins_1000', paymentMethod:'try' })).status).toBe(200);
     expect(db.purchaseShopProduct).toHaveBeenCalledWith('signed-player', 'coins_1000', 'gems', undefined);
   });
+  it('serves the new frame listings and uses the signed account for frame rentals', async () => {
+    const app = express().use(express.json()).use(social);
+    const catalog = await request(app).get('/shop/catalog');
+    expect(catalog.status).toBe(200);
+    expect(catalog.body.catalog).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'frame_dragon_phoenix', category: 'frames', currency: 'gems' }),
+      expect.objectContaining({ id: 'frame_steampunk', category: 'frames', currency: 'gems' }),
+    ]));
+    const rental = await request(app).post('/shop/purchase').set('Authorization', 'Bearer player')
+      .send({ userId: 'not-the-buyer', productId: 'frame_steampunk', durationId: '1d' });
+    expect(rental.status).toBe(200);
+    expect(db.purchaseShopProduct).toHaveBeenCalledExactlyOnceWith('signed-player', 'frame_steampunk', 'gems', '1d');
+  });
 });

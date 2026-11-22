@@ -1,5 +1,25 @@
 # Visual refresh acceptance and regression checks
 
+## Responsive player web app
+- At 1032×1376 (13-inch iPad Pro in portrait), Home shows a full-width game banner above the four mode cards. Rotate to landscape: the banner and modes sit side by side. The fixed bottom row must not cover scrollable content in either orientation.
+- At 768px, 1032px, 1376px, and 1920px, switch through Oyna, Keşfet, Liderler, Arkadaşlar, and Profil: the outer frame and bottom navigation must keep the same horizontal and vertical position. Test the Lig Puanı and Toplam XP tabs and scroll to the last player. At desktop width check both columns; portrait tablet keeps the list below the podium.
+- Open `/app` signed out: verify the complete splash artwork and that the desktop utility panel does not appear over it. Dismiss the analytics prompt; in a short window both choices must remain reachable without zooming out.
+- Cycle through Giriş Yap, Kayıt Ol and Şifremi Unuttum?; enter Misafir olarak göz at, search in Keşfet, open and close a category, and use the guest sign-in card to return to login. Resize without losing text entered in the form.
+- With a synthetic signed-in player, verify HIZLI EŞLEŞME and all four game modes, the daily streak, five feature tiles and five bottom tabs. Check inbox and return, open/cancel matchmaking, open the room creation/join tabs and verify quiz answers remain reachable in a short landscape viewport.
+- Check portrait mobile (320px and 375px), tablets (768px and 1024px), desktop (1280px and 1568px) and a short desktop window. Keep the phone design, use two columns where there is room, prevent horizontal page overflow, and keep the bottom navigation clear of scrollable content. On desktop, check the QR and both developer shortcuts.
+- Check all 30 player routes against `client/src/navigation/webLayout.ts`: dashboard shell, centered workspace, and game/recovery focus layouts. A focus screen can hide the QR panel, but its background fills the frame and the content remains readable. A dashboard or workspace does not leave an empty QR lane.
+- Profil: confirm the identity card, the five profile tabs and the summary grid share the same left and right edges. Open Ustalık, Unvan, Ayar and Hesap; open Karakter and Düzenle; resize and check the last field and save button can be reached without changing account data.
+- Check the six achievement cards on both personal and friend profiles: the grid matches the stats width, artwork and labels are larger on roomy web screens, and locked/earned states still fit. Resize in place between phone, tablet and desktop; check the Ustalık and Unvan grids, the bottom tabs, and the shared button hit areas. Compare Shop and Inventory art, Özel Oda form choices, and Difficulty controls without completing a purchase or changing a real account.
+- Özel Oda: on desktop and wide iPad, rules and privacy controls sit side by side in Oda Kur; code input and open rooms sit side by side in Odaya Katıl. On a narrow tablet, stack the same sections. Change question count, toggle Oda Şifresi, open/cancel category selection, and verify the form can scroll to Odayı Oluştur. Check empty and populated room lists using fixtures.
+- Open Mağaza, Etkinlik, Envanter, Pro Lig and Sezon and check all visible tabs, card columns, and bottom navigation. Open Ayarlar, Bildirimler, Günlük Görev, Arkadaş Profili and practice setup from their entry points; check the last control is reachable by scrolling. Check room lobby, question, intermission, results and recovery states with local fixture data.
+
+## Web guest reload and friend code entry
+- Login: dismiss the analytics prompt, switch between “Giriş Yap” and “Kayıt Ol”, and return to login. Select “Misafir olarak göz at” and expect Keşfet and the guest sign-in card, without a registered-user notification badge.
+- Reload in Keşfet after entering as a server guest, after the guest endpoint fails, and while it is still pending. Keep the guest restriction and show Keşfet, not the login screen. Existing locally stored `guest_local_` profiles must also restore as guests. Intentionally tapping the guest sign-in card must still open login.
+- Friends: with an isolated account, open “+ Arkadaş Ekle”. The code field shows a fixed `TV-`, uppercases typed input, accepts a full pasted code without duplicating its prefix, and leaves `TV-` visible after select-all/backspace or a successful send. An empty suffix does not make a request.
+- Switch to “Kullanıcı adıyla ekle” and back. Username submission keeps its original text, and only code submissions get a `TV-` prefix. Verify the API payload, success/error feedback, and check the form at desktop and 375px. Do not send real requests to production accounts.
+- Local Chromium QA: confirmed all four guest reload cases (including the legacy profile), deliberate account sign-in and reload, and both friend request modes at 1280px and 375px. Used intercepted API responses and synthetic accounts.
+
 ## Mobile room invitations and notification actions
 - Home and Friends: one unread notification shows a compact round `1` against the bell; zero hides the badge and wider counts remain readable. Tap the bell to open the inbox and return with the badge cleared.
 - Inbox: private room, duel and friend notices get different primary labels. Verify accept and decline dispatch the correct action, only the tapped action shows progress, and an error leaves the invitation actionable.
@@ -126,3 +146,38 @@
 - İlk yanıt hedefi geçen açık talepler ekip sorumlusunun gecikenler görünümünde yer alır; yalnızca dahili işlem veya atama süreyi durdurmaz.
 - Personel kendi oturumlarını listeler ve başka bir oturumu kapatır. Portal sahibi diğer personelin oturumlarını da kapatabilir. Passkey kurulumu ve doğrulanmış oturumla yeniden giriş, mevcut parola/TOTP seçeneğini bozmaz.
 - Hızlı Düello hunisi kayıt, seçim, doğrulanmış eşleşme ve aynı odada tamamlanan maç sayılarını gösterir. Kapsam başlangıcı veya olgunlaşmış kayıt yoksa oran göstermez.
+
+## OneSignal password reset
+
+- From login, open “Şifremi Unuttum?”, enter a registered email, and select “SIFIRLAMA KODU GÖNDER”. Expect instructions to check the inbox, no code in the HTTP response or on the screen, and a six-digit code in the transactional email only. Unknown addresses get the same public response and no email.
+- Enter the code and matching new passwords, then select “ŞİFREMİ YENİLE”. Expect a return to login with confirmation, no automatic login, and successful sign-in with the new password only.
+- Check service unavailable, wrong code, five failed attempts, expired/used codes, repeat send, and email change. A resend has a 60-second account-level cooldown. The reset and its confirmation must work across separate app instances; an account-deletion code cannot reset a password.
+- Run the web flow on desktop and 375px mobile, then recheck login/register switching and guest exploration. Use an isolated account, mock delivery locally, and only send real mail to an authorized test inbox after production configuration.
+
+## Player page data reuse (web and Android)
+
+- Open Keşfet, open a category and return, then open the category list in Özel Oda. Question counts should stay visible and come from one shared snapshot.
+- Open Liderlik and Pro Lig in turn, switch ranking tabs, inspect a player and return. Re-entry should show the last successful list without blocking while a stale list refreshes.
+- Open Arkadaşlar, lobby invitations, Etkinlikler and Bildirimler, then revisit. Check fresh cache reuse, an empty result, a failed refresh and a successful mutation or socket event without stale results replacing newer data.
+- Check public rooms with and without a realtime room snapshot, and leave/re-enter. Timers, live room data, gameplay, authentication, purchases and wallet writes must not be served from a page cache.
+- Open support cases and referral panels twice, then switch accounts. No private result or pending response may carry over to the next account.
+
+## Loading placeholders
+
+- With an uncached and delayed response, open Liderlik, Pro Lig, Arkadaşlar, Etkinlikler, Bildirimler, and Herkese Açık Odalar. Expect content-shaped shimmer placeholders rather than a spinner, then the real result, empty state, or retry action.
+- Open a player profile and the invite/support panels with a cold cache. Reopen with a warm cache and verify no placeholder flashes. Turn on reduced motion or battery saver and confirm the placeholders remain still.
+- Delay sign-in or a test-only button action. Expect a short shimmer instead of a spinner; the original result and error behavior must stay unchanged.
+
+## Store frame collection
+
+- Open Mağaza → Çerçeveler. Check Kraliyet Altın, Alev, Siber Neon, Ejderha ve Anka, Buhar Zırhı and Buz Kristal. Each visible frame should hug the avatar without a colored rectangle, opaque hole, or jagged fringe.
+- Open a frame with Büyüt, close it and open a different frame. The large preview animates after it loads; with reduced motion or battery saver it stays sharp and still. Preview art must not cover the name or buttons on a narrow phone.
+- For an authorized test account or mocked purchase, select a duration and confirm with gems. The newly active rental should appear with the same artwork in Envanter and on the profile. Existing frame ownership and rentals retain their original IDs and prices.
+
+## Account removal
+
+- At `/legal`, follow “Hesabımı sil”. In the game, open Settings → Sözleşmeler ve Politikalar and click “Hesabımı ve tüm verilerimi sil (web)”. Web navigates in the same tab; Android opens the public page in the browser.
+- On `/remove-account`, request a code with a synthetic address. The first response must not distinguish registered and unknown addresses or contain the OTP. At desktop and 375px, exercise the resend timer, changing the email, invalid code, the explicit acknowledgement and a stubbed successful response. Use only localhost fixtures.
+- In Settings → Hesap, open “Hesabımı Kalıcı Olarak Sil”. “Evet, Kod Gönder” makes an authenticated request, but does not delete anything. “Doğrula ve Sil” requires six digits and the server uses the signed-in account, never a request-supplied user ID or destination. Cancel and incorrect code leave the user signed in; only a successful deletion clears local account state. Old Android builds that submit no code must use the web flow or update.
+- Ordinary profile edits must not change the registered email address used for the verification code.
+- Removal and password-reset codes are separate. Removal codes expire after 15 minutes, have a 60-second resend interval and five incorrect attempts across resends while the code window is active. The database verification and removal operation is atomic. Manual restores and historical backups are not part of this operation.

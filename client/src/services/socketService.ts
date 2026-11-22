@@ -582,11 +582,12 @@ export class SocketService {
     this.sendEnvelope(SOCKET_EVENTS.START_GAME, { roomCode, playerId });
   }
 
-  public submitAnswer(roomCode: string, playerId: string, selectedOptionId: string): void {
+  public submitAnswer(roomCode: string, playerId: string, selectedOptionId: string, roundNumber: number): void {
     this.sendEnvelope(SOCKET_EVENTS.SUBMIT_ANSWER, {
       roomCode,
       playerId,
       selectedOptionId,
+      roundNumber,
       clientTimestamp: Date.now(),
     });
   }

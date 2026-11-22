@@ -11,6 +11,7 @@ import {
   StyleProp,
   Image,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import Svg, {
   Defs,
@@ -31,6 +32,8 @@ import { NotificationBell } from './NotificationUI';
 import { useUnreadCount } from '../store/notificationStore';
 import { BackgroundScene, backgroundFor } from './StoreKit';
 import { getCosmeticDef, UserProfile } from '@trivia/shared';
+import { WEB_TAB_WIDE_WIDTH } from '../navigation/webLayout';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 // Brand Assets
 export const BRAND_LOGO_MAIN = cdnImage('images/brand/logo_full.png');
 export const BRAND_LOGO_BANNER = cdnImage('images/brand/logo_full.png');
@@ -1055,10 +1058,11 @@ export const useProTheme = (
 export const TavrikoScreen: React.FC<{
   children: React.ReactNode;
   style?: ViewStyle;
+  mainTab?: boolean;
   /* Görüntülenen kullanıcının profili (arkadaş profili gibi): verilirse
      ekran arka planı ve tema o kullanıcının kuşandığı arka plandan alınır. */
   profileUser?: UserProfile | null;
-}> = ({ children, style, profileUser }) => {
+}> = ({ children, style, profileUser, mainTab }) => {
   // Kuşanılmış profil arka planı: süresi dolmamışsa tüm uygulamanın arka planını değiştirir.
   const storeUser = useGameStore((s) => s.user);
   const bgSource = profileUser ?? storeUser;
@@ -1069,8 +1073,19 @@ export const TavrikoScreen: React.FC<{
   const bgIsImage = activeBg ? !!backgroundFor(activeBg) : false;
   // PRO/VIP teması: arayüz vurgu renkleri de arka planla değişir
   const proTheme = useProTheme(profileUser);
+  const { width } = useWindowDimensions();
+  const page = usePlayerWebLayout();
+  const wideTab = mainTab && Platform.OS === 'web' && width >= WEB_TAB_WIDE_WIDTH;
   return (
-    <View style={[styles.screenRoot, style]}>
+    <View
+      testID={page?.roomy ? 'player-web-page' : undefined}
+      style={[
+        styles.screenRoot,
+        wideTab && styles.webTabScreen,
+        style,
+        page?.roomy && { minHeight: 0, paddingTop: 14, paddingHorizontal: page.pageInset },
+      ]}
+    >
       {/* Kuşanılmış arka plan: uygulama geneli */}
       {activeBg && (
         <View style={styles.equippedBgLayer} pointerEvents="none">
@@ -1286,6 +1301,7 @@ export const Button3D: React.FC<{
   textStyle?: StyleProp<TextStyle>;
   testID?: string;
 }> = ({ title, variant = 'gold', onPress, disabled, style, textStyle, testID }) => {
+  const page = usePlayerWebLayout();
   const variantContainer =
     variant === 'mint'
       ? styles.btn3DMint
@@ -1318,11 +1334,12 @@ export const Button3D: React.FC<{
       style={[
         styles.btn3DBase,
         variantContainer,
+        page?.roomy && { minHeight: page.ui.buttonHeight },
         disabled && { opacity: 0.55 },
         style,
       ]}
     >
-      <Text style={[styles.btn3DTextBase, variantText, textStyle]}>{title}</Text>
+      <Text style={[styles.btn3DTextBase, variantText, page?.roomy && { fontSize: page.ui.buttonLabel }, textStyle]}>{title}</Text>
     </TouchableOpacity>
   );
 };
@@ -1353,18 +1370,27 @@ const NavBarBase = <K extends string>({
   activeKey,
   onSelect,
   raisedKey,
+  inFlow,
 }: {
   items: NavItemDef<K>[];
   activeKey: K;
   onSelect: (k: K) => void;
   raisedKey?: K;
+  inFlow?: boolean;
 }) => {
   const [w, setW] = useState(0);
+  const page = usePlayerWebLayout();
+  const ui = page?.roomy ? page.ui : undefined;
+  const labelSize = ui && { fontSize: ui.navLabel };
   const slot = w > 0 ? (w - 12) / items.length : 0;
   const idx = items.findIndex((i) => i.key === activeKey);
   const showPill = idx >= 0 && items[idx].key !== raisedKey;
   return (
-    <View style={styles.bottomNav} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+    <View
+      style={[styles.bottomNav, inFlow && styles.bottomNavInFlow, ui && { height: ui.navHeight }]}
+      accessibilityRole="tablist"
+      onLayout={(e) => setW(e.nativeEvent.layout.width)}
+    >
       <View style={styles.navSheen} pointerEvents="none" />
       {w > 0 && showPill && (
         <View
@@ -1384,25 +1410,39 @@ const NavBarBase = <K extends string>({
         };
         if (item.key === raisedKey) {
           return (
-            <TouchableOpacity key={item.key} style={styles.navItem} onPress={press} activeOpacity={0.85}>
+            <TouchableOpacity
+              key={item.key}
+              style={styles.navItem}
+              onPress={press}
+              activeOpacity={0.85}
+              accessibilityRole="tab"
+              aria-selected={isActive}
+            >
               <View style={styles.navRaised}>
                 <GradientFill direction="vertical" colors={['#FFD970', '#FFB21E']} />
                 <View style={styles.navRaisedIcon}>
-                  <Svg width={22} height={22} viewBox="0 0 64 64">
+                  <Svg width={ui?.navIcon ?? 22} height={ui?.navIcon ?? 22} viewBox="0 0 64 64">
                     <Path d="M22 12l30 20-30 20z" fill="#2A1200" stroke="#2A1200" strokeWidth="6" strokeLinejoin="round" />
                   </Svg>
                 </View>
               </View>
-              <Text style={[styles.navLabel, styles.navLabelRaised]} numberOfLines={1}>
+              <Text style={[styles.navLabel, labelSize, styles.navLabelRaised]} numberOfLines={1}>
                 {item.label}
               </Text>
             </TouchableOpacity>
           );
         }
         return (
-          <TouchableOpacity key={item.key} style={styles.navItem} onPress={press} activeOpacity={0.8}>
-            <NavIcon tab={item.key as any} active={isActive} size={22} />
-            <Text style={[styles.navLabel, isActive && styles.navLabelActive]} numberOfLines={1}>
+          <TouchableOpacity
+            key={item.key}
+            style={styles.navItem}
+            onPress={press}
+            activeOpacity={0.8}
+            accessibilityRole="tab"
+            aria-selected={isActive}
+          >
+            <NavIcon tab={item.key as any} active={isActive} size={ui?.navIcon ?? 22} />
+            <Text style={[styles.navLabel, labelSize, isActive && styles.navLabelActive]} numberOfLines={1}>
               {item.label}
             </Text>
           </TouchableOpacity>
@@ -1426,6 +1466,7 @@ export const TavrikoBottomNav: React.FC<{
     ]}
     activeKey={activeTab}
     onSelect={onSelectTab}
+    inFlow={Platform.OS === 'web'}
   />
 );
 
@@ -1444,6 +1485,7 @@ export const TavrikoSecondaryBottomNav: React.FC<{
     activeKey={activeTab}
     onSelect={onSelectTab}
     raisedKey="play"
+    inFlow={Platform.OS === 'web'}
   />
 );
 const styles = StyleSheet.create({
@@ -1454,9 +1496,10 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 44 : 26,
     overflow: 'hidden',
     width: '100%',
-    maxWidth: 620,
+    maxWidth: Platform.OS === 'web' ? '100%' : 620,
     alignSelf: 'center',
   },
+  webTabScreen: { paddingHorizontal: 24, paddingTop: 14, minHeight: 0 },
   equippedBgLayer: {
     position: 'absolute',
     top: 0,
@@ -1715,6 +1758,15 @@ const styles = StyleSheet.create({
         elevation: 12,
       },
     }),
+  },
+  bottomNavInFlow: {
+    position: 'relative',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexShrink: 0,
+    marginTop: 8,
+    marginBottom: 14,
   },
   navSheen: {
     position: 'absolute',

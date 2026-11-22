@@ -1,4 +1,5 @@
 import { cdnImage } from '../utils/cdn';
+import { getApiBaseUrl } from '../config';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -7,13 +8,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   Image,
   Platform,
   Modal,
   Linking,
   useWindowDimensions,
 } from 'react-native';
+import { LoadingShimmer } from '../components/LoadingShimmer';
 import * as ImagePicker from 'expo-image-picker';
 import { compressAvatarImageAsync } from '../utils/avatarImage';
 import * as WebBrowser from 'expo-web-browser';
@@ -66,6 +67,7 @@ import { sound } from '../services/soundService';
 
 // Tavriko marka logosu (şeffaf arka planlı, CDN yerine paket içinden — hızlı ve garantili)
 const AUTH_LOGO = cdnImage('images/brand/emblem_tight.png');
+const AUTH_ARENA = cdnImage('images/duel_banner.png');
 
 /** Doğum tarihi: Date → "GG.AA.YYYY" (sunucunun beklediği biçim). */
 function formatBirthDateTR(d: Date): string {
@@ -84,6 +86,7 @@ function parseBirthDateTR(value: string): Date | null {
 const GOOGLE_CLIENT_ID =
   '411578437442-gs1rck2124rgr516fe9dn9tuu15ge9ig.apps.googleusercontent.com';
 interface AuthScreenProps {
+  wideLayout?: boolean;
   onSuccess: (user: UserProfile, token: string) => void;
   onGuestContinue: () => void;
   apiBaseUrl: string;
@@ -127,11 +130,13 @@ const GoogleGLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
   </Svg>
 );
 export const AuthScreen: React.FC<AuthScreenProps> = ({
+  wideLayout = false,
   onSuccess,
   onGuestContinue,
   apiBaseUrl,
   redirectNotice,
 }) => {
+  const resetApiBase = Platform.OS === 'web' ? getApiBaseUrl() : apiBaseUrl;
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [regStep, setRegStep] = useState<1 | 2 | 3 | 4>(1);
   // Yasal metin onayı (kayıt) ve metin görüntüleyici
@@ -166,11 +171,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   // Password Reset flow
   const [resetStep, setResetStep] = useState<'request' | 'verify'>('request');
   const [resetCode, setResetCode] = useState('');
-  const [demoResetCodeHint, setDemoResetCodeHint] = useState<string | null>(null);
+  const [resetResendAt, setResetResendAt] = useState(0);
+  const [resetResendSeconds, setResetResendSeconds] = useState(0);
   const [newResetPassword, setNewResetPassword] = useState('');
   const [confirmResetPassword, setConfirmResetPassword] = useState('');
   const [resetSuccessMsg, setResetSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!resetResendAt) return;
+    const timer = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((resetResendAt - Date.now()) / 1000));
+      setResetResendSeconds(remaining);
+      if (!remaining) clearInterval(timer);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resetResendAt]);
   // Mobilde giriş/kayıt ekranı sayfaya tam sığmalı (kaydırma olmamalı).
   // Küçük ekranlarda yerleşim kompaktlaştırılır; web'de dar görünümlü
   // (telefon) pencerelerde de kompakt mod devreye girer; masaüstündeki
@@ -614,30 +629,42 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       setLoading(false);
     }
   };
-  const handleRequestResetCode = async () => {
-    setErrorMsg(null);
+  const clearResetForm = () => {
+    setResetStep('request');
+    setResetCode('');
+    setNewResetPassword('');
+    setConfirmResetPassword('');
+    setShowResetPassword(false);
     setResetSuccessMsg(null);
-    if (!email.trim() || !email.includes('@')) {
+    setResetResendAt(0);
+    setResetResendSeconds(0);
+    setErrorMsg(null);
+  };
+  const handleRequestResetCode = async () => {
+    if (loading || (resetStep === 'verify' && Date.now() < resetResendAt)) return;
+    setErrorMsg(null);
+    const target = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target) || target.length > 254) {
       sound.playSound('wrong');
       setErrorMsg('Şifre sıfırlama kodu için kayıtlı e-posta adresinizi girin.');
       return;
     }
     setLoading(true);
     try {
-      const res = await fetch(`${apiBaseUrl}/auth/forgot-password`, {
+      const res = await fetch(`${resetApiBase}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: target }),
       });
       const data = await res.json();
-      if (!res.ok) {
+      if (!res.ok || data.success !== true) {
         throw new Error(data.error || 'Sıfırlama kodu gönderilemedi.');
       }
       sound.playSound('reward');
-      setDemoResetCodeHint(data.resetCodeDemo || null);
-      if (data.resetCodeDemo) {
-        setResetCode(data.resetCodeDemo);
-      }
+      setResetCode('');
+      const wait = Math.max(0, Math.min(600, Number(data.resendAfterSeconds) || 60));
+      setResetResendAt(Date.now() + wait * 1000);
+      setResetResendSeconds(wait);
       setResetStep('verify');
       setResetSuccessMsg(data.message);
     } catch (err: any) {
@@ -648,8 +675,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     }
   };
   const handleConfirmResetPassword = async () => {
+    if (loading) return;
     setErrorMsg(null);
-    if (!resetCode.trim() || resetCode.trim().length < 6) {
+    if (!/^\d{6}$/.test(resetCode)) {
       sound.playSound('wrong');
       setErrorMsg('6 haneli doğrulama kodunu eksiksiz girin.');
       return;
@@ -666,7 +694,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     }
     setLoading(true);
     try {
-      const res = await fetch(`${apiBaseUrl}/auth/reset-password`, {
+      const res = await fetch(`${resetApiBase}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -676,13 +704,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         }),
       });
       const data = await res.json();
-      if (!res.ok) {
+      if (!res.ok || data.success !== true) {
         throw new Error(data.error || 'Şifre güncellenemedi.');
       }
       sound.playSound('victory');
-      setPassword(newResetPassword);
+      setPassword('');
       setMode('login');
-      setResetStep('request');
+      clearResetForm();
       setResetSuccessMsg('Şifreniz başarıyla yenilendi! Şimdi giriş yapabilirsiniz.');
     } catch (err: any) {
       sound.playSound('wrong');
@@ -695,10 +723,22 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const stepBonusCoins = regStep * 200;
   const stepBonusGems = regStep * 5;
   const stepProgressPct = regStep * 25;
+  const guestEntry = (
+    <Reanimated.View entering={FadeInUp.delay(320).duration(450)}>
+      <GuestDiscoveryCard
+        compact
+        onPress={() => {
+          sound.playSound('nav');
+          sound.triggerHaptic('light');
+          onGuestContinue();
+        }}
+      />
+    </Reanimated.View>
+  );
   if (finishingOAuth && !errorMsg) {
     return (
       <View style={[styles.authRoot, { alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color="#FFC43D" />
+        <LoadingShimmer wide />
         <Text style={{ color: '#D9CDF5', fontSize: 14, marginTop: 16, fontFamily: THEME.fonts.bold }}>
           Google hesabınla oturum açılıyor...
         </Text>
@@ -706,9 +746,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     );
   }
   return (
-    <View style={styles.authRoot}>
+    <View style={[styles.authRoot, wideLayout && styles.authRootWide]}>
       {/* Luxury Multi-Layered Cosmic Background */}
-      <Svg style={StyleSheet.absoluteFill} viewBox="0 0 400 850" preserveAspectRatio="none">
+      <Svg style={StyleSheet.absoluteFill} viewBox="0 0 400 850" preserveAspectRatio="none" pointerEvents="none">
         <Defs>
           <LinearGradient id="bgGrad" x1="0" y1="0" x2="0.3" y2="1">
             <Stop offset="0" stopColor="#2E1165" />
@@ -722,13 +762,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         <Circle cx="50" cy="620" r="160" fill="#DB2777" opacity="0.15" />
       </Svg>
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, compact && styles.scrollContentCompact, tiny && styles.scrollContentTiny]}
+        style={[styles.scrollView, wideLayout && styles.authRootWide]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          compact && styles.scrollContentCompact,
+          tiny && styles.scrollContentTiny,
+          wideLayout && styles.scrollContentWide,
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={wideLayout && styles.authIntro}>
         {/* Clean Modern Brand Header (3D Crown) — sabit, animasyonsuz */}
-        <View style={[styles.heroWrap, compact && styles.heroWrapCompact, tiny && styles.heroWrapTiny]}>
+        <View style={[styles.heroWrap, compact && styles.heroWrapCompact, tiny && styles.heroWrapTiny, wideLayout && styles.heroWrapWide]}>
           <View style={[styles.heroCrownWrap, compact && styles.heroCrownWrapCompact, tiny && styles.heroCrownWrapTiny]}>
             <View style={[styles.heroCrownGlow, compact && styles.heroCrownGlowCompact]} />
             <Image
@@ -743,8 +789,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             <Text style={[styles.brandSubtitle, compact && styles.brandSubtitleCompact, tiny && styles.brandSubtitleTiny]}>CANLI BİLGİ & DÜELLO</Text>
           </View>
         </View>
+          {wideLayout && (
+            <>
+              <View style={styles.arenaPreview}>
+                <Image source={AUTH_ARENA} style={styles.arenaImage} resizeMode="cover" accessible={false} />
+                <View style={styles.arenaCaption}>
+                  <Text style={styles.arenaTitle}>Bilgini yarıştır, kazan!</Text>
+                  <Text style={styles.arenaSubtitle}>Canlı düellolar, günlük görevler ve Pro Lig</Text>
+                </View>
+              </View>
+              {guestEntry}
+            </>
+          )}
+        </View>
         {/* Main Glass Auth Card */}
-        <Reanimated.View entering={FadeInDown.delay(220).duration(500).springify().damping(16)} style={[styles.card, compact && styles.cardCompact, tiny && styles.cardTiny]}>
+        <Reanimated.View entering={FadeInDown.delay(220).duration(500).springify().damping(16)} style={[styles.card, compact && styles.cardCompact, tiny && styles.cardTiny, wideLayout && styles.cardWide]}>
           {redirectNotice ? (
             <View style={styles.redirectNoticeBanner}>
               <Text style={styles.errorText}>🔒 {redirectNotice}</Text>
@@ -822,10 +881,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </View>
               <TouchableOpacity
                 style={styles.forgotLinkWrap}
+                accessibilityRole="button"
+                testID="open-password-reset"
                 onPress={() => {
                   sound.playSound('tap');
+                  clearResetForm();
                   setMode('forgot');
-                  setErrorMsg(null);
                 }}
               >
                 <Text style={styles.forgotLinkText}>Şifremi Unuttum?</Text>
@@ -836,11 +897,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </Reanimated.View>
               )}
               {loading ? (
-                <ActivityIndicator
-                  color={THEME.colors.gold}
-                  size="large"
-                  style={{ marginVertical: 14 }}
-                />
+                <LoadingShimmer wide label="Oturum açılıyor" style={{ marginTop: compact ? 8 : 12 }} />
               ) : (
                 <Button3D
                   title="GİRİŞ YAP"
@@ -1205,11 +1262,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     </View>
                   )}
                   {loading ? (
-                    <ActivityIndicator
-                      color={THEME.colors.gold}
-                      size="large"
-                      style={{ marginVertical: 14 }}
-                    />
+                    <LoadingShimmer wide label="Hesap oluşturuluyor" />
                   ) : (
                     <View style={[styles.stepNavButtonsRow, compact && styles.stepNavButtonsRowCompact]}>
                       <TouchableOpacity style={[styles.backStepBtn, compact && styles.backStepBtnCompact]} onPress={handlePrevRegStep}>
@@ -1235,41 +1288,50 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <Text style={styles.forgotTitle}>ŞİFREMİ UNUTTUM</Text>
                 <Text style={styles.forgotSub}>
                   {resetStep === 'request'
-                    ? 'Hesabınıza kayıtlı e-posta adresini girin, 6 haneli şifre yenileme kodunuzu hemen oluşturalım.'
-                    : 'Gönderilen 6 haneli doğrulama kodunu ve yeni şifrenizi girin.'}
+                    ? 'Hesabınıza kayıtlı e-posta adresini girin. Şifrenizi yenilemek için 6 haneli bir kod isteyebilirsiniz.'
+                    : 'E-postadaki 6 haneli doğrulama kodunu ve yeni şifrenizi girin.'}
                 </Text>
               </View>
               <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>KAYITLI E-POSTA ADRESİNİZ</Text>
               <TextInput
+                testID="reset-email"
+                accessibilityLabel="Kayıtlı e-posta adresiniz"
                 style={[styles.input, compact && styles.inputCompact, tiny && styles.inputTiny]}
                 placeholder="ornek@gmail.com"
                 placeholderTextColor={THEME.colors.textMuted}
                 autoCapitalize="none"
+                autoComplete="email"
                 keyboardType="email-address"
                 value={email}
                 onChangeText={setEmail}
+                editable={resetStep === 'request' && !loading}
               />
               {resetStep === 'verify' && (
                 <>
-                  {demoResetCodeHint && (
-                    <View style={styles.codeHintBox}>
-                      <Text style={styles.codeHintLabel}>DOĞRULAMA KODUNUZ:</Text>
-                      <Text style={styles.codeHintValue}>{demoResetCodeHint}</Text>
-                    </View>
+                  {resetSuccessMsg && (
+                    <Text testID="reset-inbox-status" accessibilityLiveRegion="polite" style={styles.resetInboxStatus}>
+                      {resetSuccessMsg}
+                    </Text>
                   )}
                   <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>6 HANELİ DOĞRULAMA KODU</Text>
                   <TextInput
+                    testID="reset-otp"
+                    accessibilityLabel="6 haneli doğrulama kodu"
                     style={[styles.input, styles.codeInput]}
-                    placeholder="123456"
+                    placeholder="000000"
                     placeholderTextColor={THEME.colors.textMuted}
                     keyboardType="number-pad"
+                    autoComplete="one-time-code"
                     maxLength={6}
                     value={resetCode}
-                    onChangeText={setResetCode}
+                    onChangeText={(value) => setResetCode(value.replace(/[^0-9]/g, '').slice(0, 6))}
                   />
-                  <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>YENİ ŞİFRE (EN AZ 6 KARAKTER)</Text>
+                  <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>YENİ ŞİFRE (EN AZ 8 KARAKTER)</Text>
                   <View style={styles.passwordInputWrap}>
                     <TextInput
+                      testID="reset-new-password"
+                      accessibilityLabel="Yeni şifre"
+                      autoComplete="new-password"
                       style={[styles.passwordInput, compact && styles.inputCompact, tiny && styles.inputTiny]}
                       placeholder="••••••••"
                       placeholderTextColor={THEME.colors.textMuted}
@@ -1279,6 +1341,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     />
                     <TouchableOpacity
                       style={styles.eyeBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={showResetPassword ? 'Yeni şifreyi gizle' : 'Yeni şifreyi göster'}
                       onPress={() => setShowResetPassword(!showResetPassword)}
                     >
                       {showResetPassword ? <EyeOpenIcon size={20} /> : <EyeOffIcon size={20} />}
@@ -1287,6 +1351,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   <Text style={[styles.label, compact && styles.labelCompact, tiny && styles.labelTiny]}>YENİ ŞİFRE TEKRAR</Text>
                   <View style={styles.passwordInputWrap}>
                     <TextInput
+                      testID="reset-confirm-password"
+                      accessibilityLabel="Yeni şifre tekrar"
+                      autoComplete="new-password"
                       style={[styles.passwordInput, compact && styles.inputCompact, tiny && styles.inputTiny]}
                       placeholder="••••••••"
                       placeholderTextColor={THEME.colors.textMuted}
@@ -1303,13 +1370,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </Reanimated.View>
               )}
               {loading ? (
-                <ActivityIndicator
-                  color={THEME.colors.gold}
-                  size="large"
-                  style={{ marginVertical: 14 }}
-                />
+                <LoadingShimmer wide label={resetStep === 'request' ? 'Sıfırlama kodu gönderiliyor' : 'Şifre yenileniyor'}
+                  style={{ marginTop: compact ? 10 : 14 }} />
               ) : resetStep === 'request' ? (
                 <Button3D
+                  testID="reset-send"
                   title="SIFIRLAMA KODU GÖNDER"
                   variant="gold"
                   onPress={handleRequestResetCode}
@@ -1317,19 +1382,46 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 />
               ) : (
                 <Button3D
+                  testID="reset-submit"
                   title="ŞİFREMİ YENİLE"
                   variant="mint"
                   onPress={handleConfirmResetPassword}
                   style={[{ marginTop: compact ? 10 : 14 }, compact && styles.btnCompact, tiny && styles.btnTiny]}
                 />
               )}
+              {resetStep === 'verify' && (
+                <View style={styles.resetActions}>
+                  <TouchableOpacity
+                    testID="reset-resend"
+                    accessibilityRole="button"
+                    style={styles.resetSecondaryAction}
+                    onPress={handleRequestResetCode}
+                    disabled={loading || resetResendSeconds > 0}
+                  >
+                    <Text style={[styles.backToLoginText, resetResendSeconds > 0 && styles.resetActionMuted]}>
+                      {resetResendSeconds > 0 ? `Tekrar gönder (${resetResendSeconds} sn)` : 'Kodu tekrar gönder'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    testID="reset-change-email"
+                    accessibilityRole="button"
+                    style={styles.resetSecondaryAction}
+                    onPress={clearResetForm}
+                    disabled={loading}
+                  >
+                    <Text style={styles.backToLoginText}>E-postayı değiştir</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
               <TouchableOpacity
                 style={styles.backToLoginBtn}
+                accessibilityRole="button"
+                testID="reset-back"
+                disabled={loading}
                 onPress={() => {
                   sound.playSound('tap');
+                  clearResetForm();
                   setMode('login');
-                  setResetStep('request');
-                  setErrorMsg(null);
                 }}
               >
                 <Text style={styles.backToLoginText}>← Giriş Ekranına Dön</Text>
@@ -1368,17 +1460,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </>
           )}
         </Reanimated.View>
-        {/* Guest Mode Entry */}
-        <Reanimated.View entering={FadeInUp.delay(320).duration(450)}>
-          <GuestDiscoveryCard
-            compact
-            onPress={() => {
-              sound.playSound('nav');
-              sound.triggerHaptic('light');
-              onGuestContinue();
-            }}
-          />
-        </Reanimated.View>
+        {!wideLayout && guestEntry}
       </ScrollView>
       <LegalDocumentModal documentId={openLegalDoc} onClose={() => setOpenLegalDoc(null)} />
       {/* Country Picker Modal */}
@@ -1446,6 +1528,32 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     alignSelf: 'center',
   },
+  authRootWide: { maxWidth: '100%' },
+  scrollContentWide: {
+    maxWidth: 1032,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+  },
+  authIntro: { flex: 1, minWidth: 0, maxWidth: 464 },
+  heroWrapWide: { flexDirection: 'row', gap: 12, marginBottom: 14 },
+  arenaPreview: {
+    minHeight: 180,
+    justifyContent: 'flex-end',
+    backgroundColor: '#130932',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.5)',
+    overflow: 'hidden',
+  },
+  arenaImage: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
+  arenaCaption: { backgroundColor: 'rgba(14, 5, 34, 0.92)', padding: 12 },
+  arenaTitle: { color: '#FFFFFF', fontFamily: THEME.fonts.display, fontSize: 23 },
+  arenaSubtitle: { color: '#E2D7F5', fontFamily: THEME.fonts.bold, fontSize: 13, marginTop: 2 },
+  cardWide: { flex: 1, minWidth: 0, width: 'auto', padding: 20 },
   // ---- Mobil kompakt yerleşim: küçük ekranlarda kaydırmasız sığdırma ----
   // Logo ekranın en tepesine yapışmasın: üstte nefes payı bırak (status bar).
   scrollContentCompact: {
@@ -1916,27 +2024,15 @@ const styles = StyleSheet.create({
     color: '#D9CDF5',
     lineHeight: 17,
   },
-  codeHintBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  resetInboxStatus: {
     backgroundColor: 'rgba(90, 219, 181, 0.15)',
-    borderWidth: 1,
-    borderColor: '#5ADBB5',
     borderRadius: 12,
     padding: 10,
-    marginTop: 10,
-  },
-  codeHintLabel: {
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-    color: '#5ADBB5',
-  },
-  codeHintValue: {
-    fontSize: 18,
-    fontFamily: THEME.fonts.display,
-    color: '#FFFFFF',
-    letterSpacing: 3,
+    marginTop: 8,
+    color: '#C4F5E7',
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: THEME.fonts.medium,
   },
   codeInput: {
     textAlign: 'center',
@@ -1948,6 +2044,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     marginTop: 6,
+  },
+  resetActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  resetSecondaryAction: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  resetActionMuted: {
+    color: '#ACA1BE',
   },
   backToLoginText: {
     fontSize: 12,

@@ -16,6 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { CategoryId, DifficultyLevel, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import { sound } from '../services/soundService';
 import {
   TavrikoScreen,
@@ -139,15 +140,21 @@ const DifficultyCard: React.FC<{
   index: number;
   selected: boolean;
   onPress: () => void;
-}> = ({ diff, index, selected, onPress }) => {
+  inGrid: boolean;
+}> = ({ diff, index, selected, onPress, inGrid }) => {
+  const page = usePlayerWebLayout();
+  const roomy = page?.roomy;
+  const medalSize = Math.round(44 * (page?.ui.art ?? 1));
   // Ölçek animasyonu kaldırıldı: basınca kart ekran dışına taşıyordu.
   return (
     <Animated.View
       entering={FadeInDown.delay(140 + index * 80).duration(420).springify(0.8)}
+      style={inGrid && styles.webGridItem}
     >
       <TouchableOpacity
         style={[
           styles.diffCard,
+          roomy && styles.webDiffCard,
           { shadowColor: selected ? diff.glow : 'transparent' },
           selected && { backgroundColor: diff.tint },
           selected && { borderColor: diff.color },
@@ -159,6 +166,7 @@ const DifficultyCard: React.FC<{
         <View
           style={[
             styles.diffMedal,
+            roomy && { width: medalSize, height: medalSize, borderRadius: medalSize / 2 },
             { borderColor: `${diff.color}66`, backgroundColor: `${diff.color}14` },
             selected && { shadowColor: diff.glow },
           ]}
@@ -167,14 +175,14 @@ const DifficultyCard: React.FC<{
         </View>
         <View style={styles.diffBody}>
           <View style={styles.diffTitleRow}>
-            <Text style={[styles.diffTitle, { color: diff.color }]}>{diff.title}</Text>
+            <Text style={[styles.diffTitle, roomy && { fontSize: 22 }, { color: diff.color }]}>{diff.title}</Text>
             <View style={styles.starsRow}>
               {Array.from({ length: diff.stars }).map((_, idx) => (
                 <XpStarIcon key={idx} size={17} />
               ))}
             </View>
           </View>
-          <Text style={styles.diffDesc}>{diff.desc}</Text>
+          <Text style={[styles.diffDesc, roomy && { fontSize: 14 }]}>{diff.desc}</Text>
         </View>
         <View style={[styles.xpPill, { borderColor: `${diff.color}59` }]}>
           <Text style={[styles.xpPillText, { color: diff.color }]}>{diff.xpMultiplier}</Text>
@@ -195,6 +203,8 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
   isGuest = false,
   onLoginPrompt,
 }) => {
+  const page = usePlayerWebLayout();
+  const inGrid = page?.roomy === true && page.contentWidth >= 750;
   const [selected, setSelected] = useState<DifficultyLevel>(() => loadStoredPreferences().defaultDifficulty ?? 'medium');
   const [questionCount, setQuestionCount] = useState<number>(5);
   const category = ALL_CATEGORIES.find((c) => c.id === categoryId);
@@ -207,7 +217,7 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
   const subCategoryName = subCategory;
   const subCategoryArt: ImageSourcePropType | undefined = useMemo(() => {
     if (!category || !subCategory) return undefined;
-    const sub = category.subCategories.find((s) => s.name === subCategory);
+    const sub = category.subCategories?.find((s) => s.name === subCategory);
     return sub ? DISCOVER_SUBCATEGORY_IMG[sub.id] : undefined;
   }, [category, subCategory]);
 
@@ -300,11 +310,13 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
           ))}
         </View>
 
+        <View style={inGrid && styles.webGrid}>
         {DIFFICULTIES.map((diff, idx) => (
           <DifficultyCard
             key={diff.id}
             diff={diff}
             index={idx}
+            inGrid={inGrid}
             selected={selected === diff.id}
             onPress={() => {
               sound.playSound('tap');
@@ -313,6 +325,7 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
             }}
           />
         ))}
+        </View>
 
         <Animated.View entering={FadeInUp.delay(500).duration(460).springify(0.8)} style={styles.footerWrap}>
           {/* Seçilen zorluğun mini özeti */}
@@ -336,6 +349,9 @@ export const DifficultySelectScreen: React.FC<DifficultySelectScreenProps> = ({
   );
 };
 const styles = StyleSheet.create({
+  webGrid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12 },
+  webGridItem: { width: '49%', minWidth: 0 },
+  webDiffCard: { minHeight: 90, paddingHorizontal: 16 },
   scrollContent: {
     paddingBottom: 28,
   },

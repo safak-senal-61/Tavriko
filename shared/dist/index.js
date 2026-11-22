@@ -21,3 +21,4 @@ __exportStar(require("./categories"), exports);
 __exportStar(require("./cosmetics"), exports);
 __exportStar(require("./legal"), exports);
 __exportStar(require("./rewards"), exports);
+__exportStar(require("./questionSelection"), exports);

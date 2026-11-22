@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { getRandomValues } from 'expo-crypto';
 import {
   View,
   StyleSheet,
@@ -6,6 +7,7 @@ import {
   Platform,
   AppState,
   Animated,
+  ScrollView,
   useWindowDimensions,
   Text,
   TouchableOpacity,
@@ -13,10 +15,13 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import { useGameStore, clearAllAccountStorage, getStoredAuth } from '../store/gameStore';
+import { useGameStore, clearAllAccountStorage } from '../store/gameStore';
 import { authHeaders } from '../utils/apiAuth';
+import { PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
+import { eventsUrl, friendsChanged, leaderboardUrl, profileUrl, referralUrl } from '../utils/pageResources';
 import { shuffleOptionsForPlayer } from '../utils/optionShuffle';
 import { seenScopeKey, getSeenQuestionIds, markQuestionsSeen } from '../utils/seenQuestions';
+import { getOfflinePracticeAnswer, requestPracticeAnswer } from '../utils/practiceAnswers';
 import { socketService } from '../services/socketService';
 import { sound } from '../services/soundService';
 import { identifyPlayer, trackEvent, markMatchmakingStart, trackMatchFound } from '../services/analytics';
@@ -34,6 +39,7 @@ import {
   CustomRoomSettings,
   MatchQuestionReviewItem,
   ALL_CATEGORIES,
+  uniqueQuestions,
 } from '@trivia/shared';
 // Screens
 import { SplashScreen } from '../screens/SplashScreen';
@@ -83,40 +89,15 @@ import { captureRoomLink, clearPendingRoomCode } from '../utils/roomLink';
 import { ProfileInspectModal, PublicProfileCard } from '../components/ProfileInspectModal';
 import { DeveloperScreen } from '../screens/DeveloperScreen';
 import { ConnectionStatusOverlay } from '../components/ConnectionStatusOverlay';
+import { AnalyticsConsentBanner } from '../components/AnalyticsConsentBanner';
+import type { AnalyticsConsentValue } from '../services/analyticsConsent';
 import { useNetStatus, OFFLINE_GAME_GRACE_MS } from '../store/netStatus';
 import { netMonitor } from '../services/netMonitor';
-export type ScreenName =
-  | 'splash'
-  | 'auth'
-  | 'profile_setup'
-  | 'home'
-  | 'categories'
-  | 'difficulty'
-  | 'matchmaking'
-  | 'duel_versus'
-  | 'custom_room'
-  | 'lobby'
-  | 'quiz_arena'
-  | 'intermission'
-  | 'match_result'
-  | 'friends'
-  | 'profile'
-  | 'profile_edit'
-  | 'friend_profile'
-  | 'leaderboard'
-  | 'daily_challenge'
-  | 'practice'
-  | 'notifications'
-  | 'settings'
-  | 'reconnect'
-  | 'error'
-  | 'season'
-  | 'shop'
-  | 'events'
-  | 'inventory'
-  | 'pro_league'
-  | 'developer';
-import { DEFAULT_API_BASE, getApiBaseUrl } from '../config';
+import { getWebLayout, WEB_FRAME_GAP, WEB_UTILITY_WIDTH } from './webLayout';
+import type { ScreenName } from './webLayout';
+import { PlayerWebLayoutContext } from './PlayerWebLayoutContext';
+export type { ScreenName } from './webLayout';
+import { CLOUD_BASE_URL, DEFAULT_API_BASE, getApiBaseUrl } from '../config';
 import { LegalConsentGate } from '../components/LegalDocuments';
 import {
   consumeGoogleLegalAck,
@@ -141,16 +122,11 @@ const GAME_SESSION_SCREENS: ScreenName[] = [
   'duel_versus',
   'matchmaking',
 ];
-export const RootNavigator: React.FC = () => {
+export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsConsentValue) => void }> = ({ onAnalyticsDecide }) => {
   const [pendingReferral, setPendingReferral] = useState(() => captureReferralLink());
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
-  // Genis ekran (tablet, yatay, masaüstu): ortalanmis 520px telefon cercevesi.
-  // Artik yalnizca web'de degil, native tabletlerde de aktif — telefon
-  // arayuzu tablete yayilip bos/gerilimli gorunmesin diye.
-  const isDesktop = windowWidth > 540;
-  // Yan menu (sidebar) yalnizca cok genis web ekranlarinda.
-  const isWide = isWeb && windowWidth >= 1180;
+  const isNativeTablet = !isWeb && windowWidth > 540;
 
   const isWebOAuthReturn =
     isWeb &&
@@ -166,7 +142,7 @@ export const RootNavigator: React.FC = () => {
       window.location.hash.includes('developer') ||
       window.location.pathname.includes('/developer'));
 
-  const initialAuthUser = getStoredAuth()?.user || useGameStore.getState().user;
+  const initialAuthUser = useGameStore.getState().user;
   const initialScreen: ScreenName = isWebOAuthReturn
     ? 'auth'
     : isWebDeveloperReturn
@@ -176,6 +152,10 @@ export const RootNavigator: React.FC = () => {
     : 'splash';
 
   const [currentScreen, setCurrentScreen] = useState<ScreenName>(initialScreen);
+  const webLayout = useMemo(
+    () => getWebLayout(windowWidth, windowHeight, currentScreen, isWeb),
+    [windowWidth, windowHeight, currentScreen, isWeb],
+  );
   /* KVKK: arkadaşın tam profili (salt okunur) — ayarlar/hesap bölümleri gizli */
   const [viewingProfile, setViewingProfile] = useState<UserProfile | null>(null);
   // İnternet bağlantısı durumu (netMonitor besler; overlay + oyun koruma süresi)
@@ -186,8 +166,7 @@ export const RootNavigator: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string>('');
   /** Alt kategoride soru yok uyarısı: window.alert yerine marka dilinde modal */
   const [gameAlert, setGameAlert] = useState<{ message: string; title?: string } | null>(null);
-  // Guest Restriction & Redirect Banner State
-  const [isGuest, setIsGuest] = useState<boolean>(false);
+  // Guest redirect banner
   const [authRedirectNotice, setAuthRedirectNotice] = useState<string | null>(null);
   // Screen transition animation
   const screenFade = useRef(new Animated.Value(1)).current;
@@ -246,7 +225,7 @@ export const RootNavigator: React.FC = () => {
     rewards?: any;
   } | null>(null);
   const isEvaluatingRef = useRef<boolean>(false);
-  const practiceSessionIdRef = useRef<string>('sess_' + Math.random().toString(36).substring(2, 9));
+  const practiceSessionIdRef = useRef('');
   // 1v1 Live Duel State
   const [duelOpponent, setDuelOpponent] = useState<{
     id: string;
@@ -275,6 +254,7 @@ export const RootNavigator: React.FC = () => {
     setFinalSummary,
     resetGame,
   } = useGameStore();
+  const isGuest = user?.isGuest === true;
 
   // PostHog: kullanıcı kimliği netleştiğinde analitik tarafında tanımla
   useEffect(() => {
@@ -360,23 +340,40 @@ export const RootNavigator: React.FC = () => {
     }
   }, [showLegalGate, user?.id, acceptLegal]);
 
-  const refreshUserProfile = useCallback(async () => {
+  const refreshUserProfile = useCallback(async (afterWrite = false) => {
     const current = useGameStore.getState();
-    if (!current.user || current.user.isGuest) return;
+    if (!current.user || current.user.isGuest || !current.token) return;
     const owner = current.user.id;
+    const url = profileUrl(API_BASE, owner);
+    if (afterWrite) pageDataCache.invalidate(url, owner);
+    const previous = pageDataCache.snapshot(url, owner);
     try {
-      const response = await fetch(`${API_BASE}/social/profile/${encodeURIComponent(owner)}`, {
-        headers: current.token ? { Authorization: `Bearer ${current.token}` } : {},
-      });
-      const fresh = response.ok ? await response.json() : null;
-      if (fresh?.id === owner && useGameStore.getState().user?.id === owner) syncWithFreshUser(fresh);
+      const fresh = await pageDataCache.load<UserProfile>(url, PAGE_TTL.profile, { scope: owner, token: current.token });
+      const latest = useGameStore.getState();
+      // A warm read or a request started before another local update must not roll back the account.
+      if (fresh?.id === owner && latest.user === current.user && latest.token === current.token
+          && pageDataCache.snapshot(url, owner) !== previous) {
+        const localAvatar = current.user.avatarUrl;
+        // Preserve the boot-time migration for older accounts with a locally chosen avatar.
+        if (!afterWrite && localAvatar && !['av1', 'av_1'].includes(localAvatar)
+            && (!fresh.avatarUrl || ['av1', 'av_1'].includes(fresh.avatarUrl))) {
+          void fetch(`${API_BASE}/auth/profile`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${current.token}` },
+            body: JSON.stringify({ userId: owner, avatarUrl: localAvatar }),
+          }).catch(() => {});
+          syncWithFreshUser({ ...fresh, avatarUrl: localAvatar });
+        } else syncWithFreshUser(fresh);
+      }
     } catch {}
   }, [syncWithFreshUser]);
+
+  useEffect(() => { if (user?.id && !isGuest) void refreshUserProfile(); }, [user?.id, token, isGuest, refreshUserProfile]);
 
   // One inbox for every screen: HTTP reconnect snapshots and socket arrivals
   // share the same IDs, read receipts and exact badge count.
   useEffect(() => {
-    const owner = user && !user.isGuest && !isGuest ? user.id : null;
+    const owner = user && !isGuest ? user.id : null;
     const inbox = useNotificationStore.getState();
     inbox.activate(owner, user?.notifications);
     if (!owner) return;
@@ -396,7 +393,7 @@ export const RootNavigator: React.FC = () => {
       subscription.remove();
       if (Platform.OS === 'web' && typeof window !== 'undefined') window.removeEventListener('focus', refresh);
     };
-  }, [user?.id, isGuest]);
+  }, [user?.id, token, isGuest]);
 
   const currentQuestionRef = useRef<ClientQuestion | null>(currentQuestion);
   currentQuestionRef.current = currentQuestion;
@@ -468,7 +465,7 @@ export const RootNavigator: React.FC = () => {
   const sharedProfileHandledRef = useRef<string | null>(null);
   useEffect(() => {
     const code = sharedProfileCode || getPendingProfileCode();
-    if (!code || !user || isGuest || user.isGuest || sharedProfileHandledRef.current === code) return;
+    if (!code || !user || isGuest || sharedProfileHandledRef.current === code) return;
     sharedProfileHandledRef.current = code;
     setSharedProfileLoading(true);
     fetch(`${API_BASE}/social/users/by-code/${encodeURIComponent(code)}`)
@@ -479,7 +476,7 @@ export const RootNavigator: React.FC = () => {
       })
       .catch(() => {})
       .finally(() => setSharedProfileLoading(false));
-  }, [sharedProfileCode, user, isGuest]);
+  }, [sharedProfileCode, user?.id, isGuest]);
   // Keep system status bar completely hidden in fullscreen mode without triggering re-layouts on screen changes
   useEffect(() => {
     StatusBar.setHidden(true, 'none');
@@ -491,44 +488,6 @@ export const RootNavigator: React.FC = () => {
     return () => sub.remove();
   }, []);
 
-  // Yetkili sunucu senkronizasyonu: Uygulama açılışında bir kez PostgreSQL'den güncel profili çeker
-  const hasInitialProfileFetchedRef = useRef(false);
-  useEffect(() => {
-    if (!hasInitialProfileFetchedRef.current && user && !isGuest && user.id) {
-      hasInitialProfileFetchedRef.current = true;
-      fetch(`${API_BASE}/social/profile/${user.id}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((freshUser) => {
-          if (freshUser && freshUser.id === user.id) {
-            // Eğer sunucudan varsayılan av1 dönerse ama yerelde kullanıcının seçtiği özel bir avatar varsa, yerel avatarı koru ve sunucuya bildir
-            if (
-              user.avatarUrl &&
-              user.avatarUrl !== 'av1' &&
-              user.avatarUrl !== 'av_1' &&
-              (!freshUser.avatarUrl || freshUser.avatarUrl === 'av1' || freshUser.avatarUrl === 'av_1')
-            ) {
-              freshUser.avatarUrl = user.avatarUrl;
-              // Sunucu veritabanını da bu avatar ile hemen kalıcı güncelle
-              fetch(`${API_BASE}/auth/profile`, {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
-                body: JSON.stringify({
-                  userId: user.id,
-                  avatarUrl: user.avatarUrl,
-                }),
-              }).catch(() => {});
-            }
-            setUser(freshUser);
-          }
-        })
-        .catch(() => {});
-    }
-  }, []);
   // Apply stored user preferences (sound, music, haptics) once at app boot
   useEffect(() => {
     applyStoredPreferencesOnBoot();
@@ -620,6 +579,9 @@ export const RootNavigator: React.FC = () => {
     const unsubQuestion = socketService.onQuestionStart((question: ClientQuestion) => {
       if (isSinglePlayerActiveRef.current) return;
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
+      const state = useGameStore.getState();
+      const isSameRound = state.currentQuestion?.id === question.id &&
+        state.currentQuestion.roundNumber === question.roundNumber;
       // Her oyuncunun şıkları kendi ekranında farklı sırada görünür. Cevaplar
       // şık ID'si ile gönderilip ID ile değerlendirildiği için bu güvenlidir;
       // tohum oyuncu+soru olduğundan yeniden bağlanınca sıra değişmez.
@@ -630,10 +592,13 @@ export const RootNavigator: React.FC = () => {
           user?.id || 'guest',
           `${question.id}-${question.roundNumber}`
         ),
-      });
+      }, isSameRound);
+      if (isSameRound) return; // Reconnect: sync the timer, but keep the selected answer.
       setRoundResult(null);
       setMultiplayerFeedback(null);
-      selectOption(null);
+      const me = user && activeRoomRef.current?.players[user.id];
+      selectOption(me?.hasAnsweredCurrentRound && activeRoomRef.current?.currentRound === question.roundNumber
+        ? me.lastSelectedOptionId ?? null : null);
       setAnsweredOpponentIds(new Set());
       if (currentScreenRef.current !== 'quiz_arena') {
         navigateTo('quiz_arena');
@@ -728,7 +693,10 @@ export const RootNavigator: React.FC = () => {
                 return;
               }
               if (data?.user) {
+                if (useGameStore.getState().user?.id !== user.id || useGameStore.getState().token !== token) return;
                 setUser(data.user);
+                pageDataCache.invalidate(eventsUrl(API_BASE, user.id), user.id);
+                pageDataCache.invalidate(leaderboardUrl(API_BASE));
               }
               if (data?.rewards && !(data.rewards.alreadyRecorded && !data.rewards.xp && !data.rewards.lp)) {
                 setMatchRewards({
@@ -848,7 +816,8 @@ export const RootNavigator: React.FC = () => {
       sound.playSound('reward');
       sound.triggerHaptic('success');
       if (currentScreenRef.current === 'notifications') inbox.dismissToast();
-      void refreshUserProfile();
+      if (['friend', 'friend_request', 'friend_accepted'].includes(notif.type)) friendsChanged(API_BASE, user.id);
+      if (notif.type === 'reward') pageDataCache.invalidate(referralUrl(API_BASE), user.id);
     });
     const unsubNotifUpdate = socketService.on('notification:update', (data: { id: string; handled: 'accepted' | 'declined' }) => {
       if (data?.id && (data.handled === 'accepted' || data.handled === 'declined')) {
@@ -856,8 +825,10 @@ export const RootNavigator: React.FC = () => {
       }
     });
 
-    const unsubFriendsSync = socketService.on('friends:update', () => {
-      refreshUserProfile();
+    const unsubFriendsSync = socketService.on('friends:update', (change?: { removedBy?: string }) => {
+      friendsChanged(API_BASE, user.id, change?.removedBy);
+      // May include a referral reward. Keep the profile and wallet authoritative.
+      void refreshUserProfile(true);
     });
 
     const heartbeatInterval = setInterval(() => {
@@ -878,41 +849,22 @@ export const RootNavigator: React.FC = () => {
       presenceAppState.remove();
       clearInterval(heartbeatInterval);
     };
-  }, [user?.id, user?.displayName, user?.avatarUrl, token, isGuest, scheduleGameTimeout]);
+  }, [user?.id, user?.displayName, user?.avatarUrl, token, isGuest, scheduleGameTimeout, refreshUserProfile]);
   // -------------------------------------------------------------
   // Auth & Profile Actions
   // -------------------------------------------------------------
   const handleGuestPlay = async () => {
-    setIsGuest(true);
     setAuthRedirectNotice(null);
-    try {
-      const res = await fetch(`${API_BASE}/auth/guest`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName: 'Misafir Oyuncu' }),
-      });
-      const data = await res.json();
-      if (data.user) {
-        setUser(
-          {
-            ...data.user,
-            displayName: 'Misafir Oyuncu',
-            avatarUrl: 'av0',
-          },
-          data.token
-        );
-        // Guests go straight to Keşfet (CategoryExploreScreen)!
-        navigateTo('categories');
-        return;
-      }
-    } catch {
-      // Fallback local guest
+    if (useGameStore.getState().user?.isGuest) {
+      navigateTo('categories');
+      return;
     }
     const fallbackUser: UserProfile = {
       id: 'guest_local_' + Math.random().toString(36).substring(2, 7),
       username: 'misafir_oyuncu',
       displayName: 'Misafir Oyuncu',
       avatarUrl: 'av0',
+      isGuest: true,
       level: 1,
       xp: 0,
       coins: 200,
@@ -928,11 +880,31 @@ export const RootNavigator: React.FC = () => {
       },
       categoryMastery: {},
     };
+    // Persist the choice before the network request so a quick reload resumes Keşfet.
     setUser(fallbackUser, 'mock_token');
     navigateTo('categories');
+    try {
+      const res = await fetch(`${API_BASE}/auth/guest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: fallbackUser.displayName }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      // Do not overwrite a real account that signed in while the guest request was pending.
+      if (data.user && data.token && useGameStore.getState().user?.id === fallbackUser.id) {
+        setUser({
+          ...data.user,
+          displayName: fallbackUser.displayName,
+          avatarUrl: fallbackUser.avatarUrl,
+          isGuest: true,
+        }, data.token);
+      }
+    } catch {
+      // The local guest can continue when the guest endpoint is unavailable.
+    }
   };
   const handleAuthSuccess = (loggedInUser: UserProfile, token: string) => {
-    setIsGuest(false);
     setAuthRedirectNotice(null);
     setUser(loggedInUser, token);
     const referral = getPendingReferral();
@@ -1038,7 +1010,7 @@ export const RootNavigator: React.FC = () => {
     setDailyResultModal(null);
     setIsPracticeSummaryVisible(false);
     isEvaluatingRef.current = false;
-    practiceSessionIdRef.current = 'sess_' + Math.random().toString(36).substring(2, 9);
+    practiceSessionIdRef.current = '';
 
     const clearedStats: PracticeStats = {
       totalQuestions: 5,
@@ -1258,7 +1230,7 @@ export const RootNavigator: React.FC = () => {
 
   // --- Paylaşılan oda bağlantısından otomatik katılım (?oda=KOD) ---
   useEffect(() => {
-    if (!sharedRoomCode || !user || isGuest || user.isGuest) return;
+    if (!sharedRoomCode || !user || isGuest) return;
     if (sharedRoomHandledRef.current === sharedRoomCode) return;
     if (activeRoomRef.current) return; // zaten bir odada
     sharedRoomHandledRef.current = sharedRoomCode;
@@ -1337,8 +1309,10 @@ export const RootNavigator: React.FC = () => {
     };
     practiceStatsRef.current = initStats;
     setPracticeStats(initStats);
-    practiceSessionIdRef.current =
-      'sess_' + Math.random().toString(36).substring(2, 9);
+    const sessionBytes = getRandomValues(new Uint8Array(16));
+    const sessionId = 'sess_' + Array.from(sessionBytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    practiceSessionIdRef.current = sessionId;
+    const isCurrentSession = () => practiceSessionIdRef.current === sessionId && isSinglePlayerActiveRef.current;
     try {
       // Anti-tekrar: bu kapsamda (kategori/alt kategori) daha önce çözülen
       // sorular sunucuya seenIds olarak gönderilir; havuz tükenirse sunucu
@@ -1346,10 +1320,11 @@ export const RootNavigator: React.FC = () => {
       const scopeKey = seenScopeKey(category, subCategory);
       const seenIds = (await getSeenQuestionIds(scopeKey)).slice(-250);
       const res = await fetch(
-        `${API_BASE}/questions/practice?category=${category}${subCategory ? `&subcategory=${encodeURIComponent(subCategory)}` : ''}&difficulty=${difficulty}&count=${questionCount}&sessionId=${practiceSessionIdRef.current}${seenIds.length ? `&seenIds=${encodeURIComponent(seenIds.join(','))}` : ''}`
+        `${API_BASE}/questions/practice?category=${category}${subCategory ? `&subcategory=${encodeURIComponent(subCategory)}` : ''}&difficulty=${difficulty}&count=${questionCount}&sessionId=${sessionId}${seenIds.length ? `&seenIds=${encodeURIComponent(seenIds.join(','))}` : ''}`
       );
       if (res.ok) {
         const data = await res.json();
+        if (!isCurrentSession()) return;
         if (subCategory && data.code === 'SUBCATEGORY_EMPTY') {
           // Alt kategoride soru yoksa başka alt kategoriden soru göstermek yerine bilgilendir.
           isGameActiveRef.current = false;
@@ -1361,15 +1336,15 @@ export const RootNavigator: React.FC = () => {
           });
           return;
         }
-        if (data.questions && data.questions.length > 0) {
-          void markQuestionsSeen(scopeKey, data.questions.map((q: ClientQuestion) => q.id));
-          setPracticeQuestions(data.questions);
+        const selected = Array.isArray(data.questions) ? uniqueQuestions<ClientQuestion>(data.questions, questionCount) : [];
+        if (selected.length > 0) {
+          const questions = selected.map((q, index) => ({ ...q, roundNumber: index + 1, totalRounds: selected.length }));
+          void markQuestionsSeen(scopeKey, questions.map((q) => q.id));
+          setPracticeQuestions(questions);
           setPracticeIndex(0);
-          setPracticeStats((prev) => ({
-            ...prev,
-            totalQuestions: data.questions.length,
-          }));
-          setCurrentQuestion(data.questions[0]);
+          practiceStatsRef.current = { ...initStats, totalQuestions: questions.length };
+          setPracticeStats(practiceStatsRef.current);
+          setCurrentQuestion(questions[0]);
           selectOption(null);
           navigateTo('quiz_arena');
           return;
@@ -1377,6 +1352,14 @@ export const RootNavigator: React.FC = () => {
       }
     } catch {
       // Offline fallback below
+    }
+    if (!isCurrentSession()) return;
+    if (subCategory || isDaily) {
+      isGameActiveRef.current = false;
+      isSinglePlayerActiveRef.current = false;
+      setIsSinglePlayerActive(false);
+      setGameAlert({ title: 'Sorular Yüklenemedi', message: 'Bağlantını kontrol edip tekrar dene.' });
+      return;
     }
     // High quality offline fallback questions
     const fallbackQuestions: ClientQuestion[] = [
@@ -1456,13 +1439,13 @@ export const RootNavigator: React.FC = () => {
         timeLimitSec: 15,
       },
     ];
-    setPracticeQuestions(fallbackQuestions);
+    const count = Math.min(questionCount, fallbackQuestions.length);
+    const questions = fallbackQuestions.slice(0, count).map((q) => ({ ...q, totalRounds: count }));
+    setPracticeQuestions(questions);
     setPracticeIndex(0);
-    setPracticeStats((prev) => ({
-      ...prev,
-      totalQuestions: fallbackQuestions.length,
-    }));
-    setCurrentQuestion(fallbackQuestions[0]);
+    practiceStatsRef.current = { ...initStats, totalQuestions: questions.length };
+    setPracticeStats(practiceStatsRef.current);
+    setCurrentQuestion(questions[0]);
     selectOption(null);
     navigateTo('quiz_arena');
   };
@@ -1470,7 +1453,9 @@ export const RootNavigator: React.FC = () => {
   // oyuncu "Sonraki Soru" düğmesine basana kadar geri bildirim ekranda kalır.
   const schedulePracticeAdvance = () => {
     if (loadStoredPreferences().autoNextQuestion === false) return;
+    const sessionId = practiceSessionIdRef.current;
     scheduleGameTimeout(() => {
+      if (practiceSessionIdRef.current !== sessionId || !isSinglePlayerActiveRef.current) return;
       advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions);
     }, 1500);
   };
@@ -1523,7 +1508,10 @@ export const RootNavigator: React.FC = () => {
             .then((r) => r.json())
             .then((data) => {
               if (data?.user) {
+                if (useGameStore.getState().user?.id !== user.id || useGameStore.getState().token !== token) return;
                 setUser(data.user);
+                pageDataCache.invalidate(eventsUrl(API_BASE, user.id), user.id);
+                pageDataCache.invalidate(leaderboardUrl(API_BASE));
               }
               sound.playSound('victory');
               sound.triggerHaptic('success');
@@ -1586,13 +1574,16 @@ export const RootNavigator: React.FC = () => {
             mode: 'solo',
             difficulty: selectedDifficulty,
             bestStreak: practiceStreak,
-            category: selectedCategory || (practiceCategory as any) || 'general_culture',
+            category: selectedCategory || 'general_culture',
           }),
         })
           .then((r) => r.json())
           .then((data) => {
             if (data?.user) {
+              if (useGameStore.getState().user?.id !== user.id || useGameStore.getState().token !== token) return;
               setUser(data.user);
+              pageDataCache.invalidate(eventsUrl(API_BASE, user.id), user.id);
+              pageDataCache.invalidate(leaderboardUrl(API_BASE));
             }
             if (data?.rewards) {
               setPracticeRewards({ xp: data.rewards.xp, coins: data.rewards.coins, boosted: !!data.rewards.boosted });
@@ -1602,235 +1593,89 @@ export const RootNavigator: React.FC = () => {
       }
     }
   };
-  const handleSubmitAnswer = async (
-    optionId: string,
-    timeRemainingMs: number
-  ) => {
-    // Multiplayer flow
-    if (activeRoom && user) {
-      selectOption(optionId);
-      socketService.submitAnswer(activeRoom.code, user.id, optionId);
-      return;
-    }
-    // Practice / Guest Flow
+  const evaluatePracticeAnswer = async (optionId: string | null, timeRemainingMs: number) => {
     if (isEvaluatingRef.current || isAnswerLocked || !currentQuestion) return;
     isEvaluatingRef.current = true;
     selectOption(optionId);
-    try {
-      const res = await fetch(`${API_BASE}/questions/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          questionId: currentQuestion.id,
-          selectedOptionId: optionId,
-          timeRemainingMs,
-          totalTimeMs: currentQuestion.timeLimitSec * 1000,
-          currentStreak: practiceStreak,
-          sessionId: practiceSessionIdRef.current,
-          playerId: user?.id || 'guest_local',
-        }),
-      });
-      if (res.ok) {
-        const result = await res.json();
-        const rawPts = result.pointsAwarded || 0;
-        const normPts = rawPts > 300 ? Math.round(rawPts / 10) : Math.max(0, Math.round(rawPts));
-        const rawSpd = result.speedBonus || 0;
-        const normSpd = rawSpd > 100 ? Math.round(rawSpd / 10) : Math.max(0, Math.round(rawSpd));
-        const feedback: RoundFeedback = {
-          isCorrect: result.isCorrect,
-          isTimeout: false,
-          correctOptionId: result.correctOptionId,
-          explanation: result.explanation || '',
-          pointsAwarded: normPts,
-          speedBonus: normSpd,
-          streak: result.streak || 0,
-        };
-        setPracticeFeedback(feedback);
-        setPracticeStreak(feedback.streak);
-        if (result.isCorrect) {
-          sound.playSound(feedback.streak >= 2 ? 'streak' : 'correct');
-          sound.triggerHaptic('success');
-        } else {
-          sound.playSound('wrong');
-          sound.triggerHaptic('error');
-        }
-        const updatedStats: PracticeStats = {
-          ...practiceStatsRef.current,
-          correctAnswers:
-            practiceStatsRef.current.correctAnswers + (result.isCorrect ? 1 : 0),
-          wrongAnswers:
-            practiceStatsRef.current.wrongAnswers + (result.isCorrect ? 0 : 1),
-          totalScore:
-            practiceStatsRef.current.totalScore + feedback.pointsAwarded,
-        };
-        practiceStatsRef.current = updatedStats;
-        setPracticeStats(updatedStats);
-        schedulePracticeAdvance();
-        return;
-      }
-    } catch {
-      // Offline fallback evaluation
-    }
-    // Local evaluation fallback if backend is unreachable
-    const isMockCorrect =
-      optionId === 'opt_b' || optionId === 'opt_c' || optionId === 'opt_a';
-    const points = isMockCorrect ? 120 : 0;
-    const newStreak = isMockCorrect ? practiceStreak + 1 : 0;
-    if (isMockCorrect) {
-      sound.playSound('correct');
-      sound.triggerHaptic('success');
-    } else {
-      sound.playSound('wrong');
-      sound.triggerHaptic('error');
-    }
-    setPracticeFeedback({
-      isCorrect: isMockCorrect,
-      isTimeout: false,
-      correctOptionId: 'opt_b',
-      explanation: 'Doğru cevap sistem tarafından teyit edildi.',
-      pointsAwarded: points,
-      speedBonus: 20,
-      streak: newStreak,
+    const sessionId = practiceSessionIdRef.current;
+    const offlineAnswer = getOfflinePracticeAnswer(currentQuestion.id);
+    const result = offlineAnswer ? null : await requestPracticeAnswer(`${API_BASE}/questions/submit`, {
+      questionId: currentQuestion.id,
+      selectedOptionId: optionId,
+      timeRemainingMs,
+      totalTimeMs: currentQuestion.timeLimitSec * 1000,
+      currentStreak: practiceStreak,
+      sessionId,
+      playerId: user?.id || 'guest_local',
     });
-    setPracticeStreak(newStreak);
-    const mockUpdatedStats: PracticeStats = {
-      ...practiceStatsRef.current,
-      correctAnswers:
-        practiceStatsRef.current.correctAnswers + (isMockCorrect ? 1 : 0),
-      wrongAnswers:
-        practiceStatsRef.current.wrongAnswers + (isMockCorrect ? 0 : 1),
-      totalScore: practiceStatsRef.current.totalScore + points,
+    if (sessionId !== practiceSessionIdRef.current || !isSinglePlayerActiveRef.current) return;
+
+    const isTimeout = optionId === null || result?.isTimeout === true;
+    const unavailable = !isTimeout && !result && !offlineAnswer;
+    const isCorrect = !isTimeout && (result?.isCorrect ?? optionId === offlineAnswer);
+    const rawPts = result?.pointsAwarded ?? (isCorrect ? 120 : 0);
+    const rawSpd = result?.speedBonus ?? (isCorrect ? 20 : 0);
+    const feedback: RoundFeedback = {
+      isCorrect,
+      isTimeout,
+      unavailable,
+      correctOptionId: result?.correctOptionId ?? offlineAnswer ?? '',
+      explanation: unavailable ? 'Bağlantı nedeniyle bu soru puanlanmadı.' : result?.explanation || '',
+      pointsAwarded: isCorrect ? (rawPts > 300 ? Math.round(rawPts / 10) : Math.max(0, Math.round(rawPts))) : 0,
+      speedBonus: isCorrect ? (rawSpd > 100 ? Math.round(rawSpd / 10) : Math.max(0, Math.round(rawSpd))) : 0,
+      streak: isCorrect ? result?.streak ?? practiceStreak + 1 : 0,
     };
-    practiceStatsRef.current = mockUpdatedStats;
-    setPracticeStats(mockUpdatedStats);
+    if (!unavailable) {
+      sound.playSound(isCorrect ? (feedback.streak >= 2 ? 'streak' : 'correct') : 'wrong');
+      sound.triggerHaptic(isCorrect ? 'success' : 'error');
+    }
+    setPracticeFeedback(feedback);
+    setPracticeStreak(feedback.streak);
+    const updatedStats: PracticeStats = {
+      ...practiceStatsRef.current,
+      correctAnswers: practiceStatsRef.current.correctAnswers + (isCorrect ? 1 : 0),
+      wrongAnswers: practiceStatsRef.current.wrongAnswers + (!isCorrect && !isTimeout && !unavailable ? 1 : 0),
+      emptyAnswers: practiceStatsRef.current.emptyAnswers + (isTimeout || unavailable ? 1 : 0),
+      totalScore: practiceStatsRef.current.totalScore + feedback.pointsAwarded,
+    };
+    practiceStatsRef.current = updatedStats;
+    setPracticeStats(updatedStats);
     schedulePracticeAdvance();
   };
-  const handleTimeExpired = async () => {
-    if (activeRoom && user) {
+  const handleSubmitAnswer = (optionId: string, timeRemainingMs: number) => {
+    if (activeRoom && user && currentQuestion) {
+      selectOption(optionId);
+      socketService.submitAnswer(activeRoom.code, user.id, optionId, currentQuestion.roundNumber);
       return;
     }
-    if (isEvaluatingRef.current || !currentQuestion) return;
-    isEvaluatingRef.current = true;
-    selectOption(null);
-    sound.playSound('wrong');
-    sound.triggerHaptic('error');
-    try {
-      const res = await fetch(`${API_BASE}/questions/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          questionId: currentQuestion.id,
-          selectedOptionId: null,
-          timeRemainingMs: 0,
-          totalTimeMs: currentQuestion.timeLimitSec * 1000,
-          currentStreak: practiceStreak,
-          sessionId: practiceSessionIdRef.current,
-          playerId: user?.id || 'guest_local',
-        }),
-      });
-      if (res.ok) {
-        const result = await res.json();
-        setPracticeFeedback({
-          isCorrect: false,
-          isTimeout: true,
-          correctOptionId: result.correctOptionId,
-          explanation: result.explanation || '',
-          pointsAwarded: 0,
-          speedBonus: 0,
-          streak: 0,
-        });
-        setPracticeStreak(0);
-        const timeoutStats: PracticeStats = {
-          ...practiceStatsRef.current,
-          emptyAnswers: practiceStatsRef.current.emptyAnswers + 1,
-        };
-        practiceStatsRef.current = timeoutStats;
-        setPracticeStats(timeoutStats);
-        schedulePracticeAdvance();
-        return;
-      }
-    } catch {
-      // Local fallback timeout
-    }
-    setPracticeFeedback({
-      isCorrect: false,
-      isTimeout: true,
-      correctOptionId: 'opt_b',
-      explanation: 'Süre doldu! Zamanında cevap verilmedi.',
-      pointsAwarded: 0,
-      speedBonus: 0,
-      streak: 0,
-    });
-    setPracticeStreak(0);
-    const mockTimeoutStats: PracticeStats = {
-      ...practiceStatsRef.current,
-      emptyAnswers: practiceStatsRef.current.emptyAnswers + 1,
-    };
-    practiceStatsRef.current = mockTimeoutStats;
-    setPracticeStats(mockTimeoutStats);
-    schedulePracticeAdvance();
+    void evaluatePracticeAnswer(optionId, timeRemainingMs);
+  };
+  const handleTimeExpired = () => {
+    if (!activeRoom) void evaluatePracticeAnswer(null, 0);
   };
   return (
-    <View style={[styles.outerWrapper, isDesktop && styles.desktopOuter]}>
+    <View style={[
+      styles.outerWrapper,
+      isNativeTablet && styles.tabletOuter,
+      webLayout.roomy && [styles.webOuter, { paddingHorizontal: webLayout.frameGutter }],
+    ]}>
       <StatusBar hidden={true} animated={false} />
 
-      {/* Desktop Left Sidebar (Wide Displays >= 1180px) */}
-      {isWide && (
-        <View style={styles.desktopSidebarLeft}>
-          <View style={styles.desktopCard}>
-            <View style={{ alignItems: 'center', marginBottom: 18 }}>
-              <View style={styles.crownGlow}>
-                <Text style={{ fontSize: 32 }}>👑</Text>
-              </View>
-              <Text style={styles.brandTitleText}>Tavriko</Text>
-              <Text style={styles.brandSubtitleText}>CANLI BİLGİ & DÜELLO</Text>
-            </View>
-
-            <View style={styles.desktopFeatureList}>
-              <View style={styles.desktopFeatureItem}>
-                <Text style={styles.desktopFeatureIcon}>⚡</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.desktopFeatureTitle}>1v1 Canlı Düello</Text>
-                  <Text style={styles.desktopFeatureDesc}>Gerçek zamanlı hız ve bilgi yarışı</Text>
-                </View>
-              </View>
-
-              <View style={styles.desktopFeatureItem}>
-                <Text style={styles.desktopFeatureIcon}>🏆</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.desktopFeatureTitle}>Pro Lig & Sezon</Text>
-                  <Text style={styles.desktopFeatureDesc}>Haftalık liglerde zirveye tırman</Text>
-                </View>
-              </View>
-
-              <View style={styles.desktopFeatureItem}>
-                <Text style={styles.desktopFeatureIcon}>🧠</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.desktopFeatureTitle}>18+ Zengin Kategori</Text>
-                  <Text style={styles.desktopFeatureDesc}>Yüzlerce doğrulanmış güncel soru</Text>
-                </View>
-              </View>
-
-              <View style={styles.desktopFeatureItem}>
-                <Text style={styles.desktopFeatureIcon}>🔥</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.desktopFeatureTitle}>Günlük Seri</Text>
-                  <Text style={styles.desktopFeatureDesc}>Her gün gir, ödülleri ve XP'yi katla</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.desktopStatusPill}>
-              <View style={styles.pulseDot} />
-              <Text style={styles.desktopStatusText}>7/24 Kesintisiz Bulut Aktif</Text>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* Main Centered Mobile Frame */}
-      <View style={[styles.phoneFrame, isDesktop && styles.desktopPhoneFrame]}>
-        <Animated.View style={[styles.container, { opacity: screenFade }]}>
+      <View style={[
+        styles.appFrame,
+        isNativeTablet && styles.nativeTabletFrame,
+        webLayout.roomy && [styles.webFrame, { maxWidth: webLayout.frameMaxWidth }],
+      ]}>
+        <Animated.View
+          testID={isWeb ? 'player-web-content' : undefined}
+          nativeID={isWeb ? `player-screen-${currentScreen}` : undefined}
+          style={[
+            styles.container,
+            !isWeb && styles.nativeContainer,
+            { opacity: screenFade },
+          ]}
+        >
+        <PlayerWebLayoutContext.Provider value={webLayout}>
         {currentScreen === 'splash' && (
           <SplashScreen
             onFinish={() => {
@@ -1844,6 +1689,7 @@ export const RootNavigator: React.FC = () => {
         )}
         {currentScreen === 'auth' && (
           <AuthScreen
+            wideLayout={webLayout.split}
             onSuccess={handleAuthSuccess}
             onGuestContinue={handleGuestPlay}
             apiBaseUrl={API_BASE}
@@ -1860,6 +1706,7 @@ export const RootNavigator: React.FC = () => {
         )}
         {currentScreen === 'home' && user && (
           <HomeScreen
+            wideLayout={webLayout.split}
             user={user}
             isGuest={isGuest}
             onQuickMatch={handleStartQuickMatch}
@@ -1907,6 +1754,7 @@ export const RootNavigator: React.FC = () => {
         )}
         {currentScreen === 'categories' && (
           <CategoryExploreScreen
+            wideLayout={webLayout.split}
             avatarSeed={user?.avatarUrl || user?.displayName}
             coins={user?.coins}
             gems={user?.gems}
@@ -2008,6 +1856,7 @@ export const RootNavigator: React.FC = () => {
             room={activeRoom}
             currentUserId={user.id}
             user={user}
+            apiBaseUrl={API_BASE}
             onBack={handleExitCurrentGame}
             onToggleReady={handleToggleReady}
             onStartGame={handleStartGame}
@@ -2028,7 +1877,10 @@ export const RootNavigator: React.FC = () => {
                 ),
               }}
               selectedOptionId={selectedOptionId}
-              isLocked={isEvaluatingRef.current}
+              isLocked={isEvaluatingRef.current || isAnswerLocked ||
+                !!(user && activeRoom?.currentRound === currentQuestion.roundNumber &&
+                  activeRoom.players[user.id]?.hasAnsweredCurrentRound)}
+              isMultiplayer={!!activeRoom}
               streak={
                 activeRoom && user
                   ? activeRoom.players[user.id]?.currentStreak || 0
@@ -2204,11 +2056,16 @@ export const RootNavigator: React.FC = () => {
             token={token}
             pendingReferral={pendingReferral}
             onClearReferral={() => { clearPendingReferral(); setPendingReferral(null); }}
-            onReferralConnected={() => { void refreshUserProfile(); }}
+            onReferralConnected={() => { void refreshUserProfile(true); }}
             user={user || undefined}
             isGuest={isGuest}
             apiBaseUrl={API_BASE}
             onBack={() => navigateTo('home')}
+            onSignIn={() => {
+              setUser(null, null);
+              setAuthRedirectNotice('Arkadaş eklemek için hesabına giriş yap.');
+              navigateTo('auth');
+            }}
             onInviteToMatch={(friendId, friendName, roomCode) => {
               if (roomCode) {
                 handleCreateCustomRoom(undefined, roomCode);
@@ -2275,6 +2132,7 @@ export const RootNavigator: React.FC = () => {
         )}
         {currentScreen === 'leaderboard' && (
           <LeaderboardScreen
+            wideLayout={webLayout.leaderboardColumns}
             user={user || undefined}
             apiBaseUrl={API_BASE}
             onBack={() => navigateTo('home')}
@@ -2312,7 +2170,6 @@ export const RootNavigator: React.FC = () => {
                 handleStartQuickMatch();
               }
             }}
-            onRefreshUser={() => { void refreshUserProfile(); }}
           />
         )}
         {currentScreen === 'settings' && (
@@ -2324,7 +2181,6 @@ export const RootNavigator: React.FC = () => {
             onBack={() => navigateTo('home')}
             onDeveloper={() => navigateTo('developer')}
             onLogout={() => {
-              setIsGuest(false);
               setAuthRedirectNotice(null);
               setUser(null, null);
               resetGame();
@@ -2358,34 +2214,8 @@ export const RootNavigator: React.FC = () => {
                 }
               }
             }}
-            onDeleteAccount={async () => {
-              if (user) {
-                try {
-                  const res = await fetch(`${API_BASE}/auth/delete-account`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      ...(useGameStore.getState().token ? { Authorization: `Bearer ${useGameStore.getState().token}` } : {}),
-                    },
-                    body: JSON.stringify({ userId: user.id }),
-                  });
-                  const data = await res.json().catch(() => null);
-                  if (!res.ok || !data?.success) {
-                    // Silme başarısızsa veriler korunur ve kullanıcı bilgilendirilir
-                    Alert.alert(
-                      'Hesap Silinemedi',
-                      data?.message || 'Hesabınız silinirken bir hata oluştu. Lütfen tekrar deneyin.'
-                    );
-                    return;
-                  }
-                } catch (err) {
-                  console.error('Delete account failed:', err);
-                  Alert.alert('Hesap Silinemedi', 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.');
-                  return;
-                }
-              }
+            onAccountRemoved={() => {
               clearAllAccountStorage();
-              setIsGuest(false);
               setAuthRedirectNotice(null);
               setUser(null, null);
               resetGame();
@@ -2397,7 +2227,7 @@ export const RootNavigator: React.FC = () => {
           <DeveloperScreen
             user={user || undefined}
             apiBaseUrl={API_BASE}
-            onUpdateUser={(updated) => setUser(updated, null)}
+            onUpdateUser={(updated) => setUser(updated)}
             onNavigate={(screen) => navigateTo(screen)}
             onBack={() => navigateTo('settings')}
           />
@@ -2407,7 +2237,7 @@ export const RootNavigator: React.FC = () => {
             user={user || undefined}
             apiBaseUrl={API_BASE}
             onUpdateUser={(u) => setUser(u)}
-            onRefreshUser={() => { void refreshUserProfile(); }}
+            onRefreshUser={() => { void refreshUserProfile(true); }}
             onBack={() => navigateTo('home')}
             onProfile={() => navigateTo('profile')}
           />
@@ -2493,6 +2323,7 @@ export const RootNavigator: React.FC = () => {
             onHome={() => navigateTo('home')}
           />
         )}
+        </PlayerWebLayoutContext.Provider>
         </Animated.View>
         {currentScreen !== 'notifications' && user && !isGuest && (
           <NotificationToast onOpen={() => navigateTo('notifications')} />
@@ -2534,9 +2365,8 @@ export const RootNavigator: React.FC = () => {
         />
       )}
 
-      {/* Desktop Right Sidebar (Wide Displays >= 1180px) */}
-      {isWide && (
-        <View style={styles.desktopSidebarRight}>
+      {webLayout.showUtility && (
+        <ScrollView style={styles.desktopSidebar} contentContainerStyle={styles.desktopSidebarContent}>
           <View style={styles.desktopCard}>
             <View style={{ alignItems: 'center', marginBottom: 12 }}>
               <Text style={{ fontSize: 26, marginBottom: 4 }}>📱</Text>
@@ -2548,9 +2378,10 @@ export const RootNavigator: React.FC = () => {
 
             <View style={styles.desktopQrWrapper}>
               <Image
-                source={{ uri: '/qr' }}
-                style={{ width: 140, height: 140, borderRadius: 12 }}
+                source={{ uri: `${CLOUD_BASE_URL}/qr` }}
+                style={{ width: 128, height: 128, borderRadius: 8 }}
                 resizeMode="contain"
+                accessibilityLabel="Tavriko mobil bağlantısının QR kodu"
               />
             </View>
 
@@ -2558,6 +2389,7 @@ export const RootNavigator: React.FC = () => {
 
             <TouchableOpacity
               style={styles.portalShortcutBtn}
+              accessibilityRole="button"
               onPress={() => {
                 navigateTo('developer');
               }}
@@ -2567,9 +2399,10 @@ export const RootNavigator: React.FC = () => {
 
             <TouchableOpacity
               style={[styles.portalShortcutBtn, { marginTop: 6, backgroundColor: 'rgba(255, 196, 61, 0.1)', borderColor: 'rgba(255, 196, 61, 0.3)' }]}
+              accessibilityRole="button"
               onPress={() => {
                 if (typeof window !== 'undefined') {
-                  window.open('/developer', '_blank');
+                  window.open('/developer', '_blank', 'noopener,noreferrer');
                 }
               }}
             >
@@ -2583,7 +2416,7 @@ export const RootNavigator: React.FC = () => {
               </Text>
             </View>
           </View>
-        </View>
+        </ScrollView>
       )}
       <LegalConsentGate
         visible={showLegalGate && !autoLegalInFlight}
@@ -2593,13 +2426,14 @@ export const RootNavigator: React.FC = () => {
         onAccept={() => { void acceptLegal('in_app'); }}
         onLogout={() => {
           setLegalGateError(null);
-          setIsGuest(false);
           setAuthRedirectNotice(null);
           setUser(null, null);
           resetGame();
           navigateTo('auth');
         }}
       />
+      {/* Web'de açılış görselini kapatmadan, ilk etkileşimli ekranda sor. */}
+      {(!isWeb || currentScreen !== 'splash') && <AnalyticsConsentBanner onDecide={onAnalyticsDecide} />}
     </View>
   );
 };
@@ -2611,20 +2445,28 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  desktopOuter: {
+  tabletOuter: {
     backgroundColor: '#090414',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
   },
-  phoneFrame: {
+  webOuter: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: WEB_FRAME_GAP,
+    paddingVertical: 12,
+    backgroundColor: '#100822',
+  },
+  appFrame: {
     flex: 1,
     width: '100%',
     height: '100%',
     backgroundColor: THEME.colors.background,
   },
-  desktopPhoneFrame: {
+  nativeTabletFrame: {
     maxWidth: 520,
     width: 520,
     height: '100%',
@@ -2635,25 +2477,36 @@ const styles = StyleSheet.create({
     boxShadow: '0 0 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(108, 92, 231, 0.35)',
     overflow: 'hidden',
   },
+  webFrame: {
+    flexBasis: 0,
+    minWidth: 0,
+    minHeight: 0,
+    alignSelf: 'stretch',
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.24)',
+  },
   container: {
     flex: 1,
     backgroundColor: THEME.colors.background,
     width: '100%',
-    maxWidth: 520,
     alignSelf: 'center',
+    minHeight: 0,
   },
-  desktopSidebarLeft: {
-    width: 300,
-    height: '100%',
-    maxHeight: 760,
-    marginRight: 28,
-    justifyContent: 'center',
+  nativeContainer: {
+    maxWidth: 520,
   },
-  desktopSidebarRight: {
-    width: 300,
-    height: '100%',
-    maxHeight: 760,
-    marginLeft: 28,
+  desktopSidebar: {
+    flexGrow: 0,
+    flexShrink: 0,
+    width: WEB_UTILITY_WIDTH,
+    maxHeight: '100%',
+    alignSelf: 'center',
+    minHeight: 0,
+  },
+  desktopSidebarContent: {
+    flexGrow: 1,
     justifyContent: 'center',
   },
   desktopCard: {
@@ -2661,83 +2514,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    padding: 24,
-    ...(Platform.OS === 'web' ? ({ backdropFilter: 'blur(20px)', boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)' } as any) : {}),
-  },
-  crownGlow: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: 'rgba(255, 196, 61, 0.16)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 196, 61, 0.35)',
-  },
-  brandTitleText: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 34,
-    color: '#FFFFFF',
-    letterSpacing: 1,
-  },
-  brandSubtitleText: {
-    fontFamily: THEME.fonts.extraBold,
-    fontSize: 12,
-    color: '#FFC43D',
-    letterSpacing: 2,
-    marginTop: 2,
-  },
-  desktopFeatureList: {
-    gap: 14,
-    marginVertical: 18,
-  },
-  desktopFeatureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    padding: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  desktopFeatureIcon: {
-    fontSize: 20,
-  },
-  desktopFeatureTitle: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  desktopFeatureDesc: {
-    color: THEME.colors.textSecondary,
-    fontSize: 11,
-    fontFamily: THEME.fonts.medium,
-    marginTop: 1,
-  },
-  desktopStatusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.35)',
-    borderRadius: 20,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-  },
-  pulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#10B981',
-  },
-  desktopStatusText: {
-    color: '#10B981',
-    fontSize: 11,
-    fontFamily: THEME.fonts.bold,
+    padding: 16,
   },
   desktopCardTitle: {
     color: '#FFFFFF',
@@ -2746,7 +2523,7 @@ const styles = StyleSheet.create({
   },
   desktopCardDesc: {
     color: THEME.colors.textSecondary,
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: THEME.fonts.medium,
     textAlign: 'center',
     marginTop: 4,
@@ -2762,7 +2539,7 @@ const styles = StyleSheet.create({
   },
   desktopQrUrlText: {
     color: '#A78BFA',
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: THEME.fonts.bold,
     textAlign: 'center',
     marginBottom: 12,
@@ -2772,6 +2549,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#FFC43D',
     borderRadius: 14,
+    minHeight: 44,
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2781,6 +2559,7 @@ const styles = StyleSheet.create({
     color: '#FFC43D',
     fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
+    textAlign: 'center',
   },
   desktopTipBox: {
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
@@ -2791,13 +2570,13 @@ const styles = StyleSheet.create({
   },
   desktopTipTitle: {
     color: '#FFC43D',
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: THEME.fonts.extraBold,
     marginBottom: 2,
   },
   desktopTipText: {
     color: THEME.colors.textSecondary,
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: THEME.fonts.body,
     lineHeight: 15,
   },

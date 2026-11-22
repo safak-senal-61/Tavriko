@@ -13,9 +13,6 @@ jobs:
       fail-fast: false
       matrix:
         workspace: [shared, server, client, cloudflare]
-    defaults:
-      run:
-        working-directory: ${{ matrix.workspace }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,10 +20,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: ${{ matrix.workspace }}/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install dependencies
+      - name: Install workspace dependencies from the root lockfile
         run: npm ci
 
       - name: Run tests
+        working-directory: ${{ matrix.workspace }}
         run: npm test

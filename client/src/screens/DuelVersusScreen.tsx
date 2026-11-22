@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform, Image, ScrollView, ActivityIndicator, useWindowDimensions, ImageSourcePropType } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform, Image, ScrollView, useWindowDimensions, ImageSourcePropType } from 'react-native';
+import { LoadingShimmer } from '../components/LoadingShimmer';
 import { Bot, Check, Radio, ShieldCheck, Swords, Volume2, VolumeX, X } from 'lucide-react-native';
 import { cdnImage } from '../utils/cdn';
 import { THEME } from '../theme/tokens';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import { sound } from '../services/soundService';
 import { DiscoveryArtwork, useReducedMotion } from '../components/DiscoveryArtwork';
 import { GradientFill } from '../components/TavrikoGradient';
@@ -24,6 +26,7 @@ export const DuelVersusScreen: React.FC<DuelVersusScreenProps> = ({
 }) => {
   const isBot = !!opponentProfile.isBot;
   const compact = useWindowDimensions().height < 760;
+  const wideStage = usePlayerWebLayout()?.roomy;
   const reduced = useReducedMotion();
   const [countdown, setCountdown] = useState(3);
   const [audio, setAudio] = useState(sound.isSoundEnabled());
@@ -75,7 +78,7 @@ export const DuelVersusScreen: React.FC<DuelVersusScreenProps> = ({
           {audio ? <Volume2 size={19} color="#F1E7FF" /> : <VolumeX size={19} color="#F1E7FF" />}
         </TouchableOpacity>
       </View>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, compact && { gap: 12, paddingVertical: 12 }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, wideStage && styles.webScroll, compact && { gap: 12, paddingVertical: 12 }]}>
         <View style={styles.heading}>
           <Text style={styles.eyebrow}>EŞLEŞME TAMAMLANDI</Text>
           <Text accessibilityRole="header" style={styles.title}>{isBot ? 'Bilgiye meydan oku.' : 'Rakibin hazır.'}</Text>
@@ -123,7 +126,7 @@ export const DuelVersusScreen: React.FC<DuelVersusScreenProps> = ({
         <View style={styles.countdownPanel}>
           <View style={styles.countdownRow}>
             <View style={styles.countBubble}>
-              {countdown > 0 ? <Text style={styles.countNumber}>{countdown}</Text> : <ActivityIndicator size="small" color="#FFE2A4" />}
+              {countdown > 0 ? <Text style={styles.countNumber}>{countdown}</Text> : <LoadingShimmer />}
             </View>
             <View style={styles.countCopy}>
               <Text accessibilityLiveRegion="polite" style={styles.countTitle}>{countdown > 0 ? '15 soruluk düello başlıyor' : 'Arena hazırlanıyor'}</Text>
@@ -147,6 +150,7 @@ const styles = StyleSheet.create({
   mode: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
   modeText: { color: '#FFE2A4', fontFamily: THEME.fonts.extraBold, fontSize: 12, letterSpacing: 0.5 },
   scroll: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingVertical: 16, width: '100%', maxWidth: 580, alignSelf: 'center' },
+  webScroll: { maxWidth: '100%' },
   heading: { gap: 6, alignItems: 'center' },
   eyebrow: { color: '#ADF0D8', fontFamily: THEME.fonts.extraBold, fontSize: 12, letterSpacing: 1.3 },
   title: { color: '#FFFFFF', fontFamily: THEME.fonts.display, fontSize: 28, lineHeight: 34, textAlign: 'center' },

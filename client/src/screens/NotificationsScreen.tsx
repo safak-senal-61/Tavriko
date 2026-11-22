@@ -1,6 +1,7 @@
 import { formatNotificationTime } from '../utils/notificationTime';
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TouchableOpacity, Image } from 'react-native';
+import { LoadingShimmer, PageShimmer } from '../components/LoadingShimmer';
 import type { UserProfile, NotificationItem } from '@trivia/shared';
 import { Check, CheckCheck, Clock3, LogIn, RefreshCw, Swords, UserPlus, X } from 'lucide-react-native';
 import { THEME } from '../theme/tokens';
@@ -13,19 +14,20 @@ import { DISCOVERY_IMG, DiscoveryArtwork } from '../components/DiscoveryArtwork'
 import { GradientFill } from '../components/TavrikoGradient';
 import { isPrivateRoomInvite, notificationVisual } from '../components/NotificationUI';
 import { isInvitation, isUnread, useNotificationStore, useUnreadCount } from '../store/notificationStore';
+import { useGameStore } from '../store/gameStore';
+import { friendsChanged } from '../utils/pageResources';
 
 interface NotificationsScreenProps {
   user?: UserProfile;
   apiBaseUrl?: string;
   onBack: () => void;
   onAcceptDuel?: (roomCode?: string) => void;
-  onRefreshUser?: () => void;
 }
 
 export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
-  user, apiBaseUrl, onBack, onAcceptDuel, onRefreshUser,
+  user, apiBaseUrl, onBack, onAcceptDuel,
 }) => {
-  const { items, readIds, loading, error, markRead, patch, refresh } = useNotificationStore();
+  const { items, readIds, loading, hydrated, error, markRead, patch, refresh } = useNotificationStore();
   const count = useUnreadCount();
   const [filter, setFilter] = useState<'all' | 'unread' | 'invites'>('all');
   const [pending, setPending] = useState<{ id: string; action: 'accept' | 'decline' } | null>(null);
@@ -39,6 +41,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   const handleRespond = async (notification: NotificationItem, action: 'accept' | 'decline') => {
     if (!user?.id || pending) return;
     const owner = user.id;
+    const token = useGameStore.getState().token;
     setPending({ id: notification.id, action });
     setResponseError(null);
     sound.playSound('tap');
@@ -50,7 +53,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'İstek tamamlanamadı. Lütfen yeniden dene.');
-      if (useNotificationStore.getState().userId !== owner) return;
+      if (useNotificationStore.getState().userId !== owner || useGameStore.getState().token !== token) return;
       const duel = notification.type === 'match_invite' || notification.type === 'duel';
       patch(notification.id, {
         handled: action === 'accept' ? 'accepted' : 'declined',
@@ -66,7 +69,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
       if (action === 'accept' && !duel && (data.senderId || notification.senderId)) {
         socketService.notifyUserRealtime(data.senderId || notification.senderId, 'friends:update', { friendId: owner });
       }
-      onRefreshUser?.();
+      if (!duel) friendsChanged(base, owner);
     } catch (err: any) {
       setResponseError({ id: notification.id, text: err.message || 'Bağlantı kurulamadı. Yeniden dene.' });
     } finally {
@@ -93,9 +96,10 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
 
         <View style={styles.toolbar}>
           <Text style={styles.inboxTitle}>Gelen kutun <Text style={styles.total}>{items.length}</Text></Text>
-          <TouchableOpacity onPress={() => void refresh(base)} accessibilityRole="button"
-            accessibilityLabel="Bildirimleri yenile" disabled={loading} style={styles.refresh}>
-            {loading ? <ActivityIndicator size="small" color="#E1BFFF" /> : <RefreshCw size={17} color="#E1BFFF" />}
+          <TouchableOpacity onPress={() => void refresh(base, true)} accessibilityRole="button"
+            accessibilityLabel="Bildirimleri yenile" disabled={loading}
+            accessibilityState={{ busy: loading, disabled: loading }} style={styles.refresh}>
+            <RefreshCw size={17} color={loading ? '#9283AE' : '#E1BFFF'} />
           </TouchableOpacity>
         </View>
         <View style={styles.tabs} accessibilityRole="tablist">
@@ -116,16 +120,13 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
         {error && (
           <View accessibilityLiveRegion="polite" style={styles.error}>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity accessibilityRole="button" onPress={() => void refresh(base)} style={styles.retry}>
+            <TouchableOpacity accessibilityRole="button" onPress={() => void refresh(base, true)} style={styles.retry}>
               <Text style={styles.retryText}>Yeniden dene</Text>
             </TouchableOpacity>
           </View>
         )}
-        {loading && items.length === 0 ? (
-          <View style={styles.loading}>
-            {[0, 1, 2].map(i => <View key={i} style={styles.skeleton}><View style={styles.skeletonImage} /><View style={styles.skeletonCopy} /></View>)}
-            <Text style={styles.meta}>Haberlerin yükleniyor...</Text>
-          </View>
+        {loading && !hydrated && items.length === 0 ? (
+          <PageShimmer label="Bildirimler yükleniyor" shape="cards" />
         ) : shown.length === 0 ? (
           <View style={styles.empty}>
             <DiscoveryArtwork source={filter === 'invites' ? DISCOVERY_IMG.social : DISCOVERY_IMG.bell} size={144} />
@@ -171,14 +172,14 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
                     onPress={() => void handleRespond(item, 'accept')}>
                     <GradientFill colors={['#FFD765', '#FFB72F']} direction="diagonal" />
                     <View pointerEvents="none" style={styles.actionIcon}>
-                      {accepting ? <ActivityIndicator size="small" color="#361F11" /> : <AcceptIcon size={18} color="#361F11" />}
+                      {accepting ? <LoadingShimmer ink /> : <AcceptIcon size={18} color="#361F11" />}
                     </View>
                     <Text style={[styles.actionText, styles.acceptText]}>{accepting ? 'İşleniyor…' : privateRoom ? 'Odaya Katıl' : duel ? 'Düelloya Katıl' : 'Arkadaşı Ekle'}</Text>
                   </Pressable>
                   <Pressable accessibilityRole="button" disabled={!!pending}
                     style={({ pressed }) => [styles.action, styles.decline, pressed && styles.pressed, pending && !declining && styles.inactive]}
                     accessibilityState={{ disabled: !!pending, busy: declining }} onPress={() => void handleRespond(item, 'decline')}>
-                    {declining ? <ActivityIndicator size="small" color="#FFD0DF" /> : <X size={17} color="#FFD0DF" />}
+                    {declining ? <LoadingShimmer /> : <X size={17} color="#FFD0DF" />}
                     <Text style={[styles.actionText, styles.declineText]}>{declining ? 'İşleniyor…' : 'Reddet'}</Text>
                   </Pressable>
                 </View>
@@ -254,10 +255,6 @@ const styles = StyleSheet.create({
   errorText: { color: '#FFD2DC', fontFamily: THEME.fonts.bold, fontSize: 13, lineHeight: 20 },
   retry: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   retryText: { color: '#FFFFFF', fontFamily: THEME.fonts.extraBold, fontSize: 14 },
-  loading: { gap: 12 },
-  skeleton: { height: 132, borderRadius: 22, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#291B3C' },
-  skeletonImage: { width: 56, height: 56, borderRadius: 16, backgroundColor: '#453356' },
-  skeletonCopy: { flex: 1, height: 44, borderRadius: 8, backgroundColor: '#453356' },
   empty: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 16, gap: 12 },
   emptyTitle: { color: '#FFFFFF', fontFamily: THEME.fonts.extraBold, fontSize: 20, textAlign: 'center' },
   emptySub: { color: '#DDD0EE', fontFamily: THEME.fonts.body, fontSize: 14, lineHeight: 22, textAlign: 'center' },

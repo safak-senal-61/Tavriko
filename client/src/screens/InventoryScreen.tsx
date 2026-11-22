@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import {
   View,
   Text,
@@ -7,8 +8,9 @@ import {
   ScrollView,
   Modal,
   Animated,
-  ActivityIndicator,
+  Platform,
 } from 'react-native';
+import { LoadingShimmer } from '../components/LoadingShimmer';
 import { UserProfile, InventoryItem, ItemCategory, COSMETIC_RENTAL_MS, getCosmeticDef } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -166,6 +168,10 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   onNotifications,
   onProfile,
 }) => {
+  const page = usePlayerWebLayout();
+  const threeItems = page?.columns === 3;
+  const roomy = page?.roomy;
+  const itemArt = Math.round(44 * (page?.ui.art ?? 1));
   const [activeTab, setActiveTab] = useState<InvTabType>('all');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
@@ -558,7 +564,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
             desc="Diğer sekmelere göz atabilirsin."
           />
         ) : (
-          <View style={styles.grid}>
+          <View style={[styles.grid, threeItems && styles.webGrid]}>
             {filteredItems.map((item, index) => {
               const rarityColor = RARITY_COLORS[item.rarity || 'common'];
               const isChest = item.category === 'chest' || item.id.includes('chest');
@@ -567,7 +573,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                 <Reanimated.View
                   key={`${activeTab}-${item.id}`}
                   entering={FadeInDown.delay(Math.min(index, 8) * 50).duration(340)}
-                  style={styles.itemCardWrap}
+                  style={[styles.itemCardWrap, threeItems && styles.webItemWrap]}
                 >
                 <TouchableOpacity
                   style={styles.itemCard}
@@ -585,19 +591,19 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                   <View style={styles.qtyBadge}>
                     <Text style={styles.qtyText}>x{item.qty}</Text>
                   </View>
-                  <View style={styles.iconWrap}>
-                    {renderItemVisual(item, 44)}
+                  <View style={[styles.iconWrap, roomy && { height: 2.15 * itemArt }]}>
+                    {renderItemVisual(item, itemArt)}
                   </View>
-                  <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                  <Text style={styles.itemDesc} numberOfLines={2}>{item.desc}</Text>
+                  <Text style={[styles.itemName, roomy && { fontSize: 17 }]} numberOfLines={roomy ? 2 : 1}>{item.name}</Text>
+                  <Text style={[styles.itemDesc, roomy && { fontSize: 13, lineHeight: 18 }]} numberOfLines={2}>{item.desc}</Text>
                   {isChest && (
-                    <View style={styles.openPill}>
-                      <Text style={styles.openPillText}>Sandığı aç</Text>
+                    <View style={[styles.openPill, roomy && styles.webOpenPill]}>
+                      <Text style={[styles.openPillText, roomy && { fontSize: 14 }]}>Sandığı aç</Text>
                     </View>
                   )}
                   {isEquippable(item) && (
-                    <View style={styles.openPill}>
-                      <Text style={styles.openPillText}>
+                    <View style={[styles.openPill, roomy && styles.webOpenPill]}>
+                      <Text style={[styles.openPillText, roomy && { fontSize: 14 }]}>
                         {equippingItemId === item.id ? 'Uygulanıyor...' : 'Kuşan'}
                       </Text>
                     </View>
@@ -735,7 +741,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                         onPress={triggerChestOpeningAnimation}
                       >
                         {isOpeningChest ? (
-                          <ActivityIndicator color="#12052C" size="small" />
+                          <LoadingShimmer label="Sandık açılıyor" ink />
                         ) : (
                           <Text style={styles.openBtnText}>Sandığı Aç</Text>
                         )}
@@ -770,7 +776,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 140,
+    paddingBottom: Platform.OS === 'web' ? 20 : 140,
     paddingHorizontal: 4,
   },
   heroWrap: {
@@ -894,6 +900,9 @@ const styles = StyleSheet.create({
     rowGap: 10,
     marginTop: 8,
   },
+  webGrid: { justifyContent: 'flex-start', columnGap: 12 },
+  webItemWrap: { width: '32%' },
+  webOpenPill: { minHeight: 44, justifyContent: 'center' },
   itemCardWrap: {
     width: '48.5%',
     alignSelf: 'stretch',

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Check, Target, CalendarDays, ChevronRight } from 'lucide-react-native';
 import { UserProfile, DailyChallengeConfig, getDailyChallengeConfig } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import { TavrikoScreen, TavrikoTopBar, Button3D, CoinIcon, GemIcon, ChestIcon } from '../components/TavrikoIcons';
 import { DiscoveryArtwork, DISCOVERY_IMG } from '../components/DiscoveryArtwork';
 import { GradientFill } from '../components/TavrikoGradient';
@@ -13,6 +14,9 @@ interface DailyChallengeScreenProps {
   onStartDaily: (config: DailyChallengeConfig) => void;
 }
 export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({ user, onBack, onStartDaily }) => {
+  const page = usePlayerWebLayout();
+  const dailyColumns = page?.roomy === true && page.contentWidth >= 900;
+  const size = (base: number) => Math.round(base * (page?.ui.art ?? 1));
   const streak = Math.max(1, user?.dailyStreak ?? 1);
   const completed = Boolean(user?.dailyChallenge?.completedToday);
   const cfg = getDailyChallengeConfig(streak);
@@ -22,6 +26,8 @@ export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({ user
       avatarSeed={user?.avatarUrl || user?.displayName} />
     <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
       <View style={s.heading}><CalendarDays size={18} color="#FFD270" /><Text style={s.eyebrow}>GÜNLÜK MEYDAN OKUMA</Text></View>
+      <View style={[s.dailyBody, dailyColumns && s.webDailyBody]}>
+      <View style={[s.dailySection, dailyColumns && s.webDailySection]}>
       <View style={s.hero}>
         <GradientFill colors={['#49305E', '#321C50', '#25213F']} direction="diagonal" />
         <View style={s.heroRow}>
@@ -29,7 +35,7 @@ export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({ user
             <Text style={s.heroTitle}>{completed ? 'Serin korundu.\nHarika oynadın.' : 'Bugün de\nbir adım öne.'}</Text>
             <Text style={s.body}>{completed ? 'Ödüllerin hesabına işlendi. Yeni hedefin yarın seni bekliyor.' : 'Bilgini test et, serini sürdür.\nHer gün büyüyen ödülleri topla.'}</Text>
           </View>
-          <DiscoveryArtwork source={DISCOVERY_IMG.streak} size={100} />
+          <DiscoveryArtwork source={DISCOVERY_IMG.streak} size={size(100)} />
         </View>
         <View style={s.heroFooter}><Text style={s.gold}>{streak} günlük seri</Text><Text style={s.body}>En iyi: {user?.stats?.bestStreak ?? 0}</Text></View>
       </View>
@@ -48,6 +54,8 @@ export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({ user
         })}
       </View>
 
+      </View>
+      <View style={[s.dailySection, dailyColumns && s.webDailySection]}>
       <View style={[s.mission, completed && s.completed]}>
         <View style={s.missionTop}><View style={s.status}><Target size={15} color={completed ? '#87EBC9' : '#FFD270'} />
           <Text style={completed ? s.mint : s.gold}>{completed ? 'BUGÜN TAMAMLANDI' : `${cfg.dayNumber}. GÜNÜN GÖREVİ`}</Text></View>
@@ -57,12 +65,12 @@ export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({ user
         <View style={s.divider} />
         <Text style={s.rewardCaption}>{completed ? 'KAZANILAN ÖDÜLLER' : 'SENİ BEKLEYEN ÖDÜLLER'}</Text>
         <View style={s.rewards}>
-          <View style={s.reward}><DiscoveryArtwork source={DISCOVERY_IMG.speed} size={34} animated={false} /><Text style={s.rewardValue}>+{cfg.rewardXp}</Text><Text style={s.small}>XP</Text></View>
-          <View style={s.reward}><CoinIcon size={32} /><Text style={s.rewardValue}>+{cfg.rewardCoins}</Text><Text style={s.small}>Altın</Text></View>
-          <View style={s.reward}><GemIcon size={32} /><Text style={s.rewardValue}>+{cfg.rewardGems}</Text><Text style={s.small}>Elmas</Text></View>
+          <View style={s.reward}><DiscoveryArtwork source={DISCOVERY_IMG.speed} size={size(34)} animated={false} /><Text style={s.rewardValue}>+{cfg.rewardXp}</Text><Text style={s.small}>XP</Text></View>
+          <View style={s.reward}><CoinIcon size={size(32)} /><Text style={s.rewardValue}>+{cfg.rewardCoins}</Text><Text style={s.small}>Altın</Text></View>
+          <View style={s.reward}><GemIcon size={size(32)} /><Text style={s.rewardValue}>+{cfg.rewardGems}</Text><Text style={s.small}>Elmas</Text></View>
         </View>
         {cfg.rewardChest && <View style={s.chest}><ChestIcon size={32} /><View style={{ flex: 1 }}><Text style={s.gold}>🎁 Hediye Kutusu</Text><Text style={s.body}>7 günlük serinin özel final ödülü — anahtarsız açılır</Text></View></View>}
-        <Button3D title={completed ? 'TEKRAR PRATİK YAP (ÖDÜLSÜZ)' : 'MEYDAN OKUMAYA BAŞLA'} variant={completed ? 'mint' : 'gold'} onPress={() => onStartDaily(cfg)} textStyle={{ fontSize: 13 }} />
+        <Button3D title={completed ? 'TEKRAR PRATİK YAP (ÖDÜLSÜZ)' : 'MEYDAN OKUMAYA BAŞLA'} variant={completed ? 'mint' : 'gold'} onPress={() => onStartDaily(cfg)} textStyle={{ fontSize: page?.roomy ? 16 : 13 }} />
       </View>
       <View style={s.tomorrow}><View style={s.tomorrowArt}><DiscoveryArtwork source={completed ? DISCOVERY_IMG.victory : DISCOVERY_IMG.collector} size={60} /></View>
         <View style={{ flex: 1 }}><Text style={s.rewardCaption}>{completed ? `YARIN · ${next.dayNumber}. GÜN` : 'SERİNİ SÜRDÜR'}</Text>
@@ -70,11 +78,17 @@ export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({ user
           <Text style={s.body}>{completed ? `+${next.rewardXp} XP · ${next.rewardCoins} altın · ${next.rewardGems} elmas` : 'Her gün oyna, Mega Sandık hedefine yaklaş.'}</Text></View>
         <ChevronRight size={18} color="#C8B7DF" />
       </View>
+      </View>
+      </View>
     </ScrollView>
   </TavrikoScreen>;
 };
 const s = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 36, gap: 16 },
+  dailyBody: { gap: 16 },
+  dailySection: { gap: 16 },
+  webDailyBody: { flexDirection: 'row', alignItems: 'flex-start' },
+  webDailySection: { flex: 1, minWidth: 0 },
   heading: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   eyebrow: { color: '#F3D58B', fontFamily: THEME.fonts.extraBold, fontSize: 12, letterSpacing: 1 },
   hero: { borderRadius: 26, borderColor: '#75518A', borderWidth: 1, overflow: 'hidden' },

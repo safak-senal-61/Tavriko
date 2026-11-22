@@ -1,6 +1,7 @@
 import { cdnImage } from '../utils/cdn';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import { GradientFill } from '../components/TavrikoGradient';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,10 +15,14 @@ import {
   Image,
   Modal,
   FlatList,
-  ActivityIndicator,
 } from 'react-native';
+import { PageShimmer } from '../components/LoadingShimmer';
 import { DEFAULT_API_BASE } from '../config';
 import { authHeaders } from '../utils/apiAuth';
+import { useGameStore } from '../store/gameStore';
+import { PAGE_TTL } from '../utils/pageDataCache';
+import { friendsUrl, type FriendsPayload } from '../utils/pageResources';
+import { usePageData } from '../utils/usePageData';
 import Reanimated, {
   FadeInDown,
   ZoomIn,
@@ -58,6 +63,7 @@ interface LobbyScreenProps {
   room: GameRoom;
   currentUserId: string;
   user?: UserProfile | null;
+  apiBaseUrl?: string;
   onBack: () => void;
   onToggleReady: () => void;
   onStartGame: () => void;
@@ -258,7 +264,7 @@ const FriendInviteCard: React.FC<{ onPress: () => void; subtitle: string; disabl
 };
 
 /** Boş slot: sadece şeffaf (arka plansız) soru işareti + bekleniyor yazısı */
-const EmptySlotCard: React.FC = () => {
+const EmptySlotCard: React.FC<{ inGrid: boolean }> = ({ inGrid }) => {
   const p = useSharedValue(0);
   useEffect(() => {
     p.value = withRepeat(withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.sin) }), -1, true);
@@ -270,7 +276,7 @@ const EmptySlotCard: React.FC = () => {
   return (
     <Reanimated.View
       entering={FadeInDown.delay(140).duration(400)}
-      style={styles.emptySlotRow}
+      style={[styles.emptySlotRow, inGrid && styles.webPlayerSlot]}
     >
       <Reanimated.Image
         source={LOBBY_IMG.questionMark}
@@ -380,11 +386,14 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   room,
   currentUserId,
   user,
+  apiBaseUrl = DEFAULT_API_BASE,
   onBack,
   onToggleReady,
   onStartGame,
   onKickPlayer,
 }) => {
+  const page = usePlayerWebLayout();
+  const playerGrid = page?.roomy === true && page.contentWidth >= 760;
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [chatText, setChatText] = useState('');
@@ -392,10 +401,12 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
   // --- Oyun içi arkadaş daveti ---
   const [friendInviteVisible, setFriendInviteVisible] = useState(false);
-  const [friendsList, setFriendsList] = useState<LobbyFriendItem[]>([]);
-  const [friendsLoading, setFriendsLoading] = useState(false);
-  const [friendsError, setFriendsError] = useState(false);
-  const [friendsReload, setFriendsReload] = useState(0);
+  const token = useGameStore(state => state.token);
+  const owner = user && !user.isGuest ? currentUserId : undefined;
+  const { data: friendsData, loading: friendsLoading, error: friendsError, read: readFriends } =
+    usePageData<FriendsPayload<LobbyFriendItem>>(friendInviteVisible && owner ? friendsUrl(apiBaseUrl, owner) : null,
+      PAGE_TTL.friends, owner, token);
+  const friendsList = useMemo(() => (friendsData?.friends ?? []).filter(f => f?.isFriend === true), [friendsData]);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [invitedFriendIds, setInvitedFriendIds] = useState<Set<string>>(new Set());
   const pendingInvites = useRef(new Set<string>());
@@ -403,39 +414,13 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   const [, refreshPresence] = useState(0);
 
   useEffect(() => {
-    if (!currentUserId || !user || user.isGuest) return;
-    const controller = new AbortController();
-    setFriendsLoading(true);
-    setFriendsError(false);
-    fetch(`${DEFAULT_API_BASE}/social/friends/${encodeURIComponent(currentUserId)}`, {
-      headers: authHeaders(),
-      signal: controller.signal,
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        if (!Array.isArray(data.friends)) throw new Error();
-        if (!controller.signal.aborted) {
-          setFriendsList((data.friends as LobbyFriendItem[]).filter(f => f?.isFriend === true));
-        }
-      })
-      .catch(() => { if (!controller.signal.aborted) setFriendsError(true); })
-      .finally(() => { if (!controller.signal.aborted) setFriendsLoading(false); });
-    return () => controller.abort();
-  }, [currentUserId, user?.id, user?.isGuest, friendsReload]);
-
-  useEffect(() => {
+    if (!friendInviteVisible) return;
     const onPresence = () => refreshPresence(n => n + 1);
-    const bumpFriends = () => setFriendsReload(n => n + 1);
-    const unsub = [
-      socketService.on('presence:snapshot', onPresence),
-      socketService.on('presence:update', (presence: { userId?: string }) => {
-        if (friendsList.some(friend => friend.id === presence?.userId)) onPresence();
-      }),
-      socketService.on('friends:update', bumpFriends),
-    ];
+    const unsub = ['presence:snapshot', 'presence:update', 'user:online', 'user:offline']
+      .map(event => socketService.on(event, onPresence));
+    socketService.requestPresenceSnapshot();
     return () => unsub.forEach(remove => remove());
-  }, [friendsList]);
+  }, [friendInviteVisible]);
 
   const inviteFriend = async (friendId: string) => {
     if (roomFull || room.players[friendId] || invitedFriendIds.has(friendId) || pendingInvites.current.has(friendId)) return;
@@ -473,7 +458,6 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
     .filter(f => !room.players[f.id])
     .map(f => ({ ...f, online: socketService.getUserPresence(f.id)?.online ?? f.online }))
     .sort((a, b) => Number(b.online) - Number(a.online));
-  const onlineFriendCount = availableFriends.filter(f => f.online).length;
   const isHost = currentUserId === room.hostId;
   const myPlayer = room.players[currentUserId];
   const isReady = myPlayer?.isReady ?? false;
@@ -786,14 +770,10 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             disabled={roomFull || !user || !!user.isGuest}
             subtitle={roomFull ? 'Oda dolu'
               : !user || user.isGuest ? 'Davet etmek için giriş yap'
-              : friendsLoading && friendsList.length === 0 ? 'Arkadaşlar yükleniyor…'
-              : friendsError ? 'Arkadaş listesini yeniden yükle'
-              : availableFriends.length ? `${availableFriends.length} arkadaş · ${onlineFriendCount} çevrimiçi`
-              : 'Davet edilebilecek arkadaş yok'}
+              : 'Arkadaşlarını bu odaya çağır'}
             onPress={() => {
               sound.playSound('tap');
               setInviteError(null);
-              setFriendsReload(n => n + 1);
               setFriendInviteVisible(true);
             }}
           />
@@ -824,7 +804,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           </Text>
         </View>
 
-        <View style={styles.playersList}>
+        <View style={[styles.playersList, playerGrid && styles.webPlayersList]}>
           {players.map((p, index) => {
             const playerIsHost = p.id === room.hostId;
             const isMe = p.id === currentUserId;
@@ -833,7 +813,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
               <Reanimated.View
                 key={p.id}
                 entering={FadeInDown.delay(index * 80).duration(380)}
-                style={[styles.playerRow, isMe && styles.playerRowMe]}
+                style={[styles.playerRow, playerGrid && styles.webPlayerSlot, isMe && styles.playerRowMe]}
               >
                 <View style={styles.playerAvatarWrap}>
                   {/* index prop'u verilirse seed çözümü atlanıp liste sırası
@@ -888,7 +868,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
           {/* Boş Slotlar: Üretilmiş kaide görseli + nefes alan parıltı */}
           {Array.from({ length: Math.min(4, emptySlotCount) }).map((_, idx) => (
-            <EmptySlotCard key={`empty_${idx}`} />
+            <EmptySlotCard key={`empty_${idx}`} inGrid={playerGrid} />
           ))}
         </View>
 
@@ -1033,11 +1013,9 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             {roomFull ? (
               <Text style={styles.friendModalEmptyText}>Oda dolu. Yer açıldığında tekrar davet edebilirsin.</Text>
             ) : friendsLoading && friendsList.length === 0 ? (
-              <View style={styles.friendModalEmpty}>
-                <ActivityIndicator color="#9B8CFF" />
-              </View>
-            ) : friendsError && friendsList.length === 0 ? (
-              <TouchableOpacity accessibilityRole="button" onPress={() => setFriendsReload(n => n + 1)} style={styles.friendModalEmpty}>
+              <PageShimmer label="Davet edilebilir arkadaşlar yükleniyor" rows={2} />
+            ) : friendsError && !friendsData ? (
+              <TouchableOpacity accessibilityRole="button" onPress={() => void readFriends(true).catch(() => {})} style={styles.friendModalEmpty}>
                 <Text style={styles.friendModalEmptyText}>Arkadaşlar yüklenemedi. Yeniden dene.</Text>
               </TouchableOpacity>
             ) : availableFriends.length === 0 ? (
@@ -1283,6 +1261,8 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 14,
   },
+  webPlayersList: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  webPlayerSlot: { width: '49%', minWidth: 0 },
   playerRow: {
     flexDirection: 'row',
     alignItems: 'center',

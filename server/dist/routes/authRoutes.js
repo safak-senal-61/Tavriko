@@ -2,11 +2,17 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getPendingGoogleSessions = getPendingGoogleSessions;
 const express_1 = require("express");
+const node_net_1 = require("node:net");
+const express_rate_limit_1 = require("express-rate-limit");
+const functions_1 = require("@vercel/functions");
 const prismaClient_1 = require("../db/prismaClient");
 const supabaseClient_1 = require("../db/supabaseClient");
 const shared_1 = require("@trivia/shared");
 const logger_1 = require("../utils/logger");
 const auth_1 = require("../middleware/auth");
+const oneSignalEmail_1 = require("../services/oneSignalEmail");
+const passwordReset_1 = require("../services/passwordReset");
+const accountRemoval_1 = require("../services/accountRemoval");
 const LEGAL_CONSENT_REQUIRED_ERROR = 'Devam etmek için Kullanım Koşulları, Gizlilik Politikası ve KVKK Aydınlatma Metni’ni onaylamalısın.';
 function buildLegalConsent(method) {
     return {
@@ -17,6 +23,24 @@ function buildLegalConsent(method) {
     };
 }
 const router = (0, express_1.Router)();
+// Vercel overwrites this header at its edge. Do not trust a client-supplied
+// forwarding header on standalone servers, or change Express trust globally.
+const rateLimitKey = (req) => {
+    const forwarded = process.env.VERCEL === '1' ? req.get('x-forwarded-for')?.trim() : undefined;
+    const ip = forwarded && (0, node_net_1.isIP)(forwarded) ? forwarded : req.ip || req.socket.remoteAddress;
+    return ip && (0, node_net_1.isIP)(ip) ? (0, express_rate_limit_1.ipKeyGenerator)(ip) : 'unknown';
+};
+const rateLimitOptions = {
+    keyGenerator: rateLimitKey,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: { error: 'Çok fazla istek. Lütfen birkaç dakika sonra tekrar deneyin.' },
+};
+const signedRemovalRequestLimit = (0, express_rate_limit_1.rateLimit)({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const publicRemovalRequestLimit = (0, express_rate_limit_1.rateLimit)({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const signedRemovalConfirmLimit = (0, express_rate_limit_1.rateLimit)({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const publicRemovalConfirmLimit = (0, express_rate_limit_1.rateLimit)({ ...rateLimitOptions, windowMs: 5 * 60_000, limit: 15 });
+const sessionProfileLimit = (0, express_rate_limit_1.rateLimit)({ ...rateLimitOptions, windowMs: 60_000, limit: 120 });
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ||
     '411578437442-gs1rck2124rgr516fe9dn9tuu15ge9ig.apps.googleusercontent.com';
 const pendingSessions = new Map();
@@ -164,7 +188,8 @@ router.post('/guest', async (req, res) => {
         res.json(result);
     }
     catch (err) {
-        res.status(500).json({ error: err.message });
+        logger_1.logger.error('AUTH', 'Misafir oturumu oluşturulamadı', { error: err instanceof Error ? err.name : 'unknown' });
+        res.status(500).json({ error: 'Misafir oturumu oluşturulamadı.' });
     }
 });
 router.post('/register', async (req, res) => {
@@ -480,83 +505,171 @@ router.post('/google', async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
-// SECURITY: account deletion requires the account owner's verified session token.
-router.post('/delete-account', auth_1.requireUserAuth, async (req, res) => {
+const REMOVAL_UNAVAILABLE = 'Hesap silme doğrulaması şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.';
+const REMOVAL_ACCEPTED = 'Bu adres bir Tavriko hesabına bağlıysa doğrulama kodu e-postayla gönderilir. Gelen kutunuzu ve spam klasörünüzü kontrol edin.';
+const INVALID_REMOVAL_CODE = 'Kod geçersiz, kullanılmış veya süresi dolmuş. Gerekirse yeni bir kod isteyin.';
+router.post('/delete-account/request', signedRemovalRequestLimit, auth_1.requireUserAuth, async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const config = (0, oneSignalEmail_1.getOneSignalEmailConfig)();
+    const secret = (0, passwordReset_1.getPasswordResetSecret)();
+    if (!config || !secret) {
+        res.status(503).json({ error: REMOVAL_UNAVAILABLE });
+        return;
+    }
     try {
-        const userId = req.authUserId;
-        if (!userId) {
-            res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
+        // Ignore all client-supplied destinations and use the authenticated account.
+        const result = await (0, accountRemoval_1.issueAccountRemoval)(prismaClient_1.db.rawClient, { id: req.authUserId }, secret);
+        if (result.status === 'unavailable') {
+            res.status(400).json({ error: 'Doğrulama kodu için hesabınıza kayıtlı bir e-posta adresi olmalıdır.' });
             return;
         }
-        const result = await prismaClient_1.db.deleteAccount(userId);
-        res.json(result);
-    }
-    catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-// KVKK: /remove-account web sayfasının e-posta ile hesap silme akışı.
-// E-posta altyapısı olmadığından doğrulama kodu yanıtta gösterilir (şifre
-// sıfırlamadaki demoResetCode deseniyle aynı).
-router.post('/request-delete-code', async (req, res) => {
-    try {
-        const { email } = req.body || {};
-        const result = await prismaClient_1.db.requestAccountDeletionCode(String(email || ''));
-        res.json(result);
-    }
-    catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-router.post('/confirm-delete', async (req, res) => {
-    try {
-        const { email, code } = req.body || {};
-        const result = await prismaClient_1.db.confirmAccountDeletion(String(email || ''), String(code || ''));
-        if (!result.success) {
-            res.status(400).json(result);
+        if (result.status === 'cooldown') {
+            res.json({ success: true, delivery: 'previous-request', resendAfterSeconds: result.remaining });
             return;
         }
-        res.json(result);
+        if (!await (0, oneSignalEmail_1.sendOneSignalAccountRemovalEmail)(config, result)) {
+            res.status(503).json({ delivery: 'unconfirmed', resendAfterSeconds: accountRemoval_1.REMOVAL_RESEND_SECONDS });
+            return;
+        }
+        res.json({ success: true, delivery: 'accepted', resendAfterSeconds: accountRemoval_1.REMOVAL_RESEND_SECONDS });
     }
-    catch (err) {
-        res.status(500).json({ error: err.message });
+    catch {
+        logger_1.logger.error('AUTH', 'Hesap silme kodu hazırlanamadı.');
+        res.status(503).json({ error: REMOVAL_UNAVAILABLE });
     }
 });
+// Public account removal does not disclose whether the address is registered.
+router.post('/request-delete-code', publicRemovalRequestLimit, (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const email = (0, accountRemoval_1.accountRemovalEmail)(req.body?.email);
+    if (!email) {
+        res.status(400).json({ error: 'Geçerli bir e-posta adresi girin.' });
+        return;
+    }
+    const config = (0, oneSignalEmail_1.getOneSignalEmailConfig)();
+    const secret = (0, passwordReset_1.getPasswordResetSecret)();
+    if (!config || !secret) {
+        res.status(503).json({ error: REMOVAL_UNAVAILABLE });
+        return;
+    }
+    const delivery = Promise.resolve().then(async () => {
+        const removal = await (0, accountRemoval_1.issueAccountRemoval)(prismaClient_1.db.rawClient, { email }, secret);
+        if (removal.status === 'issued')
+            await (0, oneSignalEmail_1.sendOneSignalAccountRemovalEmail)(config, removal);
+    }).catch(() => { logger_1.logger.error('AUTH', 'Hesap silme kodu hazırlanamadı.'); });
+    if (process.env.VERCEL)
+        (0, functions_1.waitUntil)(delivery);
+    res.json({ success: true, message: REMOVAL_ACCEPTED, resendAfterSeconds: accountRemoval_1.REMOVAL_RESEND_SECONDS });
+});
+async function finishAccountRemoval(req, res, target) {
+    res.set('Cache-Control', 'no-store');
+    const code = req.body?.code;
+    if (typeof code !== 'string' || !/^[0-9]{6}$/.test(code.trim())) {
+        res.status(400).json({ error: 'E-postanızdaki 6 haneli doğrulama kodunu girin.' });
+        return;
+    }
+    const secret = (0, passwordReset_1.getPasswordResetSecret)();
+    if (!secret) {
+        res.status(503).json({ error: REMOVAL_UNAVAILABLE });
+        return;
+    }
+    try {
+        const removed = await (0, accountRemoval_1.confirmAccountRemoval)(prismaClient_1.db.rawClient, target, code.trim(), secret);
+        if (!removed) {
+            res.status(400).json({ error: INVALID_REMOVAL_CODE });
+            return;
+        }
+        prismaClient_1.db.forgetDeletedAccount(removed.id);
+        res.json({ success: true, message: 'Tavriko hesabınız kalıcı olarak silindi.' });
+    }
+    catch {
+        logger_1.logger.error('AUTH', 'Hesap silme doğrulaması tamamlanamadı.');
+        res.status(503).json({ error: REMOVAL_UNAVAILABLE });
+    }
+}
+router.post('/delete-account', signedRemovalConfirmLimit, auth_1.requireUserAuth, async (req, res) => {
+    await finishAccountRemoval(req, res, { id: req.authUserId });
+});
+router.post('/confirm-delete', publicRemovalConfirmLimit, async (req, res) => {
+    const email = (0, accountRemoval_1.accountRemovalEmail)(req.body?.email);
+    if (!email) {
+        res.set('Cache-Control', 'no-store').status(400).json({ error: 'Geçerli bir e-posta adresi girin.' });
+        return;
+    }
+    await finishAccountRemoval(req, res, { email });
+});
+const RESET_UNAVAILABLE = 'Şifre sıfırlama şu anda kullanılamıyor. Lütfen daha sonra tekrar deneyin.';
+const RESET_ACCEPTED = 'Bu e-posta bir şifreli hesaba bağlıysa doğrulama kodu gönderilir. Gelen kutunuzu ve spam klasörünüzü kontrol edin.';
+function readResetIdentifier(body) {
+    const value = body?.identifier ?? body?.email;
+    if (typeof value !== 'string')
+        return null;
+    const normalized = value.trim().toLowerCase();
+    if (!normalized || normalized.length > 254)
+        return null;
+    return normalized;
+}
 router.post('/forgot-password', async (req, res) => {
-    try {
-        const { identifier, email } = req.body;
-        const target = identifier || email;
-        if (!target) {
-            res.status(400).json({ error: 'Lütfen kayıtlı e-posta adresinizi veya kullanıcı adınızı girin.' });
-            return;
-        }
-        // SECURITY: the one-time code is delivered out-of-band (email), NEVER returned in
-        // the HTTP response. A generic response is sent whether or not the account exists
-        // to prevent user enumeration.
-        await prismaClient_1.db.requestPasswordReset(target).catch(() => undefined);
-        res.json({
-            success: true,
-            message: 'Şifre sıfırlama kodu kayıtlı e-posta adresinize gönderildi.',
-        });
+    res.set('Cache-Control', 'no-store');
+    const target = readResetIdentifier(req.body);
+    if (!target) {
+        res.status(400).json({ error: 'Lütfen kayıtlı e-posta adresinizi veya kullanıcı adınızı girin.' });
+        return;
     }
-    catch (err) {
-        res.status(400).json({ error: err.message });
+    const config = (0, oneSignalEmail_1.getOneSignalEmailConfig)();
+    const secret = (0, passwordReset_1.getPasswordResetSecret)();
+    if (!config || !secret) {
+        res.status(503).json({ error: RESET_UNAVAILABLE });
+        return;
     }
+    // Keep account lookup, the expensive OTP derivation and delivery out of the
+    // public response path, so eligibility is not revealed by processing time.
+    const delivery = Promise.resolve().then(async () => {
+        const reset = await (0, passwordReset_1.issuePasswordReset)(prismaClient_1.db.rawClient, target, secret);
+        if (reset)
+            await (0, oneSignalEmail_1.sendOneSignalPasswordResetEmail)(config, reset);
+    }).catch(() => {
+        logger_1.logger.error('AUTH', 'Şifre sıfırlama kodu hazırlanamadı.');
+    });
+    if (process.env.VERCEL)
+        (0, functions_1.waitUntil)(delivery);
+    res.json({
+        success: true,
+        message: RESET_ACCEPTED,
+        resendAfterSeconds: passwordReset_1.PASSWORD_RESET_RESEND_SECONDS,
+    });
 });
 router.post('/reset-password', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const target = readResetIdentifier(req.body);
+    const { otpCode, code, newPassword } = req.body || {};
+    const finalCode = otpCode ?? code;
+    if (!target || typeof finalCode !== 'string' || !/^\d{6}$/.test(finalCode.trim())) {
+        res.status(400).json({ error: '6 haneli doğrulama kodunu eksiksiz girin.' });
+        return;
+    }
+    if (typeof newPassword !== 'string' || newPassword.length < 8 || Buffer.byteLength(newPassword) > 72) {
+        res.status(400).json({ error: 'Yeni şifre en az 8 karakter olmalı ve 72 baytı aşmamalıdır.' });
+        return;
+    }
+    const secret = (0, passwordReset_1.getPasswordResetSecret)();
+    if (!secret) {
+        res.status(503).json({ error: RESET_UNAVAILABLE });
+        return;
+    }
     try {
-        const { identifier, email, otpCode, code, newPassword } = req.body;
-        const target = identifier || email;
-        const finalCode = otpCode || code;
-        if (!target || !finalCode || !newPassword) {
-            res.status(400).json({ error: 'Tüm alanların doldurulması zorunludur.' });
+        const confirmed = await (0, passwordReset_1.confirmPasswordReset)(prismaClient_1.db.rawClient, {
+            identifier: target, code: finalCode.trim(), password: newPassword,
+        }, secret);
+        if (!confirmed) {
+            res.status(400).json({ error: 'Kod geçersiz, kullanılmış veya süresi dolmuş. Gerekirse yeni kod isteyin.' });
             return;
         }
-        const result = await prismaClient_1.db.confirmPasswordReset(target, finalCode, newPassword);
-        res.json(result);
+        res.json({ success: true, message: 'Şifreniz başarıyla yenilendi!' });
     }
-    catch (err) {
-        res.status(400).json({ error: err.message });
+    catch {
+        logger_1.logger.error('AUTH', 'Şifre sıfırlama doğrulaması tamamlanamadı.');
+        res.status(503).json({ error: RESET_UNAVAILABLE });
     }
 });
 // SECURITY: profile updates are bound to the verified session identity. The old
@@ -567,6 +680,12 @@ router.put('/profile', auth_1.requireUserAuth, async (req, res) => {
         const userId = req.authUserId;
         if (!userId) {
             res.status(401).json({ error: 'Kullanıcı oturumu doğrulanamadı.' });
+            return;
+        }
+        // The mailbox is the second factor for password reset and account removal.
+        // Profile editing must not let a session silently change that destination.
+        if (req.body?.email !== undefined) {
+            res.status(400).json({ error: 'Kayıtlı e-posta adresi profil düzenleme ekranından değiştirilemez.' });
             return;
         }
         logger_1.logger.info('AUTH', `Profil güncelleme isteği: userId=${userId}, avatarUrl=${req.body.avatarUrl || 'değişmedi'}, displayName=${req.body.displayName || 'değişmedi'}`);
@@ -713,7 +832,7 @@ router.post('/sync-wallet', auth_1.requireUserAuth, async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
-router.get('/me', (req, res) => {
+router.get('/me', sessionProfileLimit, async (req, res) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         res.status(401).json({ error: 'Yetkilendirme başlığı eksik' });
@@ -725,7 +844,7 @@ router.get('/me', (req, res) => {
         res.status(401).json({ error: 'Geçersiz veya süresi dolmuş oturum' });
         return;
     }
-    const profile = prismaClient_1.db.getUserProfile(payload.userId);
+    const profile = await prismaClient_1.db.getUserProfileAsync(payload.userId);
     if (!profile) {
         res.status(404).json({ error: 'Kullanıcı bulunamadı' });
         return;

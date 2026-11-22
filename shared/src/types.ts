@@ -105,6 +105,8 @@ export interface ClientQuestion {
   roundNumber: number;
   totalRounds: number;
   timeLimitSec: number;
+  /** Live rooms include the remaining server time, including when a player reconnects. */
+  timeRemainingMs?: number;
   /** Sorunun ait olduğu alt kategori adı (ör. "Nişancı Oyunları (FPS)") */
   subCategory?: string;
 }
@@ -956,6 +958,28 @@ export const SHOP_CATALOG: ShopProduct[] = [
     badge: 'ÖZEL',
     grantItems: [{ id: 'frame_flame', name: 'Alev Çerçevesi', desc: 'Ateşli profil çerçevesi', qty: 1, category: 'frame', rarity: 'mythic' }],
   },
+  {
+    id: 'frame_dragon_phoenix',
+    name: 'Ejderha ve Anka Çerçevesi',
+    desc: 'Kadim ejderha ile alevden anka avatarını çevreler.',
+    category: 'frames',
+    price: 150,
+    currency: 'gems',
+    rarity: 'mythic',
+    badge: 'YENİ',
+    grantItems: [{ id: 'frame_dragon_phoenix', name: 'Ejderha ve Anka Çerçevesi', desc: 'Ejderha ve anka motifli profil çerçevesi', qty: 1, category: 'frame', rarity: 'mythic' }],
+  },
+  {
+    id: 'frame_steampunk',
+    name: 'Buhar Zırhı Çerçevesi',
+    desc: 'Pirinç dişliler ve mavi ışıklarla işlenmiş zırhlı kanatlar.',
+    category: 'frames',
+    price: 90,
+    currency: 'gems',
+    rarity: 'legendary',
+    badge: 'YENİ',
+    grantItems: [{ id: 'frame_steampunk', name: 'Buhar Zırhı Çerçevesi', desc: 'Pirinç ve çelik profil çerçevesi', qty: 1, category: 'frame', rarity: 'legendary' }],
+  },
 
   // --- Badges ---
   {
@@ -1097,7 +1121,7 @@ export const SHOP_CATALOG: ShopProduct[] = [
   {
     id: 'frame_ice',
     name: 'Buz Kristal Çerçeve',
-    desc: 'Kutup soğuğunda parlayan buz mavisi kristal halka. Seçtiğin süre boyunca aktif.',
+    desc: 'Buz mavisi ve mor kristaller avatarının çevresinde parıldar.',
     category: 'frames',
     price: 55,
     currency: 'gems',

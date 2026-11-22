@@ -61,4 +61,22 @@ describe('Alt kategori soru seçimi (Keşfet)', () => {
     expect(qs.length).toBe(15);
     expect(new Set(qs.map((q) => q.categoryId)).size).toBeGreaterThan(1);
   });
+
+  it('aynı metin başka ID ile gelse bile kısa havuzda soru kopyalamaz', async () => {
+    const bank = db as unknown as { questions: ReturnType<typeof db.getAllQuestions> };
+    const original = bank.questions;
+    const first = db.getQuestions('gaming_videogames', undefined, 1, [], 'fps_games')[0];
+    bank.questions = [first, { ...first, id: 'duplicate-text' }];
+    try {
+      expect(db.getQuestions('gaming_videogames', undefined, 15, [first.id])).toHaveLength(1);
+      const response = await request(app).get('/api/questions/practice').query({
+        category: 'gaming_videogames', subcategory: 'fps_games', count: 15,
+      });
+      expect(response.status).toBe(200);
+      expect(response.body.count).toBe(1);
+      expect(response.body.questions[0]).toMatchObject({ roundNumber: 1, totalRounds: 1 });
+    } finally {
+      bank.questions = original;
+    }
+  });
 });

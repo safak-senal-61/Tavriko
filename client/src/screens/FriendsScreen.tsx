@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
   View,
@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  ActivityIndicator,
   Share,
   TextInput,
   Modal,
   Platform,
   Image,
 } from 'react-native';
+import { PageShimmer } from '../components/LoadingShimmer';
 import Reanimated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import * as Clipboard from 'expo-clipboard';
 import { UserProfile, calculateLevelFromXp, extractProfileCosmetics } from '@trivia/shared';
@@ -20,12 +20,19 @@ import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { trackEvent } from '../services/analytics';
 import { authHeaders } from '../utils/apiAuth';
+import { FRIEND_CODE_PREFIX, normalizeFriendCodeSuffix } from '../utils/friendCode';
 import { DEFAULT_API_BASE } from '../config';
+import { PageLoadError } from '../components/PageLoadError';
+import { useGameStore } from '../store/gameStore';
+import { PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
+import { friendsChanged, friendsUrl, profileUrl, type FriendsPayload } from '../utils/pageResources';
+import { usePageData } from '../utils/usePageData';
+import { UserProfileModal } from '../components/UserProfileModal';
 import { socketService } from '../services/socketService';
 import { ReferralCards } from '../components/ReferralCards';
 import { DISCOVERY_IMG } from '../components/DiscoveryArtwork';
 import { GradientFill } from '../components/TavrikoGradient';
-import { AnimatedFrame, AnimatedNameText, ANIMATED_FRAME_COLORS, ANIMATED_NAME_COLORS } from '../components/StoreKit';
+import { AnimatedFrame, AnimatedNameText, ANIMATED_FRAME_COLORS, ANIMATED_NAME_COLORS, frameFor, FramedAvatar } from '../components/StoreKit';
 import {
   TavrikoScreen,
   TavrikoTopBar,
@@ -42,6 +49,7 @@ interface FriendsScreenProps {
   isGuest?: boolean;
   apiBaseUrl?: string;
   onBack: () => void;
+  onSignIn: () => void;
   onInviteToMatch: (friendId: string, friendName?: string, roomCode?: string) => void;
   onJoinFriendRoom?: (roomCode: string) => void;
   onNavigateTab?: (tab: 'play' | 'explore' | 'leaders' | 'friends' | 'profile') => void;
@@ -81,6 +89,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   isGuest = false,
   apiBaseUrl,
   onBack,
+  onSignIn,
   onInviteToMatch,
   onJoinFriendRoom,
   onNavigateTab,
@@ -89,17 +98,15 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'friends' | 'add' | 'requests'>('friends');
   const [copied, setCopied] = useState(false);
-  const [friendCode, setFriendCode] = useState(user?.friendCode || 'TV-10000');
-  const [friendsList, setFriendsList] = useState<FriendRowItem[]>([]);
-  const [sentRequests, setSentRequests] = useState<any[]>([]);
-  const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
   const [respondingReqId, setRespondingReqId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [challengeLoadingId, setChallengeLoadingId] = useState<string | null>(null);
   const [challengeNotice, setChallengeNotice] = useState<string | null>(null);
   // Profile Inspection Modal State
   const [inspectPlayer, setInspectPlayer] = useState<FriendRowItem | null>(null);
   const [inspectDetails, setInspectDetails] = useState<any | null>(null);
+  const [privateProfileId, setPrivateProfileId] = useState<string | null>(null);
+  const latestProfilePress = useRef(0);
+  useEffect(() => () => { latestProfilePress.current++; }, []);
   const [inspectLoading, setInspectLoading] = useState(false);
   const [removingFriend, setRemovingFriend] = useState(false);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
@@ -129,190 +136,48 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     ]).start();
   };
   // Add Friend state
-  const [addInput, setAddInput] = useState('');
+  const [addByUsername, setAddByUsername] = useState(false);
+  const [codeSuffix, setCodeSuffix] = useState('');
+  const [usernameInput, setUsernameInput] = useState('');
   const [addLoading, setAddLoading] = useState(false);
   const [addSuccessMsg, setAddSuccessMsg] = useState<string | null>(null);
   const [addErrorMsg, setAddErrorMsg] = useState<string | null>(null);
+  const [signInRequired, setSignInRequired] = useState(false);
   const base = apiBaseUrl || DEFAULT_API_BASE;
-  const fetchFriends = () => {
-    const uid = user?.id || 'default';
-    setLoading(true);
-    socketService.requestPresenceSnapshot();
-    fetch(`${base}/social/friends/${uid}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.friendCode) setFriendCode(data.friendCode);
-        if (Array.isArray(data.sentRequests)) setSentRequests(data.sentRequests);
-        if (Array.isArray(data.incomingRequests)) setIncomingRequests(data.incomingRequests);
-        if (Array.isArray(data.friends)) {
-          // Strictly deduplicate users by ID, username, and normalized display name
-          const seenIds = new Set<string>();
-          const seenUsernames = new Set<string>();
-          const seenNames = new Set<string>();
-
-          // 1. Never show the current user in their own friends list
-          if (user?.id) seenIds.add(user.id);
-          if (uid && uid !== 'default') seenIds.add(uid);
-          if (user?.username) seenUsernames.add(user.username.toLowerCase().trim());
-          const myNormName = (user?.displayName || user?.fullName || user?.username || '')
-            .toLowerCase()
-            .replace(/[^a-z0-9ğüşıöç]/gi, '')
-            .trim();
-          if (myNormName) seenNames.add(myNormName);
-
-          // 2. ONLY include accepted friends (f.isFriend === true) and merge Cloudflare WS presence
-          const acceptedOnly = data.friends
-            .filter((f: FriendRowItem) => f && f.isFriend !== false)
-            .map((f: FriendRowItem) => {
-              const wsPresence = socketService.getUserPresence(f.id);
-              const isOnline = Boolean(f.online || wsPresence?.online);
-              const inRoom = Boolean(f.inRoom || wsPresence?.inRoom);
-              const currentRoomCode = f.currentRoomCode || wsPresence?.currentRoomCode;
-              let status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
-              if (inRoom && currentRoomCode) {
-                status = `Oda: #${currentRoomCode} · Lobide`;
-              }
-              return {
-                ...f,
-                isFriend: true,
-                online: isOnline,
-                inRoom,
-                currentRoomCode,
-                status,
-              };
-            });
-
-          const sorted = [...acceptedOnly].sort((a, b) => {
-            if (a.inRoom !== b.inRoom) return a.inRoom ? -1 : 1;
-            if (a.online !== b.online) return a.online ? -1 : 1;
-            return (b.xp || 0) - (a.xp || 0);
-          });
-
-          const cleanFriends = sorted.filter((f: FriendRowItem) => {
-            if (!f || !f.id || seenIds.has(f.id)) return false;
-            const uName = (f.username || '').toLowerCase().trim();
-            const normName = (f.displayName || f.name || f.username || '')
-              .toLowerCase()
-              .replace(/[^a-z0-9ğüşıöç]/gi, '')
-              .trim();
-            // Display names are not unique. Two friends named Ahmet are two people.
-            seenIds.add(f.id);
-            if (uName) seenUsernames.add(uName);
-            if (normName) seenNames.add(normName);
-            return true;
-          });
-          setFriendsList(cleanFriends);
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        setLoading(false);
-      });
-  };
-
+  const owner = !isGuest ? user?.id : undefined;
+  const { data, loading, error, read } = usePageData<FriendsPayload<FriendRowItem>>(
+    owner ? friendsUrl(base, owner) : null, PAGE_TTL.friends, owner, token);
+  const sentRequests = data?.sentRequests ?? [];
+  const incomingRequests = data?.incomingRequests ?? [];
+  const [presenceVersion, updatePresence] = useState(0);
+  const friendsList = useMemo(() => {
+    const seen = new Set([owner]);
+    return (data?.friends ?? []).filter(friend => {
+      if (!friend?.id || friend.isFriend === false || seen.has(friend.id)) return false;
+      seen.add(friend.id);
+      return true;
+    }).map(friend => {
+      const presence = socketService.getUserPresence(friend.id);
+      const online = presence?.online ?? friend.online;
+      const inRoom = presence ? presence.inRoom : friend.inRoom;
+      const currentRoomCode = presence ? presence.currentRoomCode : friend.currentRoomCode;
+      return { ...friend, online, inRoom, currentRoomCode,
+        status: inRoom && currentRoomCode ? `Oda: #${currentRoomCode} · Lobide`
+          : online ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı' };
+    }).sort((a, b) => Number(Boolean(b.inRoom)) - Number(Boolean(a.inRoom))
+      || Number(b.online) - Number(a.online) || (b.xp || 0) - (a.xp || 0));
+  }, [data, owner, presenceVersion]);
   useEffect(() => {
-    fetchFriends();
-
-    const unsubPresenceSnapshot = socketService.on('presence:snapshot', (data: any) => {
-      if (!data || !Array.isArray(data.presences)) return;
-      const onlineMap = new Map<string, any>();
-      for (const p of data.presences) {
-        if (p && p.userId) onlineMap.set(p.userId, p);
-      }
-      setFriendsList((prev) =>
-        prev.map((f) => {
-          const p = onlineMap.get(f.id);
-          const isOnline = p ? Boolean(p.online) : f.online;
-          const inRoom = p ? Boolean(p.inRoom) : f.inRoom;
-          const currentRoomCode = p?.currentRoomCode || f.currentRoomCode;
-          let status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
-          if (inRoom && currentRoomCode) {
-            status = `Oda: #${currentRoomCode} · Lobide`;
-          }
-          return { ...f, online: isOnline, inRoom, currentRoomCode, status };
-        })
-      );
-    });
-
-    // Listen to real-time presence events from WebSocket
-    const unsubPresenceUpdate = socketService.on('presence:update', (data: any) => {
-      if (!data || !data.userId) return;
-      setFriendsList((prev) =>
-        prev.map((f) => {
-          if (f.id === data.userId) {
-            const isOnline = data.online ?? f.online;
-            const inRoom = data.inRoom ?? f.inRoom;
-            const currentRoomCode = data.currentRoomCode ?? f.currentRoomCode;
-            let status = isOnline ? 'Arkadaşın · Çevrimiçi' : 'Arkadaşın · Çevrimdışı';
-            if (inRoom && currentRoomCode) {
-              status = `Oda: #${currentRoomCode} · Lobide`;
-            }
-            return {
-              ...f,
-              online: isOnline,
-              inRoom,
-              currentRoomCode,
-              status,
-            };
-          }
-          return f;
-        })
-      );
-    });
-
-    const unsubUserOnline = socketService.on('user:online', (data: any) => {
-      const uid = data?.userId || data?.presence?.userId;
-      if (!uid) return;
-      setFriendsList((prev) =>
-        prev.map((f) => {
-          if (f.id === uid) {
-            return {
-              ...f,
-              online: true,
-              status: 'Arkadaşın · Çevrimiçi',
-            };
-          }
-          return f;
-        })
-      );
-    });
-
-    const unsubUserOffline = socketService.on('user:offline', (data: any) => {
-      const uid = data?.userId || data?.presence?.userId;
-      if (!uid) return;
-      setFriendsList((prev) =>
-        prev.map((f) => {
-          if (f.id === uid) {
-            return {
-              ...f,
-              online: false,
-              inRoom: false,
-              status: 'Arkadaşın · Çevrimdışı',
-            };
-          }
-          return f;
-        })
-      );
-    });
-
-    const unsubFriendsUpdate = socketService.on('friends:update', () => {
-      fetchFriends();
-    });
-
-    const unsubNewNotif = socketService.on('notification:new', () => {
-      fetchFriends();
-    });
-
-    return () => {
-      unsubPresenceSnapshot();
-      unsubPresenceUpdate();
-      unsubUserOnline();
-      unsubUserOffline();
-      unsubFriendsUpdate();
-      unsubNewNotif();
-    };
-  }, [apiBaseUrl, user?.id]);
-  const currentCode = user?.friendCode || friendCode;
+    if (!owner) return;
+    const onPresence = () => updatePresence(n => n + 1);
+    const unsub = ['presence:snapshot', 'presence:update', 'user:online', 'user:offline']
+      .map(event => socketService.on(event, onPresence));
+    socketService.requestPresenceSnapshot();
+    return () => unsub.forEach(remove => remove());
+  }, [owner]);
+  const sameSession = () => Boolean(owner && useGameStore.getState().user?.id === owner && useGameStore.getState().token === token);
+  const fetchFriends = (removedId?: string) => { if (owner && sameSession()) friendsChanged(base, owner, removedId); };
+  const currentCode = user?.friendCode || data?.friendCode || 'TV-10000';
   const handleCopyCode = async () => {
     sound.playSound('reward');
     sound.triggerHaptic('success');
@@ -333,42 +198,32 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     sound.playSound('tap');
     sound.triggerHaptic('light');
     setConfirmRemoveId(null);
-    /* Tam profil sayfası kullanılıyorsa küçük modal hiç açılmaz:
-       profil arkadan çekilip doğrudan tam ekran görüntülenir. */
-    if (onOpenFullProfile) {
-      setInspectLoading(true);
-      try {
-        const res = await fetch(`${base}/social/profile/${player.id}`, {
-          headers: authHeaders(),
-        });
-        if (res.ok) {
-          const fullProfile = await res.json();
-          if (fullProfile?.id) {
-            setInspectLoading(false);
-            onOpenFullProfile(fullProfile);
-            return;
-          }
-        }
-      } catch {
-        // offline: eski modal temel bilgilerle açılır
-      }
-      setInspectLoading(false);
-    }
-    setInspectPlayer(player);
-    setInspectDetails(null);
-    setInspectLoading(true);
+    if (!owner) return;
+    const press = ++latestProfilePress.current;
+    const isCurrent = () => press === latestProfilePress.current && sameSession();
+    const url = profileUrl(base, player.id);
+    // A warm profile opens immediately; a stale one is checked before showing it
+    // because the owner's visibility settings may have changed.
+    setInspectLoading(!pageDataCache.snapshot(url, owner).data);
     try {
-      const res = await fetch(`${base}/social/profile/${player.id}`, {
-        headers: authHeaders(),
-      });
-      if (res.ok) {
-        const fullProfile = await res.json();
-        setInspectDetails(fullProfile);
+      const fullProfile = await pageDataCache.load<UserProfile & { isPrivate?: boolean }>(url, PAGE_TTL.profile, { scope: owner, token });
+      if (!isCurrent()) return;
+      if (fullProfile?.isPrivate) {
+        setPrivateProfileId(player.id);
+        return;
       }
+      if (fullProfile?.id && onOpenFullProfile) {
+        onOpenFullProfile(fullProfile);
+        return;
+      }
+      setInspectPlayer(player);
+      setInspectDetails(fullProfile);
     } catch {
-      // offline / cached fallback
+      if (!isCurrent()) return;
+      setInspectPlayer(player);
+      setInspectDetails(null);
     } finally {
-      setInspectLoading(false);
+      if (isCurrent()) setInspectLoading(false);
     }
   };
 
@@ -390,12 +245,13 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       if (!res.ok) {
         throw new Error(data.error || 'Arkadaş çıkarılamadı.');
       }
+      if (!sameSession()) return;
       sound.playSound('reward');
       sound.triggerHaptic('success');
       socketService.notifyUserRealtime(targetPlayer.id, 'friends:update', {
         removedBy: user.id,
       });
-      setFriendsList((prev) => prev.filter((item) => item.id !== targetPlayer.id));
+      fetchFriends(targetPlayer.id);
       setConfirmRemoveId(null);
       setInspectPlayer(null);
       setChallengeNotice(
@@ -410,33 +266,40 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     }
   };
   const handleAddFriend = async () => {
-    const clean = addInput.trim();
+    if (addLoading) return;
+    const clean = addByUsername
+      ? usernameInput.trim()
+      : codeSuffix && `${FRIEND_CODE_PREFIX}${codeSuffix}`;
     if (!clean) {
       sound.playSound('wrong');
-      setAddErrorMsg('Lütfen arkadaşlık kodu veya kullanıcı adı girin.');
+      setAddErrorMsg(addByUsername ? 'Lütfen kullanıcı adını gir.' : 'Lütfen TV- sonrasındaki arkadaş kodunu gir.');
       return;
     }
-    if (!user) {
+    if (!user || isGuest || user.isGuest || !token || token === 'mock_token') {
       sound.playSound('wrong');
-      setAddErrorMsg('Arkadaş eklemek için lütfen giriş yapın.');
+      setSignInRequired(true);
+      setAddErrorMsg('Arkadaş eklemek için hesabına giriş yap.');
       return;
     }
     setAddLoading(true);
     setAddErrorMsg(null);
     setAddSuccessMsg(null);
+    setSignInRequired(false);
     try {
       const res = await fetch(`${base}/social/friends/add`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({
-          userId: user.id,
-          codeOrUsername: clean,
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ codeOrUsername: clean }),
       });
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        setSignInRequired(true);
+        throw new Error('Oturumun artık geçerli değil. Arkadaşlık isteği göndermek için tekrar giriş yap.');
+      }
+      if (!res.ok || !data.success) {
         throw new Error(data.error || 'Arkadaşlık isteği gönderilemedi.');
       }
+      if (!sameSession()) return;
       sound.playSound('reward');
       sound.triggerHaptic('success');
       if (data.friend?.id && data.notification) {
@@ -446,11 +309,12 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         data.message ||
           `📨 ${data.friend?.displayName || clean} oyuncusuna arkadaşlık isteği gönderildi! Kabul ettiğinde Arkadaşlarım listende görünecek.`
       );
-      setAddInput('');
+      if (addByUsername) setUsernameInput('');
+      else setCodeSuffix('');
       fetchFriends();
     } catch (err: any) {
       sound.playSound('wrong');
-      setAddErrorMsg(err.message || 'Kullanıcı bulunamadı.');
+      setAddErrorMsg(err.message || 'Bağlantını kontrol edip tekrar dene.');
     } finally {
       setAddLoading(false);
     }
@@ -458,6 +322,8 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
 
   const handleRespondIncomingRequest = async (req: any, action: 'accept' | 'decline') => {
     if (!user) return;
+    setSignInRequired(false);
+    setChallengeNotice(null);
     sound.playSound(action === 'accept' ? 'reward' : 'tap');
     sound.triggerHaptic(action === 'accept' ? 'success' : 'light');
     setRespondingReqId(req.id);
@@ -471,8 +337,14 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
           action,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        setSignInRequired(true);
+        setChallengeNotice('İsteğe yanıt vermek için tekrar giriş yap.');
+        return;
+      }
       if (res.ok && data.success) {
+        if (!sameSession()) return;
         if (action === 'accept') {
           if (req.type === 'match_invite' || req.type === 'duel') {
             const targetRoom = data.roomCode || req.roomCode || 'DUEL1';
@@ -487,8 +359,12 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
           }
         }
         fetchFriends();
+      } else {
+        setChallengeNotice(data.error || 'İsteğe yanıt verilemedi. Lütfen tekrar dene.');
       }
-    } catch {} finally {
+    } catch {
+      setChallengeNotice('İsteğe yanıt verilemedi. Bağlantını kontrol edip tekrar dene.');
+    } finally {
       setRespondingReqId(null);
     }
   };
@@ -533,7 +409,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     }
   };
   return (
-    <TavrikoScreen>
+    <TavrikoScreen mainTab>
       <TavrikoTopBar
         leftType="bell"
         onLeftPress={onNotifications || onBack}
@@ -584,6 +460,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         {challengeNotice && (
           <View style={styles.challengeNoticeCard}>
             <Text style={styles.challengeNoticeText}>{challengeNotice}</Text>
+            {signInRequired && <Button3D title="TEKRAR GİRİŞ YAP" variant="mint" onPress={onSignIn} />}
           </View>
         )}
         {/* 3 Navigation Tabs */}
@@ -633,7 +510,9 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         {/* Tab 1: Friends List (ONLY ACCEPTED FRIENDS) */}
         {activeTab === 'friends' && (
           loading ? (
-            <ActivityIndicator color="#FFC43D" size="large" style={{ marginTop: 28 }} />
+            <PageShimmer label="Arkadaş listesi yükleniyor" />
+          ) : error && !data ? (
+            <PageLoadError onRetry={() => void read(true).catch(() => {})} />
           ) : friendsList.length === 0 ? (
             <View style={styles.emptyStateBox}>
               <Text style={styles.emptyStateTitle}>Henüz ekli arkadaşın yok</Text>
@@ -735,23 +614,45 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
               <GradientFill colors={['#1C0C3E00', '#1C0C3ECC', '#1C0C3E']} />
               <Reanimated.Text entering={ZoomIn.delay(80)} style={styles.addCardTitle}>ARKADAŞLIK İSTEĞİ GÖNDER</Reanimated.Text>
               <Text style={styles.addCardSub}>
-                Arkadaşının 7 haneli kodunu (Örn: TV-UB1AY94) veya kullanıcı adını girerek arkadaşlık isteği gönder. Karşı taraf Bildirimler kısmından kabul ettiğinde arkadaş listene eklenir.
+                {addByUsername
+                  ? 'Arkadaşının kullanıcı adını yaz.'
+                  : 'Arkadaş kodunun TV- sonrasındaki kısmını yaz.'}{' '}
+                Arkadaşın isteği kabul ettiğinde listende görünür.
               </Text>
               <View style={styles.inputWrap}>
+                {!addByUsername && <Text style={styles.codeInputPrefix}>{FRIEND_CODE_PREFIX}</Text>}
                 <TextInput
+                  key={addByUsername ? 'username' : 'friend-code'}
+                  testID={addByUsername ? 'input-friend-username' : 'input-friend-code'}
+                  accessibilityLabel={addByUsername ? 'Arkadaşının kullanıcı adı' : 'Arkadaş kodu, TV- sonrasındaki bölüm'}
                   style={styles.textInput}
-                  placeholder="Örn: TV-UB1AY94 veya kullanıcı adı"
+                  placeholder={addByUsername ? 'Örn: oyuncu_adi' : 'UB1AY94'}
                   placeholderTextColor="rgba(217, 205, 245, 0.45)"
-                  value={addInput}
+                  value={addByUsername ? usernameInput : codeSuffix}
                   onChangeText={(t) => {
-                    setAddInput(t);
+                    if (addByUsername) setUsernameInput(t);
+                    else setCodeSuffix(normalizeFriendCodeSuffix(t));
                     setAddErrorMsg(null);
                     setAddSuccessMsg(null);
                   }}
-                  autoCapitalize="none"
+                  autoCapitalize={addByUsername ? 'none' : 'characters'}
                   autoCorrect={false}
                 />
               </View>
+              <TouchableOpacity
+                accessibilityRole="button"
+                disabled={addLoading}
+                onPress={() => {
+                  setAddByUsername((prev) => !prev);
+                  setAddErrorMsg(null);
+                  setAddSuccessMsg(null);
+                }}
+                style={styles.addMethodButton}
+              >
+                <Text style={styles.addMethodLabel}>
+                  {addByUsername ? 'Arkadaş koduyla ekle' : 'Kullanıcı adıyla ekle'}
+                </Text>
+              </TouchableOpacity>
               {addErrorMsg && (
                 <View style={styles.errorBox}>
                   <Text style={styles.errorText}>⚠️ {addErrorMsg}</Text>
@@ -763,10 +664,10 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                 </View>
               )}
               <Button3D
-                title={addLoading ? 'GÖNDERİLİYOR...' : 'ARKADAŞLIK İSTEĞİ GÖNDER'}
+                title={signInRequired ? 'TEKRAR GİRİŞ YAP' : addLoading ? 'GÖNDERİLİYOR...' : 'ARKADAŞLIK İSTEĞİ GÖNDER'}
                 variant="mint"
                 disabled={addLoading}
-                onPress={handleAddFriend}
+                onPress={signInRequired ? onSignIn : handleAddFriend}
                 style={{ marginTop: 14 }}
                 textStyle={{ fontSize: 13 }}
               />
@@ -805,7 +706,11 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         {/* Tab 3: Incoming Friend Requests & Duel Invitations */}
         {activeTab === 'requests' && (
           <View>
-            {incomingRequests.length > 0 ? (
+            {loading ? (
+              <PageShimmer label="Arkadaşlık istekleri yükleniyor" rows={2} />
+            ) : error && !data ? (
+              <PageLoadError onRetry={() => void read(true).catch(() => {})} />
+            ) : incomingRequests.length > 0 ? (
               incomingRequests.map((req, rIdx) => (
                 <Reanimated.View
                   key={req.id}
@@ -870,6 +775,8 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         />
       )}
       {/* Interactive Player Profile Modal */}
+      {privateProfileId && <UserProfileModal visible userId={privateProfileId} currentUserId={owner} apiBaseUrl={base}
+        onClose={() => setPrivateProfileId(null)} />}
       <Modal
         visible={Boolean(inspectPlayer)}
         transparent
@@ -912,14 +819,20 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                   const frameDef = cosmetics.frame;
                   const bgDef = cosmetics.background;
                   const nameDef = cosmetics.nameEffect;
-                  const frameId = (inspectDetails as any)?.equippedFrame;
+                  const frameId = frameDef?.id;
                   const nameEffectId = (inspectDetails as any)?.equippedNameEffect;
                   const animatedFrame = frameId ? ANIMATED_FRAME_COLORS[frameId] : null;
                   const animatedName = nameEffectId ? ANIMATED_NAME_COLORS[nameEffectId] : null;
                   return (
                     <>
                       <Reanimated.View entering={ZoomIn.springify().damping(16)} style={styles.inspectAvatarWrap}>
-                        {animatedFrame ? (
+                        {frameId && frameFor(frameId) ? (
+                          <FramedAvatar
+                            frameId={frameId}
+                            seed={inspectDetails?.avatarUrl || inspectPlayer.avatarUrl || inspectPlayer.name}
+                            size={92}
+                          />
+                        ) : frameId && animatedFrame ? (
                           <AnimatedFrame
                             frameId={frameId}
                             seed={inspectDetails?.avatarUrl || inspectPlayer.avatarUrl || inspectPlayer.name}
@@ -1092,7 +1005,8 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                       title="+ ARKADAŞ OLARAK EKLE"
                       variant="mint"
                       onPress={() => {
-                        setAddInput(inspectPlayer.username || inspectPlayer.id);
+                        setAddByUsername(true);
+                        setUsernameInput(inspectPlayer.username || '');
                         switchTabSmooth('add');
                         setInspectPlayer(null);
                       }}
@@ -1149,7 +1063,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
 };
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 110,
+    paddingBottom: Platform.OS === 'web' ? 12 : 110,
   },
   title: {
     fontFamily: THEME.fonts.display,
@@ -1347,6 +1261,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   inputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(8, 3, 20, 0.75)',
     borderRadius: 14,
     borderWidth: 1.5,
@@ -1355,9 +1271,29 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   textInput: {
+    flex: 1,
+    minWidth: 0,
+    padding: 0,
     color: '#FFFFFF',
     fontSize: 15,
     fontFamily: THEME.fonts.extraBold,
+  },
+  codeInputPrefix: {
+    color: '#FFC43D',
+    fontSize: 15,
+    fontFamily: THEME.fonts.extraBold,
+  },
+  addMethodButton: {
+    alignSelf: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 12,
+  },
+  addMethodLabel: {
+    color: '#D9CDF5',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    textDecorationLine: 'underline',
   },
   errorBox: {
     backgroundColor: 'rgba(255, 92, 119, 0.16)',
