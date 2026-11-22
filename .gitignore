@@ -21,6 +21,7 @@ scripts/fix-font-weights.js
 server/*_store.json
 # Temp extraction scripts and kit dumps
 *.py
+!scripts/verify-play-aab.py
 screen_dumps/
 unpacked_pages/
 unpacked_uikit/

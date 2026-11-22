@@ -2,7 +2,6 @@ import { Router, Request, Response } from 'express';
 import { logger } from '../utils/logger';
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
-import { getPendingGoogleSessions } from './authRoutes';
 import { adminPages, adminSessionScript, adminTheme, renderAdminHeader, renderAdminHero, type AdminPage } from './adminShell';
 import {
   requireAdminAuth,
@@ -108,28 +107,8 @@ logRouter.get('/logs/stream', requireAdminAuth, (req: Request, res: Response) =>
   logger.info('SYSTEM', 'Yeni bir istemci SSE log akışına bağlandı');
 });
 
-// Public client log ingestion (mobile app). Input is size-capped and sanitized
-// to prevent log flooding / injection.
-logRouter.post('/logs/ingest', (req: Request, res: Response) => {
-  const { level = 'INFO', category = 'CLIENT', message, details } = req.body;
-  if (!message || typeof message !== 'string') {
-    res.status(400).json({ error: 'message zorunludur' });
-    return;
-  }
-  const safeLevel = ['INFO', 'WARN', 'ERROR'].includes(level) ? level : 'INFO';
-  const safeCategory = typeof category === 'string' ? category.slice(0, 24) : 'CLIENT';
-  const safeMessage = message.slice(0, 1000).replace(/[\r\n\t]/g, ' ');
-  let safeDetails: any = details;
-  if (details && typeof details === 'object') {
-    try {
-      safeDetails = JSON.parse(JSON.stringify(details).slice(0, 4000));
-    } catch {
-      safeDetails = undefined;
-    }
-  }
-  logger.log(safeCategory as any, safeLevel as any, `[MOBİL] ${safeMessage}`, safeDetails);
-  res.json({ success: true });
-});
+// Older installed clients still send OAuth diagnostics. Silently discard them.
+logRouter.post('/logs/ingest', (_req: Request, res: Response) => { res.sendStatus(204); });
 
 logRouter.post('/logs/clear', requireAdminAuth, (req: Request, res: Response) => {
   logger.clear();
@@ -161,13 +140,10 @@ logRouter.get('/logs/stats', requireAdminAuth, async (req: Request, res: Respons
       recentUsers = [];
     }
 
-    const sessions = getPendingGoogleSessions ? getPendingGoogleSessions() : [];
-
     res.json({
       uptimeSeconds: Math.floor(process.uptime()),
       postgresUsersCount: pgUsers,
       recentUsers,
-      activeGoogleSessions: sessions,
       supabaseConfigured: true,
     });
   } catch (err: any) {

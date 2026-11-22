@@ -15,6 +15,8 @@ import {
   FinalMatchSummary,
   PlayerScoreSummary,
   SOCKET_EVENTS,
+  isLobbyQuickMessage,
+  isLobbyReaction,
 } from '@trivia/shared';
 import { Env } from '../env';
 import { encodeWsMessage, decodeWsMessage, createWsError, WsMessage } from '../websocket/protocol';
@@ -952,10 +954,10 @@ export class GameRoomDO extends DurableObject<Env> {
   }
 
   private handleSendEmote(playerId: string, envelope: WsMessage): void {
-    const emote = sanitizeString(envelope.payload?.emote || '👏', 10);
-    const id = envelope.payload?.id || `emote_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const emote = envelope.payload?.emote;
+    if (!this.room?.players?.[playerId] || !isLobbyReaction(emote)) return;
     this.broadcast(SOCKET_EVENTS.EMOTE_RECEIVED, {
-      id,
+      id: crypto.randomUUID(),
       playerId,
       emote,
       roomCode: this.room?.code,
@@ -963,16 +965,15 @@ export class GameRoomDO extends DurableObject<Env> {
   }
 
   private handleLobbyChat(playerId: string, envelope: WsMessage): void {
-    const rawText = envelope.payload?.text || '';
-    const text = sanitizeString(rawText, 100);
-    if (!text.trim()) return;
+    const text = envelope.payload?.text;
     const player = this.room?.players?.[playerId];
+    if (!player || !isLobbyQuickMessage(text)) return;
     const payload = {
-      id: envelope.payload?.id || `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: crypto.randomUUID(),
       roomCode: this.room?.code,
       playerId,
-      displayName: player?.displayName || envelope.payload?.displayName || 'Oyuncu',
-      avatarUrl: player?.avatarUrl || envelope.payload?.avatarUrl,
+      displayName: player.displayName,
+      avatarUrl: player.avatarUrl,
       text,
       timestamp: Date.now(),
     };

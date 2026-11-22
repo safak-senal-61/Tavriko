@@ -1,5 +1,5 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
-import { SOCKET_EVENTS, ClientQuestion, RoundResult, FinalMatchSummary, GameRoom } from '@trivia/shared';
+import { SOCKET_EVENTS, ClientQuestion, RoundResult, FinalMatchSummary, GameRoom, isLobbyQuickMessage, isLobbyReaction } from '@trivia/shared';
 import { GameRoomManager } from '../engine/GameRoomManager';
 import { Matchmaker } from '../engine/Matchmaker';
 import { db } from '../db/prismaClient';
@@ -375,32 +375,29 @@ export function setupSocketHandlers(
       socket.emit(SOCKET_EVENTS.PUBLIC_ROOMS_UPDATE, roomManager.getPublicRooms());
     });
 
-    socket.on(SOCKET_EVENTS.SEND_EMOTE, (data: { roomCode: string; playerId: string; emote: string; id?: string }) => {
+    socket.on(SOCKET_EVENTS.SEND_EMOTE, (data: { roomCode: string; emote: unknown }) => {
+      if (!data || !isLobbyReaction(data.emote) || !socket.rooms.has(data.roomCode) ||
+        !roomManager.getRoom(data.roomCode)?.players[initialPlayerId]) return;
       io.to(data.roomCode).emit(SOCKET_EVENTS.EMOTE_RECEIVED, {
-        ...data,
-        id: data.id || `emote_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        roomCode: data.roomCode,
+        playerId: initialPlayerId,
+        emote: data.emote,
+        id: randomUUID(),
       });
     });
 
-    socket.on(SOCKET_EVENTS.LOBBY_CHAT, (data: {
-      id?: string;
-      roomCode: string;
-      playerId: string;
-      displayName: string;
-      avatarUrl?: string;
-      text: string;
-    }) => {
-      if (!data.text || !data.roomCode) return;
-      const cleanText = data.text.trim().slice(0, 100);
-      if (!cleanText) return;
+    socket.on(SOCKET_EVENTS.LOBBY_CHAT, (data: { roomCode: string; text: unknown }) => {
+      if (!data || !isLobbyQuickMessage(data.text) || !socket.rooms.has(data.roomCode)) return;
+      const player = roomManager.getRoom(data.roomCode)?.players[initialPlayerId];
+      if (!player) return;
 
       const payload = {
-        id: data.id || `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        id: randomUUID(),
         roomCode: data.roomCode,
-        playerId: data.playerId,
-        displayName: data.displayName || 'Oyuncu',
-        avatarUrl: data.avatarUrl,
-        text: cleanText,
+        playerId: initialPlayerId,
+        displayName: player.displayName,
+        avatarUrl: player.avatarUrl,
+        text: data.text,
         timestamp: Date.now(),
       };
 

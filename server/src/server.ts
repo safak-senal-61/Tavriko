@@ -153,7 +153,6 @@ export function createApp() {
       '/api/auth/register',
       '/api/auth/forgot-password',
       '/api/auth/reset-password',
-      '/api/auth/google/complete-session',
       '/api/portal/login',
       '/api/portal/security/passkeys',
     ],
@@ -168,7 +167,7 @@ export function createApp() {
     const start = Date.now();
     // Express may strip a mounted router's prefix from req.path before finish.
     const requestPath = req.path;
-    const isAccountSecurity = /^\/api\/auth\/(?:(?:forgot|reset)-password|request-delete-code|confirm-delete|delete-account(?:\/request)?)\/?$/i.test(requestPath);
+    const isAccountSecurity = /^\/api\/auth\/(?:(?:forgot|reset)-password|request-delete-code|confirm-delete|delete-account(?:\/request)?|google(?:\/.*)?)\/?$/i.test(requestPath);
     const omitRequestDetails = isAccountSecurity || /^\/api\/social\/ads\/rewarded(?:\/|$)/i.test(requestPath);
     res.on('finish', () => {
       const duration = Date.now() - start;
@@ -177,7 +176,7 @@ export function createApp() {
       if (
         /^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/(?:ops|accounts)(?:\/|$)/i.test(req.path) ||
         req.path === '/favicon.ico' ||
-        req.path === '/api/logs' || req.path === '/api/internal/player-access' ||
+        req.path === '/api/logs' || /^\/api\/logs\/ingest\/?$/i.test(requestPath) || req.path === '/api/internal/player-access' ||
         /^\/api\/portal(?:\/|$)/i.test(req.path) || /^\/api\/support(?:\/|$)/i.test(req.path) ||
         /^\/api\/(?:internal|player)\/duel-funnel(?:\/|$)/i.test(req.path) ||
         req.path === '/api/logs/stream' ||

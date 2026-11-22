@@ -6,7 +6,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  TextInput,
   StyleSheet,
   ScrollView,
   Share,
@@ -35,7 +34,7 @@ import Reanimated, {
 } from 'react-native-reanimated';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
-import { GameRoom, UserProfile } from '@trivia/shared';
+import { GameRoom, UserProfile, LOBBY_QUICK_MESSAGES, LOBBY_REACTIONS, isLobbyQuickMessage, isLobbyReaction } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
@@ -120,7 +119,6 @@ const CheckSvgIcon = ({ size = 18, color = '#5ADBB5' }: { size?: number; color?:
 );
 
 // Tavriko UI Kit 8 Lobi Reaksiyonu
-const LOBBY_REACTION_EMOJIS = ['🔥', '👏', '😂', '❤️', '⚡', '🎯', '🚀'];
 
 /* Üretilmiş lobi görselleri: sahne banner'ı ve şeffaf arka plansız soru işareti */
 const LOBBY_IMG = {
@@ -288,15 +286,6 @@ const EmptySlotCard: React.FC<{ inGrid: boolean }> = ({ inGrid }) => {
   );
 };
 
-// Hızlı Mesaj Çipleri
-const QUICK_CHAT_CHIPS = [
-  'Selam 👋',
-  'Hazırım! ⚡',
-  'Hadi başla! 🚀',
-  'Bol şans! 🎯',
-  'Buradayım 🔥',
-];
-
 interface FloatingItemData {
   id: string;
   type: 'emoji' | 'message';
@@ -396,13 +385,51 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   const playerGrid = page?.roomy === true && page.contentWidth >= 760;
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [chatText, setChatText] = useState('');
   const [floatingItems, setFloatingItems] = useState<FloatingItemData[]>([]);
 
   // --- Oyun içi arkadaş daveti ---
   const [friendInviteVisible, setFriendInviteVisible] = useState(false);
   const token = useGameStore(state => state.token);
   const owner = user && !user.isGuest ? currentUserId : undefined;
+  const blockedIds = useRef(new Set<string>());
+  const [locallyBlockedIds, setLocallyBlockedIds] = useState<string[]>([]);
+  blockedIds.current = new Set([...(user?.blockedUserIds ?? []), ...locallyBlockedIds]);
+  const [moderationTarget, setModerationTarget] = useState<{ id: string; name: string } | null>(null);
+  const [moderationBusy, setModerationBusy] = useState(false);
+  const [moderationMessage, setModerationMessage] = useState<string | null>(null);
+  const [moderationDone, setModerationDone] = useState(false);
+  const pendingModeration = useRef(false);
+
+  const moderatePlayer = async (action: 'profile' | 'behavior' | 'block') => {
+    if (!moderationTarget || !owner || !token || pendingModeration.current) return;
+    const targetUserId = moderationTarget.id;
+    pendingModeration.current = true;
+    setModerationBusy(true);
+    setModerationMessage(null);
+    try {
+      const path = action === 'block' ? '/social/block' : '/support/player-report';
+      const response = await fetch(`${apiBaseUrl}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(action === 'block' ? { targetUserId } : { targetUserId, reason: action }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result) throw new Error(result?.error || 'İşlem tamamlanamadı.');
+      if (action === 'block') {
+        blockedIds.current.add(targetUserId);
+        setLocallyBlockedIds(ids => [...new Set([...ids, targetUserId])]);
+        setModerationMessage('Oyuncu engellendi. Lobi mesajları ve tepkileri artık gösterilmeyecek.');
+      } else {
+        setModerationMessage('Bildirim destek ekibine iletildi.');
+      }
+      setModerationDone(true);
+    } catch (error) {
+      setModerationMessage(error instanceof Error ? error.message : 'İşlem tamamlanamadı.');
+    } finally {
+      pendingModeration.current = false;
+      setModerationBusy(false);
+    }
+  };
   const { data: friendsData, loading: friendsLoading, error: friendsError, read: readFriends } =
     usePageData<FriendsPayload<LobbyFriendItem>>(friendInviteVisible && owner ? friendsUrl(apiBaseUrl, owner) : null,
       PAGE_TTL.friends, owner, token);
@@ -466,7 +493,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
   // Real-time WebSocket Reaksiyonları ve Canlı Süzülen Mesajlar (Veritabanına kaydedilmez)
   useEffect(() => {
     const unsubEmote = socketService.onEmoteReceived((data) => {
-      if (data.roomCode === room.code && data.playerId !== currentUserId) {
+      if (data.roomCode === room.code && data.playerId !== currentUserId &&
+        !blockedIds.current.has(data.playerId) && isLobbyReaction(data.emote)) {
         // Çift render ve soket yankısını hem ID hem içerik+zaman bazlı engelle
         const idKey = data.id;
         const contentKey = `emote_${data.playerId}_${data.emote}_${Math.floor(Date.now() / 2000)}`;
@@ -491,7 +519,8 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
     });
 
     const unsubChat = socketService.onLobbyMessage((data) => {
-      if (data.roomCode === room.code && data.playerId !== currentUserId) {
+      if (data.roomCode === room.code && data.playerId !== currentUserId &&
+        !blockedIds.current.has(data.playerId) && isLobbyQuickMessage(data.text)) {
         // Çift sohbet mesajını hem ID hem içerik+zaman bazlı engelle
         const idKey = data.id;
         const contentKey = `chat_${data.playerId}_${data.text}_${Math.floor(Date.now() / 2500)}`;
@@ -554,9 +583,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
     socketService.sendEmote(room.code, currentUserId, emoji, emoteId);
   };
 
-  const handleSendChat = (presetText?: string) => {
-    const textToSend = (presetText || chatText).trim();
-    if (!textToSend) return;
+  const handleSendChat = (textToSend: typeof LOBBY_QUICK_MESSAGES[number]) => {
     sound.playSound('tap');
     sound.triggerHaptic('medium');
 
@@ -590,7 +617,6 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
       chatId
     );
 
-    if (!presetText) setChatText('');
   };
 
   // Nefes alma (pulsing) animasyonu
@@ -808,6 +834,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
           {players.map((p, index) => {
             const playerIsHost = p.id === room.hostId;
             const isMe = p.id === currentUserId;
+            const isBlocked = blockedIds.current.has(p.id);
 
             return (
               <Reanimated.View
@@ -819,7 +846,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                   {/* index prop'u verilirse seed çözümü atlanıp liste sırası
                       avatarı ezeliyordu; seçilen avatar her oyuncuda görünsün
                       diye index kaldırıldı (seed artık tek belirleyici). */}
-                  <CharacterAvatar seed={p.avatarUrl || p.displayName} size={42} />
+                  <CharacterAvatar seed={isBlocked ? 'av1' : p.avatarUrl || p.displayName} size={42} />
                   {playerIsHost && (
                     <View style={styles.hostCrown}>
                       <Text style={styles.hostCrownText}>👑</Text>
@@ -830,7 +857,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 <View style={styles.playerInfo}>
                   <View style={styles.nameRow}>
                     <Text style={styles.playerName} numberOfLines={1}>
-                      {p.displayName} {isMe ? '(Sen)' : ''}
+                      {isBlocked ? 'Engellenen oyuncu' : p.displayName} {isMe ? '(Sen)' : ''}
                     </Text>
                   </View>
                   <Text style={styles.playerRoleText}>
@@ -850,6 +877,17 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                   </Text>
                 </View>
 
+                {owner && !isMe && !p.isBot && !/^guest[_:]/i.test(p.id) && !isBlocked && (
+                  <TouchableOpacity style={styles.kickBtn} accessibilityRole="button"
+                    accessibilityLabel={`${p.displayName}: bildir veya engelle`}
+                    onPress={() => {
+                      setModerationMessage(null);
+                      setModerationDone(false);
+                      setModerationTarget({ id: p.id, name: p.displayName });
+                    }}>
+                    <Text style={styles.kickBtnText}>⋯</Text>
+                  </TouchableOpacity>
+                )}
                 {/* Kurucu Kick Butonu */}
                 {isHost && !playerIsHost && onKickPlayer && (
                   <TouchableOpacity
@@ -876,7 +914,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         <View style={styles.reactionsSection}>
           <Text style={styles.reactionsHeader}>LOBİ REAKSİYONLARI</Text>
           <View style={styles.reactionsPillBar}>
-            {LOBBY_REACTION_EMOJIS.map((emoji) => (
+            {LOBBY_REACTIONS.map((emoji) => (
               <BouncyReaction
                 key={emoji}
                 emoji={emoji}
@@ -893,7 +931,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.quickChipsScroll}
           >
-            {QUICK_CHAT_CHIPS.map((chip) => (
+            {LOBBY_QUICK_MESSAGES.map((chip) => (
               <TouchableOpacity
                 key={chip}
                 style={styles.quickChip}
@@ -905,26 +943,6 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             ))}
           </ScrollView>
 
-          <View style={styles.chatInputRow}>
-            <TextInput
-              style={styles.chatInput}
-              value={chatText}
-              onChangeText={setChatText}
-              placeholder="Lobiye mesaj yaz (anlık süzülür)..."
-              placeholderTextColor="#9A8BC2"
-              maxLength={70}
-              returnKeyType="send"
-              onSubmitEditing={() => handleSendChat()}
-            />
-            <TouchableOpacity
-              style={[styles.chatSendBtn, !chatText.trim() && styles.chatSendBtnDisabled]}
-              onPress={() => handleSendChat()}
-              activeOpacity={0.8}
-              disabled={!chatText.trim()}
-            >
-              <Text style={styles.chatSendBtnText}>➤</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         {/* 5. ALT BAŞLATMA ALANI (Tavriko UI Kit Birebir) */}
@@ -1070,6 +1088,34 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
               />
             )}
           </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={!!moderationTarget} transparent animationType="fade"
+        onRequestClose={() => !moderationBusy && setModerationTarget(null)}>
+        <View style={styles.friendModalOverlay}>
+          <View style={styles.friendModalShell}>
+            <View style={styles.friendModalCard} accessibilityViewIsModal>
+              <Text style={styles.friendModalTitle}>Oyuncu güvenliği</Text>
+              <Text style={styles.friendModalSub} numberOfLines={1}>{moderationTarget?.name}</Text>
+              {!moderationDone && ([
+                ['profile', 'Uygunsuz ad veya görseli bildir'],
+                ['behavior', 'Uygunsuz davranışı bildir'],
+                ['block', 'Oyuncuyu engelle'],
+              ] as const).map(([action, label]) => (
+                <TouchableOpacity key={action} style={styles.quickChip} accessibilityRole="button"
+                  disabled={moderationBusy} onPress={() => void moderatePlayer(action)}>
+                  <Text style={styles.quickChipText}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+              {moderationMessage && (
+                <Text accessibilityLiveRegion="polite" style={styles.friendModalSub}>{moderationMessage}</Text>
+              )}
+              <TouchableOpacity style={styles.quickChip} accessibilityRole="button"
+                disabled={moderationBusy} onPress={() => setModerationTarget(null)}>
+                <Text style={styles.quickChipText}>Kapat</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1742,42 +1788,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: THEME.fonts.bold,
   },
-  chatInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 6,
-    width: '100%',
-  },
-  chatInput: {
-    flex: 1,
-    height: 42,
-    backgroundColor: '#1E0E3D',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(154, 107, 255, 0.3)',
-    paddingHorizontal: 12,
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontFamily: THEME.fonts.medium,
-  },
-  chatSendBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: '#5ADBB5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chatSendBtnDisabled: {
-    opacity: 0.4,
-  },
-  chatSendBtnText: {
-    color: '#0C3A33',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-
   // 5. Alt Kontroller
   controlsWrap: {
     width: '100%',
