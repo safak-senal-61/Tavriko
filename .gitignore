@@ -16,6 +16,7 @@ build/
 server/.env
 client/.env
 .vercel
+client/dist-pages/
 scripts/*vercel*.js
 scripts/fix-font-weights.js
 server/*_store.json

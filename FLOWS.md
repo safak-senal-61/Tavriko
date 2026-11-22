@@ -1,5 +1,13 @@
 # Visual refresh acceptance and regression checks
 
+## Cloudflare Pages web preview
+
+- Open `/` and `/app` in a fresh browser session. Check “Giriş Yap”, “Kayıt Ol”, “Şifremi Unuttum?” and “Misafir olarak göz at” at desktop and 375px. Guest exploration and an isolated signed-in session should survive a reload on the same origin.
+- With fixture credentials, sign in and open Özel Oda → Odaya Katıl. A valid six-character code must reach the existing realtime Worker; check the lobby and a failed join without altering a live room. Replay an incoming `?joinRoom=` link with an isolated session.
+- On the Pages origin, verify JSON login/profile requests and their preflights reach the configured Vercel API. Verify a disallowed origin and privileged API routes do not gain CORS access. On Vercel and native, keep the existing endpoints.
+- In an isolated browser, exercise Google's PKCE return on the Pages origin and verify `/app` replaces the code in the address bar. With a deployment test account, confirm the real Supabase redirect allowlist before a public switch.
+- `/play` and `/game` still open the game. `/legal`, `/remove-account` and `/admin` still land on Vercel; `ads.txt` is a plain-text static asset. Keep the current canonical URL and do not activate ads or switch production during preview.
+
 ## Production service checks
 
 - Site Sağlığı: test refresh, pause/resume and mobile-width layout. The Firebase card distinguishes Google API validation from device delivery; the Sentry card distinguishes SDK initialization from a manually sent test event. Polar stays disabled when it is not configured.

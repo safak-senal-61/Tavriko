@@ -1,0 +1,15 @@
+/play /app 302
+/game /app 302
+/admin https://tavriko-app.vercel.app/admin 302
+/portal https://tavriko-app.vercel.app/portal 302
+/legal https://tavriko-app.vercel.app/legal 302
+/aydinlatma-metni https://tavriko-app.vercel.app/aydinlatma-metni 302
+/gizlilik-politikasi https://tavriko-app.vercel.app/gizlilik-politikasi 302
+/kullanim-kosullari https://tavriko-app.vercel.app/kullanim-kosullari 302
+/satis-sozlesmesi https://tavriko-app.vercel.app/satis-sozlesmesi 302
+/cerez-politikasi https://tavriko-app.vercel.app/cerez-politikasi 302
+/topluluk-kurallari https://tavriko-app.vercel.app/topluluk-kurallari 302
+/remove-account https://tavriko-app.vercel.app/remove-account 302
+/qr https://tavriko-app.vercel.app/qr 302
+/admin/* https://tavriko-app.vercel.app/admin/:splat 302
+/legal/* https://tavriko-app.vercel.app/legal/:splat 302
