@@ -8,20 +8,15 @@ import {
   Nunito_800ExtraBold,
   Nunito_900Black,
 } from '@expo-google-fonts/nunito';
-import { View, AppState, Platform } from 'react-native';
+import { View, Platform } from 'react-native';
 import { LoadingShimmer } from './src/components/LoadingShimmer';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { hydrateAuthStorage, getStoredAuth } from './src/utils/authStorage';
 import { useGameStore } from './src/store/gameStore';
-import { initAnalytics, trackSessionStart } from './src/services/analytics';
-import { initPushNotifications, registerForPushNotifications } from './src/services/pushNotifications';
+import { initPushNotifications } from './src/services/pushNotifications';
 import { checkAndApplyOtaUpdate } from './src/services/otaUpdates';
 import { adsSupported, refreshAdsConsent } from './src/services/ads';
-import {
-  getAnalyticsConsent,
-  hydrateAnalyticsConsent,
-  type AnalyticsConsentValue,
-} from './src/services/analyticsConsent';
+import { hydrateAnalyticsConsent } from './src/services/analyticsConsent';
 
 // Sentry hata izleme: DSN doğrudan koda gömülüdür. Client DSN'leri gizli
 // değildir (her tarayıcı/mobil bundle'ında görünür), yalnızca olay GÖNDERME
@@ -101,23 +96,9 @@ function AppInner() {
     Nunito_900Black,
   });
 
-  // Ürün analitiği (PostHog) — KVKK uyumu: yalnızca kullanıcı analitik onayı
-  // verdikten sonra başlar. session_start event'i D1/D7 retention ölçümünün temeli.
-  const [analyticsConsent, setAnalyticsConsentState] = useState<AnalyticsConsentValue | null>(null);
   useEffect(() => {
-    void hydrateAnalyticsConsent().then(() => {
-      setAnalyticsConsentState(getAnalyticsConsent());
-      void initAnalytics().then(() => {
-        trackSessionStart();
-      });
-    });
+    void hydrateAnalyticsConsent();
   }, []);
-  useEffect(() => {
-    if (analyticsConsent !== 'granted') return;
-    void initAnalytics().then(() => {
-      trackSessionStart();
-    });
-  }, [analyticsConsent]);
 
   // EAS Update (OTA): üretim derlemelerinde açılışta güncelleme kontrolü;
   // Expo Go / dev / web'de no-op. Hata durumunda sessizce susar.
@@ -125,27 +106,9 @@ function AppInner() {
     void checkAndApplyOtaUpdate();
   }, []);
 
-  // Push bildirimleri: ön planda banner gösterimi + kanal kurulumu (mobil).
-  // Oturum açan kullanıcıların cihaz token'ı sunucuya kaydolunur; kullanıcı
-  // değişirse (giriş/çıkış) yeni kullanıcı için yeniden denenir.
+  // Dokunma yönlendirmesi ve Android kanalları; burada izin istenmez.
   useEffect(() => {
     initPushNotifications();
-    const register = (state: ReturnType<typeof useGameStore.getState>) => {
-      if (state.user?.id && !state.user.isGuest && state.token && state.token !== 'mock_token') {
-        void registerForPushNotifications(state.user.id);
-      }
-    };
-    register(useGameStore.getState());
-    const unsubscribe = useGameStore.subscribe((state, prev) => {
-      if (state.user?.id !== prev.user?.id || state.token !== prev.token) register(state);
-    });
-    const subscription = AppState.addEventListener('change', state => {
-      if (state === 'active') register(useGameStore.getState());
-    });
-    return () => {
-      unsubscribe();
-      subscription.remove();
-    };
   }, []);
 
   // Mobilde kalıcı oturum: güvenli depodan (Keystore/Keychain) yükle.
@@ -176,7 +139,7 @@ function AppInner() {
     );
   }
 
-  return <RootNavigator onAnalyticsDecide={setAnalyticsConsentState} />;
+  return <RootNavigator />;
 }
 
 // Sentry.wrap, SDK kapalıyken bile bileşeni değiştirmeden geçirir.

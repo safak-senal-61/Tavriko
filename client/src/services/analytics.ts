@@ -9,6 +9,7 @@
  * store_purchase, referral_signup, daily_streak_claimed, settings_changed, session_start
  */
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import PostHog from 'posthog-react-native';
 import { getAnalyticsConsent } from './analyticsConsent';
 
@@ -21,57 +22,70 @@ const POSTHOG_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY || DEFAULT_POSTHOG_KEY;
 const POSTHOG_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
 
 let client: PostHog | null = null;
-let initPromise: Promise<void> | null = null;
+let initPromise: Promise<PostHog | null> | null = null;
+let requestedPlayer: string | null = null;
+let activePlayer: string | null = null;
+let sessionRevision = 0;
 
 /** Eşleşme kuyruğuna girme anı — matchmaking_time hesabı için */
 let matchmakingStartedAt: number | null = null;
 
-export function initAnalytics(): Promise<void> {
-  // KVKK uyumu: analitik yalnızca açık "Kabul Et" onayından sonra başlar.
-  // Red veya cevapsız durumda hiçbir olay gönderilmez (tam no-op).
-  if (getAnalyticsConsent() !== 'granted') return Promise.resolve();
-  if (!POSTHOG_KEY || initPromise) return initPromise ?? Promise.resolve();
-  initPromise = (async () => {
+/** Each eligible sign-in emits one identified session event, even on first consent. */
+export async function syncAnalyticsSession(playerId: string | null): Promise<void> {
+  const next = getAnalyticsConsent() === 'granted' ? playerId : null;
+  if (next === requestedPlayer) return;
+  requestedPlayer = next;
+  activePlayer = null;
+  matchmakingStartedAt = null;
+  const revision = ++sessionRevision;
+  if (!next || !POSTHOG_KEY) {
+    if (client) await client.optOut().catch(() => {});
+    return;
+  }
+  initPromise ??= (async () => {
     try {
       const ph = new PostHog(POSTHOG_KEY, {
         host: POSTHOG_HOST,
-        // Uygulama içi oyun; sayfa görüntüleme otomatik izleme kapalı
+        defaultOptIn: false,
         captureAppLifecycleEvents: false,
+        enableSessionReplay: false,
+        errorTracking: { autocapture: false },
       });
       await ph.ready();
-      client = ph;
+      return ph;
     } catch (err) {
       console.warn('[analytics] PostHog başlatılamadı, analitik kapalı:', err);
-      client = null;
+      return null;
     }
   })();
-  return initPromise;
-}
-
-/** Kullanıcı oturum açtığında / kimliği netleştiğinde çağrılır */
-export function identifyPlayer(playerId: string, props?: Record<string, any>): void {
-  if (!client) return;
   try {
-    void client.identify(playerId, props);
+    const ph = await initPromise;
+    if (!ph || revision !== sessionRevision || getAnalyticsConsent() !== 'granted') return;
+    client = ph;
+    if (ph.getDistinctId() !== next) ph.reset();
+    await ph.optIn();
+    if (revision !== sessionRevision || getAnalyticsConsent() !== 'granted') {
+      if (!requestedPlayer || getAnalyticsConsent() !== 'granted') await ph.optOut();
+      return;
+    }
+    ph.identify(next);
+    activePlayer = next;
+    trackEvent('session_start', {
+      platform: Platform.OS,
+      version: process.env.EXPO_PUBLIC_APP_VERSION || Constants.expoConfig?.version || 'dev',
+    });
   } catch {
-    // ignore
+    // Telemetry must never break gameplay.
   }
 }
 
 export function trackEvent(event: string, props?: Record<string, any>): void {
-  if (!client) return;
+  if (!client || !activePlayer || getAnalyticsConsent() !== 'granted') return;
   try {
     client.capture(event, props);
   } catch {
     // ignore
   }
-}
-
-export function trackSessionStart(): void {
-  trackEvent('session_start', {
-    platform: Platform.OS,
-    version: process.env.EXPO_PUBLIC_APP_VERSION || 'dev',
-  });
 }
 
 /** Eşleşme kuyruğuna girme anını kaydet */
@@ -96,7 +110,7 @@ export function trackMatchFound(matchedWith: 'bot' | 'human'): number | undefine
  * Örn: bot'a düşme süresi — 'matchmaking-bot-fallback-sec' (sn)
  */
 export function getFeatureFlag(key: string, fallback: number | string | boolean): number | string | boolean {
-  if (!client) return fallback;
+  if (!client || !activePlayer || getAnalyticsConsent() !== 'granted') return fallback;
   try {
     const value = client.getFeatureFlag(key);
     return value === undefined || value === null ? fallback : value;
@@ -113,10 +127,8 @@ export function getBotFallbackMs(): number {
 }
 
 export default {
-  initAnalytics,
-  identifyPlayer,
+  syncAnalyticsSession,
   trackEvent,
-  trackSessionStart,
   markMatchmakingStart,
   trackMatchFound,
   getFeatureFlag,

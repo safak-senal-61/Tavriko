@@ -24,7 +24,7 @@ import { seenScopeKey, getSeenQuestionIds, markQuestionsSeen } from '../utils/se
 import { getOfflinePracticeAnswer, requestPracticeAnswer } from '../utils/practiceAnswers';
 import { socketService } from '../services/socketService';
 import { sound } from '../services/soundService';
-import { identifyPlayer, trackEvent, markMatchmakingStart, trackMatchFound } from '../services/analytics';
+import { syncAnalyticsSession, trackEvent, markMatchmakingStart, trackMatchFound } from '../services/analytics';
 import { duelFunnelPreference, recordDuelSelection } from '../services/duelFunnel';
 import { THEME } from '../theme/tokens';
 import {
@@ -90,7 +90,10 @@ import { ProfileInspectModal, PublicProfileCard } from '../components/ProfileIns
 import { DeveloperScreen } from '../screens/DeveloperScreen';
 import { ConnectionStatusOverlay } from '../components/ConnectionStatusOverlay';
 import { AnalyticsConsentBanner } from '../components/AnalyticsConsentBanner';
-import type { AnalyticsConsentValue } from '../services/analyticsConsent';
+import { useAnalyticsConsent } from '../services/analyticsConsent';
+import { PushPermissionReminder } from '../components/PushPermissionReminder';
+import { pushSupported } from '../services/pushNotifications';
+import { usePushPermission } from '../services/usePushPermission';
 import { useNetStatus, OFFLINE_GAME_GRACE_MS } from '../store/netStatus';
 import { netMonitor } from '../services/netMonitor';
 import { getWebLayout, WEB_FRAME_GAP, WEB_UTILITY_WIDTH } from './webLayout';
@@ -122,7 +125,7 @@ const GAME_SESSION_SCREENS: ScreenName[] = [
   'duel_versus',
   'matchmaking',
 ];
-export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsConsentValue) => void }> = ({ onAnalyticsDecide }) => {
+export const RootNavigator: React.FC = () => {
   const [pendingReferral, setPendingReferral] = useState(() => captureReferralLink());
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
@@ -254,17 +257,6 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
   } = useGameStore();
   const isGuest = user?.isGuest === true;
 
-  // PostHog: kullanıcı kimliği netleştiğinde analitik tarafında tanımla
-  useEffect(() => {
-    if (user?.id) {
-      identifyPlayer(user.id, {
-        displayName: user.displayName,
-        username: user.username,
-        isGuest: !!user.isGuest,
-      });
-    }
-  }, [user?.id]);
-
   // Merge a fresh server-side user profile into the current store (keeps token)
   const syncWithFreshUser = useCallback(
     (fresh: UserProfile) => {
@@ -307,6 +299,17 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
   }, [user?.id, user?.isGuest, realSessionToken]);
   const showLegalGate =
     Boolean(realSessionToken) && currentScreen !== 'auth' && currentScreen !== 'splash' && needsLegalConsent(user, isGuest);
+  const consent = useAnalyticsConsent();
+  const signedInPlayer = realSessionToken && !isGuest && !showLegalGate &&
+    currentScreen !== 'auth' && currentScreen !== 'splash' ? user?.id ?? null : null;
+  const safePromptScreen = Boolean(signedInPlayer && !activeRoom && !gameAlert && !viewingProfile && netOnline);
+  const showAnalyticsConsent = consent === null && safePromptScreen &&
+    (currentScreen === 'home' || currentScreen === 'friends');
+  const push = usePushPermission(signedInPlayer, realSessionToken);
+
+  useEffect(() => {
+    void syncAnalyticsSession(consent === 'granted' ? signedInPlayer : null);
+  }, [signedInPlayer, consent]);
 
   const acceptLegal = useCallback(
     async (method: 'google' | 'in_app') => {
@@ -2174,6 +2177,7 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
           <SettingsScreen
             user={user}
             token={token}
+            pushPermission={pushSupported && signedInPlayer ? push : undefined}
             onUpdateUser={syncWithFreshUser}
             apiBaseUrl={API_BASE}
             onBack={() => navigateTo('home')}
@@ -2430,8 +2434,15 @@ export const RootNavigator: React.FC<{ onAnalyticsDecide?: (value: AnalyticsCons
           navigateTo('auth');
         }}
       />
-      {/* Web'de açılış görselini kapatmadan, ilk etkileşimli ekranda sor. */}
-      {(!isWeb || currentScreen !== 'splash') && <AnalyticsConsentBanner onDecide={onAnalyticsDecide} />}
+      {showAnalyticsConsent && <AnalyticsConsentBanner />}
+      {pushSupported && signedInPlayer && (
+        <PushPermissionReminder
+          eligible={safePromptScreen && currentScreen === 'home' && push.foreground && !push.busy &&
+            (consent === 'granted' || consent === 'denied')}
+          permission={push.status}
+          onEnable={push.enable}
+        />
+      )}
     </View>
   );
 };

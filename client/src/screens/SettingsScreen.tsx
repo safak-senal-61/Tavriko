@@ -17,13 +17,15 @@ import { UserProfile, UserSettings } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { trackEvent } from '../services/analytics';
+import { setAnalyticsConsent, useAnalyticsConsent } from '../services/analyticsConsent';
+import type { PushPermission } from '../services/pushNotifications';
 import { socketService } from '../services/socketService';
 import { DISCOVERY_IMG, DiscoveryArtwork } from '../components/DiscoveryArtwork';
 import { PreferenceSwitch } from '../components/PreferenceSwitch';
 import { GradientFill } from '../components/TavrikoGradient';
 import { savePreferences, loadStoredPreferences } from '../store/appPrefs';
 import { InfoHint } from '../components/InfoHint';
-import { Volume2, Gamepad2, ShieldCheck, UserRound, Sparkles, FileText } from 'lucide-react-native';
+import { Bell, Volume2, Gamepad2, ShieldCheck, UserRound, Sparkles, FileText } from 'lucide-react-native';
 import type { LegalDocumentId } from '@trivia/shared';
 import { LegalDocumentList, LegalDocumentModal, LegalWebLink } from '../components/LegalDocuments';
 import { getLegalConsent } from '../utils/legalConsent';
@@ -103,6 +105,12 @@ interface SettingsScreenProps {
   onSyncWallet?: () => Promise<void>;
   token?: string | null;
   onUpdateUser?: (updated: UserProfile) => void;
+  pushPermission?: {
+    status: PushPermission;
+    busy: boolean;
+    error: boolean;
+    enable: () => Promise<void>;
+  };
 }
 
 const SETTINGS_STORAGE_KEY = 'tavriko_user_settings_v2';
@@ -127,7 +135,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onSyncWallet,
   token,
   onUpdateUser,
+  pushPermission,
 }) => {
+  const analyticsConsent = useAnalyticsConsent();
   const saved: UserSettings = { ...loadLocalSettings(), ...((user?.settings as UserSettings) || {}) };
   const pick = <K extends keyof UserSettings>(key: K, fallback: NonNullable<UserSettings[K]>) =>
     (saved[key] ?? fallback) as NonNullable<UserSettings[K]>;
@@ -507,6 +517,32 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </View>
         )}
 
+        {pushPermission && (
+          <TouchableOpacity
+            style={[styles.groupCard, styles.pushPermissionCard]}
+            accessibilityRole="button"
+            accessibilityLabel={`Anlık bildirimler: ${pushPermission.status === 'granted' ? 'Açık' : pushPermission.status === 'unknown' ? 'Durum bilinmiyor' : 'Kapalı'}`}
+            accessibilityHint="Bildirim iznini yönetir"
+            disabled={pushPermission.busy}
+            accessibilityState={{ disabled: pushPermission.busy, busy: pushPermission.busy }}
+            onPress={() => { void pushPermission.enable(); }}
+          >
+            <Bell size={20} color="#FFC43D" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.itemLabel}>Anlık Bildirimler</Text>
+              <Text style={styles.itemSub}>Düello, oda ve arkadaşlık davetleri.</Text>
+              <Text style={styles.itemSub} accessibilityLiveRegion="polite">
+                {pushPermission.error ? 'İzin ayarları açılamadı. Tekrar dene.' :
+                  pushPermission.status === 'granted' ? 'Açık' :
+                  pushPermission.status === 'unknown' ? 'İzin durumu bilinmiyor' : 'Kapalı'}
+              </Text>
+            </View>
+            <Text style={styles.pushPermissionAction}>{pushPermission.busy ? 'Bekle…' :
+              pushPermission.status === 'requestable' ? 'Aç' :
+              pushPermission.status === 'unknown' ? 'Kontrol et' : 'Yönet'}</Text>
+          </TouchableOpacity>
+        )}
+
         <View accessibilityRole="tablist" style={styles.preferenceTabs}>
           {([
             ['sound', 'Ses', Volume2], ['game', 'Oyun', Gamepad2],
@@ -747,6 +783,19 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </View>
 
         <View style={styles.groupCard}>
+          {user && !user.isGuest && token && token !== 'mock_token' && analyticsConsent !== undefined && (
+            <View style={styles.itemRow}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={styles.itemLabel}>Kullanım Analitiği</Text>
+                <Text style={styles.itemSub}>Tavriko’yu iyileştirmek için oyun içi etkileşimlerinin hesap tanımlayıcınla birlikte ölçülmesine izin ver.</Text>
+              </View>
+              <PreferenceSwitch
+                value={analyticsConsent === 'granted'}
+                label="Kullanım Analitiği"
+                onValueChange={value => setAnalyticsConsent(value ? 'granted' : 'denied')}
+              />
+            </View>
+          )}
           {adPrivacyOptions && (
             <TouchableOpacity
               accessibilityRole="button"
@@ -1059,6 +1108,8 @@ const styles = StyleSheet.create({
   heroEyebrow: { color: '#ADF0D8', fontFamily: THEME.fonts.extraBold, fontSize: 12, letterSpacing: 1 },
   heroTitle: { color: '#FFFFFF', fontFamily: THEME.fonts.display, fontSize: 25, lineHeight: 31 },
   heroSub: { color: '#DDD0EE', fontFamily: THEME.fonts.body, fontSize: 13, lineHeight: 19 },
+  pushPermissionCard: { padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  pushPermissionAction: { color: '#FFC43D', fontFamily: THEME.fonts.extraBold, fontSize: 13 },
   preferenceTabs: { flexDirection: 'row', backgroundColor: '#1C1030', borderRadius: 18, padding: 4, marginBottom: 24, gap: 4 },
   preferenceTab: { flex: 1, minWidth: 0, minHeight: 64, alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 14 },
   preferenceTabActive: { backgroundColor: '#FFC43D' },
