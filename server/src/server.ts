@@ -607,6 +607,7 @@ export function createApp() {
       'og-image.png',
       'manifest.json',
       'robots.txt',
+      'app-ads.txt',
       'sitemap.xml',
     ];
     app.get(brandStaticFiles.map((name) => `/${name}`), (req, res, next) => {
