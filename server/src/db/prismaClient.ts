@@ -52,6 +52,7 @@ import {
 } from '@trivia/shared';
 import type { TrackedMatchSummary } from '../services/playerAnalytics';
 import { ALL_CATEGORIES, QUESTION_BANK } from './questionsData';
+import { getRawPrisma } from './rawPrisma';
 import { RICH_SEED_BANK } from '../ai/evrenLlmGenerator';
 import { supabaseService } from './supabaseClient';
 import { mergeQuestionStores } from '../utils/questionStoreMerge';
@@ -280,18 +281,7 @@ export class PrismaService {
   > = new Map();
 
   constructor() {
-    const dbUrl =
-      process.env.DATABASE_URL ||
-      process.env.DIRECT_URL ||
-      'postgresql://postgres:postgres@localhost:5432/postgres';
-    this.rawClient = new PrismaClient({
-      datasources: {
-        db: {
-          url: dbUrl,
-        },
-      },
-      log: ['error'],
-    });
+    this.rawClient = getRawPrisma();
     this.loadLocalSnapshots();
     this.initQuestions();
     this.seedDefaults();

@@ -28,17 +28,23 @@ Module._resolveFilename = function (request, parent, isMain, options) {
   return origResolve.call(this, request, parent, isMain, options);
 };
 
-let createApp;
-try {
-  createApp = require('../server/dist/server').createApp;
-} catch (e) {
-  try {
-    createApp = require('./server/dist/server').createApp;
-  } catch (e2) {
-    createApp = require(path.join(__dirname, '..', 'server', 'dist', 'server')).createApp;
+let mainApp;
+let jokerApp;
+function loadApp(fast) {
+  const filename = fast ? 'jokerApp' : 'server';
+  // Keep the normal requires literal so Vercel traces their dependencies.
+  if (fs.existsSync(path.join(__dirname, '..', 'server', 'dist', `${filename}.js`))) {
+    return fast ? require('../server/dist/jokerApp').createJokerApp() : require('../server/dist/server').createApp().app;
   }
+  if (fs.existsSync(path.join(__dirname, 'server', 'dist', `${filename}.js`))) {
+    return fast ? require('./server/dist/jokerApp').createJokerApp() : require('./server/dist/server').createApp().app;
+  }
+  const entry = require(path.join(process.cwd(), 'server', 'dist', filename));
+  return fast ? entry.createJokerApp() : entry.createApp().app;
 }
 
-const { app } = createApp();
-
-module.exports = app;
+module.exports = (req, res) => {
+  const fast = /^\/api\/(?:questions\/practice\/joker|internal\/room-joker)\/?(?:\?|$)/i.test(req.url);
+  if (fast) return (jokerApp ??= loadApp(true))(req, res);
+  return (mainApp ??= loadApp(false))(req, res);
+};

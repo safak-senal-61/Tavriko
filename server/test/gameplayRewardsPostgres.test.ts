@@ -153,6 +153,33 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     expect((await play({ roundNumber: 3 })).status).toBe(409);
   });
 
+  it('uses an issued practice snapshot through the lightweight app with no catalogue lookup', async () => {
+    const { createJokerApp } = await import('../src/jokerApp');
+    const { sealPracticeJoker } = await import('../src/services/practiceJokerProof');
+    const { db } = await import('../src/db/prismaClient');
+    const userId = await player('fast_joker');
+    await item(userId, 'joker_eliminate');
+    const scope = { userId, sessionId: `sess_${randomUUID().replaceAll('-', '')}`, questionId: 'snapshot-only-qa' };
+    const question = { correctOptionId: 'a', options: ['a', 'b', 'c', 'd'].map(id => ({ id, text: id })) };
+    const proof = sealPracticeJoker(scope, question, Date.now() + 30_000, secret);
+    const questionRead = vi.spyOn(db, 'getQuestionById');
+    try {
+      const server = request(createJokerApp());
+      const send = () => server.post('/api/questions/practice/joker').set('Authorization', auth(userId))
+        .send({ sessionId: scope.sessionId, questionId: scope.questionId, jokerId: 'joker_eliminate', proof });
+      const [first, retry] = await Promise.all([send(), send()]);
+      expect(first.status).toBe(200);
+      expect(first.headers['server-timing']).toMatch(/^joker-wallet;dur=\d+$/);
+      expect(first.body.eliminated).toHaveLength(1);
+      expect(first.body.eliminated).not.toContain('a');
+      expect(retry.status).toBe(200);
+      expect(retry.body).toEqual(first.body);
+      expect(questionRead).not.toHaveBeenCalled();
+      expect(await inventory(userId)).toMatchObject([{ itemId: 'joker_eliminate', qty: 0 }]);
+      expect(await client.practiceJokerUse.count({ where: { userId } })).toBe(1);
+    } finally { questionRead.mockRestore(); }
+  });
+
   it('does not consume a tactic in a standard duel and debits an eligible tactic only once', async () => {
     const userId = await player('bot_tactic');
     expect((await post(userId, '/shop/purchase', { productId: 'joker_double' })).status).toBe(200);

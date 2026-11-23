@@ -85,7 +85,19 @@ export class GameRoomDO extends DurableObject<Env> {
       this.verifiedPlayers = new Set(await this.ctx.storage.get<string[]>('verifiedPlayers') ?? []);
       this.funnelMatchId = await this.ctx.storage.get<string>('funnelMatchId') ?? null;
 
-      if (storedRoom) this.room = storedRoom;
+      if (storedRoom) {
+        this.room = storedRoom;
+        // Only rooms restored mid-round can contain effects stored under
+        // individual player keys by the older Worker. Restore once off the tap path.
+        if (storedRoom.status === 'question_active' && supportsLiveJokers(storedRoom.mode) && env.INTERNAL_API_SECRET) {
+          await Promise.all(Object.values(storedRoom.players).filter(player => !player.isBot && !player.jokerRound?.effect).map(async player => {
+            const saved = await this.ctx.storage.get<SavedRoomJoker>(`joker:${player.id}`);
+            if (saved && saved.startedAt === storedRoom.roundStartedAt && saved.roundNumber === storedRoom.currentRound) {
+              (player.jokerRound ??= {}).effect = saved.effect;
+            }
+          }));
+        }
+      }
       if (storedQuestions) this.questions = storedQuestions;
       this.reconnectDeadlines = await this.ctx.storage.get<Record<string, number>>('reconnectDeadlines') ?? {};
       if (storedAlarm?.type === 'reconnect_grace' && storedRoom) {
@@ -892,13 +904,8 @@ export class GameRoomDO extends DurableObject<Env> {
       return true;
     };
     if (rejectWhilePending()) return;
-    const saved = supportsLiveJokers(answerRoom.mode) && this.env.INTERNAL_API_SECRET
-      ? await this.ctx.storage.get<SavedRoomJoker>(`joker:${playerId}`) : undefined;
-    if (this.room !== answerRoom || answerRoom.status !== 'question_active' || answerRoom.currentRound !== answerRound ||
-        answerRoom.players[playerId] !== player || player.hasAnsweredCurrentRound) return;
-    if (rejectWhilePending()) return;
     const runtime = player.jokerRound;
-    const effect = runtime?.effect ?? (saved?.startedAt === roundStartedAt && saved.roundNumber === answerRound ? saved.effect : undefined);
+    const effect = runtime?.effect;
     if (effect?.eliminated.includes(selectedOptionId)) {
       ws.send(createWsError('Bu şık elendi.', 'OPTION_ELIMINATED', envelope.requestId));
       return;
@@ -1002,16 +1009,8 @@ export class GameRoomDO extends DurableObject<Env> {
     if (this.pendingJokers.has(pendingKey)) { fail('Joker isteği işleniyor.'); return; }
     this.pendingJokers.add(pendingKey);
     try {
-      const saved = await this.ctx.storage.get<SavedRoomJoker>(`joker:${playerId}`);
-      if (this.room !== room || room.currentRound !== roundNumber || room.status !== 'question_active' ||
-          player.hasAnsweredCurrentRound || Date.now() >= deadline) {
-        fail('Bu soruda joker kullanılamıyor.'); return;
-      }
       if (player.jokerRound?.effect) {
         ws.send(encodeWsMessage(SOCKET_EVENTS.JOKER_RESULT, player.jokerRound.effect, envelope.requestId)); return;
-      }
-      if (saved?.startedAt === startedAt && saved.roundNumber === roundNumber) {
-        ws.send(encodeWsMessage(SOCKET_EVENTS.JOKER_RESULT, saved.effect, envelope.requestId)); return;
       }
       const tactics = this.getJokerTactics(room);
       const capabilities = this.jokerCapabilities(room, player);
@@ -1366,15 +1365,7 @@ export class GameRoomDO extends DurableObject<Env> {
   }
 
   private async getQuestionForSocket(attachment: WsAttachment): Promise<ClientQuestion | null> {
-    let question = this.getClientQuestion(this.room?.players[attachment.playerId]);
-    if (question?.jokerRoundStartedAt && !question.jokerEffect && attachment.canSpendJokers) {
-      const saved = await this.ctx.storage.get<SavedRoomJoker>(`joker:${attachment.playerId}`);
-      question = this.room?.status === 'question_active' ? this.getClientQuestion(this.room.players[attachment.playerId]) : null;
-      if (question && saved && saved.startedAt === question.jokerRoundStartedAt && saved.roundNumber === question.roundNumber) {
-        question.jokerEffect = saved.effect;
-      }
-    }
-    return question;
+    return this.getClientQuestion(this.room?.players[attachment.playerId]);
   }
 
   private sendPrivateQuestion(socket: WebSocket): void {
