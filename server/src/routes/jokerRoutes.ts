@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import { rateLimit } from 'express-rate-limit';
-import { timingSafeEqual } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { isJokerId } from '@trivia/shared';
+import { isAdvancedJoker, isJokerId, SHOP_CATALOG } from '@trivia/shared';
 import { getRawPrisma } from '../db/rawPrisma';
 import { walletRateLimitOptions } from '../middleware/walletRateLimit';
 import { consumeQuizJoker } from '../services/quizJokers';
@@ -10,9 +10,10 @@ import { getJokerSigningSecret, practiceSessionPattern, readPracticeJoker, type 
 
 const router = Router();
 const practiceJokerLimit = rateLimit({ ...walletRateLimitOptions, limit: 45 });
+const quickPurchaseLimit = rateLimit({ ...walletRateLimitOptions, limit: 24 });
 const playerIdPattern = /^[a-z0-9_-]{1,128}$/i;
 
-router.use(['/questions/practice/joker', '/internal/room-joker'], (_req, res, next) => {
+router.use(['/questions/practice/joker', '/internal/room-joker', '/social/shop/jokers/quick-purchase'], (_req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
 });
@@ -63,7 +64,7 @@ function sendJokerResult(res: Response, started: number, result: Awaited<ReturnT
   res.json(result.effect);
 }
 
-router.post('/questions/practice/joker', practiceJokerLimit, async (req: Request, res: Response): Promise<void> => {
+function authenticatedJokerPlayer(req: Request, res: Response): string | undefined {
   const authorization = req.get('Authorization');
   if (!authorization?.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Yetkilendirme başlığı eksik' }); return;
@@ -75,6 +76,13 @@ router.post('/questions/practice/joker', practiceJokerLimit, async (req: Request
     if (typeof token !== 'string' && typeof token.userId === 'string') userId = token.userId;
   } catch {}
   if (!userId) { res.status(401).json({ error: 'Geçersiz veya süresi dolmuş oturum' }); return; }
+  return userId;
+}
+
+router.post('/questions/practice/joker', practiceJokerLimit, async (req: Request, res: Response): Promise<void> => {
+  const userId = authenticatedJokerPlayer(req, res);
+  if (!userId) return;
+  const secret = getJokerSigningSecret();
   const { sessionId, questionId, jokerId, proof } = req.body || {};
   if (!playerIdPattern.test(userId) || /^(guest_|bot_)/i.test(userId) || !isJokerId(jokerId) || typeof sessionId !== 'string' ||
       !practiceSessionPattern.test(sessionId) || typeof questionId !== 'string' || !questionId || questionId.length > 160) {
@@ -89,6 +97,51 @@ router.post('/questions/practice/joker', practiceJokerLimit, async (req: Request
     if (!question) { jokerFailure(res, 'unavailable'); return; }
     const started = performance.now();
     sendJokerResult(res, started, await consumeQuizJoker(scope, jokerId, question, receipt.deadline));
+  } catch (error) {
+    jokerBackendError(res, error);
+  }
+});
+
+router.post('/social/shop/jokers/quick-purchase', quickPurchaseLimit, async (req: Request, res: Response): Promise<void> => {
+  const userId = authenticatedJokerPlayer(req, res);
+  if (!userId) return;
+  const { productId } = req.body || {};
+  const product = isJokerId(productId) ? SHOP_CATALOG.find(item => item.id === productId && item.category === 'jokers' && item.currency === 'coins') : undefined;
+  const item = product?.grantItems?.[0];
+  if (!product || !item || !playerIdPattern.test(userId) || /^(guest_|bot_)/i.test(userId)) {
+    res.status(400).json({ error: 'Satın almak için geçerli bir joker seç.' }); return;
+  }
+  try {
+    if (isAdvancedJoker(productId) && !await (await import('../services/realtimeJokerAvailability')).advancedJokersReady()) {
+      res.status(503).json({ error: 'Bu joker henüz canlı maçlarda kullanıma açık değil.' }); return;
+    }
+    const started = performance.now();
+    const [result] = await getRawPrisma().$queryRaw<{ ready: boolean; hasFunds: boolean; coins: number | null; qty: number | null }[]>`
+      WITH ready AS MATERIALIZED (
+        SELECT pg_catalog.to_regclass('public.practice_joker_uses') IS NOT NULL AS enabled
+      ), account AS MATERIALIZED (
+        SELECT u."id", u."coins" FROM "users" u, ready WHERE u."id" = ${userId} AND ready.enabled FOR UPDATE OF u
+      ), grant_item AS (
+        INSERT INTO "user_inventory_items" AS i ("id", "userId", "itemId", "name", "desc", "qty", "updatedAt")
+        SELECT ${randomUUID()}, "id", ${item.id}, ${item.name}, ${item.desc}, ${item.qty}, CURRENT_TIMESTAMP
+        FROM account WHERE "coins" >= ${product.price}
+        ON CONFLICT ("userId", "itemId") DO UPDATE
+          SET "qty" = EXCLUDED."qty", "updatedAt" = CURRENT_TIMESTAMP WHERE i."qty" <= 0
+        RETURNING "userId", "qty"
+      ), debit AS (
+        UPDATE "users" u SET "coins" = u."coins" - ${product.price}, "updatedAt" = CURRENT_TIMESTAMP
+        FROM grant_item g WHERE u."id" = g."userId" RETURNING u."coins", g."qty"
+      )
+      SELECT ready.enabled AS "ready", COALESCE(account."coins" >= ${product.price}, false) AS "hasFunds",
+        debit."coins", debit."qty" FROM ready LEFT JOIN account ON true LEFT JOIN debit ON true
+    `;
+    res.set('Server-Timing', `joker-purchase;dur=${Math.round(performance.now() - started)}`);
+    if (!result?.ready) { res.status(503).json({ error: 'Joker mağazası şu anda kullanıma açık değil.' }); return; }
+    if (result.coins !== null && result.qty !== null) {
+      res.json({ coins: result.coins, item: { ...item, qty: result.qty } }); return;
+    }
+    if (!result.hasFunds) { res.status(409).json({ error: `Bu joker için ${product.price} altın gerekli.` }); return; }
+    res.status(409).json({ error: 'Bu joker zaten envanterinde.', code: 'already_owned' });
   } catch (error) {
     jokerBackendError(res, error);
   }

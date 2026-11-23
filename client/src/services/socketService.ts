@@ -36,6 +36,18 @@ interface WsMessageEnvelope<T = any> {
   timestamp: number;
 }
 
+type JokerRequest = {
+  roomCode: string;
+  playerId: string;
+  question: ClientQuestion;
+  jokerId: JokerId;
+  sentTo?: WebSocket;
+  sends: number;
+  busyRetries: number;
+  finish: (error?: Error, effect?: JokerEffect) => void;
+};
+const jokerRoundEnded = () => new Error('Bu soru artık aktif değil. Jokeri sonraki soruda kullanabilirsin.');
+
 export class SocketService {
   private ws: WebSocket | null = null;
   private currentUrl: string = '';
@@ -55,7 +67,8 @@ export class SocketService {
   // DOs (they resolve displayName/avatar from it) instead of giant avatarUrl
   // query values that can break the WebSocket upgrade
   private authToken: string | null = null;
-  private jokerRequests = new Map<string, (error?: Error, effect?: JokerEffect) => void>();
+  private jokerRequests = new Map<string, JokerRequest>();
+  private roomQuestion?: ClientQuestion;
 
   // Track session details for automatic recovery
   private lastSessionContext: {
@@ -71,6 +84,7 @@ export class SocketService {
   public setAuthToken(token: string | null | undefined): void {
     const clean = token && !token.startsWith('mock') && !token.startsWith('guest_local') ? token : null;
     if (this.authToken !== clean) {
+      this.cancelRoomJokers();
       this.authToken = clean;
     }
   }
@@ -225,7 +239,8 @@ export class SocketService {
       if (this.currentUrl === targetUrl) {
         return this.getSocket();
       }
-      // Re-targeting to different URL (e.g. from matchmaking to room)
+    }
+    if (this.currentUrl && this.currentUrl !== targetUrl) {
       this.closeInternal();
     }
 
@@ -235,10 +250,14 @@ export class SocketService {
   }
 
   private initWebSocket(url: string): void {
+    clearTimeout(this.reconnectTimer);
+    this.roomQuestion = undefined;
     try {
-      this.ws = new WebSocket(url);
+      const ws = new WebSocket(url);
+      this.ws = ws;
 
-      this.ws.onopen = () => {
+      ws.onopen = () => {
+        if (this.ws !== ws) return;
         const wasReconnect = this.reconnectAttempts > 0;
         this.reconnectAttempts = 0;
         this.startPingInterval();
@@ -256,15 +275,17 @@ export class SocketService {
         }
       };
 
-      this.ws.onmessage = (event: MessageEvent) => {
-        this.handleIncomingMessage(event.data);
+      ws.onmessage = (event: MessageEvent) => {
+        if (this.ws === ws) this.handleIncomingMessage(event.data, ws);
       };
 
-      this.ws.onerror = (error: any) => {
-        this.emitLocal('error', error);
+      ws.onerror = (error: any) => {
+        if (this.ws === ws) this.emitLocal('error', error);
       };
 
-      this.ws.onclose = (event: CloseEvent) => {
+      ws.onclose = (event: CloseEvent) => {
+        if (this.ws !== ws) return;
+        this.roomQuestion = undefined;
         this.stopPingInterval();
         leaveWsBreadcrumb(
           `WS koptu (kod: ${event.code}${event.reason ? ', neden: ' + event.reason : ''}${this.isManuallyClosed ? ', manuel' : ''})`,
@@ -273,12 +294,13 @@ export class SocketService {
         this.emitLocal('disconnect', { reason: event.reason, code: event.code });
 
         if (!this.isManuallyClosed && this.reconnectAttempts < this.maxReconnectAttempts) {
-          const delay = Math.min(1000 * Math.pow(1.5, this.reconnectAttempts), 8000);
+          const delay = this.jokerRequests.size && this.reconnectAttempts === 0
+            ? 0 : Math.min(1000 * Math.pow(1.5, this.reconnectAttempts), 8000);
           this.reconnectAttempts += 1;
           leaveWsBreadcrumb(`WS yeniden bağlanıyor (deneme: ${this.reconnectAttempts}, bekleme: ${delay}ms)`, 'warning');
           clearTimeout(this.reconnectTimer);
           this.reconnectTimer = setTimeout(() => {
-            if (!this.isManuallyClosed && this.currentUrl) {
+            if (this.ws === ws && !this.isManuallyClosed && this.currentUrl) {
               this.initWebSocket(this.currentUrl);
             }
           }, delay);
@@ -289,7 +311,7 @@ export class SocketService {
     }
   }
 
-  private handleIncomingMessage(raw: any): void {
+  private handleIncomingMessage(raw: any, gameSocket?: WebSocket): void {
     try {
       const text = typeof raw === 'string' ? raw : new TextDecoder().decode(raw);
       const parsed: WsMessageEnvelope = JSON.parse(text);
@@ -298,14 +320,23 @@ export class SocketService {
 
       const event = parsed.event;
       let payload = parsed.payload;
-      const jokerRequest = parsed.requestId ? this.jokerRequests.get(parsed.requestId) : undefined;
+      const jokerRequest = gameSocket && parsed.requestId ? this.jokerRequests.get(parsed.requestId) : undefined;
       if (jokerRequest && event === SOCKET_EVENTS.ERROR) {
-        jokerRequest(new Error(payload?.message || 'Joker kullanılamadı.'));
+        if (payload?.message === 'Joker isteği işleniyor.' && jokerRequest.busyRetries < 4) {
+          // The previous socket might have committed the same operation but
+          // not sent its result yet. Retry that same round receipt, not a new use.
+          const id = parsed.requestId!;
+          const attempt = ++jokerRequest.busyRetries;
+          setTimeout(() => {
+            if (this.ws !== gameSocket || this.jokerRequests.get(id) !== jokerRequest) return;
+            this.flushRoomJoker(id, jokerRequest, true);
+          }, 200 * attempt);
+        } else jokerRequest.finish(new Error(payload?.message || 'Joker kullanılamadı.'));
         return;
       }
       if (jokerRequest && event === SOCKET_EVENTS.JOKER_RESULT) {
-        if (Array.isArray(payload?.eliminated)) jokerRequest(undefined, payload);
-        else jokerRequest(new Error('Joker sonucu alınamadı.'));
+        if (Array.isArray(payload?.eliminated)) jokerRequest.finish(undefined, payload);
+        else jokerRequest.finish(new Error('Joker sonucu alınamadı.'));
         return;
       }
 
@@ -348,6 +379,16 @@ export class SocketService {
         payload = payload.room;
       }
 
+      if (gameSocket && this.lastSessionContext.roomCode) {
+        if (event === SOCKET_EVENTS.QUESTION_START) {
+          this.roomQuestion = payload;
+          this.jokerRequests.forEach((request, id) => this.flushRoomJoker(id, request));
+        } else if (event === SOCKET_EVENTS.ROUND_RESULT || event === SOCKET_EVENTS.GAME_OVER ||
+          (event === SOCKET_EVENTS.ROOM_STATE_SYNC && payload?.code === this.lastSessionContext.roomCode &&
+            (payload.status === 'round_result' || payload.status === 'finished' || payload.status === 'game_over'))) {
+          this.cancelRoomJokers();
+        }
+      }
       this.emitLocal(event, payload);
     } catch (err) {
       // Ignore non-json or ping frames
@@ -360,8 +401,8 @@ export class SocketService {
       callbacks.forEach((cb) => {
         try {
           cb(data);
-        } catch (e) {
-          console.error(`[SocketService] Error in listener for event ${event}:`, e);
+        } catch {
+          console.error('[SocketService] WebSocket event listener failed.');
         }
       });
     }
@@ -390,13 +431,15 @@ export class SocketService {
     ) {
       this.presenceWs.send(message);
     } else {
-      // If connecting, wait briefly
+      const socket = this.ws;
+      if (!socket || socket.readyState !== WebSocket.CONNECTING) return;
+      // Never send a queued action for the previous room through a new socket.
       const checkAndSend = setInterval(() => {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        if (this.ws !== socket || socket.readyState === WebSocket.CLOSED) {
           clearInterval(checkAndSend);
-          this.ws.send(message);
-        } else if (!this.ws || this.ws.readyState === WebSocket.CLOSED) {
+        } else if (socket.readyState === WebSocket.OPEN) {
           clearInterval(checkAndSend);
+          socket.send(message);
         }
       }, 100);
       setTimeout(() => clearInterval(checkAndSend), 3000);
@@ -422,11 +465,13 @@ export class SocketService {
   private closeInternal(): void {
     this.stopPingInterval();
     clearTimeout(this.reconnectTimer);
-    if (this.ws) {
+    this.cancelRoomJokers();
+    const ws = this.ws;
+    this.ws = null;
+    if (ws) {
       try {
-        this.ws.close();
+        ws.close();
       } catch {}
-      this.ws = null;
     }
   }
 
@@ -584,6 +629,7 @@ export class SocketService {
     });
     if (this.lastSessionContext.roomCode === cleanCode) {
       delete this.lastSessionContext.roomCode;
+      this.cancelRoomJokers();
     }
   }
 
@@ -606,9 +652,49 @@ export class SocketService {
     });
   }
 
-  public useRoomJoker(question: ClientQuestion, jokerId: JokerId): Promise<JokerEffect> {
+  private cancelRoomJokers(): void {
+    this.roomQuestion = undefined;
+    this.jokerRequests.forEach(request => request.finish(jokerRoundEnded()));
+  }
+
+  private flushRoomJoker(id: string, request: JokerRequest, busyRetry = false): void {
     const ws = this.ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return Promise.reject(new Error('Oyun bağlantısı hazır değil. Tekrar dene.'));
+    const current = this.roomQuestion;
+    const original = request.question;
+    if (this.lastSessionContext.roomCode !== request.roomCode || this.lastSessionContext.playerId !== request.playerId) {
+      request.finish(jokerRoundEnded()); return;
+    }
+    if (!ws || ws.readyState !== WebSocket.OPEN || !current) return;
+    const sameRound = current.jokerRoundStartedAt === original.jokerRoundStartedAt &&
+      current.roundNumber === original.roundNumber;
+    if (sameRound && current.jokerEffect && (current.id === original.id || request.sends > 0)) {
+      request.finish(undefined, current.jokerEffect); return;
+    }
+    if (!sameRound || current.id !== original.id || current.timeRemainingMs === 0) {
+      request.finish(jokerRoundEnded()); return;
+    }
+    if (!busyRetry && request.sentTo === ws) return;
+    if (!busyRetry && request.sends >= 2) return;
+    try {
+      ws.send(JSON.stringify({
+        event: SOCKET_EVENTS.USE_JOKER,
+        requestId: id,
+        timestamp: Date.now(),
+        payload: { jokerId: request.jokerId, questionId: original.id, roundNumber: original.roundNumber, startedAt: original.jokerRoundStartedAt },
+      }));
+      if (!busyRetry) request.sends++;
+      request.sentTo = ws;
+    } catch {
+      this.roomQuestion = undefined;
+      try { ws.close(); } catch {}
+    }
+  }
+
+  public useRoomJoker(roomCode: string, playerId: string, question: ClientQuestion, jokerId: JokerId): Promise<JokerEffect> {
+    if (this.isManuallyClosed || this.lastSessionContext.playerId !== playerId ||
+        this.lastSessionContext.roomCode !== roomCode || !question.jokerRoundStartedAt) {
+      return Promise.reject(jokerRoundEnded());
+    }
     const requestId = `joker_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     return new Promise((resolve, reject) => {
       const finish = (error?: Error, effect?: JokerEffect) => {
@@ -617,18 +703,11 @@ export class SocketService {
         if (effect && !error) resolve(effect);
         else reject(error ?? new Error('Joker sonucu alınamadı.'));
       };
-      const timeout = setTimeout(() => finish(new Error('Joker yanıtı gecikti. Tekrar dene.')), 3500);
-      this.jokerRequests.set(requestId, finish);
-      try {
-        ws.send(JSON.stringify({
-          event: SOCKET_EVENTS.USE_JOKER,
-          requestId,
-          timestamp: Date.now(),
-          payload: { jokerId, questionId: question.id, roundNumber: question.roundNumber, startedAt: question.jokerRoundStartedAt },
-        }));
-      } catch {
-        finish(new Error('Oyun bağlantısı koptu. Tekrar dene.'));
-      }
+      const timeout = setTimeout(() => finish(new Error('Joker için zamanında sunucu onayı alınamadı.')), 5000);
+      const request: JokerRequest = { roomCode, playerId, question, jokerId, sends: 0, busyRetries: 0, finish };
+      this.jokerRequests.set(requestId, request);
+      this.flushRoomJoker(requestId, request);
+      this.ensureConnected();
     });
   }
 

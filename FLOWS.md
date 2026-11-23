@@ -12,6 +12,7 @@
 ## Live quiz jokers and scoreboard
 
 - Open 1v1, quick match and a friend room with test accounts. From Jokerlerim use one owned joker before answering, see its effect privately, verify one stock debit and no score or timer change. Retry, reconnect and advance to the next question; reject expired and already answered uses.
+- Drop the game socket right before a joker tap and right after a send. Keep the action bound to the same room and round, recover a committed effect without re-sending, and never carry a queued use into the next question. In the quiz, `Joker Al` opens without animation and buys an out-of-stock joker with a single atomic coin debit; the purchase does not automatically use it or stop the clock.
 - Let a 1v1 search fall back to a bot. Confirm Jokerlerim stays usable for the signed-in player even after the bot answers, until the player answers or the question expires.
 - Verify separate illustrations, stock, and the İpuçları / Şık Eleme / Taktikler filters in Mağaza, Envanter and Jokerlerim. In signed-in online practice verify private highlights and the existing purchase and use flow. Guests, offline play and Günlük Meydan Okuma do not consume paid stock.
 - At 270–375px, select a long option and compare its text width and height before and after correct feedback. The correct glow must not shrink it and points must stay in the feedback card without covering another option.

@@ -2013,7 +2013,7 @@ export const RootNavigator: React.FC = () => {
                 user,
                 apply: async (jokerId: JokerId) => {
                   if (activeRoom) {
-                    const effect = await socketService.useRoomJoker(currentQuestion, jokerId);
+                    const effect = await socketService.useRoomJoker(activeRoom.code, user.id, currentQuestion, jokerId);
                     refreshWallet();
                     return effect;
                   }
@@ -2025,13 +2025,23 @@ export const RootNavigator: React.FC = () => {
                   return effect;
                 },
                 buy: async (productId: JokerId) => {
-                  const response = await fetch(`${API_BASE}/social/shop/purchase`, {
+                  const response = await fetch(`${API_BASE}/social/shop/jokers/quick-purchase`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
                     body: JSON.stringify({ productId }),
                   });
-                  const result = await response.json();
-                  if (!response.ok || !result.user) throw new Error(result.error || 'Joker satın alınamadı.');
-                  if (useGameStore.getState().user?.id === user.id && useGameStore.getState().token === token) syncWithFreshUser(result.user);
+                  const result = await response.json().catch(() => null);
+                  if (!response.ok || !Number.isFinite(result?.coins) || result?.item?.id !== productId) {
+                    if (result?.code === 'already_owned') refreshWallet();
+                    throw new Error(result?.error || 'Joker satın alınamadı.');
+                  }
+                  const current = useGameStore.getState();
+                  if (current.user?.id === user.id && current.token === token) {
+                    const inventory = (current.user.inventory ?? []).filter(item => item.id !== productId);
+                    const next = { ...current.user, coins: result.coins, inventory: [...inventory, result.item] };
+                    setUser(next);
+                    // The receipt is authoritative. Abort older profile reads without fetching the full profile again.
+                    pageDataCache.seed(profileUrl(API_BASE, user.id), next, user.id);
+                  }
                 },
               } : undefined}
               onNext={

@@ -44,7 +44,7 @@ function loadApp(fast) {
 }
 
 module.exports = (req, res) => {
-  const fast = /^\/api\/(?:questions\/practice\/joker|internal\/room-joker)\/?(?:\?|$)/i.test(req.url);
+  const fast = /^\/api\/(?:questions\/practice\/joker|internal\/room-joker|social\/shop\/jokers\/quick-purchase)\/?(?:\?|$)/i.test(req.url);
   if (fast) return (jokerApp ??= loadApp(true))(req, res);
   return (mainApp ??= loadApp(false))(req, res);
 };
