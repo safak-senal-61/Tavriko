@@ -4,14 +4,15 @@
 
 - Open 1v1, quick match and a friend room with test accounts. From Jokerlerim use one owned joker before answering, see its effect privately, verify one stock debit and no score or timer change. Retry, reconnect and advance to the next question; reject expired and already answered uses.
 - Let a 1v1 search fall back to a bot. Confirm Jokerlerim stays usable for the signed-in player even after the bot answers, until the player answers or the question expires.
-- Verify all four matching illustrations and stock in Mağaza, purchase confirmation, Envanter and Jokerlerim. In signed-in online practice keep the existing purchase and use flow. Guests, offline play and Günlük Meydan Okuma do not consume paid stock.
+- Verify separate illustrations, stock, and the İpuçları / Şık Eleme / Taktikler filters in Mağaza, Envanter and Jokerlerim. In signed-in online practice verify private highlights and the existing purchase and use flow. Guests, offline play and Günlük Meydan Okuma do not consume paid stock.
+- At 270–375px, select a long option and compare its text width and height before and after correct feedback. The correct glow must not shrink it and points must stay in the feedback card without covering another option.
 - Delay a test purchase response. After Satın Al, expect the confirmation to close and “Satın alma işleniyor…” to appear immediately, with balance unchanged and duplicate purchase disabled. After success, show the committed balance and item; after rejection, show the error and allow a new attempt. Use test currency only.
 - At 375px and desktop, answer a question and scroll through the quiz feedback and Ödüller (including tabs) without a visible vertical scrollbar. Check that no crown covers an avatar, “Önde” follows the score without changing height, and the winner has a distinct podium label.
 
 ## Wallet and joker artwork
 
 - Mağaza → Elmas / Altın: each of the four packages uses its original image, from small to extra large. The category artwork and the profile's low-balance panel use the medium original.
-- Mağaza → Jokerler: Tek Eleme and Yarı Yarıya use two distinct transparent PNGs. Inspect them on the product list and confirmation, and confirm the prices remain 250 and 450 altın.
+- Mağaza → Jokerler: Tek Eleme and Yarı Yarıya use two distinct poster-derived illustrations. Inspect them on the product list and confirmation, and confirm the prices remain 250 and 450 altın.
 - Envanter and antrenman → Jokerlerim: owned joker items show the same artwork as the store. The quiz shortcut remains legible at its smaller size; the panel can still be opened and dismissed, including when stock is empty.
 - At desktop and 375px, inspect the artwork for visible edges, correct proportions, no clipping, and no vector fallback. Native bundle must contain all ten images; do not make live purchases for visual QA.
 

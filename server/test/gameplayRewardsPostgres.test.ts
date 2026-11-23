@@ -145,6 +145,24 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     expect((await play({ roundNumber: 3 })).status).toBe(409);
   });
 
+  it('does not consume a tactic in a standard duel and debits an eligible tactic only once', async () => {
+    const userId = await player('bot_tactic');
+    expect((await post(userId, '/shop/purchase', { productId: 'joker_double' })).status).toBe(200);
+    const startedAt = Date.now();
+    const body = { userId, startedAt, deadline: startedAt + 15000, roomCode: 'QABOT', roundNumber: 1,
+      questionId: 'qa_bot_joker', correctOptionId: 'a', jokerId: 'joker_double',
+      options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }] };
+    const play = (tactics?: string) => request(app).post('/api/internal/room-joker')
+      .set('x-internal-secret', internalSecret).send({ ...body, tactics });
+    expect((await play()).status).toBe(409);
+    expect(await inventory(userId)).toMatchObject([{ itemId: 'joker_double', qty: 1 }]);
+    const outcomes = await Promise.all([play('friendly'), play('friendly')]);
+    expect(outcomes.map(response => response.status)).toEqual([200, 200]);
+    for (const response of outcomes) expect(response.body).toMatchObject({ modifier: 'double', eliminated: [] });
+    expect(await inventory(userId)).toMatchObject([{ itemId: 'joker_double', qty: 0 }]);
+    expect(await client.practiceJokerUse.count({ where: { userId } })).toBe(1);
+  });
+
   it('does not credit mismatched orders, duplicate deliveries, or replayed refunds', async () => {
     const { applyGemOrder } = await import('../src/services/polarGemPayments');
     const userId = await player('payment');

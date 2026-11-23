@@ -1,4 +1,4 @@
-import { Question, CategoryId, DifficultyLevel, FinalMatchSummary, JokerEffect, JokerId, uniqueQuestions } from '@trivia/shared';
+import { Question, CategoryId, DifficultyLevel, FinalMatchSummary, JokerEffect, JokerId, JokerTactics, uniqueQuestions } from '@trivia/shared';
 import { getFallbackQuestions } from '../game/defaultQuestions';
 
 export class ApiService {
@@ -8,7 +8,7 @@ export class ApiService {
   ) {}
 
   public async useRoomJoker(input: {
-    userId: string; roomCode: string; roundNumber: number; startedAt: number; deadline: number; jokerId: JokerId;
+    userId: string; roomCode: string; roundNumber: number; startedAt: number; deadline: number; jokerId: JokerId; tactics?: JokerTactics;
   }, question: Question): Promise<JokerEffect> {
     if (!this.internalSecret) throw new Error('Jokerler henüz kullanıma açık değil.');
     const cleanUrl = (this.backendUrl || 'https://tavriko-app.vercel.app').replace(/\/+$/, '');
@@ -20,7 +20,12 @@ export class ApiService {
     });
     const data = await response.json() as JokerEffect & { error?: string };
     if (!response.ok || !Array.isArray(data.eliminated)) throw new Error(data.error || 'Joker kullanılamadı. Tekrar dene.');
-    return { eliminated: data.eliminated, ...(typeof data.hint === 'string' ? { hint: data.hint } : {}) };
+    return {
+      eliminated: data.eliminated,
+      ...(typeof data.hint === 'string' ? { hint: data.hint } : {}),
+      ...(typeof data.highlightedOptionId === 'string' ? { highlightedOptionId: data.highlightedOptionId } : {}),
+      ...(data.modifier === 'double' || data.modifier === 'lightning' || data.modifier === 'streak_guard' ? { modifier: data.modifier } : {}),
+    };
   }
 
   public async fetchRoomQuestions(

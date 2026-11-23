@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Image as ImageIcon, Sparkles } from 'lucide-react-native';
 import { WalletArtwork } from '../components/WalletArtwork';
+import { JokerGroupTabs } from '../components/WalletPanels';
 import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import {
   View,
@@ -13,7 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import { LoadingShimmer } from '../components/LoadingShimmer';
-import { UserProfile, InventoryItem, ItemCategory, COSMETIC_RENTAL_MS, getCosmeticDef, getChestOpening, isPermanentGameplayBadge, isJokerId } from '@trivia/shared';
+import { UserProfile, InventoryItem, ItemCategory, COSMETIC_RENTAL_MS, getCosmeticDef, getChestOpening, isPermanentGameplayBadge, isJokerId, JOKERS, JokerGroup } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
@@ -177,6 +178,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   const roomy = page?.roomy;
   const itemArt = Math.round(44 * (page?.ui.art ?? 1));
   const [activeTab, setActiveTab] = useState<InvTabType>('all');
+  const [jokerGroup, setJokerGroup] = useState<JokerGroup | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
   const [selectedChest, setSelectedChest] = useState<InventoryItem | null>(null);
@@ -220,7 +222,8 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     if (activeTab === 'chests') return !!getChestOpening(item.id);
     if (activeTab === 'keys') return item.category === 'key' || item.id.includes('key');
     if (activeTab === 'boosters') return item.category === 'booster' || item.id.includes('bolt') || item.id.includes('flame');
-    if (activeTab === 'jokers') return item.category === 'joker';
+    if (activeTab === 'jokers') return item.category === 'joker' &&
+      (!jokerGroup || JOKERS.some(joker => joker.id === item.id && joker.group === jokerGroup));
     if (activeTab === 'badges') return item.category === 'badge' || item.id.includes('badge');
     if (activeTab === 'avatars') return item.category === 'avatar' || item.id.includes('avatar');
     if (activeTab === 'cosmetics') return item.category === 'frame' || item.category === 'name_effect' || item.category === 'background';
@@ -431,6 +434,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
           onChange={(id, idx) => handleSelectInvTab(id, idx)}
           scrollRef={invTabScrollRef}
         />
+        {activeTab === 'jokers' && <JokerGroupTabs selected={jokerGroup} onChange={setJokerGroup} />}
 
         {/* Aktif Etkiler: kuşanılmış kozmetikler + aktif iksirler; süre barı
             bitince satırlar kaybolur, kozmetikler otomatik eski haline döner */}

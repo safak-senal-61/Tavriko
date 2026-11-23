@@ -18,8 +18,11 @@ import {
   isLobbyQuickMessage,
   isLobbyReaction,
   isJokerId,
+  canUseJoker,
+  LIGHTNING_WINDOW_MS,
   supportsLiveJokers,
   JokerEffect,
+  JokerTactics,
 } from '@trivia/shared';
 import { Env } from '../env';
 import { encodeWsMessage, decodeWsMessage, createWsError, WsMessage } from '../websocket/protocol';
@@ -831,7 +834,7 @@ export class GameRoomDO extends DurableObject<Env> {
     }
 
     const selectedOptionId = String(envelope.payload?.selectedOptionId || '');
-    if (!selectedOptionId) {
+    if (!this.room.currentQuestion.options.some(option => option.id === selectedOptionId)) {
       ws.send(createWsError('Cevap şıkkı zorunludur', 'BAD_REQUEST', envelope.requestId));
       return;
     }
@@ -840,6 +843,24 @@ export class GameRoomDO extends DurableObject<Env> {
     const roundStartedAt = this.room.roundStartedAt || now;
     const totalTimeMs = (this.room.currentQuestion.timeLimitSec || this.room.questionTimeSec || 15) * 1000;
     const elapsedMs = Math.max(0, now - roundStartedAt);
+    const answerRoom = this.room;
+    const answerRound = answerRoom.currentRound;
+    const pendingKey = `${playerId}:${roundStartedAt}:${answerRound}`;
+    const rejectWhilePending = () => {
+      if (!this.pendingJokers.has(pendingKey)) return false;
+      ws.send(createWsError('Joker işleniyor. Cevabını tekrar seç.', 'JOKER_PENDING', envelope.requestId));
+      return true;
+    };
+    if (rejectWhilePending()) return;
+    const saved = supportsLiveJokers(answerRoom.mode) && this.env.INTERNAL_API_SECRET
+      ? await this.ctx.storage.get<SavedRoomJoker>(`joker:${playerId}`) : undefined;
+    if (this.room !== answerRoom || answerRoom.status !== 'question_active' || answerRoom.currentRound !== answerRound) return;
+    if (rejectWhilePending()) return;
+    const effect = saved?.startedAt === roundStartedAt && saved.roundNumber === answerRound ? saved.effect : undefined;
+    if (effect?.eliminated.includes(selectedOptionId)) {
+      ws.send(createWsError('Bu şık elendi.', 'OPTION_ELIMINATED', envelope.requestId));
+      return;
+    }
 
     // Expiration check with 600ms grace for network latency
     if (elapsedMs > totalTimeMs + 600) {
@@ -848,7 +869,12 @@ export class GameRoomDO extends DurableObject<Env> {
       return;
     }
 
-    await this.processPlayerAnswer(playerId, selectedOptionId, elapsedMs);
+    await this.processPlayerAnswer(playerId, selectedOptionId, elapsedMs, effect?.modifier);
+  }
+
+  private getJokerTactics(room: GameRoom): JokerTactics | undefined {
+    if (room.mode !== 'friends_private' && !(room.mode === 'duel' && Object.values(room.players).some(player => player.isBot))) return undefined;
+    return 'friendly';
   }
 
   private async handleUseJoker(ws: WebSocket, attachment: WsAttachment, envelope: WsMessage): Promise<void> {
@@ -873,8 +899,20 @@ export class GameRoomDO extends DurableObject<Env> {
     if (this.pendingJokers.has(pendingKey)) { fail('Joker isteği işleniyor.'); return; }
     this.pendingJokers.add(pendingKey);
     try {
+      const saved = await this.ctx.storage.get<SavedRoomJoker>(`joker:${playerId}`);
+      if (this.room !== room || room.currentRound !== roundNumber || room.status !== 'question_active' ||
+          player.hasAnsweredCurrentRound || Date.now() >= deadline) {
+        fail('Bu soruda joker kullanılamıyor.'); return;
+      }
+      if (saved?.startedAt === startedAt && saved.roundNumber === roundNumber) {
+        ws.send(encodeWsMessage(SOCKET_EVENTS.JOKER_RESULT, saved.effect, envelope.requestId)); return;
+      }
+      const tactics = this.getJokerTactics(room);
+      if (!canUseJoker(jokerId, question.options, { live: true, tactics, lightningAvailable: Date.now() - startedAt < LIGHTNING_WINDOW_MS })) {
+        fail('Bu joker bu soruya veya maç türüne uygun değil.'); return;
+      }
       const effect = await this.apiService.useRoomJoker(
-        { userId: playerId, roomCode: room.code, roundNumber, startedAt, deadline, jokerId }, question,
+        { userId: playerId, roomCode: room.code, roundNumber, startedAt, deadline, jokerId, tactics }, question,
       );
       // The request may finish after the round changes. Never attach an old effect to a new round.
       if (this.room === room && room.currentRound === roundNumber && room.roundStartedAt === startedAt) {
@@ -891,14 +929,15 @@ export class GameRoomDO extends DurableObject<Env> {
   private async processPlayerAnswer(
     playerId: string,
     selectedOptionId: string,
-    elapsedMs: number
+    elapsedMs: number,
+    modifier?: JokerEffect['modifier'],
   ): Promise<void> {
     if (!this.room || this.room.status !== 'question_active' || !this.room.currentQuestion) return;
     const player = this.room.players[playerId];
     if (!player || player.hasAnsweredCurrentRound) return;
     const roundNumber = this.room.currentRound;
 
-    applyPlayerRoundAnswer(this.room, playerId, selectedOptionId, elapsedMs);
+    applyPlayerRoundAnswer(this.room, playerId, selectedOptionId, elapsedMs, modifier);
 
     await this.persist();
     if (this.room.status !== 'question_active' || this.room.currentRound !== roundNumber) return;
@@ -1081,7 +1120,7 @@ export class GameRoomDO extends DurableObject<Env> {
       totalRounds: this.room.totalRounds,
       timeLimitSec,
       ...(this.env.INTERNAL_API_SECRET && supportsLiveJokers(this.room.mode) && this.room.roundStartedAt
-        ? { jokerRoundStartedAt: this.room.roundStartedAt } : {}),
+        ? { jokerRoundStartedAt: this.room.roundStartedAt, jokerTactics: this.getJokerTactics(this.room) } : {}),
       timeRemainingMs: Math.max(0, (this.room.roundStartedAt ?? Date.now()) + timeLimitSec * 1000 - Date.now()),
       ...(q.subCategory ? { subCategory: q.subCategory } : {}),
     };

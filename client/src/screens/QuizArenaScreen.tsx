@@ -27,7 +27,7 @@ import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { trackEvent } from '../services/analytics';
 import { loadStoredPreferences } from '../store/appPrefs';
-import { ClientQuestion, ALL_CATEGORIES, JokerEffect, JokerId, UserProfile } from '@trivia/shared';
+import { ClientQuestion, ALL_CATEGORIES, JokerEffect, JokerId, LIGHTNING_WINDOW_MS, UserProfile } from '@trivia/shared';
 import { JokerPanel } from '../components/WalletPanels';
 import { WalletArtwork } from '../components/WalletArtwork';
 import { ArrowUpRight, Flag } from 'lucide-react-native';
@@ -37,7 +37,6 @@ import {
   CheckMarkSvg,
   CrossMarkSvg,
   CharacterAvatar,
-  CoinIcon,
   CloseXIcon,
 } from '../components/TavrikoIcons';
 import { GradientFill } from '../components/TavrikoGradient';
@@ -762,6 +761,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     if (
       answerState !== 'answerable' ||
       isLocked ||
+      jokerLock.current ||
       feedback ||
       hasExpiredRef.current ||
       secondsLeft <= 0
@@ -1080,7 +1080,9 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         </View>
       )}
       {jokers && jokersOpen && !jokerEffect && !isOptionsDisabled && (
-        <JokerPanel user={jokers.user} options={question.options} busy={jokerBusy} error={jokerError} onClose={() => setJokersOpen(false)}
+        <JokerPanel user={jokers.user} options={question.options} live={isMultiplayer} tactics={question.jokerTactics}
+          lightningAvailable={totalMs - secondsLeft * 1000 < LIGHTNING_WINDOW_MS}
+          busy={jokerBusy} error={jokerError} onClose={() => setJokersOpen(false)}
           onApply={id => { void useJokerAction(id, false); }} onBuy={id => { void useJokerAction(id, true); }} />
       )}
 
@@ -1091,8 +1093,10 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           const isMyChoice = activeSelectedId === opt.id;
           const isCorrectChoice = !!feedback && feedback.correctOptionId === opt.id;
           const isWrongChoice = !!feedback && !feedback.unavailable && isMyChoice && !isCorrectChoice;
-          const showPoints = !!feedback && feedback.isCorrect && isMyChoice && isCorrectChoice && feedback.pointsAwarded > 0;
           const removed = !feedback && eliminated.includes(opt.id);
+          const highlighted = !feedback && jokerEffect?.highlightedOptionId === opt.id;
+          const stateLabel = removed ? 'elendi' : isCorrectChoice ? 'doğru cevap'
+            : isWrongChoice ? 'yanlış cevap' : highlighted ? 'jokerin işaretlediği şık' : isMyChoice ? 'seçildi' : '';
 
           return (
             <Animated.View
@@ -1108,18 +1112,22 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   !feedback && isMyChoice && styles.optCardSelected,
                   feedback && isCorrectChoice && styles.optCardCorrect,
                   feedback && isWrongChoice && styles.optCardWrong,
+                  highlighted && styles.optCardHighlighted,
                   isOptionsDisabled && !isMyChoice && !isCorrectChoice && styles.optCardDimmed,
                   removed && { opacity: .42 },
                 ]}
-                disabled={isOptionsDisabled || removed}
+                disabled={isOptionsDisabled || jokerBusy || removed}
                 activeOpacity={0.8}
                 onPress={() => handleSelect(opt.id)}
                 testID={`quiz-option-${index}`}
                 accessibilityRole="button"
-                accessibilityLabel={removed ? `${optionLabels[index]} elendi` : `${optionLabels[index]} ${opt.text}`}
+                accessibilityLabel={removed ? `${optionLabels[index]} elendi` : `${optionLabels[index]} ${opt.text}${stateLabel ? `, ${stateLabel}` : ''}`}
               >
                 {feedback && isCorrectChoice ? (
-                  <GradientFill colors={['#6FF0C6', '#3FD08A', '#22A873']} stops={[0, 0.5, 1]} />
+                  <>
+                    <GradientFill colors={['#217654', '#146748', '#0C543A']} stops={[0, 0.5, 1]} />
+                    <View pointerEvents="none" style={styles.optCorrectGlow} />
+                  </>
                 ) : feedback && isWrongChoice ? (
                   <GradientFill colors={['#FF8A98', '#FF5A6A', '#C8243A']} stops={[0, 0.5, 1]} />
                 ) : (
@@ -1145,7 +1153,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                     style={[
                       styles.optBadgeText,
                       !feedback && isMyChoice && { color: '#180B34' },
-                      feedback && isCorrectChoice && { color: '#14935F' },
+                      feedback && isCorrectChoice && { color: '#146748' },
                       feedback && isWrongChoice && { color: '#C8243A' },
                     ]}
                   >
@@ -1153,38 +1161,16 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   </Text>
                 </View>
 
-                <Text style={[styles.optText, compact && styles.optTextCompact, isLargeText && styles.optTextLarge]} numberOfLines={2}>
+                <Text style={[styles.optText, compact && styles.optTextCompact, isLargeText && styles.optTextLarge]}>
                   {removed ? 'Elendi' : opt.text}
                 </Text>
 
-                {feedback ? (
-                  isCorrectChoice ? (
-                    <View style={styles.choiceTagCorrect}>
-                      <View style={styles.choiceTagCheck}>
-                        <CheckMarkSvg size={14} color="#14935F" />
-                      </View>
-                      <Text style={styles.choiceTagText}>Doğru Cevap</Text>
-                    </View>
-                  ) : isWrongChoice ? (
-                    <View style={styles.choiceTagWrong}>
-                      <View style={styles.choiceTagCheck}>
-                        <CrossMarkSvg size={14} color="#C8243A" />
-                      </View>
-                      <Text style={styles.choiceTagText}>Seçimin</Text>
-                    </View>
-                  ) : null
-                ) : isMyChoice ? (
-                  <View style={styles.choiceTagPending}>
-                    <Text style={styles.choiceTagPendingText}>Seçildi</Text>
-                  </View>
-                ) : null}
+                <View pointerEvents="none" style={[styles.optionMark, (isCorrectChoice || isWrongChoice) && styles.optionMarkResult]}>
+                  {isCorrectChoice ? <CheckMarkSvg size={13} color="#14935F" />
+                    : isWrongChoice ? <CrossMarkSvg size={13} color="#C8243A" />
+                    : highlighted || isMyChoice && !feedback ? <View style={styles.optionMarkDot} /> : null}
+                </View>
               </TouchableOpacity>
-              {showPoints && (
-                <Animated.View entering={FadeInDown.springify().damping(12)} style={styles.pointsPopup} pointerEvents="none">
-                  <CoinIcon size={18} />
-                  <Text style={styles.pointsPopupText}>+{feedback!.pointsAwarded}</Text>
-                </Animated.View>
-              )}
             </Animated.View>
           );
         })}
@@ -1278,8 +1264,8 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 
 const styles = StyleSheet.create({
   jokerRow: { alignItems: 'flex-end', marginVertical: 2 },
-  jokerTrigger: { flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 5, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: '#72597F', backgroundColor: '#271B40' },
-  jokerTriggerText: { color: '#FFE0B1', fontSize: 13, fontFamily: THEME.fonts.extraBold },
+  jokerTrigger: { flexDirection: 'row', alignItems: 'center', maxWidth: '100%', minHeight: 44, gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: '#72597F', backgroundColor: '#271B40' },
+  jokerTriggerText: { color: '#FFE0B1', flexShrink: 1, fontSize: 13, fontFamily: THEME.fonts.extraBold },
   screenContainer: {
     justifyContent: 'space-between',
     paddingBottom: 12,
@@ -1696,7 +1682,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    height: 58,
+    minHeight: 58,
+    paddingVertical: 4,
     paddingLeft: 8,
     paddingRight: 10,
     borderRadius: 29,
@@ -1705,29 +1692,28 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(154, 107, 255, 0.6)',
   },
   optCardCompact: {
-    height: 50,
+    minHeight: 50,
     borderRadius: 25,
   },
   optCardTiny: {
-    height: 46,
+    minHeight: 46,
     borderRadius: 23,
   },
   optCardSelected: {
     borderColor: '#FFC43D',
-    borderWidth: 2,
   },
   optCardCorrect: {
     borderColor: '#B6FFE0',
-    borderWidth: 2,
-    shadowColor: '#3FD08A',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 14,
-    elevation: 8,
+  },
+  optCorrectGlow: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(63, 208, 138, 0.06)',
+  },
+  optCardHighlighted: {
+    borderColor: '#FFCE67',
   },
   optCardWrong: {
     borderColor: '#FFB3BC',
-    borderWidth: 2,
   },
   optCardDimmed: {
     opacity: 0.6,
@@ -1766,6 +1752,7 @@ const styles = StyleSheet.create({
   },
   optText: {
     flex: 1,
+    minWidth: 0,
     color: '#FFFFFF',
     fontSize: 18,
     fontFamily: THEME.fonts.black,
@@ -1776,86 +1763,15 @@ const styles = StyleSheet.create({
   optTextLarge: {
     fontSize: 20,
   },
-  choiceTagCorrect: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingLeft: 4,
-    paddingRight: 10,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(10, 80, 50, 0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  choiceTagWrong: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingLeft: 4,
-    paddingRight: 10,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(110, 10, 30, 0.5)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  choiceTagCheck: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+  optionMark: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  choiceTagText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: THEME.fonts.black,
-  },
-  choiceTagPending: {
-    paddingHorizontal: 10,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 196, 61, 0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 196, 61, 0.7)',
-  },
-  choiceTagPendingText: {
-    color: '#FFC43D',
-    fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
-  },
-  pointsPopup: {
-    position: 'absolute',
-    right: 6,
-    bottom: -16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingLeft: 4,
-    paddingRight: 10,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#FF9B2F',
-    borderWidth: 2,
-    borderColor: '#FFE27A',
-    zIndex: 10,
-    shadowColor: '#FFC43D',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  pointsPopupText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: THEME.fonts.display,
-    textShadowColor: 'rgba(120, 50, 0, 0.7)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
+  optionMarkResult: { backgroundColor: '#FFFFFF' },
+  optionMarkDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFCE67' },
   // ---- Alt Durum ----
   fixedBottomStatus: {
     minHeight: 52,

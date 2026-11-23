@@ -22,7 +22,8 @@ import Svg, {
   Circle,
   Path,
 } from 'react-native-svg';
-import { UserProfile, SHOP_CATALOG, ShopProduct, ShopProductCategory, SHOP_DURATIONS, isCosmeticProduct, isJokerId, shopPriceForDuration } from '@trivia/shared';
+import { UserProfile, SHOP_CATALOG, ShopProduct, ShopProductCategory, SHOP_DURATIONS, JOKERS, JokerGroup, isCosmeticProduct, isJokerId, shopPriceForDuration } from '@trivia/shared';
+import { JokerGroupTabs } from '../components/WalletPanels';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { getApiBaseUrl } from '../config';
@@ -287,6 +288,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const threeProducts = page?.columns === 3;
   const roomy = page?.roomy;
   const [activeTab, setActiveTab] = useState<ShopProductCategory>(initialTab === 'diamonds' && !WEB ? 'gold' : initialTab ?? (WEB ? 'diamonds' : 'gold'));
+  const [jokerGroup, setJokerGroup] = useState<JokerGroup | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
@@ -390,7 +392,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     ]).start();
   };
 
-  const filteredProducts = SELLABLE_CATALOG.filter((p) => p.category === activeTab);
+  const filteredProducts = SELLABLE_CATALOG.filter(p => p.category === activeTab &&
+    (activeTab !== 'jokers' || !jokerGroup || JOKERS.some(joker => joker.id === p.id && joker.group === jokerGroup)));
 
   // 2x XP artırıcı aktif mi? Kalan süre (ms) yoksa null.
   const boosterExp = user?.activeBoosterExpiresAt ?? 0;
@@ -547,7 +550,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             <Text accessibilityRole="header" style={styles.walletTitle}>{activeTab === 'diamonds' ? 'Elmas paketleri' : activeTab === 'gold' ? 'Altın paketleri' : 'Quiz jokerleri'}</Text>
             <Text style={styles.walletDescription}>{activeTab === 'diamonds'
               ? polarSandbox ? 'Polar test ortamı. Gerçek ödeme yapma.' : polarAvailable ? 'Tek seferlik, güvenli Polar ödemesi.' : 'Elmas paketlerinin ödemesi henüz kullanıma açık değil.'
-              : activeTab === 'gold' ? 'Quiz oynayarak altın kazan veya elmasla paket al.' : 'Altınla al; 1v1, arkadaş maçı veya çevrimiçi antrenmanda kullan.'}</Text>
+              : activeTab === 'gold' ? 'Quiz oynayarak altın kazan veya elmasla paket al.' : 'Altınla al. Her jokerin kullanılabildiği maç türü kartında yazıyor.'}</Text>
           </View>
         </View> : <><KitHero
           art={STORE_IMG.trophy}
@@ -585,6 +588,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </View>
         )}
 
+        {activeTab === 'jokers' && <JokerGroupTabs selected={jokerGroup} onChange={setJokerGroup} />}
         {/* Ürün Izgarası (Yumuşak Sekme Geçiş Animasyonu ile) */}
         <Animated.View
           style={[
@@ -644,7 +648,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
                 {/* İsim & Açıklama */}
                 <Text style={[styles.productName, roomy && { fontSize: 17 }]} numberOfLines={roomy || item.category === 'frames' ? 2 : 1}>{item.name}</Text>
-                <Text style={[styles.productDesc, roomy && { fontSize: 13, lineHeight: 18 }]} numberOfLines={2}>{item.desc}</Text>
+                <Text style={[styles.productDesc, roomy && { fontSize: 13, lineHeight: 18 }]} numberOfLines={item.category === 'jokers' ? undefined : 2}>{item.desc}</Text>
 
                 {/* 2x XP Artırıcı Aktifse: Kalan Süre Barı */}
                 {(item.category === 'boosters' || item.id.includes('booster')) &&

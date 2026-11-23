@@ -7,6 +7,7 @@ exports.applyPlayerRoundAnswer = applyPlayerRoundAnswer;
 exports.buildRoomLeaderboard = buildRoomLeaderboard;
 exports.evaluateRoundResult = evaluateRoundResult;
 exports.buildFinalMatchSummary = buildFinalMatchSummary;
+const jokers_1 = require("./jokers");
 exports.BASE_POINTS = 100;
 exports.MAX_SPEED_BONUS = 50;
 exports.WRONG_ANSWER_PENALTY = 0;
@@ -59,7 +60,7 @@ function calculateRankings(players) {
  * Shared authoritative helper: applies a player's submitted answer to room state,
  * updating score, streak, response time, and correctAnswersCount (+1 for correct, +0 for wrong).
  */
-function applyPlayerRoundAnswer(room, playerId, selectedOptionId, elapsedMs) {
+function applyPlayerRoundAnswer(room, playerId, selectedOptionId, elapsedMs, modifier) {
     const player = room.players[playerId];
     const question = room.currentQuestion;
     if (!player || !question) {
@@ -75,6 +76,13 @@ function applyPlayerRoundAnswer(room, playerId, selectedOptionId, elapsedMs) {
         currentStreak: player.currentStreak,
         penaltyForWrong: room.penaltyForWrong,
     });
+    if (!isCorrect && modifier === 'streak_guard')
+        scoreResult.streak = player.currentStreak;
+    if (isCorrect && modifier === 'double')
+        scoreResult.pointsAwarded *= 2;
+    if (isCorrect && modifier === 'lightning' && elapsedMs <= jokers_1.LIGHTNING_WINDOW_MS) {
+        scoreResult.pointsAwarded = Math.round(scoreResult.pointsAwarded * 1.5);
+    }
     player.hasAnsweredCurrentRound = true;
     player.lastAnswerTimeMs = elapsedMs;
     player.lastSelectedOptionId = selectedOptionId;

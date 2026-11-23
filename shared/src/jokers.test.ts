@@ -42,4 +42,23 @@ describe('quiz joker effects', () => {
     expect(supportsLiveJokers('daily_challenge')).toBe(false);
     expect(supportsLiveJokers('ranked_random')).toBe(false);
   });
+
+  it('marks the nearest numeric distractor, reveals the right option and keeps dice replay stable', () => {
+    const numeric = { ...question, options: ['1996', '1999', '2000', '2005'].map((text, i) => ({ id: 'abcd'[i], text })) };
+    expect(resolveJokerEffect('joker_nearest', question)).toBeNull();
+    expect(resolveJokerEffect('joker_nearest', numeric)).toMatchObject({ highlightedOptionId: 'c' });
+    expect(resolveJokerEffect('joker_prophecy', question)).toMatchObject({ highlightedOptionId: 'b' });
+    expect(resolveJokerEffect('joker_reveal', question)?.hint).toBe('Doğru cevap: İstanbul Boğazı');
+    const first = resolveJokerEffect('joker_dice', question, undefined, { randomIndex: 42 });
+    expect(first?.highlightedOptionId).toBe('c');
+    expect(resolveJokerEffect('joker_dice', { ...question, options: [...question.options].reverse() }, [], { randomIndex: 42 })).toEqual(first);
+  });
+
+  it('blocks scoring tactics in practice and public human duels, and rejects late lightning', () => {
+    expect(canUseJoker('joker_double', question.options)).toBe(false);
+    expect(canUseJoker('joker_reveal', question.options, { live: true })).toBe(false);
+    expect(canUseJoker('joker_reveal', question.options, { live: true, tactics: 'friendly' })).toBe(true);
+    expect(resolveJokerEffect('joker_double', question, undefined, { tactics: 'friendly' })).toMatchObject({ modifier: 'double' });
+    expect(resolveJokerEffect('joker_lightning', question, undefined, { tactics: 'friendly', lightningAvailable: false })).toBeNull();
+  });
 });

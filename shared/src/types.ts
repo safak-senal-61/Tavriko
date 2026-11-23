@@ -101,6 +101,7 @@ export interface ClientQuestion {
   jokerProof?: string;
   /** Live room capability, also identifies the exact round instance. */
   jokerRoundStartedAt?: number;
+  jokerTactics?: 'friendly';
   /** Only sent to the authenticated owner when reconnecting. */
   jokerEffect?: JokerEffect;
   id: string;
@@ -692,16 +693,31 @@ export interface ShopProduct {
 
 export const LOW_GEMS = 100;
 export const LOW_COINS = 500;
-export const JOKERS = [
-  { id: 'joker_eliminate', name: 'Tek Eleme', desc: 'Bir yanlış şıkkı kaldırır.', price: 250, eliminated: 1 },
-  { id: 'joker_half', name: 'Yarı Yarıya', desc: 'İki yanlış şıkkı kaldırır.', price: 450, eliminated: 2 },
-  { id: 'joker_initial', name: 'İlk Karakter', desc: 'Doğru şıkkın ilk harfini veya rakamını gösterir.', price: 200, eliminated: 0 },
-  { id: 'joker_word_count', name: 'Kelime Sayısı', desc: 'Doğru şıkkın kaç kelime olduğunu gösterir.', price: 150, eliminated: 0 },
+export const JOKER_GROUPS = [
+  { id: 'hint', label: 'İpuçları' },
+  { id: 'remove', label: 'Şık Eleme' },
+  { id: 'tactic', label: 'Taktikler' },
 ] as const;
+export type JokerGroup = typeof JOKER_GROUPS[number]['id'];
+export const JOKERS = [
+  { id: 'joker_eliminate', name: 'Tek Eleme', desc: 'Bir yanlış şıkkı kaldırır.', price: 250, eliminated: 1, group: 'remove' },
+  { id: 'joker_half', name: 'Yarı Yarıya', desc: 'İki yanlış şıkkı kaldırır.', price: 450, eliminated: 2, group: 'remove' },
+  { id: 'joker_initial', name: 'İlk Karakter', desc: 'Doğru şıkkın ilk harfini veya rakamını gösterir.', price: 200, eliminated: 0, group: 'hint' },
+  { id: 'joker_word_count', name: 'Kelime Sayısı', desc: 'Doğru şıkkın kaç kelime olduğunu gösterir.', price: 150, eliminated: 0, group: 'hint' },
+  { id: 'joker_nearest', name: 'Hedefi Bul', desc: 'Sayısal soruda doğru değere en yakın yanlış şıkkı işaretler.', price: 180, eliminated: 0, group: 'hint' },
+  { id: 'joker_prophecy', name: 'Kehanet', desc: 'Doğru şıkkı sana işaretler. Antrenman, botlu ve arkadaş maçlarında.', price: 700, eliminated: 0, group: 'hint' },
+  { id: 'joker_reveal', name: 'Cevap Göster', desc: 'Doğru cevabın metnini gösterir. Antrenman, botlu ve arkadaş maçlarında.', price: 700, eliminated: 0, group: 'hint' },
+  { id: 'joker_dice', name: 'Şans Zarı', desc: 'Rastgele bir şıkkı önerir; sen onaylamadan cevap göndermez.', price: 100, eliminated: 0, group: 'tactic' },
+  { id: 'joker_streak_guard', name: 'Seri Koruyucu', desc: 'Bu soruda yanlış seçersen serini korur. Botlu ve arkadaş maçlarında.', price: 250, eliminated: 0, group: 'tactic' },
+  { id: 'joker_lightning', name: 'Şimşek Cevap', desc: 'İlk 5 saniyede doğru cevap verirsen %50 ek puan. Botlu ve arkadaş maçlarında.', price: 220, eliminated: 0, group: 'tactic' },
+  { id: 'joker_double', name: 'Çifte Puan', desc: 'Bu soruda doğru cevap puanını ikiye katlar. Botlu ve arkadaş maçlarında.', price: 400, eliminated: 0, group: 'tactic' },
+] as const satisfies readonly { id: string; name: string; desc: string; price: number; eliminated: number; group: JokerGroup }[];
 export type JokerId = typeof JOKERS[number]['id'];
 export interface JokerEffect {
   eliminated: string[];
   hint?: string;
+  highlightedOptionId?: string;
+  modifier?: 'streak_guard' | 'lightning' | 'double';
 }
 
 /**

@@ -4,7 +4,7 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
-import { SOCKET_EVENTS } from '@trivia/shared';
+import { calculateScore, SOCKET_EVENTS, type JokerEffect } from '@trivia/shared';
 import { GameRoomDO } from '../src/durable-objects/GameRoom';
 import type { Env } from '../src/env';
 import { DEFAULT_QUESTIONS } from '../src/game/defaultQuestions';
@@ -22,9 +22,10 @@ describe('room joker requests', () => {
       code: 'QUIZ01', mode, status: 'question_active', currentRound: 1,
       currentQuestion: question, totalRounds: 2, roundStartedAt: startedAt,
       players: {
-        one: { id: 'one', hasAnsweredCurrentRound: false },
+        one: { id: 'one', hasAnsweredCurrentRound: false, score: 0, currentStreak: 0, totalResponseTimeMs: 0, correctAnswersCount: 0 },
         two: { id: withBot ? 'bot_atlas' : 'two', isBot: withBot, hasAnsweredCurrentRound: withBot },
       },
+      scores: { one: 0, two: 0 },
     };
     const values = new Map<string, unknown>([['room', room]]);
     let restore: Promise<unknown>;
@@ -47,7 +48,10 @@ describe('room joker requests', () => {
       SOCKET_EVENTS.USE_JOKER,
       { startedAt, roundNumber: 1, questionId: question.id, jokerId: 'joker_eliminate', playerId: 'two', ...patch }, 'use-1',
     ));
-    return { worker, room, question, one, two, unverified, use, api, effect, startedAt, values };
+    const answer = (selectedOptionId: string) => worker.webSocketMessage(one as unknown as WebSocket, encodeWsMessage(
+      SOCKET_EVENTS.SUBMIT_ANSWER, { roundNumber: 1, selectedOptionId }, 'answer-1',
+    ));
+    return { worker, room, question, one, two, unverified, use, answer, api, effect, startedAt, values };
   }
 
   it.each(['duel', 'friends_private'] as const)('applies and privately replays an owned effect in %s', async mode => {
@@ -73,6 +77,39 @@ describe('room joker requests', () => {
     await use();
     expect(api).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: 'one' }), question);
     expect(JSON.parse(one.send.mock.calls[0][0])).toMatchObject({ event: SOCKET_EVENTS.JOKER_RESULT, payload: effect });
+  });
+
+  it('derives tactic eligibility from the actual room and privately replays it only once', async () => {
+    const human = await setup();
+    await human.use(human.one, { jokerId: 'joker_double', tactics: 'friendly' });
+    expect(human.api).not.toHaveBeenCalled();
+    const friends = await setup('friends_private');
+    const result = { eliminated: [], modifier: 'double' as const };
+    friends.api.mockResolvedValue(result);
+    await friends.use(friends.one, { jokerId: 'joker_double' });
+    await friends.use(friends.one, { jokerId: 'joker_prophecy' });
+    expect(friends.api).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ tactics: 'friendly', jokerId: 'joker_double' }), friends.question);
+    expect(friends.one.send.mock.calls.map(([message]) => JSON.parse(message).payload)).toEqual([result, result]);
+    expect(friends.two.send).not.toHaveBeenCalled();
+  });
+
+  it('blocks answers while the joker is pending and applies the saved multiplier when scoring', async () => {
+    const { use, one, api, answer, room, question, startedAt } = await setup('friends_private');
+    let finish!: (effect: JokerEffect) => void;
+    let sent!: () => void;
+    const requested = new Promise<void>(resolve => { sent = resolve; });
+    api.mockImplementation(() => new Promise(resolve => { finish = resolve; sent(); }));
+    const consuming = use(one, { jokerId: 'joker_double' });
+    await requested;
+    await answer(question.correctOptionId);
+    expect(JSON.parse(one.send.mock.calls[0][0])).toMatchObject({ event: SOCKET_EVENTS.ERROR, payload: { code: 'JOKER_PENDING' } });
+    finish({ eliminated: [], modifier: 'double' });
+    await consuming;
+    vi.setSystemTime(startedAt + 1000);
+    await answer(question.correctOptionId);
+    const totalTimeMs = (question.timeLimitSec || 15) * 1000;
+    const normal = calculateScore({ isCorrect: true, timeRemainingMs: totalTimeMs - 1000, totalTimeMs, currentStreak: 0, penaltyForWrong: false });
+    expect(room.players.one).toMatchObject({ score: normal.pointsAwarded * 2, correctAnswersCount: 1, hasAnsweredCurrentRound: true });
   });
 
   it('rejects unverified, stale, answered and expired requests before contacting the wallet', async () => {

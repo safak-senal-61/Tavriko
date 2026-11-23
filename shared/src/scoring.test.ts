@@ -145,5 +145,14 @@ describe('Scoring Logic', () => {
     expect(roundResult.leaderboard[0].playerId).toBe('p1');
     expect(roundResult.leaderboard[0].correctAnswersCount).toBe(1);
     expect(roundResult.leaderboard[1].correctAnswersCount).toBe(0);
+
+    const next = (player: 'p1' | 'p2') => ({ ...room, scores: { ...room.scores },
+      players: { ...room.players, [player]: { ...room.players[player], currentStreak: 1 } } });
+    const plain = applyPlayerRoundAnswer(next('p1'), 'p1', 'a', 3000);
+    expect(applyPlayerRoundAnswer(next('p1'), 'p1', 'a', 3000, 'double').pointsAwarded).toBe(plain.pointsAwarded * 2);
+    expect(applyPlayerRoundAnswer(next('p1'), 'p1', 'a', 3000, 'lightning').pointsAwarded).toBe(Math.round(plain.pointsAwarded * 1.5));
+    expect(applyPlayerRoundAnswer(next('p1'), 'p1', 'a', 6000, 'lightning').pointsAwarded)
+      .toBe(applyPlayerRoundAnswer(next('p1'), 'p1', 'a', 6000).pointsAwarded);
+    expect(applyPlayerRoundAnswer(next('p2'), 'p2', 'b', 3000, 'streak_guard')).toMatchObject({ streak: 1, pointsAwarded: 0 });
   });
 });

@@ -10,6 +10,10 @@ Canlı jokerler düello, hızlı eşleşme ve arkadaş odalarında çalışır. 
 
 Botlu düello da aynı canlı joker yolunu kullanır. Vercel dağıtımı Cloudflare Worker’ı güncellemez. `cloudflare/` altında yetkili hesapla `npm run deploy` çalıştırdıktan sonra Worker’ın `/health` yanıtında `features.liveQuizJokers: true` olduğunu kontrol edin. Bu yalnızca Worker yapılandırmasını gösterir; ardından test hesabıyla botlu düello açarak jokerin uygulanmasını ve tek kopya düşmesini doğrulayın.
 
+Poster jokerleri için yeni Supabase migration’ı yoktur. Önce Worker’ı yayınlayıp `/health` yanıtındaki `features.posterQuizJokers` alanını doğrulayın; ardından API ve istemciyi yayınlayın. Hedefi Bul, Kehanet, Cevap Göster ve Şans Zarı (otomatik gönderim yapmaz) mevcut özel joker sonucu üzerinden iletilir. Kehanet ve Cevap Göster açık insan eşleşmelerinde kullanılamaz. Seri Koruyucu, Şimşek Cevap ve Çifte Puan sadece botlu düello ve arkadaş odalarında uygulanır; koşulu ve puanı Worker hesaplar. İnsanlarla açık eşleşmede veya antrenmanda bu taktikler stok düşürmez. Şıkları Patlat çizimi mevcut Tek Eleme kimliğiyle kullanılır; Yarı Yarıya da kimliğini ve fiyatını korur.
+
+Uygulamada bulunmayan 11 poster taslağı `docs/joker-art-drafts/` altında ayrı tutulur ve satışa çıkmaz. Koruma Kalkanı mevcut puanlama yanlışta eksi puan vermediği için işlevsiz olurdu. Halk Desteği gerçek şık oylarına, zaman jokerleri oyuncu bazlı sayaçlara, soru ve yeniden cevap jokerleri sunucu tarafı tur kuralına, Sihirli Destek ve Altın Avı ise tur/ödül kayıtlarına ihtiyaç duyar.
+
 Hedef Supabase proje referansını ve Prisma migration geçmişini doğrulayın. Staging’de ve ardından doğrulanmış hedefte, dağıtım hesabıyla `cd server && npx prisma migrate status && npx prisma migrate deploy` sırasını kullanın. `DATABASE_URL` ve `DIRECT_URL` yalnız sunucu ortamında tanımlanmalı. Migration geçmişi ile şema uyuşmuyorsa SQL’i doğrudan yapıştırmayın veya migration’ı uygulanmış olarak işaretlemeyin; önce farkı inceleyin.
 
 ## Polar sanal ödeme
