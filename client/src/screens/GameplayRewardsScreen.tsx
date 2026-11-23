@@ -1,10 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { GAMEPLAY_REWARDS, type GameplayRewardStatus, type UserProfile } from '@trivia/shared';
+import { GAMEPLAY_REWARDS, type UserProfile } from '@trivia/shared';
 import { KitHeader, KitHero, KitChips, KIT, STORE_IMG, BadgeVisual, storeImageFor } from '../components/StoreKit';
 import { TavrikoScreen, TavrikoTopBar } from '../components/TavrikoIcons';
 import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
-import { authHeaders } from '../utils/apiAuth';
+import { PageShimmer } from '../components/LoadingShimmer';
+import { useGameStore } from '../store/gameStore';
+import { PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
+import { fetchGameplayRewards, gameplayRewardsUrl, isGameplayRewardsPayload } from '../utils/pageResources';
+import { usePageData } from '../utils/usePageData';
 
 type RewardTab = 'chest' | 'badge';
 const tabs: { id: RewardTab; label: string }[] = [
@@ -14,6 +18,7 @@ const tabs: { id: RewardTab; label: string }[] = [
 
 type Props = {
   user: UserProfile;
+  token: string;
   apiBaseUrl: string;
   onUpdateUser: (user: UserProfile) => void;
   onBack: () => void;
@@ -21,39 +26,28 @@ type Props = {
   onFriends: () => void;
 };
 
-export function GameplayRewardsScreen({ user, apiBaseUrl, onUpdateUser, onBack, onInventory, onFriends }: Props) {
+export function GameplayRewardsScreen({ user, token, apiBaseUrl, onUpdateUser, onBack, onInventory, onFriends }: Props) {
   const layout = usePlayerWebLayout();
   const columns = layout?.columns ?? 1;
   const [tab, setTab] = useState<RewardTab>('chest');
-  const [rewards, setRewards] = useState<GameplayRewardStatus[] | null>(null);
-  const [loadError, setLoadError] = useState('');
-  const [reload, setReload] = useState(0);
+  const url = gameplayRewardsUrl(apiBaseUrl);
+  const fetcher = useCallback((signal: AbortSignal) => fetchGameplayRewards(url, token, signal), [url, token]);
+  const { data, error, loading, read } = usePageData(url, PAGE_TTL.gameplayRewards, user.id, token, fetcher);
+  const rewards = data?.rewards;
+  const [retrying, setRetrying] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [claimError, setClaimError] = useState(false);
   const [message, setMessage] = useState('');
   const claimInFlight = useRef(false);
   const claimController = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    setRewards(null);
-    setLoadError('');
-    fetch(`${apiBaseUrl}/social/rewards`, { headers: authHeaders(), signal: controller.signal })
-      .then(async res => {
-        const body = await res.json().catch(() => null);
-        if (!res.ok || !Array.isArray(body?.rewards)) {
-          if (!controller.signal.aborted) setLoadError(body?.error || 'Ödüller yüklenemedi. Tekrar deneyebilirsin.');
-          return;
-        }
-        if (!controller.signal.aborted) setRewards(body.rewards);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setLoadError('Sunucuya bağlanılamadı. Tekrar deneyebilirsin.');
-      });
-    return () => controller.abort();
-  }, [apiBaseUrl, reload]);
-
   useEffect(() => () => claimController.current?.abort(), []);
+
+  const retry = async () => {
+    setRetrying(true);
+    try { await read(true); } catch { /* The cache retains the error and any available cards. */ }
+    finally { setRetrying(false); }
+  };
 
   const claim = async (id: string, name: string) => {
     if (claimInFlight.current) return;
@@ -64,27 +58,31 @@ export function GameplayRewardsScreen({ user, apiBaseUrl, onUpdateUser, onBack, 
     setMessage('');
     setClaimError(false);
     try {
-      const res = await fetch(`${apiBaseUrl}/social/rewards/claim`, {
+      const res = await fetch(`${url}/claim`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ rewardId: id }),
         signal: controller.signal,
       });
       const body = await res.json().catch(() => null);
-      if (controller.signal.aborted) return;
-      if (!res.ok || !Array.isArray(body?.rewards)) {
+      const session = useGameStore.getState();
+      if (controller.signal.aborted || session.user?.id !== user.id || session.token !== token) return;
+      if (!res.ok || !isGameplayRewardsPayload(body)) {
         setClaimError(true);
         setMessage(body?.error || 'Ödül alınamadı. Tekrar deneyebilirsin.');
         return;
       }
-      setRewards(body.rewards);
-      if (body.user?.id === user.id) onUpdateUser(body.user);
-      setMessage(body.claimedNow ? `${name} envanterine eklendi.` : `${name} zaten alınmış.`);
+      // A confirmed claim supersedes any GET that began before the write.
+      pageDataCache.seed(url, { rewards: body.rewards }, user.id);
+      const claimResult = body as typeof body & { user?: UserProfile; claimedNow?: boolean };
+      if (claimResult.user?.id === user.id) onUpdateUser(claimResult.user);
+      setMessage(claimResult.claimedNow ? `${name} envanterine eklendi.` : `${name} zaten alınmış.`);
     } catch {
       if (controller.signal.aborted) return;
       setClaimError(true);
       setMessage('Sunucuya bağlanılamadı. Tekrar deneyebilirsin.');
     } finally {
+      claimController.current = null;
       claimInFlight.current = false;
       if (!controller.signal.aborted) setBusy(null);
     }
@@ -121,10 +119,20 @@ export function GameplayRewardsScreen({ user, apiBaseUrl, onUpdateUser, onBack, 
           <View style={styles.notice}>
             <Text accessibilityLiveRegion="polite" style={[styles.copy, { color: claimError ? '#FFB4AF' : KIT.mint }]}>{message}</Text>
             {claimError && (
-              <Pressable accessibilityRole="button" style={styles.outline} onPress={() => { setMessage(''); setReload(n => n + 1); }}>
+              <Pressable accessibilityRole="button" disabled={retrying} style={styles.outline} onPress={() => { setMessage(''); void retry(); }}>
                 <Text style={styles.linkText}>İlerlemeyi yenile</Text>
               </Pressable>
             )}
+          </View>
+        )}
+        {!!error && !retrying && (
+          <View style={styles.notice}>
+            <Text accessibilityLiveRegion="polite" style={styles.copy}>
+              {rewards ? 'İlerleme yenilenemedi. Son yüklenen ödülleri görüyorsun.' : 'Ödüller yüklenemedi. Tekrar deneyebilirsin.'}
+            </Text>
+            <Pressable accessibilityRole="button" style={styles.outline} onPress={() => void retry()}>
+              <Text style={styles.linkText}>Tekrar dene</Text>
+            </Pressable>
           </View>
         )}
         {rewards ? (
@@ -167,15 +175,8 @@ export function GameplayRewardsScreen({ user, apiBaseUrl, onUpdateUser, onBack, 
               );
             })}
           </View>
-        ) : (
-          <View style={styles.notice}>
-            <Text accessibilityLiveRegion="polite" style={styles.copy}>{loadError || 'Ödüller yükleniyor…'}</Text>
-            {!!loadError && (
-              <Pressable accessibilityRole="button" style={styles.outline} onPress={() => setReload(n => n + 1)}>
-                <Text style={styles.linkText}>Tekrar dene</Text>
-              </Pressable>
-            )}
-          </View>
+        ) : (loading || retrying) && (
+          <PageShimmer label="Ödüller yükleniyor" shape="rewards" rows={4} columns={columns} />
         )}
       </ScrollView>
     </TavrikoScreen>

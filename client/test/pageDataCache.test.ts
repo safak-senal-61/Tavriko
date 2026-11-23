@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PageDataCache } from '../src/utils/pageDataCache';
-import { categoriesUrl, friendsUrl, leaderboardRows, leaderboardUrl } from '../src/utils/pageResources';
+import { PAGE_TTL, PageDataCache, pageDataCache } from '../src/utils/pageDataCache';
+import { categoriesUrl, fetchGameplayRewards, friendsChanged, friendsUrl, gameplayRewardsUrl,
+  leaderboardRows, leaderboardUrl, prefetchGameplayRewards } from '../src/utils/pageResources';
 
 const first = '/api/example';
 const response = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
@@ -16,6 +17,7 @@ describe('shared page reads', () => {
     vi.setSystemTime(new Date(2026, 0, 1));
   });
   afterEach(() => {
+    pageDataCache.clearPrivate();
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
@@ -26,6 +28,55 @@ describe('shared page reads', () => {
     expect(friendsUrl('/api', 'a/b')).toBe('/api/social/friends/a%2Fb');
     expect(leaderboardRows({ topPlayers: ['alice'] })).toEqual(['alice']);
     expect(leaderboardRows({ leaders: ['bob'] })).toEqual(['bob']);
+  });
+
+  it('shares the rewards preload with the screen, retains stale cards and invalidates after friend changes', async () => {
+    const url = gameplayRewardsUrl('/api/');
+    const old = { rewards: [{ id: 'chest', current: 1, claimed: false }] };
+    const newer = { rewards: [{ id: 'chest', current: 2, claimed: false }] };
+    const transport = vi.fn().mockResolvedValueOnce(response(old)).mockResolvedValueOnce(response(newer));
+    vi.stubGlobal('fetch', transport);
+    const read = () => pageDataCache.load(url, PAGE_TTL.gameplayRewards, {
+      scope: 'alice', token: 'first-session', fetcher: signal => fetchGameplayRewards(url, 'first-session', signal),
+    });
+
+    const preload = prefetchGameplayRewards('/api/', 'alice', 'first-session');
+    expect(read()).toBe(preload);
+    await expect(preload).resolves.toEqual(old);
+    expect(transport).toHaveBeenCalledOnce();
+    expect(transport).toHaveBeenCalledWith('/api/social/rewards', expect.objectContaining({
+      headers: { Authorization: 'Bearer first-session' }, cache: 'no-store',
+    }));
+    expect(pageDataCache.snapshot(url, 'bob').data).toBeUndefined();
+    friendsChanged('/api', 'alice');
+    expect(pageDataCache.snapshot(url, 'alice').invalidated).toBe(true);
+    const refresh = read();
+    expect(pageDataCache.snapshot(url, 'alice').data).toEqual(old);
+    await expect(refresh).resolves.toEqual(newer);
+    pageDataCache.clearPrivate();
+    expect(pageDataCache.snapshot(url, 'alice').data).toBeUndefined();
+  });
+
+  it('keeps the last valid rewards on a malformed refresh and retains a confirmed claim over an older read', async () => {
+    const url = gameplayRewardsUrl('/api');
+    const ready = { rewards: [{ id: 'chest', current: 5, claimed: false }] };
+    const claimed = { rewards: [{ id: 'chest', current: 5, claimed: true }] };
+    const delayed = deferred<Response>();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(response({ rewards: [{ id: 'chest' }] }))
+      .mockReturnValueOnce(delayed.pending));
+    const refresh = () => pageDataCache.load(url, PAGE_TTL.gameplayRewards, {
+      scope: 'alice', token: 'session', force: true, fetcher: signal => fetchGameplayRewards(url, 'session', signal),
+    });
+    pageDataCache.seed(url, ready, 'alice');
+    await expect(refresh()).rejects.toThrow('Ödül ilerlemesi okunamadı');
+    expect(pageDataCache.snapshot(url, 'alice').data).toEqual(ready);
+    const pending = refresh();
+    const rejection = expect(pending).rejects.toThrow();
+    await Promise.resolve();
+    pageDataCache.seed(url, claimed, 'alice');
+    delayed.resolve(response(ready));
+    await rejection;
+    expect(pageDataCache.snapshot(url, 'alice').data).toEqual(claimed);
   });
 
   it('deduplicates simultaneous reads, caches empty results and retains a warm snapshot during expiration', async () => {
