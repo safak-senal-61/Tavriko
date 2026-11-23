@@ -14,7 +14,7 @@ import { encodeWsMessage } from '../src/websocket/protocol';
 describe('room joker requests', () => {
   afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 
-  async function setup(mode: 'duel' | 'friends_private' = 'duel', withBot = false) {
+  async function setup(mode: 'duel' | 'friends_private' = 'duel', withBot = false, legacy = false) {
     vi.useFakeTimers();
     const startedAt = Date.now();
     const question = DEFAULT_QUESTIONS[0];
@@ -27,14 +27,17 @@ describe('room joker requests', () => {
       },
       scores: { one: 0, two: 0 },
     };
+    const effect = { eliminated: [question.options.find(o => o.id !== question.correctOptionId)!.id] };
     const values = new Map<string, unknown>([['room', room], ['questions', DEFAULT_QUESTIONS.slice(0, 4)]]);
+    if (legacy) values.set('joker:one', { startedAt, roundNumber: 1, effect });
+    const get = vi.fn(async (key: string) => values.get(key));
     const setAlarm = vi.fn();
     const audienceFetch = vi.fn().mockResolvedValue(Response.json({}));
     let restore: Promise<unknown>;
     const ctx = {
       blockConcurrencyWhile: (run: () => Promise<unknown>) => { restore = run(); },
       storage: {
-        get: async (key: string) => values.get(key),
+        get,
         put: async (key: string, value: unknown) => { values.set(key, value); },
         delete: async (key: string) => { values.delete(key); },
         setAlarm,
@@ -50,7 +53,6 @@ describe('room joker requests', () => {
       GAME_ROOMS: { idFromName: (name: string) => name, get: () => ({ fetch: audienceFetch }) },
     } as unknown as Env);
     await restore!;
-    const effect = { eliminated: [question.options.find(o => o.id !== question.correctOptionId)!.id] };
     const api = vi.spyOn(ApiService.prototype, 'useRoomJoker').mockResolvedValue(effect);
     const use = (socket = one, patch: object = {}) => worker.webSocketMessage(socket as unknown as WebSocket, encodeWsMessage(
       SOCKET_EVENTS.USE_JOKER,
@@ -59,12 +61,14 @@ describe('room joker requests', () => {
     const answer = (selectedOptionId: string, questionId = question.id) => worker.webSocketMessage(one as unknown as WebSocket, encodeWsMessage(
       SOCKET_EVENTS.SUBMIT_ANSWER, { roundNumber: 1, selectedOptionId, questionId }, 'answer-1',
     ));
-    return { worker, room, question, one, two, unverified, use, answer, api, effect, startedAt, values, setAlarm, audienceFetch };
+    return { worker, room, question, one, two, unverified, use, answer, api, effect, startedAt, values, setAlarm, audienceFetch, get };
   }
 
   it.each(['duel', 'friends_private'] as const)('applies and privately replays an owned effect in %s', async mode => {
-    const { worker, one, two, question, use, api, effect, startedAt, values } = await setup(mode);
+    const { worker, one, two, question, use, api, effect, startedAt, values, get } = await setup(mode);
+    get.mockClear();
     await use();
+    expect(get).not.toHaveBeenCalled();
     expect(api).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: 'one', startedAt }), question);
     expect(JSON.parse(one.send.mock.calls[0][0])).toMatchObject({ event: SOCKET_EVENTS.JOKER_RESULT, requestId: 'use-1', payload: effect });
     expect(two.send).not.toHaveBeenCalled();
@@ -73,6 +77,19 @@ describe('room joker requests', () => {
     const replay = (socket: typeof one) => (worker as any).getQuestionForSocket(socket.deserializeAttachment());
     expect(await replay(one)).toMatchObject({ jokerEffect: effect });
     expect(await replay(two)).not.toHaveProperty('jokerEffect');
+  });
+
+  it('restores a legacy effect before a player reconnects, without reading storage on a tap', async () => {
+    const { worker, one, two, get, api, effect, use, answer } = await setup('duel', false, true);
+    expect(get).toHaveBeenCalledWith('joker:one');
+    get.mockClear();
+    expect(await (worker as any).getQuestionForSocket(one.deserializeAttachment())).toMatchObject({ jokerEffect: effect });
+    expect(await (worker as any).getQuestionForSocket(two.deserializeAttachment())).not.toHaveProperty('jokerEffect');
+    await use();
+    await answer(effect.eliminated[0]);
+    expect(get).not.toHaveBeenCalled();
+    expect(api).not.toHaveBeenCalled();
+    expect(JSON.parse(one.send.mock.calls.at(-1)![0])).toMatchObject({ payload: { code: 'OPTION_ELIMINATED' } });
   });
 
   it('returns bounded wallet latency only to the requesting player and only once', async () => {
