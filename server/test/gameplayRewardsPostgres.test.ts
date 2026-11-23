@@ -56,9 +56,10 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     const { db } = await import('../src/db/prismaClient');
     const { default: socialRoutes } = await import('../src/routes/socialRoutes');
     const { default: triviaRoutes } = await import('../src/routes/triviaRoutes');
+    const { polarGemPlayerRoutes } = await import('../src/routes/polarGemRoutes');
     ({ recordCompletedPlayers } = await import('../src/services/playerAnalytics'));
     client = db.rawClient;
-    app = express().use(express.json()).use(root, socialRoutes).use('/api', triviaRoutes);
+    app = express().use(express.json()).use(root, socialRoutes, polarGemPlayerRoutes).use('/api', triviaRoutes);
   });
 
   it('debits gold for a joker, then deducts one copy despite concurrent requests', async () => {
@@ -114,6 +115,12 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     await refund(3999, 'refunded');
     await pay();
     expect(await balance()).toBe(0);
+  });
+
+  it('limits repeated checkout requests before reaching the payment service', async () => {
+    const send = () => request(app).post(`${root}/shop/diamonds/checkout`).send({});
+    for (let i = 0; i < 16; i++) expect((await send()).status).toBe(401);
+    expect((await send()).status).toBe(429);
   });
 
   afterAll(async () => {

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { requireUserAuth } from '../middleware/auth';
 import { db } from '../db/prismaClient';
 import { presenceManager } from '../services/presenceManager';
@@ -6,8 +7,11 @@ import { SHOP_CATALOG, SEASON_1_TIERS, EVENT_DEFINITIONS } from '@trivia/shared'
 import { rewardedAdRoutes } from './rewardedAdRoutes';
 import { gameplayRewardRoutes } from './gameplayRewardRoutes';
 import { walletSchemaReady } from '../services/walletSchema';
+import { walletRateLimitOptions } from '../middleware/walletRateLimit';
 
 const router = Router();
+const shopAvailabilityLimit = rateLimit({ ...walletRateLimitOptions, limit: 120 });
+const shopPurchaseLimit = rateLimit({ ...walletRateLimitOptions, limit: 40 });
 
 router.get('/leaderboard', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -239,11 +243,11 @@ router.get('/shop/catalog', (req: Request, res: Response): void => {
   });
 });
 
-router.get('/shop/jokers/availability', async (_req, res) => {
+router.get('/shop/jokers/availability', shopAvailabilityLimit, async (_req, res) => {
   res.set('Cache-Control', 'no-store').json({ enabled: await walletSchemaReady(db.rawClient) });
 });
 
-router.post('/shop/purchase', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
+router.post('/shop/purchase', shopPurchaseLimit, requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.authUserId;
     const { productId, packId, durationId } = req.body || {};

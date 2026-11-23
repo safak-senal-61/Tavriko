@@ -1,12 +1,19 @@
 import express, { Router } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { db } from '../db/prismaClient';
 import { requireUserAuth } from '../middleware/auth';
 import { applyGemOrder, createGemCheckout, polarGemConfig, verifyPolarGemSignature } from '../services/polarGemPayments';
 import { checkoutIdPattern } from '../services/polarSandbox';
 import { walletSchemaReady } from '../services/walletSchema';
+import { walletRateLimitOptions } from '../middleware/walletRateLimit';
+
+const availabilityLimit = rateLimit({ ...walletRateLimitOptions, limit: 120 });
+const checkoutStartLimit = rateLimit({ ...walletRateLimitOptions, limit: 16 });
+const checkoutStatusLimit = rateLimit({ ...walletRateLimitOptions, limit: 120 });
+const webhookLimit = rateLimit({ ...walletRateLimitOptions, limit: 600 });
 
 export const polarGemPlayerRoutes = Router();
-polarGemPlayerRoutes.post('/shop/diamonds/availability', async (req, res) => {
+polarGemPlayerRoutes.post('/shop/diamonds/availability', availabilityLimit, async (req, res) => {
   const config = polarGemConfig();
   res.set('Cache-Control', 'no-store').json({
     enabled: Boolean(config && req.get('origin') === config.origin && await walletSchemaReady(db.rawClient)),
@@ -14,7 +21,7 @@ polarGemPlayerRoutes.post('/shop/diamonds/availability', async (req, res) => {
   });
 });
 
-polarGemPlayerRoutes.post('/shop/diamonds/checkout', requireUserAuth, async (req, res) => {
+polarGemPlayerRoutes.post('/shop/diamonds/checkout', checkoutStartLimit, requireUserAuth, async (req, res) => {
   const config = polarGemConfig();
   const userId = req.authUserId;
   const packId = req.body?.productId;
@@ -39,7 +46,7 @@ polarGemPlayerRoutes.post('/shop/diamonds/checkout', requireUserAuth, async (req
   }
 });
 
-polarGemPlayerRoutes.get('/shop/diamonds/checkout/:id', requireUserAuth, async (req, res) => {
+polarGemPlayerRoutes.get('/shop/diamonds/checkout/:id', checkoutStatusLimit, requireUserAuth, async (req, res) => {
   res.set('Cache-Control', 'no-store');
   const id = req.params.id;
   if (!req.authUserId || typeof id !== 'string' || !checkoutIdPattern.test(id)) { res.sendStatus(404); return; }
@@ -53,7 +60,7 @@ polarGemPlayerRoutes.get('/shop/diamonds/checkout/:id', requireUserAuth, async (
 });
 
 export const polarGemWebhook = Router();
-polarGemWebhook.post('/', express.raw({ type: 'application/json', limit: '128kb' }), async (req, res) => {
+polarGemWebhook.post('/', webhookLimit, express.raw({ type: 'application/json', limit: '128kb' }), async (req, res) => {
   const config = polarGemConfig();
   if (!config) { res.sendStatus(503); return; }
   if (!Buffer.isBuffer(req.body) || !verifyPolarGemSignature(req.body, name => req.get(name), config.secret)) {

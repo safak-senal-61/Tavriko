@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { rateLimit } from 'express-rate-limit';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { db } from '../db/prismaClient';
 import { CategoryId, DifficultyLevel, calculateScore, ClientQuestion, JOKERS } from '@trivia/shared';
@@ -8,8 +9,11 @@ import { supabaseService } from '../db/supabaseClient';
 import { importQuestionsFromJson } from '../utils/questionImporter';
 import { getJwtSecret, requireAdminAuth, requireUserAuth } from '../middleware/auth';
 import { walletSchemaReady } from '../services/walletSchema';
+import { walletRateLimitOptions } from '../middleware/walletRateLimit';
 
 const router = Router();
+const practiceQuestionsLimit = rateLimit({ ...walletRateLimitOptions, limit: 90 });
+const practiceJokerLimit = rateLimit({ ...walletRateLimitOptions, limit: 45 });
 const practiceSessionPattern = /^sess_[a-f0-9]{32}$/;
 const practiceProof = (userId: string, sessionId: string, questionId: string, expiry: number, secret: string) =>
   createHmac('sha256', secret).update(JSON.stringify(['practice-joker', userId, sessionId, questionId, expiry])).digest('hex');
@@ -23,7 +27,7 @@ router.get('/categories', async (req: Request, res: Response): Promise<void> => 
 });
 
 // Single-player / practice question fetcher with anti-repeat support
-router.get('/questions/practice', async (req: Request, res: Response): Promise<void> => {
+router.get('/questions/practice', practiceQuestionsLimit, async (req: Request, res: Response): Promise<void> => {
   const category = (req.query.category as CategoryId) || 'mixed';
   const difficulty = req.query.difficulty as DifficultyLevel | undefined;
   const subCategory = (req.query.subcategory as string) || undefined;
@@ -83,7 +87,7 @@ router.get('/questions/practice', async (req: Request, res: Response): Promise<v
   res.json({ category, subCategory: subCategory || null, count: questions.length, questions });
 });
 
-router.post('/questions/practice/joker', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
+router.post('/questions/practice/joker', practiceJokerLimit, requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   const userId = req.authUserId;
   const { sessionId, questionId, jokerId, proof } = req.body || {};
   const joker = JOKERS.find(item => item.id === jokerId);
