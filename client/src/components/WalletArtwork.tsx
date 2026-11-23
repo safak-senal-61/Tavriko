@@ -3,19 +3,20 @@ import { Image, type ImageSourcePropType } from 'react-native';
 
 export type WalletArt = 'diamonds' | 'gold' | 'joker_eliminate' | 'joker_half';
 
-// Bundle the original store PNGs so the artwork works without a CDN connection.
+// Byte-for-byte copies of the original assets/images/store PNGs. Keep these
+// small wallet assets in the app bundle so the artwork also works offline.
 const WALLET_PACKS: Record<'diamonds' | 'gold', readonly ImageSourcePropType[]> = {
   diamonds: [
-    require('../../assets/images/store/gems_s.png'),
-    require('../../assets/images/store/gems_m.png'),
-    require('../../assets/images/store/gems_l.png'),
-    require('../../assets/images/store/gems_xl.png'),
+    require('../../bundled/wallet/gems_s.png'),
+    require('../../bundled/wallet/gems_m.png'),
+    require('../../bundled/wallet/gems_l.png'),
+    require('../../bundled/wallet/gems_xl.png'),
   ],
   gold: [
-    require('../../assets/images/store/coins_s.png'),
-    require('../../assets/images/store/coins_m.png'),
-    require('../../assets/images/store/coins_l.png'),
-    require('../../assets/images/store/coins_xl.png'),
+    require('../../bundled/wallet/coins_s.png'),
+    require('../../bundled/wallet/coins_m.png'),
+    require('../../bundled/wallet/coins_l.png'),
+    require('../../bundled/wallet/coins_xl.png'),
   ],
 };
 
