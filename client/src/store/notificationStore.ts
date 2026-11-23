@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import type { NotificationItem } from '@trivia/shared';
+import { plainDisplayText } from '@trivia/shared';
 import { useGameStore } from './gameStore';
 import { PAGE_TTL, PageDataError, fetchPageJson, pageDataCache } from '../utils/pageDataCache';
 import { inboxUrl } from '../utils/pageResources';
@@ -15,7 +16,8 @@ export function cleanNotifications(items: NotificationItem[]): NotificationItem[
   const unique = new Map<string, NotificationItem>();
   for (const item of items) {
     if (!item || typeof item.id !== 'string' || SAMPLE_PREFIXES.some(p => item.id.startsWith(p)) || MOCK_IDS.includes(item.id)) continue;
-    unique.set(item.id, { ...unique.get(item.id), ...item });
+    const merged = { ...unique.get(item.id), ...item };
+    unique.set(item.id, { ...merged, title: plainDisplayText(merged.title || ''), sub: plainDisplayText(merged.sub || '') });
   }
   return Array.from(unique.values());
 }

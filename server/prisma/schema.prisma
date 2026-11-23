@@ -67,7 +67,7 @@ model User {
   level                     Int                 @default(1)
   xp                        Int                 @default(0)
   coins                     Int                 @default(500)
-  gems                      Int                 @default(15)
+  gems                      Int                 @default(0)
   dailyStreak               Int                 @default(1)
   rankTitle                 String              @default("Acemi Kaşif")
   rankPoints                Int                 @default(1000)
@@ -112,10 +112,41 @@ model User {
   referralsSent             ReferralRedemption[] @relation("ReferralInviter")
   rewardedAds               RewardedAdAttempt[]
   gameplayRewardClaims      GameplayRewardClaim[]
+  polarGemOrders            PolarGemOrder[]
+  practiceJokerUses         PracticeJokerUse[]
 
   @@index([rankPoints(sort: Desc)])
   @@index([xp(sort: Desc)])
   @@map("users")
+}
+
+model PolarGemOrder {
+  checkoutId String @id
+  orderId String? @unique
+  userId String
+  productId String
+  gems Int
+  amount Int
+  refundedGems Int @default(0)
+  status String @default("open")
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("polar_gem_orders")
+}
+
+model PracticeJokerUse {
+  userId String
+  sessionId String
+  questionId String
+  jokerId String
+  eliminated String[]
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, sessionId, questionId])
+  @@map("practice_joker_uses")
 }
 
 model GameplayRewardClaim {

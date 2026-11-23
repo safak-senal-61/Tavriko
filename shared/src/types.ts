@@ -97,6 +97,8 @@ export interface Question {
 
 // Client-safe question omitting correctOptionId
 export interface ClientQuestion {
+  /** Short-lived proof provided only for authenticated practice questions. */
+  jokerProof?: string;
   id: string;
   categoryId: CategoryId;
   difficulty: DifficultyLevel;
@@ -284,6 +286,7 @@ export type ItemCategory =
   | 'chest'
   | 'key'
   | 'booster'
+  | 'joker'
   | 'cosmetic'
   | 'badge'
   | 'avatar'
@@ -562,6 +565,12 @@ export interface SeasonTierItem {
   premiumReward: SeasonReward;
 }
 
+function seasonGoldReward(reward: SeasonReward): SeasonReward {
+  if (reward.type !== 'gem') return reward;
+  const amount = reward.amount * 10;
+  return { ...reward, type: 'coin', amount, title: `${amount.toLocaleString('tr-TR')} Altın` };
+}
+
 // Helper generating 50 rich, balanced tiers for Season 1
 export function generateSeason1Tiers(): SeasonTierItem[] {
   const tiers: SeasonTierItem[] = [];
@@ -636,8 +645,8 @@ export function generateSeason1Tiers(): SeasonTierItem[] {
     tiers.push({
       tier: i,
       requiredSeasonXp,
-      freeReward,
-      premiumReward,
+      freeReward: seasonGoldReward(freeReward),
+      premiumReward: seasonGoldReward(premiumReward),
     });
   }
 
@@ -657,6 +666,7 @@ export type ShopProductCategory =
   | 'frames'
   | 'name_effects'
   | 'boosters'
+  | 'jokers'
   | 'backgrounds';
 
 export interface ShopProduct {
@@ -675,6 +685,14 @@ export interface ShopProduct {
   grantGems?: number;
   grantPremiumPass?: boolean;
 }
+
+export const LOW_GEMS = 100;
+export const LOW_COINS = 500;
+export const JOKERS = [
+  { id: 'joker_eliminate', name: 'Tek Eleme', desc: 'Bir yanlış şıkkı kaldırır.', price: 250, eliminated: 1 },
+  { id: 'joker_half', name: 'Yarı Yarıya', desc: 'İki yanlış şıkkı kaldırır.', price: 450, eliminated: 2 },
+] as const;
+export type JokerId = typeof JOKERS[number]['id'];
 
 /**
  * Süreli kozmetik mağaza ürünleri için süre seçenekleri: 1 saatten en fazla 1
@@ -712,6 +730,11 @@ export function shopPriceForDuration(p: ShopProduct, durationId?: string | null)
 export const SEASON_REWARD_HOURS = 24 * 30;
 
 export const SHOP_CATALOG: ShopProduct[] = [
+  ...JOKERS.map((j): ShopProduct => ({
+    id: j.id, name: j.name, desc: j.desc, category: 'jokers', price: j.price,
+    currency: 'coins', rarity: j.eliminated === 1 ? 'common' : 'rare',
+    grantItems: [{ id: j.id, name: j.name, desc: j.desc, qty: 1, category: 'joker', rarity: 'rare' }],
+  })),
   // --- Featured ---
   {
     id: 'pack_season_premium_pass',
@@ -1201,7 +1224,7 @@ export interface GameEvent {
   endsInHours: number;
 }
 
-export const EVENT_DEFINITIONS: GameEvent[] = [
+const BASE_EVENT_DEFINITIONS: GameEvent[] = [
   // --- Daily Events ---
   {
     id: 'daily_5_matches',
@@ -1333,6 +1356,10 @@ export const EVENT_DEFINITIONS: GameEvent[] = [
   },
 ];
 
+export const EVENT_DEFINITIONS = BASE_EVENT_DEFINITIONS.map(event => ({
+  ...event, rewardCoins: event.rewardCoins + event.rewardGems * 10, rewardGems: 0,
+}));
+
 export interface DailyChallengeConfig {
   dayNumber: number; // 1 to 7
   totalQuestions: number;
@@ -1376,8 +1403,8 @@ export function getDailyChallengeConfig(streakDay: number = 1): DailyChallengeCo
 
   // Mütevazı XP: 40..100 (seviye 1 için 500 XP gerekir)
   const rewardXp = 30 + dayNumber * 10;
-  const rewardCoins = 40 + dayNumber * 20;
-  const rewardGems = 5 + dayNumber * 5;
+  const rewardCoins = 90 + dayNumber * 70;
+  const rewardGems = 0;
   // Hediye kutusu yalnızca 7 günlük serinin tamamlanmasında verilir (boş yere görünmez)
   const rewardChest = dayNumber === 7 ? 'gift_box' : undefined;
 

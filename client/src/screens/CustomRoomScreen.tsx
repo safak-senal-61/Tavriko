@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { PageShimmer } from '../components/LoadingShimmer';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
-import { ArrowRight, Clipboard as ClipboardIcon, RefreshCw } from 'lucide-react-native';
+import { ArrowRight, Clipboard as ClipboardIcon, Lock, RefreshCw } from 'lucide-react-native';
 import { DISCOVERY_IMG, DiscoveryArtwork } from '../components/DiscoveryArtwork';
 import { GradientFill } from '../components/TavrikoGradient';
 import * as Clipboard from 'expo-clipboard';
@@ -687,7 +687,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
               />
             </View>
 
-            {/* UI Kit Odaya Katıl Aksiyon Satırı: [ 📋 Yapıştır | KATIL ] */}
+            {/* UI Kit Odaya Katıl Aksiyon Satırı: [  Yapıştır | KATIL ] */}
             <View style={styles.joinActionRow}>
               <TouchableOpacity
                 style={styles.pasteButton}
@@ -777,9 +777,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
                           {room.title}
                         </Text>
                         {room.hasPassword && (
-                          <Text style={{ fontSize: 13 }} accessibilityLabel="Şifreli Oda">
-                            🔒
-                          </Text>
+                          <Lock size={13} color="#E6D8FA" accessibilityLabel="Şifreli oda" />
                         )}
                       </View>
                       <Text style={styles.publicRoomSub}>
@@ -834,7 +832,7 @@ export const CustomRoomScreen: React.FC<CustomRoomScreenProps> = ({
           style={styles.passwordModalOverlay}
         >
           <View style={styles.passwordModalCard}>
-            <Text style={styles.passwordModalTitle}>🔒 Şifreli Oda</Text>
+            <Text style={styles.passwordModalTitle}>Şifreli Oda</Text>
             <Text style={styles.passwordModalSub}>
               {targetRoomCode} kodlu odaya katılmak için lütfen şifreyi girin:
             </Text>

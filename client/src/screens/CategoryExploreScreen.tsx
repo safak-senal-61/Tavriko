@@ -20,11 +20,13 @@ import { categoryCounts, subCountKey } from '../utils/categoryCounts';
 import { PAGE_TTL } from '../utils/pageDataCache';
 import { categoriesUrl } from '../utils/pageResources';
 import { usePageData } from '../utils/usePageData';
+import { Search } from 'lucide-react-native';
 import {
   TavrikoScreen,
   TavrikoTopBar,
   TavrikoBottomNav,
   Button3D,
+  CategorySquircleIcon,
 } from '../components/TavrikoIcons';
 import { GuestDiscoveryCard } from '../components/DiscoveryArtwork';
 import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
@@ -52,10 +54,10 @@ type GroupTab = 'all' | 'gaming_pop' | 'history_culture' | 'science_nature' | 'l
 
 const GROUP_TABS: { id: GroupTab; label: string }[] = [
   { id: 'all', label: 'Tümü' },
-  { id: 'gaming_pop', label: '🎮 Oyun & Pop' },
-  { id: 'history_culture', label: '🏛️ Tarih & Kültür' },
-  { id: 'science_nature', label: '🔬 Bilim & Doğa' },
-  { id: 'lifestyle', label: '🎯 Yaşam & Spor' },
+  { id: 'gaming_pop', label: 'Oyun & Pop' },
+  { id: 'history_culture', label: 'Tarih & Kültür' },
+  { id: 'science_nature', label: 'Bilim & Doğa' },
+  { id: 'lifestyle', label: 'Yaşam & Spor' },
 ];
 
 const GROUP_MEMBERS: Record<GroupTab, CategoryId[]> = {
@@ -295,14 +297,14 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                 onPress={handleRandomCategory}
                 activeOpacity={0.85}
               >
-                <Text style={styles.heroRandomText}>🎲 Rastgele Kategori</Text>
+                <Text style={styles.heroRandomText}>Rastgele Kategori</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Arama */}
           <View style={styles.searchBar}>
-            <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
+            <Search size={16} color="#D3C4EA" style={{ marginRight: 8 }} />
             <TextInput
               style={styles.searchInput}
               placeholder="Kategori ara... (örn: anime, futbol, uzay)"
@@ -381,9 +383,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                         <Image source={art} style={[styles.catArt, webCategoryArt]} />
                       </View>
                     ) : (
-                      <Text style={styles.catEmojiFallback}>
-                        {(cat.subCategories && cat.subCategories[0]?.emoji) || '🎯'}
-                      </Text>
+                      <CategorySquircleIcon category={cat.id} size={56} />
                     )}
                     <Text style={[styles.catName, page?.roomy && styles.webCatName]} numberOfLines={2}>
                       {cat.name}
@@ -406,7 +406,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
 
           {visibleSections.length === 0 && (
             <View style={styles.emptyState}>
-              <Text style={{ fontSize: 32, marginBottom: 6 }}>🔍</Text>
+              <Search size={32} color="#D3C4EA" style={{ marginBottom: 6 }} />
               <Text style={styles.emptyTitle}>Eşleşen Kategori Bulunamadı</Text>
               <Text style={styles.emptySub}>
                 Farklı bir arama terimi deneyebilir veya grup sekmesini değiştirebilirsin.
@@ -482,7 +482,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                 </View>
 
                 <Button3D
-                  title="⚡ TÜMÜNÜ OYNA"
+                  title="TÜMÜNÜ OYNA"
                   variant="gold"
                   onPress={() => playAll(sheetCategory)}
                   style={{ marginTop: 12 }}
@@ -532,7 +532,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
                               style={styles.subChipArt}
                             />
                           ) : (
-                            <Text style={styles.subChipEmoji}>{sc.emoji}</Text>
+                            <CategorySquircleIcon category={sheetCategory.id} size={34} />
                           )}
                           <Text style={styles.subChipName} numberOfLines={2}>
                             {sc.name}

@@ -21,6 +21,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
 import Svg, { Path, Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { CalendarDays } from 'lucide-react-native';
 // Doğum tarihi için şık takvim seçici (native). Web'de takvim girişi metin
 // alanıyla korunur; modül yalnızca native'de yüklenir (web'de import
 // edilmemesi bundle'ı ve platform uyumluluğunu korur).
@@ -50,7 +51,7 @@ async function takeVerifier(): Promise<string | null> {
   else await SecureStore.deleteItemAsync(verifierKey);
   if (!value) return null;
   const { verifier, expiresAt } = JSON.parse(value);
-  return typeof verifier === 'string' && expiresAt > Date.now() ? verifier : null;
+  return typeof verifier === 'string' && expiresAt >Date.now() ? verifier : null;
 }
 import { UserProfile, LEGAL_VERSION, LegalDocumentId } from '@trivia/shared';
 import {
@@ -102,17 +103,16 @@ interface CountryOption {
   code: string;
   name: string;
   dial: string;
-  flag: string;
 }
 const COUNTRIES: CountryOption[] = [
-  { code: 'TR', name: 'Türkiye', dial: '+90', flag: '🇹🇷' },
-  { code: 'AZ', name: 'Azerbaycan', dial: '+994', flag: '🇦🇿' },
-  { code: 'DE', name: 'Almanya', dial: '+49', flag: '🇩🇪' },
-  { code: 'US', name: 'ABD', dial: '+1', flag: '🇺🇸' },
-  { code: 'GB', name: 'Birleşik Krallık', dial: '+44', flag: '🇬🇧' },
-  { code: 'NL', name: 'Hollanda', dial: '+31', flag: '🇳🇱' },
-  { code: 'FR', name: 'Fransa', dial: '+33', flag: '🇫🇷' },
-  { code: 'CY', name: 'KKTC', dial: '+90', flag: '🇨🇾' },
+  { code: 'TR', name: 'Türkiye', dial: '+90' },
+  { code: 'AZ', name: 'Azerbaycan', dial: '+994' },
+  { code: 'DE', name: 'Almanya', dial: '+49' },
+  { code: 'US', name: 'ABD', dial: '+1' },
+  { code: 'GB', name: 'Birleşik Krallık', dial: '+44' },
+  { code: 'NL', name: 'Hollanda', dial: '+31' },
+  { code: 'FR', name: 'Fransa', dial: '+33' },
+  { code: 'CY', name: 'KKTC', dial: '+90' },
 ];
 const GoogleGLogo: React.FC<{ size?: number }> = ({ size = 20 }) => (
   <Svg width={size} height={size} viewBox="0 0 48 48">
@@ -330,7 +330,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               displayName: displayName.trim(),
               // Ad + soyad ayrı alanlardan birleştirilir.
               fullName: `${firstName.trim()} ${lastName.trim()}`.trim() || undefined,
-              country: `${selectedCountry.flag} ${selectedCountry.name}`,
+              country: selectedCountry.name,
               phoneNumber: formattedPhone,
               birthDate: birthDate.trim() || undefined,
               gender,
@@ -637,7 +637,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         <Reanimated.View entering={FadeInDown.delay(220).duration(500).springify().damping(16)} style={[styles.card, compact && styles.cardCompact, tiny && styles.cardTiny, wideLayout && styles.cardWide]}>
           {redirectNotice ? (
             <View style={styles.redirectNoticeBanner}>
-              <Text style={styles.errorText}>🔒 {redirectNotice}</Text>
+              <Text style={styles.errorText}> {redirectNotice}</Text>
             </View>
           ) : null}
           {/* Top Tabs: ONLY Giriş Yap & Kayıt Ol */}
@@ -724,7 +724,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </TouchableOpacity>
               {errorMsg && (
                 <Reanimated.View entering={ZoomIn.duration(220)} style={styles.errorBanner}>
-                  <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
+                  <Text style={styles.errorText}> {errorMsg}</Text>
                 </Reanimated.View>
               )}
               {loading ? (
@@ -855,7 +855,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   </View>
                   {errorMsg && (
                     <View style={styles.errorBanner}>
-                      <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
+                      <Text style={styles.errorText}> {errorMsg}</Text>
                     </View>
                   )}
                   <Button3D
@@ -907,7 +907,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                         }}
                         activeOpacity={0.85}
                       >
-                        <Text style={styles.datePickerIcon}>📅</Text>
+                        <CalendarDays size={17} color="#D4BFED" />
                         <Text style={[styles.datePickerText, !birthDate && styles.datePickerPlaceholder]}>
                           {birthDate || 'Takvimden doğum tarihini seç'}
                         </Text>
@@ -953,7 +953,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   </View>
                   {errorMsg && (
                     <View style={styles.errorBanner}>
-                      <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
+                      <Text style={styles.errorText}> {errorMsg}</Text>
                     </View>
                   )}
                   <View style={[styles.stepNavButtonsRow, compact && styles.stepNavButtonsRowCompact]}>
@@ -981,7 +981,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       setCountryPickerOpen(true);
                     }}
                   >
-                    <Text style={styles.countryPickerFlag}>{selectedCountry.flag}</Text>
+                    <Text style={styles.countryPickerFlag}>{selectedCountry.code}</Text>
                     <Text style={styles.countryPickerText}>
                       {selectedCountry.name} ({selectedCountry.dial})
                     </Text>
@@ -1003,7 +1003,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   </View>
                   {errorMsg && (
                     <View style={styles.errorBanner}>
-                      <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
+                      <Text style={styles.errorText}> {errorMsg}</Text>
                     </View>
                   )}
                   <View style={[styles.stepNavButtonsRow, compact && styles.stepNavButtonsRowCompact]}>
@@ -1089,7 +1089,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   />
                   {errorMsg && (
                     <View style={styles.errorBanner}>
-                      <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
+                      <Text style={styles.errorText}> {errorMsg}</Text>
                     </View>
                   )}
                   {loading ? (
@@ -1197,7 +1197,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               )}
               {errorMsg && (
                 <Reanimated.View entering={ZoomIn.duration(220)} style={styles.errorBanner}>
-                  <Text style={styles.errorText}>⚠️ {errorMsg}</Text>
+                  <Text style={styles.errorText}> {errorMsg}</Text>
                 </Reanimated.View>
               )}
               {loading ? (
@@ -1268,7 +1268,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <Text style={styles.dividerText}>VEYA</Text>
                 <View style={styles.dividerLine} />
               </View>
-              {/* Google Sign-In Button -> Directly Opens Official Google Accounts Chooser */}
+              {/* Google Sign-In Button ->Directly Opens Official Google Accounts Chooser */}
               <TouchableOpacity
                 style={[styles.googleBtn, compact && styles.googleBtnCompact, tiny && styles.googleBtnTiny]}
                 onPress={handleRealGoogleSignIn}
@@ -1318,7 +1318,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     setCountryPickerOpen(false);
                   }}
                 >
-                  <Text style={styles.countryOptionFlag}>{c.flag}</Text>
+                  <Text style={styles.countryOptionFlag}>{c.code}</Text>
                   <Text style={styles.countryOptionName}>{c.name}</Text>
                   <Text style={styles.countryOptionDial}>{c.dial}</Text>
                 </TouchableOpacity>

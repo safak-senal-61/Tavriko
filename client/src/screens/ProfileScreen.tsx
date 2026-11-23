@@ -18,7 +18,7 @@ import { LoadingShimmer } from '../components/LoadingShimmer';
 import Animated, { FadeInRight, FadeInUp, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
-import { UserProfile, UserSettings, calculateLevelFromXp, getBadgeDef } from '@trivia/shared';
+import { UserProfile, UserSettings, calculateLevelFromXp, getBadgeDef, plainDisplayText } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
@@ -35,7 +35,7 @@ import {
   SpeedBoltIcon,
   StreakFlameIcon,
   BadgeShieldIcon,
-  CrownIcon,
+  LaurelIcon,
   XpStarIcon,
   ModeSquircleIcon,
   AVATAR_PRESETS,
@@ -71,7 +71,7 @@ const CosmeticCountdown: React.FC<{ expiresAt: number | undefined; style?: any }
   const text = h > 0 ? `${h}s ${String(m).padStart(2, '0')}dk` : `${m}dk ${String(s).padStart(2, '0')}sn`;
   return (
     <Text style={[{ color: '#FFD98A', fontSize: 10, fontFamily: THEME.fonts.bold }, style]} numberOfLines={1}>
-      ⏳ {text}
+       {text}
     </Text>
   );
 };
@@ -158,6 +158,7 @@ interface ProfileScreenProps {
   onUpdateUser?: (updated: UserProfile) => void;
   onNavigateTab?: (tab: 'play' | 'explore' | 'leaders' | 'friends' | 'profile') => void;
   onSettings?: () => void;
+  onOpenWallet?: () => void;
   /* KVKK: başka bir oyuncunun profili bu ekranla görüntülenirken
      düzenleme, ayarlar ve hesap bölümleri gizlenir. */
   viewOnly?: boolean;
@@ -240,6 +241,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onUpdateUser,
   onNavigateTab,
   onSettings,
+  onOpenWallet,
   viewOnly,
 }) => {
   const page = usePlayerWebLayout();
@@ -301,7 +303,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const equippedTitle = resolveProfileTitle(settings.equippedTitle, prog.level, prog.rankTitle);
   // Kuşanılmış kozmetikler (süresi dolmamışsa): çerçeve, isim efekti, rozet, arka plan
   const cosmeticActive = (id: string | undefined, expiresAt: number | undefined) =>
-    !id ? null : (!expiresAt || expiresAt > Date.now() ? id : null);
+    !id ? null : (!expiresAt || expiresAt >Date.now() ? id : null);
   const activeFrame = cosmeticActive(user.equippedFrame, user.equippedFrameExpiresAt);
   const activeNameEffect = cosmeticActive(user.equippedNameEffect, user.equippedNameEffectExpiresAt);
   const activeBadge = cosmeticActive(user.equippedBadge, user.equippedBadgeExpiresAt);
@@ -719,6 +721,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         gems={user.gems ?? 0}
         avatarSeed={user.avatarUrl || user.displayName}
         onAvatarPress={viewOnly ? undefined : onEditProfile}
+        onCurrencyPress={viewOnly ? undefined : onOpenWallet}
       />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Unified Compact Hero Identity Card */}
@@ -934,7 +937,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 }}
                 activeOpacity={0.82}
               >
-                <Text style={{ fontSize: 14 }}>🎭</Text>
                 <Text
                   style={[
                     styles.heroActionBtnText,
@@ -1201,7 +1203,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   </Text>
                 </View>
                 <View style={styles.masterySpotCrownWrap}>
-                  <CrownIcon size={26} />
+                  <LaurelIcon size={26} />
                 </View>
               </Animated.View>
             )}
@@ -1475,7 +1477,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               ['Kullanıcı Adı', `@${user.username}`],
               ['Ad Soyad', user.fullName || user.displayName],
               ['E-posta Adresi', user.email || 'Belirtilmedi'],
-              ['Ülke', `${user.countryName || 'Türkiye'} (${user.countryCode || 'TR'})`],
+              ['Ülke', `${plainDisplayText(user.countryName ?? '') || 'Türkiye'} (${user.countryCode || 'TR'})`],
               ['Telefon', user.phone || 'Belirtilmedi'],
               ['Doğum Tarihi', user.birthDate || 'Belirtilmedi'],
               ['Cinsiyet', user.gender || 'Belirtilmedi'],

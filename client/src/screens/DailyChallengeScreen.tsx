@@ -67,15 +67,14 @@ export const DailyChallengeScreen: React.FC<DailyChallengeScreenProps> = ({ user
         <View style={s.rewards}>
           <View style={s.reward}><DiscoveryArtwork source={DISCOVERY_IMG.speed} size={size(34)} animated={false} /><Text style={s.rewardValue}>+{cfg.rewardXp}</Text><Text style={s.small}>XP</Text></View>
           <View style={s.reward}><CoinIcon size={size(32)} /><Text style={s.rewardValue}>+{cfg.rewardCoins}</Text><Text style={s.small}>Altın</Text></View>
-          <View style={s.reward}><GemIcon size={size(32)} /><Text style={s.rewardValue}>+{cfg.rewardGems}</Text><Text style={s.small}>Elmas</Text></View>
         </View>
-        {cfg.rewardChest && <View style={s.chest}><ChestIcon size={32} /><View style={{ flex: 1 }}><Text style={s.gold}>🎁 Hediye Kutusu</Text><Text style={s.body}>7 günlük serinin özel final ödülü — anahtarsız açılır</Text></View></View>}
+        {cfg.rewardChest && <View style={s.chest}><ChestIcon size={32} /><View style={{ flex: 1 }}><Text style={s.gold}>Hediye Kutusu</Text><Text style={s.body}>7 günlük serinin final ödülü. Anahtarsız açılır.</Text></View></View>}
         <Button3D title={completed ? 'TEKRAR PRATİK YAP (ÖDÜLSÜZ)' : 'MEYDAN OKUMAYA BAŞLA'} variant={completed ? 'mint' : 'gold'} onPress={() => onStartDaily(cfg)} textStyle={{ fontSize: page?.roomy ? 16 : 13 }} />
       </View>
       <View style={s.tomorrow}><View style={s.tomorrowArt}><DiscoveryArtwork source={completed ? DISCOVERY_IMG.victory : DISCOVERY_IMG.collector} size={60} /></View>
         <View style={{ flex: 1 }}><Text style={s.rewardCaption}>{completed ? `YARIN · ${next.dayNumber}. GÜN` : 'SERİNİ SÜRDÜR'}</Text>
           <Text style={s.tomorrowTitle}>{completed ? next.description : '7. günde büyük final'}</Text>
-          <Text style={s.body}>{completed ? `+${next.rewardXp} XP · ${next.rewardCoins} altın · ${next.rewardGems} elmas` : 'Her gün oyna, Mega Sandık hedefine yaklaş.'}</Text></View>
+          <Text style={s.body}>{completed ? `+${next.rewardXp} XP · ${next.rewardCoins} altın` : 'Her gün oyna, Mega Sandık hedefine yaklaş.'}</Text></View>
         <ChevronRight size={18} color="#C8B7DF" />
       </View>
       </View>

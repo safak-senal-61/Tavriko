@@ -104,7 +104,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </View>
                 {profile.equippedBadge && (
                   <View style={styles.badgePill}>
-                    <Text style={styles.badgeText}>⭐ {profile.equippedBadge}</Text>
+                    <Text style={styles.badgeText}> {profile.equippedBadge}</Text>
                   </View>
                 )}
                 <Text style={styles.displayName}>{profile.displayName}</Text>

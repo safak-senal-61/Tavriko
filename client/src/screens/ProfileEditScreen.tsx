@@ -30,37 +30,37 @@ interface ProfileEditScreenProps {
   onSaved: (updated: UserProfile) => void;
 }
 
-const COUNTRIES: Array<{ code: string; name: string; flag: string }> = [
-  { code: 'TR', name: 'Türkiye', flag: '🇹🇷' },
-  { code: 'AZ', name: 'Azerbaycan', flag: '🇦🇿' },
-  { code: 'CY', name: 'Kıbrıs (KKTC dahil)', flag: '🇨🇾' },
-  { code: 'DE', name: 'Almanya', flag: '🇩🇪' },
-  { code: 'US', name: 'Amerika Birleşik Devletleri', flag: '🇺🇸' },
-  { code: 'GB', name: 'Birleşik Krallık', flag: '🇬🇧' },
-  { code: 'FR', name: 'Fransa', flag: '🇫🇷' },
-  { code: 'IT', name: 'İtalya', flag: '🇮🇹' },
-  { code: 'ES', name: 'İspanya', flag: '🇪🇸' },
-  { code: 'NL', name: 'Hollanda', flag: '🇳🇱' },
-  { code: 'BE', name: 'Belçika', flag: '🇧🇪' },
-  { code: 'AT', name: 'Avusturya', flag: '🇦🇹' },
-  { code: 'CH', name: 'İsviçre', flag: '🇨🇭' },
-  { code: 'SE', name: 'İsveç', flag: '🇸🇪' },
-  { code: 'NO', name: 'Norveç', flag: '🇳🇴' },
-  { code: 'DK', name: 'Danimarka', flag: '🇩🇰' },
-  { code: 'GR', name: 'Yunanistan', flag: '🇬🇷' },
-  { code: 'SA', name: 'Suudi Arabistan', flag: '🇸🇦' },
-  { code: 'AE', name: 'Birleşik Arap Emirlikleri', flag: '🇦🇪' },
-  { code: 'RU', name: 'Rusya', flag: '🇷🇺' },
-  { code: 'CA', name: 'Kanada', flag: '🇨🇦' },
-  { code: 'AU', name: 'Avustralya', flag: '🇦🇺' },
-  { code: 'JP', name: 'Japonya', flag: '🇯🇵' },
-  { code: 'CN', name: 'Çin', flag: '🇨🇳' },
-  { code: 'KR', name: 'Güney Kore', flag: '🇰🇷' },
-  { code: 'BR', name: 'Brezilya', flag: '🇧🇷' },
-  { code: 'AR', name: 'Arjantin', flag: '🇦🇷' },
-  { code: 'EG', name: 'Mısır', flag: '🇪🇬' },
-  { code: 'MA', name: 'Fas', flag: '🇲🇦' },
-  { code: 'IN', name: 'Hindistan', flag: '🇮🇳' },
+const COUNTRIES: Array<{ code: string; name: string  }> = [
+  { code: 'TR', name: 'Türkiye' },
+  { code: 'AZ', name: 'Azerbaycan' },
+  { code: 'CY', name: 'Kıbrıs (KKTC dahil)' },
+  { code: 'DE', name: 'Almanya' },
+  { code: 'US', name: 'Amerika Birleşik Devletleri' },
+  { code: 'GB', name: 'Birleşik Krallık' },
+  { code: 'FR', name: 'Fransa' },
+  { code: 'IT', name: 'İtalya' },
+  { code: 'ES', name: 'İspanya' },
+  { code: 'NL', name: 'Hollanda' },
+  { code: 'BE', name: 'Belçika' },
+  { code: 'AT', name: 'Avusturya' },
+  { code: 'CH', name: 'İsviçre' },
+  { code: 'SE', name: 'İsveç' },
+  { code: 'NO', name: 'Norveç' },
+  { code: 'DK', name: 'Danimarka' },
+  { code: 'GR', name: 'Yunanistan' },
+  { code: 'SA', name: 'Suudi Arabistan' },
+  { code: 'AE', name: 'Birleşik Arap Emirlikleri' },
+  { code: 'RU', name: 'Rusya' },
+  { code: 'CA', name: 'Kanada' },
+  { code: 'AU', name: 'Avustralya' },
+  { code: 'JP', name: 'Japonya' },
+  { code: 'CN', name: 'Çin' },
+  { code: 'KR', name: 'Güney Kore' },
+  { code: 'BR', name: 'Brezilya' },
+  { code: 'AR', name: 'Arjantin' },
+  { code: 'EG', name: 'Mısır' },
+  { code: 'MA', name: 'Fas' },
+  { code: 'IN', name: 'Hindistan' },
 ];
 
 const GENDERS: Array<{ id: string; label: string }> = [
@@ -536,7 +536,7 @@ export const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({
                     activeOpacity={0.82}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <Text style={styles.countryFlagEmoji}>{c.flag}</Text>
+                      <Text style={styles.countryFlagEmoji}>{c.code}</Text>
                       <Text style={styles.countryName}>{c.name}</Text>
                     </View>
                     <View style={styles.countryCodePill}>

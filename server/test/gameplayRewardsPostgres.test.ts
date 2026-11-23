@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
@@ -55,9 +55,64 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     vi.stubEnv('JWT_SECRET', secret);
     const { db } = await import('../src/db/prismaClient');
     const { default: socialRoutes } = await import('../src/routes/socialRoutes');
+    const { default: triviaRoutes } = await import('../src/routes/triviaRoutes');
     ({ recordCompletedPlayers } = await import('../src/services/playerAnalytics'));
     client = db.rawClient;
-    app = express().use(express.json()).use(root, socialRoutes);
+    app = express().use(express.json()).use(root, socialRoutes).use('/api', triviaRoutes);
+  });
+
+  it('debits gold for a joker, then deducts one copy despite concurrent requests', async () => {
+    const { db } = await import('../src/db/prismaClient');
+    const id = await player('joker');
+    await client.user.update({ where: { id }, data: { coins: 250, gems: 99 } });
+    expect((await post(id, '/shop/purchase', { productId: 'gems_100', paymentMethod: 'try' })).status).toBe(409);
+    const purchases = await Promise.all([1, 2].map(() => post(id, '/shop/purchase', { productId: 'joker_eliminate', paymentMethod: 'gems' })));
+    expect(purchases.map(r => r.status).sort()).toEqual([200, 400]);
+    expect(await client.user.findUnique({ where: { id } })).toMatchObject({ coins: 0, gems: 99 });
+    expect(await inventory(id)).toMatchObject([{ itemId: 'joker_eliminate', qty: 1 }]);
+    expect((await post(id, '/inventory/use', { itemId: 'joker_eliminate' })).status).toBe(400);
+    const questionId = 'qa_joker_question';
+    const q = { id: questionId, correctOptionId: 'a', options: ['a', 'b', 'c', 'd'].map(id => ({ id, text: id })) };
+    const spy = vi.spyOn(db, 'getQuestionById').mockReturnValue(q as ReturnType<typeof db.getQuestionById>);
+    try {
+      const sessionId = `sess_${randomUUID().replaceAll('-', '')}`;
+      const deadline = Date.now() + 60000;
+      const signature = createHmac('sha256', secret).update(JSON.stringify(['practice-joker', id, sessionId, questionId, deadline])).digest('hex');
+      const data = { sessionId, questionId, jokerId: 'joker_eliminate', proof: `${deadline}.${signature}` };
+      const use = (owner: string, body: object) => request(app).post('/api/questions/practice/joker').set('Authorization', auth(owner)).send(body);
+      expect((await use(await player('wrong_joker'), data)).status).toBe(400);
+      const plays = await Promise.all([use(id, data), use(id, data)]);
+      expect(plays.map(r => r.status)).toEqual([200, 200]);
+      expect(plays[0].body.eliminated).toHaveLength(1);
+      expect(plays[0].body.eliminated).not.toContain('a');
+      expect(plays[0].body).toEqual(plays[1].body);
+      expect(await inventory(id)).toMatchObject([{ itemId: 'joker_eliminate', qty: 0 }]);
+    } finally { spy.mockRestore(); }
+  });
+
+  it('does not credit mismatched orders, duplicate deliveries, or replayed refunds', async () => {
+    const { applyGemOrder } = await import('../src/services/polarGemPayments');
+    const userId = await player('payment');
+    const checkoutId = randomUUID(), orderId = randomUUID(), productId = randomUUID();
+    await client.polarGemOrder.create({ data: { checkoutId, userId, productId, gems: 100, amount: 3999 } });
+    const order = { id: orderId, checkout_id: checkoutId, product_id: productId, customer: { external_id: userId },
+      currency: 'try', subtotal_amount: 3999, discount_amount: 0, paid: true, status: 'paid' };
+    const pay = (patch: object = {}) => applyGemOrder(client, { type: 'order.paid', data: { ...order, ...patch } });
+    const refund = (refunded_amount: number, status = 'paid') =>
+      applyGemOrder(client, { type: 'order.refunded', data: { ...order, refunded_amount, status } });
+    const balance = async () => (await client.user.findUniqueOrThrow({ where: { id: userId } })).gems;
+    await pay({ subtotal_amount: 1 });
+    await pay({ customer: { external_id: 'different-account' } });
+    await pay({ product_id: randomUUID() });
+    expect(await balance()).toBe(0);
+    await Promise.all([pay(), pay(), pay()]);
+    expect(await balance()).toBe(100);
+    await Promise.all([refund(2000), refund(2000)]);
+    await pay();
+    expect(await balance()).toBe(50);
+    await refund(3999, 'refunded');
+    await pay();
+    expect(await balance()).toBe(0);
   });
 
   afterAll(async () => {
@@ -151,7 +206,8 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     expect(await inventory(id)).toHaveLength(0);
     expect((await claim()).body.claimedNow).toBe(false);
     const { coins, xp, gems } = opens.find(r => r.status === 200)!.body.reward;
-    expect(await client.user.findUnique({ where: { id } })).toMatchObject({ coins: 500 + coins, xp, gems: 15 + gems });
+    expect(gems).toBe(0);
+    expect(await client.user.findUnique({ where: { id } })).toMatchObject({ coins: 500 + coins, xp, gems: 0 });
   });
 
   it('rolls back failed claims, rejects mismatched keys and spends the actual master key', async () => {
@@ -185,6 +241,19 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
         await tx.$executeRawUnsafe(`SET LOCAL ROLE ${role}`);
         return tx.$queryRaw`SELECT * FROM "gameplay_reward_claims"`;
       })).rejects.toThrow('permission denied');
+    }
+  });
+
+  it('keeps payment and joker usage tables private', async () => {
+    const readOrders = (tx: PrismaClient) => tx.$queryRaw`SELECT 1 FROM "polar_gem_orders" LIMIT 1`;
+    const readJokers = (tx: PrismaClient) => tx.$queryRaw`SELECT 1 FROM "practice_joker_uses" LIMIT 1`;
+    for (const role of ['anon', 'authenticated']) {
+      for (const query of [readOrders, readJokers]) {
+        await expect(client.$transaction(async tx => {
+          await tx.$executeRawUnsafe(`SET LOCAL ROLE ${role}`);
+          return query(tx as PrismaClient);
+        })).rejects.toThrow('permission denied');
+      }
     }
   });
 });

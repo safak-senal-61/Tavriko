@@ -495,7 +495,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <Text style={styles.walletText}>{user.gems ?? 0} Elmas</Text>
               </View>
               <View style={styles.walletPill}>
-                <Text style={[styles.walletText, { color: '#00F0FF' }]}>⚡ {user.xp ?? 0} XP</Text>
+                <Text style={[styles.walletText, { color: '#00F0FF' }]}> {user.xp ?? 0} XP</Text>
                 <InfoHint topic="xp" size={16} color="#00F0FF" label="XP nasıl kazanılır?" />
               </View>
             </View>

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.EVENT_DEFINITIONS = exports.SHOP_CATALOG = exports.SEASON_REWARD_HOURS = exports.SHOP_DURATIONS = exports.SEASON_1_TIERS = void 0;
+exports.EVENT_DEFINITIONS = exports.SHOP_CATALOG = exports.SEASON_REWARD_HOURS = exports.SHOP_DURATIONS = exports.JOKERS = exports.LOW_COINS = exports.LOW_GEMS = exports.SEASON_1_TIERS = void 0;
 exports.getXpRequiredForLevel = getXpRequiredForLevel;
 exports.calculateLevelFromXp = calculateLevelFromXp;
 exports.generateSeason1Tiers = generateSeason1Tiers;
@@ -82,6 +82,12 @@ function calculateLevelFromXp(totalXp = 0) {
         progressPct,
         totalXp: safeXp,
     };
+}
+function seasonGoldReward(reward) {
+    if (reward.type !== 'gem')
+        return reward;
+    const amount = reward.amount * 10;
+    return { ...reward, type: 'coin', amount, title: `${amount.toLocaleString('tr-TR')} Altın` };
 }
 // Helper generating 50 rich, balanced tiers for Season 1
 function generateSeason1Tiers() {
@@ -179,13 +185,19 @@ function generateSeason1Tiers() {
         tiers.push({
             tier: i,
             requiredSeasonXp,
-            freeReward,
-            premiumReward,
+            freeReward: seasonGoldReward(freeReward),
+            premiumReward: seasonGoldReward(premiumReward),
         });
     }
     return tiers;
 }
 exports.SEASON_1_TIERS = generateSeason1Tiers();
+exports.LOW_GEMS = 100;
+exports.LOW_COINS = 500;
+exports.JOKERS = [
+    { id: 'joker_eliminate', name: 'Tek Eleme', desc: 'Bir yanlış şıkkı kaldırır.', price: 250, eliminated: 1 },
+    { id: 'joker_half', name: 'Yarı Yarıya', desc: 'İki yanlış şıkkı kaldırır.', price: 450, eliminated: 2 },
+];
 /**
  * Süreli kozmetik mağaza ürünleri için süre seçenekleri: 1 saatten en fazla 1
  * aya kadar. Fiyat, ürünün temel fiyatı süre çarpanıyla ölçeklenir.
@@ -217,6 +229,11 @@ function shopPriceForDuration(p, durationId) {
 /** Sezon kozmetik ödülleri en fazla 1 ay geçerlidir */
 exports.SEASON_REWARD_HOURS = 24 * 30;
 exports.SHOP_CATALOG = [
+    ...exports.JOKERS.map((j) => ({
+        id: j.id, name: j.name, desc: j.desc, category: 'jokers', price: j.price,
+        currency: 'coins', rarity: j.eliminated === 1 ? 'common' : 'rare',
+        grantItems: [{ id: j.id, name: j.name, desc: j.desc, qty: 1, category: 'joker', rarity: 'rare' }],
+    })),
     // --- Featured ---
     {
         id: 'pack_season_premium_pass',
@@ -673,7 +690,7 @@ exports.SHOP_CATALOG = [
         grantItems: [{ id: 'bg_galaxy_vip', name: 'Galaksi VIP Teması', desc: 'Seçtiğin süre boyunca aktif galaksi VIP arayüz teması', qty: 1, category: 'background', rarity: 'mythic' }],
     },
 ];
-exports.EVENT_DEFINITIONS = [
+const BASE_EVENT_DEFINITIONS = [
     // --- Daily Events ---
     {
         id: 'daily_5_matches',
@@ -802,6 +819,9 @@ exports.EVENT_DEFINITIONS = [
         endsInHours: 48,
     },
 ];
+exports.EVENT_DEFINITIONS = BASE_EVENT_DEFINITIONS.map(event => ({
+    ...event, rewardCoins: event.rewardCoins + event.rewardGems * 10, rewardGems: 0,
+}));
 function getDailyChallengeConfig(streakDay = 1) {
     const safeStreak = Math.max(1, streakDay);
     const dayNumber = ((safeStreak - 1) % 7) + 1;
@@ -837,8 +857,8 @@ function getDailyChallengeConfig(streakDay = 1) {
     }
     // Mütevazı XP: 40..100 (seviye 1 için 500 XP gerekir)
     const rewardXp = 30 + dayNumber * 10;
-    const rewardCoins = 40 + dayNumber * 20;
-    const rewardGems = 5 + dayNumber * 5;
+    const rewardCoins = 90 + dayNumber * 70;
+    const rewardGems = 0;
     // Hediye kutusu yalnızca 7 günlük serinin tamamlanmasında verilir (boş yere görünmez)
     const rewardChest = dayNumber === 7 ? 'gift_box' : undefined;
     return {

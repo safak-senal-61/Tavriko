@@ -338,9 +338,9 @@ export const ANIMATED_NAME_STYLES: Record<string, {
 
 const PARTICLE_EMOJI: Record<string, string> = {
   snowflake: '❄',
-  leaf: '🍃',
+  leaf: '◆',
   star: '✦',
-  ember: '🔥',
+  ember: '✧',
 };
 
 /** Yörüngede dönen parçacıklar: avatarın etrafında süzülen öğeler */

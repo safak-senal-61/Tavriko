@@ -31,6 +31,7 @@ import {
   getDailyChallengeConfig,
   SEASON_1_TIERS,
   SHOP_CATALOG,
+  JOKERS,
   EVENT_DEFINITIONS,
   SeasonReward,
   ItemRarity,
@@ -498,6 +499,7 @@ export class PrismaService {
   };
 
   private getItemCategory(itemId: string): ItemCategory {
+    if (JOKERS.some(j => j.id === itemId)) return 'joker';
     if (getChestOpening(itemId) || itemId.includes('chest')) return 'chest';
     if (itemId.includes('key')) return 'key';
     if (itemId.includes('booster')) return 'booster';
@@ -845,7 +847,7 @@ export class PrismaService {
               level: args.create.level ?? 1,
               xp: args.create.xp ?? 0,
               coins: args.create.coins ?? 500,
-              gems: args.create.gems ?? 15,
+              gems: args.create.gems ?? 0,
               dailyStreak: args.create.dailyStreak ?? 1,
               rankTitle: args.create.rankTitle ?? 'Acemi Kaşif',
               rankPoints: args.create.rankPoints ?? 1000,
@@ -1492,7 +1494,7 @@ export class PrismaService {
           level: record.level,
           xp: record.xp,
           coins: record.coins,
-          gems: record.gems ?? 14,
+          gems: record.gems ?? 0,
           dailyStreak: profile.dailyStreak ?? 1,
           rankTitle: record.rankTitle,
           rankPoints: record.rankPoints,
@@ -1647,7 +1649,7 @@ export class PrismaService {
   } {
     let xp = 200;
     let coins = 300;
-    let gems = 10;
+    const gems = 0;
 
     if (payload.fullName && payload.fullName.trim().length >= 2) {
       xp += 250;
@@ -1664,12 +1666,10 @@ export class PrismaService {
     if (payload.phone && payload.phone.trim().length >= 6) {
       xp += 350;
       coins += 200;
-      gems += 10;
     }
     if (payload.avatarUrl) {
       xp += 200;
       coins += 100;
-      gems += 5;
     }
 
     const level = Math.max(1, Math.floor(xp / 450) + 1);
@@ -1691,7 +1691,7 @@ export class PrismaService {
       level: 1,
       xp: 0,
       coins: 200,
-      gems: 5,
+      gems: 0,
       rankTitle: 'Misafir Kaşif',
       rankPoints: 1000,
       stats: {
@@ -1776,7 +1776,7 @@ export class PrismaService {
         level: bonus.level || 1,
         xp: bonus.xp || 0,
         coins: bonus.coins || 500,
-        gems: bonus.gems || 15,
+        gems: bonus.gems,
         dailyStreak: 1,
         rankTitle: bonus.rankTitle || 'Acemi Kaşif',
         rankPoints: 1000 + (bonus.level || 1) * 100,
@@ -1968,7 +1968,7 @@ export class PrismaService {
             level: bonus.level || 1,
             xp: bonus.xp || 0,
             coins: bonus.coins || 500,
-            gems: bonus.gems || 15,
+            gems: bonus.gems,
             dailyStreak: 1,
             rankTitle: bonus.rankTitle || 'Acemi Kaşif',
             rankPoints: 1000,
@@ -2022,7 +2022,7 @@ export class PrismaService {
           level: bonus.level || 1,
           xp: bonus.xp || 0,
           coins: bonus.coins || 500,
-          gems: bonus.gems || 15,
+          gems: bonus.gems,
           dailyStreak: 1,
           lastDailyDate: null,
           rankTitle: bonus.rankTitle || 'Acemi Kaşif',
@@ -2740,7 +2740,6 @@ export class PrismaService {
       };
       record.xp += cfg.rewardXp;
       record.coins += cfg.rewardCoins;
-      record.gems = (record.gems || 15) + cfg.rewardGems;
 
       if (cfg.rewardChest) {
         if (!record.inventory) record.inventory = [];
@@ -4974,6 +4973,7 @@ export class PrismaService {
     user: UserProfile;
     rewardText: string;
   }> {
+    if (JOKERS.some(j => j.id === itemId)) throw new Error('Jokerler yalnızca antrenmanda kullanılabilir.');
     let record = await this.loadRecord(userId);
     if (!record) throw new Error('Kullanıcı bulunamadı.');
     if (!record.inventory) record.inventory = this.defaultInventory();
@@ -5044,8 +5044,8 @@ export class PrismaService {
       record.equippedBadgeExpiresAt = Date.now() + rentalMs;
       rewardText = `${item.name} profilinize uygulandı! ${rentalLabel} boyunca aktif.`;
     } else if (itemId === 'gem') {
-      record.gems = (record.gems || 0) + 10;
-      rewardText = '+10 Elmas hesabına eklendi!';
+      record.coins += 100;
+      rewardText = '+100 Altın hesabına eklendi!';
     } else if (itemId === 'coin') {
       record.coins += 100;
       rewardText = '+100 Altın hesabına eklendi!';
@@ -5391,11 +5391,28 @@ export class PrismaService {
   ): Promise<{ user: UserProfile; message: string }> {
     let record = await this.loadRecord(userId);
     if (!record) throw new Error('Kullanıcı bulunamadı.');
-    const originalCoins = record.coins, originalGems = record.gems || 0;
-
     const product = SHOP_CATALOG.find((p) => p.id === productId);
     if (!product) throw new Error('Ürün mağazada bulunamadı.');
-    if (product.currency === 'try') throw new Error('Gerçek para ile satın alma şu anda kapalı.');
+    if (product.currency === 'try' || product.grantGems) throw new Error('Elmas paketleri yalnızca doğrulanmış ödeme ile yüklenir.');
+    if (product.category === 'jokers') {
+      if (record.isGuest) throw new Error('Joker satın almak için giriş yap.');
+      const item = product.grantItems![0];
+      const saved = await this.rawClient.$transaction(async tx => {
+        const debit = await tx.user.updateMany({
+          where: { id: record.id, coins: { gte: product.price } },
+          data: { coins: { decrement: product.price } },
+        });
+        if (!debit.count) throw new Error(`Bu joker için ${product.price} altın gerekli.`);
+        await tx.userInventoryItem.upsert({
+          where: { userId_itemId: { userId: record.id, itemId: item.id } },
+          update: { qty: { increment: item.qty } },
+          create: { userId: record.id, itemId: item.id, name: item.name, desc: item.desc, qty: item.qty },
+        });
+        return tx.user.findUniqueOrThrow({ where: { id: record.id }, include: { inventoryItems: true } });
+      });
+      return { user: this.toProfile(this.prismaUserToRecord(saved)), message: `${item.name} envanterine eklendi.` };
+    }
+    const originalCoins = record.coins, originalGems = record.gems || 0;
 
     // Süreli kozmetiklerde süre seçimi: 1 saatten en fazla 1 aya kadar.
     // Fiyat, temel fiyat x süre çarpanıyla ölçeklenir.
@@ -5419,9 +5436,6 @@ export class PrismaService {
     }
     if (product.grantCoins) {
       record.coins += product.grantCoins;
-    }
-    if (product.grantGems) {
-      record.gems = (record.gems || 0) + product.grantGems;
     }
 
     if (product.grantItems) {
@@ -5562,7 +5576,7 @@ export class PrismaService {
     const chestRarity = opening.rarity;
 
     // Ağırlıklı rastgele ödül tabloları: çoğunlukla düşük, ara sıra orta, nadiren yüksek.
-    // Elmas her sandıktan çıkmaz (elmas ekonomisini zorlaştırmak için düşüş şansı sınırlı).
+    // Sandıkların rastlantısal ödülleri yalnızca kazanılan altın, XP ve eşyalardır.
     type Tier = 'low' | 'mid' | 'high';
     const rollTier = (pLow: number, pMid: number): Tier => {
       const r = Math.random();
@@ -5575,7 +5589,7 @@ export class PrismaService {
     };
 
     let coins = 0;
-    let gems = 0;
+    const gems = 0; // Older clients still expect this field.
     let xp = 0;
     let bonusItem: InventoryItem | undefined;
 
@@ -5583,7 +5597,6 @@ export class PrismaService {
       // 7 günlük meydan okuma hediye kutusu: cömert ama değişken epik ödüller
       const t = rollTier(0.5, 0.35);
       coins = bracket(t, [800, 1500], [1500, 2800], [2800, 4500]);
-      gems = Math.random() < 0.5 ? randInt(30, 70) : 0;
       xp = bracket(t, [100, 150], [150, 200], [200, 250]);
       const giftBonusPool: InventoryItem[] = [
         {
@@ -5607,7 +5620,6 @@ export class PrismaService {
     } else if (chestId === 'chest_legendary' || chestId === 'chest_diamond') {
       const t = rollTier(0.45, 0.38);
       coins = bracket(t, [1000, 2000], [2000, 4000], [4000, 6500]);
-      gems = Math.random() < 0.45 ? randInt(50, 110) : 0;
       xp = bracket(t, [80, 120], [120, 180], [180, 250]);
       bonusItem = {
         id: 'frame_flame',
@@ -5620,7 +5632,6 @@ export class PrismaService {
     } else if (chestId.includes('gold')) {
       const t = rollTier(0.5, 0.35);
       coins = bracket(t, [500, 900], [900, 1800], [1800, 2800]);
-      gems = Math.random() < 0.4 ? randInt(20, 45) : 0;
       xp = bracket(t, [50, 80], [80, 120], [120, 160]);
       bonusItem = {
         id: 'booster_xp_2x_1h',
@@ -5633,13 +5644,11 @@ export class PrismaService {
     } else if (chestId.includes('silver')) {
       const t = rollTier(0.55, 0.32);
       coins = bracket(t, [250, 500], [500, 900], [900, 1400]);
-      gems = Math.random() < 0.35 ? randInt(8, 20) : 0;
       xp = bracket(t, [25, 45], [45, 70], [70, 100]);
     } else {
       // Ahşap sandık: çoğunlukla mütevazı ödül
       const t = rollTier(0.6, 0.3);
       coins = bracket(t, [80, 180], [180, 350], [350, 500]);
-      gems = Math.random() < 0.35 ? randInt(3, 8) : 0;
       xp = bracket(t, [10, 20], [20, 35], [35, 50]);
     }
 
@@ -5662,7 +5671,6 @@ export class PrismaService {
         else record.inventory.push(bonusItem);
       }
       record.coins += coins;
-      record.gems += gems;
       record.xp += xp;
       const { level, rankTitle } = calculateLevelFromXp(record.xp);
       record.level = level;
@@ -5700,7 +5708,7 @@ export class PrismaService {
         const { level, rankTitle } = calculateLevelFromXp(owner.xp + xp);
         return tx.user.update({
           where: { id: accountId },
-          data: { coins: { increment: coins }, gems: { increment: gems }, xp: { increment: xp }, level, rankTitle },
+          data: { coins: { increment: coins }, xp: { increment: xp }, level, rankTitle },
           include: { inventoryItems: true },
         });
       });
@@ -5710,12 +5718,11 @@ export class PrismaService {
     if (record.username) this.users.set(record.username, record);
     if (record.email) this.users.set(record.email.toLowerCase(), record);
 
-    const rewardText = `🎉 Sandık açıldı: +${coins} Altın, +${gems} Elmas ve +${xp} XP kazandınız!${bonusItem ? ` Bonus: ${bonusItem.name}!` : ''}`;
+    const rewardText = `Sandık açıldı: +${coins} Altın ve +${xp} XP kazandınız.${bonusItem ? ` Bonus: ${bonusItem.name}.` : ''}`;
 
     // İstemcinin ödül modalünde gösterdiği liste (boş olanlar filtrelenir).
     const rewards: Array<{ type: 'coins' | 'gems' | 'xp' | 'item'; amount: number; label?: string; rarity?: string }> = [];
     if (coins > 0) rewards.push({ type: 'coins', amount: coins });
-    if (gems > 0) rewards.push({ type: 'gems', amount: gems });
     if (xp > 0) rewards.push({ type: 'xp', amount: xp });
     if (bonusItem) rewards.push({ type: 'item', amount: bonusItem.qty, label: bonusItem.name, rarity: bonusItem.rarity });
 
@@ -5879,7 +5886,7 @@ export class PrismaService {
 
     return {
       user: this.toProfile(record),
-      message: `Tebrikler! ${event.title} tamamlandı: +${event.rewardCoins} Altın, +${event.rewardGems} Elmas, +${event.rewardSeasonXp} Sezon XP kazandınız!`,
+      message: `${event.title} tamamlandı: +${event.rewardCoins} Altın ve +${event.rewardSeasonXp} Sezon XP.`,
     };
   }
 
@@ -5961,7 +5968,7 @@ export class PrismaService {
       seasonXp: record.seasonXp ?? 0,
       hasPremiumPass: !!record.hasPremiumPass,
       coins: record.coins,
-      gems: record.gems ?? 14,
+      gems: record.gems ?? 0,
       dailyStreak: record.dailyStreak ?? 1,
       dailyChallenge: {
         lastCompletedDate: dcState?.lastCompletedDate,

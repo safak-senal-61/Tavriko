@@ -23,7 +23,7 @@ import {
   CoinIcon,
   GemIcon,
   KeyIcon,
-  CrownIcon,
+  LaurelIcon,
   BadgeShieldIcon,
   SpeedBoltIcon,
 } from '../components/TavrikoIcons';
@@ -529,7 +529,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
           </Reanimated.View>
         ) : (
           <View style={styles.passActiveBanner}>
-            <CrownIcon size={20} />
+            <LaurelIcon size={20} />
             <Text style={styles.passActiveText}>Sezon 1 Premium Pass aktif</Text>
           </View>
         )}
@@ -567,7 +567,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
           </View>
           <View style={styles.trackHeaderCenter} />
           <View style={styles.trackHeaderRight}>
-            <CrownIcon size={14} />
+            <LaurelIcon size={14} />
             <Text style={styles.trackHeaderPremiumTitle}>PREMIUM</Text>
           </View>
         </View>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { getRandomValues } from 'expo-crypto';
+import * as SecureStore from 'expo-secure-store';
+import { Smartphone } from 'lucide-react-native';
 import {
   View,
   StyleSheet,
@@ -41,6 +43,10 @@ import {
   MatchQuestionReviewItem,
   ALL_CATEGORIES,
   uniqueQuestions,
+  JokerId,
+  LOW_GEMS,
+  LOW_COINS,
+  ShopProductCategory,
 } from '@trivia/shared';
 // Screens
 import { SplashScreen } from '../screens/SplashScreen';
@@ -72,6 +78,7 @@ import { ReconnectScreen } from '../screens/ReconnectScreen';
 import { ErrorStateScreen } from '../screens/ErrorStateScreen';
 import { SeasonScreen } from '../screens/SeasonScreen';
 import { ShopScreen } from '../screens/ShopScreen';
+import { LowWalletPanel } from '../components/WalletPanels';
 import { EventsScreen } from '../screens/EventsScreen';
 import { InventoryScreen } from '../screens/InventoryScreen';
 import { GameplayRewardsScreen } from '../screens/GameplayRewardsScreen';
@@ -113,6 +120,7 @@ import {
 } from '../utils/legalConsent';
 
 const API_BASE = DEFAULT_API_BASE;
+const WALLET_REMINDER_MS = 24 * 60 * 60 * 1000;
 // 1v1 düello her zaman tüm kategorilerden karışık ve 15 soruluk oynanır. Keşfet'te en son
 // seçilen kategori (selectedCategory) düelloya taşınmamalı.
 const DUEL_CATEGORY: CategoryId = 'mixed';
@@ -131,6 +139,7 @@ export const RootNavigator: React.FC = () => {
   const [pendingReferral, setPendingReferral] = useState(() => captureReferralLink());
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
+  const [checkoutReturn] = useState(() => isWeb && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('gem_checkout'));
   const isNativeTablet = !isWeb && windowWidth > 540;
 
   const isWebOAuthReturn =
@@ -151,10 +160,13 @@ export const RootNavigator: React.FC = () => {
     : isWebDeveloperReturn
     ? 'developer'
     : initialAuthUser
-    ? (initialAuthUser.isGuest ? 'categories' : pendingReferral ? 'friends' : 'home')
+    ? (initialAuthUser.isGuest ? 'categories' : checkoutReturn ? 'shop' : pendingReferral ? 'friends' : 'home')
     : 'splash';
 
   const [currentScreen, setCurrentScreen] = useState<ScreenName>(initialScreen);
+  const [shopTab, setShopTab] = useState<ShopProductCategory>();
+  const [walletReminder, setWalletReminder] = useState<{ owner: string; kind: 'diamonds' | 'gold' } | null>(null);
+  const walletSeen = useRef(new Set<string>());
   const webLayout = useMemo(
     () => getWebLayout(windowWidth, windowHeight, currentScreen, isWeb),
     [windowWidth, windowHeight, currentScreen, isWeb],
@@ -182,6 +194,7 @@ export const RootNavigator: React.FC = () => {
       inbox.dismissToast();
       inbox.markAllSeen();
     }
+    if (nextScreen !== 'shop') setShopTab(undefined);
     // Prevent screen darkening/blinking during questions or same-mode transitions
     if (nextScreen === 'quiz_arena' && currentScreenRef.current === 'quiz_arena') {
       return;
@@ -193,6 +206,11 @@ export const RootNavigator: React.FC = () => {
       duration: 150,
       useNativeDriver: Platform.OS !== 'web',
     }).start();
+  };
+  const openWalletShop = (tab?: ShopProductCategory) => {
+    setWalletReminder(null);
+    setShopTab(tab);
+    navigateTo('shop');
   };
   // Practice & Single-Player Mode State
   const [practiceQuestions, setPracticeQuestions] = useState<ClientQuestion[]>([]);
@@ -385,6 +403,43 @@ export const RootNavigator: React.FC = () => {
       }
     } catch {}
   }, [setUser, syncWithFreshUser]);
+  const refreshWallet = useCallback(() => { void refreshUserProfile(true); }, [refreshUserProfile]);
+
+  useEffect(() => {
+    if (currentScreen !== 'profile' || !signedInPlayer || !user || !netOnline) return;
+    const owner = user.id;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      void (async () => {
+        const candidates: ('diamonds' | 'gold')[] = [];
+        if (isWeb && typeof user.gems === 'number' && user.gems < LOW_GEMS) {
+          const available = await fetch(`${API_BASE}/social/shop/diamonds/availability`, { method: 'POST', signal: controller.signal })
+            .then(r => r.ok ? r.json() : null).catch(() => null);
+          if (available?.enabled === true && available.sandbox !== true) candidates.push('diamonds');
+        }
+        if (user.coins < LOW_COINS) candidates.push('gold');
+        for (const kind of candidates) {
+          const key = `wallet-reminder.v1.${encodeURIComponent(owner).replace(/%/g, '.')}.${kind}`;
+          let last = 0;
+          try {
+            last = Number(Platform.OS === 'web' ? window.localStorage.getItem(key) : await SecureStore.getItemAsync(key));
+          } catch { return; }
+          if (controller.signal.aborted || currentScreenRef.current !== 'profile' || useGameStore.getState().user?.id !== owner) return;
+          if (walletSeen.current.has(key) || Date.now() - last < WALLET_REMINDER_MS) continue;
+          walletSeen.current.add(key);
+          setWalletReminder({ owner, kind });
+          if (Platform.OS === 'web') {
+            try { window.localStorage.setItem(key, String(Date.now())); } catch {}
+          } else void SecureStore.setItemAsync(key, String(Date.now())).catch(() => {});
+          return;
+        }
+      })();
+    }, 1300);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [currentScreen, isWeb, netOnline, signedInPlayer, user?.id, user?.coins, user?.gems]);
+  useEffect(() => {
+    if (currentScreen !== 'profile' || walletReminder?.owner !== user?.id) setWalletReminder(null);
+  }, [currentScreen, user?.id, walletReminder?.owner]);
 
   useEffect(() => {
     setCheckedLegalSession(null);
@@ -935,7 +990,7 @@ export const RootNavigator: React.FC = () => {
     setUser(loggedInUser, token);
     const referral = getPendingReferral();
     setPendingReferral(referral);
-    navigateTo(referral ? 'friends' : 'home');
+    navigateTo(checkoutReturn ? 'shop' : referral ? 'friends' : 'home');
   };
   const handleSaveProfile = async (name: string, rawAvatarSeedOrUri: string) => {
     if (user) {
@@ -1346,7 +1401,8 @@ export const RootNavigator: React.FC = () => {
       const scopeKey = seenScopeKey(category, subCategory);
       const seenIds = (await getSeenQuestionIds(scopeKey)).slice(-250);
       const res = await fetch(
-        `${API_BASE}/questions/practice?category=${category}${subCategory ? `&subcategory=${encodeURIComponent(subCategory)}` : ''}&difficulty=${difficulty}&count=${questionCount}&sessionId=${sessionId}${seenIds.length ? `&seenIds=${encodeURIComponent(seenIds.join(','))}` : ''}`
+        `${API_BASE}/questions/practice?category=${category}${subCategory ? `&subcategory=${encodeURIComponent(subCategory)}` : ''}&difficulty=${difficulty}&count=${questionCount}&sessionId=${sessionId}${!isDaily && signedInPlayer ? '&jokers=1' : ''}${seenIds.length ? `&seenIds=${encodeURIComponent(seenIds.join(','))}` : ''}`,
+        !isDaily && signedInPlayer ? { headers: authHeaders() } : undefined,
       );
       if (res.ok) {
         const data = await res.json();
@@ -1518,7 +1574,7 @@ export const RootNavigator: React.FC = () => {
             },
             xp: (user.xp || 0) + (activeDailyConfig.rewardXp || 50),
             coins: (user.coins || 0) + (activeDailyConfig.rewardCoins || 40),
-            gems: (user.gems || 0) + (activeDailyConfig.rewardGems || 5),
+            gems: user.gems ?? 0,
           };
           setUser(optimisticUser);
 
@@ -1714,7 +1770,7 @@ export const RootNavigator: React.FC = () => {
           <SplashScreen
             onFinish={() => {
               if (user) {
-                navigateTo(isGuest ? 'categories' : 'home');
+                navigateTo(isGuest ? 'categories' : checkoutReturn ? 'shop' : 'home');
               } else {
                 navigateTo('auth');
               }
@@ -1770,7 +1826,7 @@ export const RootNavigator: React.FC = () => {
             onSeason={() =>
               requireAuth(() => navigateTo('season'), 'Sezon 1 Pass')
             }
-            onShop={() => requireAuth(() => navigateTo('shop'), 'Mağaza')}
+            onShop={(tab) => requireAuth(() => openWalletShop(tab), 'Mağaza')}
             onRewards={() => requireAuth(() => navigateTo('gameplay_rewards'), 'Ödüller')}
             onEvents={() =>
               requireAuth(() => navigateTo('events'), 'Etkinlikler')
@@ -1930,6 +1986,31 @@ export const RootNavigator: React.FC = () => {
               onSelectOption={handleSubmitAnswer}
               onTimeExpired={handleTimeExpired}
               onExit={handleExitCurrentGame}
+              jokers={!activeRoom && !activeDailyConfig && signedInPlayer && user && currentQuestion.jokerProof ? {
+                user,
+                apply: async (jokerId: JokerId) => {
+                  const response = await fetch(`${API_BASE}/questions/practice/joker`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                    body: JSON.stringify({
+                      questionId: currentQuestion.id, proof: currentQuestion.jokerProof,
+                      sessionId: practiceSessionIdRef.current, jokerId,
+                    }),
+                  });
+                  const result = await response.json();
+                  if (!response.ok || !Array.isArray(result.eliminated)) throw new Error(result.error || 'Joker kullanılamadı.');
+                  refreshWallet();
+                  return result.eliminated;
+                },
+                buy: async (productId: JokerId) => {
+                  const response = await fetch(`${API_BASE}/social/shop/purchase`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                    body: JSON.stringify({ productId }),
+                  });
+                  const result = await response.json();
+                  if (!response.ok || !result.user) throw new Error(result.error || 'Joker satın alınamadı.');
+                  if (useGameStore.getState().user?.id === user.id && useGameStore.getState().token === token) syncWithFreshUser(result.user);
+                },
+              } : undefined}
               onNext={
                 !activeRoom && practiceFeedback && loadStoredPreferences().autoNextQuestion === false
                   ? () => advanceToNextPracticeQuestion(practiceIndex + 1, practiceQuestions)
@@ -2148,6 +2229,7 @@ export const RootNavigator: React.FC = () => {
             onEditPersonalInfo={() => navigateTo('profile_edit')}
             onUpdateAvatar={handleUpdateAvatarDirect}
             onSettings={() => navigateTo('settings')}
+            onOpenWallet={() => openWalletShop(isWeb ? 'diamonds' : 'gold')}
             onNavigateTab={(tab) => {
               if (tab === 'play') navigateTo('home');
               else if (tab === 'explore') navigateTo('categories');
@@ -2155,6 +2237,10 @@ export const RootNavigator: React.FC = () => {
               else if (tab === 'friends') navigateTo('friends');
             }}
           />
+        )}
+        {currentScreen === 'profile' && user && signedInPlayer && walletReminder?.owner === user.id && (
+          <LowWalletPanel kind={walletReminder.kind} amount={walletReminder.kind === 'diamonds' ? user.gems ?? 0 : user.coins}
+            onClose={() => setWalletReminder(null)} onStore={() => openWalletShop(walletReminder.kind)} />
         )}
         {currentScreen === 'profile_edit' && user && (
           <ProfileEditScreen
@@ -2282,7 +2368,9 @@ export const RootNavigator: React.FC = () => {
           <ShopScreen
             user={user || undefined}
             apiBaseUrl={API_BASE}
-            onUpdateUser={(u) => setUser(u)}
+            initialTab={shopTab}
+            onUpdateUser={syncWithFreshUser}
+            onRefresh={refreshWallet}
             onBack={() => navigateTo('home')}
             onNotifications={() => navigateTo('notifications')}
             onProfile={() => navigateTo('profile')}
@@ -2418,7 +2506,7 @@ export const RootNavigator: React.FC = () => {
         <ScrollView style={styles.desktopSidebar} contentContainerStyle={styles.desktopSidebarContent}>
           <View style={styles.desktopCard}>
             <View style={{ alignItems: 'center', marginBottom: 12 }}>
-              <Text style={{ fontSize: 26, marginBottom: 4 }}>📱</Text>
+              <Smartphone size={26} color="#E2D2FF" style={{ marginBottom: 4 }} />
               <Text style={styles.desktopCardTitle}>Cebinde Devam Et</Text>
               <Text style={styles.desktopCardDesc}>
                 Telefon kameranı açıp QR kodu tara, kurulumsuz anında mobilde oyna!
@@ -2443,7 +2531,7 @@ export const RootNavigator: React.FC = () => {
                 navigateTo('developer');
               }}
             >
-              <Text style={styles.portalShortcutText}>🛡️ Geliştirici Sandbox Paneli</Text>
+              <Text style={styles.portalShortcutText}>Geliştirici Sandbox Paneli</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -2455,11 +2543,11 @@ export const RootNavigator: React.FC = () => {
                 }
               }}
             >
-              <Text style={[styles.portalShortcutText, { color: '#FFC43D' }]}>🌐 Web Operasyon Portalı</Text>
+              <Text style={[styles.portalShortcutText, { color: '#FFC43D' }]}>Web Operasyon Portalı</Text>
             </TouchableOpacity>
 
             <View style={styles.desktopTipBox}>
-              <Text style={styles.desktopTipTitle}>💡 Web İpucu</Text>
+              <Text style={styles.desktopTipTitle}>Web İpucu</Text>
               <Text style={styles.desktopTipText}>
                 Klavyeniz ve farenizle sorulara anında cevap verebilir, tüm lig ve ödülleri büyük ekranda takip edebilirsiniz.
               </Text>

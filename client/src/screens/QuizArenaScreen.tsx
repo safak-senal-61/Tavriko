@@ -27,14 +27,17 @@ import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { trackEvent } from '../services/analytics';
 import { loadStoredPreferences } from '../store/appPrefs';
-import { ClientQuestion, ALL_CATEGORIES } from '@trivia/shared';
+import { ClientQuestion, ALL_CATEGORIES, JokerId, UserProfile } from '@trivia/shared';
+import { JokerPanel } from '../components/WalletPanels';
+import { WalletArtwork } from '../components/WalletArtwork';
+import { Flag } from 'lucide-react-native';
 import {
   TavrikoScreen,
   StreakFlameIcon,
   CheckMarkSvg,
   CrossMarkSvg,
   CharacterAvatar,
-  CrownIcon,
+  LaurelIcon,
   CoinIcon,
   CloseXIcon,
 } from '../components/TavrikoIcons';
@@ -69,6 +72,7 @@ interface QuizArenaScreenProps {
   onExit?: () => void;
   /** Otomatik sonraki soru kapalıyken gösterilen "Sonraki Soru" düğmesinin eylemi */
   onNext?: () => void;
+  jokers?: { user: UserProfile; apply: (id: JokerId) => Promise<string[]>; buy: (id: JokerId) => Promise<void> };
   isDuelMode?: boolean;
   myDisplayName?: string;
   /** Profil fotoğrafı yoksa karakter avatarı seçmek için tohum (avatarUrl veya isim) */
@@ -434,7 +438,7 @@ const SummitRaceTrack: React.FC<{
           })}
         </View>
         <View style={styles.raceFlag}>
-          <Text style={styles.raceFlagText}>🚩</Text>
+          <Flag size={16} color="#FFD178" />
         </View>
       </View>
     </View>
@@ -472,7 +476,7 @@ const DuelPlayerBlock: React.FC<{
       </View>
       {showCrown && (
         <View style={styles.playerCrown} pointerEvents="none">
-          <CrownIcon size={28} />
+          <LaurelIcon size={28} />
         </View>
       )}
       <View style={[styles.playerNamePill, { borderColor: `${color}AA` }]}>
@@ -542,7 +546,7 @@ const MiniPlayerBlock: React.FC<{
           </View>
         )}
         {showCrown && (
-          <View style={styles.miniCrown} pointerEvents="none"><CrownIcon size={14} /></View>
+          <View style={styles.miniCrown} pointerEvents="none"><LaurelIcon size={14} /></View>
         )}
       </View>
         <Text
@@ -580,6 +584,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   onTimeExpired,
   onExit,
   onNext,
+  jokers,
   isDuelMode = false,
   myDisplayName = 'Sen',
   myAvatarUrl,
@@ -596,6 +601,13 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     return [];
   }, [racersProp]);
   const [localSelectedOptionId, setLocalSelectedOptionId] = useState<string | null>(null);
+  const [jokersOpen, setJokersOpen] = useState(false);
+  const [jokerBusy, setJokerBusy] = useState(false);
+  const [jokerError, setJokerError] = useState<string>();
+  const [jokerResult, setJokerResult] = useState<{ key: string; eliminated: string[] }>();
+  const jokerLock = useRef(false);
+  const jokerRound = `${question.id}:${question.roundNumber}:${question.jokerProof ?? ''}`;
+  const eliminated = jokerResult?.key === jokerRound ? jokerResult.eliminated : [];
   // Settings > "Soru Metin Boyutu" (normal / large) — real, app-wide effect
   const [isLargeText] = useState<boolean>(() => {
     try {
@@ -646,6 +658,8 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   // When question changes, reset time, answer state, and timer cleanly
   useEffect(() => {
     hasExpiredRef.current = false;
+    setJokersOpen(false);
+    setJokerError(undefined);
     setLocalSelectedOptionId(null);
     const remainingMs = question.timeRemainingMs ?? totalMs;
     const newEndTime = Date.now() + remainingMs;
@@ -654,6 +668,31 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     setSecondsLeft(Math.ceil(remainingMs / 1000));
     setAnswerState('answerable');
   }, [question.id, question.roundNumber, totalMs]);
+  useEffect(() => {
+    if (answerState !== 'answerable' || isLocked || feedback) setJokersOpen(false);
+  }, [answerState, isLocked, feedback]);
+  const useJokerAction = async (id: JokerId, buy: boolean) => {
+    if (!jokers || jokerLock.current || isLocked || feedback || answerState !== 'answerable' || eliminated.length) return;
+    if (!buy && endTimeRef.current - Date.now() < 2500) {
+      setJokerError('Bu soru için süre çok az. Sonraki soruda kullanabilirsin.');
+      return;
+    }
+    jokerLock.current = true;
+    setJokerBusy(true);
+    setJokerError(undefined);
+    try {
+      if (buy) await jokers.buy(id);
+      else {
+        setJokerResult({ key: jokerRound, eliminated: await jokers.apply(id) });
+        setJokersOpen(false);
+      }
+    } catch (error) {
+      setJokerError(error instanceof Error ? error.message : 'İşlem tamamlanamadı.');
+    } finally {
+      jokerLock.current = false;
+      setJokerBusy(false);
+    }
+  };
   useEffect(() => {
     if (question.timeRemainingMs === undefined) return;
     // A replay after reconnect can shorten the timer but must not restart it.
@@ -925,7 +964,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           score={myScore}
           showCrown={meLeads}
           hasAnswered={!!rightPlayer && myAnswered}
-          badge={streak >= 2 ? `🔥 x${streak}` : null}
+          badge={streak >= 2 ? `×${streak}` : null}
           compact={compact}
         />
         <CircularTimer
@@ -1018,6 +1057,22 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         </Text>
       </Animated.View>
 
+      {jokers && !isOptionsDisabled && (
+        <TouchableOpacity
+          style={[styles.jokerTrigger, eliminated.length > 0 && { opacity: .7 }]}
+          accessibilityRole="button"
+          disabled={eliminated.length > 0}
+          onPress={() => { setJokerError(undefined); setJokersOpen(true); }}
+        >
+          <WalletArtwork kind="joker_half" size={29} />
+          <Text style={styles.jokerTriggerText}>{eliminated.length ? 'Joker kullanıldı' : 'Jokerlerim'}</Text>
+        </TouchableOpacity>
+      )}
+      {jokers && jokersOpen && !isOptionsDisabled && (
+        <JokerPanel user={jokers.user} busy={jokerBusy} error={jokerError} onClose={() => setJokersOpen(false)}
+          onApply={id => { void useJokerAction(id, false); }} onBuy={id => { void useJokerAction(id, true); }} />
+      )}
+
       {/* 5. Şıklar */}
       <View style={[styles.optionsContainer, compact && { gap: 7 }, denseLayout && { gap: 5 }, wideAnswers && styles.optionsWide]}>
         {question.options.map((opt, index) => {
@@ -1026,6 +1081,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           const isCorrectChoice = !!feedback && feedback.correctOptionId === opt.id;
           const isWrongChoice = !!feedback && !feedback.unavailable && isMyChoice && !isCorrectChoice;
           const showPoints = !!feedback && feedback.isCorrect && isMyChoice && isCorrectChoice && feedback.pointsAwarded > 0;
+          const removed = !feedback && eliminated.includes(opt.id);
 
           return (
             <Animated.View
@@ -1042,13 +1098,14 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   feedback && isCorrectChoice && styles.optCardCorrect,
                   feedback && isWrongChoice && styles.optCardWrong,
                   isOptionsDisabled && !isMyChoice && !isCorrectChoice && styles.optCardDimmed,
+                  removed && { opacity: .42 },
                 ]}
-                disabled={isOptionsDisabled}
+                disabled={isOptionsDisabled || removed}
                 activeOpacity={0.8}
                 onPress={() => handleSelect(opt.id)}
                 testID={`quiz-option-${index}`}
                 accessibilityRole="button"
-                accessibilityLabel={`${optionLabels[index]} ${opt.text}`}
+                accessibilityLabel={removed ? `${optionLabels[index]} elendi` : `${optionLabels[index]} ${opt.text}`}
               >
                 {feedback && isCorrectChoice ? (
                   <GradientFill colors={['#6FF0C6', '#3FD08A', '#22A873']} stops={[0, 0.5, 1]} />
@@ -1086,7 +1143,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                 </View>
 
                 <Text style={[styles.optText, compact && styles.optTextCompact, isLargeText && styles.optTextLarge]} numberOfLines={2}>
-                  {opt.text}
+                  {removed ? 'Elendi' : opt.text}
                 </Text>
 
                 {feedback ? (
@@ -1209,6 +1266,8 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 };
 
 const styles = StyleSheet.create({
+  jokerTrigger: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', minHeight: 38, gap: 5, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: '#72597F', backgroundColor: '#271B40', marginBottom: 4 },
+  jokerTriggerText: { color: '#FFE0B1', fontSize: 13, fontFamily: THEME.fonts.extraBold },
   screenContainer: {
     justifyContent: 'space-between',
     paddingBottom: 12,

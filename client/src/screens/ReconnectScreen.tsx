@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, ScrollView } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
+import { WifiOff } from 'lucide-react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -119,7 +120,7 @@ export const ReconnectScreen: React.FC<ReconnectScreenProps> = ({
               />
             </Svg>
             <View style={styles.ringNumberWrap}>
-              <Text style={styles.wifiGlyph}>📡</Text>
+              <WifiOff size={47} color="#FFCB78" />
             </View>
           </Animated.View>
           <Text style={styles.title}>BAĞLANTI KOPTU</Text>

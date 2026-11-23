@@ -26,7 +26,7 @@ import {
   CharacterAvatar,
   CoinIcon,
   GemIcon,
-  CrownIcon,
+  LaurelIcon,
   StreakFlameIcon,
 } from '../components/TavrikoIcons';
 import { GradientFill, formatNumberTR } from '../components/TavrikoGradient';
@@ -64,7 +64,7 @@ interface HomeScreenProps {
   onNotifications: () => void;
   onSettings: () => void;
   onSeason?: () => void;
-  onShop?: () => void;
+  onShop?: (tab?: 'gold' | 'diamonds') => void;
   onEvents?: () => void;
   onInventory?: () => void;
   onRewards?: () => void;
@@ -251,7 +251,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 if (onShop) {
                   sound.playSound('reward');
                   sound.triggerHaptic('light');
-                  onShop();
+                  onShop('gold');
                 }
               }}
               activeOpacity={onShop ? 0.8 : 1}
@@ -266,7 +266,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 if (onShop) {
                   sound.playSound('reward');
                   sound.triggerHaptic('light');
-                  onShop();
+                  onShop('diamonds');
                 }
               }}
               activeOpacity={onShop ? 0.8 : 1}
@@ -338,7 +338,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <CharacterAvatar seed={user.avatarUrl || user.displayName} size={shortLayout ? 48 : 62} />
               </View>
               <View style={styles.profileCrown} pointerEvents="none">
-                <CrownIcon size={26} />
+                <LaurelIcon size={26} />
               </View>
             </View>
             <View style={styles.profileInfo}>
@@ -378,7 +378,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               stops={[0, 0.45, 0.72, 0.85]}
             />
             <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>⚔️ 1v1 DÜELLO</Text>
+              <Text style={styles.heroBadgeText}>1v1 DÜELLO</Text>
             </View>
             <View style={styles.heroBottom}>
               <Text
@@ -390,7 +390,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 HIZLI EŞLEŞME
               </Text>
               <View style={styles.heroSubRow}>
-                <CrownIcon size={16} />
+                <LaurelIcon size={16} />
                 <Text style={styles.heroSub} numberOfLines={wideLayout ? 2 : 1}>
                   15 Soru · {formatNumberTR(user.rankPoints ?? 1000)} Lig Puanı · {formatNumberTR(user.stats?.totalMatches ?? 0)} Düello Maçı
                 </Text>
@@ -542,7 +542,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 colors={['#D98A1F', '#8A4A12', '#4A2A10']}
                 borderColor="rgba(255, 196, 61, 0.6)"
                 glowColor="#FFC43D"
-                onPress={onShop}
+                onPress={() => onShop()}
               />
             )}
             {onEvents && (

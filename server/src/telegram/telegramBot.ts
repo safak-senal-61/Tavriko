@@ -982,7 +982,7 @@ export class TelegramBotService {
           `🔥 *En Yüksek Seri:* ${bestStreak} doğru cevap\n` +
           `🪙 *Bakiye:* ${prof.coins || 0} Altın | 💎 ${prof.gems || 0} Elmas\n` +
           `🎒 *Envanter:* ${(prof.inventory || []).length} eşya\n` +
-          `👑 *Durum:* ${prof.hasPremiumPass ? '⭐ Premium Pass Aktif' : 'Ücretsiz Oyuncu'}\n` +
+          `✦ *Durum:* ${prof.hasPremiumPass ? '⭐ Premium Pass Aktif' : 'Ücretsiz Oyuncu'}\n` +
           `━━━━━━━━━━━━━━━━━━━━━━━`;
         return { authorized: true, message: text };
       }
