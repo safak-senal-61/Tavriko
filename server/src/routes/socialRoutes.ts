@@ -347,7 +347,7 @@ router.post('/season/claim', requireUserAuth, async (req: Request, res: Response
   }
 });
 
-router.post('/season/premium-pass', requireUserAuth, (_req, res): void => {
+router.post('/season/premium-pass', (_req, res): void => {
   res.status(410).json({ error: 'Premium Pass artık elmasla alınmıyor. Güncel web sürümündeki Sezon ekranını kullan.' });
 });
 
