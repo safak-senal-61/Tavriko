@@ -2039,7 +2039,8 @@ export const RootNavigator: React.FC = () => {
                     const inventory = (current.user.inventory ?? []).filter(item => item.id !== productId);
                     const next = { ...current.user, coins: result.coins, inventory: [...inventory, result.item] };
                     setUser(next);
-                    refreshWallet();
+                    // The receipt is authoritative. Abort older profile reads without fetching the full profile again.
+                    pageDataCache.seed(profileUrl(API_BASE, user.id), next, user.id);
                   }
                 },
               } : undefined}
