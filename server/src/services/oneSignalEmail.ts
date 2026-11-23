@@ -51,10 +51,19 @@ type EmailMessage = { name?: string; email_subject: string; email_preheader: str
   { email_body: string } | { template_id: string; custom_data: { code: string; valid_minutes: number } }
 );
 
+export function sendOneSignalSupportEmail(
+  config: NonNullable<ReturnType<typeof getOneSignalEmailConfig>>,
+  email: string,
+  message: Extract<EmailMessage, { email_body: string }>,
+): Promise<boolean> {
+  return sendTransactionalEmail(config, email, message, 'support');
+}
+
 async function sendTransactionalEmail(
   config: NonNullable<ReturnType<typeof getOneSignalEmailConfig>>,
   email: string,
   message: EmailMessage,
+  purpose: 'security' | 'support' = 'security',
 ): Promise<boolean> {
   try {
     const response = await fetch(EMAIL_ENDPOINT, {
@@ -78,12 +87,12 @@ async function sendTransactionalEmail(
     if (!result || typeof result !== 'object' || !('id' in result) ||
         typeof result.id !== 'string' || !result.id.trim()) {
       // Do not log the address, response body, API key, or OTP.
-      logger.warn('AUTH', 'OneSignal güvenlik e-postasını kabul etmedi.', { status: response.status });
+      logger.warn(purpose === 'security' ? 'AUTH' : 'SYSTEM', 'OneSignal işlem e-postasını kabul etmedi.', { status: response.status });
       return false;
     }
     return true;
   } catch {
-    logger.warn('AUTH', 'OneSignal güvenlik e-postası gönderilemedi.');
+    logger.warn(purpose === 'security' ? 'AUTH' : 'SYSTEM', 'OneSignal işlem e-postası gönderilemedi.');
     return false;
   }
 }

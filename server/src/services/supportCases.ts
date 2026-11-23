@@ -1,6 +1,7 @@
 import type { PrismaClient, SupportCase } from '@prisma/client';
 import { portalAssignees, type AdminSession } from '../middleware/auth';
 import { audit, OperationError } from './adminAccountOperations';
+import { isBugReport, type BugPlayerEmail } from './supportBugEmails';
 
 const dayMs = 86_400_000;
 export const firstReplyHours = () => {
@@ -67,7 +68,9 @@ export async function replyToCase(client: PrismaClient, id: string, actor: { acc
         title: input.ask ? 'Destek ekibi bilgi bekliyor' : 'Destek talebinize yeni mesaj', sub: 'Mesajı Ayarlar → Hesap → Destek talepleri bölümünden açın.',
         timeText: 'Şimdi' } });
     }
-    return { id: reply.id, revision: input.revision + 1 };
+    const email: BugPlayerEmail | null = !player && isBugReport(old)
+      ? { id, accountId: old.accountId, subject: old.subject, text: input.body, event: 'reply' } : null;
+    return { id: reply.id, revision: input.revision + 1, ...(email ? { email } : {}) };
   });
 }
 
@@ -134,5 +137,8 @@ export async function updateCase(client: PrismaClient, admin: AdminSession, id: 
         sub: 'Yanıtı Ayarlar → Hesap → Destek talepleri bölümünde görebilirsiniz.', timeText: 'Şimdi',
       } });
     }
+    const email: BugPlayerEmail | null = input.status === 'resolved' && input.resolution && isBugReport(old)
+      ? { id, accountId: old.accountId, subject: old.subject, text: input.resolution, event: 'resolved' } : null;
+    return email;
   });
 }

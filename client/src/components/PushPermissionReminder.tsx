@@ -6,6 +6,7 @@ import {
   deferPushReminder,
   parsePushReminder,
   pushReminderDue,
+  shortenPushReminderSchedule,
   PUSH_REMINDER_FOREGROUND_DELAY_MS,
   type PushReminderPreference,
 } from '../services/pushReminderPolicy';
@@ -37,7 +38,11 @@ let write = Promise.resolve();
 function loadPreference() {
   if (cachedPreference) return Promise.resolve(cachedPreference);
   return loading ??= SecureStore.getItemAsync(KEY).catch(() => null).then(raw => {
-    return cachedPreference ??= parsePushReminder(raw);
+    if (cachedPreference) return cachedPreference;
+    const stored = parsePushReminder(raw);
+    const adjusted = shortenPushReminderSchedule(stored, Date.now());
+    if (adjusted.nextAt !== stored.nextAt) savePreference(adjusted);
+    return cachedPreference ??= adjusted;
   });
 }
 

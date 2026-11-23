@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
+import { waitUntil } from '@vercel/functions';
 import { db } from '../db/prismaClient';
 import { requireUserAuth } from '../middleware/auth';
 import { OperationError, uuidPattern } from '../services/adminAccountOperations';
 import { appealCutoff, caseText, openCase, publicCaseFields, readCaseReplies, replyToCase } from '../services/supportCases';
 import { isGuestIdentity } from '../services/playerAccess';
+import { BUG_REPORT_PREFIX, notifyOwnerOfBug } from '../services/supportBugEmails';
 
 export function createSupportRouter(client = db.rawClient) {
   const router = Router();
@@ -31,12 +33,25 @@ export function createSupportRouter(client = db.rawClient) {
   router.post('/', async (req, res) => {
     if (!req.is('application/json')) return res.status(415).json({ error: 'JSON gerekli.' });
     const { kind, moderationId, message } = req.body || {};
+    const bug = kind === 'bug';
     const text = caseText(message, 12, 1200);
-    const subject = kind === 'appeal' ? 'Moderasyon itirazı' : caseText(req.body?.subject, 4, 80);
+    const subject = kind === 'appeal' ? 'Moderasyon itirazı' : caseText(req.body?.subject, 4, bug ? 80 - BUG_REPORT_PREFIX.length : 80);
     if (!text || !subject || subject.includes('\n') || (kind === 'appeal' ? typeof moderationId !== 'string' || !uuidPattern.test(moderationId)
-      : kind !== 'support' || moderationId != null)) return res.status(400).json({ error: 'Konu, açıklama veya itiraz kaydı geçersiz.' });
+      : (!bug && kind !== 'support') || moderationId != null || subject.startsWith(BUG_REPORT_PREFIX.trimEnd()))) {
+      return res.status(400).json({ error: 'Konu, açıklama veya itiraz kaydı geçersiz.' });
+    }
     try {
-      res.status(201).json(await openCase(client, req.authUserId!, { kind, subject, message: text, moderationId: moderationId ?? null }));
+      const accountId = req.authUserId!;
+      const saved = await openCase(client, accountId, {
+        kind: kind === 'appeal' ? 'appeal' : 'support',
+        subject: bug ? BUG_REPORT_PREFIX + subject : subject, message: text, moderationId: moderationId ?? null,
+      });
+      if (bug) {
+        const delivery = notifyOwnerOfBug(client, { id: saved.id, accountId, subject: saved.subject });
+        if (process.env.VERCEL) waitUntil(delivery);
+        else void delivery;
+      }
+      res.status(201).json(saved);
     } catch (error) {
       if (error instanceof OperationError) return res.status(error.status).json({ error: error.message });
       res.status(503).json({ error: 'Talep kaydedilemedi. Yeniden göndermeden önce listeyi yenileyin.' });

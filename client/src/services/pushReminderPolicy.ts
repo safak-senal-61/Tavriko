@@ -1,6 +1,6 @@
-const DAY_MS = 86_400_000;
-const REMINDER_INTERVALS_DAYS = [3, 7, 14] as const;
-export const PUSH_REMINDER_FOREGROUND_DELAY_MS = 12_000;
+const HOUR_MS = 3_600_000;
+const REMINDER_INTERVALS_HOURS = [6, 24, 48, 72] as const;
+export const PUSH_REMINDER_FOREGROUND_DELAY_MS = 5_000;
 
 export interface PushReminderPreference {
   shown: number;
@@ -27,6 +27,15 @@ export function pushReminderDue(preference: PushReminderPreference, now: number)
 }
 
 export function deferPushReminder(preference: PushReminderPreference, now: number): PushReminderPreference {
-  const days = REMINDER_INTERVALS_DAYS[Math.min(preference.shown, REMINDER_INTERVALS_DAYS.length - 1)];
-  return { ...preference, shown: preference.shown + 1, nextAt: now + days * DAY_MS };
+  return { ...preference, shown: preference.shown + 1, nextAt: now + reminderInterval(preference.shown) };
+}
+
+function reminderInterval(index: number) {
+  return REMINDER_INTERVALS_HOURS[Math.min(index, REMINDER_INTERVALS_HOURS.length - 1)] * HOUR_MS;
+}
+
+/** Clamp old long schedules without resetting opt-outs or deferring overdue reminders. */
+export function shortenPushReminderSchedule(preference: PushReminderPreference, now: number) {
+  if (preference.stopped || !preference.shown) return preference;
+  return { ...preference, nextAt: Math.min(preference.nextAt, now + reminderInterval(preference.shown - 1)) };
 }
