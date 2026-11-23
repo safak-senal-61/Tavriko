@@ -130,7 +130,7 @@ router.post('/internal/room-joker', async (req: Request, res: Response): Promise
       !timingSafeEqual(Buffer.from(secret), Buffer.from(supplied))) {
     res.status(403).json({ error: 'Yetkisiz erişim' }); return;
   }
-  const { userId, roomCode, roundNumber, startedAt, deadline, questionId, jokerId, options, correctOptionId } = req.body || {};
+  const { userId, roomCode, roundNumber, startedAt, deadline, questionId, jokerId, options, correctOptionId, tactics } = req.body || {};
   const choices = Array.isArray(options) && options.length >= 2 && options.length <= 12 &&
     options.every(option => typeof option?.id === 'string' && option.id.length <= 160 &&
       typeof option.text === 'string' && option.text.length <= 1000);
@@ -140,7 +140,8 @@ router.post('/internal/room-joker', async (req: Request, res: Response): Promise
       !Number.isSafeInteger(startedAt) || !Number.isSafeInteger(deadline) || startedAt > Date.now() + 2000 ||
       deadline <= startedAt || deadline > startedAt + 120_000 ||
       typeof questionId !== 'string' || !questionId || questionId.length > 160 ||
-      !isJokerId(jokerId) || !choices || typeof correctOptionId !== 'string') {
+      !isJokerId(jokerId) || !choices || typeof correctOptionId !== 'string' ||
+      (tactics !== undefined && tactics !== 'friendly')) {
     res.status(400).json({ error: 'Geçersiz joker isteği.' }); return;
   }
   if (!await walletSchemaReady(db.rawClient)) {
@@ -149,7 +150,7 @@ router.post('/internal/room-joker', async (req: Request, res: Response): Promise
   try {
     const result = await consumeQuizJoker(
       { userId, sessionId: `room:${roomCode}:${startedAt}:${roundNumber}`, questionId },
-      jokerId, { options, correctOptionId }, deadline,
+      jokerId, { options, correctOptionId }, deadline, { tactics, startedAt },
     );
     if (result.status !== 'applied') {
       res.status(409).json({ error: result.status === 'empty' ? 'Envanterinde bu jokerden kalmadı.' : 'Bu soruda joker kullanılamıyor.' }); return;

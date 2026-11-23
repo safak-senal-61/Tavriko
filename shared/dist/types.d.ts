@@ -54,6 +54,7 @@ export interface ClientQuestion {
     jokerProof?: string;
     /** Live room capability, also identifies the exact round instance. */
     jokerRoundStartedAt?: number;
+    jokerTactics?: 'friendly';
     /** Only sent to the authenticated owner when reconnecting. */
     jokerEffect?: JokerEffect;
     id: string;
@@ -449,35 +450,101 @@ export interface ShopProduct {
 }
 export declare const LOW_GEMS = 100;
 export declare const LOW_COINS = 500;
+export declare const JOKER_GROUPS: readonly [{
+    readonly id: "hint";
+    readonly label: "İpuçları";
+}, {
+    readonly id: "remove";
+    readonly label: "Şık Eleme";
+}, {
+    readonly id: "tactic";
+    readonly label: "Taktikler";
+}];
+export type JokerGroup = typeof JOKER_GROUPS[number]['id'];
 export declare const JOKERS: readonly [{
     readonly id: "joker_eliminate";
     readonly name: "Tek Eleme";
     readonly desc: "Bir yanlış şıkkı kaldırır.";
     readonly price: 250;
     readonly eliminated: 1;
+    readonly group: "remove";
 }, {
     readonly id: "joker_half";
     readonly name: "Yarı Yarıya";
     readonly desc: "İki yanlış şıkkı kaldırır.";
     readonly price: 450;
     readonly eliminated: 2;
+    readonly group: "remove";
 }, {
     readonly id: "joker_initial";
     readonly name: "İlk Karakter";
     readonly desc: "Doğru şıkkın ilk harfini veya rakamını gösterir.";
     readonly price: 200;
     readonly eliminated: 0;
+    readonly group: "hint";
 }, {
     readonly id: "joker_word_count";
     readonly name: "Kelime Sayısı";
     readonly desc: "Doğru şıkkın kaç kelime olduğunu gösterir.";
     readonly price: 150;
     readonly eliminated: 0;
+    readonly group: "hint";
+}, {
+    readonly id: "joker_nearest";
+    readonly name: "Hedefi Bul";
+    readonly desc: "Sayısal soruda doğru değere en yakın yanlış şıkkı işaretler.";
+    readonly price: 180;
+    readonly eliminated: 0;
+    readonly group: "hint";
+}, {
+    readonly id: "joker_prophecy";
+    readonly name: "Kehanet";
+    readonly desc: "Doğru şıkkı sana işaretler. Antrenman, botlu ve arkadaş maçlarında.";
+    readonly price: 700;
+    readonly eliminated: 0;
+    readonly group: "hint";
+}, {
+    readonly id: "joker_reveal";
+    readonly name: "Cevap Göster";
+    readonly desc: "Doğru cevabın metnini gösterir. Antrenman, botlu ve arkadaş maçlarında.";
+    readonly price: 700;
+    readonly eliminated: 0;
+    readonly group: "hint";
+}, {
+    readonly id: "joker_dice";
+    readonly name: "Şans Zarı";
+    readonly desc: "Rastgele bir şıkkı önerir; sen onaylamadan cevap göndermez.";
+    readonly price: 100;
+    readonly eliminated: 0;
+    readonly group: "tactic";
+}, {
+    readonly id: "joker_streak_guard";
+    readonly name: "Seri Koruyucu";
+    readonly desc: "Bu soruda yanlış seçersen serini korur. Botlu ve arkadaş maçlarında.";
+    readonly price: 250;
+    readonly eliminated: 0;
+    readonly group: "tactic";
+}, {
+    readonly id: "joker_lightning";
+    readonly name: "Şimşek Cevap";
+    readonly desc: "İlk 5 saniyede doğru cevap verirsen %50 ek puan. Botlu ve arkadaş maçlarında.";
+    readonly price: 220;
+    readonly eliminated: 0;
+    readonly group: "tactic";
+}, {
+    readonly id: "joker_double";
+    readonly name: "Çifte Puan";
+    readonly desc: "Bu soruda doğru cevap puanını ikiye katlar. Botlu ve arkadaş maçlarında.";
+    readonly price: 400;
+    readonly eliminated: 0;
+    readonly group: "tactic";
 }];
 export type JokerId = typeof JOKERS[number]['id'];
 export interface JokerEffect {
     eliminated: string[];
     hint?: string;
+    highlightedOptionId?: string;
+    modifier?: 'streak_guard' | 'lightning' | 'double';
 }
 /**
  * Süreli kozmetik mağaza ürünleri için süre seçenekleri: 1 saatten en fazla 1

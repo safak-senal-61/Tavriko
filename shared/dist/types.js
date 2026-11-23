@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.EVENT_DEFINITIONS = exports.SHOP_CATALOG = exports.SEASON_REWARD_HOURS = exports.SHOP_DURATIONS = exports.JOKERS = exports.LOW_COINS = exports.LOW_GEMS = exports.SEASON_1_TIERS = void 0;
+exports.EVENT_DEFINITIONS = exports.SHOP_CATALOG = exports.SEASON_REWARD_HOURS = exports.SHOP_DURATIONS = exports.JOKERS = exports.JOKER_GROUPS = exports.LOW_COINS = exports.LOW_GEMS = exports.SEASON_1_TIERS = void 0;
 exports.getXpRequiredForLevel = getXpRequiredForLevel;
 exports.calculateLevelFromXp = calculateLevelFromXp;
 exports.generateSeason1Tiers = generateSeason1Tiers;
@@ -194,11 +194,23 @@ function generateSeason1Tiers() {
 exports.SEASON_1_TIERS = generateSeason1Tiers();
 exports.LOW_GEMS = 100;
 exports.LOW_COINS = 500;
+exports.JOKER_GROUPS = [
+    { id: 'hint', label: 'İpuçları' },
+    { id: 'remove', label: 'Şık Eleme' },
+    { id: 'tactic', label: 'Taktikler' },
+];
 exports.JOKERS = [
-    { id: 'joker_eliminate', name: 'Tek Eleme', desc: 'Bir yanlış şıkkı kaldırır.', price: 250, eliminated: 1 },
-    { id: 'joker_half', name: 'Yarı Yarıya', desc: 'İki yanlış şıkkı kaldırır.', price: 450, eliminated: 2 },
-    { id: 'joker_initial', name: 'İlk Karakter', desc: 'Doğru şıkkın ilk harfini veya rakamını gösterir.', price: 200, eliminated: 0 },
-    { id: 'joker_word_count', name: 'Kelime Sayısı', desc: 'Doğru şıkkın kaç kelime olduğunu gösterir.', price: 150, eliminated: 0 },
+    { id: 'joker_eliminate', name: 'Tek Eleme', desc: 'Bir yanlış şıkkı kaldırır.', price: 250, eliminated: 1, group: 'remove' },
+    { id: 'joker_half', name: 'Yarı Yarıya', desc: 'İki yanlış şıkkı kaldırır.', price: 450, eliminated: 2, group: 'remove' },
+    { id: 'joker_initial', name: 'İlk Karakter', desc: 'Doğru şıkkın ilk harfini veya rakamını gösterir.', price: 200, eliminated: 0, group: 'hint' },
+    { id: 'joker_word_count', name: 'Kelime Sayısı', desc: 'Doğru şıkkın kaç kelime olduğunu gösterir.', price: 150, eliminated: 0, group: 'hint' },
+    { id: 'joker_nearest', name: 'Hedefi Bul', desc: 'Sayısal soruda doğru değere en yakın yanlış şıkkı işaretler.', price: 180, eliminated: 0, group: 'hint' },
+    { id: 'joker_prophecy', name: 'Kehanet', desc: 'Doğru şıkkı sana işaretler. Antrenman, botlu ve arkadaş maçlarında.', price: 700, eliminated: 0, group: 'hint' },
+    { id: 'joker_reveal', name: 'Cevap Göster', desc: 'Doğru cevabın metnini gösterir. Antrenman, botlu ve arkadaş maçlarında.', price: 700, eliminated: 0, group: 'hint' },
+    { id: 'joker_dice', name: 'Şans Zarı', desc: 'Rastgele bir şıkkı önerir; sen onaylamadan cevap göndermez.', price: 100, eliminated: 0, group: 'tactic' },
+    { id: 'joker_streak_guard', name: 'Seri Koruyucu', desc: 'Bu soruda yanlış seçersen serini korur. Botlu ve arkadaş maçlarında.', price: 250, eliminated: 0, group: 'tactic' },
+    { id: 'joker_lightning', name: 'Şimşek Cevap', desc: 'İlk 5 saniyede doğru cevap verirsen %50 ek puan. Botlu ve arkadaş maçlarında.', price: 220, eliminated: 0, group: 'tactic' },
+    { id: 'joker_double', name: 'Çifte Puan', desc: 'Bu soruda doğru cevap puanını ikiye katlar. Botlu ve arkadaş maçlarında.', price: 400, eliminated: 0, group: 'tactic' },
 ];
 /**
  * Süreli kozmetik mağaza ürünleri için süre seçenekleri: 1 saatten en fazla 1

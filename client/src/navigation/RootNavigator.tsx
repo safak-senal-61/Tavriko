@@ -2008,7 +2008,8 @@ export const RootNavigator: React.FC = () => {
                   const result = await response.json();
                   if (!response.ok || !Array.isArray(result.eliminated)) throw new Error(result.error || 'Joker kullanılamadı.');
                   refreshWallet();
-                  return { eliminated: result.eliminated, hint: typeof result.hint === 'string' ? result.hint : undefined };
+                  return { eliminated: result.eliminated, hint: typeof result.hint === 'string' ? result.hint : undefined,
+                    highlightedOptionId: typeof result.highlightedOptionId === 'string' ? result.highlightedOptionId : undefined };
                 },
                 buy: async (productId: JokerId) => {
                   const response = await fetch(`${API_BASE}/social/shop/purchase`, {

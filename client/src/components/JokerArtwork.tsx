@@ -3,14 +3,15 @@ import { View } from 'react-native';
 import Svg, { Defs, G, LinearGradient, Path, Rect, Stop, Circle } from 'react-native-svg';
 import type { JokerId } from '@trivia/shared';
 
-const colors: Record<JokerId, [string, string, string]> = {
+type DrawnJoker = Extract<JokerId, 'joker_eliminate' | 'joker_half' | 'joker_initial' | 'joker_word_count'>;
+const colors: Record<DrawnJoker, [string, string, string]> = {
   joker_eliminate: ['#793760', '#321D42', '#FFABCA'],
   joker_half: ['#4D4693', '#25204D', '#CFB8FF'],
   joker_initial: ['#256577', '#172D4D', '#8DF2E0'],
   joker_word_count: ['#80543C', '#3E2841', '#FFDA91'],
 };
 
-export function JokerArtwork({ kind, size }: { kind: JokerId; size: number }) {
+export function JokerArtwork({ kind, size }: { kind: DrawnJoker; size: number }) {
   const gradientId = `joker-${useId().replace(/[^a-z0-9-]/gi, '')}`;
   const [light, dark, ink] = colors[kind];
   const half = kind === 'joker_half';

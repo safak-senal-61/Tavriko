@@ -4,7 +4,9 @@ import {
   PlayerScoreSummary,
   RoundResult,
   FinalMatchSummary,
+  JokerEffect,
 } from './types';
+import { LIGHTNING_WINDOW_MS } from './jokers';
 
 export interface ScoreInput {
   isCorrect: boolean;
@@ -85,7 +87,8 @@ export function applyPlayerRoundAnswer(
   room: GameRoom,
   playerId: string,
   selectedOptionId: string,
-  elapsedMs: number
+  elapsedMs: number,
+  modifier?: JokerEffect['modifier'],
 ): ScoreCalculationResult & { isCorrect: boolean } {
   const player = room.players[playerId];
   const question = room.currentQuestion;
@@ -104,6 +107,11 @@ export function applyPlayerRoundAnswer(
     currentStreak: player.currentStreak,
     penaltyForWrong: room.penaltyForWrong,
   });
+  if (!isCorrect && modifier === 'streak_guard') scoreResult.streak = player.currentStreak;
+  if (isCorrect && modifier === 'double') scoreResult.pointsAwarded *= 2;
+  if (isCorrect && modifier === 'lightning' && elapsedMs <= LIGHTNING_WINDOW_MS) {
+    scoreResult.pointsAwarded = Math.round(scoreResult.pointsAwarded * 1.5);
+  }
 
   player.hasAnsweredCurrentRound = true;
   player.lastAnswerTimeMs = elapsedMs;
