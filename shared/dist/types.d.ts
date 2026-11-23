@@ -439,7 +439,7 @@ export interface LevelProgress {
 export declare function getXpRequiredForLevel(level: number): number;
 export declare function calculateLevelFromXp(totalXp?: number): LevelProgress;
 export interface SeasonReward {
-    type: 'coin' | 'gem' | 'key' | 'chest' | 'booster' | 'frame' | 'badge' | 'name_effect' | 'background';
+    type: 'coin' | 'gem' | 'joker' | 'booster' | 'frame' | 'badge' | 'name_effect' | 'background';
     amount: number;
     title: string;
     itemId?: string;
@@ -452,7 +452,6 @@ export interface SeasonTierItem {
     premiumReward: SeasonReward;
 }
 export declare function generateSeason1Tiers(): SeasonTierItem[];
-export declare const SEASON_1_TIERS: SeasonTierItem[];
 export type ShopProductCategory = 'featured' | 'diamonds' | 'gold' | 'avatars' | 'frames' | 'name_effects' | 'boosters' | 'jokers' | 'backgrounds';
 export interface ShopProduct {
     id: string;
@@ -475,7 +474,6 @@ export interface ShopProduct {
     }[];
     grantCoins?: number;
     grantGems?: number;
-    grantPremiumPass?: boolean;
 }
 export declare const LOW_GEMS = 100;
 export declare const LOW_COINS = 500;
@@ -646,6 +644,7 @@ export declare const JOKERS: readonly [{
     readonly group: "tactic";
 }];
 export type JokerId = typeof JOKERS[number]['id'];
+export declare const SEASON_1_TIERS: SeasonTierItem[];
 export type JokerAction = 'retry' | 'pause' | 'support' | 'probe' | 'gold' | 'replace' | 'extra_time' | 'skip' | 'shield' | 'freeze';
 export interface JokerEffect {
     eliminated: string[];

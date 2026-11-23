@@ -27,7 +27,7 @@ import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { trackEvent } from '../services/analytics';
 import { loadStoredPreferences } from '../store/appPrefs';
-import { ClientQuestion, ALL_CATEGORIES, JokerEffect, JokerId, LIGHTNING_WINDOW_MS, UserProfile } from '@trivia/shared';
+import { canUseJoker, ClientQuestion, ALL_CATEGORIES, JOKERS, JokerEffect, JokerId, LIGHTNING_WINDOW_MS, UserProfile } from '@trivia/shared';
 import { JokerPanel } from '../components/WalletPanels';
 import { WalletArtwork } from '../components/WalletArtwork';
 import { ArrowUpRight, Flag } from 'lucide-react-native';
@@ -700,7 +700,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     }
   }, [jokerRound, question.jokerPauseUntil, question.jokerPauseRemainingMs]);
   const useJokerAction = async (id: JokerId, buy: boolean) => {
-    if (!jokers || jokerLock.current || isLocked || feedback || answerState !== 'answerable' || jokerEffect || frozen || skipped) return;
+    if (!jokers || jokerLock.current || isOptionsDisabled || jokerEffect) return;
     if (!buy && endTimeRef.current - Date.now() < 1500) {
       setJokerError('Bu soru için süre çok az. Sonraki soruda kullanabilirsin.');
       return;
@@ -839,6 +839,14 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     !!feedback ||
     hasExpiredRef.current ||
     secondsLeft <= 0;
+  const lightningAvailable = totalMs - secondsLeft * 1000 < LIGHTNING_WINDOW_MS;
+  const quickJokers = jokers && !jokerEffect && !isOptionsDisabled
+    ? JOKERS.flatMap(joker => {
+      const qty = jokers.user.inventory?.find(item => item.id === joker.id)?.qty ?? 0;
+      return qty > 0 && canUseJoker(joker.id, question.options, {
+        live: isMultiplayer, tactics: question.jokerTactics, capabilities: question.jokerCapabilities, lightningAvailable,
+      }) ? [{ ...joker, qty }] : [];
+    }).slice(0, 2) : [];
   const totalRounds = question.totalRounds || 10;
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const compact = windowHeight < 800;
@@ -1101,23 +1109,35 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
 
       {jokers && (
         <View style={styles.jokerRow}>
-          <TouchableOpacity
-            style={[styles.jokerTrigger, isOptionsDisabled && !jokerEffect && { opacity: .55 }]}
-            accessibilityRole="button"
-            disabled={!!jokerEffect || isOptionsDisabled || jokerBusy}
-            onPress={() => { setJokerError(undefined); setJokersOpen(true); }}
-          >
-            <WalletArtwork kind="joker_half" size={29} />
+          {jokerEffect || frozen || jokerBusy || (jokerRetry && !isOptionsDisabled) ? (
             <Text accessibilityLiveRegion="polite" style={styles.jokerTriggerText}>
               {frozen ? 'Sayacın donduruldu' : clockPaused ? 'Sayaç duraklatıldı' :
-                jokerRetry?.hint ?? jokerEffect?.hint ?? (jokerEffect ? 'Joker kullanıldı' : 'Jokerlerim')}
+                jokerRetry?.hint ?? jokerEffect?.hint ?? (jokerBusy ? 'Joker kullanılıyor…' : 'Joker kullanıldı')}
             </Text>
-          </TouchableOpacity>
+          ) : !isOptionsDisabled && (
+            <View style={styles.jokerActions}>
+              {quickJokers.map(joker => (
+                <TouchableOpacity key={joker.id} style={[styles.jokerTrigger, styles.jokerQuick]}
+                  accessibilityRole="button" accessibilityLabel={`${joker.name} kullan, ${joker.qty} adet`}
+                  onPress={() => { void useJokerAction(joker.id, false); }}>
+                  <WalletArtwork kind={joker.id} size={23} />
+                  <Text style={styles.jokerTriggerText}>{joker.name} · {joker.qty}</Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity style={[styles.jokerTrigger, !quickJokers.length && styles.jokerQuick]}
+                accessibilityRole="button" onPress={() => { setJokerError(undefined); setJokersOpen(true); }}>
+                <Text style={styles.jokerTriggerText}>Tüm jokerler</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {!jokersOpen && jokerError && !jokerEffect && !isOptionsDisabled && (
+            <Text accessibilityRole="alert" style={styles.jokerInlineError}>{jokerError}</Text>
+          )}
         </View>
       )}
       {jokers && jokersOpen && !jokerEffect && !isOptionsDisabled && (
         <JokerPanel user={jokers.user} options={question.options} live={isMultiplayer} tactics={question.jokerTactics} capabilities={question.jokerCapabilities}
-          lightningAvailable={totalMs - secondsLeft * 1000 < LIGHTNING_WINDOW_MS}
+          lightningAvailable={lightningAvailable}
           busy={jokerBusy} error={jokerError} onClose={() => setJokersOpen(false)}
           onApply={id => { void useJokerAction(id, false); }} onBuy={id => { void useJokerAction(id, true); }} />
       )}
@@ -1306,9 +1326,12 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 };
 
 const styles = StyleSheet.create({
-  jokerRow: { alignItems: 'flex-end', marginVertical: 2 },
-  jokerTrigger: { flexDirection: 'row', alignItems: 'center', maxWidth: '100%', minHeight: 44, gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: '#72597F', backgroundColor: '#271B40' },
-  jokerTriggerText: { color: '#FFE0B1', flexShrink: 1, fontSize: 13, fontFamily: THEME.fonts.extraBold },
+  jokerRow: { marginVertical: 2, gap: 4 },
+  jokerActions: { flexDirection: 'row', gap: 5 },
+  jokerTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 44, gap: 3, paddingHorizontal: 5, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: '#72597F', backgroundColor: '#271B40' },
+  jokerQuick: { flex: 1, minWidth: 0 },
+  jokerTriggerText: { color: '#FFE0B1', flexShrink: 1, fontSize: 12, fontFamily: THEME.fonts.extraBold },
+  jokerInlineError: { color: '#FFB7C9', fontSize: 12 },
   screenContainer: {
     justifyContent: 'space-between',
     paddingBottom: 12,

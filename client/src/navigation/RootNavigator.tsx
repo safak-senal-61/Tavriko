@@ -140,6 +140,12 @@ export const RootNavigator: React.FC = () => {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const isWeb = Platform.OS === 'web';
   const [checkoutReturn] = useState(() => isWeb && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('gem_checkout'));
+  const [seasonReturn] = useState(() => {
+    if (!isWeb || typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.has('season_checkout') || params.get('season') === '1';
+  });
+  const checkoutScreen = seasonReturn ? 'season' : checkoutReturn ? 'shop' : undefined;
   const isNativeTablet = !isWeb && windowWidth > 540;
 
   const isWebOAuthReturn =
@@ -160,7 +166,7 @@ export const RootNavigator: React.FC = () => {
     : isWebDeveloperReturn
     ? 'developer'
     : initialAuthUser
-    ? (initialAuthUser.isGuest ? 'categories' : checkoutReturn ? 'shop' : pendingReferral ? 'friends' : 'home')
+    ? (initialAuthUser.isGuest ? 'categories' : checkoutScreen ?? (pendingReferral ? 'friends' : 'home'))
     : 'splash';
 
   const [currentScreen, setCurrentScreen] = useState<ScreenName>(initialScreen);
@@ -1003,7 +1009,7 @@ export const RootNavigator: React.FC = () => {
     setUser(loggedInUser, token);
     const referral = getPendingReferral();
     setPendingReferral(referral);
-    navigateTo(checkoutReturn ? 'shop' : referral ? 'friends' : 'home');
+    navigateTo(checkoutScreen ?? (referral ? 'friends' : 'home'));
   };
   const handleSaveProfile = async (name: string, rawAvatarSeedOrUri: string) => {
     if (user) {
@@ -1783,7 +1789,7 @@ export const RootNavigator: React.FC = () => {
           <SplashScreen
             onFinish={() => {
               if (user) {
-                navigateTo(isGuest ? 'categories' : checkoutReturn ? 'shop' : 'home');
+                navigateTo(isGuest ? 'categories' : checkoutScreen ?? 'home');
               } else {
                 navigateTo('auth');
               }
@@ -2381,7 +2387,7 @@ export const RootNavigator: React.FC = () => {
             user={user || undefined}
             apiBaseUrl={API_BASE}
             onUpdateUser={(u) => setUser(u)}
-            onRefreshUser={() => { void refreshUserProfile(true); }}
+            onRefreshUser={refreshWallet}
             onBack={() => navigateTo('home')}
             onProfile={() => navigateTo('profile')}
           />

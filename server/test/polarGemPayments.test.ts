@@ -11,7 +11,7 @@ const env = { ...products, POLAR_GEMS_ENABLED: 'true', POLAR_GEMS_SANDBOX: 'true
   POLAR_GEMS_APP_ORIGIN: 'https://app.example.test', POLAR_GEMS_ACCESS_TOKEN: 'fake-token', POLAR_GEMS_WEBHOOK_SECRET: 'test-webhook' };
 
 describe('paid diamonds and joker economy', () => {
-  it('keeps availability off without both tables or a working database', async () => {
+  it('checks and caches payment and joker table readiness independently', async () => {
     const missing = { $queryRaw: vi.fn().mockResolvedValue([{ ready: false }]) };
     const unavailable = { $queryRaw: vi.fn().mockRejectedValue(new Error('offline')) };
     const migrated = { $queryRaw: vi.fn().mockResolvedValue([{ ready: true }]) };
@@ -20,6 +20,12 @@ describe('paid diamonds and joker economy', () => {
     expect(await walletSchemaReady(migrated as unknown as PrismaClient)).toBe(true);
     expect(await walletSchemaReady(migrated as unknown as PrismaClient)).toBe(true);
     expect(migrated.$queryRaw).toHaveBeenCalledTimes(1);
+    const jokersOnly = { $queryRaw: vi.fn().mockResolvedValueOnce([{ ready: true }]).mockResolvedValueOnce([{ ready: false }]) };
+    const prisma = jokersOnly as unknown as PrismaClient;
+    expect(await walletSchemaReady(prisma)).toBe(true);
+    expect(await walletSchemaReady(prisma, 'gems')).toBe(false);
+    expect(await walletSchemaReady(prisma)).toBe(true);
+    expect(jokersOnly.$queryRaw).toHaveBeenCalledTimes(2);
   });
 
   it('leaves checkout off without configuration and keeps packs separated', () => {
@@ -31,7 +37,12 @@ describe('paid diamonds and joker economy', () => {
     expect(SHOP_CATALOG.filter(pack => pack.category === 'jokers').map(pack => [pack.id, pack.currency, pack.price]))
       .toEqual(JOKERS.map(joker => [joker.id, 'coins', joker.price]));
     expect(EVENT_DEFINITIONS.every(event => event.rewardGems === 0)).toBe(true);
-    expect(SEASON_1_TIERS.every(t => t.freeReward.type !== 'gem' && !['gem', 'chest', 'key'].includes(t.premiumReward.type))).toBe(true);
+    const tracks = SEASON_1_TIERS.flatMap(t => [t.freeReward, t.premiumReward]);
+    expect(tracks.every(reward => !['gem', 'chest', 'key'].includes(reward.type))).toBe(true);
+    expect(tracks.filter(reward => reward.type === 'joker')).toHaveLength(9);
+    expect(tracks.filter(reward => reward.type === 'joker').every(reward =>
+      reward.amount > 0 && JOKERS.some(joker => joker.id === reward.itemId && joker.name === reward.title))).toBe(true);
+    expect(SHOP_CATALOG.some(pack => pack.id === 'pack_season_premium_pass')).toBe(false);
   });
 
   it('accepts a fresh signature over the original payload only', () => {

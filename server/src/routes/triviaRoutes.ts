@@ -114,7 +114,9 @@ router.post('/questions/practice/joker', practiceJokerLimit, requireUserAuth, as
   try {
     const result = await consumeQuizJoker({ userId, sessionId, questionId }, jokerId, question, Number(deadline));
     if (result.status !== 'applied') {
-      res.status(409).json({ error: result.status === 'empty' ? 'Envanterinde bu jokerden kalmadı.' : 'Bu soruda joker kullanılamıyor.' }); return;
+      res.status(409).json({ error: result.status === 'empty' ? 'Envanterinde bu jokerden kalmadı.'
+        : result.status === 'already_used' ? 'Bu soruda başka bir joker kullanıldı.'
+        : 'Bu soruda joker kullanılamıyor.' }); return;
     }
     res.json(result.effect);
   } catch {
@@ -161,7 +163,9 @@ router.post('/internal/room-joker', async (req: Request, res: Response): Promise
       jokerId, { options, correctOptionId }, deadline, { tactics, startedAt, capabilities: activeCapabilities, votes: counts },
     );
     if (result.status !== 'applied') {
-      res.status(409).json({ error: result.status === 'empty' ? 'Envanterinde bu jokerden kalmadı.' : 'Bu soruda joker kullanılamıyor.' }); return;
+      res.status(409).json({ error: result.status === 'empty' ? 'Envanterinde bu jokerden kalmadı.'
+        : result.status === 'already_used' ? 'Bu soruda başka bir joker kullanıldı.'
+        : 'Bu soruda joker kullanılamıyor.' }); return;
     }
     res.json(result.effect);
   } catch {

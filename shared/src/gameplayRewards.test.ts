@@ -55,7 +55,7 @@ describe('gameplay rewards', () => {
       expect(id).not.toMatch(/^(chest|key|badge)(_|$)|^pack_(starter|mega_bundle)$/);
       expect(grantItems?.some(i => ['chest', 'key', 'badge'].includes(i.category)) ?? false).toBe(false);
     }
-    expect(SEASON_1_TIERS.some(tier => tier.freeReward.type === 'chest')).toBe(true);
+    expect(SEASON_1_TIERS.some(tier => ['chest', 'key'].includes(tier.freeReward.type))).toBe(false);
     expect(SEASON_1_TIERS.some(tier => ['chest', 'key'].includes(tier.premiumReward.type))).toBe(false);
   });
 });

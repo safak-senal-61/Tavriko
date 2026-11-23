@@ -181,7 +181,7 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
       </View>
     );
   }
-  const img = pId === 'pack_season_premium_pass' ? STORE_IMG.trophy : storeImageFor(pId, product.category);
+  const img = storeImageFor(pId, product.category);
   if (img) {
     const tint = RARITY_COLORS[product.rarity || 'common'];
     return (
@@ -408,7 +408,6 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
   const isProductOwned = (product: ShopProduct): boolean => {
     if (!user) return false;
-    if (product.grantPremiumPass && user.hasPremiumPass) return true;
     if (product.category === 'frames' && user.inventory?.some((i) => i.id === product.id)) return true;
     if (product.category === 'name_effects' && user.inventory?.some((i) => i.id === product.id)) return true;
     if (product.category === 'backgrounds' && user.inventory?.some((i) => i.id === product.id)) return true;

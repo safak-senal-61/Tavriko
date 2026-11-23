@@ -113,6 +113,7 @@ model User {
   rewardedAds               RewardedAdAttempt[]
   gameplayRewardClaims      GameplayRewardClaim[]
   polarGemOrders            PolarGemOrder[]
+  polarSeasonOrders         PolarSeasonOrder[]
   practiceJokerUses         PracticeJokerUse[]
 
   @@index([rankPoints(sort: Desc)])
@@ -134,6 +135,22 @@ model PolarGemOrder {
 
   @@index([userId, createdAt])
   @@map("polar_gem_orders")
+}
+
+model PolarSeasonOrder {
+  checkoutId String @id
+  orderId String? @unique
+  userId String
+  productId String
+  amount Int
+  sandbox Boolean
+  granted Boolean @default(false)
+  status String @default("open")
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("polar_season_orders")
 }
 
 model PracticeJokerUse {

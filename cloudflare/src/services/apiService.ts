@@ -18,9 +18,12 @@ export class ApiService {
       headers: { 'Content-Type': 'application/json', 'x-internal-secret': this.internalSecret },
       body: JSON.stringify({ ...input, questionId: question.id, options: question.options, correctOptionId: question.correctOptionId }),
       signal: AbortSignal.timeout(4500),
-    });
-    const data = await response.json() as JokerEffect & { error?: string };
-    if (!response.ok || !Array.isArray(data.eliminated)) throw new Error(data.error || 'Joker kullanılamadı. Tekrar dene.');
+    }).catch(() => { throw new Error('Joker sunucusuna ulaşılamadı. Tekrar dene.'); });
+    const data = await response.json().catch(() => null) as (JokerEffect & { error?: string }) | null;
+    if (response.status === 403 || response.status === 404) throw new Error('Canlı maç jokerleri şu anda kullanılamıyor.');
+    if (!response.ok || !Array.isArray(data?.eliminated)) {
+      throw new Error(typeof data?.error === 'string' ? data.error : 'Joker kullanılamadı. Tekrar dene.');
+    }
     return {
       eliminated: data.eliminated,
       ...(typeof data.hint === 'string' ? { hint: data.hint } : {}),

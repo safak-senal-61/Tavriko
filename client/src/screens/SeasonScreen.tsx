@@ -8,7 +8,8 @@ import {
   Modal,
   Platform,
 } from 'react-native';
-import { UserProfile, SEASON_1_TIERS, SeasonTierItem, SeasonReward } from '@trivia/shared';
+import { UserProfile, SEASON_1_TIERS, SeasonTierItem, SeasonReward, isJokerId } from '@trivia/shared';
+import { WalletArtwork } from '../components/WalletArtwork';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
@@ -19,10 +20,7 @@ import {
   TavrikoProgressBar,
   Button3D,
   XpStarIcon,
-  ChestIcon,
   CoinIcon,
-  GemIcon,
-  KeyIcon,
   LaurelIcon,
   BadgeShieldIcon,
   SpeedBoltIcon,
@@ -69,6 +67,7 @@ const RARITY_COLOR: Record<string, string> = {
 };
 
 const TIER_XP = 400;
+const rewardLabel = (reward: SeasonReward) => reward.type === 'joker' ? `${reward.amount}× ${reward.title}` : reward.title;
 
 export const SeasonScreen: React.FC<SeasonScreenProps> = ({
   user,
@@ -84,6 +83,8 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
   const [claimingAll, setClaimingAll] = useState(false);
   const [claimedRewardModal, setClaimedRewardModal] = useState<SeasonReward | null>(null);
   const [isPurchasingPass, setIsPurchasingPass] = useState(false);
+  const [offer, setOffer] = useState<{ amount: number; sandbox: boolean } | null>(null);
+  const [checkingOffer, setCheckingOffer] = useState(false);
   const [onlyClaimable, setOnlyClaimable] = useState(false);
 
   const scrollRef = useRef<any>(null);
@@ -94,8 +95,73 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
 
   const seasonXp = user?.seasonXp || 0;
   const hasPremium = !!user?.hasPremiumPass;
+  const base = apiBaseUrl || DEFAULT_API_BASE;
+  const canCheckOffer = Platform.OS === 'web' && !!user && !user.isGuest && !hasPremium;
   const claimedFree = user?.claimedSeasonFreeTiers || user?.claimedSeasonTiers || [1];
   const claimedPremium = user?.claimedSeasonPremiumTiers || [];
+
+  useEffect(() => {
+    if (!canCheckOffer) return;
+    const controller = new AbortController();
+    setCheckingOffer(true);
+    setOffer(null);
+    void fetch(`${base}/social/season/checkout/availability`, { method: 'POST', signal: controller.signal })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!controller.signal.aborted && data?.enabled === true && Number.isSafeInteger(data.amount) && data.amount > 0) {
+          setOffer({ amount: data.amount, sandbox: data.sandbox === true });
+        }
+      }).catch(() => {})
+      .finally(() => { if (!controller.signal.aborted) setCheckingOffer(false); });
+    return () => controller.abort();
+  }, [base, canCheckOffer, user?.id]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !user || user.isGuest) return;
+    const address = new URL(window.location.href);
+    const id = address.searchParams.get('season_checkout');
+    const clearReturn = () => {
+      const current = new URL(window.location.href);
+      current.searchParams.delete('season_checkout');
+      current.searchParams.delete('season');
+      window.history.replaceState(window.history.state, '', current);
+    };
+    if (!id || !/^[a-f0-9-]{36}$/i.test(id)) {
+      if (id || address.searchParams.has('season')) clearReturn();
+      return;
+    }
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    let attempts = 0;
+    setIsError(false);
+    setStatusMessage('Ödemen Polar tarafından doğrulanıyor.');
+    const check = async () => {
+      attempts += 1;
+      try {
+        const res = await fetch(`${base}/social/season/checkout/${id}`, { headers: authHeaders(), signal: controller.signal });
+        if (res.ok) {
+          const { status } = await res.json();
+          if (controller.signal.aborted) return;
+          if (status === 'paid' || status === 'refunded') {
+            clearReturn();
+            setStatusMessage(status === 'paid' ? 'Ödemen doğrulandı. Premium Pass etkinleştirildi.' : 'Bu ödeme iade edildi.');
+            onRefreshUser?.();
+            return;
+          }
+        } else if (res.status === 404 && !controller.signal.aborted) {
+          clearReturn();
+          setIsError(true);
+          setStatusMessage('Ödeme bu hesapta bulunamadı. Ödeme sırasında kullandığın hesapla giriş yap.');
+          return;
+        }
+      } catch {}
+      if (controller.signal.aborted) return;
+      if (attempts < 8) timer = setTimeout(check, 2200);
+      else setStatusMessage('Ödeme henüz doğrulanmadı. Tekrar ödeme yapmadan önce Sezon ekranını yenile.');
+    };
+    void check();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [base, user?.id, user?.isGuest, onRefreshUser]);
 
   const currentTier = Math.min(50, Math.max(1, Math.floor(seasonXp / TIER_XP) + 1));
   const currentTierBaseXp = (currentTier - 1) * TIER_XP;
@@ -243,35 +309,29 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
   };
 
   const handleBuyPremiumPass = async () => {
-    if (!user || inFlightRef.current) return;
+    if (!canCheckOffer || !offer || inFlightRef.current) return;
     setStatusMessage(null);
     setIsError(false);
 
-    if ((user.gems || 0) < 250) {
-      failWith(`Yetersiz elmas. Premium Pass için 250 elmas gerekir (mevcut: ${user.gems || 0}).`);
-      return;
-    }
-
-    const base = apiBaseUrl || DEFAULT_API_BASE;
     inFlightRef.current = true;
     setIsPurchasingPass(true);
     try {
       sound.playSound('tap');
-      const res = await fetch(`${base}/social/season/premium-pass`, {
+      const res = await fetch(`${base}/social/season/checkout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ userId: user.id }),
+        headers: authHeaders(),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         failWith(data.error || 'İşlem başarısız oldu.');
         return;
       }
-      sound.playSound('reward');
-      sound.triggerHaptic('success');
-      setIsError(false);
-      setStatusMessage('Sezon 1 Premium Pass etkinleştirildi.');
-      if (data.user && onUpdateUser) onUpdateUser(data.user);
+      const url = new URL(data.url);
+      const origins = offer.sandbox ? ['https://sandbox.polar.sh'] : ['https://polar.sh', 'https://buy.polar.sh'];
+      if (!origins.includes(url.origin) || !url.pathname.startsWith('/checkout/') || url.username || url.password) {
+        failWith('Ödeme adresi doğrulanamadı.'); return;
+      }
+      window.location.assign(url.href);
     } catch {
       failWith('Bağlantı hatası oluştu.');
     } finally {
@@ -287,7 +347,8 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
     let img: any = null;
     if (type === 'coin') img = storeImageFor(`coins_${reward.amount}`);
     else if (type === 'gem') img = storeImageFor(`gems_${reward.amount}`);
-    else if (type === 'chest' || type === 'key' || type === 'booster' || type === 'badge') {
+    else if (type === 'joker' && isJokerId(reward.itemId)) return <WalletArtwork kind={reward.itemId} size={Math.round(size * 1.35)} />;
+    else if (type === 'booster' || type === 'badge') {
       img = storeImageFor(reward.itemId || type, type);
     }
     if (img) {
@@ -385,7 +446,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
           )}
         </View>
         <Text style={isPremiumTrack ? styles.premiumRewardAmount : styles.rewardAmount} numberOfLines={2}>
-          {reward.title}
+          {rewardLabel(reward)}
         </Text>
         {claimed ? (
           <View style={styles.claimedPill}>
@@ -513,19 +574,22 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
               <View style={{ flex: 1 }}>
                 <Text style={styles.passPromoTitle}>Premium Pass</Text>
                 <Text style={styles.passPromoSub}>
-                  50 kademede 15.000 Altın, 1.200 Elmas, Alev Çerçevesi ve Efsanevi Sandıklar.
+                  Altın, sabit joker ödülleri ve Alev Çerçevesi. Abonelik değil, tek seferlik ödeme.
                 </Text>
               </View>
             </View>
-            <TouchableOpacity
+            {canCheckOffer && offer ? <TouchableOpacity
               style={styles.passBuyBtn}
               onPress={handleBuyPremiumPass}
               activeOpacity={0.85}
-              disabled={isPurchasingPass || claimingAll}
+              accessibilityRole="button"
+              disabled={isPurchasingPass || claimingAll || !!loadingKey}
             >
-              <GemIcon size={18} />
-              <Text style={styles.passBuyBtnText}>{isPurchasingPass ? 'Açılıyor...' : '250'}</Text>
-            </TouchableOpacity>
+              <Text style={styles.passBuyBtnText}>{isPurchasingPass ? 'Açılıyor…' :
+                `${offer.sandbox ? 'Test ödemesi' : 'Polar ile satın al'} · ${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(offer.amount / 100)}`}</Text>
+            </TouchableOpacity> : <Text style={styles.passPromoSub}>{Platform.OS !== 'web'
+              ? 'Satın alma web sürümünde yapılır.' : !user || user.isGuest ? 'Satın almak için giriş yap.'
+              : checkingOffer ? 'Ödeme durumu kontrol ediliyor…' : 'Polar ödemesi henüz açık değil.'}</Text>}
           </Reanimated.View>
         ) : (
           <View style={styles.passActiveBanner}>
@@ -638,7 +702,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
                 {renderRewardIcon(claimedRewardModal, 56)}
               </Reanimated.View>
               <Text style={styles.modalTitle}>Ödül alındı</Text>
-              <Text style={styles.modalRewardName}>{claimedRewardModal.title}</Text>
+              <Text style={styles.modalRewardName}>{rewardLabel(claimedRewardModal)}</Text>
               <Text style={styles.modalSub}>Ödülünüz hesabınıza ve envanterinize tanımlandı.</Text>
               <Button3D
                 title="Harika"
@@ -729,17 +793,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 200, 55, 0.45)',
     overflow: 'hidden',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: 'stretch',
     gap: 10,
   },
-  passPromoLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  passPromoLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   passPromoTitle: { fontFamily: THEME.fonts.black, fontSize: 16, color: '#FFFFFF' },
   passPromoSub: { color: '#D9CDF5', fontSize: 11, fontFamily: THEME.fonts.bold, marginTop: 2 },
   passBuyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     backgroundColor: KIT.gold,
     paddingVertical: 10,

@@ -15,11 +15,11 @@
 
 4. `/admin` → “Site Sağlığı / Polar Sandbox” → “Test ödemesi başlat”. [Polar test kartı](https://polar.sh/docs/integrate/sandbox) `4242 4242 4242 4242`, ileri tarih ve herhangi bir üç haneli CVC ile deneyin. Gerçek kart veya müşteri bilgisi girmeyin. Dönüşte `confirmed` yalnızca isteğin alındığını belirtir. Panel `succeeded` durumunu Polar'dan sunucu tarafında okuyana kadar ödemeyi doğrulamaz; gerekirse “Durumu tekrar sorgula”yı kullanın.
 
-Checkout yalnızca yönetici portalı oturumuyla açılır. Demo için webhook, ücretli sipariş defteri veya oyuncuya ürün teslimi yoktur. Demo dışında TRY ürünlerinin satışı ve eski kart formu kapalıdır; katalogdaki altın/elmas ile alışveriş devam eder.
+Bu demo checkout'u yalnızca yönetici portalı oturumuyla açılır. Demo için webhook, ücretli sipariş defteri veya oyuncuya ürün teslimi yoktur. Oyunculara yönelik Sezon Pass ayrı bir akıştır.
 
 ## Oynayarak kazanılan ödüller
 
-Sandıklar, anahtarlar ve rozetler mağazada satılmaz. Premium Sezon Pass hattındaki sandık ve anahtarlar yerine miktarı önceden belli altın veya elmas gelir. Ücretsiz Sezon Pass ve etkinlik ödülleri ile önceden kazanılmış eşyalar korunur. Ücretsiz sandık içerikleri rastgele kalır ve Polar checkout'una bağlanmaz.
+Sandıklar, anahtarlar ve rozetler mağazada satılmaz. Sezon 1'in iki hattı da sabit ödüller içerir; sandık ve anahtar yoktur. Daha önce kazanılmış eşyalar korunur. Maç görevlerinden ücretsiz kazanılan sandıklar Polar checkout'una bağlanmaz.
 
 Oyna → Ödüller ekranı, sunucunun doğruladığı ve oyuncunun en az bir doğru cevap verdiği tamamlanmış maçları sayar. Solo alıştırma ve istemci istatistikleri sayılmaz; geçmişteki doğrulanmış kayıtlar sayılır. Her sandık eşiği hesap başına bir kez alınır ve anahtarıyla birlikte envantere gider. Rozetler karşılıklı kabul edilmiş arkadaşlık, maç sayısı, toplam doğru cevap, farklı oyun günleri (Türkiye saati) ve kusursuz maç görevlerinden kazanılır. Görev rozetleri envanterden süresiz kuşanılır.
 
@@ -49,3 +49,16 @@ Site kökündeki `/ads.txt` ve HTML’deki `google-adsense-account` meta etiketi
 ## Canlı ödemeden önce
 
 Canlı kullanıma otomatik geçiş yoktur. Satılacak ürünlerin [Polar Kabul Edilebilir Kullanım Politikası](https://polar.sh/legal/acceptable-use-policy) ve varsa mobil uygulama mağazası kuralları açısından uygunluğu ayrıca değerlendirilmelidir. Üretim ödemesi için imzalı sipariş bildirimleri, tekrarları güvenle işleyen teslimat, kalıcı sipariş kaydı ve iade/iptal kuralları gerekir.
+
+## Sezon 1 Premium Pass
+
+Sezon ekranı sandık ve anahtar vermez; jokerler ve diğer ödüller kademeye göre sabittir. Eski elmas satın alma yolu kapatılmıştır. Daha önce alınan Pass ve ödüller korunur. Polar ödemesi yalnızca web arayüzünde başlatılır.
+
+1. İzole bir veritabanında `20261123130000_polar_season_pass` migration'ını test et. Canlıya geçerken önce mevcut migration durumunu doğrula, sonra `npx prisma migrate deploy --schema=server/prisma/schema.prisma` çalıştır. Yeni ledger, mevcut kullanıcı ve ödül kayıtlarını değiştirmez.
+2. Polar'da abonelik olmayan, sabit TRY fiyatlı ayrı bir Sezon 1 ürünü oluştur. [Polar ürün ve fiyatlandırma ayarları](https://polar.sh/docs/features/products) ile fiyatı doğrula. Vercel sunucu ortamına `POLAR_SEASON_PRODUCT_ID`, `POLAR_SEASON_AMOUNT_KURUS` (ondalık TL değil tam sayı kuruş), `POLAR_SEASON_APP_ORIGIN` (ör. `https://tavriko-app.vercel.app`, son `/` olmadan) ve checkout okuma/yazma yetkili `POLAR_SEASON_ACCESS_TOKEN` ekle.
+3. Polar webhook hedefini `/api/webhooks/polar-season` olarak ayarla ve `order.paid`, `order.refunded` olaylarını seç; hedefin imza sırrını `POLAR_SEASON_WEBHOOK_SECRET` olarak kaydet. Checkout oluşturmak için `POLAR_SEASON_ENABLED=true` gerekir. Satış kapatılsa bile webhook teslimi ve iadeler çalışmaya devam eder. Checkout yanıtı ve sipariş olayları için [Polar Checkout API](https://polar.sh/docs/api-reference/2026-10/checkouts/create-checkout-session) sözleşmesine bak.
+4. Önce test ortamında `POLAR_SEASON_SANDBOX=true` ile açık checkout'u yeniden kullanma, başarılı ödeme sonrası Sezon ekranına dönüş, geciken webhook, tekrar teslim ve tam iade senaryolarını dene. Sandbox'ı ayrı veritabanıyla çalıştır; Vercel production ortamında Sandbox Pass devre dışıdır. Canlı ürün ve webhook onayı olmadan satış bayrağını açma. Ödül ilerlemesi ve daha önce alınmış eşyalar iade sırasında silinmez; yalnızca bu ödeme ile açılan erişim kapanır.
+
+## Realtime Worker sürüm kontrolü
+
+Yeni jokerler için `shared` paketini derle, `npm run build:cloudflare` ve `npm run test:cloudflare` komutlarını çalıştır. Cloudflare'da doğru hesapla `npm run deploy:cloudflare` çalıştırmadan önce Vercel ile Worker'ın mevcut `INTERNAL_API_SECRET` değerlerinin eşleştiğini ve `practice_joker_uses` migration'ının uygulandığını doğrula. Dağıtım sonrası [Worker sağlık uç noktası](https://tavriko-realtime.uncertainidentity8.workers.dev/health) `advancedQuizJokers: true` göstermeli. Bu bayrak tek başına stok tüketimini doğrulamaz; bir test hesabıyla botlu ve arkadaş maçında birer joker kullanıp etkinin ve stok düşüşünün doğru olduğunu kontrol et.

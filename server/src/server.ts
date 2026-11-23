@@ -29,6 +29,7 @@ import { initErrorMonitor, captureError } from './utils/errorMonitor';
 import triviaRoutes from './routes/triviaRoutes';
 import socialRoutes from './routes/socialRoutes';
 import { polarGemPlayerRoutes, polarGemWebhook } from './routes/polarGemRoutes';
+import { polarSeasonPlayerRoutes, polarSeasonWebhook } from './routes/polarSeasonRoutes';
 import referralRoutes from './routes/referralRoutes';
 import pushRoutes from './routes/pushRoutes';
 import { requireAdminAuth, getAdminSessionFromRequest, isPortalConfigured, setTelegramAdminVerifier } from './middleware/auth';
@@ -95,6 +96,7 @@ export function createApp() {
     })
   );
   app.use('/api/webhooks/polar-gems', polarGemWebhook);
+  app.use('/api/webhooks/polar-season', polarSeasonWebhook);
   app.use(express.json({ limit: '15mb' }));
   app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
@@ -3741,6 +3743,7 @@ export function createApp() {
   app.use('/api', triviaRoutes);
   app.use('/api/social', socialRoutes);
   app.use('/api/social', polarGemPlayerRoutes);
+  app.use('/api/social', polarSeasonPlayerRoutes);
   app.use('/api/referrals', referralRoutes);
   app.use('/api/push', pushRoutes);
   app.use(legalRouter);
