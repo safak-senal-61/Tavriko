@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Image as ImageIcon, Sparkles } from 'lucide-react-native';
+import { WalletArtwork } from '../components/WalletArtwork';
 import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import {
   View,
@@ -28,7 +30,7 @@ import {
   SpeedBoltIcon,
   StreakFlameIcon,
   HeartIcon,
-  CrownIcon,
+  LaurelIcon,
 } from '../components/TavrikoIcons';
 import Reanimated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { Image } from 'react-native';
@@ -61,22 +63,22 @@ interface InventoryScreenProps {
   onRewards?: () => void;
 }
 
-type InvTabType = 'all' | 'chests' | 'keys' | 'boosters' | 'cosmetics' | 'badges' | 'avatars';
+type InvTabType = 'all' | 'chests' | 'keys' | 'boosters' | 'cosmetics' | 'badges' | 'avatars' | 'jokers';
 
 interface TabItem {
   id: InvTabType;
   label: string;
-  icon: string;
 }
 
 const INV_TABS: TabItem[] = [
-  { id: 'all', label: 'Tümü', icon: '🎒' },
-  { id: 'chests', label: 'Sandıklar', icon: '📦' },
-  { id: 'keys', label: 'Anahtarlar', icon: '🗝️' },
-  { id: 'boosters', label: 'Güçlendirici', icon: '⚡' },
-  { id: 'cosmetics', label: 'Kozmetikler', icon: '✨' },
-  { id: 'badges', label: 'Rozetler', icon: '🎖️' },
-  { id: 'avatars', label: 'Avatarlar', icon: '🎭' },
+  { id: 'all', label: 'Tümü' },
+  { id: 'chests', label: 'Sandıklar' },
+  { id: 'keys', label: 'Anahtarlar' },
+  { id: 'boosters', label: 'Güçlendirici' },
+  { id: 'jokers', label: 'Jokerler' },
+  { id: 'cosmetics', label: 'Kozmetikler' },
+  { id: 'badges', label: 'Rozetler' },
+  { id: 'avatars', label: 'Avatarlar' },
 ];
 
 const RARITY_COLORS: Record<string, string> = {
@@ -102,7 +104,7 @@ const ActiveEffectRow: React.FC<{
   }, [expiresAt]);
   if (left <= 0) return null;
   // Toplam süre tahmini: kalan 1 saati aşarsa 24 saatlik iksirdir (yoksa 1 saat)
-  const total = left > COSMETIC_RENTAL_MS * 1.2 ? 24 * 60 * 60 * 1000 : COSMETIC_RENTAL_MS;
+  const total = left >COSMETIC_RENTAL_MS * 1.2 ? 24 * 60 * 60 * 1000 : COSMETIC_RENTAL_MS;
   const pct = Math.max(0, Math.min(100, (left / total) * 100));
   const totalSec = Math.floor(left / 1000);
   const h = Math.floor(totalSec / 3600);
@@ -119,7 +121,7 @@ const ActiveEffectRow: React.FC<{
             style={[activeFxStyles.barFill, { backgroundColor: accent, width: `${pct}%` }]}
           />
         </View>
-        <Text style={activeFxStyles.timeText}>⏳ {timeText} kaldı</Text>
+        <Text style={activeFxStyles.timeText}> {timeText} kaldı</Text>
       </View>
     </View>
   );
@@ -213,10 +215,12 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   const userInventory: InventoryItem[] = user?.inventory || [];
 
   const filteredItems = userInventory.filter((item) => {
+    if (item.category === 'joker' && item.qty <= 0) return false;
     if (activeTab === 'all') return true;
     if (activeTab === 'chests') return !!getChestOpening(item.id);
     if (activeTab === 'keys') return item.category === 'key' || item.id.includes('key');
     if (activeTab === 'boosters') return item.category === 'booster' || item.id.includes('bolt') || item.id.includes('flame');
+    if (activeTab === 'jokers') return item.category === 'joker';
     if (activeTab === 'badges') return item.category === 'badge' || item.id.includes('badge');
     if (activeTab === 'avatars') return item.category === 'avatar' || item.id.includes('avatar');
     if (activeTab === 'cosmetics') return item.category === 'frame' || item.category === 'name_effect' || item.category === 'background';
@@ -353,6 +357,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
      ateş ikonuna düşüyordu. Her ürün artık kendi türünün görselini
      kullanıyor. */
   const renderItemVisual = (item: InventoryItem, size = 48) => {
+    if (item.id === 'joker_eliminate' || item.id === 'joker_half') return <WalletArtwork kind={item.id} size={size * 1.65} />;
     const pk = previewKindOf(item);
     if (pk === 'frame') {
       if (frameFor(item.id)) {
@@ -391,7 +396,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     if (item.category === 'key' || item.id.includes('key')) return <KeyIcon size={size} />;
     if (item.id.startsWith('badge_')) return <BadgeVisual badgeId={item.id} size={Math.round(size * 1.4)} />;
     if (item.id.includes('bolt')) return <SpeedBoltIcon size={size} />;
-    if (item.id.includes('crown')) return <CrownIcon size={size} />;
+    if (item.id.includes('crown')) return <LaurelIcon size={size} />;
     if (item.id.includes('heart')) return <HeartIcon size={size} />;
     if (item.id.includes('gem')) return <GemIcon size={size} />;
     if (item.id.includes('coin')) return <CoinIcon size={size} />;
@@ -467,7 +472,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
             activeRows.push(
               <ActiveEffectRow
                 key="fx-name"
-                visual={<Text style={{ fontSize: 22 }}>✨</Text>}
+                visual={<Sparkles size={21} color="#FFE0A9" />}
                 label={getCosmeticDef(nameFx.id)?.name || 'İsim Efekti'}
                 expiresAt={nameFx.expiresAt}
                 accent="#D946EF"
@@ -478,7 +483,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
             activeRows.push(
               <ActiveEffectRow
                 key="fx-bg"
-                visual={<Text style={{ fontSize: 22 }}>🖼️</Text>}
+                visual={<ImageIcon size={21} color="#E0CBFF" />}
                 label={getCosmeticDef(bg.id)?.name || 'Arka Plan'}
                 expiresAt={bg.expiresAt}
                 accent="#8B5CF6"
@@ -490,7 +495,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
               <ActiveEffectRow
                 key="fx-xp2"
                 visual={<SpeedBoltIcon size={30} />}
-                label="⚡ 2x XP İksiri"
+                label=" 2x XP İksiri"
                 expiresAt={user.activeBoosterExpiresAt}
                 accent="#38BDF8"
               />
@@ -501,7 +506,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
               <ActiveEffectRow
                 key="fx-xp3"
                 visual={<SpeedBoltIcon size={30} />}
-                label="⚡ 3x XP İksiri"
+                label=" 3x XP İksiri"
                 expiresAt={user.xp3BoosterExpiresAt}
                 accent="#A855F7"
               />
@@ -512,7 +517,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
               <ActiveEffectRow
                 key="fx-coin"
                 visual={<CoinIcon size={30} />}
-                label="🪙 2x Altın İksiri"
+                label=" 2x Altın İksiri"
                 expiresAt={user.coinBoosterExpiresAt}
                 accent="#F59E0B"
               />
@@ -685,13 +690,13 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                         ) : rew.type === 'gems' ? (
                           <GemIcon size={22} />
                         ) : rew.type === 'item' ? (
-                          <CrownIcon size={22} />
+                          <LaurelIcon size={22} />
                         ) : (
                           <SpeedBoltIcon size={22} />
                         )}
                         <Text style={styles.rewardText}>
                           {rew.type === 'item'
-                            ? `🎁 Bonus: ${rew.label ?? 'Özel Eşya'}${rew.amount > 1 ? ` x${rew.amount}` : ''}`
+                            ? `Bonus: ${rew.label ?? 'Özel Eşya'}${rew.amount > 1 ? ` x${rew.amount}` : ''}`
                             : `+${rew.amount} ${rew.type === 'coins' ? 'Altın' : rew.type === 'gems' ? 'Elmas' : 'XP'}`}
                         </Text>
                       </Reanimated.View>

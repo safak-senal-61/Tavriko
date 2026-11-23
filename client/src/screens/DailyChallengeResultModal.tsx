@@ -5,7 +5,6 @@ import {
   Button3D,
   StreakFlameIcon,
   CoinIcon,
-  GemIcon,
   ChestIcon,
 } from '../components/TavrikoIcons';
 interface DailyChallengeResultModalProps {
@@ -47,14 +46,14 @@ export const DailyChallengeResultModal: React.FC<DailyChallengeResultModalProps>
           </View>
           {/* Title */}
           <Text style={styles.title}>
-            {success ? 'GÜNLÜK SERİ ATEŞLENDİ! 🔥' : 'HEDEF TAMAMLANAMADI'}
+            {success ? 'GÜNLÜK SERİ KORUNDU' : 'HEDEF TAMAMLANAMADI'}
           </Text>
           {/* Status Badge */}
           <View style={[styles.statusBadge, success ? styles.statusBadgeSuccess : styles.statusBadgeFail]}>
             <Text style={[styles.statusBadgeText, success ? styles.statusTextSuccess : styles.statusTextFail]}>
               {success
                 ? `✓ ${rewards?.newStreak || streak} GÜNLÜK SERİ KORUNDU`
-                : `⚠️ EN AZ ${requiredCorrect} DOĞRU GEREKLİYDİ`}
+                : `EN AZ ${requiredCorrect} DOĞRU GEREKLİYDİ`}
             </Text>
           </View>
           {/* Description */}
@@ -75,15 +74,11 @@ export const DailyChallengeResultModal: React.FC<DailyChallengeResultModalProps>
                   <CoinIcon size={16} />
                   <Text style={styles.rewardItemVal}> +{rewards?.coins ?? 0}</Text>
                 </View>
-                <View style={styles.rewardItem}>
-                  <GemIcon size={16} />
-                  <Text style={styles.rewardItemVal}> +{rewards?.gems ?? 0}</Text>
-                </View>
                 {rewards?.chest && (
                   <View style={styles.rewardItem}>
                     <ChestIcon size={18} />
                     <Text style={styles.rewardItemVal}>
-                      {rewards.chest === 'gift_box' ? ' Hediye Kutusu' : rewards.chest === 'mega_chest' ? ' Mega Sandık' : ' Sandık'}
+                      {rewards.chest === 'gift_box' ? 'Hediye Kutusu' : rewards.chest === 'mega_chest' ? 'Mega Sandık' : 'Sandık'}
                     </Text>
                   </View>
                 )}
@@ -102,7 +97,7 @@ export const DailyChallengeResultModal: React.FC<DailyChallengeResultModalProps>
             ) : (
               <>
                 <Button3D
-                  title="TEKRAR DENE ⚡"
+                  title="TEKRAR DENE"
                   variant="mint"
                   onPress={onRetry}
                   style={{ width: '100%' }}

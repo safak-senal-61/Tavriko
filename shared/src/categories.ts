@@ -310,7 +310,7 @@ export const ALL_CATEGORIES: CategoryInfo[] = [
       { id: 'mesoamerican_mythology', name: 'Maya, Aztek ve İnka', emoji: '🗿' },
       { id: 'arabian_nights', name: 'Binbir Gece Masalları', emoji: '🧞' },
       { id: 'ancient_tales', name: 'Antik Efsaneler', emoji: '🏺' },
-      { id: 'legendary_rulers', name: 'Efsanevi Krallar ve Kraliçeler', emoji: '👑' },
+      { id: 'legendary_rulers', name: 'Efsanevi Krallar ve Kraliçeler', emoji: '✦' },
       { id: 'warrior_tribes', name: 'Savaşçı Halklar', emoji: '🛡️' },
     ],
   },
@@ -366,7 +366,7 @@ export const ALL_CATEGORIES: CategoryInfo[] = [
       { id: 'great_discoveries', name: 'Büyük Keşifler', emoji: '🚢' },
       { id: 'far_east_history', name: 'Uzak Doğu Tarihi', emoji: '🏯' },
       { id: 'ancient_anatolia', name: 'Antik Anadolu Medeniyetleri', emoji: '🔱' },
-      { id: 'ottoman_dynasty', name: 'Osmanlı ve Hanedan', emoji: '👑' },
+      { id: 'ottoman_dynasty', name: 'Osmanlı ve Hanedan', emoji: '✦' },
     ],
   },
   {

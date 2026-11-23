@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Award, Bell, Bot, ChartNoAxesColumn, CirclePlus, Shield, Ticket, Trophy, UserX, Zap } from 'lucide-react-native';
 import {
   View,
   Text,
@@ -186,17 +187,17 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
       hasPremiumPass: nextPass,
     };
     onUpdateUser(updated);
-    notify(nextPass ? '⭐ Premium Pass KİLİDİ AÇILDI!' : 'Premium Pass kapatıldı.');
+    notify(nextPass ? 'Premium Pass KİLİDİ AÇILDI!' : 'Premium Pass kapatıldı.');
   };
 
   const handleAddChests = () => {
     if (!user || !onUpdateUser) return;
     const inv = [...(user.inventory || [])];
     inv.push(
-      { id: 'chest_gold_' + Date.now(), name: 'Altın Sandık', desc: 'Değerli ödüller içerir', category: 'chest', rarity: 'legendary', qty: 1, icon: '📦', equipped: false },
-      { id: 'key_gold_' + Date.now(), name: 'Altın Anahtar', desc: 'Altın sandığı açar', category: 'key', rarity: 'legendary', qty: 1, icon: '🗝️', equipped: false },
-      { id: 'chest_silver_' + Date.now(), name: 'Gümüş Sandık', desc: 'Sürpriz ödüller içerir', category: 'chest', rarity: 'rare', qty: 2, icon: '📦', equipped: false },
-      { id: 'key_silver_' + Date.now(), name: 'Gümüş Anahtar', desc: 'Gümüş sandığı açar', category: 'key', rarity: 'rare', qty: 2, icon: '🗝️', equipped: false }
+      { id: 'chest_gold_' + Date.now(), name: 'Altın Sandık', desc: 'Değerli ödüller içerir', category: 'chest', rarity: 'legendary', qty: 1, icon: '', equipped: false },
+      { id: 'key_gold_' + Date.now(), name: 'Altın Anahtar', desc: 'Altın sandığı açar', category: 'key', rarity: 'legendary', qty: 1, icon: '', equipped: false },
+      { id: 'chest_silver_' + Date.now(), name: 'Gümüş Sandık', desc: 'Sürpriz ödüller içerir', category: 'chest', rarity: 'rare', qty: 2, icon: '', equipped: false },
+      { id: 'key_silver_' + Date.now(), name: 'Gümüş Anahtar', desc: 'Gümüş sandığı açar', category: 'key', rarity: 'rare', qty: 2, icon: '', equipped: false }
     );
     const updated: UserProfile = {
       ...user,
@@ -231,16 +232,16 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
       const res = await fetch(`${base}/admin/telegram/test`);
       const data = await res.json();
       if (data.success && data.bot) {
-        setTgStatus(`✅ @${data.bot.username || data.bot.first_name} Aktif ve hazır!`);
+        setTgStatus(` @${data.bot.username || data.bot.first_name} Aktif ve hazır!`);
         sound.playSound('reward');
         sound.triggerHaptic('success');
       } else {
-        setTgStatus(`⚠️ ${data.error || 'Bot henüz başlatılmamış.'}`);
+        setTgStatus(` ${data.error || 'Bot henüz başlatılmamış.'}`);
         sound.playSound('wrong');
         sound.triggerHaptic('error');
       }
     } catch {
-      setTgStatus('❌ Sunucuya erişilemedi.');
+      setTgStatus('Sunucuya erişilemedi.');
       sound.playSound('wrong');
       sound.triggerHaptic('error');
     } finally {
@@ -309,17 +310,17 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
       });
       const data = await res.json();
       if (data.success) {
-        setNotifStatus(`✅ ${data.message}`);
+        setNotifStatus(` ${data.message}`);
         setNotifTarget('');
         setNotifTitle('');
         setNotifSub('');
         sound.playSound('reward');
       } else {
-        setNotifStatus(`⚠️ ${data.error}`);
+        setNotifStatus(` ${data.error}`);
         sound.playSound('wrong');
       }
     } catch (e: any) {
-      setNotifStatus(`❌ ${e.message}`);
+      setNotifStatus(` ${e.message}`);
       sound.playSound('wrong');
     } finally {
       setNotifSending(false);
@@ -329,7 +330,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
   // --- Add new product ---
   const handleAddProduct = async () => {
     if (!productName.trim() || !productPrice.trim()) {
-      setProductStatus('⚠️ Ürün adı ve fiyat zorunludur.');
+      setProductStatus('Ürün adı ve fiyat zorunludur.');
       return;
     }
     setProductAdding(true);
@@ -337,14 +338,14 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
       // Local-only for now — the shop catalog is defined in shared.
       // We just show a notification that the product would be added.
       const productId = `dev_${Date.now()}`;
-      setProductStatus(`✅ Ürün "${productName}" hazırlandı! ID: ${productId}\nKategori: ${productCategory}\nFiyat: ${productPrice} ${productCurrency}\nNadirlik: ${productRarity}`);
+      setProductStatus(`Ürün "${productName}" hazırlandı! ID: ${productId}\nKategori: ${productCategory}\nFiyat: ${productPrice} ${productCurrency}\nNadirlik: ${productRarity}`);
       setProductName('');
       setProductDesc('');
       setProductPrice('');
       sound.playSound('reward');
       sound.triggerHaptic('success');
     } catch (e: any) {
-      setProductStatus(`❌ ${e.message}`);
+      setProductStatus(` ${e.message}`);
       sound.playSound('wrong');
     } finally {
       setProductAdding(false);
@@ -382,12 +383,12 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
         {/* Status Toast */}
         {statusMsg && (
           <View style={styles.statusToast}>
-            <Text style={styles.statusToastText}>✨ {statusMsg}</Text>
+            <Text style={styles.statusToastText}> {statusMsg}</Text>
           </View>
         )}
 
         {/* Section 1: System & Network Health */}
-        {renderSection('🌐 SİSTEM & AĞ DURUMU', (
+        {renderSection('SİSTEM & AĞ DURUMU', (
           <>
             <View style={styles.healthRow}>
               <View style={styles.healthInfo}>
@@ -395,7 +396,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
                 <Text style={styles.healthSub} numberOfLines={1}>{REALTIME_WS_BASE}</Text>
               </View>
               <View style={[styles.statusBadge, wsConnected ? styles.badgeSuccess : styles.badgeWarn]}>
-                <Text style={styles.statusBadgeText}>{wsConnected ? 'BAĞLI ✓' : 'KOPUK ⚠️'}</Text>
+                <Text style={styles.statusBadgeText}>{wsConnected ? 'BAĞLI ✓' : 'KOPUK'}</Text>
               </View>
             </View>
 
@@ -426,7 +427,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
         ))}
 
         {/* Section 2: Sandbox & Cheat Tools */}
-        {renderSection('⚡ KULLANICI & EKONOMİ SANDBOX', (
+        {renderSection('KULLANICI & EKONOMİ SANDBOX', (
           <>
             <Text style={styles.cardDesc}>
               Yerel testler için aktif oturumunuza anında altın, elmas, seviye veya envanter tanımlayın.
@@ -444,17 +445,17 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.actionBtn} onPress={handleAddXp} activeOpacity={0.8}>
-                <Text style={styles.actionIcon}>⭐</Text>
+                <Award size={20} color="#FFD088" />
                 <Text style={styles.actionBtnText}>+500 XP (Seviye)</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.actionBtn} onPress={handleAddLp} activeOpacity={0.8}>
-                <Text style={styles.actionIcon}>🏆</Text>
+                <Trophy size={20} color="#FFD088" />
                 <Text style={styles.actionBtnText}>+150 LP (Lig)</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.actionBtn} onPress={handleTogglePass} activeOpacity={0.8}>
-                <Text style={styles.actionIcon}>🎟️</Text>
+                <Ticket size={20} color="#FFD088" />
                 <Text style={styles.actionBtnText}>
                   {user?.hasPremiumPass ? 'Pass Kapat' : 'Premium Pass Aç'}
                 </Text>
@@ -469,7 +470,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
         ))}
 
         {/* Section 3: Moderation - Block & Notify */}
-        {renderSection('🛡️ MODERASYON & ARKADAŞ YÖNETİMİ', (
+        {renderSection('MODERASYON & ARKADAŞ YÖNETİMİ', (
           <>
             <Text style={styles.cardDesc}>
               Kullanıcıları engelleyin, bildirim gönderin ve arkadaş yönetimi yapın.
@@ -480,7 +481,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
               onPress={() => { sound.playSound('tap'); setBlockModal(true); }}
               activeOpacity={0.8}
             >
-              <Text style={{ fontSize: 18 }}>🚫</Text>
+              <UserX size={18} color="#DDD1F2" />
               <Text style={styles.moderationBtnText}>Kullanıcı Engelle</Text>
             </TouchableOpacity>
 
@@ -489,7 +490,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
               onPress={() => { sound.playSound('tap'); setNotifModal(true); }}
               activeOpacity={0.8}
             >
-              <Text style={{ fontSize: 18 }}>🔔</Text>
+              <Bell size={18} color="#DDD1F2" />
               <Text style={styles.moderationBtnText}>Bildirim Gönder</Text>
             </TouchableOpacity>
 
@@ -498,7 +499,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
               onPress={() => { sound.playSound('tap'); setProductModal(true); }}
               activeOpacity={0.8}
             >
-              <Text style={{ fontSize: 18 }}>➕</Text>
+              <CirclePlus size={18} color="#DDD1F2" />
               <Text style={styles.moderationBtnText}>Yeni Ürün Ekle</Text>
             </TouchableOpacity>
 
@@ -531,11 +532,11 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
         ))}
 
         {/* Section 4: Web Portals & Admin Bridges */}
-        {renderSection('🛡️ YÖNETİM & LOG PORTALLARI', (
+        {renderSection('YÖNETİM & LOG PORTALLARI', (
           <>
             <TouchableOpacity style={styles.portalRowBtn} onPress={() => openUrl('/developer')}>
               <View style={styles.portalIconBox}>
-                <Text style={{ fontSize: 20 }}>🛡️</Text>
+                <Shield size={20} color="#DDD1F2" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.portalTitle}>Developer & Ops Portalı (/developer)</Text>
@@ -546,7 +547,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
 
             <TouchableOpacity style={styles.portalRowBtn} onPress={() => openUrl('/telegram-admin')}>
               <View style={styles.portalIconBox}>
-                <Text style={{ fontSize: 20 }}>🤖</Text>
+                <Bot size={20} color="#DDD1F2" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.portalTitle}>Telegram Bot Yönetimi (/telegram-admin)</Text>
@@ -566,7 +567,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
                   <LoadingShimmer label="Telegram bağlantısı sınanıyor" />
                 ) : (
                   <>
-                    <Text style={{ fontSize: 15 }}>⚡</Text>
+                    <Zap size={15} color="#FFD088" />
                     <Text style={styles.tgTestBtnText}>
                       Telegram Bot Durumunu Canlı Test Et
                     </Text>
@@ -583,7 +584,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
 
             <TouchableOpacity style={[styles.portalRowBtn, { borderBottomWidth: 0 }]} onPress={() => openUrl('/api/logs')}>
               <View style={styles.portalIconBox}>
-                <Text style={{ fontSize: 20 }}>📊</Text>
+                <ChartNoAxesColumn size={20} color="#DDD1F2" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.portalTitle}>Ham Telemetri & Loglar (/api/logs)</Text>
@@ -595,18 +596,18 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
         ))}
 
         {/* Section 5: Quick Screen Jump */}
-        {renderSection('🚀 HIZLI EKRAN ATLAMA', (
+        {renderSection('HIZLI EKRAN ATLAMA', (
           <View style={styles.jumpRow}>
             {(
               [
-                { label: '🏆 Sezon 1', screen: 'season' },
-                { label: '🎖️ Pro Lig', screen: 'pro_league' },
-                { label: '🛍️ Mağaza', screen: 'shop' },
-                { label: '🎒 Envanter', screen: 'inventory' },
-                { label: '📅 Etkinlikler', screen: 'events' },
-                { label: '⚔️ Özel Oda', screen: 'custom_room' },
-                { label: '📡 1v1 Radar', screen: 'matchmaking' },
-                { label: '👤 Profil', screen: 'profile' },
+                { label: 'Sezon 1', screen: 'season' },
+                { label: 'Pro Lig', screen: 'pro_league' },
+                { label: 'Mağaza', screen: 'shop' },
+                { label: 'Envanter', screen: 'inventory' },
+                { label: 'Etkinlikler', screen: 'events' },
+                { label: 'Özel Oda', screen: 'custom_room' },
+                { label: ' 1v1 Radar', screen: 'matchmaking' },
+                { label: 'Profil', screen: 'profile' },
               ] as const
             ).map((item) => (
               <TouchableOpacity
@@ -624,7 +625,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
         ))}
 
         {/* Section 6: Raw User State */}
-        {renderSection('📄 AKTİF OYUNCU DURUMU (JSON)', (
+        {renderSection('AKTİF OYUNCU DURUMU (JSON)', (
           <>
             <TouchableOpacity style={styles.jsonHeaderRow} onPress={() => setShowJson((v) => !v)}>
               <Text style={styles.jsonToggleText}>{showJson ? 'Gizle ▲' : 'Göster ▼'}</Text>
@@ -781,7 +782,7 @@ export const DeveloperScreen: React.FC<DeveloperScreenProps> = ({
                   onPress={() => setProductCurrency(c)}
                 >
                   <Text style={[styles.selectorPillText, productCurrency === c ? { color: '#1E0E45' } : null]}>
-                    {c === 'coins' ? '🪙 Altın' : c === 'gems' ? '💎 Elmas' : '₺ TRY'}
+                    {c === 'coins' ? 'Altın' : c === 'gems' ? 'Elmas' : '₺ TRY'}
                   </Text>
                 </TouchableOpacity>
               ))}

@@ -26,7 +26,7 @@ import {
   TavrikoScreen,
   Button3D,
   CharacterAvatar,
-  CrownIcon,
+  LaurelIcon,
   CoinIcon,
   CheckMarkSvg,
   CrossMarkSvg,
@@ -97,7 +97,7 @@ const PodiumColumn: React.FC<{
     <Animated.View entering={FadeInUp.delay(delay).springify().damping(14)} style={styles.podiumCol}>
       {place === 1 ? (
         <Animated.View entering={ZoomIn.delay(delay + 260).springify()}>
-          <CrownIcon size={28} />
+          <LaurelIcon size={28} />
         </Animated.View>
       ) : (
         <View style={{ height: 28 }} />

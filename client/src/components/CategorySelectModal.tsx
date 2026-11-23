@@ -25,6 +25,7 @@ import { categoryCounts, subCountKey } from '../utils/categoryCounts';
 import { PAGE_TTL } from '../utils/pageDataCache';
 import { categoriesUrl } from '../utils/pageResources';
 import { usePageData } from '../utils/usePageData';
+import { CategorySquircleIcon } from './TavrikoIcons';
 
 /**
  * Kategori listesinin TEK DOĞRULUK KAYNAĞI shared/src/categories.ts kataloğudur;
@@ -336,7 +337,7 @@ export const CategorySelectModal: React.FC<CategorySelectModalProps> = ({
                               resizeMode="contain"
                             />
                           ) : (
-                            <Text style={styles.subEmoji}>{sc.emoji}</Text>
+                            <CategorySquircleIcon category={sc.id} size={36} />
                           )}
                           <Text style={styles.subName} numberOfLines={2}>
                             {sc.name}

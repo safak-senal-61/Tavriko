@@ -1,0 +1,90 @@
+import React from 'react';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { JOKERS, JokerId, UserProfile } from '@trivia/shared';
+import { CloseXIcon, CoinIcon } from './TavrikoIcons';
+import { WalletArtwork } from './WalletArtwork';
+import { THEME } from '../theme/tokens';
+
+export const walletAmount = (n: number) => n.toLocaleString('tr-TR');
+
+function Panel({ title, onClose, children }: React.PropsWithChildren<{ title: string; onClose: () => void }>) {
+  return <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+    <View style={s.scrim}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessible={false} />
+      <View style={s.panel} accessibilityViewIsModal>
+        <Pressable onPress={onClose} style={s.close} accessibilityRole="button" accessibilityLabel="Kapat">
+          <CloseXIcon size={16} color="#D9CDEC" />
+        </Pressable>
+        <Text accessibilityRole="header" style={s.title}>{title}</Text>
+        {children}
+      </View>
+    </View>
+  </Modal>;
+}
+
+export function LowWalletPanel({ kind, amount, onClose, onStore }: {
+  kind: 'diamonds' | 'gold'; amount: number; onClose: () => void; onStore: () => void;
+}) {
+  const diamonds = kind === 'diamonds';
+  return <Panel title={diamonds ? 'Elmas bakiyen düşük' : 'Altın bakiyen düşük'} onClose={onClose}>
+    <View style={s.art}><WalletArtwork kind={kind} size={108} tier={2} /></View>
+    <Text style={s.balance}>{walletAmount(amount)} {diamonds ? 'elmas' : 'altın'}</Text>
+    <Text style={s.desc}>{diamonds ? 'Kozmetikler ve altın paketleri için elmas paketlerine göz at.' : 'Quizlerde altın kazanabilir veya mağazada elmaslarını altına çevirebilirsin.'}</Text>
+    <Pressable style={s.primary} onPress={onStore} accessibilityRole="button">
+      <Text style={s.primaryText}>{diamonds ? 'Elmas paketlerini gör' : 'Altın paketlerini gör'}</Text>
+    </Pressable>
+    <Pressable onPress={onClose} style={s.secondary} accessibilityRole="button"><Text style={s.desc}>Şimdi değil</Text></Pressable>
+  </Panel>;
+}
+
+export function JokerPanel({ user, busy, error, onApply, onBuy, onClose }: {
+  user: UserProfile; busy: boolean; error?: string; onApply: (id: JokerId) => void;
+  onBuy: (id: JokerId) => void; onClose: () => void;
+}) {
+  return <Panel title="Jokerlerim" onClose={onClose}>
+    <View style={s.wallet}><CoinIcon size={17} /><Text style={s.balance}>{walletAmount(user.coins ?? 0)} altın</Text></View>
+    <Text style={s.desc}>Soru başına bir joker kullanabilirsin. Sayaç işlemeye devam eder.</Text>
+    {JOKERS.map(joker => {
+      const qty = user.inventory?.find(i => i.id === joker.id)?.qty ?? 0;
+      const canBuy = user.coins >= joker.price;
+      return <View key={joker.id} style={s.joker}>
+        <WalletArtwork kind={joker.id} size={62} />
+        <View style={s.detail}>
+          <Text style={s.itemTitle}>{joker.name} · {qty} adet</Text>
+          <Text style={s.itemDesc}>{joker.desc}</Text>
+          <View style={s.actions}>
+            {qty > 0 && <Pressable style={s.use} disabled={busy} onPress={() => onApply(joker.id)} accessibilityRole="button"><Text style={s.primaryText}>Kullan</Text></Pressable>}
+            <Pressable style={[s.buy, !canBuy && s.disabled]} disabled={busy || !canBuy} onPress={() => onBuy(joker.id)} accessibilityRole="button" accessibilityLabel={`${joker.name} satın al: ${joker.price} altın`}>
+              <CoinIcon size={15} /><Text style={s.buyText}>{joker.price} · Al</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>;
+    })}
+    {error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
+  </Panel>;
+}
+
+const s = StyleSheet.create({
+  scrim: { flex: 1, backgroundColor: '#080713B8', alignItems: 'center', justifyContent: 'center', padding: 18 },
+  panel: { width: '100%', maxWidth: 414, backgroundColor: '#211A36', borderColor: '#5B4A78', borderWidth: 1, borderRadius: 24, padding: 20, gap: 10 },
+  close: { position: 'absolute', right: 9, top: 9, width: 42, height: 42, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  title: { color: '#FAF4FF', fontSize: 23, fontFamily: THEME.fonts.extraBold, textAlign: 'center', paddingHorizontal: 22 },
+  art: { alignItems: 'center' },
+  balance: { color: '#F7D197', fontFamily: THEME.fonts.extraBold, fontSize: 16, textAlign: 'center' },
+  desc: { color: '#D3C6E4', fontFamily: THEME.fonts.bold, fontSize: 13, textAlign: 'center', lineHeight: 19 },
+  primary: { backgroundColor: '#F4C687', borderRadius: 12, minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: 5 },
+  primaryText: { color: '#27182C', fontFamily: THEME.fonts.extraBold, fontSize: 14 },
+  secondary: { minHeight: 40, justifyContent: 'center' },
+  wallet: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  joker: { flexDirection: 'row', backgroundColor: '#2B2243', borderColor: '#4B3B64', borderWidth: 1, borderRadius: 12, padding: 9, alignItems: 'center', gap: 8 },
+  detail: { flex: 1, gap: 4 },
+  itemTitle: { color: '#F8F2FF', fontSize: 15, fontFamily: THEME.fonts.extraBold },
+  itemDesc: { color: '#CBBEDD', fontSize: 12, fontFamily: THEME.fonts.bold },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 3 },
+  use: { backgroundColor: '#F4C687', borderRadius: 8, justifyContent: 'center', minHeight: 40, paddingHorizontal: 13 },
+  buy: { flexDirection: 'row', alignItems: 'center', gap: 5, borderColor: '#8F6F60', borderWidth: 1, minHeight: 40, paddingHorizontal: 10, borderRadius: 8 },
+  disabled: { opacity: .55 },
+  buyText: { color: '#FFE2AC', fontFamily: THEME.fonts.extraBold, fontSize: 13 },
+  error: { color: '#FFB7C9', fontSize: 13, textAlign: 'center' },
+});

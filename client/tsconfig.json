@@ -7,7 +7,7 @@
       "DOM.Iterable",
       "ES2022"
     ],
-    "types": ["vitest/globals"],
+    "types": ["vitest/globals", "node"],
     "jsx": "react-jsx",
     "strict": true,
     "moduleResolution": "bundler",

@@ -169,17 +169,11 @@ export const TrophyIcon: React.FC<{ size?: number }> = ({ size = 28 }) => (
     <Path d="M24 14v10" stroke="#fff" strokeOpacity="0.6" strokeWidth="3" strokeLinecap="round" />
   </Svg>
 );
-export const CrownIcon: React.FC<{ size?: number }> = ({ size = 28 }) => (
+export const LaurelIcon: React.FC<{ size?: number }> = ({ size = 28 }) => (
   <Svg width={size} height={size} viewBox="0 0 64 64">
-    <SharedSvgDefs />
-    <Path d="M6 48L8 18l16 14 8-18 8 18 16-14 2 30z" fill="url(#gold)" />
-    <Rect x="6" y="48" width="52" height="8" rx="4" fill="#e07a00" />
-    <Circle cx="8" cy="18" r="3.5" fill="#FFF9C4" />
-    <Circle cx="32" cy="14" r="3.5" fill="#FFF9C4" />
-    <Circle cx="56" cy="18" r="3.5" fill="#FFF9C4" />
-    <Circle cx="20" cy="52" r="2.2" fill="#E91E63" />
-    <Circle cx="32" cy="52" r="2.2" fill="#00E5FF" />
-    <Circle cx="44" cy="52" r="2.2" fill="#E91E63" />
+    <Path d="M32 54C14 53 8 35 11 22m21 32c18-1 24-19 21-32" stroke="#E5A851" strokeWidth="3.5" strokeLinecap="round" fill="none" />
+    <Path d="M11 29C5 25 5 18 8 14c7 3 8 9 3 15zm5 10C9 39 4 34 5 29c8 0 12 4 11 10zm8 9c-6 4-12 2-15-3 7-4 12-3 15 3zm29-19c6-4 6-11 3-15-7 3-8 9-3 15zm-5 10c7 0 12-5 11-10-8 0-12 4-11 10zm-8 9c6 4 12 2 15-3-7-4-12-3-15 3z" fill="#FFD47F" />
+    <Path d="m32 12 4.8 9.8 10.8 1.6-7.8 7.6 1.8 10.8-9.6-5.1-9.6 5.1L24 31l-7.6-7.6 10.8-1.6z" fill="#F7CB70" stroke="#FFF0B2" strokeWidth="1.5" />
   </Svg>
 );
 export const XpStarIcon: React.FC<{ size?: number }> = ({ size = 22 }) => (
@@ -945,7 +939,7 @@ export const TavrikoBadgeBanner: React.FC<{
       borderColor: 'rgba(130, 196, 255, 0.38)',
     }}
   >
-    <CrownIcon size={22 * scale} />
+    <LaurelIcon size={22 * scale} />
     <Text
       style={{
         fontFamily: THEME.fonts.display,

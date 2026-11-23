@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import {
   View,
@@ -34,6 +34,7 @@ import {
   CoinIcon,
   GemIcon,
   SpeedBoltIcon,
+  GiftIcon,
 } from '../components/TavrikoIcons';
 import Reanimated, { FadeInDown } from 'react-native-reanimated';
 import { Image } from 'react-native';
@@ -57,6 +58,7 @@ import {
   backgroundFor,
 } from '../components/StoreKit';
 import { RewardedAdCard } from '../components/RewardedAdCard';
+import { WalletArtwork } from '../components/WalletArtwork';
 
 interface ShopScreenProps {
   user?: UserProfile;
@@ -66,26 +68,27 @@ interface ShopScreenProps {
   onNavigateSecondary?: (tab: SecondaryNavTab) => void;
   onNotifications?: () => void;
   onProfile?: () => void;
+  initialTab?: ShopProductCategory;
+  onRefresh?: () => void;
 }
 
 interface CategoryTabItem {
   id: ShopProductCategory;
   name: string;
-  icon: string;
 }
 
-// Gerçek para (TL) ürünleri Play Billing entegre edilene kadar gösterilmez;
-// çalışmayan satın alma düğmeleri mağaza incelemesinde sorun çıkarır.
-const SELLABLE_CATALOG = SHOP_CATALOG.filter((p) => p.currency !== 'try');
+const WEB = Platform.OS === 'web';
+const SELLABLE_CATALOG = SHOP_CATALOG.filter(p =>WEB || p.currency !== 'try');
 
 const ALL_CATEGORY_TABS: CategoryTabItem[] = [
-  { id: 'featured', name: 'Paketler', icon: '🎁' },
-  { id: 'frames', name: 'Çerçeveler', icon: '🖼️' },
-  { id: 'name_effects', name: 'İsim Efekti', icon: '✨' },
-  { id: 'boosters', name: 'Güçlendirici', icon: '⚡' },
-  { id: 'backgrounds', name: 'Arka Plan', icon: '🌌' },
-  { id: 'diamonds', name: 'Elmas', icon: '💎' },
-  { id: 'gold', name: 'Altın', icon: '🪙' },
+  { id: 'diamonds', name: 'Elmas' },
+  { id: 'gold', name: 'Altın' },
+  { id: 'jokers', name: 'Jokerler' },
+  { id: 'featured', name: 'Paketler' },
+  { id: 'frames', name: 'Çerçeveler' },
+  { id: 'name_effects', name: 'İsim Efekti' },
+  { id: 'boosters', name: 'Güçlendirici' },
+  { id: 'backgrounds', name: 'Arka Plan' },
 ];
 const CATEGORY_TABS = ALL_CATEGORY_TABS.filter((tab) => SELLABLE_CATALOG.some((p) => p.category === tab.id));
 
@@ -110,6 +113,13 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
   const size = (base: number) => Math.round(base * art);
   const previewHeight = art > 1 && { height: size(108) };
   const visualSize = size(92);
+  if (product.category === 'diamonds' || product.category === 'gold') {
+    const tier = SHOP_CATALOG.filter(p => p.category === product.category).findIndex(p => p.id === product.id) + 1;
+    return <View style={[styles.visualTall, previewHeight]}><WalletArtwork kind={product.category} size={visualSize} tier={tier} /></View>;
+  }
+  if (product.id === 'joker_eliminate' || product.id === 'joker_half') {
+    return <View style={[styles.visualTall, previewHeight]}><WalletArtwork kind={product.id} size={visualSize} /></View>;
+  }
   if ((product.category === 'frames' || pId.includes('frame')) && frameFor(pId)) {
     const frameSize = size(Math.min(124, Math.round(width * 0.34)));
     return (
@@ -193,7 +203,7 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
           </Defs>
           <Circle cx="28" cy="28" r="22" stroke="url(#frameGrad)" strokeWidth="4" fill="rgba(19, 9, 38, 0.8)" />
           <Circle cx="28" cy="28" r="16" fill="rgba(255, 255, 255, 0.1)" />
-          <Text style={styles.frameEmojiInside}>👤</Text>
+          <Text style={styles.frameEmojiInside}>T</Text>
         </Svg>
       </View>
     );
@@ -206,7 +216,7 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
       <View style={[styles.visualBox, { borderColor: isFire ? '#FF9B2F' : '#FFC837' }]}>
         <View style={styles.nameEffectPreview}>
           <Text style={[styles.nameEffectText, isFire ? styles.nameEffectFire : styles.nameEffectGold]}>
-            Tavriko {isFire ? '🔥' : '✨'}
+            Tavriko
           </Text>
         </View>
       </View>
@@ -254,26 +264,9 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
     );
   }
 
-  // Elmas / Altın
-  if (product.category === 'diamonds') {
-    return (
-      <View style={styles.visualBox}>
-        <GemIcon size={48} />
-      </View>
-    );
-  }
-
-  if (product.category === 'gold') {
-    return (
-      <View style={styles.visualBox}>
-        <CoinIcon size={48} />
-      </View>
-    );
-  }
-
   return (
     <View style={styles.visualBox}>
-      <Text style={styles.fallbackVisualEmoji}>🎁</Text>
+      <GiftIcon size={40} />
     </View>
   );
 };
@@ -286,14 +279,69 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   onNavigateSecondary,
   onNotifications,
   onProfile,
+  initialTab,
+  onRefresh,
 }) => {
   const page = usePlayerWebLayout();
   const threeProducts = page?.columns === 3;
   const roomy = page?.roomy;
-  const [activeTab, setActiveTab] = useState<ShopProductCategory>('frames');
+  const [activeTab, setActiveTab] = useState<ShopProductCategory>(initialTab === 'diamonds' && !WEB ? 'gold' : initialTab ?? (WEB ? 'diamonds' : 'gold'));
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  const purchaseLock = useRef(false);
+  const [polarAvailable, setPolarAvailable] = useState(false);
+  const [polarSandbox, setPolarSandbox] = useState(false);
+  const [jokersAvailable, setJokersAvailable] = useState(false);
+  const base = apiBaseUrl || getApiBaseUrl();
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch(`${base}/social/shop/jokers/availability`, { signal: controller.signal })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (!controller.signal.aborted) setJokersAvailable(data?.enabled === true); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [base]);
+  useEffect(() => {
+    if (!WEB) return;
+    const controller = new AbortController();
+    void fetch(`${base}/social/shop/diamonds/availability`, { method: 'POST', signal: controller.signal })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (!controller.signal.aborted) { setPolarAvailable(data?.enabled === true); setPolarSandbox(data?.sandbox === true); } })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [base]);
+  useEffect(() => {
+    if (!WEB || !user || user.isGuest || typeof window === 'undefined') return;
+    const address = new URL(window.location.href);
+    const checkout = address.searchParams.get('gem_checkout');
+    if (!checkout || !/^[a-f0-9-]{36}$/i.test(checkout)) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    let attempts = 0;
+    setStatusMessage('Ödemen doğrulanıyor. Elmaslar doğrulamadan sonra bakiyene eklenir.');
+    const check = async () => {
+      attempts += 1;
+      try {
+        const result = await fetch(`${base}/social/shop/diamonds/checkout/${checkout}`, { headers: authHeaders(), signal: controller.signal });
+        if (controller.signal.aborted) return;
+        if (result.ok) {
+          const { status } = await result.json();
+          if (controller.signal.aborted) return;
+          if (status === 'paid' || status === 'refunded') {
+            address.searchParams.delete('gem_checkout');
+            window.history.replaceState(window.history.state, '', address);
+            setStatusMessage(status === 'paid' ? 'Ödemen doğrulandı. Elmas bakiyen güncellendi.' : 'Bu ödeme iade edildi.');
+            onRefresh?.();
+            return;
+          }
+        }
+      } catch {}
+      if (!controller.signal.aborted && attempts < 8) timer = setTimeout(check, 2200);
+    };
+    void check();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [base, user?.id, user?.isGuest, onRefresh]);
   const [confirmProduct, setConfirmProduct] = useState<ShopProduct | null>(null);
   // Süreli kozmetikler için seçilen süre (1 saat - 30 gün); fiyatı ölçekler
   const [durationId, setDurationId] = useState<string>('1h');
@@ -344,7 +392,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 
   // 2x XP artırıcı aktif mi? Kalan süre (ms) yoksa null.
   const boosterExp = user?.activeBoosterExpiresAt ?? 0;
-  const boosterRemainingMs = boosterExp > Date.now() ? boosterExp - Date.now() : null;
+  const boosterRemainingMs = boosterExp >Date.now() ? boosterExp - Date.now() : null;
 
   const isProductOwned = (product: ShopProduct): boolean => {
     if (!user) return false;
@@ -355,7 +403,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     return false;
   };
 
-  const handleInitiatePurchase = (product: ShopProduct) => {
+  const handleInitiatePurchase = async (product: ShopProduct) => {
     sound.playSound('tap');
     if (!user) {
       sound.playSound('wrong');
@@ -372,8 +420,29 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     }
 
     if (product.currency === 'try') {
-      setIsError(true);
-      setStatusMessage('Gerçek para ile satın alma şu anda kapalı.');
+      if (!WEB || !polarAvailable || user.isGuest || purchaseLock.current) return;
+      purchaseLock.current = true;
+      setPurchasingId(product.id);
+      setStatusMessage(null);
+      try {
+        const response = await fetch(`${base}/social/shop/diamonds/checkout`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+          body: JSON.stringify({ productId: product.id }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Ödeme sayfası açılamadı.');
+        const url = new URL(data.url);
+        const allowedOrigins = polarSandbox ? ['https://sandbox.polar.sh'] : ['https://polar.sh', 'https://buy.polar.sh'];
+        if (!allowedOrigins.includes(url.origin) ||
+            !url.pathname.startsWith('/checkout/') || url.username || url.password) throw new Error('Ödeme adresi doğrulanamadı.');
+        window.location.assign(url.href);
+      } catch (error) {
+        setIsError(true);
+        setStatusMessage(error instanceof Error ? error.message : 'Ödeme sayfası açılamadı.');
+      } finally {
+        purchaseLock.current = false;
+        setPurchasingId(null);
+      }
       return;
     }
 
@@ -383,7 +452,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       sound.playSound('wrong');
       sound.triggerHaptic('error');
       setIsError(true);
-      setStatusMessage(`⚠️ Yetersiz Altın! ${price} Altın gerekli (Mevcut: ${user.coins ?? 0}).`);
+      setStatusMessage(`Yetersiz altın. Bu ürün için ${price} altın gerekli.`);
       return;
     }
 
@@ -391,7 +460,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       sound.playSound('wrong');
       sound.triggerHaptic('error');
       setIsError(true);
-      setStatusMessage(`⚠️ Yetersiz Elmas! ${price} Elmas gerekli (Mevcut: ${user.gems ?? 0}).`);
+      setStatusMessage(`Yetersiz elmas. Bu ürün için ${price} elmas gerekli.`);
       return;
     }
 
@@ -399,7 +468,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   };
 
   const handleConfirmPurchase = async () => {
-    if (!confirmProduct || confirmProduct.currency === 'try' || !user) return;
+    if (!confirmProduct || confirmProduct.currency === 'try' || !user || purchaseLock.current) return;
+    purchaseLock.current = true;
     const product = confirmProduct;
     setPurchasingId(product.id);
     setStatusMessage(null);
@@ -441,6 +511,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       setIsError(true);
       setStatusMessage('Bağlantı hatası oluştu.');
     } finally {
+      purchaseLock.current = false;
       setPurchasingId(null);
       setConfirmProduct(null);
     }
@@ -462,7 +533,21 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       >
         {/* Başlık */}
         <KitHeader title="Mağaza" subtitle="Kozmetikler ve güçlendiriciler" />
-        <KitHero
+        <KitChips
+          tabs={CATEGORY_TABS.filter(c => c.id !== 'jokers' || jokersAvailable).map((c) => ({ id: c.id, label: c.name }))}
+          active={activeTab}
+          onChange={(id, idx) => handleSelectCategoryTab(id, idx)}
+          scrollRef={tabScrollRef}
+        />
+        {(activeTab === 'diamonds' || activeTab === 'gold' || activeTab === 'jokers') ? <View style={styles.walletSection}>
+          <WalletArtwork kind={activeTab === 'jokers' ? 'joker_half' : activeTab} size={74} tier={2} />
+          <View style={styles.walletSummary}>
+            <Text accessibilityRole="header" style={styles.walletTitle}>{activeTab === 'diamonds' ? 'Elmas paketleri' : activeTab === 'gold' ? 'Altın paketleri' : 'Antrenman jokerleri'}</Text>
+            <Text style={styles.walletDescription}>{activeTab === 'diamonds'
+              ? polarSandbox ? 'Polar test ortamı. Gerçek ödeme yapma.' : polarAvailable ? 'Tek seferlik, güvenli Polar ödemesi.' : 'Elmas paketlerinin ödemesi henüz kullanıma açık değil.'
+              : activeTab === 'gold' ? 'Quiz oynayarak altın kazan veya elmasla paket al.' : 'Jokerler elmasla değil, altınla alınır.'}</Text>
+          </View>
+        </View> : <><KitHero
           art={STORE_IMG.trophy}
           artSize={110}
           eyebrow="TAVRİKO MAĞAZASI"
@@ -481,12 +566,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           }}
         />
 
-        <KitChips
-          tabs={CATEGORY_TABS.map((c) => ({ id: c.id, label: c.name }))}
-          active={activeTab}
-          onChange={(id, idx) => handleSelectCategoryTab(id, idx)}
-          scrollRef={tabScrollRef}
-        />
+        </>}
 
         {/* Durum Bildirimi */}
         {statusMessage && (
@@ -574,19 +654,21 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                         <View style={styles.boosterTimerTrack}>
                           <View style={[styles.boosterTimerFill, { width: `${pct}%` }]} />
                         </View>
-                        <Text style={styles.boosterTimerText}>⚡ Aktif — kalan süre: {remainingLabel}</Text>
+                        <Text style={styles.boosterTimerText}>Aktif — kalan süre: {remainingLabel}</Text>
                       </View>
                     );
                   })()}
 
                 {/* Fiyat Butonu (Tavriko Altın/Elmas Butonu) */}
                 <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={`Satın al: ${item.name}`}
                   style={[
                     styles.priceBtn,
                     roomy && styles.webPriceButton,
-                    owned || item.currency === 'try' ? styles.priceBtnOwned : styles.priceBtnActive,
+                    owned || (item.currency === 'try' && !polarAvailable) ? styles.priceBtnOwned : styles.priceBtnActive,
                   ]}
-                  disabled={owned || isBuying || item.currency === 'try'}
+                  disabled={owned || purchasingId !== null || (item.currency === 'try' && !polarAvailable)}
                   activeOpacity={0.8}
                   onPress={() => handleInitiatePurchase(item)}
                 >
@@ -595,11 +677,11 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                   ) : owned ? (
                     <Text style={styles.priceBtnTextOwned}>SAHİPSİN</Text>
                   ) : item.currency === 'try' ? (
-                    <Text style={styles.priceBtnTextOwned}>ÖDEME KAPALI</Text>
+                    <Text style={polarAvailable ? styles.priceBtnText : styles.priceBtnTextOwned}>{item.price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺{polarAvailable ? ' · Satın al' : ''}</Text>
                   ) : (
                     <View style={styles.priceContentRow}>
                       <Text style={styles.priceBtnText}>
-                        {item.price}
+                        {item.price}{item.category === 'jokers' ? ' Altın' : ''}
                       </Text>
                       {item.currency === 'coins' && <CoinIcon size={16} />}
                       {item.currency === 'gems' && <GemIcon size={16} />}
@@ -727,6 +809,10 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  walletSection: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: '#5D4A77', backgroundColor: '#251B3B', padding: 10, marginBottom: 16 },
+  walletSummary: { flex: 1, gap: 4, paddingRight: 8 },
+  walletTitle: { fontFamily: THEME.fonts.extraBold, color: '#FFE0A9', fontSize: 19 },
+  walletDescription: { fontFamily: THEME.fonts.bold, color: '#D9C9E9', fontSize: 13, lineHeight: 19 },
   scrollContent: {
     paddingBottom: Platform.OS === 'web' ? 20 : 160,
     paddingHorizontal: 4,

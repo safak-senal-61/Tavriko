@@ -20,7 +20,7 @@ import {
   TavrikoTopBar,
   TavrikoBottomNav,
   CharacterAvatar,
-  CrownIcon,
+  LaurelIcon,
 } from '../components/TavrikoIcons';
 import { formatNumberTR } from '../components/TavrikoGradient';
 import { InfoHint } from '../components/InfoHint';
@@ -211,7 +211,7 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
                     entering={FadeInUp.delay(place === 1 ? 80 : place === 2 ? 180 : 260).springify().damping(14)}
                     style={styles.podiumCol}
                   >
-                    {place === 1 && <CrownIcon size={26} />}
+                    {place === 1 && <LaurelIcon size={26} />}
                     <View style={[styles.podiumAvatarRing, { borderColor: tone.ring, width: avatar + 8, height: avatar + 8, borderRadius: (avatar + 8) / 2 }]}>
                       <CharacterAvatar seed={item.avatarUrl || item.displayName} size={avatar} />
                     </View>

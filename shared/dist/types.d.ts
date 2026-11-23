@@ -50,6 +50,8 @@ export interface Question {
     timeLimitSec?: number;
 }
 export interface ClientQuestion {
+    /** Short-lived proof provided only for authenticated practice questions. */
+    jokerProof?: string;
     id: string;
     categoryId: CategoryId;
     difficulty: DifficultyLevel;
@@ -213,7 +215,7 @@ export interface FinalMatchSummary {
     questionReviews?: MatchQuestionReviewItem[];
 }
 export type ItemRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
-export type ItemCategory = 'chest' | 'key' | 'booster' | 'cosmetic' | 'badge' | 'avatar' | 'frame' | 'name_effect' | 'background';
+export type ItemCategory = 'chest' | 'key' | 'booster' | 'joker' | 'cosmetic' | 'badge' | 'avatar' | 'frame' | 'name_effect' | 'background';
 export interface InventoryItem {
     id: string;
     name: string;
@@ -417,7 +419,7 @@ export interface SeasonTierItem {
 }
 export declare function generateSeason1Tiers(): SeasonTierItem[];
 export declare const SEASON_1_TIERS: SeasonTierItem[];
-export type ShopProductCategory = 'featured' | 'diamonds' | 'gold' | 'avatars' | 'frames' | 'name_effects' | 'boosters' | 'backgrounds';
+export type ShopProductCategory = 'featured' | 'diamonds' | 'gold' | 'avatars' | 'frames' | 'name_effects' | 'boosters' | 'jokers' | 'backgrounds';
 export interface ShopProduct {
     id: string;
     name: string;
@@ -441,6 +443,22 @@ export interface ShopProduct {
     grantGems?: number;
     grantPremiumPass?: boolean;
 }
+export declare const LOW_GEMS = 100;
+export declare const LOW_COINS = 500;
+export declare const JOKERS: readonly [{
+    readonly id: "joker_eliminate";
+    readonly name: "Tek Eleme";
+    readonly desc: "Bir yanlış şıkkı kaldırır.";
+    readonly price: 250;
+    readonly eliminated: 1;
+}, {
+    readonly id: "joker_half";
+    readonly name: "Yarı Yarıya";
+    readonly desc: "İki yanlış şıkkı kaldırır.";
+    readonly price: 450;
+    readonly eliminated: 2;
+}];
+export type JokerId = typeof JOKERS[number]['id'];
 /**
  * Süreli kozmetik mağaza ürünleri için süre seçenekleri: 1 saatten en fazla 1
  * aya kadar. Fiyat, ürünün temel fiyatı süre çarpanıyla ölçeklenir.
@@ -491,7 +509,32 @@ export interface GameEvent {
     };
     endsInHours: number;
 }
-export declare const EVENT_DEFINITIONS: GameEvent[];
+export declare const EVENT_DEFINITIONS: {
+    rewardCoins: number;
+    rewardGems: number;
+    id: string;
+    type: "daily" | "weekly" | "special";
+    title: string;
+    desc: string;
+    targetCount: number;
+    currentCount?: number;
+    started?: boolean;
+    completed?: boolean;
+    claimed?: boolean;
+    metric: "matches_played" | "correct_answers" | "wins" | "streak" | "category_solved";
+    categoryFilter?: CategoryId;
+    rewardXp: number;
+    rewardSeasonXp: number;
+    rewardItem?: {
+        id: string;
+        name: string;
+        desc: string;
+        qty: number;
+        category: ItemCategory;
+        rarity: ItemRarity;
+    };
+    endsInHours: number;
+}[];
 export interface DailyChallengeConfig {
     dayNumber: number;
     totalQuestions: number;

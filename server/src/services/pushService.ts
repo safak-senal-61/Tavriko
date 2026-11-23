@@ -18,6 +18,7 @@
  * döngüsel içe aktarımı önlemek amacıyla geçici (lazy) require ile yapılır.
  */
 import type { NotificationItem } from '@trivia/shared';
+import { plainDisplayText } from '@trivia/shared';
 import { logger } from '../utils/logger';
 import { sendFcmToTokens } from './fcmService';
 
@@ -101,8 +102,8 @@ export async function sendPushToExpo(
         body: JSON.stringify(
           chunk.map((token) => ({
             to: token,
-            title: payload.title,
-            body: payload.body,
+            title: plainDisplayText(payload.title),
+            body: plainDisplayText(payload.body),
             sound: 'default',
             ...(payload.channelId ? { channelId: payload.channelId === 'general' ? 'default' : payload.channelId } : {}),
             ...(payload.channelId === 'invites' ? { priority: 'high' } : {}),
@@ -135,8 +136,8 @@ export async function sendPushToExpo(
   // FCM device tokenlar (Android): firebase-admin ile doğrudan gönderim.
   if (fcmTokens.length) {
     const fcmResult = await sendFcmToTokens(fcmTokens, {
-      title: payload.title,
-      body: payload.body,
+      title: plainDisplayText(payload.title),
+      body: plainDisplayText(payload.body),
       data: payload.data,
       channelId: payload.channelId,
       categoryId: payload.categoryId,

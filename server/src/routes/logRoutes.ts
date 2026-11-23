@@ -1255,7 +1255,7 @@ export function renderDashboardHtml(page: AdminPage = adminPages[0]): string {
             </div>
           </div>
           <div class="cos-card">
-            <div class="cos-icon-wrap gold-frame">👑</div>
+            <div class="cos-icon-wrap gold-frame">✦</div>
             <div class="cos-name">Kraliyet Altın Çerçeve</div>
             <div class="cos-desc">24 ayar parıldayan altın. Pulse animasyonlu.</div>
             <div class="cos-meta">
@@ -1322,7 +1322,7 @@ export function renderDashboardHtml(page: AdminPage = adminPages[0]): string {
             </div>
           </div>
           <div class="cos-card">
-            <div class="cos-icon-wrap animated-gradient" style="background:linear-gradient(135deg,#1E0E45,#4C1D95,#1E0E45);background-size:400% 400%;animation:cosGradientShift 5s ease-in-out infinite;">👑</div>
+            <div class="cos-icon-wrap animated-gradient" style="background:linear-gradient(135deg,#1E0E45,#4C1D95,#1E0E45);background-size:400% 400%;animation:cosGradientShift 5s ease-in-out infinite;">✦</div>
             <div class="cos-name">Kraliyet Moru Teması</div>
             <div class="cos-desc">Altın yıldızlı kraliyet kadifesi. Gradient shift animasyonlu.</div>
             <div class="cos-meta">

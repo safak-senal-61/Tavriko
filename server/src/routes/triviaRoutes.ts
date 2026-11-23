@@ -1,13 +1,22 @@
 import { Router, Request, Response } from 'express';
+import { rateLimit } from 'express-rate-limit';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { db } from '../db/prismaClient';
-import { CategoryId, DifficultyLevel, calculateScore, ClientQuestion } from '@trivia/shared';
+import { CategoryId, DifficultyLevel, calculateScore, ClientQuestion, JOKERS } from '@trivia/shared';
 import { generateQuestionsWithEvrenGLM } from '../ai/evrenLlmGenerator';
 import { cacheService } from '../cache/redisClient';
 import { supabaseService } from '../db/supabaseClient';
 import { importQuestionsFromJson } from '../utils/questionImporter';
-import { requireAdminAuth } from '../middleware/auth';
+import { getJwtSecret, requireAdminAuth, requireUserAuth } from '../middleware/auth';
+import { walletSchemaReady } from '../services/walletSchema';
+import { walletRateLimitOptions } from '../middleware/walletRateLimit';
 
 const router = Router();
+const practiceQuestionsLimit = rateLimit({ ...walletRateLimitOptions, limit: 90 });
+const practiceJokerLimit = rateLimit({ ...walletRateLimitOptions, limit: 45 });
+const practiceSessionPattern = /^sess_[a-f0-9]{32}$/;
+const practiceProof = (userId: string, sessionId: string, questionId: string, expiry: number, secret: string) =>
+  createHmac('sha256', secret).update(JSON.stringify(['practice-joker', userId, sessionId, questionId, expiry])).digest('hex');
 
 // Public trivia categories
 router.get('/categories', async (req: Request, res: Response): Promise<void> => {
@@ -18,7 +27,7 @@ router.get('/categories', async (req: Request, res: Response): Promise<void> => 
 });
 
 // Single-player / practice question fetcher with anti-repeat support
-router.get('/questions/practice', async (req: Request, res: Response): Promise<void> => {
+router.get('/questions/practice', practiceQuestionsLimit, async (req: Request, res: Response): Promise<void> => {
   const category = (req.query.category as CategoryId) || 'mixed';
   const difficulty = req.query.difficulty as DifficultyLevel | undefined;
   const subCategory = (req.query.subcategory as string) || undefined;
@@ -26,6 +35,13 @@ router.get('/questions/practice', async (req: Request, res: Response): Promise<v
   const seenIdsRaw = req.query.seenIds as string | undefined;
   const seenIds = seenIdsRaw ? seenIdsRaw.split(',') : [];
   const sessionId = (req.query.sessionId as string) || 'practice';
+  const authorization = req.get('Authorization');
+  const proofOwner = authorization?.startsWith('Bearer ') ? db.verifyToken(authorization.slice(7))?.userId : undefined;
+  const proofSecret = getJwtSecret();
+  if (authorization) res.set('Cache-Control', 'private, no-store');
+  const issueJokerProof = req.query.jokers === '1' && typeof proofOwner === 'string' &&
+    !proofOwner.startsWith('guest_') && proofSecret && practiceSessionPattern.test(sessionId) &&
+    await walletSchemaReady(db.rawClient);
 
   // Sunucusuz ortamda kalıcı soru havuzunun (Telegram soruları dahil) hazır olmasını bekle
   await db.ensureQuestionsRestored();
@@ -49,6 +65,9 @@ router.get('/questions/practice', async (req: Request, res: Response): Promise<v
   await Promise.all(
     questions.map((q) => {
       cumulativeMs += q.timeLimitSec * 1000 + 4000;
+      if (issueJokerProof && proofOwner) {
+        q.jokerProof = `${cumulativeMs}.${practiceProof(proofOwner, sessionId, q.id, cumulativeMs, proofSecret)}`;
+      }
       return cacheService.setQuestionExpiry(sessionId, q.id, cumulativeMs, 300);
     })
   );
@@ -66,6 +85,52 @@ router.get('/questions/practice', async (req: Request, res: Response): Promise<v
   }
 
   res.json({ category, subCategory: subCategory || null, count: questions.length, questions });
+});
+
+router.post('/questions/practice/joker', practiceJokerLimit, requireUserAuth, async (req: Request, res: Response): Promise<void> => {
+  const userId = req.authUserId;
+  const { sessionId, questionId, jokerId, proof } = req.body || {};
+  const joker = JOKERS.find(item => item.id === jokerId);
+  const secret = getJwtSecret();
+  const [deadline, signature] = typeof proof === 'string' && /^\d{13}\.[a-f0-9]{64}$/.test(proof) ? proof.split('.') : [];
+  if (!userId || userId.startsWith('guest_') || !joker || !secret || !deadline || typeof sessionId !== 'string' ||
+      !practiceSessionPattern.test(sessionId) || typeof questionId !== 'string' || questionId.length > 160 ||
+      !timingSafeEqual(Buffer.from(practiceProof(userId, sessionId, questionId, Number(deadline), secret), 'hex'), Buffer.from(signature, 'hex'))) {
+    res.status(400).json({ error: 'Bu soruda joker kullanılamıyor.' }); return;
+  }
+  if (!await walletSchemaReady(db.rawClient)) {
+    res.status(503).json({ error: 'Jokerler henüz kullanıma açık değil.' }); return;
+  }
+  let question = db.getQuestionById(questionId);
+  if (!question) {
+    await db.ensureQuestionsRestored();
+    question = db.getQuestionById(questionId);
+  }
+  const wrong = question?.options.filter(option => option.id !== question?.correctOptionId) ?? [];
+  if (!question?.options.some(option => option.id === question?.correctOptionId) || wrong.length <= joker.eliminated || Date.now() > Number(deadline)) {
+    res.status(409).json({ error: 'Bu soruda joker kullanılamıyor.' }); return;
+  }
+  try {
+    const eliminated = await db.rawClient.$transaction(async tx => {
+      const [account] = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "users" WHERE "id" = ${userId} FOR UPDATE`;
+      if (!account) return null;
+      const key = { userId, sessionId, questionId };
+      const used = await tx.practiceJokerUse.findUnique({ where: { userId_sessionId_questionId: key } });
+      if (used) return used.eliminated;
+      const stock = await tx.userInventoryItem.updateMany({
+        where: { userId, itemId: joker.id, qty: { gt: 0 } }, data: { qty: { decrement: 1 } },
+      });
+      if (!stock.count) return null;
+      const start = Math.floor(Math.random() * wrong.length);
+      const hidden = [...wrong.slice(start), ...wrong.slice(0, start)].slice(0, joker.eliminated).map(option => option.id);
+      await tx.practiceJokerUse.create({ data: { ...key, jokerId: joker.id, eliminated: hidden } });
+      return hidden;
+    });
+    if (!eliminated) { res.status(409).json({ error: 'Envanterinde bu jokerden kalmadı.' }); return; }
+    res.json({ eliminated });
+  } catch {
+    res.status(503).json({ error: 'Joker şu anda kullanılamadı. Tekrar dene.' });
+  }
 });
 
 // Authoritative practice / guest answer validation endpoint

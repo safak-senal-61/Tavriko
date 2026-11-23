@@ -18,7 +18,7 @@ import {
   SecondaryNavTab,
   TrophyIcon,
   CharacterAvatar,
-  CrownIcon,
+  LaurelIcon,
 } from '../components/TavrikoIcons';
 import Reanimated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { KitHero, STORE_IMG, KIT } from '../components/StoreKit';
@@ -148,7 +148,7 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
                     onPress={() => handleOpenProfile(top1.userId)}
                   >
                     <View style={styles.crownWrap}>
-                      <CrownIcon size={26} />
+                      <LaurelIcon size={26} />
                     </View>
                     <View style={styles.podiumAvatarWrap}>
                       <View style={[styles.podiumRing, styles.goldRing]}>

@@ -109,7 +109,7 @@ export const FRAME_DEFS: CosmeticDef[] = [
     name: 'Kraliyet Altın Çerçeve',
     desc: '24 ayar parıldayan kraliyet altın halkası.',
     rarity: 'legendary',
-    visual: { ringColor: '#FFC43D', ringColor2: '#F59E0B', anim: 'shimmer', icon: '👑' },
+    visual: { ringColor: '#FFC43D', ringColor2: '#F59E0B', anim: 'shimmer', icon: '✦' },
   },
   {
     id: 'frame_flame',
@@ -188,7 +188,7 @@ export const BACKGROUND_DEFS: CosmeticDef[] = [
       bgColor: '#1E0E45',
       bgColor2: '#4C1D95',
       anim: 'pulse',
-      icon: '👑',
+      icon: '✦',
     },
   },
   {
@@ -241,7 +241,7 @@ export const BACKGROUND_DEFS: CosmeticDef[] = [
       bgColor: '#3B2105',
       bgColor2: '#B8860B',
       anim: 'shimmer',
-      icon: '👑',
+      icon: '✦',
       ui: { accent: '#FFC43D', accent2: '#FFE27A', bgTint: 'rgba(255, 196, 61, 0.10)' },
     },
   },
@@ -434,7 +434,7 @@ export const BADGE_DEFS: CosmeticDef[] = [
     name: 'Sezon 1 Şampiyonu Rozeti',
     desc: 'Sezon 1’i tamamlayanların efsanevi mührü. 1 saat geçerlidir.',
     rarity: 'legendary',
-    visual: { icon: '👑' },
+    visual: { icon: '✦' },
   },
 ];
 

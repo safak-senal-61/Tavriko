@@ -34,7 +34,8 @@ import Reanimated, {
 } from 'react-native-reanimated';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
-import { GameRoom, UserProfile, LOBBY_QUICK_MESSAGES, LOBBY_REACTIONS, isLobbyQuickMessage, isLobbyReaction } from '@trivia/shared';
+import { Flame, ThumbsUp, Smile, Heart, Zap, Target, Rocket, Flag } from 'lucide-react-native';
+import { GameRoom, UserProfile, LOBBY_QUICK_MESSAGES, LOBBY_REACTIONS, isLobbyQuickMessage, isLobbyReaction, plainDisplayText } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
@@ -154,13 +155,21 @@ const CodeCardShell: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   return <Reanimated.View style={cardStyle}>{children}</Reanimated.View>;
 };
 
-/** Basınca zıplayan emoji butonu */
+const reactionArt = [Flame, ThumbsUp, Smile, Heart, Zap, Target, Rocket] as const;
+const reactionLabels = ['Ateş', 'Alkış', 'Gülümseme', 'Kalp', 'Hız', 'Hedef', 'Roket'] as const;
+function ReactionArt({ reaction, size = 21 }: { reaction: string; size?: number }) {
+  const Icon = reactionArt[LOBBY_REACTIONS.findIndex(value => value === reaction)];
+  return Icon ? <Icon size={size} color="#FFD081" strokeWidth={2.2} /> : null;
+}
+
 const BouncyReaction: React.FC<{ emoji: string; onPress: () => void }> = ({ emoji, onPress }) => {
   const s = useSharedValue(1);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
   return (
     <TouchableOpacity
       style={styles.reactionTouch}
+      accessibilityRole="button"
+      accessibilityLabel={reactionLabels[LOBBY_REACTIONS.findIndex(value => value === emoji)]}
       activeOpacity={0.65}
       onPress={() => {
         s.value = withSequence(withTiming(1.45, { duration: 120 }), withTiming(1, { duration: 220 }));
@@ -168,7 +177,7 @@ const BouncyReaction: React.FC<{ emoji: string; onPress: () => void }> = ({ emoj
       }}
     >
       <Reanimated.View style={style}>
-        <Text style={styles.reactionEmojiText}>{emoji}</Text>
+        <ReactionArt reaction={emoji} />
       </Reanimated.View>
     </TouchableOpacity>
   );
@@ -339,7 +348,7 @@ const FloatingLobbyItem: React.FC<{
           },
         ]}
       >
-        <Text style={styles.floatingEmojiText}>{item.content}</Text>
+        <ReactionArt reaction={item.content} size={32} />
       </Animated.View>
     );
   }
@@ -365,7 +374,7 @@ const FloatingLobbyItem: React.FC<{
         <Text style={styles.floatingChatSender} numberOfLines={1}>
           {item.senderName}
         </Text>
-        <Text style={styles.floatingChatBody}>{item.content}</Text>
+        <Text style={styles.floatingChatBody}>{plainDisplayText(item.content)}</Text>
       </View>
     </Animated.View>
   );
@@ -665,14 +674,14 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
     try {
       await Share.share({
         message:
-          `🎮 Tavriko bilgi yarışmasında özel odama katıl!\n\n` +
-          `🔗 Oda Bağlantısı: ${roomLink}\n` +
-          `📝 Oda Kodu: ${room.code}\n\n` +
-          `📋 Oda Detayları:\n` +
-          `• 🔒 ${room.privacy === 'public' ? 'Herkese Açık' : 'Özel Oda'}\n` +
-          `• 📝 ${room.totalRounds || 7} Soru\n` +
-          `• ⏱️ Soru Başına ${room.questionTimeSec || 20} Saniye\n` +
-          `• ${room.penaltyForWrong ? '⚠️ Yanlışta -50 Puan Cezası' : '🛡️ Cezasız Mod'}\n\n` +
+          `Tavriko bilgi yarışmasında özel odama katıl!\n\n` +
+          `Oda Bağlantısı: ${roomLink}\n` +
+          `Oda Kodu: ${room.code}\n\n` +
+          `Oda Detayları:\n` +
+          `•  ${room.privacy === 'public' ? 'Herkese Açık' : 'Özel Oda'}\n` +
+          `•  ${room.totalRounds || 7} Soru\n` +
+          `•  Soru Başına ${room.questionTimeSec || 20} Saniye\n` +
+          `• ${room.penaltyForWrong ? 'Yanlışta -50 Puan Cezası' : 'Cezasız Mod'}\n\n` +
           `Bağlantıya dokunarak ya da Özel Oda ekranından kodu girerek hemen katılabilirsin!`,
       });
     } catch {}
@@ -719,7 +728,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             <Text style={styles.title}>ÖZEL LOBİ</Text>
             <View style={styles.heroPillRow}>
               <View style={styles.heroPill}>
-                <Text style={styles.heroPillText}>🔒 {room.privacy === 'public' ? 'Herkese Açık' : 'Özel Oda'}</Text>
+                <Text style={styles.heroPillText}> {room.privacy === 'public' ? 'Herkese Açık' : 'Özel Oda'}</Text>
               </View>
             </View>
           </View>
@@ -808,14 +817,14 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         {/* 2. ODA PARAMETRELERİ (Kademeli girişli çipler) */}
         <View style={styles.chipsRow}>
           <Reanimated.View entering={FadeInDown.delay(140).duration(380)} style={styles.specChip}>
-            <Text style={styles.specChipText}>📝 {room.totalRounds || 7} Soru</Text>
+            <Text style={styles.specChipText}> {room.totalRounds || 7} Soru</Text>
           </Reanimated.View>
           <Reanimated.View entering={FadeInDown.delay(190).duration(380)} style={styles.specChip}>
-            <Text style={styles.specChipText}>⏱️ {room.questionTimeSec || 20}sn</Text>
+            <Text style={styles.specChipText}> {room.questionTimeSec || 20}sn</Text>
           </Reanimated.View>
           <Reanimated.View entering={FadeInDown.delay(240).duration(380)} style={styles.specChip}>
             <Text style={styles.specChipText}>
-              {room.penaltyForWrong ? '⚠️ -50p Ceza' : '🛡️ Cezasız'}
+              {room.penaltyForWrong ? ' -50p Ceza' : 'Cezasız'}
             </Text>
           </Reanimated.View>
         </View>
@@ -826,7 +835,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             Oyuncular ({players.length}/{maxPlayers})
           </Text>
           <Text style={styles.roomStatusTag}>
-            {canStart ? '🟢 Başlamaya Hazır' : '🟡 Katılımcı Bekleniyor'}
+            {canStart ? 'Başlamaya Hazır' : 'Katılımcı Bekleniyor'}
           </Text>
         </View>
 
@@ -849,7 +858,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                   <CharacterAvatar seed={isBlocked ? 'av1' : p.avatarUrl || p.displayName} size={42} />
                   {playerIsHost && (
                     <View style={styles.hostCrown}>
-                      <Text style={styles.hostCrownText}>👑</Text>
+                      <Flag size={15} color="#FFD081" accessibilityLabel="Oda sahibi" />
                     </View>
                   )}
                 </View>
@@ -873,7 +882,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                   ]}
                 >
                   <Text style={[styles.statusChipText, p.isReady && styles.statusChipTextReady]}>
-                    {p.isReady ? '✓ HAZIR' : '⏳ BEKLİYOR'}
+                    {p.isReady ? '✓ HAZIR' : 'BEKLİYOR'}
                   </Text>
                 </View>
 
@@ -938,7 +947,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 activeOpacity={0.75}
                 onPress={() => handleSendChat(chip)}
               >
-                <Text style={styles.quickChipText}>{chip}</Text>
+                <Text style={styles.quickChipText}>{plainDisplayText(chip)}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -962,10 +971,10 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
               ) : (
                 <View style={styles.readyContainer}>
                   <Text style={styles.readyNotificationText}>
-                    ✨ Lobi hazır! Yarışmayı hemen başlatabilirsiniz ({players.length}/{maxPlayers}).
+                     Lobi hazır! Yarışmayı hemen başlatabilirsiniz ({players.length}/{maxPlayers}).
                   </Text>
                   <Button3D
-                    title="OYUNU BAŞLAT 🎮"
+                    title="OYUNU BAŞLAT"
                     onPress={() => {
                       sound.playSound('tap');
                       sound.triggerHaptic('medium');
@@ -987,7 +996,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 }}
               >
                 <Text style={[styles.readyToggleText, isReady && styles.readyToggleTextActive]}>
-                  {isReady ? '✓ HAZIRSIN' : '⚡ HAZIR OL'}
+                  {isReady ? '✓ HAZIRSIN' : 'HAZIR OL'}
                 </Text>
               </TouchableOpacity>
               <Text style={styles.waitingHostText}>
@@ -1092,7 +1101,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         </View>
       </Modal>
       <Modal visible={!!moderationTarget} transparent animationType="fade"
-        onRequestClose={() => !moderationBusy && setModerationTarget(null)}>
+        onRequestClose={() => { if (!moderationBusy) setModerationTarget(null); }}>
         <View style={styles.friendModalOverlay}>
           <View style={styles.friendModalShell}>
             <View style={styles.friendModalCard} accessibilityViewIsModal>

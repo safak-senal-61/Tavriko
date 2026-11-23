@@ -190,7 +190,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
     sound.triggerHaptic('light');
     try {
       await Share.share({
-        message: `Tavriko bilgi yarışmasında bana meydan oku! 🎮\nArkadaşlık Kodum: ${currentCode}\nUygulamayı aç ve 1v1 düelloya başla!`,
+        message: `Tavriko bilgi yarışmasında bana meydan oku!\nArkadaşlık Kodum: ${currentCode}\nUygulamayı aç ve 1v1 düelloya başla!`,
       });
     } catch {}
   };
@@ -260,7 +260,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       setTimeout(() => setChallengeNotice(null), 3500);
     } catch (err: any) {
       sound.playSound('wrong');
-      setChallengeNotice(`⚠️ ${err.message || 'Arkadaş çıkarılamadı.'}`);
+      setChallengeNotice(` ${err.message || 'Arkadaş çıkarılamadı.'}`);
     } finally {
       setRemovingFriend(false);
     }
@@ -307,7 +307,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       }
       setAddSuccessMsg(
         data.message ||
-          `📨 ${data.friend?.displayName || clean} oyuncusuna arkadaşlık isteği gönderildi! Kabul ettiğinde Arkadaşlarım listende görünecek.`
+          ` ${data.friend?.displayName || clean} oyuncusuna arkadaşlık isteği gönderildi! Kabul ettiğinde Arkadaşlarım listende görünecek.`
       );
       if (addByUsername) setUsernameInput('');
       else setCodeSuffix('');
@@ -394,7 +394,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       if (res.ok && data.success) {
         sound.playSound('reward');
         sound.triggerHaptic('success');
-        setChallengeNotice(`⚔️ ${friend.displayName || friend.name} oyuncusuna 1v1 düello daveti gönderildi! Odaya aktarılıyorsunuz...`);
+        setChallengeNotice(` ${friend.displayName || friend.name} oyuncusuna 1v1 düello daveti gönderildi! Odaya aktarılıyorsunuz...`);
         setTimeout(() => {
           onInviteToMatch(friend.id, friend.displayName || friend.name, data.roomCode);
         }, 1000);
@@ -403,7 +403,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
       }
     } catch (err: any) {
       sound.playSound('wrong');
-      setChallengeNotice(`⚠️ ${err.message || 'Davet gönderilemedi.'}`);
+      setChallengeNotice(` ${err.message || 'Davet gönderilemedi.'}`);
     } finally {
       setChallengeLoadingId(null);
     }
@@ -655,7 +655,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
               </TouchableOpacity>
               {addErrorMsg && (
                 <View style={styles.errorBox}>
-                  <Text style={styles.errorText}>⚠️ {addErrorMsg}</Text>
+                  <Text style={styles.errorText}> {addErrorMsg}</Text>
                 </View>
               )}
               {addSuccessMsg && (
@@ -684,7 +684,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                     letterSpacing: 0.6,
                   }}
                 >
-                  ⏳ GÖNDERİLEN BEKLEYEN İSTEKLER ({sentRequests.length})
+                   GÖNDERİLEN BEKLEYEN İSTEKLER ({sentRequests.length})
                 </Text>
                 {sentRequests.map((sr) => (
                   <View key={sr.id} style={styles.friendRow}>
