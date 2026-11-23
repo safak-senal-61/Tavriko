@@ -26,6 +26,8 @@ exports.SOCKET_EVENTS = {
     PLAYER_RECONNECTED: 'game:player_reconnected',
     // Gameplay Flow (Client -> Server)
     SUBMIT_ANSWER: 'game:submit_answer',
+    USE_JOKER: 'game:use_joker',
+    JOKER_RESULT: 'game:joker_result',
     // Social & Chat
     SEND_EMOTE: 'game:send_emote',
     EMOTE_RECEIVED: 'game:emote_received',

@@ -21,7 +21,7 @@ import Svg, {
   Circle,
   Path,
 } from 'react-native-svg';
-import { UserProfile, SHOP_CATALOG, ShopProduct, ShopProductCategory, SHOP_DURATIONS, isCosmeticProduct, shopPriceForDuration } from '@trivia/shared';
+import { UserProfile, SHOP_CATALOG, ShopProduct, ShopProductCategory, SHOP_DURATIONS, isCosmeticProduct, isJokerId, shopPriceForDuration } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { getApiBaseUrl } from '../config';
@@ -117,7 +117,7 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
     const tier = SHOP_CATALOG.filter(p => p.category === product.category).findIndex(p => p.id === product.id) + 1;
     return <View style={[styles.visualTall, previewHeight]}><WalletArtwork kind={product.category} size={visualSize} tier={tier} /></View>;
   }
-  if (product.id === 'joker_eliminate' || product.id === 'joker_half') {
+  if (isJokerId(product.id)) {
     return <View style={[styles.visualTall, previewHeight]}><WalletArtwork kind={product.id} size={visualSize} /></View>;
   }
   if ((product.category === 'frames' || pId.includes('frame')) && frameFor(pId)) {
@@ -542,10 +542,10 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         {(activeTab === 'diamonds' || activeTab === 'gold' || activeTab === 'jokers') ? <View style={styles.walletSection}>
           <WalletArtwork kind={activeTab === 'jokers' ? 'joker_half' : activeTab} size={74} tier={2} />
           <View style={styles.walletSummary}>
-            <Text accessibilityRole="header" style={styles.walletTitle}>{activeTab === 'diamonds' ? 'Elmas paketleri' : activeTab === 'gold' ? 'Altın paketleri' : 'Antrenman jokerleri'}</Text>
+            <Text accessibilityRole="header" style={styles.walletTitle}>{activeTab === 'diamonds' ? 'Elmas paketleri' : activeTab === 'gold' ? 'Altın paketleri' : 'Quiz jokerleri'}</Text>
             <Text style={styles.walletDescription}>{activeTab === 'diamonds'
               ? polarSandbox ? 'Polar test ortamı. Gerçek ödeme yapma.' : polarAvailable ? 'Tek seferlik, güvenli Polar ödemesi.' : 'Elmas paketlerinin ödemesi henüz kullanıma açık değil.'
-              : activeTab === 'gold' ? 'Quiz oynayarak altın kazan veya elmasla paket al.' : 'Jokerler elmasla değil, altınla alınır.'}</Text>
+              : activeTab === 'gold' ? 'Quiz oynayarak altın kazan veya elmasla paket al.' : 'Altınla al; 1v1, arkadaş maçı veya çevrimiçi antrenmanda kullan.'}</Text>
           </View>
         </View> : <><KitHero
           art={STORE_IMG.trophy}
@@ -732,7 +732,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             <Text style={styles.modalTitle}>SATIN ALMAYI ONAYLA</Text>
             {confirmProduct && (
               <>
-                {(confirmProduct.id === 'joker_eliminate' || confirmProduct.id === 'joker_half') && (
+                {isJokerId(confirmProduct.id) && (
                   <WalletArtwork kind={confirmProduct.id} size={64} />
                 )}
                 <Text style={styles.modalProduct}>{confirmProduct.name}</Text>

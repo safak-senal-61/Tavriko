@@ -10,3 +10,4 @@ export * from './questionSelection';
 export * from './lobbyChat';
 export * from './posthogConfig';
 export * from './displayText';
+export * from './jokers';

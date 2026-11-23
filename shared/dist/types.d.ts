@@ -52,6 +52,10 @@ export interface Question {
 export interface ClientQuestion {
     /** Short-lived proof provided only for authenticated practice questions. */
     jokerProof?: string;
+    /** Live room capability, also identifies the exact round instance. */
+    jokerRoundStartedAt?: number;
+    /** Only sent to the authenticated owner when reconnecting. */
+    jokerEffect?: JokerEffect;
     id: string;
     categoryId: CategoryId;
     difficulty: DifficultyLevel;
@@ -457,8 +461,24 @@ export declare const JOKERS: readonly [{
     readonly desc: "İki yanlış şıkkı kaldırır.";
     readonly price: 450;
     readonly eliminated: 2;
+}, {
+    readonly id: "joker_initial";
+    readonly name: "İlk Karakter";
+    readonly desc: "Doğru şıkkın ilk harfini veya rakamını gösterir.";
+    readonly price: 200;
+    readonly eliminated: 0;
+}, {
+    readonly id: "joker_word_count";
+    readonly name: "Kelime Sayısı";
+    readonly desc: "Doğru şıkkın kaç kelime olduğunu gösterir.";
+    readonly price: 150;
+    readonly eliminated: 0;
 }];
 export type JokerId = typeof JOKERS[number]['id'];
+export interface JokerEffect {
+    eliminated: string[];
+    hint?: string;
+}
 /**
  * Süreli kozmetik mağaza ürünleri için süre seçenekleri: 1 saatten en fazla 1
  * aya kadar. Fiyat, ürünün temel fiyatı süre çarpanıyla ölçeklenir.

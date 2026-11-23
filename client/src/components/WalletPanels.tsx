@@ -1,6 +1,6 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { JOKERS, JokerId, UserProfile } from '@trivia/shared';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { canUseJoker, JOKERS, JokerId, QuestionOption, UserProfile } from '@trivia/shared';
 import { CloseXIcon, CoinIcon } from './TavrikoIcons';
 import { WalletArtwork } from './WalletArtwork';
 import { THEME } from '../theme/tokens';
@@ -37,23 +37,27 @@ export function LowWalletPanel({ kind, amount, onClose, onStore }: {
   </Panel>;
 }
 
-export function JokerPanel({ user, busy, error, onApply, onBuy, onClose }: {
+export function JokerPanel({ user, options, busy, error, onApply, onBuy, onClose }: {
   user: UserProfile; busy: boolean; error?: string; onApply: (id: JokerId) => void;
-  onBuy: (id: JokerId) => void; onClose: () => void;
+  options: QuestionOption[]; onBuy: (id: JokerId) => void; onClose: () => void;
 }) {
   return <Panel title="Jokerlerim" onClose={onClose}>
     <View style={s.wallet}><CoinIcon size={17} /><Text style={s.balance}>{walletAmount(user.coins ?? 0)} altın</Text></View>
     <Text style={s.desc}>Soru başına bir joker kullanabilirsin. Sayaç işlemeye devam eder.</Text>
+    {error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
+    <ScrollView showsVerticalScrollIndicator={false} style={s.catalog} contentContainerStyle={s.catalogContent}>
     {JOKERS.map(joker => {
       const qty = user.inventory?.find(i => i.id === joker.id)?.qty ?? 0;
       const canBuy = user.coins >= joker.price;
+      const usable = canUseJoker(joker.id, options);
       return <View key={joker.id} style={s.joker}>
         <WalletArtwork kind={joker.id} size={62} />
         <View style={s.detail}>
           <Text style={s.itemTitle}>{joker.name} · {qty} adet</Text>
           <Text style={s.itemDesc}>{joker.desc}</Text>
+          {!usable && <Text style={s.itemDesc}>Bu soruya uygun değil.</Text>}
           <View style={s.actions}>
-            {qty > 0 && <Pressable style={s.use} disabled={busy} onPress={() => onApply(joker.id)} accessibilityRole="button"><Text style={s.primaryText}>Kullan</Text></Pressable>}
+            {qty > 0 && <Pressable style={[s.use, !usable && s.disabled]} disabled={busy || !usable} onPress={() => onApply(joker.id)} accessibilityRole="button" accessibilityLabel={`${joker.name} kullan`}><Text style={s.primaryText}>Kullan</Text></Pressable>}
             <Pressable style={[s.buy, !canBuy && s.disabled]} disabled={busy || !canBuy} onPress={() => onBuy(joker.id)} accessibilityRole="button" accessibilityLabel={`${joker.name} satın al: ${joker.price} altın`}>
               <CoinIcon size={15} /><Text style={s.buyText}>{joker.price} · Al</Text>
             </Pressable>
@@ -61,13 +65,15 @@ export function JokerPanel({ user, busy, error, onApply, onBuy, onClose }: {
         </View>
       </View>;
     })}
-    {error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
+    </ScrollView>
   </Panel>;
 }
 
 const s = StyleSheet.create({
   scrim: { flex: 1, backgroundColor: '#080713B8', alignItems: 'center', justifyContent: 'center', padding: 18 },
-  panel: { width: '100%', maxWidth: 414, backgroundColor: '#211A36', borderColor: '#5B4A78', borderWidth: 1, borderRadius: 24, padding: 20, gap: 10 },
+  panel: { width: '100%', maxWidth: 414, maxHeight: '100%', minHeight: 0, backgroundColor: '#211A36', borderColor: '#5B4A78', borderWidth: 1, borderRadius: 24, padding: 20, gap: 10 },
+  catalog: { flexGrow: 0, flexShrink: 1 },
+  catalogContent: { gap: 8 },
   close: { position: 'absolute', right: 9, top: 9, width: 42, height: 42, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   title: { color: '#FAF4FF', fontSize: 23, fontFamily: THEME.fonts.extraBold, textAlign: 'center', paddingHorizontal: 22 },
   art: { alignItems: 'center' },

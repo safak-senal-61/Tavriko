@@ -1,4 +1,4 @@
-import { Question, CategoryId, DifficultyLevel, FinalMatchSummary, uniqueQuestions } from '@trivia/shared';
+import { Question, CategoryId, DifficultyLevel, FinalMatchSummary, JokerEffect, JokerId, uniqueQuestions } from '@trivia/shared';
 import { getFallbackQuestions } from '../game/defaultQuestions';
 
 export class ApiService {
@@ -6,6 +6,22 @@ export class ApiService {
     private backendUrl: string,
     private internalSecret?: string
   ) {}
+
+  public async useRoomJoker(input: {
+    userId: string; roomCode: string; roundNumber: number; startedAt: number; deadline: number; jokerId: JokerId;
+  }, question: Question): Promise<JokerEffect> {
+    if (!this.internalSecret) throw new Error('Jokerler henüz kullanıma açık değil.');
+    const cleanUrl = (this.backendUrl || 'https://tavriko-app.vercel.app').replace(/\/+$/, '');
+    const response = await fetch(`${cleanUrl}/api/internal/room-joker`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': this.internalSecret },
+      body: JSON.stringify({ ...input, questionId: question.id, options: question.options, correctOptionId: question.correctOptionId }),
+      signal: AbortSignal.timeout(4500),
+    });
+    const data = await response.json() as JokerEffect & { error?: string };
+    if (!response.ok || !Array.isArray(data.eliminated)) throw new Error(data.error || 'Joker kullanılamadı. Tekrar dene.');
+    return { eliminated: data.eliminated, ...(typeof data.hint === 'string' ? { hint: data.hint } : {}) };
+  }
 
   public async fetchRoomQuestions(
     categoryId: CategoryId,

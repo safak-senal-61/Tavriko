@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const url = process.env.GAMEPLAY_REWARDS_TEST_DATABASE_URL;
 const secret = 'isolated-gameplay-rewards-jwt-test-only';
+const internalSecret = 'isolated-room-joker-test-only';
 const root = '/api/social';
 const suffix = randomUUID().slice(0, 8);
 const ids = new Set<string>();
@@ -53,6 +54,7 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     vi.stubEnv('DATABASE_URL', url);
     vi.stubEnv('DIRECT_URL', url);
     vi.stubEnv('JWT_SECRET', secret);
+    vi.stubEnv('INTERNAL_API_SECRET', internalSecret);
     const { db } = await import('../src/db/prismaClient');
     const { default: socialRoutes } = await import('../src/routes/socialRoutes');
     const { default: triviaRoutes } = await import('../src/routes/triviaRoutes');
@@ -90,6 +92,36 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
       expect(plays[0].body).toEqual(plays[1].body);
       expect(await inventory(id)).toMatchObject([{ itemId: 'joker_eliminate', qty: 0 }]);
     } finally { spy.mockRestore(); }
+  });
+
+  it('uses live stock once per round, even with concurrent different jokers', async () => {
+    const userId = await player('livejoker');
+    await client.user.update({ where: { id: userId }, data: { coins: 600 } });
+    expect((await post(userId, '/shop/purchase', { productId: 'joker_word_count' })).status).toBe(200);
+    expect((await post(userId, '/shop/purchase', { productId: 'joker_eliminate' })).status).toBe(200);
+    const startedAt = Date.now();
+    const round = {
+      userId, roomCode: 'QA0001', startedAt, deadline: startedAt + 15_000, roundNumber: 1,
+      questionId: 'qa_live_joker', correctOptionId: 'a', jokerId: 'joker_word_count',
+      options: [{ id: 'a', text: 'İstanbul Boğazı' }, { id: 'b', text: 'Van' }, { id: 'c', text: 'İzmir' }, { id: 'd', text: 'Ankara' }],
+    };
+    const play = (patch: object = {}, key = internalSecret) => request(app).post('/api/internal/room-joker')
+      .set('x-internal-secret', key).send({ ...round, ...patch });
+    expect((await play({}, 'wrong')).status).toBe(403);
+    expect((await play({ startedAt: startedAt - 20_000, deadline: startedAt - 5000 })).status).toBe(409);
+    expect((await play({ options: round.options.map(o => ({ ...o, text: 'Aynı' })) })).status).toBe(409);
+    const outcomes = await Promise.all([play(), play({ jokerId: 'joker_eliminate' })]);
+    expect(outcomes.map(response => response.status)).toEqual([200, 200]);
+    expect(outcomes[0].body).toEqual(outcomes[1].body);
+    expect((await inventory(userId)).reduce((sum, entry) => sum + entry.qty, 0)).toBe(1);
+    expect(await client.practiceJokerUse.count({ where: { userId } })).toBe(1);
+    const played = await client.practiceJokerUse.findFirstOrThrow({ where: { userId } });
+    const remaining = played.jokerId === 'joker_word_count' ? 'joker_eliminate' : 'joker_word_count';
+    const next = await play({ roundNumber: 2, jokerId: remaining });
+    expect(next.status).toBe(200);
+    if (remaining === 'joker_word_count') expect(next.body).toEqual({ eliminated: [], hint: '2 kelime' });
+    else expect(next.body.eliminated).toHaveLength(1);
+    expect((await play({ roundNumber: 3 })).status).toBe(409);
   });
 
   it('does not credit mismatched orders, duplicate deliveries, or replayed refunds', async () => {

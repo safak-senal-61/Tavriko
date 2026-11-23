@@ -95,7 +95,7 @@ export function GameplayRewardsScreen({ user, token, apiBaseUrl, onUpdateUser, o
         leftType="back" onLeftPress={onBack}
         coins={user.coins} gems={user.gems ?? 0} avatarSeed={user.avatarUrl || user.displayName}
       />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView testID="gameplay-rewards-scroll" showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <KitHeader title="Ödüller" subtitle="Maçları oyna, görevleri tamamla" />
         <KitHero eyebrow="TAVRİKO ÖDÜLLERİ" title="Oyna ve kazan" height={142}
           art={STORE_IMG.chestGold} artSize={106} subtitle="Sandıkları ve kalıcı rozetleri ücretsiz kazan." />

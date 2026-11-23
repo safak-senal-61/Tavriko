@@ -851,17 +851,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 entering={FadeInDown.delay(index * 80).duration(380)}
                 style={[styles.playerRow, playerGrid && styles.webPlayerSlot, isMe && styles.playerRowMe]}
               >
-                <View style={styles.playerAvatarWrap}>
-                  {/* index prop'u verilirse seed çözümü atlanıp liste sırası
-                      avatarı ezeliyordu; seçilen avatar her oyuncuda görünsün
-                      diye index kaldırıldı (seed artık tek belirleyici). */}
-                  <CharacterAvatar seed={isBlocked ? 'av1' : p.avatarUrl || p.displayName} size={42} />
-                  {playerIsHost && (
-                    <View style={styles.hostCrown}>
-                      <Flag size={15} color="#FFD081" accessibilityLabel="Oda sahibi" />
-                    </View>
-                  )}
-                </View>
+                <CharacterAvatar seed={isBlocked ? 'av1' : p.avatarUrl || p.displayName} size={42} />
 
                 <View style={styles.playerInfo}>
                   <View style={styles.nameRow}>
@@ -869,9 +859,12 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                       {isBlocked ? 'Engellenen oyuncu' : p.displayName} {isMe ? '(Sen)' : ''}
                     </Text>
                   </View>
-                  <Text style={styles.playerRoleText}>
-                    {playerIsHost ? 'Oda Kurucusu' : 'Yarışmacı'}
-                  </Text>
+                  <View style={styles.playerRoleRow}>
+                    {playerIsHost && <Flag size={12} color="#FFD081" />}
+                    <Text style={[styles.playerRoleText, playerIsHost && styles.hostRoleText]}>
+                      {playerIsHost ? 'Oda Kurucusu' : 'Yarışmacı'}
+                    </Text>
+                  </View>
                 </View>
 
                 {/* Hazır Durumu Rozeti */}
@@ -1328,18 +1321,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(154, 107, 255, 0.25)',
   },
-  playerAvatarWrap: {
-    position: 'relative',
-  },
-  hostCrown: {
-    position: 'absolute',
-    top: -10,
-    left: -2,
-    fontSize: 13,
-  },
-  hostCrownText: {
-    fontSize: 13,
-  },
   playerRowMe: {
     borderColor: '#FFC837',
     backgroundColor: 'rgba(255, 200, 55, 0.06)',
@@ -1359,14 +1340,12 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.bold,
     maxWidth: 160,
   },
-  crownBadge: {
-    fontSize: 13,
-  },
+  playerRoleRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
+  hostRoleText: { color: '#FFD081' },
   playerRoleText: {
     color: '#9A8BC2',
     fontSize: 11,
     fontFamily: THEME.fonts.medium,
-    marginTop: 1,
   },
   statusChip: {
     paddingHorizontal: 12,

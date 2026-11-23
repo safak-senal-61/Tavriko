@@ -17,6 +17,9 @@ import {
   SOCKET_EVENTS,
   isLobbyQuickMessage,
   isLobbyReaction,
+  isJokerId,
+  supportsLiveJokers,
+  JokerEffect,
 } from '@trivia/shared';
 import { Env } from '../env';
 import { encodeWsMessage, decodeWsMessage, createWsError, WsMessage } from '../websocket/protocol';
@@ -34,8 +37,14 @@ interface WsAttachment {
   displayName: string;
   avatarUrl?: string;
   isHost: boolean;
+  canSpendJokers?: boolean;
 }
 
+interface SavedRoomJoker {
+  startedAt: number;
+  roundNumber: number;
+  effect: JokerEffect;
+}
 type AlarmType = 'countdown' | 'round_end' | 'intermission';
 
 interface AlarmContext {
@@ -55,6 +64,7 @@ export class GameRoomDO extends DurableObject<Env> {
   private verifiedPlayers = new Set<string>();
   private funnelMatchId: string | null = null;
   private rateLimiters = new WeakMap<WebSocket, RateLimiter>();
+  private pendingJokers = new Set<string>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -365,6 +375,7 @@ export class GameRoomDO extends DurableObject<Env> {
       displayName: authUser.displayName || authUser.username,
       avatarUrl: authUser.avatarUrl,
       isHost,
+      canSpendJokers: !authUser.isGuest && !isGuestIdentity(authUser.id) && !authUser.id.startsWith('bot_'),
     };
     server.serializeAttachment(attachment);
     if (!authUser.isGuest && !this.verifiedPlayers.has(authUser.id)) {
@@ -393,7 +404,7 @@ export class GameRoomDO extends DurableObject<Env> {
 
     // If game is in progress and round is active, send current question to the reconnected player
     if (this.room.status === 'question_active' && this.room.currentQuestion) {
-      const clientQ = this.getClientQuestion();
+      const clientQ = await this.getQuestionForSocket(attachment);
       if (clientQ) {
         server.send(encodeWsMessage(SOCKET_EVENTS.QUESTION_START, clientQ));
       }
@@ -463,6 +474,10 @@ export class GameRoomDO extends DurableObject<Env> {
 
         case SOCKET_EVENTS.SUBMIT_ANSWER:
           await this.handleSubmitAnswer(ws, playerId, envelope);
+          break;
+
+        case SOCKET_EVENTS.USE_JOKER:
+          await this.handleUseJoker(ws, attachment, envelope);
           break;
 
         case SOCKET_EVENTS.SEND_EMOTE:
@@ -836,6 +851,42 @@ export class GameRoomDO extends DurableObject<Env> {
     await this.processPlayerAnswer(playerId, selectedOptionId, elapsedMs);
   }
 
+  private async handleUseJoker(ws: WebSocket, attachment: WsAttachment, envelope: WsMessage): Promise<void> {
+    const { playerId, canSpendJokers } = attachment;
+    const room = this.room;
+    const question = room?.currentQuestion;
+    const roundNumber = room?.currentRound;
+    const startedAt = room?.roundStartedAt;
+    const deadline = (startedAt ?? 0) + (question?.timeLimitSec || room?.questionTimeSec || 15) * 1000;
+    const { jokerId } = envelope.payload ?? {};
+    const fail = (message: string) => ws.send(createWsError(message, 'JOKER_UNAVAILABLE', envelope.requestId));
+    if (!canSpendJokers || !this.env.INTERNAL_API_SECRET || !room || !supportsLiveJokers(room.mode) ||
+        room.status !== 'question_active' || !question || !startedAt || !roundNumber ||
+        envelope.payload?.startedAt !== startedAt || envelope.payload?.roundNumber !== roundNumber ||
+        envelope.payload?.questionId !== question.id || !isJokerId(jokerId) ||
+        !room.players[playerId] || room.players[playerId].hasAnsweredCurrentRound || Date.now() >= deadline) {
+      fail('Bu soruda joker kullanılamıyor.');
+      return;
+    }
+    const pendingKey = `${playerId}:${startedAt}:${roundNumber}`;
+    if (this.pendingJokers.has(pendingKey)) { fail('Joker isteği işleniyor.'); return; }
+    this.pendingJokers.add(pendingKey);
+    try {
+      const effect = await this.apiService.useRoomJoker(
+        { userId: playerId, roomCode: room.code, roundNumber, startedAt, deadline, jokerId }, question,
+      );
+      // The request may finish after the round changes. Never attach an old effect to a new round.
+      if (this.room === room && room.currentRound === roundNumber && room.roundStartedAt === startedAt) {
+        await this.ctx.storage.put<SavedRoomJoker>(`joker:${playerId}`, { startedAt, roundNumber, effect });
+      }
+      ws.send(encodeWsMessage(SOCKET_EVENTS.JOKER_RESULT, effect, envelope.requestId));
+    } catch (error) {
+      fail(error instanceof Error && error.message.length <= 120 ? error.message : 'Joker şu anda kullanılamadı.');
+    } finally {
+      this.pendingJokers.delete(pendingKey);
+    }
+  }
+
   private async processPlayerAnswer(
     playerId: string,
     selectedOptionId: string,
@@ -1028,9 +1079,23 @@ export class GameRoomDO extends DurableObject<Env> {
       roundNumber: this.room.currentRound,
       totalRounds: this.room.totalRounds,
       timeLimitSec,
+      ...(this.env.INTERNAL_API_SECRET && supportsLiveJokers(this.room.mode) && this.room.roundStartedAt
+        ? { jokerRoundStartedAt: this.room.roundStartedAt } : {}),
       timeRemainingMs: Math.max(0, (this.room.roundStartedAt ?? Date.now()) + timeLimitSec * 1000 - Date.now()),
       ...(q.subCategory ? { subCategory: q.subCategory } : {}),
     };
+  }
+
+  private async getQuestionForSocket(attachment: WsAttachment): Promise<ClientQuestion | null> {
+    let question = this.getClientQuestion();
+    if (question?.jokerRoundStartedAt && attachment.canSpendJokers) {
+      const saved = await this.ctx.storage.get<SavedRoomJoker>(`joker:${attachment.playerId}`);
+      question = this.room?.status === 'question_active' ? this.getClientQuestion() : null;
+      if (question && saved && saved.startedAt === question.jokerRoundStartedAt && saved.roundNumber === question.roundNumber) {
+        question.jokerEffect = saved.effect;
+      }
+    }
+    return question;
   }
 
   private getSanitizedRoom(): GameRoom {

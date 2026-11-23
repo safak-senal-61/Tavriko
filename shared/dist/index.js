@@ -26,3 +26,4 @@ __exportStar(require("./questionSelection"), exports);
 __exportStar(require("./lobbyChat"), exports);
 __exportStar(require("./posthogConfig"), exports);
 __exportStar(require("./displayText"), exports);
+__exportStar(require("./jokers"), exports);

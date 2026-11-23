@@ -197,6 +197,8 @@ exports.LOW_COINS = 500;
 exports.JOKERS = [
     { id: 'joker_eliminate', name: 'Tek Eleme', desc: 'Bir yanlış şıkkı kaldırır.', price: 250, eliminated: 1 },
     { id: 'joker_half', name: 'Yarı Yarıya', desc: 'İki yanlış şıkkı kaldırır.', price: 450, eliminated: 2 },
+    { id: 'joker_initial', name: 'İlk Karakter', desc: 'Doğru şıkkın ilk harfini veya rakamını gösterir.', price: 200, eliminated: 0 },
+    { id: 'joker_word_count', name: 'Kelime Sayısı', desc: 'Doğru şıkkın kaç kelime olduğunu gösterir.', price: 150, eliminated: 0 },
 ];
 /**
  * Süreli kozmetik mağaza ürünleri için süre seçenekleri: 1 saatten en fazla 1

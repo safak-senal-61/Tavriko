@@ -27,17 +27,16 @@ import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { trackEvent } from '../services/analytics';
 import { loadStoredPreferences } from '../store/appPrefs';
-import { ClientQuestion, ALL_CATEGORIES, JokerId, UserProfile } from '@trivia/shared';
+import { ClientQuestion, ALL_CATEGORIES, JokerEffect, JokerId, UserProfile } from '@trivia/shared';
 import { JokerPanel } from '../components/WalletPanels';
 import { WalletArtwork } from '../components/WalletArtwork';
-import { Flag } from 'lucide-react-native';
+import { ArrowUpRight, Flag } from 'lucide-react-native';
 import {
   TavrikoScreen,
   StreakFlameIcon,
   CheckMarkSvg,
   CrossMarkSvg,
   CharacterAvatar,
-  LaurelIcon,
   CoinIcon,
   CloseXIcon,
 } from '../components/TavrikoIcons';
@@ -72,7 +71,7 @@ interface QuizArenaScreenProps {
   onExit?: () => void;
   /** Otomatik sonraki soru kapalıyken gösterilen "Sonraki Soru" düğmesinin eylemi */
   onNext?: () => void;
-  jokers?: { user: UserProfile; apply: (id: JokerId) => Promise<string[]>; buy: (id: JokerId) => Promise<void> };
+  jokers?: { user: UserProfile; apply: (id: JokerId) => Promise<JokerEffect>; buy: (id: JokerId) => Promise<void> };
   isDuelMode?: boolean;
   myDisplayName?: string;
   /** Profil fotoğrafı yoksa karakter avatarı seçmek için tohum (avatarUrl veya isim) */
@@ -451,14 +450,15 @@ const DuelPlayerBlock: React.FC<{
   avatarSeed: string;
   score: number;
   side: 'me' | 'opponent';
-  showCrown?: boolean;
+  isLeading?: boolean;
+  showLeaderSlot?: boolean;
   hasAnswered?: boolean;
   badge?: string | null;
   compact?: boolean;
-}> = ({ name, avatarSeed, score, side, showCrown, hasAnswered, badge, compact = false }) => {
+}> = ({ name, avatarSeed, score, side, isLeading, showLeaderSlot, hasAnswered, badge, compact = false }) => {
   const ring = compact ? 60 : 76;
   const isMe = side === 'me';
-  const color = isMe ? '#38BDF8' : '#C06BFF';
+  const color = isLeading ? '#F5CA79' : isMe ? '#38BDF8' : '#C06BFF';
   return (
     <View style={styles.playerBlock}>
       <View
@@ -474,22 +474,18 @@ const DuelPlayerBlock: React.FC<{
           </View>
         )}
       </View>
-      {showCrown && (
-        <View style={styles.playerCrown} pointerEvents="none">
-          <LaurelIcon size={28} />
-        </View>
-      )}
       <View style={[styles.playerNamePill, { borderColor: `${color}AA` }]}>
         <Text style={styles.playerNameText} numberOfLines={1}>
           {name}
         </Text>
       </View>
       <Text
-        style={[styles.playerScore, compact && styles.playerScoreCompact, { color: isMe ? '#5FE1FF' : '#D9B8FF' }]}
+        style={[styles.playerScore, compact && styles.playerScoreCompact, { color: isLeading ? '#FFDE9A' : isMe ? '#5FE1FF' : '#D9B8FF' }]}
         numberOfLines={1}
       >
         {score}
       </Text>
+      {showLeaderSlot && <View style={styles.leaderSlot}>{isLeading && <LeaderTag />}</View>}
       {badge ? (
         <View style={styles.playerBadge}>
           <Text style={styles.playerBadgeText}>{badge}</Text>
@@ -498,6 +494,13 @@ const DuelPlayerBlock: React.FC<{
     </View>
   );
 };
+
+function LeaderTag() {
+  return <View style={styles.leaderTag}>
+    <ArrowUpRight color="#FFDE9A" size={12} />
+    <Text style={styles.leaderText}>Önde</Text>
+  </View>;
+}
 
 /**
  * Çok kişili odada avatar, isim ve puan dikey ve birbirinden bağımsız hizalanır.
@@ -508,17 +511,17 @@ const MiniPlayerBlock: React.FC<{
   score: number;
   isMe: boolean;
   ringSize: number;
-  showCrown?: boolean;
+  isLeading?: boolean;
   hasAnswered?: boolean;
   badge?: string | null;
-}> = ({ name, avatarSeed, score, isMe, ringSize, showCrown, hasAnswered, badge }) => {
-  const color = isMe ? '#38BDF8' : '#C06BFF';
+}> = ({ name, avatarSeed, score, isMe, ringSize, isLeading, hasAnswered, badge }) => {
+  const color = isLeading ? '#F5CA79' : isMe ? '#38BDF8' : '#C06BFF';
   const dot = Math.max(13, Math.round(ringSize * 0.3));
   const ringBorder = Math.max(2, Math.round(ringSize * 0.07));
   const nameSize = Math.max(9, Math.round(ringSize * 0.22));
   const scoreSize = Math.max(11, Math.round(ringSize * 0.28));
   return (
-    <View style={styles.miniPlayerBlock} accessible accessibilityLabel={`${name}, ${score} puan${hasAnswered ? ', cevapladı' : ''}`}>
+    <View style={[styles.miniPlayerBlock, isLeading && styles.miniPlayerLeading]} accessible accessibilityLabel={`${name}, ${score} puan${isLeading ? ', önde' : ''}${hasAnswered ? ', cevapladı' : ''}`}>
       <View
         style={[
           styles.playerAvatarRing,
@@ -545,9 +548,6 @@ const MiniPlayerBlock: React.FC<{
             <CheckMarkSvg size={Math.max(9, Math.round(dot * 0.6))} color="#FFFFFF" />
           </View>
         )}
-        {showCrown && (
-          <View style={styles.miniCrown} pointerEvents="none"><LaurelIcon size={14} /></View>
-        )}
       </View>
         <Text
           style={[styles.playerNameText, styles.miniPlayerName, { fontSize: nameSize }]}
@@ -558,7 +558,7 @@ const MiniPlayerBlock: React.FC<{
         </Text>
         <Text
           style={[styles.miniPlayerScore, {
-            color: isMe ? '#5FE1FF' : '#D9B8FF',
+            color: isLeading ? '#FFDE9A' : isMe ? '#5FE1FF' : '#D9B8FF',
             fontSize: scoreSize,
           }]}
           numberOfLines={1}
@@ -604,10 +604,14 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const [jokersOpen, setJokersOpen] = useState(false);
   const [jokerBusy, setJokerBusy] = useState(false);
   const [jokerError, setJokerError] = useState<string>();
-  const [jokerResult, setJokerResult] = useState<{ key: string; eliminated: string[] }>();
+  const [jokerResult, setJokerResult] = useState<{ key: string; effect: JokerEffect }>();
   const jokerLock = useRef(false);
-  const jokerRound = `${question.id}:${question.roundNumber}:${question.jokerProof ?? ''}`;
-  const eliminated = jokerResult?.key === jokerRound ? jokerResult.eliminated : [];
+  const arenaScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const jokerRound = `${question.id}:${question.roundNumber}:${question.jokerProof ?? question.jokerRoundStartedAt ?? ''}`;
+  const jokerEffect = (jokerResult?.key === jokerRound ? jokerResult.effect : undefined) ?? question.jokerEffect;
+  const eliminated = jokerEffect?.eliminated ?? [];
+  const jokerRoundRef = useRef(jokerRound);
+  jokerRoundRef.current = jokerRound;
   // Settings > "Soru Metin Boyutu" (normal / large) — real, app-wide effect
   const [isLargeText] = useState<boolean>(() => {
     try {
@@ -658,6 +662,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   // When question changes, reset time, answer state, and timer cleanly
   useEffect(() => {
     hasExpiredRef.current = false;
+    arenaScrollRef.current?.scrollTo({ y: 0, animated: false });
     setJokersOpen(false);
     setJokerError(undefined);
     setLocalSelectedOptionId(null);
@@ -667,13 +672,13 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     setEndTime(newEndTime);
     setSecondsLeft(Math.ceil(remainingMs / 1000));
     setAnswerState('answerable');
-  }, [question.id, question.roundNumber, totalMs]);
+  }, [jokerRound, totalMs]);
   useEffect(() => {
     if (answerState !== 'answerable' || isLocked || feedback) setJokersOpen(false);
   }, [answerState, isLocked, feedback]);
   const useJokerAction = async (id: JokerId, buy: boolean) => {
-    if (!jokers || jokerLock.current || isLocked || feedback || answerState !== 'answerable' || eliminated.length) return;
-    if (!buy && endTimeRef.current - Date.now() < 2500) {
+    if (!jokers || jokerLock.current || isLocked || feedback || answerState !== 'answerable' || jokerEffect) return;
+    if (!buy && endTimeRef.current - Date.now() < 1500) {
       setJokerError('Bu soru için süre çok az. Sonraki soruda kullanabilirsin.');
       return;
     }
@@ -683,11 +688,16 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     try {
       if (buy) await jokers.buy(id);
       else {
-        setJokerResult({ key: jokerRound, eliminated: await jokers.apply(id) });
-        setJokersOpen(false);
+        const effect = await jokers.apply(id);
+        if (jokerRoundRef.current === jokerRound) {
+          setJokerResult({ key: jokerRound, effect });
+          setJokersOpen(false);
+        }
       }
     } catch (error) {
-      setJokerError(error instanceof Error ? error.message : 'İşlem tamamlanamadı.');
+      if (jokerRoundRef.current === jokerRound) {
+        setJokerError(error instanceof Error ? error.message : 'İşlem tamamlanamadı.');
+      }
     } finally {
       jokerLock.current = false;
       setJokerBusy(false);
@@ -845,11 +855,9 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const narrowHeader = isGroup && windowWidth < 380;
   // 5+ kişi: soru kartı, şıklar ve yarış kartı sıkışık modda render edilir.
   const denseLayout = playerCount >= 5;
-  const multiLeaderScore = multiPlayers.reduce(
-    (acc, p) =>
-      Math.max(acc, p.isMe ? myScore : formatCleanScore(p.score || 0, p.correctAnswers, totalRounds)),
-    0
-  );
+  const groupScore = (p: typeof multiPlayers[number]) => p.isMe ? myScore : formatCleanScore(p.score || 0, p.correctAnswers, totalRounds);
+  const multiLeaderScore = Math.max(0, ...multiPlayers.map(groupScore));
+  const hasGroupLeader = multiLeaderScore > 0 && multiPlayers.filter(p => groupScore(p) === multiLeaderScore).length === 1;
   const meLeads = !!rightPlayer && myScore > rightPlayer.score;
   const opponentLeads = !!rightPlayer && rightPlayer.score > myScore;
   const categoryName = categoryObj?.name || 'Genel Kültür';
@@ -869,9 +877,6 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const subCategoryLabel = subCategoryObj?.name || subCategoryName;
   const difficultyLabel = (diffMap[question.difficulty] || 'Orta').toLocaleUpperCase('tr-TR');
   const difficultyColor = DIFFICULTY_COLORS[question.difficulty] || DIFFICULTY_COLORS.medium;
-  const scrollArena = isGroup || Platform.OS === 'web';
-  const ArenaBody = scrollArena ? ScrollView : View;
-
   return (
     <TavrikoScreen style={styles.screenContainer}>
       {/* 1. Üst Bar: Çıkış, Soru Sayacı, Kategori */}
@@ -914,12 +919,12 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           />
         )}
       </View>
-      <ArenaBody
-        style={scrollArena ? styles.arenaScroll : styles.arenaBody}
-        {...(scrollArena ? {
-          contentContainerStyle: isGroup ? styles.groupArenaBody : styles.webArenaBody,
-          showsVerticalScrollIndicator: !isGroup,
-        } : {})}
+      <ScrollView
+        ref={arenaScrollRef}
+        testID="quiz-arena-scroll"
+        style={styles.arenaScroll}
+        contentContainerStyle={isGroup ? styles.groupArenaBody : Platform.OS === 'web' ? styles.webArenaBody : styles.arenaBody}
+        showsVerticalScrollIndicator={false}
       >
       {/* Günlük Meydan Okuma bilgisi */}
       {dailyChallengeInfo && (
@@ -946,7 +951,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                     score={score}
                     isMe={!!p.isMe}
                     ringSize={multiRing}
-                    showCrown={multiLeaderScore > 0 && score === multiLeaderScore}
+                    isLeading={hasGroupLeader && score === multiLeaderScore}
                     hasAnswered={p.isMe ? myAnswered : Boolean(p.hasAnswered)}
                     badge={p.isMe && streak >= 2 ? `×${streak}` : null}
                   />
@@ -962,7 +967,8 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           name={myDisplayName}
           avatarSeed={myAvatarUrl || myRacer?.avatarUrl || myDisplayName}
           score={myScore}
-          showCrown={meLeads}
+          isLeading={meLeads}
+          showLeaderSlot={!!rightPlayer}
           hasAnswered={!!rightPlayer && myAnswered}
           badge={streak >= 2 ? `×${streak}` : null}
           compact={compact}
@@ -982,7 +988,8 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
             name={rightPlayer.name}
             avatarSeed={rightPlayer.avatarSeed}
             score={rightPlayer.score}
-            showCrown={opponentLeads}
+            isLeading={opponentLeads}
+            showLeaderSlot
             hasAnswered={rightPlayer.hasAnswered}
             compact={compact}
           />
@@ -1057,19 +1064,23 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         </Text>
       </Animated.View>
 
-      {jokers && !isOptionsDisabled && (
-        <TouchableOpacity
-          style={[styles.jokerTrigger, eliminated.length > 0 && { opacity: .7 }]}
-          accessibilityRole="button"
-          disabled={eliminated.length > 0}
-          onPress={() => { setJokerError(undefined); setJokersOpen(true); }}
-        >
-          <WalletArtwork kind="joker_half" size={29} />
-          <Text style={styles.jokerTriggerText}>{eliminated.length ? 'Joker kullanıldı' : 'Jokerlerim'}</Text>
-        </TouchableOpacity>
+      {jokers && (
+        <View style={styles.jokerRow}>
+          <TouchableOpacity
+            style={[styles.jokerTrigger, isOptionsDisabled && !jokerEffect && { opacity: .55 }]}
+            accessibilityRole="button"
+            disabled={!!jokerEffect || isOptionsDisabled || jokerBusy}
+            onPress={() => { setJokerError(undefined); setJokersOpen(true); }}
+          >
+            <WalletArtwork kind="joker_half" size={29} />
+            <Text accessibilityLiveRegion="polite" style={styles.jokerTriggerText}>
+              {jokerEffect?.hint ?? (jokerEffect ? 'Joker kullanıldı' : 'Jokerlerim')}
+            </Text>
+          </TouchableOpacity>
+        </View>
       )}
-      {jokers && jokersOpen && !isOptionsDisabled && (
-        <JokerPanel user={jokers.user} busy={jokerBusy} error={jokerError} onClose={() => setJokersOpen(false)}
+      {jokers && jokersOpen && !jokerEffect && !isOptionsDisabled && (
+        <JokerPanel user={jokers.user} options={question.options} busy={jokerBusy} error={jokerError} onClose={() => setJokersOpen(false)}
           onApply={id => { void useJokerAction(id, false); }} onBuy={id => { void useJokerAction(id, true); }} />
       )}
 
@@ -1253,7 +1264,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           </Text>
         )}
       </View>
-      </ArenaBody>
+      </ScrollView>
     </TavrikoScreen>
   );
 };
@@ -1266,13 +1277,14 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 };
 
 const styles = StyleSheet.create({
-  jokerTrigger: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', minHeight: 38, gap: 5, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: '#72597F', backgroundColor: '#271B40', marginBottom: 4 },
+  jokerRow: { alignItems: 'flex-end', marginVertical: 2 },
+  jokerTrigger: { flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 5, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, borderColor: '#72597F', backgroundColor: '#271B40' },
   jokerTriggerText: { color: '#FFE0B1', fontSize: 13, fontFamily: THEME.fonts.extraBold },
   screenContainer: {
     justifyContent: 'space-between',
     paddingBottom: 12,
   },
-  arenaBody: { flex: 1, justifyContent: 'space-between' },
+  arenaBody: { flexGrow: 1, justifyContent: 'space-between', gap: 6 },
   arenaScroll: { flex: 1, minHeight: 0 },
   groupArenaBody: { flexGrow: 1, justifyContent: 'space-between', paddingVertical: 6, gap: 6 },
   webArenaBody: { flexGrow: 1, justifyContent: 'space-between', paddingBottom: 5, gap: 8 },
@@ -1406,7 +1418,7 @@ const styles = StyleSheet.create({
   },
   miniPlayerName: { width: '100%', marginTop: 2 },
   miniPlayerScore: { fontFamily: THEME.fonts.display, fontVariant: ['tabular-nums'] },
-  miniCrown: { position: 'absolute', top: -5, right: -6 },
+  miniPlayerLeading: { backgroundColor: '#3C2B47' },
   miniStreak: {
     position: 'absolute',
     left: 3,
@@ -1449,12 +1461,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  playerCrown: {
-    position: 'absolute',
-    top: -14,
-    left: 14,
-    transform: [{ rotate: '-16deg' }],
-  },
+  leaderSlot: { height: 22, alignItems: 'center', justifyContent: 'center' },
+  leaderTag: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, height: 20, borderRadius: 8, backgroundColor: '#3C2B47', borderWidth: 1, borderColor: '#8F6E4E' },
+  leaderText: { fontSize: 12, color: '#FFDE9A', fontFamily: THEME.fonts.extraBold },
   playerNamePill: {
     marginTop: -8,
     maxWidth: 108,
@@ -1531,9 +1540,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-  },
-  raceLaurel: {
-    fontSize: 11,
   },
   raceTitle: {
     color: '#FFFFFF',

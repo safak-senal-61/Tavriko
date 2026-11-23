@@ -661,7 +661,8 @@ export const RootNavigator: React.FC = () => {
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
       const state = useGameStore.getState();
       const isSameRound = state.currentQuestion?.id === question.id &&
-        state.currentQuestion.roundNumber === question.roundNumber;
+        state.currentQuestion.roundNumber === question.roundNumber &&
+        state.currentQuestion.jokerRoundStartedAt === question.jokerRoundStartedAt;
       // Her oyuncunun şıkları kendi ekranında farklı sırada görünür. Cevaplar
       // şık ID'si ile gönderilip ID ile değerlendirildiği için bu güvenlidir;
       // tohum oyuncu+soru olduğundan yeniden bağlanınca sıra değişmez.
@@ -673,6 +674,7 @@ export const RootNavigator: React.FC = () => {
           `${question.id}-${question.roundNumber}`
         ),
       }, isSameRound);
+      if (question.jokerEffect && (!isSameRound || !state.currentQuestion?.jokerEffect)) void refreshUserProfile(true);
       if (isSameRound) return; // Reconnect: sync the timer, but keep the selected answer.
       setRoundResult(null);
       setMultiplayerFeedback(null);
@@ -1986,9 +1988,16 @@ export const RootNavigator: React.FC = () => {
               onSelectOption={handleSubmitAnswer}
               onTimeExpired={handleTimeExpired}
               onExit={handleExitCurrentGame}
-              jokers={!activeRoom && !activeDailyConfig && signedInPlayer && user && currentQuestion.jokerProof ? {
+              jokers={signedInPlayer && user && (activeRoom
+                ? currentQuestion.jokerRoundStartedAt
+                : !activeDailyConfig && currentQuestion.jokerProof) ? {
                 user,
                 apply: async (jokerId: JokerId) => {
+                  if (activeRoom) {
+                    const effect = await socketService.useRoomJoker(currentQuestion, jokerId);
+                    refreshWallet();
+                    return effect;
+                  }
                   const response = await fetch(`${API_BASE}/questions/practice/joker`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
                     body: JSON.stringify({
@@ -1999,7 +2008,7 @@ export const RootNavigator: React.FC = () => {
                   const result = await response.json();
                   if (!response.ok || !Array.isArray(result.eliminated)) throw new Error(result.error || 'Joker kullanılamadı.');
                   refreshWallet();
-                  return result.eliminated;
+                  return { eliminated: result.eliminated, hint: typeof result.hint === 'string' ? result.hint : undefined };
                 },
                 buy: async (productId: JokerId) => {
                   const response = await fetch(`${API_BASE}/social/shop/purchase`, {
