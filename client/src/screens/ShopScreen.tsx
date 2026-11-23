@@ -732,6 +732,9 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             <Text style={styles.modalTitle}>SATIN ALMAYI ONAYLA</Text>
             {confirmProduct && (
               <>
+                {(confirmProduct.id === 'joker_eliminate' || confirmProduct.id === 'joker_half') && (
+                  <WalletArtwork kind={confirmProduct.id} size={64} />
+                )}
                 <Text style={styles.modalProduct}>{confirmProduct.name}</Text>
                 <Text style={styles.modalDesc}>{confirmProduct.desc}</Text>
 

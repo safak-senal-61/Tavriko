@@ -1,5 +1,12 @@
 # Visual refresh acceptance and regression checks
 
+## Wallet and joker artwork
+
+- Mağaza → Elmas / Altın: each of the four packages uses its original image, from small to extra large. The category artwork and the profile's low-balance panel use the medium original.
+- Mağaza → Jokerler: Tek Eleme and Yarı Yarıya use two distinct transparent PNGs. Inspect them on the product list and confirmation, and confirm the prices remain 250 and 450 altın.
+- Envanter and antrenman → Jokerlerim: owned joker items show the same artwork as the store. The quiz shortcut remains legible at its smaller size; the panel can still be opened and dismissed, including when stock is empty.
+- At desktop and 375px, inspect the artwork for visible edges, correct proportions, no clipping, and no vector fallback. Native bundle must contain all ten images; do not make live purchases for visual QA.
+
 ## Rewards alignment, privacy and account prompts
 
 - Oyna → Ödüller: the chevron sits at the right and its center matches the card's center at desktop and 375px; the whole card still opens Ödüller.
