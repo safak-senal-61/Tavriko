@@ -72,6 +72,9 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     expect((await post(id, '/shop/purchase', { productId: 'gems_100', paymentMethod: 'try' })).status).toBe(409);
     const purchases = await Promise.all([1, 2].map(() => post(id, '/shop/purchase', { productId: 'joker_eliminate', paymentMethod: 'gems' })));
     expect(purchases.map(r => r.status).sort()).toEqual([200, 400]);
+    expect(purchases.find(r => r.ok)?.body.user).toMatchObject({
+      coins: 0, gems: 99, inventory: [{ id: 'joker_eliminate', qty: 1 }],
+    });
     expect(await client.user.findUnique({ where: { id } })).toMatchObject({ coins: 0, gems: 99 });
     expect(await inventory(id)).toMatchObject([{ itemId: 'joker_eliminate', qty: 1 }]);
     expect((await post(id, '/inventory/use', { itemId: 'joker_eliminate' })).status).toBe(400);
@@ -92,6 +95,24 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
       expect(plays[0].body).toEqual(plays[1].body);
       expect(await inventory(id)).toMatchObject([{ itemId: 'joker_eliminate', qty: 0 }]);
     } finally { spy.mockRestore(); }
+  });
+
+  it('returns committed balances for gold, a booster and an auto-equipped rental', async () => {
+    const id = await player('shop');
+    await client.user.update({ where: { id }, data: { gems: 250 } });
+    const gold = await post(id, '/shop/purchase', { productId: 'coins_1000' });
+    expect(gold.status).toBe(200);
+    expect(gold.body.user).toMatchObject({ coins: 1500, gems: 240 });
+    const booster = await post(id, '/shop/purchase', { productId: 'booster_xp_2x_1h' });
+    expect(booster.status).toBe(200);
+    expect(booster.body.user).toMatchObject({ gems: 215, inventory: [{ id: 'booster_xp_2x_1h', qty: 1 }] });
+    const frame = await post(id, '/shop/purchase', { productId: 'frame_ice', durationId: '1h' });
+    expect(frame.status).toBe(200);
+    expect(frame.body.user).toMatchObject({ equippedFrame: 'frame_ice', inventory: [{ id: 'booster_xp_2x_1h', qty: 1 }] });
+    expect(await client.user.findUnique({ where: { id } })).toMatchObject({
+      coins: 1500, gems: frame.body.user.gems, equippedFrame: 'frame_ice', equippedFrameExpiresAt: expect.any(BigInt),
+    });
+    expect(await inventory(id)).toMatchObject([{ itemId: 'booster_xp_2x_1h', qty: 1 }]);
   });
 
   it('uses live stock once per round, even with concurrent different jokers', async () => {

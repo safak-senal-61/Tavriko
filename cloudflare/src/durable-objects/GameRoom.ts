@@ -857,6 +857,7 @@ export class GameRoomDO extends DurableObject<Env> {
     const question = room?.currentQuestion;
     const roundNumber = room?.currentRound;
     const startedAt = room?.roundStartedAt;
+    const player = room?.players[playerId];
     const deadline = (startedAt ?? 0) + (question?.timeLimitSec || room?.questionTimeSec || 15) * 1000;
     const { jokerId } = envelope.payload ?? {};
     const fail = (message: string) => ws.send(createWsError(message, 'JOKER_UNAVAILABLE', envelope.requestId));
@@ -864,7 +865,7 @@ export class GameRoomDO extends DurableObject<Env> {
         room.status !== 'question_active' || !question || !startedAt || !roundNumber ||
         envelope.payload?.startedAt !== startedAt || envelope.payload?.roundNumber !== roundNumber ||
         envelope.payload?.questionId !== question.id || !isJokerId(jokerId) ||
-        !room.players[playerId] || room.players[playerId].hasAnsweredCurrentRound || Date.now() >= deadline) {
+        !player || player.isBot || player.hasAnsweredCurrentRound || Date.now() >= deadline) {
       fail('Bu soruda joker kullanılamıyor.');
       return;
     }

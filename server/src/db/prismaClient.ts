@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import {
+  Prisma,
   PrismaClient,
   Category as PrismaCategory,
   Question as PrismaQuestion,
@@ -5389,29 +5390,37 @@ export class PrismaService {
     paymentMethod: 'coins' | 'gems' | 'try' = 'coins',
     durationId?: string
   ): Promise<{ user: UserProfile; message: string }> {
-    let record = await this.loadRecord(userId);
-    if (!record) throw new Error('Kullanıcı bulunamadı.');
     const product = SHOP_CATALOG.find((p) => p.id === productId);
     if (!product) throw new Error('Ürün mağazada bulunamadı.');
     if (product.currency === 'try' || product.grantGems) throw new Error('Elmas paketleri yalnızca doğrulanmış ödeme ile yüklenir.');
     if (product.category === 'jokers') {
-      if (record.isGuest) throw new Error('Joker satın almak için giriş yap.');
+      if (/^(guest_|bot_)/i.test(userId)) throw new Error('Joker satın almak için giriş yap.');
       const item = product.grantItems![0];
-      const saved = await this.rawClient.$transaction(async tx => {
-        const debit = await tx.user.updateMany({
-          where: { id: record.id, coins: { gte: product.price } },
-          data: { coins: { decrement: product.price } },
+      try {
+        // Debit and grant in one transaction, without loading the account before the write.
+        const saved = await this.rawClient.user.update({
+          where: { id: userId, coins: { gte: product.price } },
+          data: {
+            coins: { decrement: product.price },
+            inventoryItems: { upsert: {
+              where: { userId_itemId: { userId, itemId: item.id } },
+              update: { qty: { increment: item.qty } },
+              create: { itemId: item.id, name: item.name, desc: item.desc, qty: item.qty },
+            } },
+          },
+          include: { inventoryItems: true },
         });
-        if (!debit.count) throw new Error(`Bu joker için ${product.price} altın gerekli.`);
-        await tx.userInventoryItem.upsert({
-          where: { userId_itemId: { userId: record.id, itemId: item.id } },
-          update: { qty: { increment: item.qty } },
-          create: { userId: record.id, itemId: item.id, name: item.name, desc: item.desc, qty: item.qty },
-        });
-        return tx.user.findUniqueOrThrow({ where: { id: record.id }, include: { inventoryItems: true } });
-      });
-      return { user: this.toProfile(this.prismaUserToRecord(saved)), message: `${item.name} envanterine eklendi.` };
+        return { user: this.toProfile(this.prismaUserToRecord(saved)), message: `${item.name} envanterine eklendi.` };
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+          throw new Error(`Bu joker için ${product.price} altın gerekli.`);
+        }
+        throw error;
+      }
     }
+    const loaded = await this.loadRecord(userId);
+    if (!loaded) throw new Error('Kullanıcı bulunamadı.');
+    const record = { ...loaded, inventory: loaded.inventory?.map(item => ({ ...item })) };
     const originalCoins = record.coins, originalGems = record.gems || 0;
 
     // Süreli kozmetiklerde süre seçimi: 1 saatten en fazla 1 aya kadar.
@@ -5444,39 +5453,24 @@ export class PrismaService {
         const isCosmeticItem =
           item.category === 'frame' || item.category === 'badge' ||
           item.category === 'name_effect' || item.category === 'background';
+        // Auto-equip consumes the newly purchased copy, not stock the player already owns.
+        const addedQty = item.qty - (isCosmeticItem ? 1 : 0);
         const existing = record.inventory.find((i) => i.id === item.id);
-        if (existing) {
-          existing.qty += item.qty;
-          // Yeni süre seçildiyse bu kopyanın süresi güncellenir
-          if (isCosmeticItem && duration) existing.durationHours = duration.hours;
-        } else {
+        if (existing && addedQty > 0) {
+          existing.qty += addedQty;
+        } else if (addedQty > 0) {
           record.inventory.push({
             id: item.id,
             name: item.name,
             desc: item.desc,
-            qty: item.qty,
+            qty: addedQty,
             category: item.category || this.getItemCategory(item.id),
             rarity: item.rarity || this.getItemRarity(item.id),
             durationHours: isCosmeticItem && duration ? duration.hours : undefined,
           });
         }
 
-        // Satın alınan kozmetik anında profile uygulanır (otomatik kuşanma) ve
-        // WePlay tarzı süreli modelde kuşanım 1 kopya harcar: envantere eklenir,
-        // hemen kuşanıldığı için 1 adet düşürülür. Süre seçime göre 1 saatten
-        // 1 aya kadardır; süre bitince kozmetik otomatik düşer.
-        const isRental = !!duration;
         const expiresAt = duration ? Date.now() + duration.hours * 60 * 60 * 1000 : undefined;
-        const isCosmetic = item.category === 'frame' || item.category === 'background' ||
-          item.category === 'name_effect' || item.category === 'badge';
-        if (isCosmetic) {
-          // Otomatik kuşanım 1 kopya tüketir
-          const cosItem = record.inventory.find((i) => i.id === item.id);
-          if (cosItem) {
-            cosItem.qty = Math.max(0, cosItem.qty - 1);
-          }
-          record.inventory = (record.inventory || []).filter((i) => i.qty > 0);
-        }
         if (item.category === 'frame' && item.id.startsWith('frame_')) {
           record.equippedFrame = item.id;
           record.equippedFrameExpiresAt = expiresAt;
@@ -5497,16 +5491,20 @@ export class PrismaService {
       }
     }
 
-    this.users.set(userId, record);
-    this.users.set(record.id, record);
-    if (record.username) this.users.set(record.username, record);
-    if (record.email) this.users.set(record.email.toLowerCase(), record);
-
     if (!record.isGuest) {
-      this.savePersistedUsers();
       try {
-        const updated = await this.rawClient.$transaction(async tx => {
-          const user = await tx.user.update({
+        // Most products have no inventory write (auto-equipped cosmetics and currency packs).
+        // Return their committed balances directly; items that grant stock use an atomic nested write.
+        const stockGrants = (product.grantItems ?? []).flatMap(item => {
+          const qty = item.qty - (['frame', 'badge', 'background', 'name_effect'].includes(item.category ?? '') ? 1 : 0);
+          return qty > 0 ? [{
+            where: { userId_itemId: { userId: record.id, itemId: item.id } },
+            update: { qty: { increment: qty } },
+            create: { itemId: item.id, name: item.name, desc: item.desc, qty, durationHours: duration?.hours },
+          }] : [];
+        });
+        const grants = (category: ItemCategory) => product.grantItems?.some(item => item.category === category);
+        const updated = await this.rawClient.user.update({
           where: {
             id: record.id,
             ...(product.currency === 'coins' ? { coins: { gte: effectivePrice } } : { gems: { gte: effectivePrice } }),
@@ -5514,30 +5512,18 @@ export class PrismaService {
           data: {
             coins: { increment: record.coins - originalCoins },
             gems: { increment: (record.gems || 0) - originalGems },
-            hasPremiumPass: record.hasPremiumPass,
-            equippedFrame: record.equippedFrame ?? null,
-            equippedBadge: record.equippedBadge ?? null,
-            equippedNameEffect: record.equippedNameEffect ?? null,
-            equippedBackground: record.equippedBackground ?? null,
-            equippedFrameExpiresAt: this.toBigIntSafe(record.equippedFrameExpiresAt),
-            equippedBadgeExpiresAt: this.toBigIntSafe(record.equippedBadgeExpiresAt),
-            equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
-            equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
-            updatedAt: new Date(),
+            hasPremiumPass: product.grantPremiumPass ? true : undefined,
+            equippedFrame: grants('frame') ? record.equippedFrame : undefined,
+            equippedBadge: grants('badge') ? record.equippedBadge : undefined,
+            equippedNameEffect: grants('name_effect') ? record.equippedNameEffect : undefined,
+            equippedBackground: grants('background') ? record.equippedBackground : undefined,
+            equippedFrameExpiresAt: grants('frame') ? this.toBigIntSafe(record.equippedFrameExpiresAt) : undefined,
+            equippedBadgeExpiresAt: grants('badge') ? this.toBigIntSafe(record.equippedBadgeExpiresAt) : undefined,
+            equippedNameEffectExpiresAt: grants('name_effect') ? this.toBigIntSafe(record.equippedNameEffectExpiresAt) : undefined,
+            equippedBackgroundExpiresAt: grants('background') ? this.toBigIntSafe(record.equippedBackgroundExpiresAt) : undefined,
+            inventoryItems: stockGrants.length ? { upsert: stockGrants } : undefined,
           },
           select: { coins: true, gems: true },
-          });
-          for (const item of product.grantItems ?? []) {
-            // An auto-equipped cosmetic consumes the newly purchased copy, not a separate support grant.
-            const qty = item.qty - (['frame', 'badge', 'background', 'name_effect'].includes(item.category ?? '') ? 1 : 0);
-            if (qty <= 0) continue;
-            await tx.userInventoryItem.upsert({
-              where: { userId_itemId: { userId: record.id, itemId: item.id } },
-              update: { qty: { increment: qty } },
-              create: { userId: record.id, itemId: item.id, name: item.name, desc: item.desc, qty, durationHours: duration?.hours },
-            });
-          }
-          return user;
         });
         record.coins = updated.coins;
         record.gems = updated.gems;
@@ -5547,6 +5533,11 @@ export class PrismaService {
       }
     }
 
+    this.users.set(userId, record);
+    this.users.set(record.id, record);
+    if (record.username) this.users.set(record.username, record);
+    if (record.email) this.users.set(record.email.toLowerCase(), record);
+    if (!record.isGuest && !process.env.DATABASE_URL && !process.env.DIRECT_URL) this.savePersistedUsers();
     return {
       user: this.toProfile(record),
       message: `${product.name} başarıyla satın alındı ve hesabınıza tanımlandı!`,

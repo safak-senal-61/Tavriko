@@ -14,14 +14,17 @@ import { encodeWsMessage } from '../src/websocket/protocol';
 describe('room joker requests', () => {
   afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
 
-  async function setup(mode: 'duel' | 'friends_private' = 'duel') {
+  async function setup(mode: 'duel' | 'friends_private' = 'duel', withBot = false) {
     vi.useFakeTimers();
     const startedAt = Date.now();
     const question = DEFAULT_QUESTIONS[0];
     const room = {
       code: 'QUIZ01', mode, status: 'question_active', currentRound: 1,
       currentQuestion: question, totalRounds: 2, roundStartedAt: startedAt,
-      players: { one: { id: 'one', hasAnsweredCurrentRound: false }, two: { id: 'two', hasAnsweredCurrentRound: false } },
+      players: {
+        one: { id: 'one', hasAnsweredCurrentRound: false },
+        two: { id: withBot ? 'bot_atlas' : 'two', isBot: withBot, hasAnsweredCurrentRound: withBot },
+      },
     };
     const values = new Map<string, unknown>([['room', room]]);
     let restore: Promise<unknown>;
@@ -58,6 +61,18 @@ describe('room joker requests', () => {
     const replay = (socket: typeof one) => (worker as any).getQuestionForSocket(socket.deserializeAttachment());
     expect(await replay(one)).toMatchObject({ jokerEffect: effect });
     expect(await replay(two)).not.toHaveProperty('jokerEffect');
+  });
+
+  it('offers the joker to the signed-in human even after the duel bot has answered', async () => {
+    const { worker, question, one, two: botSocket, api, use, startedAt, effect } = await setup('duel', true);
+    expect(await (worker as any).getQuestionForSocket(one.deserializeAttachment())).toMatchObject({
+      id: question.id, jokerRoundStartedAt: startedAt,
+    });
+    await use(botSocket);
+    expect(api).not.toHaveBeenCalled();
+    await use();
+    expect(api).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: 'one' }), question);
+    expect(JSON.parse(one.send.mock.calls[0][0])).toMatchObject({ event: SOCKET_EVENTS.JOKER_RESULT, payload: effect });
   });
 
   it('rejects unverified, stale, answered and expired requests before contacting the wallet', async () => {
