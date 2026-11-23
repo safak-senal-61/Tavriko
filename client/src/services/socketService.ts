@@ -401,8 +401,8 @@ export class SocketService {
       callbacks.forEach((cb) => {
         try {
           cb(data);
-        } catch (e) {
-          console.error(`[SocketService] Error in listener for event ${event}:`, e);
+        } catch {
+          console.error('[SocketService] WebSocket event listener failed.');
         }
       });
     }
