@@ -33,6 +33,7 @@ const worker: ExportedHandler<Env> = {
           timestamp: new Date().toISOString(),
           environment: env.ENVIRONMENT || 'production',
           r2Storage: env.AVATAR_BUCKET ? 'connected' : 'unbound',
+          features: { liveQuizJokers: Boolean(env.INTERNAL_API_SECRET) },
         }),
         {
           headers: {

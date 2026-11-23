@@ -10,6 +10,7 @@ import {
   Modal,
   Platform,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { LoadingShimmer } from '../components/LoadingShimmer';
 import Svg, {
@@ -289,6 +290,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  const [pendingPurchaseName, setPendingPurchaseName] = useState<string | null>(null);
   const purchaseLock = useRef(false);
   const [polarAvailable, setPolarAvailable] = useState(false);
   const [polarSandbox, setPolarSandbox] = useState(false);
@@ -471,17 +473,19 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     if (!confirmProduct || confirmProduct.currency === 'try' || !user || purchaseLock.current) return;
     purchaseLock.current = true;
     const product = confirmProduct;
+    setConfirmProduct(null);
     setPurchasingId(product.id);
+    setPendingPurchaseName(product.name);
     setStatusMessage(null);
     setIsError(false);
 
     const base = apiBaseUrl || getApiBaseUrl();
+    const authorization = authHeaders();
     try {
       const res = await fetch(`${base}/social/shop/purchase`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        headers: { 'Content-Type': 'application/json', ...authorization },
         body: JSON.stringify({
-          userId: user.id,
           productId: product.id,
           // Süreli kozmetiklerde seçilen süre sunucuya gönderilir
           durationId: isCosmeticProduct(product) ? durationId : undefined,
@@ -494,8 +498,6 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         sound.triggerHaptic('error');
         setIsError(true);
         setStatusMessage(data.error || 'Satın alma başarısız oldu.');
-        setConfirmProduct(null);
-        setPurchasingId(null);
         return;
       }
 
@@ -503,7 +505,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       sound.triggerHaptic('success');
       setIsError(false);
       setStatusMessage(data.message || `${product.name} başarıyla satın alındı ve envantere eklendi!`);
-      if (data.user && onUpdateUser) {
+      if (data.user?.id === user.id && authHeaders().Authorization === authorization.Authorization && onUpdateUser) {
         onUpdateUser(data.user);
       }
     } catch (err: any) {
@@ -513,7 +515,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     } finally {
       purchaseLock.current = false;
       setPurchasingId(null);
-      setConfirmProduct(null);
+      setPendingPurchaseName(null);
     }
   };
 
@@ -569,6 +571,12 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         </>}
 
         {/* Durum Bildirimi */}
+        {pendingPurchaseName && (
+          <View style={styles.purchasePending} accessibilityLiveRegion="polite" accessibilityState={{ busy: true }}>
+            <ActivityIndicator size="small" color="#FFE0A9" />
+            <Text style={styles.walletDescription}>{pendingPurchaseName}: Satın alma işleniyor…</Text>
+          </View>
+        )}
         {statusMessage && (
           <View style={[styles.statusBanner, isError ? styles.statusError : styles.statusSuccess]}>
             <Text style={[styles.statusText, isError ? styles.statusTextError : styles.statusTextSuccess]}>
@@ -812,6 +820,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  purchasePending: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, marginBottom: 12 },
   walletSection: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: '#5D4A77', backgroundColor: '#251B3B', padding: 10, marginBottom: 16 },
   walletSummary: { flex: 1, gap: 4, paddingRight: 8 },
   walletTitle: { fontFamily: THEME.fonts.extraBold, color: '#FFE0A9', fontSize: 19 },

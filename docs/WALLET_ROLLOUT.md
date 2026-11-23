@@ -8,6 +8,8 @@ Uygulama kodu veritabanından önce yayınlanırsa joker satışı ve kullanım�
 
 Canlı jokerler düello, hızlı eşleşme ve arkadaş odalarında çalışır. Önce Vercel API, sonra mevcut `INTERNAL_API_SECRET` ile Cloudflare Worker, ardından istemci yayınlanmalı. Worker soru ve oturum durumunu doğrular; API mevcut `practice_joker_uses` tablosunu canlı tur anahtarıyla da kullanır. Yeni veritabanı migration’ı gerekmez; yukarıdaki cüzdan migration’ı daha önce uygulanmış olmalıdır. Günlük meydan okuma, çevrimdışı antrenman ve misafir oyunları kapsam dışıdır.
 
+Botlu düello da aynı canlı joker yolunu kullanır. Vercel dağıtımı Cloudflare Worker’ı güncellemez. `cloudflare/` altında yetkili hesapla `npm run deploy` çalıştırdıktan sonra Worker’ın `/health` yanıtında `features.liveQuizJokers: true` olduğunu kontrol edin. Bu yalnızca Worker yapılandırmasını gösterir; ardından test hesabıyla botlu düello açarak jokerin uygulanmasını ve tek kopya düşmesini doğrulayın.
+
 Hedef Supabase proje referansını ve Prisma migration geçmişini doğrulayın. Staging’de ve ardından doğrulanmış hedefte, dağıtım hesabıyla `cd server && npx prisma migrate status && npx prisma migrate deploy` sırasını kullanın. `DATABASE_URL` ve `DIRECT_URL` yalnız sunucu ortamında tanımlanmalı. Migration geçmişi ile şema uyuşmuyorsa SQL’i doğrudan yapıştırmayın veya migration’ı uygulanmış olarak işaretlemeyin; önce farkı inceleyin.
 
 ## Polar sanal ödeme

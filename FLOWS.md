@@ -3,7 +3,9 @@
 ## Live quiz jokers and scoreboard
 
 - Open 1v1, quick match and a friend room with test accounts. From Jokerlerim use one owned joker before answering, see its effect privately, verify one stock debit and no score or timer change. Retry, reconnect and advance to the next question; reject expired and already answered uses.
+- Let a 1v1 search fall back to a bot. Confirm Jokerlerim stays usable for the signed-in player even after the bot answers, until the player answers or the question expires.
 - Verify all four matching illustrations and stock in Mağaza, purchase confirmation, Envanter and Jokerlerim. In signed-in online practice keep the existing purchase and use flow. Guests, offline play and Günlük Meydan Okuma do not consume paid stock.
+- Delay a test purchase response. After Satın Al, expect the confirmation to close and “Satın alma işleniyor…” to appear immediately, with balance unchanged and duplicate purchase disabled. After success, show the committed balance and item; after rejection, show the error and allow a new attempt. Use test currency only.
 - At 375px and desktop, answer a question and scroll through the quiz feedback and Ödüller (including tabs) without a visible vertical scrollbar. Check that no crown covers an avatar, “Önde” follows the score without changing height, and the winner has a distinct podium label.
 
 ## Wallet and joker artwork
