@@ -45,33 +45,30 @@ export function LowWalletPanel({ kind, amount, onClose, onStore }: {
   </Panel>;
 }
 
-export function JokerPanel({ user, options, live, tactics, capabilities, lightningAvailable, busy, error, onApply, onBuy, onClose }: {
-  user: UserProfile; busy: boolean; error?: string; onApply: (id: JokerId) => void;
+export function JokerPurchasePanel({ user, options, live, tactics, capabilities, lightningAvailable, busy, error, onBuy, onClose }: {
+  user: UserProfile; busy: boolean; error?: string;
   options: QuestionOption[]; onBuy: (id: JokerId) => void; onClose: () => void;
   live?: boolean; tactics?: JokerTactics; capabilities?: ClientQuestion['jokerCapabilities']; lightningAvailable?: boolean;
 }) {
   const [group, setGroup] = useState<JokerGroup | null>(null);
   const stock = new Map(user.inventory?.map(item => [item.id, item.qty]));
-  const available = JOKERS
-    .filter(joker => (!group || joker.group === group) && canUseJoker(joker.id, options, { live, tactics, capabilities, lightningAvailable }))
-    .sort((a, b) => Number((stock.get(b.id) ?? 0) > 0) - Number((stock.get(a.id) ?? 0) > 0));
-  return <Panel title="Jokerlerim" onClose={onClose}>
+  const available = JOKERS.filter(joker => (stock.get(joker.id) ?? 0) <= 0 &&
+    (!group || joker.group === group) && canUseJoker(joker.id, options, { live, tactics, capabilities, lightningAvailable }));
+  return <Panel title="Joker satın al" onClose={onClose}>
     <View style={s.wallet}><CoinIcon size={17} /><Text style={s.balance}>{walletAmount(user.coins ?? 0)} altın</Text></View>
-    <Text style={s.desc}>Yalnızca bu soruya uygun jokerler gösterilir. Sayaç işlemeye devam eder.</Text>
+    <Text style={s.desc}>Bu soruya uygun, sende olmayan jokerler. Sayaç işlemeye devam eder.</Text>
     <JokerGroupTabs selected={group} onChange={setGroup} />
     {error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
     <ScrollView showsVerticalScrollIndicator={false} style={s.catalog} contentContainerStyle={s.catalogContent}>
-    {!available.length && <Text style={s.desc}>Bu grupta kullanılabilir joker yok.</Text>}
+    {!available.length && <Text style={s.desc}>Bu grupta satın alabileceğin joker yok.</Text>}
     {available.map(joker => {
-      const qty = stock.get(joker.id) ?? 0;
       const canBuy = user.coins >= joker.price;
       return <View key={joker.id} style={s.joker}>
         <WalletArtwork kind={joker.id} size={62} />
         <View style={s.detail}>
-          <Text style={s.itemTitle}>{joker.name} · {qty} adet</Text>
+          <Text style={s.itemTitle}>{joker.name}</Text>
           <Text style={s.itemDesc}>{joker.desc}</Text>
           <View style={s.actions}>
-            {qty > 0 && <Pressable style={s.use} disabled={busy} onPress={() => onApply(joker.id)} accessibilityRole="button" accessibilityLabel={`${joker.name} kullan`}><Text style={s.primaryText}>Kullan</Text></Pressable>}
             <Pressable style={[s.buy, !canBuy && s.disabled]} disabled={busy || !canBuy} onPress={() => onBuy(joker.id)} accessibilityRole="button" accessibilityLabel={`${joker.name} satın al: ${joker.price} altın`}>
               <CoinIcon size={15} /><Text style={s.buyText}>{joker.price} · Al</Text>
             </Pressable>
@@ -105,7 +102,6 @@ const s = StyleSheet.create({
   itemTitle: { color: '#F8F2FF', fontSize: 15, fontFamily: THEME.fonts.extraBold },
   itemDesc: { color: '#CBBEDD', fontSize: 12, fontFamily: THEME.fonts.bold },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 3 },
-  use: { backgroundColor: '#F4C687', borderRadius: 8, justifyContent: 'center', minHeight: 40, paddingHorizontal: 13 },
   buy: { flexDirection: 'row', alignItems: 'center', gap: 5, borderColor: '#8F6F60', borderWidth: 1, minHeight: 40, paddingHorizontal: 10, borderRadius: 8 },
   disabled: { opacity: .55 },
   buyText: { color: '#FFE2AC', fontFamily: THEME.fonts.extraBold, fontSize: 13 },

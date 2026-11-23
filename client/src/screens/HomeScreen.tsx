@@ -37,8 +37,10 @@ import { useUnreadCount } from '../store/notificationStore';
 import { getHomeWebSizing } from '../navigation/webLayout';
 
 const compactHeaderBalance = new Intl.NumberFormat('tr-TR', { notation: 'compact', maximumFractionDigits: 1 });
-const formatHeaderBalance = (amount: number | undefined, narrow: boolean) =>
-  narrow && Math.abs(amount ?? 0) >= 100_000 ? compactHeaderBalance.format(amount ?? 0) : formatNumberTR(amount);
+const formatHeaderBalance = (amount: number | undefined, compact: boolean, tight: boolean) =>
+  compact && Math.abs(amount ?? 0) >= (tight ? 10_000 : 100_000)
+    ? compactHeaderBalance.format(amount ?? 0)
+    : formatNumberTR(amount);
 
 const LOGO_MARK = cdnImage('images/logo_mark.png');
 // 1v1 hızlı eşleşme bannerı PAKET İÇİNDEN yüklenir (require). CDN'den
@@ -220,6 +222,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const narrow = windowWidth < 390;
+  const tightHeader = windowWidth <= 340;
+  const compactHeader = windowWidth < 440;
+  const compactBalances = windowWidth < 540;
   const useWebNav = Platform.OS === 'web';
   const { short: shortLayout, portrait: portraitLayout, heroHeight, modeHeight } =
     getHomeWebSizing(windowWidth, windowHeight, wideLayout);
@@ -241,16 +246,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           onAvatarPress={onProfile}
         />
       ) : (
-        <View style={styles.headerRow}>
-          <View style={styles.brandGroup}>
-            <Image source={LOGO_MARK} style={[styles.brandMark, narrow && styles.brandMarkNarrow]} resizeMode="contain" />
-            <Text style={[styles.brandText, narrow && styles.brandTextNarrow]} numberOfLines={1}>
+        <View testID="home-header" style={[styles.headerRow, compactHeader && styles.headerRowCompact]}>
+          <View style={[styles.brandGroup, compactHeader && styles.brandGroupCompact]}>
+            <Image source={LOGO_MARK} style={[styles.brandMark, compactHeader && styles.brandMarkNarrow, tightHeader && styles.brandMarkTight]} resizeMode="contain" />
+            <Text style={[styles.brandText, compactHeader && styles.brandTextNarrow, tightHeader && styles.brandTextTight]} numberOfLines={1}>
               Tavriko
             </Text>
           </View>
-          <View style={styles.headerRight}>
+          <View style={[styles.headerRight, compactHeader && styles.headerRightCompact]}>
             <TouchableOpacity
-              style={[styles.currencyPill, narrow && styles.currencyPillNarrow]}
+              style={[styles.currencyPill, compactHeader && styles.currencyPillNarrow, tightHeader && styles.currencyPillTight]}
               onPress={() => {
                 if (onShop) {
                   sound.playSound('reward');
@@ -259,13 +264,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 }
               }}
               activeOpacity={onShop ? 0.8 : 1}
-              accessibilityLabel={`Altın: ${user.coins ?? 0}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Altın: ${formatNumberTR(user.coins)}`}
             >
-              <CoinIcon size={22} />
-              <Text style={[styles.currencyText, narrow && styles.currencyTextNarrow]}>{formatHeaderBalance(user.coins, narrow)}</Text>
+              <CoinIcon size={tightHeader ? 15 : compactHeader ? 18 : 22} />
+              <Text numberOfLines={1} style={[styles.currencyText, compactHeader && styles.currencyTextNarrow, tightHeader && styles.currencyTextTight]}>{formatHeaderBalance(user.coins, compactBalances, tightHeader)}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.currencyPill, narrow && styles.currencyPillNarrow]}
+              style={[styles.currencyPill, compactHeader && styles.currencyPillNarrow, tightHeader && styles.currencyPillTight]}
               onPress={() => {
                 if (onShop) {
                   sound.playSound('reward');
@@ -274,13 +280,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 }
               }}
               activeOpacity={onShop ? 0.8 : 1}
-              accessibilityLabel={`Elmas: ${user.gems ?? 0}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Elmas: ${formatNumberTR(user.gems)}`}
             >
-              <GemIcon size={20} />
-              <Text style={[styles.currencyText, narrow && styles.currencyTextNarrow]}>{formatHeaderBalance(user.gems, narrow)}</Text>
+              <GemIcon size={tightHeader ? 14 : compactHeader ? 16 : 20} />
+              <Text numberOfLines={1} style={[styles.currencyText, compactHeader && styles.currencyTextNarrow, tightHeader && styles.currencyTextTight]}>{formatHeaderBalance(user.gems, compactBalances, tightHeader)}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.bellButton}
+              style={[styles.bellButton, compactHeader && styles.bellButtonCompact]}
+              hitSlop={{ top: 5, bottom: 5 }}
               onPress={() => {
                 sound.playSound('tap');
                 sound.triggerHaptic('light');
@@ -290,7 +298,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               accessibilityRole="button"
               accessibilityLabel={`Bildirimler, ${unread} okunmamış`}
             >
-              <NotificationBell />
+              <NotificationBell size={compactHeader ? 16 : 21} />
             </TouchableOpacity>
           </View>
         </View>
@@ -648,32 +656,37 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
     gap: 8,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
   },
+  headerRowCompact: { gap: 5 },
   brandGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    flexShrink: 0,
+    flexShrink: 1,
+    minWidth: 0,
   },
+  brandGroupCompact: { gap: 3 },
   brandMark: {
     width: 44,
     height: 44,
   },
   brandMarkNarrow: {
-    width: 32,
-    height: 32,
+    width: 28,
+    height: 28,
   },
+  brandMarkTight: { width: 22, height: 22 },
   brandTextNarrow: {
     fontSize: 17,
     letterSpacing: 0.1,
   },
+  brandTextTight: { fontSize: 13 },
   brandText: {
     fontFamily: THEME.fonts.display,
     fontSize: 24,
     color: '#FFFFFF',
     letterSpacing: 0.3,
-    flexShrink: 0,
+    flexShrink: 1,
     textShadowColor: 'rgba(107, 60, 255, 0.9)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
@@ -684,7 +697,9 @@ const styles = StyleSheet.create({
     gap: 6,
     marginLeft: 'auto',
     flexShrink: 1,
+    minWidth: 0,
   },
+  headerRightCompact: { gap: 4 },
   currencyPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -696,19 +711,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(20, 8, 46, 0.9)',
     borderWidth: 1.5,
     borderColor: 'rgba(154, 107, 255, 0.55)',
+    flexShrink: 1,
+    minWidth: 0,
   },
   currencyPillNarrow: {
-    height: 32,
-    paddingRight: 9,
+    height: 30,
+    paddingRight: 5,
     gap: 3,
   },
+  currencyPillTight: { paddingLeft: 3, paddingRight: 4, gap: 2 },
   currencyTextNarrow: {
-    fontSize: 12.5,
+    fontSize: 12,
   },
+  currencyTextTight: { fontSize: 11 },
   currencyText: {
     color: '#FFFFFF',
     fontSize: 14,
     fontFamily: THEME.fonts.black,
+    flexShrink: 1,
+    minWidth: 0,
   },
   bellButton: {
     width: 38,
@@ -721,6 +742,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(154, 107, 255, 0.55)',
   },
+  bellButtonCompact: { width: 30, height: 30, borderRadius: 15 },
   bellDot: {
     position: 'absolute',
     top: 4,
