@@ -1,10 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GAMEPLAY_REWARDS = void 0;
+exports.rewardCompletionPlayers = rewardCompletionPlayers;
 exports.gameplayRewardStatuses = gameplayRewardStatuses;
 exports.isPermanentGameplayBadge = isPermanentGameplayBadge;
 exports.getChestOpening = getChestOpening;
 const cosmetics_1 = require("./cosmetics");
+function rewardCompletionPlayers(room, completedNormally) {
+    if (!completedNormally || room.status !== 'round_result' || room.totalRounds < 1 || room.currentRound !== room.totalRounds)
+        return [];
+    return Object.values(room.players).filter(player => !player.isBot && player.isConnected &&
+        player.rewardStarted && (player.rewardAnswers ?? 0) > 0).map(player => player.id);
+}
 const silverKey = { id: 'key_silver', name: 'Gümüş Anahtar', desc: 'Ahşap ve gümüş sandıkları açar.', qty: 1, category: 'key', rarity: 'rare' };
 const goldKey = { id: 'key_gold', name: 'Altın Anahtar', desc: 'Altın sandıkları açar.', qty: 1, category: 'key', rarity: 'epic' };
 const diamondKey = { id: 'key_diamond', name: 'Elmas Anahtar', desc: 'Efsanevi ve elmas sandıkları açar.', qty: 1, category: 'key', rarity: 'legendary' };
@@ -20,10 +27,10 @@ const badge = (id, metric, target, task) => {
 };
 const badgeGoals = { friends: 5, matches: 50, correct: 250, days: 14, perfect: 15 };
 exports.GAMEPLAY_REWARDS = [
-    chest('chest_wood', 'Ahşap Sandık', 'common', 3, silverKey),
-    chest('chest_silver', 'Gümüş Sandık', 'rare', 10, silverKey),
-    chest('chest_gold', 'Altın Sandık', 'epic', 25, goldKey),
-    chest('chest_legendary', 'Efsanevi Sandık', 'mythic', 50, diamondKey),
+    chest('chest_wood', 'Ahşap Sandık', 'common', 8, silverKey),
+    chest('chest_silver', 'Gümüş Sandık', 'rare', 20, silverKey),
+    chest('chest_gold', 'Altın Sandık', 'epic', 45, goldKey),
+    chest('chest_legendary', 'Efsanevi Sandık', 'mythic', 90, diamondKey),
     badge('badge_social_player', 'friends', badgeGoals.friends, `${badgeGoals.friends} karşılıklı arkadaşlık kur.`),
     badge('badge_veteran', 'matches', badgeGoals.matches, `${badgeGoals.matches} geçerli maç tamamla.`),
     badge('badge_trivia_master', 'correct', badgeGoals.correct, `Geçerli maçlarda toplam ${badgeGoals.correct} doğru cevap ver.`),

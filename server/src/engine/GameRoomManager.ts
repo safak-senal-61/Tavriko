@@ -15,6 +15,7 @@ import {
   PlayerScoreSummary,
   PublicRoomSummary,
   uniqueQuestions,
+  rewardCompletionPlayers,
 } from '@trivia/shared';
 import { GameStateMachine } from './GameStateMachine';
 import { addBreadcrumb } from '../utils/errorMonitor';
@@ -73,7 +74,7 @@ export class GameRoomManager {
   // Event callbacks for real-time socket propagation
   public onRoundStart?: (roomCode: string, question: ClientQuestion) => void;
   public onRoundEnd?: (roomCode: string, result: RoundResult) => void;
-  public onGameOver?: (roomCode: string, summary: FinalMatchSummary) => void;
+  public onGameOver?: (roomCode: string, summary: FinalMatchSummary, rewardCompletedPlayerIds: string[]) => void;
   public onStateSync?: (roomCode: string, room: GameRoom) => void;
 
   constructor(questionProvider: QuestionProvider) {
@@ -314,6 +315,10 @@ export class GameRoomManager {
 
     // Reset player round states
     Object.values(room.players).forEach((p) => {
+      if (room.currentRound === 1) {
+        p.rewardStarted = p.isConnected && !p.isBot;
+        p.rewardAnswers = 0;
+      }
       p.hasAnsweredCurrentRound = false;
       p.lastAnswerTimeMs = 0;
       p.lastSelectedOptionId = undefined;
@@ -427,17 +432,18 @@ export class GameRoomManager {
     // Schedule intermission or next round (1200ms gives crisp, responsive pacing while allowing review of correct answer)
     setTimeout(() => {
       if (room.currentRound >= room.totalRounds) {
-        this.finishGame(code);
+        this.finishGame(code, true);
       } else {
         this.advanceToNextRound(code);
       }
     }, 1200);
   }
 
-  public finishGame(code: string): void {
+  public finishGame(code: string, completedNormally = false): void {
     const room = this.getRoom(code);
-    if (!room) return;
+    if (!room || room.status === 'game_over') return;
 
+    const rewardCompletedPlayerIds = rewardCompletionPlayers(room, completedNormally);
     const summary = buildFinalMatchSummary(room);
 
     addBreadcrumb(`Maç bitti: ${code}`, 'game', {
@@ -448,7 +454,7 @@ export class GameRoomManager {
     });
 
     if (this.onGameOver) {
-      this.onGameOver(code, summary);
+      this.onGameOver(code, summary, rewardCompletedPlayerIds);
     }
   }
 

@@ -28,6 +28,7 @@ export const SOCKET_EVENTS = {
   SUBMIT_ANSWER: 'game:submit_answer',
   USE_JOKER: 'game:use_joker',
   JOKER_RESULT: 'game:joker_result',
+  JOKER_RETRY: 'game:joker_retry',
 
   // Social & Chat
   SEND_EMOTE: 'game:send_emote',

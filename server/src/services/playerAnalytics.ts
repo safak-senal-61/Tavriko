@@ -4,11 +4,13 @@ import type { FinalMatchSummary } from '@trivia/shared';
 import { uuidPattern } from './adminAccountOperations';
 import { recordDuelMilestone } from './duelFunnel';
 
-export type TrackedMatchSummary = FinalMatchSummary & { matchId?: string; verifiedPlayerIds?: string[]; category?: string; funnelMatch?: boolean };
+export type TrackedMatchSummary = FinalMatchSummary & { matchId?: string; verifiedPlayerIds?: string[]; category?: string;
+  funnelMatch?: boolean; rewardCompletedPlayerIds?: string[]; goldHuntPlayerIds?: string[] };
 
 export async function recordCompletedPlayers(client: PrismaClient, summary: TrackedMatchSummary) {
   if (!Array.isArray(summary.verifiedPlayerIds) || !summary.verifiedPlayerIds.length) return;
   const verified = new Set(summary.verifiedPlayerIds);
+  const earned = new Set(Array.isArray(summary.rewardCompletedPlayerIds) ? summary.rewardCompletedPlayerIds : []);
   // Older workers don't have a match instance ID. Keep a deterministic fallback for retries.
   const identity = typeof summary.matchId === 'string' && uuidPattern.test(summary.matchId)
     ? summary.matchId : JSON.stringify([summary.roomCode, summary.mode,
@@ -27,7 +29,7 @@ export async function recordCompletedPlayers(client: PrismaClient, summary: Trac
           id: `tracked_${createHash('sha256').update(JSON.stringify([identity, id])).digest('hex')}`,
           userId: id, roomCode: summary.roomCode, mode: summary.mode, categoryId: summary.category || 'general_culture',
           totalQuestions: boundedInt(summary.totalRounds), correctAnswers: boundedInt(rank.correctAnswersCount),
-          score: boundedInt(rank.score), rankingsJson: [],
+          score: boundedInt(rank.score), rankingsJson: earned.has(id) ? { rewardCompletion: true } : [],
         };
       }),
       skipDuplicates: true,

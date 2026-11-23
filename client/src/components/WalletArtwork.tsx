@@ -32,6 +32,17 @@ const JOKER_POSTERS = {
   joker_double: require('../../bundled/jokers/poster/cifte-puan.webp'),
   joker_initial: require('../../bundled/jokers/poster/ilk-karakter.webp'),
   joker_word_count: require('../../bundled/jokers/poster/kelime-sayisi.webp'),
+  joker_retry: require('../../bundled/jokers/poster/ikinci-sans.webp'),
+  joker_pause: require('../../bundled/jokers/poster/zaman-molasi.webp'),
+  joker_support: require('../../bundled/jokers/poster/sihirli-destek.webp'),
+  joker_probe: require('../../bundled/jokers/poster/kralin-hakki.webp'),
+  joker_gold_hunt: require('../../bundled/jokers/poster/altin-avi.webp'),
+  joker_replace: require('../../bundled/jokers/poster/soru-degistir.webp'),
+  joker_audience: require('../../bundled/jokers/poster/halk-destegi.webp'),
+  joker_extra_time: require('../../bundled/jokers/poster/ek-sure.webp'),
+  joker_skip: require('../../bundled/jokers/poster/pas-gec.webp'),
+  joker_shield: require('../../bundled/jokers/poster/koruma-kalkani.webp'),
+  joker_freeze: require('../../bundled/jokers/poster/zaman-dondurma.webp'),
 } satisfies Record<JokerId, ImageSourcePropType>;
 
 export function WalletArtwork({ kind, size = 88, tier = 1 }: { kind: WalletArt; size?: number; tier?: number }) {

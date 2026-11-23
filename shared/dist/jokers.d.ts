@@ -1,4 +1,4 @@
-import { GameMode, JokerEffect, JokerId, Question, QuestionOption } from './types';
+import { ClientQuestion, GameMode, JokerAction, JokerEffect, JokerId, Question, QuestionOption } from './types';
 export declare const isJokerId: (id: unknown) => id is JokerId;
 export declare const supportsLiveJokers: (mode: GameMode) => boolean;
 export type JokerTactics = 'friendly';
@@ -8,7 +8,11 @@ type JokerContext = {
     tactics?: JokerTactics;
     lightningAvailable?: boolean;
     randomIndex?: number;
+    capabilities?: ClientQuestion['jokerCapabilities'];
+    votes?: Record<string, number>;
 };
+export declare const advancedJokerAction: (id: JokerId) => JokerAction | undefined;
+export declare const isAdvancedJoker: (id: JokerId) => boolean;
 export declare function canUseJoker(id: JokerId, options: QuestionOption[], context?: JokerContext): boolean;
 export declare function resolveJokerEffect(id: JokerId, question: Pick<Question, 'options' | 'correctOptionId'>, previousEliminations?: string[], context?: JokerContext): JokerEffect | null;
 export {};

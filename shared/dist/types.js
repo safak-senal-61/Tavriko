@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.EVENT_DEFINITIONS = exports.SHOP_CATALOG = exports.SEASON_REWARD_HOURS = exports.SHOP_DURATIONS = exports.JOKERS = exports.JOKER_GROUPS = exports.LOW_COINS = exports.LOW_GEMS = exports.SEASON_1_TIERS = void 0;
+exports.EVENT_DEFINITIONS = exports.SHOP_CATALOG = exports.SEASON_REWARD_HOURS = exports.SHOP_DURATIONS = exports.JOKERS = exports.JOKER_GROUPS = exports.LOW_COINS = exports.LOW_GEMS = exports.SEASON_1_TIERS = exports.GOLD_HUNT_BONUS = void 0;
 exports.getXpRequiredForLevel = getXpRequiredForLevel;
 exports.calculateLevelFromXp = calculateLevelFromXp;
 exports.generateSeason1Tiers = generateSeason1Tiers;
@@ -8,6 +8,7 @@ exports.getShopDuration = getShopDuration;
 exports.isCosmeticProduct = isCosmeticProduct;
 exports.shopPriceForDuration = shopPriceForDuration;
 exports.getDailyChallengeConfig = getDailyChallengeConfig;
+exports.GOLD_HUNT_BONUS = 140;
 /**
  * Steep, balanced RPG leveling curve designed for longevity:
  * - Level 1: 500 XP
@@ -211,6 +212,17 @@ exports.JOKERS = [
     { id: 'joker_streak_guard', name: 'Seri Koruyucu', desc: 'Bu soruda yanlış seçersen serini korur. Botlu ve arkadaş maçlarında.', price: 250, eliminated: 0, group: 'tactic' },
     { id: 'joker_lightning', name: 'Şimşek Cevap', desc: 'İlk 5 saniyede doğru cevap verirsen %50 ek puan. Botlu ve arkadaş maçlarında.', price: 220, eliminated: 0, group: 'tactic' },
     { id: 'joker_double', name: 'Çifte Puan', desc: 'Bu soruda doğru cevap puanını ikiye katlar. Botlu ve arkadaş maçlarında.', price: 400, eliminated: 0, group: 'tactic' },
+    { id: 'joker_retry', name: 'İkinci Şans', desc: 'İlk cevabın yanlışsa süre dolmadan bir kez daha dene. Botlu ve arkadaş maçlarında.', price: 320, eliminated: 0, group: 'tactic' },
+    { id: 'joker_pause', name: 'Zaman Molası', desc: 'Kendi sayacını 5 saniye durdur. Botlu ve arkadaş maçlarında.', price: 200, eliminated: 0, group: 'tactic' },
+    { id: 'joker_support', name: 'Sihirli Destek', desc: 'Sonraki soruda bir yanlış şıkkı eler ve ilk karakteri gösterir. Botlu ve arkadaş maçlarında.', price: 300, eliminated: 0, group: 'hint' },
+    { id: 'joker_probe', name: 'Kralın Hakkı', desc: 'Bir şıkkı cevap göndermeden önce test et. Botlu ve arkadaş maçlarında.', price: 420, eliminated: 0, group: 'hint' },
+    { id: 'joker_gold_hunt', name: 'Altın Avı', desc: 'Bu soruyu doğru yanıtla ve maçı bitir: +140 altın. Botlu ve arkadaş maçlarında, maç başına en çok bir ödül.', price: 100, eliminated: 0, group: 'tactic' },
+    { id: 'joker_replace', name: 'Soru Değiştir', desc: 'Yedek bir soru varsa yalnızca senin sorunu değiştirir. Botlu ve arkadaş maçlarında.', price: 350, eliminated: 0, group: 'tactic' },
+    { id: 'joker_audience', name: 'Halk Desteği', desc: 'Önceki gerçek maçların şık tercihlerini gösterir. En az 5 kayıtlı cevap gerekir. Botlu ve arkadaş maçlarında.', price: 200, eliminated: 0, group: 'hint' },
+    { id: 'joker_extra_time', name: 'Ek Süre', desc: 'Kendi soruna 15 saniye ekle. Botlu ve arkadaş maçlarında.', price: 280, eliminated: 0, group: 'tactic' },
+    { id: 'joker_skip', name: 'Pas Geç', desc: 'Bu soruyu puan almadan pas geç; sonraki tur için diğer oyuncuları bekle. Botlu ve arkadaş maçlarında.', price: 100, eliminated: 0, group: 'tactic' },
+    { id: 'joker_shield', name: 'Koruma Kalkanı', desc: 'Yanlış cevabın puan cezasını bu turda önler. Yalnızca ceza açık arkadaş odalarında, puanın varsa.', price: 160, eliminated: 0, group: 'tactic' },
+    { id: 'joker_freeze', name: 'Zaman Dondurma', desc: 'Henüz cevaplamamış rakibin sayacını ve şıklarını 15 saniye dondur. Botlu ve iki kişilik arkadaş maçlarında.', price: 450, eliminated: 0, group: 'tactic' },
 ];
 /**
  * Süreli kozmetik mağaza ürünleri için süre seçenekleri: 1 saatten en fazla 1

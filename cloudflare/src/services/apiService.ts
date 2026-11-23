@@ -1,4 +1,4 @@
-import { Question, CategoryId, DifficultyLevel, FinalMatchSummary, JokerEffect, JokerId, JokerTactics, uniqueQuestions } from '@trivia/shared';
+import { advancedJokerAction, ClientQuestion, Question, CategoryId, DifficultyLevel, FinalMatchSummary, JokerEffect, JokerId, JokerTactics, uniqueQuestions } from '@trivia/shared';
 import { getFallbackQuestions } from '../game/defaultQuestions';
 
 export class ApiService {
@@ -9,6 +9,7 @@ export class ApiService {
 
   public async useRoomJoker(input: {
     userId: string; roomCode: string; roundNumber: number; startedAt: number; deadline: number; jokerId: JokerId; tactics?: JokerTactics;
+    capabilities?: ClientQuestion['jokerCapabilities']; votes?: Record<string, number>;
   }, question: Question): Promise<JokerEffect> {
     if (!this.internalSecret) throw new Error('Jokerler henüz kullanıma açık değil.');
     const cleanUrl = (this.backendUrl || 'https://tavriko-app.vercel.app').replace(/\/+$/, '');
@@ -25,6 +26,8 @@ export class ApiService {
       ...(typeof data.hint === 'string' ? { hint: data.hint } : {}),
       ...(typeof data.highlightedOptionId === 'string' ? { highlightedOptionId: data.highlightedOptionId } : {}),
       ...(data.modifier === 'double' || data.modifier === 'lightning' || data.modifier === 'streak_guard' ? { modifier: data.modifier } : {}),
+      ...(data.action && advancedJokerAction(input.jokerId) === data.action ? { action: data.action } : {}),
+      ...(data.votes && input.jokerId === 'joker_audience' ? { votes: data.votes } : {}),
     };
   }
 

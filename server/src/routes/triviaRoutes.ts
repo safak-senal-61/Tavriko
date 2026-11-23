@@ -130,7 +130,7 @@ router.post('/internal/room-joker', async (req: Request, res: Response): Promise
       !timingSafeEqual(Buffer.from(secret), Buffer.from(supplied))) {
     res.status(403).json({ error: 'Yetkisiz erişim' }); return;
   }
-  const { userId, roomCode, roundNumber, startedAt, deadline, questionId, jokerId, options, correctOptionId, tactics } = req.body || {};
+  const { userId, roomCode, roundNumber, startedAt, deadline, questionId, jokerId, options, correctOptionId, tactics, capabilities, votes } = req.body || {};
   const choices = Array.isArray(options) && options.length >= 2 && options.length <= 12 &&
     options.every(option => typeof option?.id === 'string' && option.id.length <= 160 &&
       typeof option.text === 'string' && option.text.length <= 1000);
@@ -148,9 +148,17 @@ router.post('/internal/room-joker', async (req: Request, res: Response): Promise
     res.status(503).json({ error: 'Jokerler henüz kullanıma açık değil.' }); return;
   }
   try {
+    const activeCapabilities = capabilities && typeof capabilities === 'object' && !Array.isArray(capabilities)
+      ? { replacement: capabilities.replacement === true, freeze: capabilities.freeze === true, shield: capabilities.shield === true,
+        gold: capabilities.gold === true, nextRound: capabilities.nextRound === true } : undefined;
+    const counts = votes && typeof votes === 'object' && !Array.isArray(votes)
+      ? Object.fromEntries(options.map((option: { id: string }) => {
+        const count = Object.hasOwn(votes, option.id) ? votes[option.id] : 0;
+        return [option.id, Number.isSafeInteger(count) && count > 0 ? Math.min(count, 1_000_000) : 0];
+      })) : undefined;
     const result = await consumeQuizJoker(
       { userId, sessionId: `room:${roomCode}:${startedAt}:${roundNumber}`, questionId },
-      jokerId, { options, correctOptionId }, deadline, { tactics, startedAt },
+      jokerId, { options, correctOptionId }, deadline, { tactics, startedAt, capabilities: activeCapabilities, votes: counts },
     );
     if (result.status !== 'applied') {
       res.status(409).json({ error: result.status === 'empty' ? 'Envanterinde bu jokerden kalmadı.' : 'Bu soruda joker kullanılamıyor.' }); return;

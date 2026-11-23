@@ -60,9 +60,9 @@ function calculateRankings(players) {
  * Shared authoritative helper: applies a player's submitted answer to room state,
  * updating score, streak, response time, and correctAnswersCount (+1 for correct, +0 for wrong).
  */
-function applyPlayerRoundAnswer(room, playerId, selectedOptionId, elapsedMs, modifier) {
+function applyPlayerRoundAnswer(room, playerId, selectedOptionId, elapsedMs, modifier, rules) {
     const player = room.players[playerId];
-    const question = room.currentQuestion;
+    const question = rules?.question ?? room.currentQuestion;
     if (!player || !question) {
         return { isCorrect: false, pointsAwarded: 0, speedBonus: 0, streakBonus: 0, streak: 0 };
     }
@@ -78,12 +78,17 @@ function applyPlayerRoundAnswer(room, playerId, selectedOptionId, elapsedMs, mod
     });
     if (!isCorrect && modifier === 'streak_guard')
         scoreResult.streak = player.currentStreak;
+    if (!isCorrect && room.mode === 'friends_private' && room.penaltyForWrong && !rules?.shield) {
+        scoreResult.pointsAwarded = -Math.min(50, Math.max(0, player.score));
+    }
     if (isCorrect && modifier === 'double')
         scoreResult.pointsAwarded *= 2;
     if (isCorrect && modifier === 'lightning' && elapsedMs <= jokers_1.LIGHTNING_WINDOW_MS) {
         scoreResult.pointsAwarded = Math.round(scoreResult.pointsAwarded * 1.5);
     }
     player.hasAnsweredCurrentRound = true;
+    if (question.options?.some(option => option.id === selectedOptionId))
+        player.rewardAnswers = (player.rewardAnswers ?? 0) + 1;
     player.lastAnswerTimeMs = elapsedMs;
     player.lastSelectedOptionId = selectedOptionId;
     player.lastAnswerIsCorrect = isCorrect;
@@ -144,6 +149,7 @@ function evaluateRoundResult(room) {
             speedBonus: p.lastSpeedBonus || 0,
             streak: p.currentStreak,
             timeMs: p.lastAnswerTimeMs || 0,
+            ...(p.jokerRound?.skipped ? { skipped: true } : {}),
         };
     });
     const leaderboard = buildRoomLeaderboard(room);

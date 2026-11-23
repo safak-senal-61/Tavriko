@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { JokerId, JokerTactics, LIGHTNING_WINDOW_MS, Question, isJokerId, resolveJokerEffect } from '@trivia/shared';
+import { ClientQuestion, JokerId, JokerTactics, LIGHTNING_WINDOW_MS, Question, isJokerId, resolveJokerEffect } from '@trivia/shared';
 import { getJwtSecret } from '../middleware/auth';
 import { db } from '../db/prismaClient';
 
@@ -8,7 +8,7 @@ export async function consumeQuizJoker(
   jokerId: JokerId,
   question: Pick<Question, 'options' | 'correctOptionId'>,
   deadline: number,
-  live?: { tactics?: JokerTactics; startedAt: number },
+  live?: { tactics?: JokerTactics; startedAt: number; capabilities?: ClientQuestion['jokerCapabilities']; votes?: Record<string, number> },
 ) {
   // Stable on retry without adding a column or taking randomness from the client.
   const randomIndex = createHmac('sha256', getJwtSecret() || process.env.INTERNAL_API_SECRET || '')
@@ -18,11 +18,13 @@ export async function consumeQuizJoker(
     if (!account || Date.now() >= deadline) return { status: 'unavailable' } as const;
     const used = await tx.practiceJokerUse.findUnique({ where: { userId_sessionId_questionId: key } });
     if (used && isJokerId(used.jokerId)) {
-      const effect = resolveJokerEffect(used.jokerId, question, used.eliminated, { live: !!live, tactics: live?.tactics, randomIndex });
+      const effect = resolveJokerEffect(used.jokerId, question, used.eliminated, {
+        live: !!live, tactics: live?.tactics, capabilities: live?.capabilities, votes: live?.votes, randomIndex,
+      });
       return effect ? { status: 'applied', effect } as const : { status: 'unavailable' } as const;
     }
     const effect = resolveJokerEffect(jokerId, question, undefined, {
-      live: !!live, tactics: live?.tactics, randomIndex,
+      live: !!live, tactics: live?.tactics, capabilities: live?.capabilities, votes: live?.votes, randomIndex,
       lightningAvailable: !!live && Date.now() - live.startedAt < LIGHTNING_WINDOW_MS,
     });
     if (!effect || Date.now() >= deadline) return { status: 'unavailable' } as const;

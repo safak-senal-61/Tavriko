@@ -6,7 +6,6 @@ import sharp from 'sharp';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const active = join(root, 'client/bundled/jokers/poster');
-const drafts = join(root, 'docs/joker-art-drafts');
 const palettes = {
   aqua: ['#60e8fb', '#217591', '#112b47'],
   berry: ['#ff96dd', '#883879', '#331b53'],
@@ -73,7 +72,7 @@ const live = {
     line('M37 37h22M37 46h15M37 55h22M37 61h14', '#ffe0b3', 3.2)],
 };
 
-const unused = {
+const advanced = {
   'ikinci-sans': ['aqua', c(48, 48, 24, '#234373') + turn +
     line('M42 44c0-5 11-6 11 0 0 4-10 6-10 11h11', '#fff0c5', 3.3)],
   'zaman-molasi': ['ice', timer(line('M45 46v10m6-10v10', '#d5f5ff', 4.5))],
@@ -117,8 +116,6 @@ function svg(palette, symbol) {
     ${symbol}</svg>`;
 }
 
-for (const [directory, icons] of [[active, live], [drafts, unused]]) {
-  for (const [name, [palette, symbol]] of Object.entries(icons)) {
-    await sharp(Buffer.from(svg(palette, symbol))).webp({ lossless: true }).toFile(join(directory, `${name}.webp`));
-  }
+for (const [name, [palette, symbol]] of Object.entries({ ...live, ...advanced })) {
+  await sharp(Buffer.from(svg(palette, symbol))).webp({ lossless: true }).toFile(join(active, `${name}.webp`));
 }

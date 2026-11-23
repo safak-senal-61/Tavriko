@@ -44,12 +44,13 @@ import {
   isCosmeticProduct,
   shopPriceForDuration,
   SEASON_REWARD_HOURS,
-  FinalMatchSummary,
   isRankedMatch,
   uniqueQuestions,
   getChestOpening,
   isPermanentGameplayBadge,
+  GOLD_HUNT_BONUS,
 } from '@trivia/shared';
+import type { TrackedMatchSummary } from '../services/playerAnalytics';
 import { ALL_CATEGORIES, QUESTION_BANK } from './questionsData';
 import { RICH_SEED_BANK } from '../ai/evrenLlmGenerator';
 import { supabaseService } from './supabaseClient';
@@ -213,6 +214,8 @@ export interface GameStatsDelta {
   difficulty?: DifficultyLevel;
   /** Dereceli (gerçek rakiple hızlı eşleşme) maç mı? Yalnızca bu maçlar LP değiştirir. */
   ranked?: boolean;
+  /** Internal final match summary only. */
+  goldHunt?: boolean;
 }
 
 /** Hesaba gerçekten yazılan ödül (2x artırıcı dahil) */
@@ -2328,13 +2331,17 @@ export class PrismaService {
    * NİHAİ maç özetinden tüm kayıtlı oyuncuların sonucunu yazar. Galibiyet, doğru sayısı ve
    * dereceli olup olmadığı yalnızca bu özetten çıkarılır; istemci değerleri kullanılmaz.
    */
-  public async recordFinalMatch(summary: FinalMatchSummary): Promise<void> {
+  public async recordFinalMatch(summary: TrackedMatchSummary): Promise<void> {
     const ranked = isRankedMatch({
       mode: summary.mode,
       roomCode: summary.roomCode,
       playerIds: (summary.rankings || []).map((r) => r.playerId),
     });
     const totalRounds = Math.max(1, Number(summary.totalRounds) || 5);
+    const idSet = (ids?: string[]) => new Set(Array.isArray(ids) ? ids : []);
+    const verified = idSet(summary.verifiedPlayerIds);
+    const completed = idSet(summary.rewardCompletedPlayerIds);
+    const gold = idSet(summary.goldHuntPlayerIds);
     for (const rankItem of summary.rankings || []) {
       if (!rankItem.playerId || rankItem.playerId.startsWith('bot_') || rankItem.playerId.startsWith('guest_')) {
         continue;
@@ -2351,6 +2358,8 @@ export class PrismaService {
         won: rankItem.rank === 1,
         roomCode: summary.roomCode,
         ranked,
+        goldHunt: !ranked && safeCorrect > 0 && verified.has(rankItem.playerId) &&
+          completed.has(rankItem.playerId) && gold.has(rankItem.playerId),
         category: typeof (summary as any).category === 'string' ? (summary as any).category : undefined,
       });
     }
@@ -2434,7 +2443,7 @@ export class PrismaService {
     const xpMultiplier = xp3Active ? 3 : xp2Active ? 2 : 1;
     const coinMultiplier = coin2Active ? 2 : 1;
     const appliedXp = baseRewards.xp * xpMultiplier;
-    const appliedCoins = baseRewards.coins * coinMultiplier;
+    const appliedCoins = baseRewards.coins * coinMultiplier + (delta.goldHunt === true ? GOLD_HUNT_BONUS : 0);
     record.xp += appliedXp;
     record.coins += appliedCoins;
     record.seasonXp = (record.seasonXp || 0) + baseRewards.seasonXp;

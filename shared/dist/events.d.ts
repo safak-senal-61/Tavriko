@@ -21,6 +21,7 @@ export declare const SOCKET_EVENTS: {
     readonly SUBMIT_ANSWER: "game:submit_answer";
     readonly USE_JOKER: "game:use_joker";
     readonly JOKER_RESULT: "game:joker_result";
+    readonly JOKER_RETRY: "game:joker_retry";
     readonly SEND_EMOTE: "game:send_emote";
     readonly EMOTE_RECEIVED: "game:emote_received";
     readonly LOBBY_CHAT: "room:lobby_chat";

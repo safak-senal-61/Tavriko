@@ -19,6 +19,9 @@ import {
   isLobbyReaction,
   isJokerId,
   canUseJoker,
+  advancedJokerAction,
+  resolveJokerEffect,
+  rewardCompletionPlayers,
   LIGHTNING_WINDOW_MS,
   supportsLiveJokers,
   JokerEffect,
@@ -112,6 +115,25 @@ export class GameRoomDO extends DurableObject<Env> {
   // --- WebSocket Upgrade & Request Handling ---
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    if (url.hostname === 'internal' && url.pathname === '/joker-audience') {
+      if (!this.env.INTERNAL_API_SECRET || request.headers.get('x-internal-secret') !== this.env.INTERNAL_API_SECRET) {
+        return new Response(null, { status: 403 });
+      }
+      if (request.method === 'GET') return Response.json(await this.ctx.storage.get('audience') ?? {});
+      if (request.method !== 'POST') return new Response(null, { status: 405 });
+      const batch = await request.json<{ optionId: string; count: number }[]>();
+      if (!Array.isArray(batch) || batch.length > 12) return new Response(null, { status: 400 });
+      await this.ctx.storage.transaction(async tx => {
+        const counts = new Map(Object.entries(await tx.get<Record<string, number>>('audience') ?? {}));
+        for (const entry of batch) {
+          if (typeof entry.optionId !== 'string' || !entry.optionId || entry.optionId.length > 160 ||
+              !Number.isSafeInteger(entry.count) || entry.count < 1 || entry.count > 50) continue;
+          counts.set(entry.optionId, Math.min(1_000_000, (counts.get(entry.optionId) ?? 0) + entry.count));
+        }
+        await tx.put('audience', Object.fromEntries(counts));
+      });
+      return new Response(null, { status: 204 });
+    }
 
     // Health / Inspection endpoint
     if (url.pathname === '/info' || request.method === 'GET' && !request.headers.get('Upgrade')) {
@@ -186,14 +208,15 @@ export class GameRoomDO extends DurableObject<Env> {
           this.room.scores[p.id] = 0;
         }
       }
+      const planned = Math.min(40, Math.max(1, Math.trunc(this.room.totalRounds || 5)));
       const questions = await this.apiService.fetchRoomQuestions(
         this.room.category,
         this.room.difficulty,
-        this.room.totalRounds,
+        planned + (this.getJokerTactics(this.room) ? Math.min(planned, 50 - planned) : 0),
         this.room.subCategory
       );
       this.questions = questions;
-      this.room.totalRounds = this.questions.length;
+      this.room.totalRounds = Math.min(planned, this.questions.length);
       await this.persist();
       await this.ctx.storage.put('questions', this.questions);
       return new Response(JSON.stringify({ success: true, room: this.getSanitizedRoom() }), {
@@ -594,7 +617,7 @@ export class GameRoomDO extends DurableObject<Env> {
 
       case 'intermission':
         if (this.room.currentRound >= this.room.totalRounds) {
-          await this.finishGame();
+          await this.finishGame(true);
         } else {
           await this.beginQuestionRound(this.room.currentRound + 1);
         }
@@ -699,10 +722,11 @@ export class GameRoomDO extends DurableObject<Env> {
     }
 
     // Fetch authoritative questions from backend or defaults
+    const planned = Math.min(40, Math.max(1, Math.trunc(this.room.totalRounds || 5)));
     const questions = await this.apiService.fetchRoomQuestions(
       this.room.category,
       this.room.difficulty,
-      this.room.totalRounds || 5,
+      planned + (this.room.mode === 'friends_private' ? Math.min(planned, 50 - planned) : 0),
       this.room.subCategory
     );
 
@@ -712,7 +736,7 @@ export class GameRoomDO extends DurableObject<Env> {
     }
 
     this.questions = questions;
-    this.room.totalRounds = this.questions.length;
+    this.room.totalRounds = Math.min(planned, this.questions.length);
     this.room.currentRound = 0;
     this.room.status = 'countdown';
 
@@ -771,7 +795,7 @@ export class GameRoomDO extends DurableObject<Env> {
   }
 
   private async beginQuestionRound(roundNum: number): Promise<void> {
-    if (!this.room || roundNum > this.questions.length) {
+    if (!this.room || roundNum > this.room.totalRounds || !this.questions[roundNum - 1]) {
       await this.finishGame();
       return;
     }
@@ -784,6 +808,19 @@ export class GameRoomDO extends DurableObject<Env> {
 
     // Reset round states
     Object.values(this.room.players).forEach((p) => {
+      if (roundNum === 1) {
+        p.rewardStarted = p.isConnected && !p.isBot;
+        p.rewardAnswers = 0;
+        p.jokerGoldEarned = false;
+      }
+      p.jokerRound = undefined;
+      if (p.jokerSupportNext) {
+        p.jokerSupportNext = false;
+        const cut = resolveJokerEffect('joker_eliminate', question);
+        const initial = resolveJokerEffect('joker_initial', question);
+        if (cut || initial) p.jokerRound = { effect: { eliminated: cut?.eliminated ?? [],
+          hint: ['Sihirli Destek', initial?.hint, cut ? 'Bir yanlış şık elendi' : undefined].filter(Boolean).join(' · ') } };
+      }
       p.hasAnsweredCurrentRound = false;
       p.lastAnswerTimeMs = 0;
       p.lastSelectedOptionId = undefined;
@@ -794,10 +831,7 @@ export class GameRoomDO extends DurableObject<Env> {
 
     await this.persist();
 
-    const clientQuestion = this.getClientQuestion();
-    if (clientQuestion) {
-      this.broadcast(SOCKET_EVENTS.QUESTION_START, clientQuestion);
-    }
+    for (const socket of this.ctx.getWebSockets()) this.sendPrivateQuestion(socket);
 
     // Set round timeout alarm
     const questionSec = question.timeLimitSec || this.room.questionTimeSec || 15;
@@ -834,15 +868,22 @@ export class GameRoomDO extends DurableObject<Env> {
     }
 
     const selectedOptionId = String(envelope.payload?.selectedOptionId || '');
-    if (!this.room.currentQuestion.options.some(option => option.id === selectedOptionId)) {
+    const question = player.jokerRound?.question ?? this.room.currentQuestion;
+    if ((player.jokerRound?.question || typeof envelope.payload?.questionId === 'string') &&
+        envelope.payload?.questionId !== question.id) {
+      this.sendPrivateQuestion(ws);
+      ws.send(createWsError('Soru değişti. Yeni soruya cevap ver.', 'STALE_QUESTION', envelope.requestId));
+      return;
+    }
+    if (!question.options.some(option => option.id === selectedOptionId)) {
       ws.send(createWsError('Cevap şıkkı zorunludur', 'BAD_REQUEST', envelope.requestId));
       return;
     }
 
     const now = Date.now();
     const roundStartedAt = this.room.roundStartedAt || now;
-    const totalTimeMs = (this.room.currentQuestion.timeLimitSec || this.room.questionTimeSec || 15) * 1000;
-    const elapsedMs = Math.max(0, now - roundStartedAt);
+    const pausedMs = (player.jokerRound?.pausedMs ?? 0) - Math.max(0, (player.jokerRound?.pauseUntil ?? 0) - now);
+    const elapsedMs = Math.max(0, now - roundStartedAt - Math.max(0, pausedMs));
     const answerRoom = this.room;
     const answerRound = answerRoom.currentRound;
     const pendingKey = `${playerId}:${roundStartedAt}:${answerRound}`;
@@ -854,27 +895,88 @@ export class GameRoomDO extends DurableObject<Env> {
     if (rejectWhilePending()) return;
     const saved = supportsLiveJokers(answerRoom.mode) && this.env.INTERNAL_API_SECRET
       ? await this.ctx.storage.get<SavedRoomJoker>(`joker:${playerId}`) : undefined;
-    if (this.room !== answerRoom || answerRoom.status !== 'question_active' || answerRoom.currentRound !== answerRound) return;
+    if (this.room !== answerRoom || answerRoom.status !== 'question_active' || answerRoom.currentRound !== answerRound ||
+        answerRoom.players[playerId] !== player || player.hasAnsweredCurrentRound) return;
     if (rejectWhilePending()) return;
-    const effect = saved?.startedAt === roundStartedAt && saved.roundNumber === answerRound ? saved.effect : undefined;
+    const runtime = player.jokerRound;
+    const effect = runtime?.effect ?? (saved?.startedAt === roundStartedAt && saved.roundNumber === answerRound ? saved.effect : undefined);
     if (effect?.eliminated.includes(selectedOptionId)) {
       ws.send(createWsError('Bu şık elendi.', 'OPTION_ELIMINATED', envelope.requestId));
       return;
     }
 
     // Expiration check with 600ms grace for network latency
-    if (elapsedMs > totalTimeMs + 600) {
+    if (now > this.playerDeadline(answerRoom, player) + 600) {
       player.hasAnsweredCurrentRound = true;
       ws.send(createWsError('Soru süresi doldu', 'TIME_EXPIRED', envelope.requestId));
       return;
     }
 
+    if (runtime?.frozen && now < (runtime.pauseUntil ?? 0)) {
+      ws.send(encodeWsMessage(SOCKET_EVENTS.JOKER_RETRY, { roundNumber: answerRound, hint: 'Sayacın donduruldu; süre açılınca cevaplayabilirsin.' }));
+      return;
+    }
+    if (runtime && !runtime.tried && (effect?.action === 'probe' ||
+      (effect?.action === 'retry' && selectedOptionId !== question.correctOptionId))) {
+      runtime.tried = true;
+      const hint = effect.action === 'probe'
+        ? (selectedOptionId === question.correctOptionId ? 'Tahmin doğru. Cevabını şimdi seç.' : 'Tahmin yanlış. Cevabını şimdi seç.')
+        : 'İlk cevap yanlış. Bir kez daha dene.';
+      runtime.effect = { ...effect, hint };
+      await this.persist();
+      ws.send(encodeWsMessage(SOCKET_EVENTS.JOKER_RETRY, { roundNumber: answerRound, hint }));
+      return;
+    }
     await this.processPlayerAnswer(playerId, selectedOptionId, elapsedMs, effect?.modifier);
   }
 
   private getJokerTactics(room: GameRoom): JokerTactics | undefined {
-    if (room.mode !== 'friends_private' && !(room.mode === 'duel' && Object.values(room.players).some(player => player.isBot))) return undefined;
+    if (room.mode !== 'friends_private' && !(room.mode === 'duel' &&
+      (room.code.startsWith('DUEL-') || Object.values(room.players).some(player => player.isBot)))) return undefined;
     return 'friendly';
+  }
+
+  private baseRoundDeadline(room: GameRoom): number {
+    return (room.roundStartedAt ?? Date.now()) + (room.currentQuestion?.timeLimitSec || room.questionTimeSec || 15) * 1000;
+  }
+
+  private playerDeadline(room: GameRoom, player: Player): number {
+    return this.baseRoundDeadline(room) + (player.jokerRound?.extensionMs ?? 0);
+  }
+
+  private freezeTarget(room: GameRoom, player: Player): Player | undefined {
+    const players = Object.values(room.players);
+    if (players.length !== 2) return undefined;
+    return players.find(p => p.id !== player.id && !p.hasAnsweredCurrentRound && (p.isConnected || p.isBot) &&
+      !p.jokerRound?.frozen && this.playerDeadline(room, p) > Date.now());
+  }
+
+  private reserveQuestion(room: GameRoom): Question | undefined {
+    const reserve = this.questions[room.totalRounds + room.currentRound - 1];
+    return reserve?.id !== room.currentQuestion?.id ? reserve : undefined;
+  }
+
+  private jokerCapabilities(room: GameRoom, player: Player): ClientQuestion['jokerCapabilities'] {
+    if (!this.getJokerTactics(room)) return undefined;
+    return { replacement: !!this.reserveQuestion(room), freeze: !!this.freezeTarget(room, player),
+      shield: room.mode === 'friends_private' && room.penaltyForWrong && player.score > 0,
+      gold: !player.jokerGoldEarned, nextRound: room.currentRound < room.totalRounds };
+  }
+
+  private audienceRequest(questionId: string, votes?: { optionId: string; count: number }[]): Promise<Response> {
+    const id = this.env.GAME_ROOMS.idFromName(`audience:${questionId}`);
+    return this.env.GAME_ROOMS.get(id).fetch('https://internal/joker-audience', {
+      method: votes ? 'POST' : 'GET',
+      headers: { 'x-internal-secret': this.env.INTERNAL_API_SECRET ?? '', 'Content-Type': 'application/json' },
+      ...(votes ? { body: JSON.stringify(votes) } : {}),
+    });
+  }
+
+  private async refreshRoundAlarm(room: GameRoom): Promise<void> {
+    if (this.room !== room || room.status !== 'question_active') return;
+    const waiting = Object.values(room.players).filter(p => !p.hasAnsweredCurrentRound);
+    const deadline = waiting.length ? Math.max(...waiting.map(p => this.playerDeadline(room, p))) : Date.now() + 450;
+    await this.scheduleAlarm('round_end', deadline - Date.now(), { roundNumber: room.currentRound });
   }
 
   private async handleUseJoker(ws: WebSocket, attachment: WsAttachment, envelope: WsMessage): Promise<void> {
@@ -884,14 +986,15 @@ export class GameRoomDO extends DurableObject<Env> {
     const roundNumber = room?.currentRound;
     const startedAt = room?.roundStartedAt;
     const player = room?.players[playerId];
-    const deadline = (startedAt ?? 0) + (question?.timeLimitSec || room?.questionTimeSec || 15) * 1000;
+    const deadline = room && player ? this.playerDeadline(room, player) : 0;
     const { jokerId } = envelope.payload ?? {};
     const fail = (message: string) => ws.send(createWsError(message, 'JOKER_UNAVAILABLE', envelope.requestId));
     if (!canSpendJokers || !this.env.INTERNAL_API_SECRET || !room || !supportsLiveJokers(room.mode) ||
         room.status !== 'question_active' || !question || !startedAt || !roundNumber ||
         envelope.payload?.startedAt !== startedAt || envelope.payload?.roundNumber !== roundNumber ||
         envelope.payload?.questionId !== question.id || !isJokerId(jokerId) ||
-        !player || player.isBot || player.hasAnsweredCurrentRound || Date.now() >= deadline) {
+        !player || player.isBot || player.hasAnsweredCurrentRound || Date.now() >= deadline ||
+        (player.jokerRound?.frozen && Date.now() < (player.jokerRound.pauseUntil ?? 0))) {
       fail('Bu soruda joker kullanılamıyor.');
       return;
     }
@@ -904,25 +1007,107 @@ export class GameRoomDO extends DurableObject<Env> {
           player.hasAnsweredCurrentRound || Date.now() >= deadline) {
         fail('Bu soruda joker kullanılamıyor.'); return;
       }
+      if (player.jokerRound?.effect) {
+        ws.send(encodeWsMessage(SOCKET_EVENTS.JOKER_RESULT, player.jokerRound.effect, envelope.requestId)); return;
+      }
       if (saved?.startedAt === startedAt && saved.roundNumber === roundNumber) {
         ws.send(encodeWsMessage(SOCKET_EVENTS.JOKER_RESULT, saved.effect, envelope.requestId)); return;
       }
       const tactics = this.getJokerTactics(room);
-      if (!canUseJoker(jokerId, question.options, { live: true, tactics, lightningAvailable: Date.now() - startedAt < LIGHTNING_WINDOW_MS })) {
+      const capabilities = this.jokerCapabilities(room, player);
+      if (!canUseJoker(jokerId, question.options, { live: true, tactics, capabilities, lightningAvailable: Date.now() - startedAt < LIGHTNING_WINDOW_MS })) {
         fail('Bu joker bu soruya veya maç türüne uygun değil.'); return;
       }
-      const effect = await this.apiService.useRoomJoker(
-        { userId: playerId, roomCode: room.code, roundNumber, startedAt, deadline, jokerId, tactics }, question,
-      );
-      // The request may finish after the round changes. Never attach an old effect to a new round.
-      if (this.room === room && room.currentRound === roundNumber && room.roundStartedAt === startedAt) {
-        await this.ctx.storage.put<SavedRoomJoker>(`joker:${playerId}`, { startedAt, roundNumber, effect });
+      const target = jokerId === 'joker_freeze' ? this.freezeTarget(room, player) : undefined;
+      const targetKey = target ? `${target.id}:${startedAt}:${roundNumber}` : undefined;
+      if (targetKey && this.pendingJokers.has(targetKey)) { fail('Rakip cevap veriyor, tekrar dene.'); return; }
+      if (targetKey) this.pendingJokers.add(targetKey);
+      try {
+        let votes: Record<string, number> | undefined;
+        if (jokerId === 'joker_audience') {
+          const response = await this.audienceRequest(question.id);
+          if (!response.ok) { fail('Halk Desteği şu anda alınamadı.'); return; }
+          votes = await response.json();
+          if (!resolveJokerEffect(jokerId, question, undefined, { live: true, tactics, capabilities, votes })) {
+            fail('Bu soru için henüz yeterli oyuncu oyu yok.'); return;
+          }
+        }
+        if (room.players[playerId] !== player || (target && room.players[target.id] !== target)) {
+          fail('Oyuncu artık bu odada değil.'); return;
+        }
+        const effect = await this.apiService.useRoomJoker(
+          { userId: playerId, roomCode: room.code, roundNumber, startedAt, deadline, jokerId, tactics,
+            ...(capabilities ? { capabilities } : {}), ...(votes ? { votes } : {}) }, question,
+        );
+        if (this.room !== room || room.currentRound !== roundNumber || room.roundStartedAt !== startedAt || room.status !== 'question_active') {
+          fail('Tur tamamlandı.'); return;
+        }
+        // Runtime and round state are persisted together. Basic effects keep the existing replay record.
+        if (effect.action || effect.votes || advancedJokerAction(jokerId)) {
+          await this.applyAdvancedJoker(room, player, effect, target);
+        } else {
+          await this.ctx.storage.put<SavedRoomJoker>(`joker:${playerId}`, { startedAt, roundNumber, effect });
+        }
+        ws.send(encodeWsMessage(SOCKET_EVENTS.JOKER_RESULT, effect, envelope.requestId));
+      } finally {
+        if (targetKey) this.pendingJokers.delete(targetKey);
       }
-      ws.send(encodeWsMessage(SOCKET_EVENTS.JOKER_RESULT, effect, envelope.requestId));
     } catch (error) {
       fail(error instanceof Error && error.message.length <= 120 ? error.message : 'Joker şu anda kullanılamadı.');
     } finally {
       this.pendingJokers.delete(pendingKey);
+    }
+  }
+
+  private async applyAdvancedJoker(room: GameRoom, player: Player, effect: JokerEffect, target?: Player): Promise<void> {
+    const runtime = player.jokerRound ??= {};
+    runtime.effect = effect;
+    switch (effect.action) {
+      case 'support':
+        player.jokerSupportNext = true;
+        break;
+      case 'replace': {
+        const reserve = this.reserveQuestion(room);
+        if (reserve) runtime.question = { ...reserve, timeLimitSec: (this.baseRoundDeadline(room) - (room.roundStartedAt ?? Date.now())) / 1000 };
+        break;
+      }
+      case 'skip':
+        runtime.skipped = true;
+        player.hasAnsweredCurrentRound = true;
+        break;
+      case 'pause':
+      case 'extra_time': {
+        const pause = effect.action === 'pause';
+        const extension = pause ? 5000 : 15000;
+        runtime.extensionMs = (runtime.extensionMs ?? 0) + extension;
+        if (pause) {
+          runtime.pausedMs = (runtime.pausedMs ?? 0) + extension;
+          runtime.pauseUntil = Date.now() + extension;
+        }
+        break;
+      }
+      case 'freeze':
+        if (target) {
+          const clock = target.jokerRound ??= {};
+          const now = Date.now();
+          const extension = Math.max(0, now + 15000 - Math.max(clock.pauseUntil ?? 0, now));
+          clock.extensionMs = (clock.extensionMs ?? 0) + extension;
+          clock.pausedMs = (clock.pausedMs ?? 0) + extension;
+          clock.pauseUntil = now + 15000;
+          clock.frozen = true;
+        }
+        break;
+    }
+    await this.persist();
+    if (effect.action === 'freeze' && target) {
+      for (const socket of this.ctx.getWebSockets(`player:${target.id}`)) this.sendPrivateQuestion(socket);
+    }
+    if (['replace', 'pause', 'extra_time', 'skip'].some(action => action === effect.action)) {
+      for (const socket of this.ctx.getWebSockets(`player:${player.id}`)) this.sendPrivateQuestion(socket);
+    }
+    if (effect.action === 'skip') this.broadcast(SOCKET_EVENTS.PLAYER_ANSWERED, { playerId: player.id });
+    if (effect.action === 'pause' || effect.action === 'extra_time' || effect.action === 'freeze' || effect.action === 'skip') {
+      await this.refreshRoundAlarm(room);
     }
   }
 
@@ -937,7 +1122,9 @@ export class GameRoomDO extends DurableObject<Env> {
     if (!player || player.hasAnsweredCurrentRound) return;
     const roundNumber = this.room.currentRound;
 
-    applyPlayerRoundAnswer(this.room, playerId, selectedOptionId, elapsedMs, modifier);
+    const score = applyPlayerRoundAnswer(this.room, playerId, selectedOptionId, elapsedMs, modifier,
+      { question: player.jokerRound?.question, shield: player.jokerRound?.effect?.action === 'shield' });
+    if (score.isCorrect && player.jokerRound?.effect?.action === 'gold') player.jokerGoldEarned = true;
 
     await this.persist();
     if (this.room.status !== 'question_active' || this.room.currentRound !== roundNumber) return;
@@ -972,7 +1159,7 @@ export class GameRoomDO extends DurableObject<Env> {
       }
     }
 
-    setTimeout(async () => {
+    const submit = async () => {
       if (
         this.room &&
         this.room.status === 'question_active' &&
@@ -980,23 +1167,32 @@ export class GameRoomDO extends DurableObject<Env> {
         this.room.players[botId] &&
         !this.room.players[botId].hasAnsweredCurrentRound
       ) {
+        const bot = this.room.players[botId];
+        const freezeUntil = bot.jokerRound?.pauseUntil ?? 0;
+        const key = `${botId}:${this.room.roundStartedAt}:${roundNum}`;
+        if (this.pendingJokers.has(key) || freezeUntil > Date.now()) {
+          setTimeout(submit, Math.max(100, freezeUntil - Date.now()));
+          return;
+        }
         await this.processPlayerAnswer(botId, selectedOptionId, thinkTimeMs);
       }
-    }, thinkTimeMs);
+    };
+    setTimeout(submit, thinkTimeMs);
   }
 
   private async autoStartDuel(): Promise<void> {
     if (!this.room || this.room.status !== 'lobby') return;
 
     if (!this.questions || this.questions.length === 0) {
+      const planned = Math.min(40, Math.max(1, Math.trunc(this.room.totalRounds || 5)));
       const questions = await this.apiService.fetchRoomQuestions(
         this.room.category,
         this.room.difficulty,
-        this.room.totalRounds || 5,
+        planned + (this.getJokerTactics(this.room) ? Math.min(planned, 50 - planned) : 0),
         this.room.subCategory
       );
       this.questions = questions;
-      this.room.totalRounds = this.questions.length;
+      this.room.totalRounds = Math.min(planned, this.questions.length);
       await this.ctx.storage.put('questions', this.questions);
     }
 
@@ -1013,6 +1209,12 @@ export class GameRoomDO extends DurableObject<Env> {
 
   private async endCurrentRound(): Promise<void> {
     if (!this.room || this.room.status !== 'question_active' || !this.room.currentQuestion) return;
+    const room = this.room;
+    const roundToken = `:${room.roundStartedAt}:${room.currentRound}`;
+    if ([...this.pendingJokers].some(key => key.endsWith(roundToken))) {
+      await this.scheduleAlarm('round_end', 250, { roundNumber: room.currentRound });
+      return;
+    }
 
     const roundResult = evaluateRoundResult(this.room);
 
@@ -1020,19 +1222,43 @@ export class GameRoomDO extends DurableObject<Env> {
 
     // Broadcast updated room state (correctAnswersCount & scores) and round results
     this.broadcastStateSync();
-    this.broadcast(SOCKET_EVENTS.ROUND_RESULT, roundResult);
+    for (const socket of this.ctx.getWebSockets()) {
+      const attachment = socket.deserializeAttachment() as WsAttachment | null;
+      const alternate = attachment ? room.players[attachment.playerId]?.jokerRound?.question : undefined;
+      try {
+        socket.send(encodeWsMessage(SOCKET_EVENTS.ROUND_RESULT, alternate
+          ? { ...roundResult, correctOptionId: alternate.correctOptionId, explanation: alternate.explanation || '' }
+          : roundResult));
+      } catch {}
+    }
+    const audience = new Map<string, Map<string, number>>();
+    for (const player of Object.values(room.players)) {
+      const question = player.jokerRound?.question ?? room.currentQuestion;
+      const optionId = player.lastSelectedOptionId;
+      if (!question || !optionId || !this.verifiedPlayers.has(player.id) || player.isBot ||
+          !question.options.some(option => option.id === optionId)) continue;
+      const votes = audience.get(question.id) ?? new Map<string, number>();
+      votes.set(optionId, (votes.get(optionId) ?? 0) + 1);
+      audience.set(question.id, votes);
+    }
+    if (this.env.INTERNAL_API_SECRET && this.env.GAME_ROOMS) {
+      for (const [questionId, votes] of audience) this.ctx.waitUntil(this.audienceRequest(questionId,
+        [...votes].map(([optionId, count]) => ({ optionId, count }))).catch(() => undefined));
+    }
 
     // Schedule fast intermission alarm for seamless round progression
     const intermissionSec = this.env.ROUND_INTERMISSION_SEC ? Number(this.env.ROUND_INTERMISSION_SEC) : 1.5;
     await this.scheduleAlarm('intermission', intermissionSec * 1000);
   }
 
-  private async finishGame(): Promise<void> {
+  private async finishGame(completedNormally = false): Promise<void> {
     if (!this.room || this.room.status === 'game_over') return;
 
+    const rewardCompletedPlayerIds = rewardCompletionPlayers(this.room, completedNormally);
     const summary = buildFinalMatchSummary(this.room);
     const tracked = { ...summary, matchId: this.funnelMatchId ?? crypto.randomUUID(), verifiedPlayerIds: [...this.verifiedPlayers],
-      category: this.room.category, funnelMatch: this.funnelMatchId !== null };
+      category: this.room.category, funnelMatch: this.funnelMatchId !== null, rewardCompletedPlayerIds,
+      goldHuntPlayerIds: rewardCompletedPlayerIds.filter(id => this.room?.players[id]?.jokerGoldEarned) };
 
     await this.persist();
     await this.clearGameAlarms();
@@ -1106,10 +1332,13 @@ export class GameRoomDO extends DurableObject<Env> {
     return buildRoomLeaderboard(this.room);
   }
 
-  private getClientQuestion(): ClientQuestion | null {
+  private getClientQuestion(player?: Player): ClientQuestion | null {
     if (!this.room || !this.room.currentQuestion) return null;
-    const q = this.room.currentQuestion;
-    const timeLimitSec = q.timeLimitSec || this.room.questionTimeSec || 15;
+    const runtime = player?.jokerRound;
+    const q = runtime?.question ?? this.room.currentQuestion;
+    const timeLimitSec = this.room.currentQuestion.timeLimitSec || this.room.questionTimeSec || 15;
+    const deadline = player ? this.playerDeadline(this.room, player) : this.baseRoundDeadline(this.room);
+    const pause = runtime?.pauseUntil && runtime.pauseUntil > Date.now() ? runtime.pauseUntil : undefined;
     return {
       id: q.id,
       categoryId: q.categoryId,
@@ -1120,22 +1349,36 @@ export class GameRoomDO extends DurableObject<Env> {
       totalRounds: this.room.totalRounds,
       timeLimitSec,
       ...(this.env.INTERNAL_API_SECRET && supportsLiveJokers(this.room.mode) && this.room.roundStartedAt
-        ? { jokerRoundStartedAt: this.room.roundStartedAt, jokerTactics: this.getJokerTactics(this.room) } : {}),
-      timeRemainingMs: Math.max(0, (this.room.roundStartedAt ?? Date.now()) + timeLimitSec * 1000 - Date.now()),
+        ? { jokerRoundStartedAt: this.room.roundStartedAt, jokerTactics: this.getJokerTactics(this.room),
+          ...(player ? { jokerCapabilities: this.jokerCapabilities(this.room, player) } : {}) } : {}),
+      ...(runtime ? { jokerDeadline: deadline, jokerPauseUntil: pause, jokerPauseRemainingMs: pause ? pause - Date.now() : undefined,
+        jokerFrozen: !!pause && runtime.frozen,
+        jokerEffect: runtime.effect, jokerSkipped: runtime.skipped } : {}),
+      timeRemainingMs: Math.max(0, deadline - Date.now()),
       ...(q.subCategory ? { subCategory: q.subCategory } : {}),
     };
   }
 
   private async getQuestionForSocket(attachment: WsAttachment): Promise<ClientQuestion | null> {
-    let question = this.getClientQuestion();
-    if (question?.jokerRoundStartedAt && attachment.canSpendJokers) {
+    let question = this.getClientQuestion(this.room?.players[attachment.playerId]);
+    if (question?.jokerRoundStartedAt && !question.jokerEffect && attachment.canSpendJokers) {
       const saved = await this.ctx.storage.get<SavedRoomJoker>(`joker:${attachment.playerId}`);
-      question = this.room?.status === 'question_active' ? this.getClientQuestion() : null;
+      question = this.room?.status === 'question_active' ? this.getClientQuestion(this.room.players[attachment.playerId]) : null;
       if (question && saved && saved.startedAt === question.jokerRoundStartedAt && saved.roundNumber === question.roundNumber) {
         question.jokerEffect = saved.effect;
       }
     }
     return question;
+  }
+
+  private sendPrivateQuestion(socket: WebSocket): void {
+    try {
+      const attachment = socket.deserializeAttachment() as WsAttachment | null;
+      const player = attachment ? this.room?.players[attachment.playerId] : undefined;
+      if (!player) return;
+      const question = this.getClientQuestion(player);
+      if (question) socket.send(encodeWsMessage(SOCKET_EVENTS.QUESTION_START, question));
+    } catch {}
   }
 
   private getSanitizedRoom(): GameRoom {
@@ -1147,6 +1390,10 @@ export class GameRoomDO extends DurableObject<Env> {
       scores: { ...this.room.scores },
     };
     delete clone.password;
+    for (const [id, player] of Object.entries(clone.players)) {
+      const { jokerRound, jokerGoldEarned, jokerSupportNext, rewardStarted, rewardAnswers, ...publicPlayer } = player;
+      clone.players[id] = publicPlayer;
+    }
     if (clone.currentQuestion && clone.status !== 'round_result' && clone.status !== 'game_over') {
       // Omit correctOptionId and explanation
       const { correctOptionId, explanation, ...safeQ } = clone.currentQuestion;

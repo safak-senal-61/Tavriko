@@ -55,6 +55,19 @@ export interface ClientQuestion {
     /** Live room capability, also identifies the exact round instance. */
     jokerRoundStartedAt?: number;
     jokerTactics?: 'friendly';
+    jokerCapabilities?: {
+        replacement?: boolean;
+        freeze?: boolean;
+        shield?: boolean;
+        gold?: boolean;
+        nextRound?: boolean;
+    };
+    /** Absolute timestamps are only sent by the authoritative Worker. */
+    jokerDeadline?: number;
+    jokerPauseUntil?: number;
+    jokerPauseRemainingMs?: number;
+    jokerFrozen?: boolean;
+    jokerSkipped?: boolean;
     /** Only sent to the authenticated owner when reconnecting. */
     jokerEffect?: JokerEffect;
     id: string;
@@ -89,6 +102,20 @@ export interface Player {
     lastSpeedBonus?: number;
     totalResponseTimeMs: number;
     correctAnswersCount: number;
+    rewardStarted?: boolean;
+    rewardAnswers?: number;
+    jokerRound?: {
+        effect?: JokerEffect;
+        question?: Question;
+        extensionMs?: number;
+        pausedMs?: number;
+        pauseUntil?: number;
+        frozen?: boolean;
+        tried?: boolean;
+        skipped?: boolean;
+    };
+    jokerSupportNext?: boolean;
+    jokerGoldEarned?: boolean;
     isBot?: boolean;
 }
 export type RoomStatus = 'lobby' | 'countdown' | 'question_active' | 'round_result' | 'intermission' | 'game_over';
@@ -170,6 +197,7 @@ export interface RoundResult {
         speedBonus: number;
         streak: number;
         timeMs: number;
+        skipped?: boolean;
     }>;
     leaderboard: PlayerScoreSummary[];
 }
@@ -219,6 +247,7 @@ export interface FinalMatchSummary {
     };
     questionReviews?: MatchQuestionReviewItem[];
 }
+export declare const GOLD_HUNT_BONUS = 140;
 export type ItemRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
 export type ItemCategory = 'chest' | 'key' | 'booster' | 'joker' | 'cosmetic' | 'badge' | 'avatar' | 'frame' | 'name_effect' | 'background';
 export interface InventoryItem {
@@ -538,13 +567,93 @@ export declare const JOKERS: readonly [{
     readonly price: 400;
     readonly eliminated: 0;
     readonly group: "tactic";
+}, {
+    readonly id: "joker_retry";
+    readonly name: "İkinci Şans";
+    readonly desc: "İlk cevabın yanlışsa süre dolmadan bir kez daha dene. Botlu ve arkadaş maçlarında.";
+    readonly price: 320;
+    readonly eliminated: 0;
+    readonly group: "tactic";
+}, {
+    readonly id: "joker_pause";
+    readonly name: "Zaman Molası";
+    readonly desc: "Kendi sayacını 5 saniye durdur. Botlu ve arkadaş maçlarında.";
+    readonly price: 200;
+    readonly eliminated: 0;
+    readonly group: "tactic";
+}, {
+    readonly id: "joker_support";
+    readonly name: "Sihirli Destek";
+    readonly desc: "Sonraki soruda bir yanlış şıkkı eler ve ilk karakteri gösterir. Botlu ve arkadaş maçlarında.";
+    readonly price: 300;
+    readonly eliminated: 0;
+    readonly group: "hint";
+}, {
+    readonly id: "joker_probe";
+    readonly name: "Kralın Hakkı";
+    readonly desc: "Bir şıkkı cevap göndermeden önce test et. Botlu ve arkadaş maçlarında.";
+    readonly price: 420;
+    readonly eliminated: 0;
+    readonly group: "hint";
+}, {
+    readonly id: "joker_gold_hunt";
+    readonly name: "Altın Avı";
+    readonly desc: "Bu soruyu doğru yanıtla ve maçı bitir: +140 altın. Botlu ve arkadaş maçlarında, maç başına en çok bir ödül.";
+    readonly price: 100;
+    readonly eliminated: 0;
+    readonly group: "tactic";
+}, {
+    readonly id: "joker_replace";
+    readonly name: "Soru Değiştir";
+    readonly desc: "Yedek bir soru varsa yalnızca senin sorunu değiştirir. Botlu ve arkadaş maçlarında.";
+    readonly price: 350;
+    readonly eliminated: 0;
+    readonly group: "tactic";
+}, {
+    readonly id: "joker_audience";
+    readonly name: "Halk Desteği";
+    readonly desc: "Önceki gerçek maçların şık tercihlerini gösterir. En az 5 kayıtlı cevap gerekir. Botlu ve arkadaş maçlarında.";
+    readonly price: 200;
+    readonly eliminated: 0;
+    readonly group: "hint";
+}, {
+    readonly id: "joker_extra_time";
+    readonly name: "Ek Süre";
+    readonly desc: "Kendi soruna 15 saniye ekle. Botlu ve arkadaş maçlarında.";
+    readonly price: 280;
+    readonly eliminated: 0;
+    readonly group: "tactic";
+}, {
+    readonly id: "joker_skip";
+    readonly name: "Pas Geç";
+    readonly desc: "Bu soruyu puan almadan pas geç; sonraki tur için diğer oyuncuları bekle. Botlu ve arkadaş maçlarında.";
+    readonly price: 100;
+    readonly eliminated: 0;
+    readonly group: "tactic";
+}, {
+    readonly id: "joker_shield";
+    readonly name: "Koruma Kalkanı";
+    readonly desc: "Yanlış cevabın puan cezasını bu turda önler. Yalnızca ceza açık arkadaş odalarında, puanın varsa.";
+    readonly price: 160;
+    readonly eliminated: 0;
+    readonly group: "tactic";
+}, {
+    readonly id: "joker_freeze";
+    readonly name: "Zaman Dondurma";
+    readonly desc: "Henüz cevaplamamış rakibin sayacını ve şıklarını 15 saniye dondur. Botlu ve iki kişilik arkadaş maçlarında.";
+    readonly price: 450;
+    readonly eliminated: 0;
+    readonly group: "tactic";
 }];
 export type JokerId = typeof JOKERS[number]['id'];
+export type JokerAction = 'retry' | 'pause' | 'support' | 'probe' | 'gold' | 'replace' | 'extra_time' | 'skip' | 'shield' | 'freeze';
 export interface JokerEffect {
     eliminated: string[];
     hint?: string;
     highlightedOptionId?: string;
     modifier?: 'streak_guard' | 'lightning' | 'double';
+    action?: JokerAction;
+    votes?: Record<string, number>;
 }
 /**
  * Süreli kozmetik mağaza ürünleri için süre seçenekleri: 1 saatten en fazla 1

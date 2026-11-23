@@ -48,6 +48,7 @@ export type QuestionAnswerState =
   | 'incorrect'
   | 'timed_out';
 export interface RoundFeedback {
+  skipped?: boolean;
   isCorrect: boolean;
   isTimeout: boolean;
   unavailable?: boolean;
@@ -65,6 +66,7 @@ interface QuizArenaScreenProps {
   streak: number;
   currentScore: number;
   feedback?: RoundFeedback | null;
+  jokerRetry?: { at: number; hint: string };
   onSelectOption: (optionId: string, timeRemainingMs: number) => void;
   onTimeExpired?: () => void;
   onExit?: () => void;
@@ -107,12 +109,13 @@ interface CircularTimerProps {
   onTimeExpired: () => void;
   onSecondChange: (sec: number) => void;
   size?: number;
+  pauseUntil?: number;
 }
 
 const TIMER_STROKE = 9;
 
 const CircularTimer: React.FC<CircularTimerProps> = React.memo(
-  ({ totalMs, endTime, isActive, secondsLeft, onTimeExpired, onSecondChange, size = 96 }) => {
+  ({ totalMs, endTime, isActive, secondsLeft, onTimeExpired, onSecondChange, size = 96, pauseUntil = 0 }) => {
     const [progressPct, setProgressPct] = useState<number>(100);
     const hasExpiredRef = useRef<boolean>(false);
     const onTimeExpiredRef = useRef(onTimeExpired);
@@ -123,11 +126,11 @@ const CircularTimer: React.FC<CircularTimerProps> = React.memo(
     useEffect(() => {
       hasExpiredRef.current = false;
       lastSecRef.current = Math.ceil(totalMs / 1000);
-      const initRemMs = Math.max(0, endTime - Date.now());
+      const initRemMs = Math.max(0, endTime - Math.max(Date.now(), pauseUntil));
       setProgressPct(Math.max(0, Math.min(100, (initRemMs / totalMs) * 100)));
       if (!isActive) return;
       const interval = setInterval(() => {
-        const remainingMs = Math.max(0, endTime - Date.now());
+        const remainingMs = Math.max(0, endTime - Math.max(Date.now(), pauseUntil));
         setProgressPct(Math.max(0, Math.min(100, (remainingMs / totalMs) * 100)));
         const sec = Math.ceil(remainingMs / 1000);
         if (sec !== lastSecRef.current) {
@@ -147,7 +150,7 @@ const CircularTimer: React.FC<CircularTimerProps> = React.memo(
         hasExpiredRef.current = true;
         clearInterval(interval);
       };
-    }, [totalMs, endTime, isActive]);
+    }, [totalMs, endTime, isActive, pauseUntil]);
 
     const isCritical = secondsLeft <= 3;
     const isWarning = !isCritical && secondsLeft <= 6;
@@ -579,6 +582,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   streak,
   currentScore,
   feedback,
+  jokerRetry,
   onSelectOption,
   onTimeExpired,
   onExit,
@@ -627,6 +631,11 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     useState<QuestionAnswerState>('answerable');
   const [endTime, setEndTime] = useState<number>(() => Date.now() + (question.timeRemainingMs ?? totalMs));
   const endTimeRef = useRef<number>(endTime);
+  const serverDeadlineRef = useRef(0);
+  const [localPauseUntil, setLocalPauseUntil] = useState(0);
+  const [clockPaused, setClockPaused] = useState(false);
+  const frozen = question.jokerFrozen === true && clockPaused;
+  const skipped = question.jokerSkipped === true || jokerEffect?.action === 'skip';
   const hasExpiredRef = useRef<boolean>(false);
   const onTimeExpiredRef = useRef(onTimeExpired);
   onTimeExpiredRef.current = onTimeExpired;
@@ -661,6 +670,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   // When question changes, reset time, answer state, and timer cleanly
   useEffect(() => {
     hasExpiredRef.current = false;
+    serverDeadlineRef.current = 0;
     arenaScrollRef.current?.scrollTo({ y: 0, animated: false });
     setJokersOpen(false);
     setJokerError(undefined);
@@ -673,10 +683,24 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     setAnswerState('answerable');
   }, [jokerRound, totalMs]);
   useEffect(() => {
-    if (answerState !== 'answerable' || isLocked || feedback) setJokersOpen(false);
-  }, [answerState, isLocked, feedback]);
+    if (answerState !== 'answerable' || isLocked || feedback || frozen || skipped) setJokersOpen(false);
+  }, [answerState, isLocked, feedback, frozen, skipped]);
+  useEffect(() => {
+    if (!jokerRetry || feedback || endTimeRef.current <= Date.now()) return;
+    setLocalSelectedOptionId(null);
+    setAnswerState('answerable');
+  }, [jokerRetry, feedback]);
+  useEffect(() => {
+    const remaining = Math.max(0, question.jokerPauseRemainingMs ?? 0);
+    setLocalPauseUntil(remaining ? Date.now() + remaining : 0);
+    setClockPaused(remaining > 0);
+    if (remaining > 0) {
+      const timer = setTimeout(() => setClockPaused(false), remaining);
+      return () => clearTimeout(timer);
+    }
+  }, [jokerRound, question.jokerPauseUntil, question.jokerPauseRemainingMs]);
   const useJokerAction = async (id: JokerId, buy: boolean) => {
-    if (!jokers || jokerLock.current || isLocked || feedback || answerState !== 'answerable' || jokerEffect) return;
+    if (!jokers || jokerLock.current || isLocked || feedback || answerState !== 'answerable' || jokerEffect || frozen || skipped) return;
     if (!buy && endTimeRef.current - Date.now() < 1500) {
       setJokerError('Bu soru için süre çok az. Sonraki soruda kullanabilirsin.');
       return;
@@ -704,12 +728,19 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   };
   useEffect(() => {
     if (question.timeRemainingMs === undefined) return;
-    // A replay after reconnect can shorten the timer but must not restart it.
-    const syncedEnd = Math.min(endTimeRef.current, Date.now() + question.timeRemainingMs);
+    // Only a newer authoritative deadline can extend a running round.
+    const allowExtension = !!question.jokerDeadline && question.jokerDeadline > serverDeadlineRef.current;
+    if (question.jokerDeadline) serverDeadlineRef.current = Math.max(serverDeadlineRef.current, question.jokerDeadline);
+    const proposal = Date.now() + question.timeRemainingMs;
+    const syncedEnd = allowExtension ? proposal : Math.min(endTimeRef.current, proposal);
     endTimeRef.current = syncedEnd;
     setEndTime(syncedEnd);
-    setSecondsLeft(Math.ceil(Math.max(0, syncedEnd - Date.now()) / 1000));
-  }, [question.timeRemainingMs]);
+    setSecondsLeft(Math.ceil(Math.max(0, syncedEnd - Date.now() - (question.jokerPauseRemainingMs ?? 0)) / 1000));
+    if (allowExtension && hasExpiredRef.current && syncedEnd > Date.now()) {
+      hasExpiredRef.current = false;
+      setAnswerState('answerable');
+    }
+  }, [jokerRound, question.timeRemainingMs, question.jokerDeadline, question.jokerPauseRemainingMs]);
   // AppState background/foreground synchronization
   useEffect(() => {
     const subscription = AppState.addEventListener(
@@ -762,6 +793,8 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       answerState !== 'answerable' ||
       isLocked ||
       jokerLock.current ||
+      frozen ||
+      skipped ||
       feedback ||
       hasExpiredRef.current ||
       secondsLeft <= 0
@@ -801,6 +834,8 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const isOptionsDisabled =
     answerState !== 'answerable' ||
     isLocked ||
+    frozen ||
+    skipped ||
     !!feedback ||
     hasExpiredRef.current ||
     secondsLeft <= 0;
@@ -909,7 +944,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         </View>
         {isGroup && (
           <CircularTimer
-            totalMs={totalMs}
+            totalMs={totalMs} pauseUntil={localPauseUntil}
             endTime={endTime}
             isActive={!feedback && (answerState === 'answerable' || (isMultiplayer && answerState === 'submitting'))}
             secondsLeft={secondsLeft}
@@ -974,7 +1009,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           compact={compact}
         />
         <CircularTimer
-          totalMs={totalMs}
+          totalMs={totalMs} pauseUntil={localPauseUntil}
           endTime={endTime}
           isActive={!feedback && (answerState === 'answerable' || (isMultiplayer && answerState === 'submitting'))}
           secondsLeft={secondsLeft}
@@ -1074,13 +1109,14 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           >
             <WalletArtwork kind="joker_half" size={29} />
             <Text accessibilityLiveRegion="polite" style={styles.jokerTriggerText}>
-              {jokerEffect?.hint ?? (jokerEffect ? 'Joker kullanıldı' : 'Jokerlerim')}
+              {frozen ? 'Sayacın donduruldu' : clockPaused ? 'Sayaç duraklatıldı' :
+                jokerRetry?.hint ?? jokerEffect?.hint ?? (jokerEffect ? 'Joker kullanıldı' : 'Jokerlerim')}
             </Text>
           </TouchableOpacity>
         </View>
       )}
       {jokers && jokersOpen && !jokerEffect && !isOptionsDisabled && (
-        <JokerPanel user={jokers.user} options={question.options} live={isMultiplayer} tactics={question.jokerTactics}
+        <JokerPanel user={jokers.user} options={question.options} live={isMultiplayer} tactics={question.jokerTactics} capabilities={question.jokerCapabilities}
           lightningAvailable={totalMs - secondsLeft * 1000 < LIGHTNING_WINDOW_MS}
           busy={jokerBusy} error={jokerError} onClose={() => setJokersOpen(false)}
           onApply={id => { void useJokerAction(id, false); }} onBuy={id => { void useJokerAction(id, true); }} />
@@ -1095,6 +1131,9 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           const isWrongChoice = !!feedback && !feedback.unavailable && isMyChoice && !isCorrectChoice;
           const removed = !feedback && eliminated.includes(opt.id);
           const highlighted = !feedback && jokerEffect?.highlightedOptionId === opt.id;
+          const votes = !feedback ? jokerEffect?.votes : undefined;
+          const voteTotal = votes ? Object.values(votes).reduce((sum, value) => sum + value, 0) : 0;
+          const voteShare = votes && voteTotal ? ` · %${Math.round((votes[opt.id] ?? 0) * 100 / voteTotal)}` : '';
           const stateLabel = removed ? 'elendi' : isCorrectChoice ? 'doğru cevap'
             : isWrongChoice ? 'yanlış cevap' : highlighted ? 'jokerin işaretlediği şık' : isMyChoice ? 'seçildi' : '';
 
@@ -1121,7 +1160,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                 onPress={() => handleSelect(opt.id)}
                 testID={`quiz-option-${index}`}
                 accessibilityRole="button"
-                accessibilityLabel={removed ? `${optionLabels[index]} elendi` : `${optionLabels[index]} ${opt.text}${stateLabel ? `, ${stateLabel}` : ''}`}
+                accessibilityLabel={removed ? `${optionLabels[index]} elendi` : `${optionLabels[index]} ${opt.text}${voteShare}${stateLabel ? `, ${stateLabel}` : ''}`}
               >
                 {feedback && isCorrectChoice ? (
                   <>
@@ -1162,7 +1201,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                 </View>
 
                 <Text style={[styles.optText, compact && styles.optTextCompact, isLargeText && styles.optTextLarge]}>
-                  {removed ? 'Elendi' : opt.text}
+                  {removed ? 'Elendi' : `${opt.text}${voteShare}`}
                 </Text>
 
                 <View pointerEvents="none" style={[styles.optionMark, (isCorrectChoice || isWrongChoice) && styles.optionMarkResult]}>
@@ -1204,13 +1243,15 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                 },
               ]}
             >
-              {feedback.unavailable
+              {feedback.skipped
+                ? 'SORU PAS GEÇİLDİ'
+                : feedback.unavailable
                 ? 'CEVAP DOĞRULANAMADI'
                 : feedback.isTimeout
                 ? 'SÜRE DOLDU!'
                 : feedback.isCorrect
                 ? `DOĞRU! +${feedback.pointsAwarded} puan`
-                : 'YANLIŞ CEVAP!'}
+                : feedback.pointsAwarded < 0 ? `YANLIŞ CEVAP! ${feedback.pointsAwarded} puan` : 'YANLIŞ CEVAP!'}
             </Text>
             {feedback.explanation ? (
               <Text style={styles.inlineFeedbackSub} numberOfLines={2}>
@@ -1236,6 +1277,8 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
               </TouchableOpacity>
             ) : null}
           </Animated.View>
+        ) : skipped ? (
+          <Text style={styles.bottomHintText}>Soru pas geçildi. Turun bitmesi bekleniyor…</Text>
         ) : answerState === 'submitting' || (isMultiplayer && isLocked) ? (
           <Text style={styles.bottomHintText}>
             {isMultiplayer ? 'Cevabın seçildi. Turun bitmesi bekleniyor...' : 'Cevabın kontrol ediliyor...'}

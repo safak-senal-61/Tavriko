@@ -1,4 +1,4 @@
-import { GameRoom, PlayerResult, PlayerScoreSummary, RoundResult, FinalMatchSummary, JokerEffect } from './types';
+import { GameRoom, PlayerResult, PlayerScoreSummary, RoundResult, FinalMatchSummary, JokerEffect, Question } from './types';
 export interface ScoreInput {
     isCorrect: boolean;
     timeRemainingMs: number;
@@ -30,7 +30,10 @@ export declare function calculateRankings(players: PlayerResult[]): PlayerResult
  * Shared authoritative helper: applies a player's submitted answer to room state,
  * updating score, streak, response time, and correctAnswersCount (+1 for correct, +0 for wrong).
  */
-export declare function applyPlayerRoundAnswer(room: GameRoom, playerId: string, selectedOptionId: string, elapsedMs: number, modifier?: JokerEffect['modifier']): ScoreCalculationResult & {
+export declare function applyPlayerRoundAnswer(room: GameRoom, playerId: string, selectedOptionId: string, elapsedMs: number, modifier?: JokerEffect['modifier'], rules?: {
+    question?: Question;
+    shield?: boolean;
+}): ScoreCalculationResult & {
     isCorrect: boolean;
 };
 /**

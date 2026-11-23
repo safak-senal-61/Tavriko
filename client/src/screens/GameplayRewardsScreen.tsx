@@ -103,8 +103,8 @@ export function GameplayRewardsScreen({ user, token, apiBaseUrl, onUpdateUser, o
         <View style={styles.intro}>
           <Text accessibilityRole="header" style={styles.heading}>{tab === 'chest' ? 'Sandıklar' : 'Rozetler'}</Text>
           <Text style={styles.copy}>{tab === 'chest'
-            ? 'Sunucunun doğruladığı ve en az bir doğru cevap verdiğin maçlar sayılır. Her sandık, anahtarıyla birlikte bir kez alınabilir.'
-            : 'Her görevin ilerlemesi ayrıdır. Rozetleri aldıktan sonra envanterden profiline takabilirsin.'}</Text>
+            ? 'Yalnızca başından sonuna katıldığın ve en az bir cevap verdiğin çevrimiçi maçlar sayılır. Erken çıkmak ilerleme kazandırmaz.'
+            : 'Maç görevleri yalnızca tamamladığın maçlarla ilerler. Sosyal rozetin ilerlemesi karşılıklı arkadaşlıklarla ayrı hesaplanır.'}</Text>
           <View style={styles.links}>
             <Pressable style={styles.outline} accessibilityRole="button" onPress={onInventory}>
               <Text style={styles.linkText}>Envantere git</Text>

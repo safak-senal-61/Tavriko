@@ -60,7 +60,7 @@ export function setupSocketHandlers(
     io.to(roomCode).emit(SOCKET_EVENTS.ROUND_RESULT, result);
   };
 
-  roomManager.onGameOver = (roomCode: string, summary: FinalMatchSummary) => {
+  roomManager.onGameOver = (roomCode: string, summary: FinalMatchSummary, rewardCompletedPlayerIds) => {
     io.to(roomCode).emit(SOCKET_EVENTS.GAME_OVER, summary);
     const verifiedPlayerIds = [...(io.sockets.adapter.rooms.get(roomCode) ?? [])].map(id => io.sockets.sockets.get(id)?.data.playerId)
       .filter((id): id is string => typeof id === 'string');
@@ -69,7 +69,7 @@ export function setupSocketHandlers(
     void (async () => {
       await db.recordFinalMatch(summary);
       if (process.env.DATABASE_URL || process.env.DIRECT_URL) {
-        await recordCompletedPlayers(db.rawClient, { ...summary, matchId: randomUUID(), verifiedPlayerIds, category });
+        await recordCompletedPlayers(db.rawClient, { ...summary, matchId: randomUUID(), verifiedPlayerIds, rewardCompletedPlayerIds, category });
       }
     })().catch(error => console.error('Match persistence failed', error));
   };
