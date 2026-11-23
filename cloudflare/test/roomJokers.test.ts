@@ -68,11 +68,30 @@ describe('room joker requests', () => {
     expect(api).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ userId: 'one', startedAt }), question);
     expect(JSON.parse(one.send.mock.calls[0][0])).toMatchObject({ event: SOCKET_EVENTS.JOKER_RESULT, requestId: 'use-1', payload: effect });
     expect(two.send).not.toHaveBeenCalled();
-    expect(values.get('joker:one')).toEqual({ startedAt, roundNumber: 1, effect });
+    expect(values.get('room')).toMatchObject({ players: { one: { jokerRound: { effect } } } });
     // Directly exercise the reconnect question payload builder, without requiring a real WebSocketPair.
     const replay = (socket: typeof one) => (worker as any).getQuestionForSocket(socket.deserializeAttachment());
     expect(await replay(one)).toMatchObject({ jokerEffect: effect });
     expect(await replay(two)).not.toHaveProperty('jokerEffect');
+  });
+
+  it('returns bounded wallet latency only to the requesting player and only once', async () => {
+    const { worker, question, room, one, two, use, api, effect, startedAt, setAlarm } = await setup('friends_private');
+    const baseMs = (question.timeLimitSec || 15) * 1000;
+    api.mockImplementationOnce(async () => {
+      vi.setSystemTime(startedAt + 2400);
+      return effect;
+    });
+    await use();
+    await use();
+    expect(api).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ requestedAt: startedAt }), question);
+    expect(room.players.one).toMatchObject({ jokerRound: { extensionMs: 2000, pausedMs: 2000, effect } });
+    expect(room.players.two).not.toHaveProperty('jokerRound');
+    expect(setAlarm).toHaveBeenLastCalledWith(startedAt + baseMs + 2000);
+    expect(await (worker as any).getQuestionForSocket(one.deserializeAttachment())).toMatchObject({
+      timeRemainingMs: baseMs - 400, jokerEffect: effect,
+    });
+    expect(two.send).not.toHaveBeenCalled();
   });
 
   it('offers the joker to the signed-in human even after the duel bot has answered', async () => {

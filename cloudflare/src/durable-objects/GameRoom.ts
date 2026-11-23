@@ -19,7 +19,6 @@ import {
   isLobbyReaction,
   isJokerId,
   canUseJoker,
-  advancedJokerAction,
   resolveJokerEffect,
   rewardCompletionPlayers,
   LIGHTNING_WINDOW_MS,
@@ -988,12 +987,13 @@ export class GameRoomDO extends DurableObject<Env> {
     const player = room?.players[playerId];
     const deadline = room && player ? this.playerDeadline(room, player) : 0;
     const { jokerId } = envelope.payload ?? {};
+    const requestedAt = Date.now();
     const fail = (message: string) => ws.send(createWsError(message, 'JOKER_UNAVAILABLE', envelope.requestId));
     if (!canSpendJokers || !this.env.INTERNAL_API_SECRET || !room || !supportsLiveJokers(room.mode) ||
         room.status !== 'question_active' || !question || !startedAt || !roundNumber ||
         envelope.payload?.startedAt !== startedAt || envelope.payload?.roundNumber !== roundNumber ||
         envelope.payload?.questionId !== question.id || !isJokerId(jokerId) ||
-        !player || player.isBot || player.hasAnsweredCurrentRound || Date.now() >= deadline ||
+        !player || player.isBot || player.hasAnsweredCurrentRound || requestedAt >= deadline ||
         (player.jokerRound?.frozen && Date.now() < (player.jokerRound.pauseUntil ?? 0))) {
       fail('Bu soruda joker kullanılamıyor.');
       return;
@@ -1015,7 +1015,7 @@ export class GameRoomDO extends DurableObject<Env> {
       }
       const tactics = this.getJokerTactics(room);
       const capabilities = this.jokerCapabilities(room, player);
-      if (!canUseJoker(jokerId, question.options, { live: true, tactics, capabilities, lightningAvailable: Date.now() - startedAt < LIGHTNING_WINDOW_MS })) {
+      if (!canUseJoker(jokerId, question.options, { live: true, tactics, capabilities, lightningAvailable: requestedAt - startedAt < LIGHTNING_WINDOW_MS })) {
         fail('Bu joker bu soruya veya maç türüne uygun değil.'); return;
       }
       const target = jokerId === 'joker_freeze' ? this.freezeTarget(room, player) : undefined;
@@ -1036,19 +1036,29 @@ export class GameRoomDO extends DurableObject<Env> {
           fail('Oyuncu artık bu odada değil.'); return;
         }
         const effect = await this.apiService.useRoomJoker(
-          { userId: playerId, roomCode: room.code, roundNumber, startedAt, deadline, jokerId, tactics,
+          { userId: playerId, roomCode: room.code, roundNumber, startedAt, requestedAt, deadline, jokerId, tactics,
             ...(capabilities ? { capabilities } : {}), ...(votes ? { votes } : {}) }, question,
         );
         if (this.room !== room || room.currentRound !== roundNumber || room.roundStartedAt !== startedAt || room.status !== 'question_active') {
           fail('Tur tamamlandı.'); return;
         }
-        // Runtime and round state are persisted together. Basic effects keep the existing replay record.
-        if (effect.action || effect.votes || advancedJokerAction(jokerId)) {
-          await this.applyAdvancedJoker(room, player, effect, target);
-        } else {
-          await this.ctx.storage.put<SavedRoomJoker>(`joker:${playerId}`, { startedAt, roundNumber, effect });
+        // Only a successful, first use gets latency credit. It changes the
+        // player's own clock, not anyone else's, and does not affect scoring.
+        const runtime = player.jokerRound ??= {};
+        const serviceWait = Math.min(2000, Math.max(0, Date.now() - requestedAt));
+        runtime.extensionMs = (runtime.extensionMs ?? 0) + serviceWait;
+        runtime.pausedMs = (runtime.pausedMs ?? 0) + serviceWait;
+        await this.applyRoomJoker(room, player, effect, target);
+        this.pendingJokers.delete(pendingKey);
+        for (const socket of this.ctx.getWebSockets(`player:${playerId}`)) {
+          if (serviceWait || effect.action === 'replace' || effect.action === 'pause' || effect.action === 'extra_time' || effect.action === 'skip') {
+            this.sendPrivateQuestion(socket);
+          }
         }
         ws.send(encodeWsMessage(SOCKET_EVENTS.JOKER_RESULT, effect, envelope.requestId));
+        if (serviceWait || effect.action === 'pause' || effect.action === 'extra_time' || effect.action === 'freeze' || effect.action === 'skip') {
+          await this.refreshRoundAlarm(room).catch(() => console.warn('Joker applied but round alarm could not be refreshed.'));
+        }
       } finally {
         if (targetKey) this.pendingJokers.delete(targetKey);
       }
@@ -1059,7 +1069,7 @@ export class GameRoomDO extends DurableObject<Env> {
     }
   }
 
-  private async applyAdvancedJoker(room: GameRoom, player: Player, effect: JokerEffect, target?: Player): Promise<void> {
+  private async applyRoomJoker(room: GameRoom, player: Player, effect: JokerEffect, target?: Player): Promise<void> {
     const runtime = player.jokerRound ??= {};
     runtime.effect = effect;
     switch (effect.action) {
@@ -1098,17 +1108,13 @@ export class GameRoomDO extends DurableObject<Env> {
         }
         break;
     }
-    await this.persist();
+    // Joker changes are private round state; room visibility and directory
+    // metadata have not changed and do not need a second write.
+    await this.ctx.storage.put('room', room);
     if (effect.action === 'freeze' && target) {
       for (const socket of this.ctx.getWebSockets(`player:${target.id}`)) this.sendPrivateQuestion(socket);
     }
-    if (['replace', 'pause', 'extra_time', 'skip'].some(action => action === effect.action)) {
-      for (const socket of this.ctx.getWebSockets(`player:${player.id}`)) this.sendPrivateQuestion(socket);
-    }
     if (effect.action === 'skip') this.broadcast(SOCKET_EVENTS.PLAYER_ANSWERED, { playerId: player.id });
-    if (effect.action === 'pause' || effect.action === 'extra_time' || effect.action === 'freeze' || effect.action === 'skip') {
-      await this.refreshRoundAlarm(room);
-    }
   }
 
   private async processPlayerAnswer(

@@ -136,11 +136,15 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     expect((await play({ startedAt: startedAt - 20_000, deadline: startedAt - 5000 })).status).toBe(409);
     expect((await play({ options: round.options.map(o => ({ ...o, text: 'Aynı' })) })).status).toBe(409);
     const outcomes = await Promise.all([play(), play({ jokerId: 'joker_eliminate' })]);
-    expect(outcomes.map(response => response.status)).toEqual([200, 200]);
-    expect(outcomes[0].body).toEqual(outcomes[1].body);
+    expect(outcomes.map(response => response.status).sort()).toEqual([200, 409]);
+    expect(outcomes.find(response => response.status === 409)?.body.code).toBe('already_used');
     expect((await inventory(userId)).reduce((sum, entry) => sum + entry.qty, 0)).toBe(1);
     expect(await client.practiceJokerUse.count({ where: { userId } })).toBe(1);
     const played = await client.practiceJokerUse.findFirstOrThrow({ where: { userId } });
+    const retry = await play({ jokerId: played.jokerId });
+    expect(retry.status).toBe(200);
+    expect(retry.body).toEqual(outcomes.find(response => response.status === 200)?.body);
+    expect((await inventory(userId)).reduce((sum, entry) => sum + entry.qty, 0)).toBe(1);
     const remaining = played.jokerId === 'joker_word_count' ? 'joker_eliminate' : 'joker_word_count';
     const next = await play({ roundNumber: 2, jokerId: remaining });
     expect(next.status).toBe(200);

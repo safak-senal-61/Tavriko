@@ -20,6 +20,24 @@ const practiceSessionPattern = /^sess_[a-f0-9]{32}$/;
 const practiceProof = (userId: string, sessionId: string, questionId: string, expiry: number, secret: string) =>
   createHmac('sha256', secret).update(JSON.stringify(['practice-joker', userId, sessionId, questionId, expiry])).digest('hex');
 
+function jokerFailure(res: Response, status: 'empty' | 'already_used' | 'expired' | 'unavailable') {
+  const messages = {
+    empty: 'Envanterinde bu jokerden kalmadı.',
+    already_used: 'Bu soruda başka bir joker kullanıldı.',
+    expired: 'Bu sorunun süresi doldu. Sonraki soruda tekrar dene.',
+    unavailable: 'Bu joker bu soruya veya maç türüne uygun değil.',
+  };
+  res.status(409).json({ error: messages[status], code: status });
+}
+
+function jokerBackendError(res: Response, error: unknown) {
+  const { code, meta } = (error ?? {}) as { code?: string; meta?: { code?: string } };
+  const migrationMissing = code === 'P2021' || meta?.code === '42P01';
+  console.warn('[quiz-joker] Wallet request failed', { code, databaseCode: meta?.code });
+  res.status(503).json({ error: migrationMissing ? 'Joker envanteri şu anda kullanıma açık değil.'
+    : 'Joker işlemi tamamlanamadı. Tekrar dene.', code: migrationMissing ? 'wallet_not_ready' : 'wallet_unavailable' });
+}
+
 // Public trivia categories
 router.get('/categories', async (req: Request, res: Response): Promise<void> => {
   // Sunucusuz ortamda canlı soru havuzunun hazır olmasını bekle (Keşfet sayısındaki güncel değerler için)
@@ -100,27 +118,36 @@ router.post('/questions/practice/joker', practiceJokerLimit, requireUserAuth, as
       !timingSafeEqual(Buffer.from(practiceProof(userId, sessionId, questionId, Number(deadline), secret), 'hex'), Buffer.from(signature, 'hex'))) {
     res.status(400).json({ error: 'Bu soruda joker kullanılamıyor.' }); return;
   }
-  if (!await walletSchemaReady(db.rawClient)) {
-    res.status(503).json({ error: 'Jokerler henüz kullanıma açık değil.' }); return;
-  }
-  let question = db.getQuestionById(questionId);
-  if (!question) {
-    await db.ensureQuestionsRestored();
-    question = db.getQuestionById(questionId);
-  }
-  if (!question || Date.now() >= Number(deadline)) {
-    res.status(409).json({ error: 'Bu soruda joker kullanılamıyor.' }); return;
-  }
   try {
-    const result = await consumeQuizJoker({ userId, sessionId, questionId }, jokerId, question, Number(deadline));
-    if (result.status !== 'applied') {
-      res.status(409).json({ error: result.status === 'empty' ? 'Envanterinde bu jokerden kalmadı.'
-        : result.status === 'already_used' ? 'Bu soruda başka bir joker kullanıldı.'
-        : 'Bu soruda joker kullanılamıyor.' }); return;
+    if (Date.now() >= Number(deadline)) { jokerFailure(res, 'expired'); return; }
+    let question: Pick<ClientQuestion, 'options'> & { correctOptionId: string } | undefined = db.getQuestionById(questionId) ?? undefined;
+    if (!question) {
+      // A cold API instance can load this single published question without
+      // downloading and rebuilding the entire question catalogue.
+      const stored = await db.rawClient.question.findFirst({
+        where: { id: questionId, reviewStatus: 'published' }, select: { options: true, correctOptionId: true },
+      }).catch(() => null);
+      if (stored && Array.isArray(stored.options)) {
+        const options = stored.options.flatMap(option => {
+          if (!option || typeof option !== 'object' || Array.isArray(option) ||
+              typeof option.id !== 'string' || typeof option.text !== 'string') return [];
+          return [{ id: option.id, text: option.text }];
+        });
+        if (options.length === stored.options.length && options.some(option => option.id === stored.correctOptionId)) {
+          question = { correctOptionId: stored.correctOptionId, options };
+        }
+      }
     }
+    if (!question) {
+      await db.ensureQuestionsRestored();
+      question = db.getQuestionById(questionId) ?? undefined;
+    }
+    if (!question) { jokerFailure(res, 'unavailable'); return; }
+    const result = await consumeQuizJoker({ userId, sessionId, questionId }, jokerId, question, Number(deadline));
+    if (result.status !== 'applied') { jokerFailure(res, result.status); return; }
     res.json(result.effect);
-  } catch {
-    res.status(503).json({ error: 'Joker şu anda kullanılamadı. Tekrar dene.' });
+  } catch (error) {
+    jokerBackendError(res, error);
   }
 });
 
@@ -132,7 +159,7 @@ router.post('/internal/room-joker', async (req: Request, res: Response): Promise
       !timingSafeEqual(Buffer.from(secret), Buffer.from(supplied))) {
     res.status(403).json({ error: 'Yetkisiz erişim' }); return;
   }
-  const { userId, roomCode, roundNumber, startedAt, deadline, questionId, jokerId, options, correctOptionId, tactics, capabilities, votes } = req.body || {};
+  const { userId, roomCode, roundNumber, startedAt, deadline, questionId, jokerId, options, correctOptionId, tactics, capabilities, votes, requestedAt = Date.now() } = req.body || {};
   const choices = Array.isArray(options) && options.length >= 2 && options.length <= 12 &&
     options.every(option => typeof option?.id === 'string' && option.id.length <= 160 &&
       typeof option.text === 'string' && option.text.length <= 1000);
@@ -140,14 +167,12 @@ router.post('/internal/room-joker', async (req: Request, res: Response): Promise
       typeof roomCode !== 'string' || !/^[A-Z0-9_-]{1,16}$/.test(roomCode) ||
       !Number.isSafeInteger(roundNumber) || roundNumber < 1 || roundNumber > 50 ||
       !Number.isSafeInteger(startedAt) || !Number.isSafeInteger(deadline) || startedAt > Date.now() + 2000 ||
+      !Number.isSafeInteger(requestedAt) || requestedAt < startedAt || requestedAt > Date.now() + 2000 ||
       deadline <= startedAt || deadline > startedAt + 120_000 ||
       typeof questionId !== 'string' || !questionId || questionId.length > 160 ||
       !isJokerId(jokerId) || !choices || typeof correctOptionId !== 'string' ||
       (tactics !== undefined && tactics !== 'friendly')) {
     res.status(400).json({ error: 'Geçersiz joker isteği.' }); return;
-  }
-  if (!await walletSchemaReady(db.rawClient)) {
-    res.status(503).json({ error: 'Jokerler henüz kullanıma açık değil.' }); return;
   }
   try {
     const activeCapabilities = capabilities && typeof capabilities === 'object' && !Array.isArray(capabilities)
@@ -160,16 +185,12 @@ router.post('/internal/room-joker', async (req: Request, res: Response): Promise
       })) : undefined;
     const result = await consumeQuizJoker(
       { userId, sessionId: `room:${roomCode}:${startedAt}:${roundNumber}`, questionId },
-      jokerId, { options, correctOptionId }, deadline, { tactics, startedAt, capabilities: activeCapabilities, votes: counts },
+      jokerId, { options, correctOptionId }, deadline, { tactics, startedAt, requestedAt, capabilities: activeCapabilities, votes: counts },
     );
-    if (result.status !== 'applied') {
-      res.status(409).json({ error: result.status === 'empty' ? 'Envanterinde bu jokerden kalmadı.'
-        : result.status === 'already_used' ? 'Bu soruda başka bir joker kullanıldı.'
-        : 'Bu soruda joker kullanılamıyor.' }); return;
-    }
+    if (result.status !== 'applied') { jokerFailure(res, result.status); return; }
     res.json(result.effect);
-  } catch {
-    res.status(503).json({ error: 'Joker şu anda kullanılamadı. Tekrar dene.' });
+  } catch (error) {
+    jokerBackendError(res, error);
   }
 });
 

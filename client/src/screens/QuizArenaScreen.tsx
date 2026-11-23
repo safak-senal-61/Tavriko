@@ -606,11 +606,13 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const [localSelectedOptionId, setLocalSelectedOptionId] = useState<string | null>(null);
   const [jokersOpen, setJokersOpen] = useState(false);
   const [jokerBusy, setJokerBusy] = useState(false);
+  const [applyingJokerRound, setApplyingJokerRound] = useState<string>();
   const [jokerError, setJokerError] = useState<string>();
   const [jokerResult, setJokerResult] = useState<{ key: string; effect: JokerEffect }>();
   const jokerLock = useRef(false);
   const arenaScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const jokerRound = `${question.id}:${question.roundNumber}:${question.jokerProof ?? question.jokerRoundStartedAt ?? ''}`;
+  const jokerApplying = applyingJokerRound === jokerRound;
   const jokerEffect = (jokerResult?.key === jokerRound ? jokerResult.effect : undefined) ?? question.jokerEffect;
   const eliminated = jokerEffect?.eliminated ?? [];
   const jokerRoundRef = useRef(jokerRound);
@@ -701,11 +703,16 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   }, [jokerRound, question.jokerPauseUntil, question.jokerPauseRemainingMs]);
   const useJokerAction = async (id: JokerId, buy: boolean) => {
     if (!jokers || jokerLock.current || isOptionsDisabled || jokerEffect) return;
-    if (!buy && endTimeRef.current - Date.now() < 1500) {
-      setJokerError('Bu soru için süre çok az. Sonraki soruda kullanabilirsin.');
+    const tapTime = Date.now();
+    if (tapTime >= endTimeRef.current) {
+      setJokerError('Bu sorunun süresi doldu.');
       return;
     }
     jokerLock.current = true;
+    if (!buy) {
+      setApplyingJokerRound(jokerRound);
+      sound.triggerHaptic('light');
+    }
     setJokerBusy(true);
     setJokerError(undefined);
     try {
@@ -715,6 +722,13 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       } else {
         const effect = await jokers.apply(id);
         if (jokerRoundRef.current === jokerRound) {
+          if (!isMultiplayer) {
+            const now = Date.now();
+            const deadline = endTimeRef.current + Math.min(2000, Math.max(0, now - tapTime));
+            endTimeRef.current = deadline;
+            setEndTime(deadline);
+            setSecondsLeft(Math.ceil(Math.max(0, deadline - now) / 1000));
+          }
           setJokerResult({ key: jokerRound, effect });
           setJokersOpen(false);
         }
@@ -726,6 +740,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     } finally {
       jokerLock.current = false;
       setJokerBusy(false);
+      setApplyingJokerRound(undefined);
     }
   };
   useEffect(() => {
@@ -751,6 +766,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         if (
           nextAppState === 'active' &&
           !hasExpiredRef.current &&
+          !jokerApplying &&
           answerState === 'answerable'
         ) {
           const now = Date.now();
@@ -769,7 +785,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     return () => {
       subscription.remove();
     };
-  }, [answerState]);
+  }, [answerState, jokerApplying]);
   const handleTimeExpiredInternal = useCallback(() => {
     if (!hasExpiredRef.current) {
       hasExpiredRef.current = true;
@@ -841,7 +857,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     !!feedback ||
     hasExpiredRef.current ||
     secondsLeft <= 0;
-  const lightningAvailable = totalMs - secondsLeft * 1000 < LIGHTNING_WINDOW_MS;
+  const lightningAvailable = totalMs - Math.max(0, endTimeRef.current - Date.now()) < LIGHTNING_WINDOW_MS;
   const ownedJokers = jokers && !jokerEffect && !isOptionsDisabled
     ? JOKERS.flatMap(joker => {
       const qty = jokers.user.inventory?.find(item => item.id === joker.id)?.qty ?? 0;
@@ -958,7 +974,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           <CircularTimer
             totalMs={totalMs} pauseUntil={localPauseUntil}
             endTime={endTime}
-            isActive={!feedback && (answerState === 'answerable' || (isMultiplayer && answerState === 'submitting'))}
+            isActive={!jokerApplying && !feedback && (answerState === 'answerable' || (isMultiplayer && answerState === 'submitting'))}
             secondsLeft={secondsLeft}
             onTimeExpired={handleTimeExpiredInternal}
             onSecondChange={handleSecondChange}
@@ -1023,7 +1039,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         <CircularTimer
           totalMs={totalMs} pauseUntil={localPauseUntil}
           endTime={endTime}
-          isActive={!feedback && (answerState === 'answerable' || (isMultiplayer && answerState === 'submitting'))}
+          isActive={!jokerApplying && !feedback && (answerState === 'answerable' || (isMultiplayer && answerState === 'submitting'))}
           secondsLeft={secondsLeft}
           onTimeExpired={handleTimeExpiredInternal}
           onSecondChange={handleSecondChange}
@@ -1114,14 +1130,16 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       {jokers && (
         <View style={styles.jokerRow}>
           {jokerEffect || frozen || jokerBusy || (jokerRetry && !isOptionsDisabled) ? (
-            <Text accessibilityLiveRegion="polite" style={styles.jokerTriggerText}>
-              {frozen ? 'Sayacın donduruldu' : clockPaused ? 'Sayaç duraklatıldı' :
-                jokerRetry?.hint ?? jokerEffect?.hint ?? (jokerBusy ? 'Joker kullanılıyor…' : 'Joker kullanıldı')}
-            </Text>
+            <View style={styles.jokerStatus}>
+              <Text accessibilityLiveRegion="polite" style={styles.jokerTriggerText}>
+                {frozen ? 'Sayacın donduruldu' : clockPaused ? 'Sayaç duraklatıldı' :
+                  jokerRetry?.hint ?? jokerEffect?.hint ?? (jokerApplying ? 'Joker uygulanıyor…' : jokerBusy ? 'İşlem yapılıyor…' : 'Joker kullanıldı')}
+              </Text>
+            </View>
           ) : !isOptionsDisabled && (
             <View style={styles.jokerActions}>
               {ownedJokers.length ? (
-                <ScrollView horizontal nestedScrollEnabled directionalLockEnabled
+                <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator={false}
                   testID="owned-joker-strip" style={styles.jokerStrip} contentContainerStyle={styles.jokerStripContent}>
                   {ownedJokers.map(joker => (
                     <TouchableOpacity key={joker.id} style={[styles.jokerTrigger, !joker.usable && styles.jokerUnavailable]}
@@ -1339,6 +1357,7 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 
 const styles = StyleSheet.create({
   jokerRow: { marginVertical: 2, gap: 4 },
+  jokerStatus: { minHeight: 34, justifyContent: 'center' },
   jokerActions: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
   jokerStrip: { flex: 1, minWidth: 0 },
   jokerStripContent: { gap: 5 },

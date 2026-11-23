@@ -617,7 +617,7 @@ export class SocketService {
         if (effect && !error) resolve(effect);
         else reject(error ?? new Error('Joker sonucu alınamadı.'));
       };
-      const timeout = setTimeout(() => finish(new Error('Joker yanıtı gecikti. Tekrar dene.')), 5500);
+      const timeout = setTimeout(() => finish(new Error('Joker yanıtı gecikti. Tekrar dene.')), 3500);
       this.jokerRequests.set(requestId, finish);
       try {
         ws.send(JSON.stringify({
