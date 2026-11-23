@@ -8,17 +8,26 @@ export class ApiService {
   ) {}
 
   public async useRoomJoker(input: {
-    userId: string; roomCode: string; roundNumber: number; startedAt: number; deadline: number; jokerId: JokerId; tactics?: JokerTactics;
+    userId: string; roomCode: string; roundNumber: number; startedAt: number; requestedAt?: number; deadline: number; jokerId: JokerId; tactics?: JokerTactics;
     capabilities?: ClientQuestion['jokerCapabilities']; votes?: Record<string, number>;
   }, question: Question): Promise<JokerEffect> {
     if (!this.internalSecret) throw new Error('Jokerler henüz kullanıma açık değil.');
     const cleanUrl = (this.backendUrl || 'https://tavriko-app.vercel.app').replace(/\/+$/, '');
-    const response = await fetch(`${cleanUrl}/api/internal/room-joker`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-secret': this.internalSecret },
-      body: JSON.stringify({ ...input, questionId: question.id, options: question.options, correctOptionId: question.correctOptionId }),
-      signal: AbortSignal.timeout(4500),
-    }).catch(() => { throw new Error('Joker sunucusuna ulaşılamadı. Tekrar dene.'); });
+    const stopAt = Math.min(input.deadline, Date.now() + 2700);
+    const body = JSON.stringify({ ...input, questionId: question.id, options: question.options, correctOptionId: question.correctOptionId });
+    const request = () => fetch(`${cleanUrl}/api/internal/room-joker`, {
+      method: 'POST', body,
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': this.internalSecret! },
+      signal: AbortSignal.timeout(Math.max(1, stopAt - Date.now())),
+    }).catch(() => null);
+    let response = await request();
+    // Re-send exactly the same operation once on a transient gateway failure.
+    // The wallet's unique round key handles a response lost after commit.
+    if ((!response || response.status === 502 || response.status === 504) && stopAt - Date.now() > 400) {
+      if (response?.body) void response.body.cancel().catch(() => {});
+      response = await request();
+    }
+    if (!response) throw new Error('Joker yanıtı gecikti. Tekrar dene.');
     const data = await response.json().catch(() => null) as (JokerEffect & { error?: string }) | null;
     if (response.status === 403 || response.status === 404) throw new Error('Canlı maç jokerleri şu anda kullanılamıyor.');
     if (!response.ok || !Array.isArray(data?.eliminated)) {

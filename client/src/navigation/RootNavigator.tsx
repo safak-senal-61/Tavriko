@@ -25,6 +25,7 @@ import { eventsUrl, friendsChanged, gameplayRewardsUrl, leaderboardUrl, prefetch
 import { shuffleOptionsForPlayer } from '../utils/optionShuffle';
 import { seenScopeKey, getSeenQuestionIds, markQuestionsSeen } from '../utils/seenQuestions';
 import { getOfflinePracticeAnswer, requestPracticeAnswer } from '../utils/practiceAnswers';
+import { requestPracticeJoker } from '../utils/practiceJoker';
 import { socketService } from '../services/socketService';
 import { sound } from '../services/soundService';
 import { syncAnalyticsSession, trackEvent, markMatchmakingStart, trackMatchFound } from '../services/analytics';
@@ -2016,18 +2017,12 @@ export const RootNavigator: React.FC = () => {
                     refreshWallet();
                     return effect;
                   }
-                  const response = await fetch(`${API_BASE}/questions/practice/joker`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
-                    body: JSON.stringify({
-                      questionId: currentQuestion.id, proof: currentQuestion.jokerProof,
-                      sessionId: practiceSessionIdRef.current, jokerId,
-                    }),
+                  const effect = await requestPracticeJoker(`${API_BASE}/questions/practice/joker`, authHeaders(), {
+                    questionId: currentQuestion.id, proof: currentQuestion.jokerProof,
+                    sessionId: practiceSessionIdRef.current, jokerId,
                   });
-                  const result = await response.json();
-                  if (!response.ok || !Array.isArray(result.eliminated)) throw new Error(result.error || 'Joker kullanılamadı.');
                   refreshWallet();
-                  return { eliminated: result.eliminated, hint: typeof result.hint === 'string' ? result.hint : undefined,
-                    highlightedOptionId: typeof result.highlightedOptionId === 'string' ? result.highlightedOptionId : undefined };
+                  return effect;
                 },
                 buy: async (productId: JokerId) => {
                   const response = await fetch(`${API_BASE}/social/shop/purchase`, {
