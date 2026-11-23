@@ -43,13 +43,15 @@ export const STORE_IMG = {
   keySilver: cdnImage('images/store/key_silver.png'),
   keyDiamond: cdnImage('images/store/key_diamond.png'),
   booster24h: cdnImage('images/store/booster_24h.png'),
-  badgeTrivia: cdnImage('images/store/badge_trivia_master.png'),
+  badgeTrivia: require('../../bundled/reward-badges/badge_trivia_master.png') as ImageSourcePropType,
   badgeSpeed: cdnImage('images/store/badge_speed_demon.png'),
   badgeChampion: cdnImage('images/store/badge_champion.png'),
   badgeNightOwl: cdnImage('images/store/badge_night_owl.png'),
-  badgeVeteran: cdnImage('images/store/badge_veteran.png'),
+  badgeVeteran: require('../../bundled/reward-badges/badge_veteran.png') as ImageSourcePropType,
   badgeSeasonChamp: cdnImage('images/store/badge_season_1_champ.png'),
-  badgeGenius: cdnImage('images/store/badge_genius.png'),
+  badgeGenius: require('../../bundled/reward-badges/badge_genius.png') as ImageSourcePropType,
+  badgeSocial: require('../../bundled/reward-badges/badge_social_player.png') as ImageSourcePropType,
+  badgeConsistent: require('../../bundled/reward-badges/badge_consistent_player.png') as ImageSourcePropType,
   gemsS: cdnImage('images/store/gems_s.png'),
   gemsM: cdnImage('images/store/gems_m.png'),
   gemsL: cdnImage('images/store/gems_l.png'),
@@ -139,7 +141,8 @@ export const storeImageFor = (id: string, category?: string): ImageSourcePropTyp
     return k.includes('24h') ? STORE_IMG.booster24h : STORE_IMG.booster;
   }
   if (c.startsWith('badge') || k.includes('badge')) {
-    if (k === 'badge_social_player' || k === 'badge_consistent_player') return null;
+    if (k === 'badge_social_player') return STORE_IMG.badgeSocial;
+    if (k === 'badge_consistent_player') return STORE_IMG.badgeConsistent;
     // Her rozet kendi görselini kullanır (aynı görselin tekrarı yok)
     if (k.includes('season') && k.includes('champ')) return STORE_IMG.badgeSeasonChamp;
     if (k.includes('speed')) return STORE_IMG.badgeSpeed;

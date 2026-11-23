@@ -18,16 +18,17 @@ const badge = (id, metric, target, task) => {
         throw new Error(`Missing gameplay badge definition: ${id}`);
     return { item: { id, name: def.name, rarity: def.rarity, qty: 1, category: 'badge', desc: 'Kalıcı görev rozeti.' }, metric, target, task };
 };
+const badgeGoals = { friends: 5, matches: 50, correct: 250, days: 14, perfect: 15 };
 exports.GAMEPLAY_REWARDS = [
     chest('chest_wood', 'Ahşap Sandık', 'common', 3, silverKey),
     chest('chest_silver', 'Gümüş Sandık', 'rare', 10, silverKey),
     chest('chest_gold', 'Altın Sandık', 'epic', 25, goldKey),
     chest('chest_legendary', 'Efsanevi Sandık', 'mythic', 50, diamondKey),
-    badge('badge_social_player', 'friends', 1, 'Bir arkadaşlık isteği karşılıklı kabul edilsin.'),
-    badge('badge_veteran', 'matches', 10, '10 geçerli maç tamamla.'),
-    badge('badge_trivia_master', 'correct', 50, 'Geçerli maçlarda toplam 50 doğru cevap ver.'),
-    badge('badge_consistent_player', 'days', 3, '3 farklı günde geçerli maç tamamla.'),
-    badge('badge_genius', 'perfect', 3, '3 maçta tüm soruları doğru cevapla.'),
+    badge('badge_social_player', 'friends', badgeGoals.friends, `${badgeGoals.friends} karşılıklı arkadaşlık kur.`),
+    badge('badge_veteran', 'matches', badgeGoals.matches, `${badgeGoals.matches} geçerli maç tamamla.`),
+    badge('badge_trivia_master', 'correct', badgeGoals.correct, `Geçerli maçlarda toplam ${badgeGoals.correct} doğru cevap ver.`),
+    badge('badge_consistent_player', 'days', badgeGoals.days, `${badgeGoals.days} farklı günde geçerli maç tamamla.`),
+    badge('badge_genius', 'perfect', badgeGoals.perfect, `${badgeGoals.perfect} geçerli maçta tüm soruları doğru cevapla.`),
 ];
 function gameplayRewardStatuses(metrics, claimedIds) {
     const claimed = new Set(claimedIds);

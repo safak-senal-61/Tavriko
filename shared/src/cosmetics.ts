@@ -416,7 +416,7 @@ export const BADGE_DEFS: CosmeticDef[] = [
     id: 'badge_social_player',
     kind: 'badge',
     name: 'Sosyal Oyuncu Rozeti',
-    desc: 'Tavriko’da ilk arkadaşlığını kuranlara özel.',
+    desc: 'Tavriko’da karşılıklı arkadaşlıklar kuranlara özel.',
     rarity: 'rare',
     visual: { icon: '🤝' },
   },

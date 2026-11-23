@@ -11,6 +11,8 @@
 
 - Baseline: sign-in opens Oyna; Mağaza previously opened on Sandıklar with Anahtarlar and Rozetler tabs. Envanter is where owned items are opened or equipped.
 - From Oyna → Ödüller, check all four chest progress bars, switch to Rozetler and check the friend, match and answer tasks. Verify locked, ready, claimed, network failure/retry and no duplicate claim.
+- On Rozetler, verify all five original illustrations and the new targets: 5 reciprocal friends, 50 valid matches, 250 correct answers, 14 different days, and 15 perfect matches. Confirm previously claimed badges remain permanent and marked as claimed.
+- Delay `/social/rewards` and confirm it starts on Oyna before opening Ödüller. On a cold open show card-shaped shimmer; with cached data keep the cards while a stale read refreshes or fails. Check the retry action, confirmed-claim cache update and no cache sharing after switching accounts.
 - Claim a ready chest and open Envanter; the chest and matching earned key must both be present. Claim a badge, equip it, switch to another badge and re-equip the first; permanent copies are not consumed.
 - Check that Mağaza no longer offers chests, keys or badges, including bundles, while the permanent navigation, frames, gold and boosters still open. Verify the premium season track gives fixed rewards, never chests or keys.
 - Test synthetic users only. Check verified match and friend progress, concurrent claims and reopening from another session. Check phone (320/375 px), desktop, error states and console.

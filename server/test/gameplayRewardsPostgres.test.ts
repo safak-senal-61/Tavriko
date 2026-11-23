@@ -116,6 +116,9 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     expect((await post(id, '/rewards/claim', { rewardId: 'badge_social_player' })).status).toBe(409);
     await client.user.update({ where: { id: other }, data: { friendIds: [id] } });
     expect(statusOf((await get(id)).body, 'badge_social_player').current).toBe(1);
+    expect((await post(id, '/rewards/claim', { rewardId: 'badge_social_player' })).status).toBe(409);
+    const moreFriends = await Promise.all(Array.from({ length: 4 }, (_, i) => player(`friend_${i}`, [id])));
+    await client.user.update({ where: { id }, data: { friendIds: [other, ...moreFriends] } });
     const claim = await post(id, '/rewards/claim', { userId: other, rewardId: 'badge_social_player' });
     expect(claim.status).toBe(200);
     expect(claim.body.user.inventory).toContainEqual(expect.objectContaining({ id: 'badge_social_player', durationHours: 0 }));
@@ -131,7 +134,7 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     }
     expect(await inventory(id)).toMatchObject([{ itemId: 'badge_social_player', qty: 1, durationHours: 0 }]);
     await client.user.update({ where: { id }, data: { friendIds: [] } });
-    expect(statusOf((await get(id)).body, 'badge_social_player')).toMatchObject({ current: 1, claimed: true });
+    expect(statusOf((await get(id)).body, 'badge_social_player')).toMatchObject({ current: 5, claimed: true });
   });
 
   it('grants a chest and key once under concurrency and opens it once', async () => {

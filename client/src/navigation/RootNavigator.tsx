@@ -19,7 +19,7 @@ import {
 import { useGameStore, clearAllAccountStorage } from '../store/gameStore';
 import { authHeaders } from '../utils/apiAuth';
 import { PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
-import { eventsUrl, friendsChanged, leaderboardUrl, profileUrl, referralUrl } from '../utils/pageResources';
+import { eventsUrl, friendsChanged, gameplayRewardsUrl, leaderboardUrl, prefetchGameplayRewards, profileUrl, referralUrl } from '../utils/pageResources';
 import { shuffleOptionsForPlayer } from '../utils/optionShuffle';
 import { seenScopeKey, getSeenQuestionIds, markQuestionsSeen } from '../utils/seenQuestions';
 import { getOfflinePracticeAnswer, requestPracticeAnswer } from '../utils/practiceAnswers';
@@ -306,6 +306,11 @@ export const RootNavigator: React.FC = () => {
   const showAnalyticsConsent = consent === null && safePromptScreen &&
     (currentScreen === 'home' || currentScreen === 'friends');
   const push = usePushPermission(signedInPlayer, realSessionToken);
+
+  useEffect(() => {
+    if (currentScreen !== 'home' || !netOnline || !signedInPlayer || !realSessionToken) return;
+    void prefetchGameplayRewards(API_BASE, signedInPlayer, realSessionToken).catch(() => {});
+  }, [currentScreen, netOnline, signedInPlayer, realSessionToken]);
 
   useEffect(() => {
     const player = consent === 'granted' ? signedInPlayer : null;
@@ -717,6 +722,7 @@ export const RootNavigator: React.FC = () => {
                 setUser(data.user);
                 pageDataCache.invalidate(eventsUrl(API_BASE, user.id), user.id);
                 pageDataCache.invalidate(leaderboardUrl(API_BASE));
+                pageDataCache.invalidate(gameplayRewardsUrl(API_BASE), user.id);
               }
               if (data?.rewards && !(data.rewards.alreadyRecorded && !data.rewards.xp && !data.rewards.lp)) {
                 setMatchRewards({
@@ -1604,6 +1610,7 @@ export const RootNavigator: React.FC = () => {
               setUser(data.user);
               pageDataCache.invalidate(eventsUrl(API_BASE, user.id), user.id);
               pageDataCache.invalidate(leaderboardUrl(API_BASE));
+              pageDataCache.invalidate(gameplayRewardsUrl(API_BASE), user.id);
             }
             if (data?.rewards) {
               setPracticeRewards({ xp: data.rewards.xp, coins: data.rewards.coins, boosted: !!data.rewards.boosted });
@@ -2302,10 +2309,11 @@ export const RootNavigator: React.FC = () => {
             }}
           />
         )}
-        {currentScreen === 'gameplay_rewards' && user && !isGuest && (
+        {currentScreen === 'gameplay_rewards' && user && !isGuest && token && (
           <GameplayRewardsScreen
             key={user.id}
             user={user}
+            token={token}
             apiBaseUrl={API_BASE}
             onUpdateUser={syncWithFreshUser}
             onBack={() => navigateTo('home')}

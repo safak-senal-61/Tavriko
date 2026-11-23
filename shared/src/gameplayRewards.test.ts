@@ -10,11 +10,13 @@ describe('gameplay rewards', () => {
     expect(new Set(GAMEPLAY_REWARDS.map(r => r.item.id)).size).toBe(GAMEPLAY_REWARDS.length);
   });
 
-  it('uses separate metrics, clamps progress, and keeps a claimed reward completed', () => {
-    const state = gameplayRewardStatuses({ matches: 12, correct: 130, friends: 0, days: 2, perfect: 1 }, ['badge_social_player']);
+  it('raises all badge targets without changing chests, preserves claimed badges and clamps progress', () => {
+    expect(GAMEPLAY_REWARDS.filter(r => r.item.category === 'badge').map(({ metric, target }) => [metric, target]))
+      .toEqual([['friends', 5], ['matches', 50], ['correct', 250], ['days', 14], ['perfect', 15]]);
+    const state = gameplayRewardStatuses({ matches: 12, correct: 300, friends: 0, days: 2, perfect: 1 }, ['badge_social_player']);
     expect(Object.fromEntries(state.map(({ id, current }) => [id, current]))).toEqual({
       chest_wood: 3, chest_silver: 10, chest_gold: 12, chest_legendary: 12,
-      badge_social_player: 1, badge_veteran: 10, badge_trivia_master: 50, badge_consistent_player: 2, badge_genius: 1,
+      badge_social_player: 5, badge_veteran: 12, badge_trivia_master: 250, badge_consistent_player: 2, badge_genius: 1,
     });
     expect(state.filter(s => s.claimed).map(s => s.id)).toEqual(['badge_social_player']);
   });

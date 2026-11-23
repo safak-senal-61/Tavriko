@@ -24,6 +24,7 @@ export const PAGE_TTL = {
   inbox: 30_000,
   support: 30_000,
   referral: 60_000,
+  gameplayRewards: 20_000,
   rooms: 10_000,
 };
 

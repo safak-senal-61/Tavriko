@@ -60,13 +60,14 @@ export function LoadingShimmer({ label, wide = false, ink = false, style }: {
 }
 
 /** Cold-load skeleton; callers keep rendering a cached snapshot during a refresh. */
-export function PageShimmer({ label, shape = 'rows', rows = 3, style }: {
-  label: string; shape?: 'rows' | 'cards' | 'profile' | 'lines'; rows?: number; style?: StyleProp<ViewStyle>;
+export function PageShimmer({ label, shape = 'rows', rows = 3, columns = 1, style }: {
+  label: string; shape?: 'rows' | 'cards' | 'profile' | 'lines' | 'rewards'; rows?: number; columns?: number; style?: StyleProp<ViewStyle>;
 }) {
   const progress = useSweep();
   return (
     <View accessible accessibilityRole="progressbar" accessibilityLabel={label}
-      accessibilityState={{ busy: true }} pointerEvents="none" style={[styles.stack, style]}>
+      accessibilityState={{ busy: true }} pointerEvents="none"
+      style={[styles.stack, shape === 'rewards' && styles.rewardGrid, style]}>
       {shape === 'profile' ? (
         <View style={styles.profile}>
           <Bone progress={progress} style={styles.profileAvatar} />
@@ -76,7 +77,22 @@ export function PageShimmer({ label, shape = 'rows', rows = 3, style }: {
             {[0, 1, 2].map(index => <Bone key={index} progress={progress} style={styles.metric} />)}
           </View>
         </View>
-      ) : Array.from({ length: rows }, (_, index) => (
+      ) : shape === 'rewards' ? Array.from({ length: rows }, (_, index) => (
+        <View key={index} style={[styles.rewardCard, columns > 1 && { width: columns === 2 ? '49%' : '32.3%' }]}>
+          <View style={styles.rewardHeader}>
+            <Bone progress={progress} style={styles.tile} />
+            <View style={styles.copy}>
+              <Bone progress={progress} style={styles.heading} />
+              <Bone progress={progress} style={styles.subtitle} />
+            </View>
+          </View>
+          <Bone progress={progress} style={styles.rewardMeta} />
+          <Bone progress={progress} style={styles.rewardTrack} />
+          <View style={styles.rewardFooter}>
+            <Bone progress={progress} style={styles.rewardStatus} />
+          </View>
+        </View>
+      )) : Array.from({ length: rows }, (_, index) => (
         <View key={index} style={[shape !== 'lines' && styles.card,
           shape === 'cards' && styles.tallCard, shape === 'lines' && styles.lines]}>
           {shape !== 'lines' && <Bone progress={progress} style={shape === 'cards' ? styles.tile : styles.avatar} />}
@@ -105,6 +121,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(35,20,61,0.65)', borderWidth: 1, borderColor: 'rgba(193,156,248,0.14)',
   },
   tallCard: { minHeight: 108 },
+  rewardGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 0 },
+  rewardCard: { width: '100%', padding: 12, gap: 8, borderRadius: 16, backgroundColor: '#211341', borderWidth: 1, borderColor: '#5D427B' },
+  rewardHeader: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  rewardMeta: { width: '36%', height: 14 },
+  rewardTrack: { height: 8 },
+  rewardFooter: { minHeight: 44, justifyContent: 'center' },
+  rewardStatus: { width: 88, height: 12 },
   lines: { paddingVertical: 8 },
   copy: { flex: 1, minWidth: 0, gap: 9 },
   avatar: { width: 42, height: 42, borderRadius: 21 },
