@@ -580,7 +580,7 @@ export function calculateLevelFromXp(totalXp: number = 0): LevelProgress {
 // Season 1: 50 Tiers Specification
 // -------------------------------------------------------------
 export interface SeasonReward {
-  type: 'coin' | 'gem' | 'key' | 'chest' | 'booster' | 'frame' | 'badge' | 'name_effect' | 'background';
+  type: 'coin' | 'gem' | 'joker' | 'booster' | 'frame' | 'badge' | 'name_effect' | 'background';
   amount: number;
   title: string;
   itemId?: string;
@@ -600,6 +600,11 @@ function seasonGoldReward(reward: SeasonReward): SeasonReward {
   return { ...reward, type: 'coin', amount, title: `${amount.toLocaleString('tr-TR')} Altın` };
 }
 
+function seasonJokerReward(itemId: JokerId, amount: number, rarity: ItemRarity): SeasonReward {
+  const joker = JOKERS.find(item => item.id === itemId)!;
+  return { type: 'joker', itemId, amount, title: joker.name, rarity };
+}
+
 // Helper generating 50 rich, balanced tiers for Season 1
 export function generateSeason1Tiers(): SeasonTierItem[] {
   const tiers: SeasonTierItem[] = [];
@@ -612,23 +617,23 @@ export function generateSeason1Tiers(): SeasonTierItem[] {
     if (i === 1) {
       freeReward = { type: 'coin', amount: 500, title: '500 Altın', rarity: 'common' };
     } else if (i === 5) {
-      freeReward = { type: 'chest', amount: 1, title: 'Ahşap Sandık', itemId: 'chest_wood', rarity: 'common' };
+      freeReward = seasonJokerReward('joker_eliminate', 2, 'common');
     } else if (i === 10) {
-      freeReward = { type: 'key', amount: 1, title: 'Gümüş Anahtar', itemId: 'key_silver', rarity: 'rare' };
+      freeReward = seasonJokerReward('joker_initial', 2, 'rare');
     } else if (i === 15) {
       freeReward = { type: 'gem', amount: 30, title: '30 Elmas', rarity: 'rare' };
     } else if (i === 20) {
-      freeReward = { type: 'chest', amount: 1, title: 'Gümüş Sandık', itemId: 'chest_silver', rarity: 'rare' };
+      freeReward = seasonJokerReward('joker_half', 2, 'rare');
     } else if (i === 25) {
-      freeReward = { type: 'key', amount: 1, title: 'Altın Anahtar', itemId: 'key_gold', rarity: 'epic' };
+      freeReward = seasonJokerReward('joker_eliminate', 3, 'rare');
     } else if (i === 30) {
       freeReward = { type: 'booster', amount: 1, title: '2x XP (1 Saat)', itemId: 'booster_xp_2x_1h', rarity: 'rare' };
     } else if (i === 35) {
-      freeReward = { type: 'chest', amount: 1, title: 'Altın Sandık', itemId: 'chest_gold', rarity: 'epic' };
+      freeReward = seasonJokerReward('joker_half', 3, 'epic');
     } else if (i === 40) {
       freeReward = { type: 'gem', amount: 80, title: '80 Elmas', rarity: 'epic' };
     } else if (i === 45) {
-      freeReward = { type: 'key', amount: 1, title: 'Altın Anahtar', itemId: 'key_gold', rarity: 'epic' };
+      freeReward = seasonJokerReward('joker_initial', 4, 'epic');
     } else if (i === 50) {
       freeReward = { type: 'badge', amount: 1, title: 'Sezon 1 Şampiyonu Rozeti', itemId: 'badge_season_1_champ', rarity: 'legendary' };
     } else if (i % 5 === 0) {
@@ -648,15 +653,15 @@ export function generateSeason1Tiers(): SeasonTierItem[] {
     } else if (i === 10) {
       premiumReward = { type: 'name_effect', amount: 1, title: 'Altın İsim Parıltısı', itemId: 'name_glow_gold', rarity: 'epic' };
     } else if (i === 15) {
-      premiumReward = { type: 'gem', amount: 100, title: '100 Elmas', rarity: 'epic' };
+      premiumReward = seasonJokerReward('joker_half', 4, 'epic');
     } else if (i === 20) {
       premiumReward = { type: 'frame', amount: 1, title: 'Kraliyet Altın Çerçeve', itemId: 'frame_gold', rarity: 'legendary' };
     } else if (i === 25) {
-      premiumReward = { type: 'gem', amount: 50, title: '50 Elmas', rarity: 'legendary' };
+      premiumReward = seasonJokerReward('joker_initial', 5, 'epic');
     } else if (i === 30) {
       premiumReward = { type: 'background', amount: 1, title: 'Nebula Profil Arka Planı', itemId: 'bg_nebula', rarity: 'legendary' };
     } else if (i === 35) {
-      premiumReward = { type: 'gem', amount: 120, title: '120 Elmas', rarity: 'legendary' };
+      premiumReward = seasonJokerReward('joker_half', 6, 'legendary');
     } else if (i === 40) {
       premiumReward = { type: 'name_effect', amount: 1, title: 'Ateş Gradyan İsim', itemId: 'name_gradient_fire', rarity: 'legendary' };
     } else if (i === 45) {
@@ -681,8 +686,6 @@ export function generateSeason1Tiers(): SeasonTierItem[] {
 
   return tiers;
 }
-
-export const SEASON_1_TIERS = generateSeason1Tiers();
 
 // -------------------------------------------------------------
 // Comprehensive Shop Catalog
@@ -712,7 +715,6 @@ export interface ShopProduct {
   grantItems?: { id: string; name: string; desc: string; qty: number; category: ItemCategory; rarity: ItemRarity }[];
   grantCoins?: number;
   grantGems?: number;
-  grantPremiumPass?: boolean;
 }
 
 export const LOW_GEMS = 100;
@@ -748,6 +750,7 @@ export const JOKERS = [
   { id: 'joker_freeze', name: 'Zaman Dondurma', desc: 'Henüz cevaplamamış rakibin sayacını ve şıklarını 15 saniye dondur. Botlu ve iki kişilik arkadaş maçlarında.', price: 450, eliminated: 0, group: 'tactic' },
 ] as const satisfies readonly { id: string; name: string; desc: string; price: number; eliminated: number; group: JokerGroup }[];
 export type JokerId = typeof JOKERS[number]['id'];
+export const SEASON_1_TIERS = generateSeason1Tiers();
 export type JokerAction = 'retry' | 'pause' | 'support' | 'probe' | 'gold' | 'replace' | 'extra_time' | 'skip' | 'shield' | 'freeze';
 export interface JokerEffect {
   eliminated: string[];
@@ -799,18 +802,6 @@ export const SHOP_CATALOG: ShopProduct[] = [
     currency: 'coins', rarity: j.eliminated === 1 ? 'common' : 'rare',
     grantItems: [{ id: j.id, name: j.name, desc: j.desc, qty: 1, category: 'joker', rarity: 'rare' }],
   })),
-  // --- Featured ---
-  {
-    id: 'pack_season_premium_pass',
-    name: 'Sezon 1 Premium Pass',
-    desc: '50 kademelik mitolojik ve efsanevi ödül yolunun kilidini hemen açar!',
-    category: 'featured',
-    price: 250,
-    currency: 'gems',
-    rarity: 'mythic',
-    badge: 'EN POPÜLER',
-    grantPremiumPass: true,
-  },
   // --- Diamonds (Real Money) ---
   {
     id: 'gems_100',

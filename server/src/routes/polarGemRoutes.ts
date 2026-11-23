@@ -16,7 +16,7 @@ export const polarGemPlayerRoutes = Router();
 polarGemPlayerRoutes.post('/shop/diamonds/availability', availabilityLimit, async (req, res) => {
   const config = polarGemConfig();
   res.set('Cache-Control', 'no-store').json({
-    enabled: Boolean(config && req.get('origin') === config.origin && await walletSchemaReady(db.rawClient)),
+    enabled: Boolean(config && req.get('origin') === config.origin && await walletSchemaReady(db.rawClient, 'gems')),
     sandbox: Boolean(config?.sandbox),
   });
 });
@@ -25,7 +25,7 @@ polarGemPlayerRoutes.post('/shop/diamonds/checkout', checkoutStartLimit, require
   const config = polarGemConfig();
   const userId = req.authUserId;
   const packId = req.body?.productId;
-  if (!config || req.get('origin') !== config.origin || !await walletSchemaReady(db.rawClient)) {
+  if (!config || req.get('origin') !== config.origin || !await walletSchemaReady(db.rawClient, 'gems')) {
     res.status(503).json({ error: 'Elmas ödemesi şu anda açık değil.' }); return;
   }
   if (!userId || userId.startsWith('guest_') || typeof packId !== 'string' || !config.products.has(packId)) {

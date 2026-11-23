@@ -5344,55 +5344,6 @@ export class PrismaService {
     return { user: this.toProfile(record), reward };
   }
 
-  public async buyPremiumPass(userId: string): Promise<UserProfile> {
-    return this.withUserLock(userId, async () => {
-      const record = await this.loadRecord(userId);
-      if (!record) throw new Error('Kullanıcı bulunamadı.');
-      if (record.hasPremiumPass) {
-        throw new Error('Zaten Sezon 1 Premium Pass sahibisiniz!');
-      }
-
-      const costGems = 250;
-      if ((record.gems || 0) < costGems) {
-        throw new Error(`Yetersiz Elmas! Premium Pass için ${costGems} Elmas gerekli (Mevcut: ${record.gems || 0} Elmas).`);
-      }
-
-      if (!record.isGuest && !this.isJest) {
-        try {
-          await this.rawClient.$transaction(async (tx) => {
-            await tx.$queryRaw`SELECT id FROM public.users WHERE id = ${record.id} FOR UPDATE`;
-            const fresh = await tx.user.findUnique({ where: { id: record.id } });
-            if (!fresh) throw new Error('Kullanıcı bulunamadı.');
-            if ((fresh as any).hasPremiumPass) throw new SeasonClaimError('Zaten Sezon 1 Premium Pass sahibisiniz!');
-            if ((fresh.gems || 0) < costGems) {
-              throw new SeasonClaimError(`Yetersiz Elmas! Premium Pass için ${costGems} Elmas gerekli (Mevcut: ${fresh.gems || 0} Elmas).`);
-            }
-            await tx.user.update({
-              where: { id: record.id },
-              data: { gems: { decrement: costGems }, hasPremiumPass: true, updatedAt: new Date() },
-            });
-          });
-          const fresh = await this.loadRecord(userId);
-          return this.toProfile(fresh || record);
-        } catch (err: any) {
-          if (err instanceof SeasonClaimError) throw new Error(err.message);
-          console.error('[buyPremiumPass] DB transaction error:', err);
-          if (process.env.NODE_ENV === 'production') {
-            throw new Error('Satın alma şu anda kaydedilemedi, lütfen birkaç saniye sonra tekrar dene.');
-          }
-        }
-      }
-
-      record.gems = (record.gems || 0) - costGems;
-      record.hasPremiumPass = true;
-      this.users.set(userId, record);
-      this.users.set(record.id, record);
-      if (record.username) this.users.set(record.username, record);
-      if (!record.isGuest) this.savePersistedUsers();
-      return this.toProfile(record);
-    });
-  }
-
   public async purchaseShopProduct(
     userId: string,
     productId: string,
@@ -5449,9 +5400,6 @@ export class PrismaService {
       record.gems = (record.gems || 0) - effectivePrice;
     }
 
-    if (product.grantPremiumPass) {
-      record.hasPremiumPass = true;
-    }
     if (product.grantCoins) {
       record.coins += product.grantCoins;
     }
@@ -5521,7 +5469,6 @@ export class PrismaService {
           data: {
             coins: { increment: record.coins - originalCoins },
             gems: { increment: (record.gems || 0) - originalGems },
-            hasPremiumPass: product.grantPremiumPass ? true : undefined,
             equippedFrame: grants('frame') ? record.equippedFrame : undefined,
             equippedBadge: grants('badge') ? record.equippedBadge : undefined,
             equippedNameEffect: grants('name_effect') ? record.equippedNameEffect : undefined,

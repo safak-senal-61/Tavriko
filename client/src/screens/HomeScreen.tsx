@@ -36,6 +36,10 @@ import { InfoHint } from '../components/InfoHint';
 import { useUnreadCount } from '../store/notificationStore';
 import { getHomeWebSizing } from '../navigation/webLayout';
 
+const compactHeaderBalance = new Intl.NumberFormat('tr-TR', { notation: 'compact', maximumFractionDigits: 1 });
+const formatHeaderBalance = (amount: number | undefined, narrow: boolean) =>
+  narrow && Math.abs(amount ?? 0) >= 100_000 ? compactHeaderBalance.format(amount ?? 0) : formatNumberTR(amount);
+
 const LOGO_MARK = cdnImage('images/logo_mark.png');
 // 1v1 hızlı eşleşme bannerı PAKET İÇİNDEN yüklenir (require). CDN'den
 // çekilen büyük PNG bazı Android cihazlarda çözülemeyip kartı boş
@@ -258,7 +262,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               accessibilityLabel={`Altın: ${user.coins ?? 0}`}
             >
               <CoinIcon size={22} />
-              <Text style={[styles.currencyText, narrow && styles.currencyTextNarrow]}>{formatNumberTR(user.coins)}</Text>
+              <Text style={[styles.currencyText, narrow && styles.currencyTextNarrow]}>{formatHeaderBalance(user.coins, narrow)}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.currencyPill, narrow && styles.currencyPillNarrow]}
@@ -273,7 +277,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               accessibilityLabel={`Elmas: ${user.gems ?? 0}`}
             >
               <GemIcon size={20} />
-              <Text style={[styles.currencyText, narrow && styles.currencyTextNarrow]}>{formatNumberTR(user.gems)}</Text>
+              <Text style={[styles.currencyText, narrow && styles.currencyTextNarrow]}>{formatHeaderBalance(user.gems, narrow)}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.bellButton}
@@ -644,6 +648,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
     gap: 8,
+    flexWrap: 'wrap',
   },
   brandGroup: {
     flexDirection: 'row',
@@ -677,6 +682,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    marginLeft: 'auto',
     flexShrink: 1,
   },
   currencyPill: {
@@ -707,6 +713,7 @@ const styles = StyleSheet.create({
   bellButton: {
     width: 38,
     height: 38,
+    flexShrink: 0,
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',

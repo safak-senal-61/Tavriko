@@ -347,22 +347,8 @@ router.post('/season/claim', requireUserAuth, async (req: Request, res: Response
   }
 });
 
-router.post('/season/premium-pass', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.authUserId;
-    if (!userId) {
-      res.status(400).json({ error: 'userId gereklidir' });
-      return;
-    }
-    const updated = await db.buyPremiumPass(userId);
-    res.json({
-      success: true,
-      user: updated,
-      message: '🎉 Tebrikler! Sezon 1 Premium Pass aktif edildi!',
-    });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
-  }
+router.post('/season/premium-pass', requireUserAuth, (_req, res): void => {
+  res.status(410).json({ error: 'Premium Pass artık elmasla alınmıyor. Güncel web sürümündeki Sezon ekranını kullan.' });
 });
 
 // --- Live Events ---

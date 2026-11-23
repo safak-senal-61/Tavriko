@@ -51,25 +51,28 @@ export function JokerPanel({ user, options, live, tactics, capabilities, lightni
   live?: boolean; tactics?: JokerTactics; capabilities?: ClientQuestion['jokerCapabilities']; lightningAvailable?: boolean;
 }) {
   const [group, setGroup] = useState<JokerGroup | null>(null);
+  const stock = new Map(user.inventory?.map(item => [item.id, item.qty]));
+  const available = JOKERS
+    .filter(joker => (!group || joker.group === group) && canUseJoker(joker.id, options, { live, tactics, capabilities, lightningAvailable }))
+    .sort((a, b) => Number((stock.get(b.id) ?? 0) > 0) - Number((stock.get(a.id) ?? 0) > 0));
   return <Panel title="Jokerlerim" onClose={onClose}>
     <View style={s.wallet}><CoinIcon size={17} /><Text style={s.balance}>{walletAmount(user.coins ?? 0)} altın</Text></View>
-    <Text style={s.desc}>Soru başına bir joker kullanabilirsin. Bu menü sayacı durdurmaz.</Text>
+    <Text style={s.desc}>Yalnızca bu soruya uygun jokerler gösterilir. Sayaç işlemeye devam eder.</Text>
     <JokerGroupTabs selected={group} onChange={setGroup} />
     {error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
     <ScrollView showsVerticalScrollIndicator={false} style={s.catalog} contentContainerStyle={s.catalogContent}>
-    {JOKERS.filter(joker => !group || joker.group === group).map(joker => {
-      const qty = user.inventory?.find(i => i.id === joker.id)?.qty ?? 0;
+    {!available.length && <Text style={s.desc}>Bu grupta kullanılabilir joker yok.</Text>}
+    {available.map(joker => {
+      const qty = stock.get(joker.id) ?? 0;
       const canBuy = user.coins >= joker.price;
-      const usable = canUseJoker(joker.id, options, { live, tactics, capabilities, lightningAvailable });
       return <View key={joker.id} style={s.joker}>
         <WalletArtwork kind={joker.id} size={62} />
         <View style={s.detail}>
           <Text style={s.itemTitle}>{joker.name} · {qty} adet</Text>
           <Text style={s.itemDesc}>{joker.desc}</Text>
-          {!usable && <Text style={s.itemDesc}>Bu soruya veya maç türüne uygun değil.</Text>}
           <View style={s.actions}>
-            {qty > 0 && <Pressable style={[s.use, !usable && s.disabled]} disabled={busy || !usable} onPress={() => onApply(joker.id)} accessibilityRole="button" accessibilityLabel={`${joker.name} kullan`}><Text style={s.primaryText}>Kullan</Text></Pressable>}
-            <Pressable style={[s.buy, (!canBuy || !usable) && s.disabled]} disabled={busy || !canBuy || !usable} onPress={() => onBuy(joker.id)} accessibilityRole="button" accessibilityLabel={`${joker.name} satın al: ${joker.price} altın`}>
+            {qty > 0 && <Pressable style={s.use} disabled={busy} onPress={() => onApply(joker.id)} accessibilityRole="button" accessibilityLabel={`${joker.name} kullan`}><Text style={s.primaryText}>Kullan</Text></Pressable>}
+            <Pressable style={[s.buy, !canBuy && s.disabled]} disabled={busy || !canBuy} onPress={() => onBuy(joker.id)} accessibilityRole="button" accessibilityLabel={`${joker.name} satın al: ${joker.price} altın`}>
               <CoinIcon size={15} /><Text style={s.buyText}>{joker.price} · Al</Text>
             </Pressable>
           </View>

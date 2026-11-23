@@ -1,5 +1,12 @@
 # Visual refresh acceptance and regression checks
 
+## Quiz shortcut, balances and paid Season 1
+
+- Oyna at 270/320/375px with a seven-digit balance: both currencies and Bildirimler fit; tap the bell and return.
+- On a signed-in practice question and a bot duel, apply an eligible owned joker without opening the catalogue. Check loading, visible errors, no double debit and that the next question is usable. Open “Tüm jokerler” to buy stock with gold. Incompatible jokers are not offered as quick actions.
+- Open Sezon 1: both reward tracks contain no chest or key; a newly claimed joker appears in Envanter. Existing claimed rewards and active passes remain intact.
+- Check Pass with no Polar configuration, then with a configured test checkout. The signed-in player should land back on Sezon after checkout. Only a verified paid webhook activates the pass; cancellation, replay and a full refund must not grant another entitlement. Do not make a real purchase.
+
 ## Live quiz jokers and scoreboard
 
 - Open 1v1, quick match and a friend room with test accounts. From Jokerlerim use one owned joker before answering, see its effect privately, verify one stock debit and no score or timer change. Retry, reconnect and advance to the next question; reject expired and already answered uses.

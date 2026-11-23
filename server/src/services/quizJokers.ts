@@ -18,6 +18,9 @@ export async function consumeQuizJoker(
     if (!account || Date.now() >= deadline) return { status: 'unavailable' } as const;
     const used = await tx.practiceJokerUse.findUnique({ where: { userId_sessionId_questionId: key } });
     if (used && isJokerId(used.jokerId)) {
+      // A retry must name the committed joker. Applying its effect under a different
+      // request ID could attach the wrong Worker action or freeze target.
+      if (used.jokerId !== jokerId) return { status: 'already_used' } as const;
       const effect = resolveJokerEffect(used.jokerId, question, used.eliminated, {
         live: !!live, tactics: live?.tactics, capabilities: live?.capabilities, votes: live?.votes, randomIndex,
       });
