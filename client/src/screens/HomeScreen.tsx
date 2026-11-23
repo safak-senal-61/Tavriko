@@ -298,7 +298,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               accessibilityRole="button"
               accessibilityLabel={`Bildirimler, ${unread} okunmamış`}
             >
-              <NotificationBell size={compactHeader ? 18 : 21} />
+              <NotificationBell size={compactHeader ? 16 : 21} />
             </TouchableOpacity>
           </View>
         </View>
@@ -672,8 +672,8 @@ const styles = StyleSheet.create({
     height: 44,
   },
   brandMarkNarrow: {
-    width: 30,
-    height: 30,
+    width: 28,
+    height: 28,
   },
   brandMarkTight: { width: 22, height: 22 },
   brandTextNarrow: {
@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   currencyPillNarrow: {
-    height: 32,
+    height: 30,
     paddingRight: 5,
     gap: 3,
   },
@@ -742,7 +742,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(154, 107, 255, 0.55)',
   },
-  bellButtonCompact: { width: 32, height: 32, borderRadius: 16 },
+  bellButtonCompact: { width: 30, height: 30, borderRadius: 15 },
   bellDot: {
     position: 'absolute',
     top: 4,

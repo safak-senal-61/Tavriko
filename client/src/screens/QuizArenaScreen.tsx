@@ -28,7 +28,7 @@ import { sound } from '../services/soundService';
 import { trackEvent } from '../services/analytics';
 import { loadStoredPreferences } from '../store/appPrefs';
 import { canUseJoker, ClientQuestion, ALL_CATEGORIES, JOKERS, JokerEffect, JokerId, LIGHTNING_WINDOW_MS, UserProfile } from '@trivia/shared';
-import { JokerPanel } from '../components/WalletPanels';
+import { JokerPurchasePanel } from '../components/WalletPanels';
 import { WalletArtwork } from '../components/WalletArtwork';
 import { ArrowUpRight, Flag } from 'lucide-react-native';
 import {
@@ -709,8 +709,10 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     setJokerBusy(true);
     setJokerError(undefined);
     try {
-      if (buy) await jokers.buy(id);
-      else {
+      if (buy) {
+        await jokers.buy(id);
+        if (jokerRoundRef.current === jokerRound) setJokersOpen(false);
+      } else {
         const effect = await jokers.apply(id);
         if (jokerRoundRef.current === jokerRound) {
           setJokerResult({ key: jokerRound, effect });
@@ -840,13 +842,15 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     hasExpiredRef.current ||
     secondsLeft <= 0;
   const lightningAvailable = totalMs - secondsLeft * 1000 < LIGHTNING_WINDOW_MS;
-  const quickJokers = jokers && !jokerEffect && !isOptionsDisabled
+  const ownedJokers = jokers && !jokerEffect && !isOptionsDisabled
     ? JOKERS.flatMap(joker => {
       const qty = jokers.user.inventory?.find(item => item.id === joker.id)?.qty ?? 0;
-      return qty > 0 && canUseJoker(joker.id, question.options, {
+      if (qty <= 0) return [];
+      const usable = canUseJoker(joker.id, question.options, {
         live: isMultiplayer, tactics: question.jokerTactics, capabilities: question.jokerCapabilities, lightningAvailable,
-      }) ? [{ ...joker, qty }] : [];
-    }).slice(0, 2) : [];
+      });
+      return [{ ...joker, qty, usable }];
+    }).sort((a, b) => Number(b.usable) - Number(a.usable)) : [];
   const totalRounds = question.totalRounds || 10;
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const compact = windowHeight < 800;
@@ -1116,17 +1120,25 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
             </Text>
           ) : !isOptionsDisabled && (
             <View style={styles.jokerActions}>
-              {quickJokers.map(joker => (
-                <TouchableOpacity key={joker.id} style={[styles.jokerTrigger, styles.jokerQuick]}
-                  accessibilityRole="button" accessibilityLabel={`${joker.name} kullan, ${joker.qty} adet`}
-                  onPress={() => { void useJokerAction(joker.id, false); }}>
-                  <WalletArtwork kind={joker.id} size={23} />
-                  <Text style={styles.jokerTriggerText}>{joker.name} · {joker.qty}</Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity style={[styles.jokerTrigger, !quickJokers.length && styles.jokerQuick]}
-                accessibilityRole="button" onPress={() => { setJokerError(undefined); setJokersOpen(true); }}>
-                <Text style={styles.jokerTriggerText}>Tüm jokerler</Text>
+              {ownedJokers.length ? (
+                <ScrollView horizontal nestedScrollEnabled directionalLockEnabled
+                  testID="owned-joker-strip" style={styles.jokerStrip} contentContainerStyle={styles.jokerStripContent}>
+                  {ownedJokers.map(joker => (
+                    <TouchableOpacity key={joker.id} style={[styles.jokerTrigger, !joker.usable && styles.jokerUnavailable]}
+                      disabled={!joker.usable} accessibilityRole="button"
+                      accessibilityLabel={`${joker.name} ${joker.usable ? 'kullan' : 'bu soruda kullanılamaz'}, ${joker.qty} adet`}
+                      accessibilityState={{ disabled: !joker.usable }}
+                      onPress={() => { void useJokerAction(joker.id, false); }}>
+                      <WalletArtwork kind={joker.id} size={19} />
+                      <Text numberOfLines={1} style={styles.jokerTriggerText}>{joker.name} · {joker.qty}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              ) : <Text style={[styles.jokerTriggerText, styles.jokerStrip]}>Henüz jokerin yok</Text>}
+              <TouchableOpacity style={[styles.jokerTrigger, styles.jokerShopTrigger]}
+                accessibilityRole="button" accessibilityLabel="Joker satın al"
+                onPress={() => { setJokerError(undefined); setJokersOpen(true); }}>
+                <Text numberOfLines={1} style={styles.jokerTriggerText}>Joker Al</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1136,10 +1148,10 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         </View>
       )}
       {jokers && jokersOpen && !jokerEffect && !isOptionsDisabled && (
-        <JokerPanel user={jokers.user} options={question.options} live={isMultiplayer} tactics={question.jokerTactics} capabilities={question.jokerCapabilities}
+        <JokerPurchasePanel user={jokers.user} options={question.options} live={isMultiplayer} tactics={question.jokerTactics} capabilities={question.jokerCapabilities}
           lightningAvailable={lightningAvailable}
           busy={jokerBusy} error={jokerError} onClose={() => setJokersOpen(false)}
-          onApply={id => { void useJokerAction(id, false); }} onBuy={id => { void useJokerAction(id, true); }} />
+          onBuy={id => { void useJokerAction(id, true); }} />
       )}
 
       {/* 5. Şıklar */}
@@ -1327,10 +1339,13 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 
 const styles = StyleSheet.create({
   jokerRow: { marginVertical: 2, gap: 4 },
-  jokerActions: { flexDirection: 'row', gap: 5 },
-  jokerTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 44, gap: 3, paddingHorizontal: 5, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: '#72597F', backgroundColor: '#271B40' },
-  jokerQuick: { flex: 1, minWidth: 0 },
-  jokerTriggerText: { color: '#FFE0B1', flexShrink: 1, fontSize: 12, fontFamily: THEME.fonts.extraBold },
+  jokerActions: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
+  jokerStrip: { flex: 1, minWidth: 0 },
+  jokerStripContent: { gap: 5 },
+  jokerTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 34, gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 9, borderWidth: 1, borderColor: '#72597F', backgroundColor: '#271B40' },
+  jokerUnavailable: { opacity: .55 },
+  jokerShopTrigger: { borderColor: '#AA794B', backgroundColor: '#402948', flexShrink: 0 },
+  jokerTriggerText: { color: '#FFE0B1', flexShrink: 1, fontSize: 11, fontFamily: THEME.fonts.extraBold },
   jokerInlineError: { color: '#FFB7C9', fontSize: 12 },
   screenContainer: {
     justifyContent: 'space-between',
