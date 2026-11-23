@@ -69,6 +69,13 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
       ::-webkit-scrollbar-thumb:hover {
         background: rgba(255, 196, 61, 0.75);
       }
+      [data-testid="quiz-arena-scroll"], [data-testid="gameplay-rewards-scroll"] {
+        scrollbar-width: none;
+      }
+      [data-testid="quiz-arena-scroll"]::-webkit-scrollbar,
+      [data-testid="gameplay-rewards-scroll"]::-webkit-scrollbar {
+        display: none;
+      }
       /* Eliminate browser sharp default outline on all inputs (Chrome, Safari, Edge) */
       input, textarea, select {
         outline: none !important;

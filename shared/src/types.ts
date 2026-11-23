@@ -99,6 +99,10 @@ export interface Question {
 export interface ClientQuestion {
   /** Short-lived proof provided only for authenticated practice questions. */
   jokerProof?: string;
+  /** Live room capability, also identifies the exact round instance. */
+  jokerRoundStartedAt?: number;
+  /** Only sent to the authenticated owner when reconnecting. */
+  jokerEffect?: JokerEffect;
   id: string;
   categoryId: CategoryId;
   difficulty: DifficultyLevel;
@@ -691,8 +695,14 @@ export const LOW_COINS = 500;
 export const JOKERS = [
   { id: 'joker_eliminate', name: 'Tek Eleme', desc: 'Bir yanlış şıkkı kaldırır.', price: 250, eliminated: 1 },
   { id: 'joker_half', name: 'Yarı Yarıya', desc: 'İki yanlış şıkkı kaldırır.', price: 450, eliminated: 2 },
+  { id: 'joker_initial', name: 'İlk Karakter', desc: 'Doğru şıkkın ilk harfini veya rakamını gösterir.', price: 200, eliminated: 0 },
+  { id: 'joker_word_count', name: 'Kelime Sayısı', desc: 'Doğru şıkkın kaç kelime olduğunu gösterir.', price: 150, eliminated: 0 },
 ] as const;
 export type JokerId = typeof JOKERS[number]['id'];
+export interface JokerEffect {
+  eliminated: string[];
+  hint?: string;
+}
 
 /**
  * Süreli kozmetik mağaza ürünleri için süre seçenekleri: 1 saatten en fazla 1

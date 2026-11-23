@@ -162,7 +162,8 @@ export function createApp() {
     // Express may strip a mounted router's prefix from req.path before finish.
     const requestPath = req.path;
     const isAccountSecurity = /^\/api\/auth\/(?:(?:forgot|reset)-password|request-delete-code|confirm-delete|delete-account(?:\/request)?|google(?:\/.*)?)\/?$/i.test(requestPath);
-    const omitRequestDetails = isAccountSecurity || /^\/api\/social\/ads\/rewarded(?:\/|$)/i.test(requestPath);
+    const omitRequestDetails = isAccountSecurity || /^\/api\/social\/ads\/rewarded(?:\/|$)/i.test(requestPath) ||
+      /^\/api\/(?:internal\/room-joker|questions\/practice\/joker)\/?$/i.test(requestPath);
     res.on('finish', () => {
       const duration = Date.now() - start;
       const lvl = res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'INFO';

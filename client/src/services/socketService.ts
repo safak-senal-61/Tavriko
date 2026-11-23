@@ -6,6 +6,8 @@ import {
   FinalMatchSummary,
   GameRoom,
   CustomRoomSettings,
+  JokerEffect,
+  JokerId,
 } from '@trivia/shared';
 import * as Sentry from '@sentry/react-native';
 import { getRealtimeWsUrl } from '../config';
@@ -53,6 +55,7 @@ export class SocketService {
   // DOs (they resolve displayName/avatar from it) instead of giant avatarUrl
   // query values that can break the WebSocket upgrade
   private authToken: string | null = null;
+  private jokerRequests = new Map<string, (error?: Error, effect?: JokerEffect) => void>();
 
   // Track session details for automatic recovery
   private lastSessionContext: {
@@ -295,6 +298,16 @@ export class SocketService {
 
       const event = parsed.event;
       let payload = parsed.payload;
+      const jokerRequest = parsed.requestId ? this.jokerRequests.get(parsed.requestId) : undefined;
+      if (jokerRequest && event === SOCKET_EVENTS.ERROR) {
+        jokerRequest(new Error(payload?.message || 'Joker kullanılamadı.'));
+        return;
+      }
+      if (jokerRequest && event === SOCKET_EVENTS.JOKER_RESULT) {
+        if (Array.isArray(payload?.eliminated)) jokerRequest(undefined, payload);
+        else jokerRequest(new Error('Joker sonucu alınamadı.'));
+        return;
+      }
 
       // Update local presence cache from Cloudflare WebSocket
       if (event === 'presence:snapshot' && payload && Array.isArray(payload.presences)) {
@@ -589,6 +602,32 @@ export class SocketService {
       selectedOptionId,
       roundNumber,
       clientTimestamp: Date.now(),
+    });
+  }
+
+  public useRoomJoker(question: ClientQuestion, jokerId: JokerId): Promise<JokerEffect> {
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return Promise.reject(new Error('Oyun bağlantısı hazır değil. Tekrar dene.'));
+    const requestId = `joker_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    return new Promise((resolve, reject) => {
+      const finish = (error?: Error, effect?: JokerEffect) => {
+        clearTimeout(timeout);
+        this.jokerRequests.delete(requestId);
+        if (effect && !error) resolve(effect);
+        else reject(error ?? new Error('Joker sonucu alınamadı.'));
+      };
+      const timeout = setTimeout(() => finish(new Error('Joker yanıtı gecikti. Tekrar dene.')), 5500);
+      this.jokerRequests.set(requestId, finish);
+      try {
+        ws.send(JSON.stringify({
+          event: SOCKET_EVENTS.USE_JOKER,
+          requestId,
+          timestamp: Date.now(),
+          payload: { jokerId, questionId: question.id, roundNumber: question.roundNumber, startedAt: question.jokerRoundStartedAt },
+        }));
+      } catch {
+        finish(new Error('Oyun bağlantısı koptu. Tekrar dene.'));
+      }
     });
   }
 

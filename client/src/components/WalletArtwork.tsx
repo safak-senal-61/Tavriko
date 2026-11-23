@@ -1,7 +1,9 @@
 import React from 'react';
 import { Image, type ImageSourcePropType } from 'react-native';
+import type { JokerId } from '@trivia/shared';
+import { JokerArtwork } from './JokerArtwork';
 
-export type WalletArt = 'diamonds' | 'gold' | 'joker_eliminate' | 'joker_half';
+export type WalletArt = 'diamonds' | 'gold' | JokerId;
 
 // Byte-for-byte copies of the original assets/images/store PNGs. Keep these
 // small wallet assets in the app bundle so the artwork also works offline.
@@ -20,15 +22,9 @@ const WALLET_PACKS: Record<'diamonds' | 'gold', readonly ImageSourcePropType[]> 
   ],
 };
 
-const JOKER_ART: Record<'joker_eliminate' | 'joker_half', ImageSourcePropType> = {
-  joker_eliminate: require('../../bundled/jokers/joker_eliminate.png'),
-  joker_half: require('../../bundled/jokers/joker_half.png'),
-};
-
 export function WalletArtwork({ kind, size = 88, tier = 1 }: { kind: WalletArt; size?: number; tier?: number }) {
-  const source = kind === 'diamonds' || kind === 'gold'
-    ? WALLET_PACKS[kind][tier - 1] ?? WALLET_PACKS[kind][0]
-    : JOKER_ART[kind];
+  if (kind !== 'diamonds' && kind !== 'gold') return <JokerArtwork kind={kind} size={size} />;
+  const source = WALLET_PACKS[kind][tier - 1] ?? WALLET_PACKS[kind][0];
 
   return (
     <Image

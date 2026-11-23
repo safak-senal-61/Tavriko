@@ -22,11 +22,11 @@ import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { loadStoredPreferences } from '../store/appPrefs';
 import { InfoHint } from '../components/InfoHint';
+import { Trophy } from 'lucide-react-native';
 import {
   TavrikoScreen,
   Button3D,
   CharacterAvatar,
-  LaurelIcon,
   CoinIcon,
   CheckMarkSvg,
   CrossMarkSvg,
@@ -95,13 +95,6 @@ const PodiumColumn: React.FC<{
   const ring = tone.avatar + 8;
   return (
     <Animated.View entering={FadeInUp.delay(delay).springify().damping(14)} style={styles.podiumCol}>
-      {place === 1 ? (
-        <Animated.View entering={ZoomIn.delay(delay + 260).springify()}>
-          <LaurelIcon size={28} />
-        </Animated.View>
-      ) : (
-        <View style={{ height: 28 }} />
-      )}
       <View style={[styles.podiumRing, { width: ring, height: ring, borderRadius: ring / 2, borderColor: tone.ring }]}>
         <CharacterAvatar seed={entry.avatarUrl || entry.displayName} size={tone.avatar} />
       </View>
@@ -112,6 +105,12 @@ const PodiumColumn: React.FC<{
         {formatNumberTR(normalizeDisplayScore(entry.score, totalRounds))}
         <Text style={styles.podiumUnit}> puan</Text>
       </Text>
+      <View style={styles.podiumStatus}>
+        {place === 1 && <View style={styles.winnerTag}>
+          <Trophy size={13} color="#FFDE9A" />
+          <Text style={styles.winnerText}>Kazanan</Text>
+        </View>}
+      </View>
       <View style={[styles.podiumBase, { height: tone.height, backgroundColor: tone.base, borderColor: tone.ring }]}>
         <Text style={[styles.podiumPlace, { color: tone.ring }]}>{place}</Text>
         {typeof entry.correctAnswersCount === 'number' && (
@@ -491,6 +490,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
+  podiumStatus: { height: 30, justifyContent: 'flex-start' },
+  winnerTag: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#3C2B47', borderColor: '#8F6E4E', borderWidth: 1, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  winnerText: { color: '#FFDE9A', fontSize: 12, fontFamily: THEME.fonts.extraBold },
   podiumRing: {
     borderWidth: 3,
     alignItems: 'center',

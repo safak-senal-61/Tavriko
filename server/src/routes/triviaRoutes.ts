@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { db } from '../db/prismaClient';
-import { CategoryId, DifficultyLevel, calculateScore, ClientQuestion, JOKERS } from '@trivia/shared';
+import { CategoryId, DifficultyLevel, calculateScore, ClientQuestion, isJokerId } from '@trivia/shared';
 import { generateQuestionsWithEvrenGLM } from '../ai/evrenLlmGenerator';
 import { cacheService } from '../cache/redisClient';
 import { supabaseService } from '../db/supabaseClient';
@@ -10,6 +10,8 @@ import { importQuestionsFromJson } from '../utils/questionImporter';
 import { getJwtSecret, requireAdminAuth, requireUserAuth } from '../middleware/auth';
 import { walletSchemaReady } from '../services/walletSchema';
 import { walletRateLimitOptions } from '../middleware/walletRateLimit';
+import { consumeQuizJoker } from '../services/quizJokers';
+import { validPlayerId } from '../services/playerAccess';
 
 const router = Router();
 const practiceQuestionsLimit = rateLimit({ ...walletRateLimitOptions, limit: 90 });
@@ -88,12 +90,12 @@ router.get('/questions/practice', practiceQuestionsLimit, async (req: Request, r
 });
 
 router.post('/questions/practice/joker', practiceJokerLimit, requireUserAuth, async (req: Request, res: Response): Promise<void> => {
+  res.set('Cache-Control', 'no-store');
   const userId = req.authUserId;
   const { sessionId, questionId, jokerId, proof } = req.body || {};
-  const joker = JOKERS.find(item => item.id === jokerId);
   const secret = getJwtSecret();
   const [deadline, signature] = typeof proof === 'string' && /^\d{13}\.[a-f0-9]{64}$/.test(proof) ? proof.split('.') : [];
-  if (!userId || userId.startsWith('guest_') || !joker || !secret || !deadline || typeof sessionId !== 'string' ||
+  if (!userId || userId.startsWith('guest_') || !isJokerId(jokerId) || !secret || !deadline || typeof sessionId !== 'string' ||
       !practiceSessionPattern.test(sessionId) || typeof questionId !== 'string' || questionId.length > 160 ||
       !timingSafeEqual(Buffer.from(practiceProof(userId, sessionId, questionId, Number(deadline), secret), 'hex'), Buffer.from(signature, 'hex'))) {
     res.status(400).json({ error: 'Bu soruda joker kullanılamıyor.' }); return;
@@ -106,28 +108,53 @@ router.post('/questions/practice/joker', practiceJokerLimit, requireUserAuth, as
     await db.ensureQuestionsRestored();
     question = db.getQuestionById(questionId);
   }
-  const wrong = question?.options.filter(option => option.id !== question?.correctOptionId) ?? [];
-  if (!question?.options.some(option => option.id === question?.correctOptionId) || wrong.length <= joker.eliminated || Date.now() > Number(deadline)) {
+  if (!question || Date.now() >= Number(deadline)) {
     res.status(409).json({ error: 'Bu soruda joker kullanılamıyor.' }); return;
   }
   try {
-    const eliminated = await db.rawClient.$transaction(async tx => {
-      const [account] = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "users" WHERE "id" = ${userId} FOR UPDATE`;
-      if (!account) return null;
-      const key = { userId, sessionId, questionId };
-      const used = await tx.practiceJokerUse.findUnique({ where: { userId_sessionId_questionId: key } });
-      if (used) return used.eliminated;
-      const stock = await tx.userInventoryItem.updateMany({
-        where: { userId, itemId: joker.id, qty: { gt: 0 } }, data: { qty: { decrement: 1 } },
-      });
-      if (!stock.count) return null;
-      const start = Math.floor(Math.random() * wrong.length);
-      const hidden = [...wrong.slice(start), ...wrong.slice(0, start)].slice(0, joker.eliminated).map(option => option.id);
-      await tx.practiceJokerUse.create({ data: { ...key, jokerId: joker.id, eliminated: hidden } });
-      return hidden;
-    });
-    if (!eliminated) { res.status(409).json({ error: 'Envanterinde bu jokerden kalmadı.' }); return; }
-    res.json({ eliminated });
+    const result = await consumeQuizJoker({ userId, sessionId, questionId }, jokerId, question, Number(deadline));
+    if (result.status !== 'applied') {
+      res.status(409).json({ error: result.status === 'empty' ? 'Envanterinde bu jokerden kalmadı.' : 'Bu soruda joker kullanılamıyor.' }); return;
+    }
+    res.json(result.effect);
+  } catch {
+    res.status(503).json({ error: 'Joker şu anda kullanılamadı. Tekrar dene.' });
+  }
+});
+
+router.post('/internal/room-joker', async (req: Request, res: Response): Promise<void> => {
+  res.set('Cache-Control', 'no-store');
+  const secret = process.env.INTERNAL_API_SECRET;
+  const supplied = req.get('x-internal-secret');
+  if (!secret || !supplied || Buffer.byteLength(secret) !== Buffer.byteLength(supplied) ||
+      !timingSafeEqual(Buffer.from(secret), Buffer.from(supplied))) {
+    res.status(403).json({ error: 'Yetkisiz erişim' }); return;
+  }
+  const { userId, roomCode, roundNumber, startedAt, deadline, questionId, jokerId, options, correctOptionId } = req.body || {};
+  const choices = Array.isArray(options) && options.length >= 2 && options.length <= 12 &&
+    options.every(option => typeof option?.id === 'string' && option.id.length <= 160 &&
+      typeof option.text === 'string' && option.text.length <= 1000);
+  if (typeof userId !== 'string' || !validPlayerId.test(userId) || /^(guest_|bot_)/i.test(userId) ||
+      typeof roomCode !== 'string' || !/^[A-Z0-9_-]{1,16}$/.test(roomCode) ||
+      !Number.isSafeInteger(roundNumber) || roundNumber < 1 || roundNumber > 50 ||
+      !Number.isSafeInteger(startedAt) || !Number.isSafeInteger(deadline) || startedAt > Date.now() + 2000 ||
+      deadline <= startedAt || deadline > startedAt + 120_000 ||
+      typeof questionId !== 'string' || !questionId || questionId.length > 160 ||
+      !isJokerId(jokerId) || !choices || typeof correctOptionId !== 'string') {
+    res.status(400).json({ error: 'Geçersiz joker isteği.' }); return;
+  }
+  if (!await walletSchemaReady(db.rawClient)) {
+    res.status(503).json({ error: 'Jokerler henüz kullanıma açık değil.' }); return;
+  }
+  try {
+    const result = await consumeQuizJoker(
+      { userId, sessionId: `room:${roomCode}:${startedAt}:${roundNumber}`, questionId },
+      jokerId, { options, correctOptionId }, deadline,
+    );
+    if (result.status !== 'applied') {
+      res.status(409).json({ error: result.status === 'empty' ? 'Envanterinde bu jokerden kalmadı.' : 'Bu soruda joker kullanılamıyor.' }); return;
+    }
+    res.json(result.effect);
   } catch {
     res.status(503).json({ error: 'Joker şu anda kullanılamadı. Tekrar dene.' });
   }

@@ -1,5 +1,11 @@
 # Visual refresh acceptance and regression checks
 
+## Live quiz jokers and scoreboard
+
+- Open 1v1, quick match and a friend room with test accounts. From Jokerlerim use one owned joker before answering, see its effect privately, verify one stock debit and no score or timer change. Retry, reconnect and advance to the next question; reject expired and already answered uses.
+- Verify all four matching illustrations and stock in Mağaza, purchase confirmation, Envanter and Jokerlerim. In signed-in online practice keep the existing purchase and use flow. Guests, offline play and Günlük Meydan Okuma do not consume paid stock.
+- At 375px and desktop, answer a question and scroll through the quiz feedback and Ödüller (including tabs) without a visible vertical scrollbar. Check that no crown covers an avatar, “Önde” follows the score without changing height, and the winner has a distinct podium label.
+
 ## Wallet and joker artwork
 
 - Mağaza → Elmas / Altın: each of the four packages uses its original image, from small to extra large. The category artwork and the profile's low-balance panel use the medium original.

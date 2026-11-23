@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { LoadingShimmer } from '../components/LoadingShimmer';
-import { UserProfile, InventoryItem, ItemCategory, COSMETIC_RENTAL_MS, getCosmeticDef, getChestOpening, isPermanentGameplayBadge } from '@trivia/shared';
+import { UserProfile, InventoryItem, ItemCategory, COSMETIC_RENTAL_MS, getCosmeticDef, getChestOpening, isPermanentGameplayBadge, isJokerId } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
@@ -357,7 +357,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
      ateş ikonuna düşüyordu. Her ürün artık kendi türünün görselini
      kullanıyor. */
   const renderItemVisual = (item: InventoryItem, size = 48) => {
-    if (item.id === 'joker_eliminate' || item.id === 'joker_half') return <WalletArtwork kind={item.id} size={size * 1.65} />;
+    if (isJokerId(item.id)) return <WalletArtwork kind={item.id} size={size * 1.65} />;
     const pk = previewKindOf(item);
     if (pk === 'frame') {
       if (frameFor(item.id)) {
