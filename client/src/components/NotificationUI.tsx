@@ -18,7 +18,7 @@ export function notificationVisual({ type, roomCode }: Pick<NotificationItem, 't
   return { image: DISCOVERY_IMG.bell, label: 'TAVRİKO', color: '#D7CBF1' };
 }
 
-export const NotificationBell: React.FC = () => {
+export const NotificationBell: React.FC<{ size?: number }> = ({ size = 21 }) => {
   const count = useUnreadCount();
   const reduced = useReducedMotion();
   const bounce = useRef(new Animated.Value(1)).current;
@@ -42,7 +42,7 @@ export const NotificationBell: React.FC = () => {
   return (
     <View pointerEvents="none" accessible={false} style={styles.bell}>
       <Animated.View style={{ transform: [{ rotate: ring.interpolate({ inputRange: [-1, 1], outputRange: ['-15deg', '15deg'] }) }] }}>
-        <Bell size={21} color="#F2EAFE" strokeWidth={2} />
+        <Bell size={size} color="#F2EAFE" strokeWidth={2} />
       </Animated.View>
       {count > 0 && (
         <Animated.View testID="notification-unread-badge" style={[

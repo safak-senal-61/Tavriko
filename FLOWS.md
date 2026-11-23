@@ -2,7 +2,7 @@
 
 ## Quiz shortcut, balances and paid Season 1
 
-- Oyna at 270/320/375px with a seven-digit balance: both currencies and Bildirimler fit; tap the bell and return.
+- Oyna at 270/320/375/390/414px with 1.067.904 Altın and 11.435 Elmas, then with very large balances in both currencies: Tavriko, both balances and Bildirimler stay on one row with no horizontal overflow. The bell opens Bildirim Merkezi; the currency buttons open their respective Mağaza tabs. Check that desktop still shows full balances.
 - On a signed-in practice question and a bot duel, apply an eligible owned joker without opening the catalogue. Check loading, visible errors, no double debit and that the next question is usable. Open “Tüm jokerler” to buy stock with gold. Incompatible jokers are not offered as quick actions.
 - Open Sezon 1: both reward tracks contain no chest or key; a newly claimed joker appears in Envanter. Existing claimed rewards and active passes remain intact.
 - Check Pass with no Polar configuration, then with a configured test checkout. The signed-in player should land back on Sezon after checkout. Only a verified paid webhook activates the pass; cancellation, replay and a full refund must not grant another entitlement. Do not make a real purchase.
