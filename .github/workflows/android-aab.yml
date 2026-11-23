@@ -1,7 +1,15 @@
-name: Android AAB (local EAS build)
+name: Android APK (one-off local EAS build)
 
 on:
   workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact main commit used for the matching AAB
+        type: string
+        required: true
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -9,6 +17,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -20,31 +30,37 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Compile shared package
         run: npm run build:shared
-      - name: Build AAB
+      - name: Build signed APK
         working-directory: client
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EAS_BUILD_NO_EXPO_GO_WARNING: "true"
-        run: npx -y eas-cli@latest build --local -p android --profile production --non-interactive --output ${{ github.workspace }}/tavriko.aab
-      - name: Verify release bundle
         run: |
           set -euo pipefail
-          jar="$RUNNER_TEMP/bundletool.jar"
-          curl --fail --silent --show-error --location --retry 3 \
-            https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar -o "$jar"
-          java -jar "$jar" validate --bundle=tavriko.aab
-          java -jar "$jar" dump manifest --bundle=tavriko.aab > "$RUNNER_TEMP/tavriko-manifest.xml"
-          java -jar "$jar" dump config --bundle=tavriko.aab > "$RUNNER_TEMP/tavriko-bundle-config.txt"
-          grep 'PAGE_ALIGNMENT_16K' "$RUNNER_TEMP/tavriko-bundle-config.txt"
+          node -e 'const fs = require("node:fs"); const config = require("./eas.json"); config.build["production-apk"] = { extends: "production", autoIncrement: false, android: { buildType: "apk" } }; fs.writeFileSync("eas.json", JSON.stringify(config, null, 2) + "\n");'
+          npx -y eas-cli@latest build --local -p android --profile production-apk --non-interactive --output "$GITHUB_WORKSPACE/tavriko.apk"
+      - name: Verify release APK
+        run: |
+          set -euo pipefail
+          signer="$(find "${ANDROID_HOME:?}/build-tools" -name apksigner | sort -V | tail -n 1)"
+          tools="$(dirname "$signer")"
+          "$tools/aapt2" dump badging tavriko.apk > "$RUNNER_TEMP/tavriko-badging.txt"
+          version="$(node -p 'require("./client/app.json").expo.version')"
+          grep -F "package: name='com.tavriko.app'" "$RUNNER_TEMP/tavriko-badging.txt" | grep -F "versionName='$version'"
+          target="$(sed -n "s/^targetSdkVersion:'\([0-9]*\)'$/\1/p" "$RUNNER_TEMP/tavriko-badging.txt")"
+          test "$target" -ge 36
+          grep -F "'arm64-v8a'" "$RUNNER_TEMP/tavriko-badging.txt"
+          "$tools/zipalign" -c -P 16 4 tavriko.apk
           {
-            echo "Commit: $GITHUB_SHA"
-            python3 scripts/verify-play-aab.py tavriko.aab "$RUNNER_TEMP/tavriko-manifest.xml"
-            sha256sum tavriko.aab
-          } | tee tavriko-aab-verification.txt
+            echo "Commit: $(git rev-parse HEAD)"
+            grep -E '^(package:|sdkVersion:|targetSdkVersion:|native-code:)' "$RUNNER_TEMP/tavriko-badging.txt"
+            "$signer" verify --verbose --print-certs tavriko.apk
+            sha256sum tavriko.apk
+          } | tee tavriko-apk-verification.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: tavriko-aab
+          name: tavriko-apk
           path: |
-            tavriko.aab
-            tavriko-aab-verification.txt
+            tavriko.apk
+            tavriko-apk-verification.txt
           if-no-files-found: error
