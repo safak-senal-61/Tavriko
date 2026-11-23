@@ -12,13 +12,13 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@sentry/cloudflare": "^11.12.0",
+    "@sentry/cloudflare": "^11.16.0",
     "@trivia/shared": "file:../shared"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261114.1",
+    "@cloudflare/workers-types": "^5.20261120.1",
     "typescript": "^5.7.3",
     "vitest": "^4.1.12",
-    "wrangler": "^4.162.0"
+    "wrangler": "^4.165.0"
   }
 }
