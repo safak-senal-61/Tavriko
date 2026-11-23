@@ -9,10 +9,12 @@ type Case = { id: string; subject: string; message: string; status: keyof typeof
 type Event = { id: string; action: 'warn' | 'restrict'; createdAt: string };
 const statuses = { open: 'Açık', in_progress: 'İnceleniyor', resolved: 'Sonuçlandı' };
 const date = (value: string) => new Date(value).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul' });
+const BUG_SUBJECT_LIMIT = 73; // The server adds the [HATA] prefix to the stored subject.
 
 export function SupportCases({ api, token, owner }: { api: string; token: string; owner: string }) {
   const [expanded, setExpanded] = useState(false);
   const [appeal, setAppeal] = useState<string | null>(null);
+  const [bug, setBug] = useState(false);
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [page, setPage] = useState(1);
@@ -21,6 +23,8 @@ export function SupportCases({ api, token, owner }: { api: string; token: string
   const sendRef = useRef<AbortController | null>(null);
   const endpoint = `${api.replace(/\/+$/, '')}/support`;
   const headers = { Authorization: `Bearer ${token}` };
+  const subjectLimit = bug ? BUG_SUBJECT_LIMIT : 80;
+  const invalid = (!appeal && (subject.trim().length < 4 || subject.trim().length > subjectLimit)) || message.trim().length < 12;
 
   const { data, loading, error, read } = usePageData<{ cases: Case[]; events: Event[]; more: boolean }>(
     expanded ? `${endpoint}?page=${page}` : null, PAGE_TTL.support, owner, token);
@@ -32,14 +36,14 @@ export function SupportCases({ api, token, owner }: { api: string; token: string
   }, [data]);
 
   async function send() {
-    if (sendRef.current || (!appeal && subject.trim().length < 4) || message.trim().length < 12) return;
+    if (sendRef.current || invalid) return;
     const controller = new AbortController();
     sendRef.current = controller;
     setSending(true); setNotice('');
     try {
       const response = await fetch(endpoint, {
         method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, signal: controller.signal,
-        body: JSON.stringify({ kind: appeal ? 'appeal' : 'support', ...(appeal ? { moderationId: appeal } : { subject }), message }),
+        body: JSON.stringify({ kind: appeal ? 'appeal' : bug ? 'bug' : 'support', ...(appeal ? { moderationId: appeal } : { subject }), message }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Talep gönderilemedi.');
@@ -47,7 +51,7 @@ export function SupportCases({ api, token, owner }: { api: string; token: string
         pageDataCache.invalidateWhere((url, scope) => scope === owner && url.startsWith(`${endpoint}?page=`));
       }
       if (controller.signal.aborted) return;
-      setSubject(''); setMessage(''); setAppeal(null); setNotice('Talebiniz kaydedildi.');
+      setSubject(''); setMessage(''); setAppeal(null); setNotice(bug ? 'Hata bildiriminiz kaydedildi.' : 'Talebiniz kaydedildi.');
       setPage(1);
     } catch (error) {
       if (!controller.signal.aborted) setNotice(error instanceof Error ? error.message : 'Talep gönderilemedi.');
@@ -61,24 +65,27 @@ export function SupportCases({ api, token, owner }: { api: string; token: string
     <Pressable accessibilityRole="button" accessibilityState={{ expanded }} style={s.button} onPress={() => {
       setExpanded(!expanded);
       if (!expanded) setPage(1);
-    }}><Text style={s.title}>Destek talepleri ve itirazlar</Text></Pressable>
+    }}><Text style={s.title}>Destek, hata bildirimi ve itirazlar</Text></Pressable>
     {expanded && <>
-      <Text style={s.secondary}>Hesabınızla ilgili bir talep açın veya son 30 gündeki bir moderasyon işlemine itiraz edin. Parola ve ödeme bilgisi yazmayın.</Text>
+      <Text style={s.secondary}>Destek talebi açın, hata bildirin veya son 30 gündeki bir moderasyon işlemine itiraz edin. Parola ve ödeme bilgisi yazmayın.</Text>
       <View accessibilityRole="radiogroup" style={s.group}>
-        <Pressable accessibilityRole="radio" accessibilityState={{ checked: appeal === null }} style={[s.choice, !appeal && s.selected]}
-          onPress={() => setAppeal(null)}><Text style={s.body}>Genel destek talebi</Text></Pressable>
+        <Pressable accessibilityRole="radio" disabled={sending} accessibilityState={{ checked: !appeal && !bug }} style={[s.choice, !appeal && !bug && s.selected]}
+          onPress={() => { setAppeal(null); setBug(false); }}><Text style={s.body}>Genel destek talebi</Text></Pressable>
+        <Pressable accessibilityRole="radio" disabled={sending} accessibilityState={{ checked: bug }} style={[s.choice, bug && s.selected]}
+          onPress={() => { setAppeal(null); setBug(true); }}><Text style={s.body}>Hata bildir</Text></Pressable>
         {events.map(event => <Pressable key={event.id} accessibilityRole="radio" accessibilityState={{ checked: appeal === event.id }}
-          style={[s.choice, appeal === event.id && s.selected]} onPress={() => setAppeal(event.id)}>
+          disabled={sending} style={[s.choice, appeal === event.id && s.selected]} onPress={() => { setBug(false); setAppeal(event.id); }}>
           <Text style={s.body}>{date(event.createdAt)} · {event.action === 'warn' ? 'Uyarıya itiraz et' : 'Kısıtlamaya itiraz et'}</Text>
         </Pressable>)}
       </View>
-      {!appeal && <TextInput accessibilityLabel="Talep konusu" placeholder="Talep konusu" placeholderTextColor="#AEA0C3"
-        value={subject} onChangeText={setSubject} maxLength={80} style={s.input} editable={!sending} />}
+      {!appeal && <TextInput accessibilityLabel={bug ? 'Hata konusu' : 'Talep konusu'} placeholder={bug ? 'Hata konusu' : 'Talep konusu'} placeholderTextColor="#AEA0C3"
+        value={subject} onChangeText={setSubject} maxLength={subjectLimit} style={s.input} editable={!sending} />}
+      {bug && subject.trim().length > subjectLimit && <Text style={s.secondary}>Hata konusu en fazla {subjectLimit} karakter olabilir.</Text>}
       <TextInput accessibilityLabel="Talep açıklaması" placeholder="Ne oldu? En az 12 karakter." placeholderTextColor="#AEA0C3"
         value={message} onChangeText={setMessage} maxLength={1200} multiline style={[s.input, s.message]} editable={!sending} />
-      <Pressable accessibilityRole="button" disabled={sending || (!appeal && subject.trim().length < 4) || message.trim().length < 12}
-        style={({ pressed }) => [s.button, s.primary, { opacity: sending || (!appeal && subject.trim().length < 4) || message.trim().length < 12 ? 0.55 : pressed ? 0.8 : 1 }]}
-        onPress={() => void send()}><Text style={s.primaryText}>{sending ? 'Gönderiliyor' : 'Talebi gönder'}</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={sending || invalid}
+        style={({ pressed }) => [s.button, s.primary, { opacity: sending || invalid ? 0.55 : pressed ? 0.8 : 1 }]}
+        onPress={() => void send()}><Text style={s.primaryText}>{sending ? 'Gönderiliyor' : bug ? 'Hata bildirimini gönder' : 'Talebi gönder'}</Text></Pressable>
       {!!notice && <Text accessibilityLiveRegion="polite" style={s.body}>{notice}</Text>}
       <View style={s.header}>
         <Text style={s.title}>Taleplerim</Text>

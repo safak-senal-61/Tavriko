@@ -9,6 +9,7 @@ import { addSupportNote, audit, compensationCatalog, grantInput, limits, moderat
 import { readPlayerAnalytics, readSignupCohorts } from '../services/playerAnalytics';
 import { readDuelFunnel } from '../services/duelFunnel';
 import { caseText, firstReplyHours, readCaseReplies, replyToCase, ticketKinds, updateCase } from '../services/supportCases';
+import { isBugReport, notifyPlayerOfBugUpdate } from '../services/supportBugEmails';
 
 const prefix = '/api/admin/accounts';
 const size = 20;
@@ -146,7 +147,7 @@ export function createAdminAccountsRouter(client = db.rawClient) {
       const overdue = admin.role === 'owner' ? await client.supportCase.count({ where: {
         status: { not: 'resolved' }, firstReplyAt: null, createdAt: { lte: deadline },
       } }) : null;
-      res.json({ targetHours, overdue, items: items.slice(0,20).map(item => ({ ...item,
+      res.json({ targetHours, overdue, items: items.slice(0,20).map(item => ({ ...item, bugReport: isBugReport(item),
         late: (item.firstReplyAt ?? new Date()).getTime() - item.createdAt.getTime() >= targetHours * 3_600_000,
         canEdit: admin.role === 'owner' || item.assignee === admin.email ||
         !directory.some(person => person.email === item.assignee && ticketKinds(person.role).includes(item.kind)) })), more: items.length > 20 && Number(page) < 999,
@@ -166,7 +167,11 @@ export function createAdminAccountsRouter(client = db.rawClient) {
     if (!uuidPattern.test(id) || !Number.isSafeInteger(revision) || revision < 0 || typeof ask !== 'boolean' || !body) {
       return res.status(400).json({ error: 'Mesajı ve talep bilgilerini kontrol edin.' });
     }
-    try { res.status(201).json(await replyToCase(client, id, { admin: res.locals.accountAdmin }, { revision, body, ask })); }
+    try {
+      const { email, ...reply } = await replyToCase(client, id, { admin: res.locals.accountAdmin }, { revision, body, ask });
+      const emailStatus = await notifyPlayerOfBugUpdate(client, email ?? null);
+      res.status(201).json({ ...reply, emailStatus });
+    }
     catch (error) { failed(res, error); }
   });
   router.post(prefix + '/cases/:id', mutation('cases', ['revision','assignee','status','reason','resolution']), async (req, res) => {
@@ -179,8 +184,9 @@ export function createAdminAccountsRouter(client = db.rawClient) {
       return res.status(400).json({ error: 'Talep durumunu, gerekçeyi ve varsa oyuncuya gönderilecek yanıtı kontrol edin.' });
     }
     try {
-      await updateCase(client, res.locals.accountAdmin, String(req.params.id), { revision, assignee, status, reason, resolution });
-      res.json({ success: true });
+      const email = await updateCase(client, res.locals.accountAdmin, String(req.params.id), { revision, assignee, status, reason, resolution });
+      const emailStatus = await notifyPlayerOfBugUpdate(client, email);
+      res.json({ success: true, emailStatus });
     } catch (error) { failed(res, error); }
   });
   router.get(prefix + '/risk', async (req, res) => {

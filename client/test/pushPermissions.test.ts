@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   openSettings: vi.fn(),
   sendIntent: vi.fn(),
   getDeviceToken: vi.fn(),
+  setNotificationChannel: vi.fn(async () => {}),
   session: { user: { id: 'player', isGuest: false }, token: 'session' },
 }));
 
@@ -18,7 +19,7 @@ vi.mock('expo-notifications', () => ({
   getPermissionsAsync: mocks.getPermissions, requestPermissionsAsync: mocks.requestPermissions,
   getDevicePushTokenAsync: mocks.getDeviceToken, AndroidImportance: { MAX: 5, HIGH: 4 },
   setNotificationHandler: vi.fn(), addNotificationResponseReceivedListener: vi.fn(),
-  setNotificationCategoryAsync: vi.fn(async () => {}), setNotificationChannelAsync: vi.fn(async () => {}),
+  setNotificationCategoryAsync: vi.fn(async () => {}), setNotificationChannelAsync: mocks.setNotificationChannel,
   getLastNotificationResponseAsync: vi.fn(async () => null),
 }));
 vi.mock('expo-constants', () => ({ default: { expoConfig: { android: { package: 'com.tavriko.app' } } } }));
@@ -35,6 +36,19 @@ beforeEach(() => {
 });
 
 describe('push permission and registration', () => {
+  it('waits for the Android channel to finish before requesting the first OS permission', async () => {
+    let finishChannel!: () => void;
+    mocks.getPermissions.mockResolvedValue({ status: 'undetermined', granted: false, canAskAgain: true });
+    mocks.requestPermissions.mockResolvedValue({ status: 'granted', granted: true, canAskAgain: true });
+    mocks.setNotificationChannel.mockImplementationOnce(() => new Promise<void>(resolve => { finishChannel = resolve; }));
+    const pending = enablePushFromUserAction();
+    await vi.waitFor(() => expect(mocks.setNotificationChannel).toHaveBeenCalledTimes(1));
+    expect(mocks.requestPermissions).not.toHaveBeenCalled();
+    finishChannel();
+    await expect(pending).resolves.toBe('granted');
+    expect(mocks.requestPermissions).toHaveBeenCalledOnce();
+  });
+
   it('never requests system permission during passive registration if push is off', async () => {
     mocks.getPermissions.mockResolvedValue({ granted: false, canAskAgain: true });
     await registerForPushNotifications('player');

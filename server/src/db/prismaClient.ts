@@ -156,6 +156,7 @@ export interface RegisterPayload {
   gender?: string;
   bio?: string;
   avatarUrl?: string;
+  legalConsent?: UserSettings['legalConsent'];
 }
 
 export interface PrismaHealth {
@@ -1803,6 +1804,7 @@ export class PrismaService {
         blockedUserIds: [] as any,
         eventProgress: {},
         friendIds: [],
+        settings: payload.legalConsent ? { legalConsent: payload.legalConsent } : {},
         createdAt: now,
         updatedAt: now,
       },
@@ -2140,8 +2142,10 @@ export class PrismaService {
     if (updates.equippedBadgeExpiresAt !== undefined) record.equippedBadgeExpiresAt = updates.equippedBadgeExpiresAt;
     if (updates.equippedNameEffectExpiresAt !== undefined) record.equippedNameEffectExpiresAt = updates.equippedNameEffectExpiresAt;
     if (updates.equippedBackgroundExpiresAt !== undefined) record.equippedBackgroundExpiresAt = updates.equippedBackgroundExpiresAt;
-    if (updates.settings !== undefined) {
-      record.settings = { ...(record.settings || {}), ...updates.settings };
+    const settingsPatch = { ...updates.settings };
+    delete settingsPatch.legalConsent;
+    if (record.isGuest) {
+      record.settings = { ...record.settings, ...settingsPatch };
     }
 
     record.updatedAt = Date.now();
@@ -2155,7 +2159,7 @@ export class PrismaService {
 
       // Kalıcı olarak Prisma PostgreSQL veritabanını güncelle!
       try {
-        await this.rawClient.user.update({
+        const updated = await this.rawClient.user.update({
           where: { id: record.id },
           data: {
             displayName: record.displayName,
@@ -2177,10 +2181,13 @@ export class PrismaService {
             equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
             equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
             blockedUserIds: (record.blockedUserIds || []) as any,
-            settings: (record.settings || {}) as any,
             updatedAt: new Date(),
           },
+          select: { settings: true },
         });
+        record.settings = Object.keys(settingsPatch).length
+          ? await this.mergePersistedSettings(this.rawClient, record.id, settingsPatch)
+          : updated.settings as UserSettings;
         console.log(`✅ [updateUserProfile] Prisma PostgreSQL kalıcı güncellendi: ${record.id} -> avatarUrl: ${record.avatarUrl}, title: ${record.rankTitle}`);
       } catch (dbErr) {
         console.error(`⚠️ [updateUserProfile] Prisma PostgreSQL güncelleme hatası:`, dbErr);
@@ -2197,32 +2204,35 @@ export class PrismaService {
     return this.toProfile(record);
   }
 
+  // Merge against the current row, not a cached settings snapshot. This also
+  // protects the consent receipt when other requests update unrelated fields.
+  private async mergePersistedSettings(client: Pick<PrismaClient, '$queryRaw'>, userId: string, patch: Partial<UserSettings>) {
+    const [saved] = await client.$queryRaw<{ settings: UserSettings }[]>`
+      UPDATE "users"
+      SET "settings" = COALESCE("settings", '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb,
+          "updatedAt" = NOW()
+      WHERE "id" = ${userId}
+      RETURNING "settings"`;
+    if (!saved) throw new Error('Kullanıcı bulunamadı.');
+    return saved.settings;
+  }
+
   public async updateUserSettings(
     userId: string,
     newSettings: Partial<UserSettings>
   ): Promise<UserProfile> {
-    let record = await this.loadRecord(userId);
+    const record = await this.loadRecord(userId);
     if (!record) throw new Error('Kullanıcı bulunamadı.');
 
-    record.settings = { ...(record.settings || {}), ...newSettings };
+    if (record.isGuest) {
+      if (newSettings.legalConsent) throw new Error('Misafir hesaplarında onay kaydedilemez.');
+      record.settings = { ...record.settings, ...newSettings };
+    } else {
+      record.settings = await this.mergePersistedSettings(this.rawClient, record.id, newSettings);
+    }
     record.updatedAt = Date.now();
     this.users.set(record.id, record);
     this.savePersistedUsers();
-
-    if (!record.isGuest) {
-      try {
-        await this.rawClient.user.update({
-          where: { id: record.id },
-          data: {
-            settings: record.settings as any,
-            updatedAt: new Date(),
-          },
-        });
-        console.log(`✅ [updateUserSettings] PostgreSQL ayarlar güncellendi: ${record.id}`);
-      } catch (err: any) {
-        console.warn('[updateUserSettings] DB error:', err.message);
-      }
-    }
 
     // If online status visibility was toggled
     if (newSettings.onlineStatusVisible !== undefined) {
@@ -4996,6 +5006,7 @@ export class PrismaService {
       return { user: this.toProfile(record), rewardText };
     }
     const originalCoins = record.coins, originalGems = record.gems || 0;
+    const boosterPatch: Partial<UserSettings> = {};
 
     const item = record.inventory.find((i) => i.id === itemId);
     if (!item || item.qty <= 0) {
@@ -5046,20 +5057,21 @@ export class PrismaService {
       if (itemId.startsWith('booster_xp_3x')) {
         const base = Math.max(Date.now(), record.xp3BoosterExpiresAt || 0);
         record.xp3BoosterExpiresAt = base + durationMs;
-        record.settings = { ...(record.settings || {}), xp3BoosterExpiresAt: new Date(record.xp3BoosterExpiresAt).toISOString() };
+        boosterPatch.xp3BoosterExpiresAt = new Date(record.xp3BoosterExpiresAt).toISOString();
         rewardText = `⚡ 3x XP iksiri aktif! ${durText} boyunca maçlardan kazanacağın XP 3 katına çıkar.`;
       } else if (itemId.startsWith('booster_coin')) {
         const base = Math.max(Date.now(), record.coinBoosterExpiresAt || 0);
         record.coinBoosterExpiresAt = base + durationMs;
-        record.settings = { ...(record.settings || {}), coinBoosterExpiresAt: new Date(record.coinBoosterExpiresAt).toISOString() };
+        boosterPatch.coinBoosterExpiresAt = new Date(record.coinBoosterExpiresAt).toISOString();
         rewardText = `🪙 2x Altın iksiri aktif! ${durText} boyunca maçlardan kazanacağın Altın 2 katına çıkar.`;
       } else {
         // booster_xp_2x (mevcut): 2x XP
         const base = Math.max(Date.now(), record.activeBoosterExpiresAt || 0);
         record.activeBoosterExpiresAt = base + durationMs;
-        record.settings = { ...(record.settings || {}), xpBoosterExpiresAt: new Date(record.activeBoosterExpiresAt).toISOString() };
+        boosterPatch.xpBoosterExpiresAt = new Date(record.activeBoosterExpiresAt).toISOString();
         rewardText = `⚡ 2x XP artırıcı aktif! ${durText} boyunca maçlardan kazanacağın XP 2 katına çıkar.`;
       }
+      record.settings = { ...record.settings, ...boosterPatch };
     } else {
       record.xp += 30;
       rewardText = `${item.name} aktif edildi: +30 XP kazandın!`;
@@ -5084,7 +5096,7 @@ export class PrismaService {
             data: {
               coins: { increment: record.coins - originalCoins },
               gems: { increment: (record.gems || 0) - originalGems },
-              xp: record.xp, level: record.level, settings: (record.settings || {}) as any,
+              xp: record.xp, level: record.level,
               equippedFrame: record.equippedFrame ?? null,
               equippedNameEffect: record.equippedNameEffect ?? null,
               equippedBackground: record.equippedBackground ?? null,
@@ -5092,17 +5104,21 @@ export class PrismaService {
               equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
               equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
             },
-            select: { coins: true, gems: true },
+            select: { coins: true, gems: true, settings: true },
           });
           const quantity = await tx.userInventoryItem.updateMany({ where: {
             userId: record.id, itemId, qty: { gt: 0 },
           }, data: { qty: { decrement: 1 } } });
           if (!quantity.count) throw new Error('Eşya artık envanterde yok.');
           await tx.userInventoryItem.deleteMany({ where: { userId: record.id, itemId, qty: 0 } });
-          return user;
+          const settings = Object.keys(boosterPatch).length
+            ? await this.mergePersistedSettings(tx, record.id, boosterPatch)
+            : user.settings as UserSettings;
+          return { ...user, settings };
         });
         record.coins = updated.coins;
         record.gems = updated.gems;
+        record.settings = updated.settings;
       } catch (err) {
         console.error('[useInventoryItem] DB update error:', err);
         if (process.env.DATABASE_URL || process.env.DIRECT_URL) throw new Error('Eşya kullanımı kaydedilemedi. Envanteri yenileyip tekrar deneyin.');

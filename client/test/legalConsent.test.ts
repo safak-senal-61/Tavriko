@@ -1,0 +1,39 @@
+import { LEGAL_VERSION, type UserProfile } from '@trivia/shared';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { needsLegalConsent, preserveLegalConsent, submitLegalConsent } from '../src/utils/legalConsent';
+
+const user = { id: 'player', settings: { onlineStatusVisible: true } } as UserProfile;
+const receipt = { version: LEGAL_VERSION, acceptedAt: '2026-11-23T00:00:00.000Z', documents: [], method: 'in_app' } as const;
+const accepted = { ...user, settings: { ...user.settings, legalConsent: { ...receipt, documents: [] } } };
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('account legal consent', () => {
+  it('keeps an approved receipt after a partial or stale profile update', () => {
+    for (const settings of [undefined, { onlineStatusVisible: false }, {
+      legalConsent: { ...receipt, version: 'old', documents: [] },
+    }]) {
+      const merged = preserveLegalConsent(accepted, { ...user, settings });
+      expect(merged?.settings?.legalConsent).toEqual(receipt);
+      expect(needsLegalConsent(merged, false)).toBe(false);
+    }
+  });
+
+  it('does not transfer approval to a different account or bypass new terms', () => {
+    expect(needsLegalConsent(preserveLegalConsent(accepted, { ...user, id: 'other' }), false)).toBe(true);
+    expect(preserveLegalConsent(accepted, null)).toBeNull();
+    expect(needsLegalConsent({ ...accepted, settings: { legalConsent: { ...receipt, version: 'old', documents: [] } } }, false)).toBe(true);
+    expect(needsLegalConsent(user, true)).toBe(false);
+  });
+
+  it('only accepts a successful response that contains the current receipt', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'Tekrar dene' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ user }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ user: accepted }) }));
+    const submit = () => submitLegalConsent('https://example.invalid/api', 'fixture', 'in_app');
+    await expect(submit()).rejects.toThrow('Tekrar dene');
+    await expect(submit()).rejects.toThrow('Onay kaydedilemedi');
+    await expect(submit()).resolves.toEqual(accepted);
+  });
+});

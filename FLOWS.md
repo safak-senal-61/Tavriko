@@ -1,5 +1,12 @@
 # Visual refresh acceptance and regression checks
 
+## Rewards alignment, privacy and account prompts
+
+- Oyna → Ödüller: the chevron sits at the right and its center matches the card's center at desktop and 375px; the whole card still opens Ödüller.
+- Ayarlar → Gizlilik: delay the İlk Düello ölçümü response. Ineligible players never see the card; an eligible player can enroll, and an enrolled player can withdraw. A failed load offers a retry without showing enrollment copy.
+- Sign in with and without current legal consent. A prior approval must survive a sparse profile refresh, sign-out/sign-in and a fresh device session. A failed consent write leaves the prompt actionable; current consent or updated terms behave independently from analytics permission.
+- Android: on a fresh install, dismiss or deny analytics and leave push off. From Oyna use the reminder, or open Ayarlar → Anlık Bildirimler. Verify the OS permission request, denied/blocked handling and foreground status refresh. With permission granted, verify FCM registration and no reminder. Do not send notifications to production users during QA.
+
 ## Gameplay rewards
 
 - Baseline: sign-in opens Oyna; Mağaza previously opened on Sandıklar with Anahtarlar and Rozetler tabs. Envanter is where owned items are opened or equipped.
