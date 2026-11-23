@@ -180,6 +180,30 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     } finally { questionRead.mockRestore(); }
   });
 
+  it('buys a depleted quiz joker in one operation and charges once under duplicate taps', async () => {
+    const { createJokerApp } = await import('../src/jokerApp');
+    const id = await player('quick_buy');
+    await client.user.update({ where: { id }, data: { coins: 600 } });
+    const previous = await item(id, 'joker_eliminate');
+    await client.userInventoryItem.update({ where: { id: previous.id }, data: { qty: 0 } });
+    const fast = request(createJokerApp());
+    const buy = (productId = 'joker_eliminate') => fast.post('/api/social/shop/jokers/quick-purchase')
+      .set('Authorization', auth(id)).send({ productId, price: 0, paymentMethod: 'try' });
+    await buy('starter_pack').expect(400);
+    const responses = await Promise.all([buy(), buy()]);
+    expect(responses.map(res => res.status).sort()).toEqual([200, 409]);
+    expect(responses.find(res => res.ok)?.body).toMatchObject({ coins: 350, item: { id: 'joker_eliminate', qty: 1 } });
+    expect(await inventory(id)).toMatchObject([{ itemId: 'joker_eliminate', qty: 1 }]);
+    expect(await client.user.findUnique({ where: { id } })).toMatchObject({ coins: 350 });
+    await buy('joker_half').expect(409);
+    const firstPurchase = await buy('joker_initial').expect(200);
+    expect(firstPurchase.body).toMatchObject({ coins: 150, item: { id: 'joker_initial', qty: 1 } });
+    expect(await inventory(id)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemId: 'joker_eliminate', qty: 1 }),
+      expect.objectContaining({ itemId: 'joker_initial', qty: 1 }),
+    ]));
+  });
+
   it('does not consume a tactic in a standard duel and debits an eligible tactic only once', async () => {
     const userId = await player('bot_tactic');
     expect((await post(userId, '/shop/purchase', { productId: 'joker_double' })).status).toBe(200);

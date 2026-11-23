@@ -606,10 +606,12 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const [localSelectedOptionId, setLocalSelectedOptionId] = useState<string | null>(null);
   const [jokersOpen, setJokersOpen] = useState(false);
   const [jokerBusy, setJokerBusy] = useState(false);
+  const [buyingJoker, setBuyingJoker] = useState<JokerId>();
   const [applyingJokerRound, setApplyingJokerRound] = useState<string>();
   const [jokerError, setJokerError] = useState<string>();
   const [jokerResult, setJokerResult] = useState<{ key: string; effect: JokerEffect }>();
   const jokerLock = useRef(false);
+  const purchaseLock = useRef(false);
   const arenaScrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const jokerRound = `${question.id}:${question.roundNumber}:${question.jokerProof ?? question.jokerRoundStartedAt ?? ''}`;
   const jokerApplying = applyingJokerRound === jokerRound;
@@ -702,18 +704,21 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     }
   }, [jokerRound, question.jokerPauseUntil, question.jokerPauseRemainingMs]);
   const useJokerAction = async (id: JokerId, buy: boolean) => {
-    if (!jokers || jokerLock.current || isOptionsDisabled || jokerEffect) return;
+    if (!jokers || jokerLock.current || purchaseLock.current || isOptionsDisabled || (!buy && jokerEffect)) return;
     const tapTime = Date.now();
     if (tapTime >= endTimeRef.current) {
       setJokerError('Bu sorunun süresi doldu.');
       return;
     }
-    jokerLock.current = true;
-    if (!buy) {
+    if (buy) {
+      purchaseLock.current = true;
+      setBuyingJoker(id);
+    } else {
+      jokerLock.current = true;
       setApplyingJokerRound(jokerRound);
-      sound.triggerHaptic('light');
+      setJokerBusy(true);
     }
-    setJokerBusy(true);
+    sound.triggerHaptic('light');
     setJokerError(undefined);
     try {
       if (buy) {
@@ -738,9 +743,14 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         setJokerError(error instanceof Error ? error.message : 'İşlem tamamlanamadı.');
       }
     } finally {
-      jokerLock.current = false;
-      setJokerBusy(false);
-      setApplyingJokerRound(undefined);
+      if (buy) {
+        purchaseLock.current = false;
+        setBuyingJoker(undefined);
+      } else {
+        jokerLock.current = false;
+        setJokerBusy(false);
+        setApplyingJokerRound(undefined);
+      }
     }
   };
   useEffect(() => {
@@ -1130,11 +1140,18 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       {jokers && (
         <View style={styles.jokerRow}>
           {jokerEffect || frozen || jokerBusy || (jokerRetry && !isOptionsDisabled) ? (
-            <View style={styles.jokerStatus}>
-              <Text accessibilityLiveRegion="polite" style={styles.jokerTriggerText}>
+            <View style={[styles.jokerStatus, jokerEffect && !isOptionsDisabled && styles.jokerActions]}>
+              <Text accessibilityLiveRegion="polite" style={[styles.jokerTriggerText, jokerEffect && !isOptionsDisabled && styles.jokerStrip]}>
                 {frozen ? 'Sayacın donduruldu' : clockPaused ? 'Sayaç duraklatıldı' :
                   jokerRetry?.hint ?? jokerEffect?.hint ?? (jokerApplying ? 'Joker uygulanıyor…' : jokerBusy ? 'İşlem yapılıyor…' : 'Joker kullanıldı')}
               </Text>
+              {jokerEffect && !isOptionsDisabled && (
+                <TouchableOpacity style={[styles.jokerTrigger, styles.jokerShopTrigger, styles.jokerAfterUse]}
+                  accessibilityRole="button" accessibilityLabel="Joker satın al"
+                  onPress={() => { setJokerError(undefined); setJokersOpen(true); }}>
+                  <Text numberOfLines={1} style={styles.jokerTriggerText}>Joker Al</Text>
+                </TouchableOpacity>
+              )}
             </View>
           ) : !isOptionsDisabled && (
             <View style={styles.jokerActions}>
@@ -1165,10 +1182,10 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           )}
         </View>
       )}
-      {jokers && jokersOpen && !jokerEffect && !isOptionsDisabled && (
+      {jokers && jokersOpen && !isOptionsDisabled && (
         <JokerPurchasePanel user={jokers.user} options={question.options} live={isMultiplayer} tactics={question.jokerTactics} capabilities={question.jokerCapabilities}
           lightningAvailable={lightningAvailable}
-          busy={jokerBusy} error={jokerError} onClose={() => setJokersOpen(false)}
+          buying={buyingJoker} error={jokerError} onClose={() => setJokersOpen(false)}
           onBuy={id => { void useJokerAction(id, true); }} />
       )}
 
@@ -1364,6 +1381,7 @@ const styles = StyleSheet.create({
   jokerTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 34, gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 9, borderWidth: 1, borderColor: '#72597F', backgroundColor: '#271B40' },
   jokerUnavailable: { opacity: .55 },
   jokerShopTrigger: { borderColor: '#AA794B', backgroundColor: '#402948', flexShrink: 0 },
+  jokerAfterUse: { marginLeft: 'auto' },
   jokerTriggerText: { color: '#FFE0B1', flexShrink: 1, fontSize: 11, fontFamily: THEME.fonts.extraBold },
   jokerInlineError: { color: '#FFB7C9', fontSize: 12 },
   screenContainer: {

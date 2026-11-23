@@ -15,8 +15,8 @@ export function JokerGroupTabs({ selected, onChange }: { selected: JokerGroup | 
   </View>;
 }
 
-function Panel({ title, onClose, children }: React.PropsWithChildren<{ title: string; onClose: () => void }>) {
-  return <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+function Panel({ title, onClose, children, instant }: React.PropsWithChildren<{ title: string; onClose: () => void; instant?: boolean }>) {
+  return <Modal visible transparent animationType={instant ? 'none' : 'fade'} onRequestClose={onClose}>
     <View style={s.scrim}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessible={false} />
       <View style={s.panel} accessibilityViewIsModal>
@@ -45,8 +45,8 @@ export function LowWalletPanel({ kind, amount, onClose, onStore }: {
   </Panel>;
 }
 
-export function JokerPurchasePanel({ user, options, live, tactics, capabilities, lightningAvailable, busy, error, onBuy, onClose }: {
-  user: UserProfile; busy: boolean; error?: string;
+export function JokerPurchasePanel({ user, options, live, tactics, capabilities, lightningAvailable, buying, error, onBuy, onClose }: {
+  user: UserProfile; buying?: JokerId; error?: string;
   options: QuestionOption[]; onBuy: (id: JokerId) => void; onClose: () => void;
   live?: boolean; tactics?: JokerTactics; capabilities?: ClientQuestion['jokerCapabilities']; lightningAvailable?: boolean;
 }) {
@@ -54,7 +54,7 @@ export function JokerPurchasePanel({ user, options, live, tactics, capabilities,
   const stock = new Map(user.inventory?.map(item => [item.id, item.qty]));
   const available = JOKERS.filter(joker => (stock.get(joker.id) ?? 0) <= 0 &&
     (!group || joker.group === group) && canUseJoker(joker.id, options, { live, tactics, capabilities, lightningAvailable }));
-  return <Panel title="Joker satın al" onClose={onClose}>
+  return <Panel title="Joker satın al" onClose={onClose} instant>
     <View style={s.wallet}><CoinIcon size={17} /><Text style={s.balance}>{walletAmount(user.coins ?? 0)} altın</Text></View>
     <Text style={s.desc}>Bu soruya uygun, sende olmayan jokerler. Sayaç işlemeye devam eder.</Text>
     <JokerGroupTabs selected={group} onChange={setGroup} />
@@ -64,16 +64,16 @@ export function JokerPurchasePanel({ user, options, live, tactics, capabilities,
     {available.map(joker => {
       const canBuy = user.coins >= joker.price;
       return <View key={joker.id} style={s.joker}>
-        <WalletArtwork kind={joker.id} size={62} />
+        <WalletArtwork kind={joker.id} size={38} />
         <View style={s.detail}>
           <Text style={s.itemTitle}>{joker.name}</Text>
           <Text style={s.itemDesc}>{joker.desc}</Text>
-          <View style={s.actions}>
-            <Pressable style={[s.buy, !canBuy && s.disabled]} disabled={busy || !canBuy} onPress={() => onBuy(joker.id)} accessibilityRole="button" accessibilityLabel={`${joker.name} satın al: ${joker.price} altın`}>
-              <CoinIcon size={15} /><Text style={s.buyText}>{joker.price} · Al</Text>
-            </Pressable>
-          </View>
         </View>
+        <Pressable style={[s.buy, !canBuy && s.disabled]} disabled={!!buying || !canBuy} onPress={() => onBuy(joker.id)}
+          accessibilityRole="button" accessibilityLabel={`${joker.name} satın al: ${joker.price} altın`}
+          accessibilityState={{ busy: buying === joker.id, disabled: !!buying || !canBuy }}>
+          <CoinIcon size={15} /><Text style={s.buyText}>{buying === joker.id ? 'Alınıyor…' : `${joker.price} · Al`}</Text>
+        </Pressable>
       </View>;
     })}
     </ScrollView>
@@ -101,7 +101,6 @@ const s = StyleSheet.create({
   detail: { flex: 1, gap: 4 },
   itemTitle: { color: '#F8F2FF', fontSize: 15, fontFamily: THEME.fonts.extraBold },
   itemDesc: { color: '#CBBEDD', fontSize: 12, fontFamily: THEME.fonts.bold },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 3 },
   buy: { flexDirection: 'row', alignItems: 'center', gap: 5, borderColor: '#8F6F60', borderWidth: 1, minHeight: 40, paddingHorizontal: 10, borderRadius: 8 },
   disabled: { opacity: .55 },
   buyText: { color: '#FFE2AC', fontFamily: THEME.fonts.extraBold, fontSize: 13 },
