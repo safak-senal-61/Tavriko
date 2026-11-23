@@ -1,7 +1,6 @@
 import React from 'react';
 import { Image, type ImageSourcePropType } from 'react-native';
 import type { JokerId } from '@trivia/shared';
-import { JokerArtwork } from './JokerArtwork';
 
 export type WalletArt = 'diamonds' | 'gold' | JokerId;
 
@@ -31,17 +30,18 @@ const JOKER_POSTERS = {
   joker_streak_guard: require('../../bundled/jokers/poster/seri-koruyucu.webp'),
   joker_lightning: require('../../bundled/jokers/poster/simsek-cevap.webp'),
   joker_double: require('../../bundled/jokers/poster/cifte-puan.webp'),
-} satisfies Record<Exclude<JokerId, 'joker_initial' | 'joker_word_count'>, ImageSourcePropType>;
+  joker_initial: require('../../bundled/jokers/poster/ilk-karakter.webp'),
+  joker_word_count: require('../../bundled/jokers/poster/kelime-sayisi.webp'),
+} satisfies Record<JokerId, ImageSourcePropType>;
 
 export function WalletArtwork({ kind, size = 88, tier = 1 }: { kind: WalletArt; size?: number; tier?: number }) {
-  if (kind === 'joker_initial' || kind === 'joker_word_count') return <JokerArtwork kind={kind} size={size} />;
   const isJoker = kind !== 'diamonds' && kind !== 'gold';
   const source = isJoker ? JOKER_POSTERS[kind] : WALLET_PACKS[kind][tier - 1] ?? WALLET_PACKS[kind][0];
 
   return (
     <Image
       source={source}
-      style={{ width: size, height: size, borderRadius: isJoker ? size / 6 : 0 }}
+      style={{ width: size, height: size }}
       resizeMode="contain"
       fadeDuration={0}
       accessible={false}

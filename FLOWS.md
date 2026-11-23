@@ -12,7 +12,7 @@
 ## Wallet and joker artwork
 
 - Mağaza → Elmas / Altın: each of the four packages uses its original image, from small to extra large. The category artwork and the profile's low-balance panel use the medium original.
-- Mağaza → Jokerler: Tek Eleme and Yarı Yarıya use two distinct poster-derived illustrations. Inspect them on the product list and confirmation, and confirm the prices remain 250 and 450 altın.
+- Mağaza → Jokerler: Tek Eleme and Yarı Yarıya use two distinct illustrations, redrawn from the poster motifs. Inspect the edges on the product list, purchase confirmation, inventory and the smaller in-match menu. Confirm the prices remain 250 and 450 altın.
 - Envanter and antrenman → Jokerlerim: owned joker items show the same artwork as the store. The quiz shortcut remains legible at its smaller size; the panel can still be opened and dismissed, including when stock is empty.
 - At desktop and 375px, inspect the artwork for visible edges, correct proportions, no clipping, and no vector fallback. Native bundle must contain all ten images; do not make live purchases for visual QA.
 
