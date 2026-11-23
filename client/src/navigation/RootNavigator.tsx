@@ -14,6 +14,7 @@ import {
   Image,
   Linking,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useGameStore, clearAllAccountStorage } from '../store/gameStore';
 import { authHeaders } from '../utils/apiAuth';
@@ -107,7 +108,7 @@ import {
   consumeGoogleLegalAck,
   isLegalUpdate,
   needsLegalConsent,
-  rememberLocalConsent,
+  preserveLegalConsent,
   submitLegalConsent,
 } from '../utils/legalConsent';
 
@@ -276,12 +277,7 @@ export const RootNavigator: React.FC = () => {
       ) {
         preservedAvatar = current.avatarUrl;
       }
-      // Bazı profil uçları settings alanını kısmi döndürür; yasal onay kaydı kaybolmasın.
-      const currentConsent = (current?.settings as any)?.legalConsent;
-      const freshSettings = fresh.settings
-        ? { ...fresh.settings, ...(currentConsent && !(fresh.settings as any).legalConsent ? { legalConsent: currentConsent } : {}) }
-        : current?.settings;
-      setUser({ ...(current || {}), ...fresh, settings: freshSettings, avatarUrl: preservedAvatar } as UserProfile);
+      setUser({ ...(current || {}), ...fresh, settings: fresh.settings ?? current?.settings, avatarUrl: preservedAvatar } as UserProfile);
     },
     [setUser]
   );
@@ -292,16 +288,19 @@ export const RootNavigator: React.FC = () => {
   const [autoLegalInFlight, setAutoLegalInFlight] = useState(false);
   const autoGoogleConsentTriedRef = useRef<string | null>(null);
   const realSessionToken = token && token !== 'mock_token' ? token : null;
+  const [checkedLegalSession, setCheckedLegalSession] = useState<{ id: string; token: string } | null>(null);
   useEffect(() => {
     if (!user?.id || user.isGuest || !realSessionToken) return;
     const controller = new AbortController();
     void duelFunnelPreference(getApiBaseUrl(), user.id, realSessionToken, undefined, controller.signal).catch(() => {});
     return () => controller.abort();
   }, [user?.id, user?.isGuest, realSessionToken]);
-  const showLegalGate =
-    Boolean(realSessionToken) && currentScreen !== 'auth' && currentScreen !== 'splash' && needsLegalConsent(user, isGuest);
+  const pendingLegalConsent = Boolean(realSessionToken) && needsLegalConsent(user, isGuest);
+  const shouldCheckLegal = pendingLegalConsent && currentScreen !== 'auth' && currentScreen !== 'splash';
+  const showLegalGate = shouldCheckLegal && checkedLegalSession?.id === user?.id &&
+    checkedLegalSession?.token === realSessionToken;
   const consent = useAnalyticsConsent();
-  const signedInPlayer = realSessionToken && !isGuest && !showLegalGate &&
+  const signedInPlayer = realSessionToken && !isGuest && !pendingLegalConsent &&
     currentScreen !== 'auth' && currentScreen !== 'splash' ? user?.id ?? null : null;
   const safePromptScreen = Boolean(signedInPlayer && !activeRoom && !gameAlert && !viewingProfile && netOnline);
   const showAnalyticsConsent = consent === null && safePromptScreen &&
@@ -326,16 +325,18 @@ export const RootNavigator: React.FC = () => {
       setLegalGateError(null);
       try {
         const updated = await submitLegalConsent(API_BASE, current.token, method);
-        rememberLocalConsent(current.user.id);
-        if (updated) syncWithFreshUser(updated);
-        else setUser({ ...current.user } as UserProfile);
+        const latest = useGameStore.getState();
+        if (latest.token === current.token && latest.user?.id === updated.id) {
+          // Merge only the receipt so a late response cannot roll back newer profile data.
+          setUser({ ...latest.user, settings: { ...latest.user.settings, legalConsent: updated.settings?.legalConsent } });
+        }
       } catch (err: any) {
         setLegalGateError(err?.message || 'Onay kaydedilemedi. Lütfen tekrar dene.');
       } finally {
         setLegalSubmitting(false);
       }
     },
-    [syncWithFreshUser, setUser]
+    [setUser]
   );
 
   // Google butonunun altındaki bildirimle giriş yapıldıysa onayı otomatik kaydet.
@@ -358,9 +359,9 @@ export const RootNavigator: React.FC = () => {
     try {
       const fresh = await pageDataCache.load<UserProfile>(url, PAGE_TTL.profile, { scope: owner, token: current.token });
       const latest = useGameStore.getState();
+      if (fresh?.id !== owner || latest.user?.id !== owner || latest.token !== current.token) return;
       // A warm read or a request started before another local update must not roll back the account.
-      if (fresh?.id === owner && latest.user === current.user && latest.token === current.token
-          && pageDataCache.snapshot(url, owner) !== previous) {
+      if (latest.user === current.user && pageDataCache.snapshot(url, owner) !== previous) {
         const localAvatar = current.user.avatarUrl;
         // Preserve the boot-time migration for older accounts with a locally chosen avatar.
         if (!afterWrite && localAvatar && !['av1', 'av_1'].includes(localAvatar)
@@ -372,11 +373,22 @@ export const RootNavigator: React.FC = () => {
           }).catch(() => {});
           syncWithFreshUser({ ...fresh, avatarUrl: localAvatar });
         } else syncWithFreshUser(fresh);
+      } else {
+        // A confirmed current receipt is safe to recover even from a partial refresh.
+        const withReceipt = preserveLegalConsent(fresh, latest.user);
+        if (withReceipt !== latest.user) setUser(withReceipt);
       }
     } catch {}
-  }, [syncWithFreshUser]);
+  }, [setUser, syncWithFreshUser]);
 
-  useEffect(() => { if (user?.id && !isGuest) void refreshUserProfile(); }, [user?.id, token, isGuest, refreshUserProfile]);
+  useEffect(() => {
+    setCheckedLegalSession(null);
+    if (!user?.id || isGuest || !realSessionToken) return;
+    const session = { id: user.id, token: realSessionToken };
+    let active = true;
+    void refreshUserProfile().finally(() => { if (active) setCheckedLegalSession(session); });
+    return () => { active = false; };
+  }, [user?.id, realSessionToken, isGuest, refreshUserProfile]);
 
   // One inbox for every screen: HTTP reconnect snapshots and socket arrivals
   // share the same IDs, read receipts and exact badge count.
@@ -1661,6 +1673,13 @@ export const RootNavigator: React.FC = () => {
   const handleTimeExpired = () => {
     if (!activeRoom) void evaluatePracticeAnswer(null, 0);
   };
+  if (shouldCheckLegal && (!showLegalGate || autoLegalInFlight)) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#180B34' }}>
+        <ActivityIndicator color="#FFC43D" accessibilityLabel="Hesap onayı kontrol ediliyor" />
+      </View>
+    );
+  }
   return (
     <View style={[
       styles.outerWrapper,
@@ -2441,6 +2460,7 @@ export const RootNavigator: React.FC = () => {
         </ScrollView>
       )}
       <LegalConsentGate
+        key={user?.id ?? 'signed-out'}
         visible={showLegalGate && !autoLegalInFlight}
         isUpdate={isLegalUpdate(user)}
         submitting={legalSubmitting}
@@ -2457,8 +2477,7 @@ export const RootNavigator: React.FC = () => {
       {showAnalyticsConsent && <AnalyticsConsentBanner />}
       {pushSupported && signedInPlayer && (
         <PushPermissionReminder
-          eligible={safePromptScreen && currentScreen === 'home' && push.foreground && !push.busy &&
-            (consent === 'granted' || consent === 'denied')}
+          eligible={safePromptScreen && currentScreen === 'home' && push.foreground && !push.busy && !showAnalyticsConsent}
           permission={push.status}
           onEnable={push.enable}
         />

@@ -18,15 +18,18 @@ export function DuelFunnelPreference({ api, account, token }: { api: string; acc
     finally { if (request.current === controller) request.current = null; if (!controller.signal.aborted) setBusy(false); }
   }
   useEffect(() => { void refresh(); return () => { request.current?.abort(); request.current = null; }; }, [api, account, token]);
+  if (!value && !error) return null;
   if (value && !value.optedIn && !value.canEnroll) return null;
   return <View style={s.panel}>
-    <Text style={s.title}>İlk Düello ölçümü</Text>
-    <Text style={s.copy}>İstersen ilk yedi gündeki Hızlı Düello seçimi, eşleşme ve tamamlanma adımlarını Tavriko’da toplu sayılara dahil et. Katılmamak oyunu etkilemez. İzni kaldırırsan ölçüm kayıtların silinir.</Text>
+    {value && <>
+      <Text style={s.title}>İlk Düello ölçümü</Text>
+      <Text style={s.copy}>İstersen ilk yedi gündeki Hızlı Düello seçimi, eşleşme ve tamamlanma adımlarını Tavriko’da toplu sayılara dahil et. Katılmamak oyunu etkilemez. İzni kaldırırsan ölçüm kayıtların silinir.</Text>
+    </>}
     {!!error && <Text style={s.copy} accessibilityLiveRegion="polite">{error}</Text>}
-    {(value || error) && <Pressable style={s.button} disabled={busy} accessibilityRole="button"
+    <Pressable style={s.button} disabled={busy} accessibilityRole="button"
       onPress={() => void refresh(value ? value.optedIn ? 'withdraw' : 'enroll' : undefined)}>
       <Text style={s.label}>{busy ? 'Kaydediliyor' : !value ? 'Tekrar dene' : value.optedIn ? 'Ölçüm iznini kaldır' : 'Ölçüme katıl'}</Text>
-    </Pressable>}
+    </Pressable>
   </View>;
 }
 

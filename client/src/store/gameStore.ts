@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { pageDataCache } from '../utils/pageDataCache';
+import { preserveLegalConsent } from '../utils/legalConsent';
 import {
   UserProfile,
   GameRoom,
@@ -163,13 +164,11 @@ const getCompletedScore = (
 export const useGameStore = create<GameState>((set) => ({
   user: initialAuth.user,
   token: initialAuth.token,
-  setUser: (user, token) => {
-    saveStoredAuth(user, token);
-    set((state) => ({
-      user,
-      token: token !== undefined ? token : state.token,
-    }));
-  },
+  setUser: (user, token) => set((state) => {
+    const profile = preserveLegalConsent(state.user, user);
+    saveStoredAuth(profile, token);
+    return { user: profile, token: token !== undefined ? token : state.token };
+  }),
   activeRoom: null,
   setActiveRoom: (activeRoom) =>
     set((state) => {

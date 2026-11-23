@@ -775,7 +775,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         </>}
 
         {settingsTab === 'privacy' && <>
-        {!!token && user && !user.isGuest && <DuelFunnelPreference api={Platform.OS === 'web' ? getApiBaseUrl() : apiBaseUrl || getApiBaseUrl()} account={user.id} token={token} />}
+        {token && token !== 'mock_token' && user && !user.isGuest && <DuelFunnelPreference key={`${user.id}:${token}`} api={Platform.OS === 'web' ? getApiBaseUrl() : apiBaseUrl || getApiBaseUrl()} account={user.id} token={token} />}
         {/* 4. Privacy & WebSocket Presence Section */}
         <View style={styles.sectionHeader}>
           <ShieldIcon size={18} color="#FFC43D" />

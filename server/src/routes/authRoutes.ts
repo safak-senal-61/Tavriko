@@ -100,14 +100,8 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
       gender,
       bio,
       avatarUrl,
+      legalConsent: buildLegalConsent('register'),
     });
-    try {
-      const updatedUser = await db.updateUserSettings(result.user.id, { legalConsent: buildLegalConsent('register') });
-      res.json({ ...result, user: updatedUser });
-      return;
-    } catch (consentErr: any) {
-      logger.warn('AUTH', `Kayıt sonrası yasal onay kaydedilemedi: ${consentErr.message}`);
-    }
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -401,8 +395,9 @@ router.post('/legal-consent', requireUserAuth, async (req: Request, res: Respons
     const updated = await db.updateUserSettings(userId, { legalConsent: buildLegalConsent(safeMethod) });
     logger.info('AUTH', `Yasal metin onayı kaydedildi (${safeMethod}, ${LEGAL_VERSION}): ${userId}`);
     res.json({ success: true, user: updated, legalVersion: LEGAL_VERSION });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
+  } catch {
+    logger.warn('AUTH', 'Yasal metin onayı kalıcı olarak kaydedilemedi.');
+    res.status(503).json({ error: 'Onay kaydedilemedi. Lütfen tekrar dene.' });
   }
 });
 
@@ -421,8 +416,8 @@ router.post('/settings', requireUserAuth, async (req: Request, res: Response): P
     delete (safeSettings as any).legalConsent;
     const updated = await db.updateUserSettings(userId, safeSettings);
     res.json({ success: true, user: updated });
-  } catch (err: any) {
-    res.status(400).json({ error: err.message });
+  } catch {
+    res.status(503).json({ error: 'Ayarlar kaydedilemedi. Lütfen tekrar dene.' });
   }
 });
 

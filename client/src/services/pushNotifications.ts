@@ -95,6 +95,21 @@ async function registerNotificationCategories(): Promise<void> {
  * Push bildirimlerini başlatır: kategoriler (eylem butonları), Android
  * bildirim kanalları ve dokunuş yönlendirmesi.
  */
+let androidDefaultChannel: Promise<unknown> | undefined;
+
+function ensureAndroidDefaultChannel() {
+  return androidDefaultChannel ??= Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
+    name: ANDROID_CHANNEL_NAME,
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#FFC43D',
+    sound: 'notification.wav',
+  }).catch(error => {
+    androidDefaultChannel = undefined;
+    throw error;
+  });
+}
+
 export function initPushNotifications(): void {
   if (initialized || Platform.OS === 'web') return;
   initialized = true;
@@ -128,14 +143,7 @@ export function initPushNotifications(): void {
     .catch(() => {});
 
   if (Platform.OS === 'android') {
-    void Notifications.setNotificationChannelAsync(ANDROID_CHANNEL_ID, {
-      name: ANDROID_CHANNEL_NAME,
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FFC43D',
-      // Özel bildirim sesi: res/raw/notification.wav (config plugin kopyalar).
-      sound: 'notification.wav',
-    }).catch(() => {});
+    void ensureAndroidDefaultChannel().catch(() => {});
     // Davetler (arkadaşlık isteği / düello) ayrı kanalda: farklı ses,
     // yüksek öncelik. Sunucu data.channelId ile bu kanalı hedefler.
     void Notifications.setNotificationChannelAsync('invites', {
@@ -182,7 +190,11 @@ export async function getPushPermission(): Promise<PushPermission> {
 export async function enablePushFromUserAction(): Promise<PushPermission> {
   if (!pushSupported) return 'unknown';
   const current = await getPushPermission();
-  if (current === 'requestable') return permissionState(await Notifications.requestPermissionsAsync());
+  if (current === 'requestable') {
+    // Android 13+ needs a notification channel before the first OS prompt.
+    if (Platform.OS === 'android') await ensureAndroidDefaultChannel();
+    return permissionState(await Notifications.requestPermissionsAsync());
+  }
   if (current === 'blocked') await openPushSettings();
   return current;
 }

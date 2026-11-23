@@ -14,6 +14,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import Reanimated, { FadeInDown } from 'react-native-reanimated';
+import { ChevronRight } from 'lucide-react-native';
 import { UserProfile, calculateLevelFromXp } from '@trivia/shared';
 import { resolveProfileTitle } from '../utils/profileTitle';
 import { THEME } from '../theme/tokens';
@@ -574,7 +575,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <Text style={styles.rewardsTitle}>Ödüller</Text>
                 <Text style={styles.rewardsSubtitle}>Maçlarla sandık, görevlerle rozet kazan</Text>
               </View>
-              <Text style={styles.rewardsArrow} accessible={false}>›</Text>
+              <View style={styles.rewardsArrow} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                <ChevronRight size={20} color="#FFE28B" />
+              </View>
             </TouchableOpacity>
           )}
           </Reanimated.View>
@@ -619,7 +622,7 @@ const styles = StyleSheet.create({
   rewardsArt: { height: 42, width: 50 },
   rewardsTitle: { color: '#FFE28B', fontFamily: THEME.fonts.extraBold, fontSize: 17 },
   rewardsSubtitle: { color: '#E4D5F5', fontSize: 12 },
-  rewardsArrow: { color: '#FFE28B', fontSize: 25, marginRight: 4 },
+  rewardsArrow: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
   scrollContent: {
     paddingBottom: 104,
   },

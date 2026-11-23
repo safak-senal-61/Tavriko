@@ -2,12 +2,10 @@ import { LEGAL_VERSION, UserProfile, hasAcceptedCurrentLegal, LegalConsentRecord
 
 /**
  * Yasal metin onayı yardımcıları.
- * Asıl kayıt sunucuda users.settings.legalConsent alanında tutulur; cihazdaki kayıt
- * yalnızca profil yenilemelerinde onay ekranının gereksiz yere tekrar açılmasını önler.
+ * Onay kaynağı, sunucunun kullanıcı profiline yazdığı settings.legalConsent alanıdır.
  */
 
 const GOOGLE_ACK_KEY = 'tavriko_google_legal_ack';
-const LOCAL_CONSENT_PREFIX = 'tavriko_legal_consent_';
 const GOOGLE_ACK_MAX_AGE_MS = 60 * 60 * 1000; // Google yönlendirmesi en fazla 1 saat sürer
 
 const storage = (): Storage | null => {
@@ -37,25 +35,19 @@ export const consumeGoogleLegalAck = (): boolean => {
   }
 };
 
-export const rememberLocalConsent = (userId: string) => {
-  storage()?.setItem(LOCAL_CONSENT_PREFIX + userId, LEGAL_VERSION);
-};
+export const getLegalConsent = (user: UserProfile | null | undefined) => user?.settings?.legalConsent ?? null;
 
-const hasLocalConsent = (userId: string) => storage()?.getItem(LOCAL_CONSENT_PREFIX + userId) === LEGAL_VERSION;
-
-export const getLegalConsent = (user: UserProfile | null | undefined): LegalConsentRecord | null => {
-  const consent = (user?.settings as any)?.legalConsent;
-  return consent && typeof consent === 'object' ? (consent as LegalConsentRecord) : null;
-};
+/** Profilin kısmi/bayat bir yanıtı, aynı hesabın güncel onayını silemez. */
+export function preserveLegalConsent(previous: UserProfile | null, incoming: UserProfile | null) {
+  if (!incoming || previous?.id !== incoming.id || !hasAcceptedCurrentLegal(previous.settings) ||
+    hasAcceptedCurrentLegal(incoming.settings)) return incoming;
+  return { ...incoming, settings: { ...incoming.settings, legalConsent: previous.settings?.legalConsent } };
+}
 
 /** Kayıtlı (misafir olmayan) kullanıcı güncel metinleri onaylamamışsa true. */
 export const needsLegalConsent = (user: UserProfile | null | undefined, isGuest: boolean): boolean => {
   if (!user || isGuest || user.isGuest || !user.id) return false;
-  if (hasAcceptedCurrentLegal(user.settings)) {
-    rememberLocalConsent(user.id);
-    return false;
-  }
-  return !hasLocalConsent(user.id);
+  return !hasAcceptedCurrentLegal(user.settings);
 };
 
 /** Daha önce başka bir sürümü onaylamış kullanıcılar için "güncelledik" metni gösterilir. */
@@ -68,7 +60,7 @@ export const submitLegalConsent = async (
   apiBaseUrl: string,
   token: string,
   method: LegalConsentRecord['method']
-): Promise<UserProfile | null> => {
+): Promise<UserProfile> => {
   const res = await fetch(`${apiBaseUrl}/auth/legal-consent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -76,5 +68,8 @@ export const submitLegalConsent = async (
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || 'Onay kaydedilemedi. Lütfen tekrar dene.');
-  return (data?.user as UserProfile) || null;
+  if (!data?.user?.id || !hasAcceptedCurrentLegal(data.user.settings)) {
+    throw new Error('Onay kaydedilemedi. Lütfen tekrar dene.');
+  }
+  return data.user as UserProfile;
 };
