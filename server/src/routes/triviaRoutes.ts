@@ -7,6 +7,7 @@ import { cacheService } from '../cache/redisClient';
 import { supabaseService } from '../db/supabaseClient';
 import { importQuestionsFromJson } from '../utils/questionImporter';
 import { getJwtSecret, requireAdminAuth, requireUserAuth } from '../middleware/auth';
+import { walletSchemaReady } from '../services/walletSchema';
 
 const router = Router();
 const practiceSessionPattern = /^sess_[a-f0-9]{32}$/;
@@ -34,6 +35,9 @@ router.get('/questions/practice', async (req: Request, res: Response): Promise<v
   const proofOwner = authorization?.startsWith('Bearer ') ? db.verifyToken(authorization.slice(7))?.userId : undefined;
   const proofSecret = getJwtSecret();
   if (authorization) res.set('Cache-Control', 'private, no-store');
+  const issueJokerProof = req.query.jokers === '1' && typeof proofOwner === 'string' &&
+    !proofOwner.startsWith('guest_') && proofSecret && practiceSessionPattern.test(sessionId) &&
+    await walletSchemaReady(db.rawClient);
 
   // Sunucusuz ortamda kalıcı soru havuzunun (Telegram soruları dahil) hazır olmasını bekle
   await db.ensureQuestionsRestored();
@@ -57,8 +61,7 @@ router.get('/questions/practice', async (req: Request, res: Response): Promise<v
   await Promise.all(
     questions.map((q) => {
       cumulativeMs += q.timeLimitSec * 1000 + 4000;
-      if (req.query.jokers === '1' && typeof proofOwner === 'string' && !proofOwner.startsWith('guest_') &&
-          proofSecret && practiceSessionPattern.test(sessionId)) {
+      if (issueJokerProof && proofOwner) {
         q.jokerProof = `${cumulativeMs}.${practiceProof(proofOwner, sessionId, q.id, cumulativeMs, proofSecret)}`;
       }
       return cacheService.setQuestionExpiry(sessionId, q.id, cumulativeMs, 300);
@@ -90,6 +93,9 @@ router.post('/questions/practice/joker', requireUserAuth, async (req: Request, r
       !practiceSessionPattern.test(sessionId) || typeof questionId !== 'string' || questionId.length > 160 ||
       !timingSafeEqual(Buffer.from(practiceProof(userId, sessionId, questionId, Number(deadline), secret), 'hex'), Buffer.from(signature, 'hex'))) {
     res.status(400).json({ error: 'Bu soruda joker kullanılamıyor.' }); return;
+  }
+  if (!await walletSchemaReady(db.rawClient)) {
+    res.status(503).json({ error: 'Jokerler henüz kullanıma açık değil.' }); return;
   }
   let question = db.getQuestionById(questionId);
   if (!question) {

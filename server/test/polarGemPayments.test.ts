@@ -2,6 +2,8 @@ import { createHmac, randomUUID } from 'node:crypto';
 import { JOKERS, SHOP_CATALOG, EVENT_DEFINITIONS, SEASON_1_TIERS, plainDisplayText } from '@trivia/shared';
 import { describe, expect, it, vi } from 'vitest';
 import { createGemCheckout, polarGemConfig, verifyPolarGemSignature } from '../src/services/polarGemPayments';
+import { walletSchemaReady } from '../src/services/walletSchema';
+import type { PrismaClient } from '@prisma/client';
 
 const products = { POLAR_GEMS_PRODUCT_100: randomUUID(), POLAR_GEMS_PRODUCT_300: randomUUID(),
   POLAR_GEMS_PRODUCT_600: randomUUID(), POLAR_GEMS_PRODUCT_1500: randomUUID() };
@@ -9,6 +11,17 @@ const env = { ...products, POLAR_GEMS_ENABLED: 'true', POLAR_GEMS_SANDBOX: 'true
   POLAR_GEMS_APP_ORIGIN: 'https://app.example.test', POLAR_GEMS_ACCESS_TOKEN: 'fake-token', POLAR_GEMS_WEBHOOK_SECRET: 'test-webhook' };
 
 describe('paid diamonds and joker economy', () => {
+  it('keeps availability off without both tables or a working database', async () => {
+    const missing = { $queryRaw: vi.fn().mockResolvedValue([{ ready: false }]) };
+    const unavailable = { $queryRaw: vi.fn().mockRejectedValue(new Error('offline')) };
+    const migrated = { $queryRaw: vi.fn().mockResolvedValue([{ ready: true }]) };
+    expect(await walletSchemaReady(missing as unknown as PrismaClient)).toBe(false);
+    expect(await walletSchemaReady(unavailable as unknown as PrismaClient)).toBe(false);
+    expect(await walletSchemaReady(migrated as unknown as PrismaClient)).toBe(true);
+    expect(await walletSchemaReady(migrated as unknown as PrismaClient)).toBe(true);
+    expect(migrated.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
   it('leaves checkout off without configuration and keeps packs separated', () => {
     expect(polarGemConfig({})).toBeNull();
     expect(polarGemConfig({ ...env, POLAR_GEMS_PRODUCT_300: products.POLAR_GEMS_PRODUCT_100 })).toBeNull();

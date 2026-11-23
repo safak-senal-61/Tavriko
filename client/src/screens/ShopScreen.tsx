@@ -292,7 +292,16 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const purchaseLock = useRef(false);
   const [polarAvailable, setPolarAvailable] = useState(false);
   const [polarSandbox, setPolarSandbox] = useState(false);
+  const [jokersAvailable, setJokersAvailable] = useState(false);
   const base = apiBaseUrl || getApiBaseUrl();
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch(`${base}/social/shop/jokers/availability`, { signal: controller.signal })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (!controller.signal.aborted) setJokersAvailable(data?.enabled === true); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [base]);
   useEffect(() => {
     if (!WEB) return;
     const controller = new AbortController();
@@ -525,7 +534,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         {/* Başlık */}
         <KitHeader title="Mağaza" subtitle="Kozmetikler ve güçlendiriciler" />
         <KitChips
-          tabs={CATEGORY_TABS.map((c) => ({ id: c.id, label: c.name }))}
+          tabs={CATEGORY_TABS.filter(c => c.id !== 'jokers' || jokersAvailable).map((c) => ({ id: c.id, label: c.name }))}
           active={activeTab}
           onChange={(id, idx) => handleSelectCategoryTab(id, idx)}
           scrollRef={tabScrollRef}

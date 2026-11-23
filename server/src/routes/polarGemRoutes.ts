@@ -3,12 +3,13 @@ import { db } from '../db/prismaClient';
 import { requireUserAuth } from '../middleware/auth';
 import { applyGemOrder, createGemCheckout, polarGemConfig, verifyPolarGemSignature } from '../services/polarGemPayments';
 import { checkoutIdPattern } from '../services/polarSandbox';
+import { walletSchemaReady } from '../services/walletSchema';
 
 export const polarGemPlayerRoutes = Router();
-polarGemPlayerRoutes.post('/shop/diamonds/availability', (req, res) => {
+polarGemPlayerRoutes.post('/shop/diamonds/availability', async (req, res) => {
   const config = polarGemConfig();
   res.set('Cache-Control', 'no-store').json({
-    enabled: Boolean(config && req.get('origin') === config.origin),
+    enabled: Boolean(config && req.get('origin') === config.origin && await walletSchemaReady(db.rawClient)),
     sandbox: Boolean(config?.sandbox),
   });
 });
@@ -17,7 +18,7 @@ polarGemPlayerRoutes.post('/shop/diamonds/checkout', requireUserAuth, async (req
   const config = polarGemConfig();
   const userId = req.authUserId;
   const packId = req.body?.productId;
-  if (!config || req.get('origin') !== config.origin) {
+  if (!config || req.get('origin') !== config.origin || !await walletSchemaReady(db.rawClient)) {
     res.status(503).json({ error: 'Elmas ödemesi şu anda açık değil.' }); return;
   }
   if (!userId || userId.startsWith('guest_') || typeof packId !== 'string' || !config.products.has(packId)) {

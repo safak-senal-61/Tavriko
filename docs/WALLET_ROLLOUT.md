@@ -4,6 +4,8 @@
 
 `20261123120000_wallet_and_practice_jokers` migration’ı, `polar_gem_orders` ve `practice_joker_uses` tablolarını ekler. `users.gems` sütununun yeni kayıtlar için varsayılanını sıfıra çeker; mevcut hesaplardaki bakiyeleri değiştirmez. Joker stoğu mevcut `user_inventory_items` tablosunda tutulur.
 
+Uygulama kodu veritabanından önce yayınlanırsa joker satışı ve kullanımı ile Polar ödeme başlatma işlemi kapalı kalır. Sunucu, iki tablo hazır olduğunda jokerleri otomatik olarak açar; kısa durum önbelleği en fazla 30 saniye sürer. Polar, ayrıca yetkili yapılandırma olmadan açılmaz.
+
 Hedef Supabase proje referansını ve Prisma migration geçmişini doğrulayın. Staging’de ve ardından doğrulanmış hedefte, dağıtım hesabıyla `cd server && npx prisma migrate status && npx prisma migrate deploy` sırasını kullanın. `DATABASE_URL` ve `DIRECT_URL` yalnız sunucu ortamında tanımlanmalı. Migration geçmişi ile şema uyuşmuyorsa SQL’i doğrudan yapıştırmayın veya migration’ı uygulanmış olarak işaretlemeyin; önce farkı inceleyin.
 
 ## Polar sanal ödeme

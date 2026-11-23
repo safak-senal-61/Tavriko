@@ -63,6 +63,7 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
 
   it('debits gold for a joker, then deducts one copy despite concurrent requests', async () => {
     const { db } = await import('../src/db/prismaClient');
+    expect((await request(app).get(`${root}/shop/jokers/availability`)).body).toEqual({ enabled: true });
     const id = await player('joker');
     await client.user.update({ where: { id }, data: { coins: 250, gems: 99 } });
     expect((await post(id, '/shop/purchase', { productId: 'gems_100', paymentMethod: 'try' })).status).toBe(409);

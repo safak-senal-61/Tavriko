@@ -5,6 +5,7 @@ import { presenceManager } from '../services/presenceManager';
 import { SHOP_CATALOG, SEASON_1_TIERS, EVENT_DEFINITIONS } from '@trivia/shared';
 import { rewardedAdRoutes } from './rewardedAdRoutes';
 import { gameplayRewardRoutes } from './gameplayRewardRoutes';
+import { walletSchemaReady } from '../services/walletSchema';
 
 const router = Router();
 
@@ -238,6 +239,10 @@ router.get('/shop/catalog', (req: Request, res: Response): void => {
   });
 });
 
+router.get('/shop/jokers/availability', async (_req, res) => {
+  res.set('Cache-Control', 'no-store').json({ enabled: await walletSchemaReady(db.rawClient) });
+});
+
 router.post('/shop/purchase', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.authUserId;
@@ -254,6 +259,9 @@ router.post('/shop/purchase', requireUserAuth, async (req: Request, res: Respons
       return;
     }
     if (product) {
+      if (product.category === 'jokers' && !await walletSchemaReady(db.rawClient)) {
+        res.status(503).json({ error: 'Jokerler henüz kullanıma açık değil.' }); return;
+      }
       // Süreli kozmetiklerde durationId ('1h' | '1d' | '3d' | '1w' | '30d')
       // seçilen süreyi belirler; fiyat sunucuda ölçeklenir.
       const result = await db.purchaseShopProduct(
