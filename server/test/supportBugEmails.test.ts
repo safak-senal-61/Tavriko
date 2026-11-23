@@ -4,6 +4,7 @@ import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAdminAccountsRouter } from '../src/routes/adminAccountsRoutes';
 import { createSupportRouter } from '../src/routes/supportRoutes';
+import { renderSupportEmail } from '../src/services/supportEmailTemplate';
 
 const session = vi.hoisted(() => ({ email: 'owner@example.test', role: 'owner' }));
 vi.mock('../src/db/prismaClient', () => ({ db: { rawClient: {} } }));
@@ -71,6 +72,24 @@ afterEach(() => {
 });
 
 describe('bug report OneSignal email flow', () => {
+  it('uses distinct inbox previews and status treatments, with static links and escaped content', () => {
+    const subject = '<a href="https://elsewhere.test">Sahte bağlantı</a>';
+    const report = renderSupportEmail({ kind: 'report', subject, accountId, ticketId });
+    const reply = renderSupportEmail({ kind: 'reply', subject, text: 'İlk satır\n{{ private }} <img>' });
+    const done = renderSupportEmail({ kind: 'resolved', subject, text: 'Güncellendi.' });
+    expect(new Set([report.email_preheader, reply.email_preheader, done.email_preheader]).size).toBe(3);
+    expect(report.email_body).toContain('YENİ KAYIT');
+    expect(report.email_body).toContain(`${site}/admin/kullanicilar#cases-panel`);
+    expect(reply.email_body).toContain('YENİ YANIT');
+    expect(reply.email_body).toContain('İlk satır<br>&#123;&#123; private &#125;&#125; &lt;img&gt;');
+    expect(done.email_body).toContain('SONUÇLANDI');
+    expect(done.email_body).toContain(`href="${site}/app"`);
+    for (const mail of [report, reply, done]) {
+      expect(mail.email_body).not.toContain('href="https://elsewhere.test"');
+      expect(mail.email_body).toContain('role="presentation"');
+    }
+  });
+
   it('uses the authenticated player and configured owner, not body-supplied identities', async () => {
     const { player, findUnique, tx } = fixture();
     await player().send({ ...input, accountId: 'other', email: 'wrong@example.test' }).expect(201);
