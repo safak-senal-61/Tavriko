@@ -29,10 +29,10 @@ const inventory = (userId: string) => client.userInventoryItem.findMany({ where:
 const item = (userId: string, itemId: string, durationHours?: number) =>
   client.userInventoryItem.create({ data: { userId, itemId, name: itemId, desc: 'QA', durationHours } });
 
-const match = async (userId: string, otherId: string, correctAnswersCount: number, verified = true) => {
+const match = async (userId: string, otherId: string, correctAnswersCount: number, verified = true, completed = true) => {
   const roomCode = randomUUID();
   const summary = {
-    matchId: randomUUID(), roomCode, mode: 'duel' as const, totalRounds: 5,
+    matchId: randomUUID(), roomCode, mode: 'duel' as const, totalRounds: 5, rewardCompletedPlayerIds: completed ? [userId] : [],
     verifiedPlayerIds: verified ? [userId] : [otherId],
     rankings: [
       { playerId: userId, displayName: 'QA', rank: 1, score: 500, correctAnswersCount, isBot: false },
@@ -66,9 +66,13 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
 
   it('debits gold for a joker, then deducts one copy despite concurrent requests', async () => {
     const { db } = await import('../src/db/prismaClient');
-    expect((await request(app).get(`${root}/shop/jokers/availability`)).body).toEqual({ enabled: true });
+    const health = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(Response.json({ features: { liveQuizJokers: true } }));
+    try {
+      expect((await request(app).get(`${root}/shop/jokers/availability`)).body).toEqual({ enabled: true, advanced: false });
+    } finally { health.mockRestore(); }
     const id = await player('joker');
     await client.user.update({ where: { id }, data: { coins: 250, gems: 99 } });
+    expect((await post(id, '/shop/purchase', { productId: 'joker_retry' })).status).toBe(503);
     expect((await post(id, '/shop/purchase', { productId: 'gems_100', paymentMethod: 'try' })).status).toBe(409);
     const purchases = await Promise.all([1, 2].map(() => post(id, '/shop/purchase', { productId: 'joker_eliminate', paymentMethod: 'gems' })));
     expect(purchases.map(r => r.status).sort()).toEqual([200, 400]);
@@ -163,6 +167,25 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     expect(await client.practiceJokerUse.count({ where: { userId } })).toBe(1);
   });
 
+  it('checks capability and real vote count before consuming an advanced joker', async () => {
+    const userId = await player('advanced_tactic');
+    await item(userId, 'joker_audience');
+    const startedAt = Date.now();
+    const body = { userId, startedAt, deadline: startedAt + 15000, roomCode: 'QAADV', roundNumber: 1,
+      questionId: 'qa_advanced_joker', correctOptionId: 'a', jokerId: 'joker_audience', tactics: 'friendly',
+      options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }] };
+    const play = (patch: object) => request(app).post('/api/internal/room-joker')
+      .set('x-internal-secret', internalSecret).send({ ...body, ...patch });
+    expect((await play({ votes: { a: 4, b: 1 } })).status).toBe(409);
+    expect((await play({ capabilities: {}, votes: { a: 4, b: 0 } })).status).toBe(409);
+    expect(await inventory(userId)).toMatchObject([{ itemId: 'joker_audience', qty: 1 }]);
+    const results = await Promise.all([play({ capabilities: {}, votes: { a: 4, b: 1 } }), play({ capabilities: {}, votes: { a: 4, b: 1 } })]);
+    expect(results.map(response => response.status)).toEqual([200, 200]);
+    expect(results[0].body).toMatchObject({ votes: { a: 4, b: 1 } });
+    expect(await inventory(userId)).toMatchObject([{ itemId: 'joker_audience', qty: 0 }]);
+    expect(await client.practiceJokerUse.count({ where: { userId } })).toBe(1);
+  });
+
   it('does not credit mismatched orders, duplicate deliveries, or replayed refunds', async () => {
     const { applyGemOrder } = await import('../src/services/polarGemPayments');
     const userId = await player('payment');
@@ -221,7 +244,7 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     }
   });
 
-  it('counts only verified completed matches with a correct answer and counts separate Türkiye days', async () => {
+  it('counts only verified completed matches and distinct Türkiye days, even with zero correct answers', async () => {
     const id = await player('matches');
     const other = await player('other');
     await client.user.update({ where: { id }, data: { totalMatches: 90, correctAnswers: 500, totalAnswers: 500 } });
@@ -230,7 +253,8 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
       const roomCode = await match(id, other, i + 3);
       await client.matchHistory.updateMany({ where: { roomCode }, data: { playedAt: new Date(times[i]) } });
     }
-    await match(id, other, 0);
+    await match(id, other, 3, true, false);
+    await match(id, other, 0, true, false);
     await match(id, other, 5, false);
     await client.matchHistory.create({ data: { userId: id, roomCode: 'practice', mode: 'practice', categoryId: 'history', correctAnswers: 5, rankingsJson: [] } });
     const res = await get(id);
@@ -240,6 +264,11 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
     expect(statusOf(res.body, 'badge_trivia_master').current).toBe(12);
     expect(statusOf(res.body, 'badge_genius').current).toBe(1);
     expect(statusOf(res.body, 'badge_consistent_player').current).toBe(3);
+    expect(statusOf(res.body, 'badge_veteran').current).toBe(3);
+    await match(id, other, 0);
+    const afterWrong = await get(id);
+    expect(statusOf(afterWrong.body, 'chest_wood').current).toBe(4);
+    expect(statusOf(afterWrong.body, 'badge_trivia_master').current).toBe(12);
   });
 
   it('counts reciprocal friends only and preserves permanent badges while legacy badges expire', async () => {
@@ -274,7 +303,7 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
   it('grants a chest and key once under concurrency and opens it once', async () => {
     const id = await player('chest');
     const other = await player('opponent');
-    for (let n = 0; n < 3; n++) await match(id, other, 3);
+    for (let n = 0; n < 8; n++) await match(id, other, 3);
     const claim = () => post(id, '/rewards/claim', { rewardId: 'chest_wood' });
     const claims = await Promise.all([claim(), claim(), claim()]);
     expect(claims.map(r => r.status)).toEqual([200, 200, 200]);
@@ -292,7 +321,7 @@ describe.skipIf(!url)('gameplay rewards on isolated PostgreSQL', () => {
   it('rolls back failed claims, rejects mismatched keys and spends the actual master key', async () => {
     const id = await player('rollback');
     const other = await player('rollback_opponent');
-    for (let n = 0; n < 3; n++) await match(id, other, 2);
+    for (let n = 0; n < 8; n++) await match(id, other, 2);
     await client.$executeRawUnsafe(`ALTER TABLE "user_inventory_items" ADD CONSTRAINT qa_no_silver CHECK ("itemId" <> 'key_silver') NOT VALID`);
     try {
       expect((await post(id, '/rewards/claim', { rewardId: 'chest_wood' })).status).toBe(503);

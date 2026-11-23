@@ -595,12 +595,13 @@ export class SocketService {
     this.sendEnvelope(SOCKET_EVENTS.START_GAME, { roomCode, playerId });
   }
 
-  public submitAnswer(roomCode: string, playerId: string, selectedOptionId: string, roundNumber: number): void {
+  public submitAnswer(roomCode: string, playerId: string, selectedOptionId: string, roundNumber: number, questionId?: string): void {
     this.sendEnvelope(SOCKET_EVENTS.SUBMIT_ANSWER, {
       roomCode,
       playerId,
       selectedOptionId,
       roundNumber,
+      questionId,
       clientTimestamp: Date.now(),
     });
   }
@@ -736,6 +737,10 @@ export class SocketService {
 
   public onRoundResult(callback: (result: RoundResult) => void): () => void {
     return this.on(SOCKET_EVENTS.ROUND_RESULT, callback);
+  }
+
+  public onJokerRetry(callback: (retry: { roundNumber: number; hint: string }) => void): () => void {
+    return this.on(SOCKET_EVENTS.JOKER_RETRY, callback);
   }
 
   public onGameOver(callback: (summary: FinalMatchSummary) => void): () => void {

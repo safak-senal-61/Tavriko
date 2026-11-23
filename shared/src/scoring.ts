@@ -5,6 +5,7 @@ import {
   RoundResult,
   FinalMatchSummary,
   JokerEffect,
+  Question,
 } from './types';
 import { LIGHTNING_WINDOW_MS } from './jokers';
 
@@ -89,9 +90,10 @@ export function applyPlayerRoundAnswer(
   selectedOptionId: string,
   elapsedMs: number,
   modifier?: JokerEffect['modifier'],
+  rules?: { question?: Question; shield?: boolean },
 ): ScoreCalculationResult & { isCorrect: boolean } {
   const player = room.players[playerId];
-  const question = room.currentQuestion;
+  const question = rules?.question ?? room.currentQuestion;
   if (!player || !question) {
     return { isCorrect: false, pointsAwarded: 0, speedBonus: 0, streakBonus: 0, streak: 0 };
   }
@@ -108,12 +110,16 @@ export function applyPlayerRoundAnswer(
     penaltyForWrong: room.penaltyForWrong,
   });
   if (!isCorrect && modifier === 'streak_guard') scoreResult.streak = player.currentStreak;
+  if (!isCorrect && room.mode === 'friends_private' && room.penaltyForWrong && !rules?.shield) {
+    scoreResult.pointsAwarded = -Math.min(50, Math.max(0, player.score));
+  }
   if (isCorrect && modifier === 'double') scoreResult.pointsAwarded *= 2;
   if (isCorrect && modifier === 'lightning' && elapsedMs <= LIGHTNING_WINDOW_MS) {
     scoreResult.pointsAwarded = Math.round(scoreResult.pointsAwarded * 1.5);
   }
 
   player.hasAnsweredCurrentRound = true;
+  if (question.options?.some(option => option.id === selectedOptionId)) player.rewardAnswers = (player.rewardAnswers ?? 0) + 1;
   player.lastAnswerTimeMs = elapsedMs;
   player.lastSelectedOptionId = selectedOptionId;
   player.lastAnswerIsCorrect = isCorrect;
@@ -182,6 +188,7 @@ export function evaluateRoundResult(room: GameRoom): RoundResult {
       speedBonus: p.lastSpeedBonus || 0,
       streak: p.currentStreak,
       timeMs: p.lastAnswerTimeMs || 0,
+      ...(p.jokerRound?.skipped ? { skipped: true } : {}),
     };
   });
 

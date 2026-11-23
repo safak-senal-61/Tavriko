@@ -102,6 +102,13 @@ export interface ClientQuestion {
   /** Live room capability, also identifies the exact round instance. */
   jokerRoundStartedAt?: number;
   jokerTactics?: 'friendly';
+  jokerCapabilities?: { replacement?: boolean; freeze?: boolean; shield?: boolean; gold?: boolean; nextRound?: boolean };
+  /** Absolute timestamps are only sent by the authoritative Worker. */
+  jokerDeadline?: number;
+  jokerPauseUntil?: number;
+  jokerPauseRemainingMs?: number;
+  jokerFrozen?: boolean;
+  jokerSkipped?: boolean;
   /** Only sent to the authenticated owner when reconnecting. */
   jokerEffect?: JokerEffect;
   id: string;
@@ -137,6 +144,20 @@ export interface Player {
   lastSpeedBonus?: number;
   totalResponseTimeMs: number;
   correctAnswersCount: number;
+  rewardStarted?: boolean;
+  rewardAnswers?: number;
+  jokerRound?: {
+    effect?: JokerEffect;
+    question?: Question;
+    extensionMs?: number;
+    pausedMs?: number;
+    pauseUntil?: number;
+    frozen?: boolean;
+    tried?: boolean;
+    skipped?: boolean;
+  };
+  jokerSupportNext?: boolean;
+  jokerGoldEarned?: boolean;
   isBot?: boolean;
 }
 
@@ -231,6 +252,7 @@ export interface RoundResult {
     speedBonus: number;
     streak: number;
     timeMs: number;
+    skipped?: boolean;
   }>;
   leaderboard: PlayerScoreSummary[];
 }
@@ -284,6 +306,8 @@ export interface FinalMatchSummary {
   };
   questionReviews?: MatchQuestionReviewItem[];
 }
+
+export const GOLD_HUNT_BONUS = 140;
 
 export type ItemRarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
 
@@ -711,13 +735,27 @@ export const JOKERS = [
   { id: 'joker_streak_guard', name: 'Seri Koruyucu', desc: 'Bu soruda yanlış seçersen serini korur. Botlu ve arkadaş maçlarında.', price: 250, eliminated: 0, group: 'tactic' },
   { id: 'joker_lightning', name: 'Şimşek Cevap', desc: 'İlk 5 saniyede doğru cevap verirsen %50 ek puan. Botlu ve arkadaş maçlarında.', price: 220, eliminated: 0, group: 'tactic' },
   { id: 'joker_double', name: 'Çifte Puan', desc: 'Bu soruda doğru cevap puanını ikiye katlar. Botlu ve arkadaş maçlarında.', price: 400, eliminated: 0, group: 'tactic' },
+  { id: 'joker_retry', name: 'İkinci Şans', desc: 'İlk cevabın yanlışsa süre dolmadan bir kez daha dene. Botlu ve arkadaş maçlarında.', price: 320, eliminated: 0, group: 'tactic' },
+  { id: 'joker_pause', name: 'Zaman Molası', desc: 'Kendi sayacını 5 saniye durdur. Botlu ve arkadaş maçlarında.', price: 200, eliminated: 0, group: 'tactic' },
+  { id: 'joker_support', name: 'Sihirli Destek', desc: 'Sonraki soruda bir yanlış şıkkı eler ve ilk karakteri gösterir. Botlu ve arkadaş maçlarında.', price: 300, eliminated: 0, group: 'hint' },
+  { id: 'joker_probe', name: 'Kralın Hakkı', desc: 'Bir şıkkı cevap göndermeden önce test et. Botlu ve arkadaş maçlarında.', price: 420, eliminated: 0, group: 'hint' },
+  { id: 'joker_gold_hunt', name: 'Altın Avı', desc: 'Bu soruyu doğru yanıtla ve maçı bitir: +140 altın. Botlu ve arkadaş maçlarında, maç başına en çok bir ödül.', price: 100, eliminated: 0, group: 'tactic' },
+  { id: 'joker_replace', name: 'Soru Değiştir', desc: 'Yedek bir soru varsa yalnızca senin sorunu değiştirir. Botlu ve arkadaş maçlarında.', price: 350, eliminated: 0, group: 'tactic' },
+  { id: 'joker_audience', name: 'Halk Desteği', desc: 'Önceki gerçek maçların şık tercihlerini gösterir. En az 5 kayıtlı cevap gerekir. Botlu ve arkadaş maçlarında.', price: 200, eliminated: 0, group: 'hint' },
+  { id: 'joker_extra_time', name: 'Ek Süre', desc: 'Kendi soruna 15 saniye ekle. Botlu ve arkadaş maçlarında.', price: 280, eliminated: 0, group: 'tactic' },
+  { id: 'joker_skip', name: 'Pas Geç', desc: 'Bu soruyu puan almadan pas geç; sonraki tur için diğer oyuncuları bekle. Botlu ve arkadaş maçlarında.', price: 100, eliminated: 0, group: 'tactic' },
+  { id: 'joker_shield', name: 'Koruma Kalkanı', desc: 'Yanlış cevabın puan cezasını bu turda önler. Yalnızca ceza açık arkadaş odalarında, puanın varsa.', price: 160, eliminated: 0, group: 'tactic' },
+  { id: 'joker_freeze', name: 'Zaman Dondurma', desc: 'Henüz cevaplamamış rakibin sayacını ve şıklarını 15 saniye dondur. Botlu ve iki kişilik arkadaş maçlarında.', price: 450, eliminated: 0, group: 'tactic' },
 ] as const satisfies readonly { id: string; name: string; desc: string; price: number; eliminated: number; group: JokerGroup }[];
 export type JokerId = typeof JOKERS[number]['id'];
+export type JokerAction = 'retry' | 'pause' | 'support' | 'probe' | 'gold' | 'replace' | 'extra_time' | 'skip' | 'shield' | 'freeze';
 export interface JokerEffect {
   eliminated: string[];
   hint?: string;
   highlightedOptionId?: string;
   modifier?: 'streak_guard' | 'lightning' | 'double';
+  action?: JokerAction;
+  votes?: Record<string, number>;
 }
 
 /**

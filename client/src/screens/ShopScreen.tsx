@@ -22,7 +22,7 @@ import Svg, {
   Circle,
   Path,
 } from 'react-native-svg';
-import { UserProfile, SHOP_CATALOG, ShopProduct, ShopProductCategory, SHOP_DURATIONS, JOKERS, JokerGroup, isCosmeticProduct, isJokerId, shopPriceForDuration } from '@trivia/shared';
+import { UserProfile, SHOP_CATALOG, ShopProduct, ShopProductCategory, SHOP_DURATIONS, JOKERS, JokerGroup, isCosmeticProduct, isJokerId, isAdvancedJoker, shopPriceForDuration } from '@trivia/shared';
 import { JokerGroupTabs } from '../components/WalletPanels';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
@@ -297,12 +297,18 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const [polarAvailable, setPolarAvailable] = useState(false);
   const [polarSandbox, setPolarSandbox] = useState(false);
   const [jokersAvailable, setJokersAvailable] = useState(false);
+  const [advancedJokersAvailable, setAdvancedJokersAvailable] = useState(false);
   const base = apiBaseUrl || getApiBaseUrl();
   useEffect(() => {
     const controller = new AbortController();
     void fetch(`${base}/social/shop/jokers/availability`, { signal: controller.signal })
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (!controller.signal.aborted) setJokersAvailable(data?.enabled === true); })
+      .then(data => {
+        if (!controller.signal.aborted) {
+          setJokersAvailable(data?.enabled === true);
+          setAdvancedJokersAvailable(data?.advanced === true);
+        }
+      })
       .catch(() => {});
     return () => controller.abort();
   }, [base]);
@@ -393,6 +399,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   };
 
   const filteredProducts = SELLABLE_CATALOG.filter(p => p.category === activeTab &&
+    (advancedJokersAvailable || !isJokerId(p.id) || !isAdvancedJoker(p.id)) &&
     (activeTab !== 'jokers' || !jokerGroup || JOKERS.some(joker => joker.id === p.id && joker.group === jokerGroup)));
 
   // 2x XP artırıcı aktif mi? Kalan süre (ms) yoksa null.

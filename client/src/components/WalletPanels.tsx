@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { canUseJoker, JOKERS, JOKER_GROUPS, JokerGroup, JokerId, JokerTactics, QuestionOption, UserProfile } from '@trivia/shared';
+import { canUseJoker, ClientQuestion, JOKERS, JOKER_GROUPS, JokerGroup, JokerId, JokerTactics, QuestionOption, UserProfile } from '@trivia/shared';
 import { CloseXIcon, CoinIcon } from './TavrikoIcons';
 import { WalletArtwork } from './WalletArtwork';
 import { THEME } from '../theme/tokens';
@@ -45,22 +45,22 @@ export function LowWalletPanel({ kind, amount, onClose, onStore }: {
   </Panel>;
 }
 
-export function JokerPanel({ user, options, live, tactics, lightningAvailable, busy, error, onApply, onBuy, onClose }: {
+export function JokerPanel({ user, options, live, tactics, capabilities, lightningAvailable, busy, error, onApply, onBuy, onClose }: {
   user: UserProfile; busy: boolean; error?: string; onApply: (id: JokerId) => void;
   options: QuestionOption[]; onBuy: (id: JokerId) => void; onClose: () => void;
-  live?: boolean; tactics?: JokerTactics; lightningAvailable?: boolean;
+  live?: boolean; tactics?: JokerTactics; capabilities?: ClientQuestion['jokerCapabilities']; lightningAvailable?: boolean;
 }) {
   const [group, setGroup] = useState<JokerGroup | null>(null);
   return <Panel title="Jokerlerim" onClose={onClose}>
     <View style={s.wallet}><CoinIcon size={17} /><Text style={s.balance}>{walletAmount(user.coins ?? 0)} altın</Text></View>
-    <Text style={s.desc}>Soru başına bir joker kullanabilirsin. Sayaç işlemeye devam eder.</Text>
+    <Text style={s.desc}>Soru başına bir joker kullanabilirsin. Bu menü sayacı durdurmaz.</Text>
     <JokerGroupTabs selected={group} onChange={setGroup} />
     {error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
     <ScrollView showsVerticalScrollIndicator={false} style={s.catalog} contentContainerStyle={s.catalogContent}>
     {JOKERS.filter(joker => !group || joker.group === group).map(joker => {
       const qty = user.inventory?.find(i => i.id === joker.id)?.qty ?? 0;
       const canBuy = user.coins >= joker.price;
-      const usable = canUseJoker(joker.id, options, { live, tactics, lightningAvailable });
+      const usable = canUseJoker(joker.id, options, { live, tactics, capabilities, lightningAvailable });
       return <View key={joker.id} style={s.joker}>
         <WalletArtwork kind={joker.id} size={62} />
         <View style={s.detail}>

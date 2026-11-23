@@ -3,10 +3,11 @@ import { rateLimit } from 'express-rate-limit';
 import { requireUserAuth } from '../middleware/auth';
 import { db } from '../db/prismaClient';
 import { presenceManager } from '../services/presenceManager';
-import { SHOP_CATALOG, SEASON_1_TIERS, EVENT_DEFINITIONS } from '@trivia/shared';
+import { SHOP_CATALOG, SEASON_1_TIERS, EVENT_DEFINITIONS, isAdvancedJoker, isJokerId } from '@trivia/shared';
 import { rewardedAdRoutes } from './rewardedAdRoutes';
 import { gameplayRewardRoutes } from './gameplayRewardRoutes';
 import { walletSchemaReady } from '../services/walletSchema';
+import { advancedJokersReady } from '../services/realtimeJokerAvailability';
 import { walletRateLimitOptions } from '../middleware/walletRateLimit';
 
 const router = Router();
@@ -236,15 +237,17 @@ router.post('/rooms/active', requireUserAuth, (req: Request, res: Response): voi
 });
 
 // --- Shop Catalog & Purchasing ---
-router.get('/shop/catalog', (req: Request, res: Response): void => {
+router.get('/shop/catalog', async (req: Request, res: Response): Promise<void> => {
+  const advanced = await advancedJokersReady();
   res.json({
     success: true,
-    catalog: SHOP_CATALOG,
+    catalog: advanced ? SHOP_CATALOG : SHOP_CATALOG.filter(({ id }) => !isJokerId(id) || !isAdvancedJoker(id)),
   });
 });
 
 router.get('/shop/jokers/availability', shopAvailabilityLimit, async (_req, res) => {
-  res.set('Cache-Control', 'no-store').json({ enabled: await walletSchemaReady(db.rawClient) });
+  const [enabled, advanced] = await Promise.all([walletSchemaReady(db.rawClient), advancedJokersReady()]);
+  res.set('Cache-Control', 'no-store').json({ enabled, advanced: enabled && advanced });
 });
 
 router.post('/shop/purchase', shopPurchaseLimit, requireUserAuth, async (req: Request, res: Response): Promise<void> => {
@@ -265,6 +268,9 @@ router.post('/shop/purchase', shopPurchaseLimit, requireUserAuth, async (req: Re
     if (product) {
       if (product.category === 'jokers' && !await walletSchemaReady(db.rawClient)) {
         res.status(503).json({ error: 'Jokerler henüz kullanıma açık değil.' }); return;
+      }
+      if (isJokerId(product.id) && isAdvancedJoker(product.id) && !await advancedJokersReady()) {
+        res.status(503).json({ error: 'Bu joker henüz canlı maçlarda kullanıma açık değil.' }); return;
       }
       // Süreli kozmetiklerde durationId ('1h' | '1d' | '3d' | '1w' | '30d')
       // seçilen süreyi belirler; fiyat sunucuda ölçeklenir.

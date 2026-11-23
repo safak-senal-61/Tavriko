@@ -1,4 +1,4 @@
-import { GameMode, JOKERS, JokerEffect, JokerId, Question, QuestionOption } from './types';
+import { ClientQuestion, GameMode, JOKERS, JokerAction, JokerEffect, JokerId, Question, QuestionOption } from './types';
 
 export const isJokerId = (id: unknown): id is JokerId => JOKERS.some(joker => joker.id === id);
 
@@ -7,7 +7,15 @@ export const supportsLiveJokers = (mode: GameMode): boolean =>
 
 export type JokerTactics = 'friendly';
 export const LIGHTNING_WINDOW_MS = 5000;
-type JokerContext = { live?: boolean; tactics?: JokerTactics; lightningAvailable?: boolean; randomIndex?: number };
+type JokerContext = { live?: boolean; tactics?: JokerTactics; lightningAvailable?: boolean; randomIndex?: number;
+  capabilities?: ClientQuestion['jokerCapabilities']; votes?: Record<string, number> };
+const actions = {
+  joker_retry: 'retry', joker_pause: 'pause', joker_support: 'support', joker_probe: 'probe',
+  joker_gold_hunt: 'gold', joker_replace: 'replace', joker_extra_time: 'extra_time', joker_skip: 'skip',
+  joker_shield: 'shield', joker_freeze: 'freeze',
+} as const satisfies Partial<Record<JokerId, JokerAction>>;
+export const advancedJokerAction = (id: JokerId): JokerAction | undefined => (actions as Partial<Record<JokerId, JokerAction>>)[id];
+export const isAdvancedJoker = (id: JokerId) => !!advancedJokerAction(id) || id === 'joker_audience';
 const modifiers = {
   joker_streak_guard: 'streak_guard',
   joker_lightning: 'lightning', joker_double: 'double',
@@ -33,6 +41,15 @@ export function canUseJoker(id: JokerId, options: QuestionOption[], context: Jok
   if (id === 'joker_nearest') return options.length >= 3 && !!numbers(options);
   if (id === 'joker_reveal' || id === 'joker_prophecy') return !context.live || !!context.tactics;
   if (id === 'joker_dice') return true;
+  if (isAdvancedJoker(id)) {
+    if (!context.tactics || !context.capabilities) return false;
+    if (id === 'joker_replace') return !!context.capabilities.replacement;
+    if (id === 'joker_freeze') return !!context.capabilities.freeze;
+    if (id === 'joker_shield') return !!context.capabilities.shield;
+    if (id === 'joker_gold_hunt') return !!context.capabilities.gold;
+    if (id === 'joker_support') return !!context.capabilities.nextRound;
+    return true;
+  }
   if (id === 'joker_lightning') return !!context.tactics && context.lightningAvailable !== false;
   if (id === 'joker_streak_guard' || id === 'joker_double') return !!context.tactics;
   const clues = options.map(option => clue(id, option.text));
@@ -47,6 +64,16 @@ export function resolveJokerEffect(
 ): JokerEffect | null {
   const correct = question.options.find(option => option.id === question.correctOptionId);
   if (!correct || !canUseJoker(id, question.options, previousEliminations ? { ...context, lightningAvailable: true } : context)) return null;
+  const action = advancedJokerAction(id);
+  if (action) return { eliminated: [], action, hint: `${JOKERS.find(joker => joker.id === id)!.name} etkin` };
+  if (id === 'joker_audience') {
+    const votes = Object.fromEntries(question.options.map(option => {
+      const count = context.votes && Object.hasOwn(context.votes, option.id) ? context.votes[option.id] : 0;
+      return [option.id, Number.isSafeInteger(count) && count > 0 ? count : 0];
+    }));
+    if (Object.values(votes).reduce((total, value) => total + value, 0) < 5) return null;
+    return { eliminated: [], votes, hint: 'Önceki oyuncuların şık tercihleri' };
+  }
   if (id === 'joker_prophecy') return { eliminated: [], highlightedOptionId: correct.id, hint: 'Kehanet bir şıkkı işaretledi.' };
   if (id === 'joker_reveal') return { eliminated: [], highlightedOptionId: correct.id, hint: `Doğru cevap: ${correct.text.trim()}` };
   if (id === 'joker_dice') {

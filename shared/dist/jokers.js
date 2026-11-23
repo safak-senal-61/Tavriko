@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LIGHTNING_WINDOW_MS = exports.supportsLiveJokers = exports.isJokerId = void 0;
+exports.isAdvancedJoker = exports.advancedJokerAction = exports.LIGHTNING_WINDOW_MS = exports.supportsLiveJokers = exports.isJokerId = void 0;
 exports.canUseJoker = canUseJoker;
 exports.resolveJokerEffect = resolveJokerEffect;
 const types_1 = require("./types");
@@ -9,6 +9,15 @@ exports.isJokerId = isJokerId;
 const supportsLiveJokers = (mode) => mode === 'duel' || mode === 'quick_match' || mode === 'friends_private';
 exports.supportsLiveJokers = supportsLiveJokers;
 exports.LIGHTNING_WINDOW_MS = 5000;
+const actions = {
+    joker_retry: 'retry', joker_pause: 'pause', joker_support: 'support', joker_probe: 'probe',
+    joker_gold_hunt: 'gold', joker_replace: 'replace', joker_extra_time: 'extra_time', joker_skip: 'skip',
+    joker_shield: 'shield', joker_freeze: 'freeze',
+};
+const advancedJokerAction = (id) => actions[id];
+exports.advancedJokerAction = advancedJokerAction;
+const isAdvancedJoker = (id) => !!(0, exports.advancedJokerAction)(id) || id === 'joker_audience';
+exports.isAdvancedJoker = isAdvancedJoker;
 const modifiers = {
     joker_streak_guard: 'streak_guard',
     joker_lightning: 'lightning', joker_double: 'double',
@@ -37,6 +46,21 @@ function canUseJoker(id, options, context = {}) {
         return !context.live || !!context.tactics;
     if (id === 'joker_dice')
         return true;
+    if ((0, exports.isAdvancedJoker)(id)) {
+        if (!context.tactics || !context.capabilities)
+            return false;
+        if (id === 'joker_replace')
+            return !!context.capabilities.replacement;
+        if (id === 'joker_freeze')
+            return !!context.capabilities.freeze;
+        if (id === 'joker_shield')
+            return !!context.capabilities.shield;
+        if (id === 'joker_gold_hunt')
+            return !!context.capabilities.gold;
+        if (id === 'joker_support')
+            return !!context.capabilities.nextRound;
+        return true;
+    }
     if (id === 'joker_lightning')
         return !!context.tactics && context.lightningAvailable !== false;
     if (id === 'joker_streak_guard' || id === 'joker_double')
@@ -48,6 +72,18 @@ function resolveJokerEffect(id, question, previousEliminations, context = {}) {
     const correct = question.options.find(option => option.id === question.correctOptionId);
     if (!correct || !canUseJoker(id, question.options, previousEliminations ? { ...context, lightningAvailable: true } : context))
         return null;
+    const action = (0, exports.advancedJokerAction)(id);
+    if (action)
+        return { eliminated: [], action, hint: `${types_1.JOKERS.find(joker => joker.id === id).name} etkin` };
+    if (id === 'joker_audience') {
+        const votes = Object.fromEntries(question.options.map(option => {
+            const count = context.votes && Object.hasOwn(context.votes, option.id) ? context.votes[option.id] : 0;
+            return [option.id, Number.isSafeInteger(count) && count > 0 ? count : 0];
+        }));
+        if (Object.values(votes).reduce((total, value) => total + value, 0) < 5)
+            return null;
+        return { eliminated: [], votes, hint: 'Önceki oyuncuların şık tercihleri' };
+    }
     if (id === 'joker_prophecy')
         return { eliminated: [], highlightedOptionId: correct.id, hint: 'Kehanet bir şıkkı işaretledi.' };
     if (id === 'joker_reveal')

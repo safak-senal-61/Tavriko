@@ -1,4 +1,5 @@
-import type { InventoryItem, ItemRarity } from './types';
+import type { GameRoom, InventoryItem, ItemRarity } from './types';
+export declare function rewardCompletionPlayers(room: GameRoom, completedNormally: boolean): string[];
 export type GameplayMetric = 'matches' | 'friends' | 'correct' | 'perfect' | 'days';
 export type GameplayMetrics = Record<GameplayMetric, number>;
 export type GameplayReward = {

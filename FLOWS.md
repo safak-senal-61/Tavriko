@@ -12,7 +12,7 @@
 ## Wallet and joker artwork
 
 - Mağaza → Elmas / Altın: each of the four packages uses its original image, from small to extra large. The category artwork and the profile's low-balance panel use the medium original.
-- Mağaza → Jokerler: Tek Eleme and Yarı Yarıya use two distinct poster-derived illustrations. Inspect them on the product list and confirmation, and confirm the prices remain 250 and 450 altın.
+- Mağaza → Jokerler: Tek Eleme and Yarı Yarıya use two distinct illustrations, redrawn from the poster motifs. Inspect the edges on the product list, purchase confirmation, inventory and the smaller in-match menu. Confirm the prices remain 250 and 450 altın.
 - Envanter and antrenman → Jokerlerim: owned joker items show the same artwork as the store. The quiz shortcut remains legible at its smaller size; the panel can still be opened and dismissed, including when stock is empty.
 - At desktop and 375px, inspect the artwork for visible edges, correct proportions, no clipping, and no vector fallback. Native bundle must contain all ten images; do not make live purchases for visual QA.
 
@@ -26,12 +26,13 @@
 ## Gameplay rewards
 
 - Baseline: sign-in opens Oyna; Mağaza previously opened on Sandıklar with Anahtarlar and Rozetler tabs. Envanter is where owned items are opened or equipped.
-- From Oyna → Ödüller, check all four chest progress bars, switch to Rozetler and check the friend, match and answer tasks. Verify locked, ready, claimed, network failure/retry and no duplicate claim.
+- From Oyna → Ödüller, check the 8/20/45/90 chest milestones, then switch to Rozetler. Quit a live match early, then compare with a normal finish with at least one submitted answer (even if wrong). Only the normal finish advances match progress. Also verify no advance for joining late, staying idle throughout or remaining disconnected at the end.
 - On Rozetler, verify all five original illustrations and the new targets: 5 reciprocal friends, 50 valid matches, 250 correct answers, 14 different days, and 15 perfect matches. Confirm previously claimed badges remain permanent and marked as claimed.
 - Delay `/social/rewards` and confirm it starts on Oyna before opening Ödüller. On a cold open show card-shaped shimmer; with cached data keep the cards while a stale read refreshes or fails. Check the retry action, confirmed-claim cache update and no cache sharing after switching accounts.
 - Claim a ready chest and open Envanter; the chest and matching earned key must both be present. Claim a badge, equip it, switch to another badge and re-equip the first; permanent copies are not consumed.
 - Check that Mağaza no longer offers chests, keys or badges, including bundles, while the permanent navigation, frames, gold and boosters still open. Verify the premium season track gives fixed rewards, never chests or keys.
 - Test synthetic users only. Check verified match and friend progress, concurrent claims and reopening from another session. Check phone (320/375 px), desktop, error states and console.
+- In a friend room and a bot duel, exercise the advanced joker capabilities. Check that unsuitable cards and a poll with fewer than five votes do not reduce stock. Retry a wrong answer, reconnect during a paused timer, replace a question without changing the opponent's, and skip a round without adding an answer.
 
 ## Cloudflare Pages web preview
 

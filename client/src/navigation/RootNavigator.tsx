@@ -232,6 +232,7 @@ export const RootNavigator: React.FC = () => {
   const [practiceStreak, setPracticeStreak] = useState<number>(0);
   const [practiceFeedback, setPracticeFeedback] = useState<RoundFeedback | null>(null);
   const [multiplayerFeedback, setMultiplayerFeedback] = useState<RoundFeedback | null>(null);
+  const [jokerRetry, setJokerRetry] = useState<{ roundNumber: number; hint: string; at: number }>();
   const [isPracticeSummaryVisible, setIsPracticeSummaryVisible] = useState<boolean>(false);
   // Sunucunun hesaba gerçekten yazdığı maç ödülleri (ekranda aynen gösterilir)
   const [practiceRewards, setPracticeRewards] = useState<{ xp: number; coins: number; boosted: boolean; lp?: number } | null>(null);
@@ -676,6 +677,7 @@ export const RootNavigator: React.FC = () => {
       }, isSameRound);
       if (question.jokerEffect && (!isSameRound || !state.currentQuestion?.jokerEffect)) void refreshUserProfile(true);
       if (isSameRound) return; // Reconnect: sync the timer, but keep the selected answer.
+      setJokerRetry(undefined);
       setRoundResult(null);
       setMultiplayerFeedback(null);
       const me = user && activeRoomRef.current?.players[user.id];
@@ -686,6 +688,13 @@ export const RootNavigator: React.FC = () => {
         navigateTo('quiz_arena');
       }
     });
+    const unsubJokerRetry = socketService.onJokerRetry(retry => {
+      const state = useGameStore.getState();
+      if (!activeRoomRef.current || state.currentQuestion?.roundNumber !== retry.roundNumber ||
+          typeof retry.hint !== 'string') return;
+      selectOption(null);
+      setJokerRetry({ ...retry, at: Date.now() });
+    });
     const unsubRoundResult = socketService.onRoundResult((result: RoundResult) => {
       if (isSinglePlayerActiveRef.current) return;
       if (!isGameActiveRef.current && !activeRoomRef.current) return;
@@ -693,14 +702,15 @@ export const RootNavigator: React.FC = () => {
       const myAns = user ? result.playerAnswers[user.id] : null;
 
       const rawPts = myAns?.pointsEarned ?? 0;
-      const normPts = rawPts > 300 ? Math.round(rawPts / 10) : Math.max(0, Math.round(rawPts));
+      const normPts = Math.round(rawPts);
       const rawSpd = myAns?.speedBonus ?? 0;
-      const normSpd = rawSpd > 100 ? Math.round(rawSpd / 10) : Math.max(0, Math.round(rawSpd));
+      const normSpd = Math.max(0, Math.round(rawSpd));
 
       // Anlık doğru/yanlış ve bilgi açıklamasını QuizArenaScreen'e anında ver
       const multiFeedback: RoundFeedback = {
         isCorrect: myAns?.isCorrect ?? false,
-        isTimeout: !myAns?.selectedOptionId,
+        isTimeout: !myAns?.selectedOptionId && !myAns?.skipped,
+        skipped: myAns?.skipped,
         correctOptionId: result.correctOptionId,
         explanation: result.explanation || '',
         pointsAwarded: normPts,
@@ -720,7 +730,7 @@ export const RootNavigator: React.FC = () => {
           userAnswerText: userOpt ? userOpt.text : undefined,
           correctAnswerText: correctOpt ? correctOpt.text : result.correctOptionId || '',
           isCorrect: myAns?.isCorrect ?? false,
-          isTimeout: !myAns?.selectedOptionId,
+          isTimeout: !myAns?.selectedOptionId && !myAns?.skipped,
           pointsEarned: normPts,
           explanation: result.explanation,
         };
@@ -922,6 +932,7 @@ export const RootNavigator: React.FC = () => {
     return () => {
       unsubSync();
       unsubQuestion();
+      unsubJokerRetry();
       unsubRoundResult();
       unsubGameOver();
       unsubMatchFound();
@@ -1730,7 +1741,7 @@ export const RootNavigator: React.FC = () => {
   const handleSubmitAnswer = (optionId: string, timeRemainingMs: number) => {
     if (activeRoom && user && currentQuestion) {
       selectOption(optionId);
-      socketService.submitAnswer(activeRoom.code, user.id, optionId, currentQuestion.roundNumber);
+      socketService.submitAnswer(activeRoom.code, user.id, optionId, currentQuestion.roundNumber, currentQuestion.id);
       return;
     }
     void evaluatePracticeAnswer(optionId, timeRemainingMs);
@@ -1985,6 +1996,7 @@ export const RootNavigator: React.FC = () => {
                   : practiceStats.totalScore
               }
               feedback={activeRoom ? multiplayerFeedback : practiceFeedback}
+              jokerRetry={activeRoom && jokerRetry?.roundNumber === currentQuestion.roundNumber ? jokerRetry : undefined}
               onSelectOption={handleSubmitAnswer}
               onTimeExpired={handleTimeExpired}
               onExit={handleExitCurrentGame}
