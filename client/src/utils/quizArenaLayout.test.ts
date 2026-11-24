@@ -9,6 +9,12 @@ describe('quiz arena responsiveness', () => {
     expect(phone).toMatchObject({ compactHeader: true, tightHeader: false, categoryArtSize: 19, categoryFontSize: 12, wideAnswers: false });
   });
 
+  it('adds a smaller rightward extension on the narrowest phones and keeps wider layouts unchanged', () => {
+    expect(getQuizArenaLayout(288, 568, 8)).toMatchObject({ mobileCards: true, categoryExtraRightPadding: 8 });
+    expect(getQuizArenaLayout(343, 667, 8)).toMatchObject({ mobileCards: true, categoryExtraRightPadding: 14 });
+    expect(getQuizArenaLayout(560, 780, 8)).toMatchObject({ mobileCards: false, categoryExtraRightPadding: 0 });
+  });
+
   it('adapts the arena to available tablet and desktop space', () => {
     const phone = getQuizArenaLayout(343, 844, 8);
     const tablet = getQuizArenaLayout(692, 1024, 8);

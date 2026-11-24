@@ -363,11 +363,12 @@ const SummitRaceTrack: React.FC<{
   racers: RacerInfo[];
   totalQuestions: number;
   compact?: boolean;
+  mobileCards?: boolean;
   /** 5+ oyuncu: kart içi boşluklar ve şerit aralıkları sıkılaştırılır */
   dense?: boolean;
   /** Dense moddaki orantılı küçültme katsayısı (1 = küçültme yok) */
   scale?: number;
-}> = ({ racers, totalQuestions, compact = false, dense = false, scale = 1 }) => {
+}> = ({ racers, totalQuestions, compact = false, mobileCards = false, dense = false, scale = 1 }) => {
   const marker = Math.max(8, Math.round(raceMarkerSize(racers.length, compact) * scale));
   // Şerit kalınlığı göstergelerle birlikte küçülür; 8 kişilik odada bile sığar.
   const trackHeight = Math.max(5, Math.min(8, Math.round(marker * 0.42)));
@@ -412,6 +413,7 @@ const SummitRaceTrack: React.FC<{
           paddingBottom: Math.max(3, Math.round(4 * scale)),
           gap: Math.max(1, Math.round(2 * scale)),
         },
+        mobileCards && styles.mobilePanelCorners,
       ]}
     >
       <View style={styles.raceTitleRow}>
@@ -937,7 +939,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   }, [activeRacers]);
   const playerCount = activeRacers.length;
   const arenaLayout = getQuizArenaLayout(contentWidth, windowHeight, playerCount);
-  const { dense: denseLayout, denseScale, compactHeader, tightHeader, wideAnswers, uiGrowth } = arenaLayout;
+  const { dense: denseLayout, denseScale, compactHeader, tightHeader, wideAnswers, uiGrowth, mobileCards } = arenaLayout;
   const ds = (value: number) => Math.round(value * denseScale);
   const denseFrame = arenaLayout.denseFrameMaxWidth
     ? { maxWidth: arenaLayout.denseFrameMaxWidth }
@@ -1000,7 +1002,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         </TouchableOpacity>
         <View style={[
           styles.roundPill,
-          { height: roundHeight, borderRadius: roundHeight / 2 },
+          { height: roundHeight, borderRadius: mobileCards ? 8 : roundHeight / 2 },
           denseLayout && styles.denseControlBorder,
           (denseLayout || compactHeader) && { paddingHorizontal: tightHeader ? 6 : Math.round(9 + 5 * uiGrowth) },
         ]}>
@@ -1017,9 +1019,11 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           {
             minHeight: arenaLayout.categoryMinHeight,
             maxWidth: arenaLayout.categoryMaxWidth,
-            paddingHorizontal: arenaLayout.categoryHorizontalPadding,
+            paddingLeft: arenaLayout.categoryHorizontalPadding,
+            paddingRight: arenaLayout.categoryHorizontalPadding + arenaLayout.categoryExtraRightPadding,
             gap: compactHeader ? 4 : 6,
           },
+          mobileCards && styles.mobileCardCorners,
         ]}>
           <Image
             testID="quiz-category-art"
@@ -1160,6 +1164,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           racers={activeRacers}
           totalQuestions={totalRounds}
           compact={compact}
+          mobileCards={mobileCards}
           dense={denseLayout}
           scale={denseScale}
         />
@@ -1168,6 +1173,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       {/* 4. Soru Kartı */}
       <Animated.View
         key={`q-${question.id}-${question.roundNumber}`}
+        testID="quiz-question-card"
         entering={FadeIn.duration(320)}
         style={[
           styles.questionCard,
@@ -1175,13 +1181,14 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           (tiny || denseLayout) && styles.questionCardTiny,
           denseLayout && styles.denseQuestionCard,
           denseLayout && { minHeight: Math.max(46, ds(68)) },
+          mobileCards && styles.mobilePanelCorners,
         ]}
       >
         <GradientFill
           colors={['rgba(107, 60, 255, 0.55)', 'rgba(52, 22, 128, 0.75)', 'rgba(30, 12, 74, 0.85)']}
           direction="diagonal"
         />
-        <View style={[styles.questionCardInner, denseLayout && styles.denseQuestionInner]} pointerEvents="none" />
+        <View style={[styles.questionCardInner, denseLayout && styles.denseQuestionInner, mobileCards && styles.mobileQuestionInner]} pointerEvents="none" />
         {!tiny && !denseLayout && (
           <View style={styles.difficultyRow}>
             <View
@@ -1296,6 +1303,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   removed && { opacity: .42 },
                   denseLayout && styles.denseOptCard,
                   denseLayout && { minHeight: Math.max(38, ds(49)) },
+                  mobileCards && styles.mobileCardCorners,
                 ]}
                 disabled={isOptionsDisabled || jokerBusy || removed}
                 activeOpacity={0.8}
@@ -1367,6 +1375,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
             style={[
               styles.inlineFeedbackCard,
               denseLayout && styles.denseFeedbackCard,
+              mobileCards && styles.mobileCardCorners,
               {
                 borderColor: feedback.isTimeout || feedback.unavailable
                   ? 'rgba(255, 196, 61, 0.6)'
@@ -1474,6 +1483,9 @@ const styles = StyleSheet.create({
   compactTopRow: { gap: 4 },
   groupTopRow: { justifyContent: 'flex-start' },
   groupHeaderTimer: { flexShrink: 0, marginLeft: 'auto' },
+  mobileCardCorners: { borderRadius: 9 },
+  mobilePanelCorners: { borderRadius: 11 },
+  mobileQuestionInner: { borderRadius: 7 },
   miniPlayerDense: { maxWidth: 84, paddingVertical: 2, borderRadius: 8 },
   denseQuestionCard: { borderRadius: 16, borderWidth: 1.5, paddingVertical: 6, paddingHorizontal: 10 },
   denseQuestionInner: { top: 3, bottom: 3, left: 3, right: 3, borderRadius: 12 },

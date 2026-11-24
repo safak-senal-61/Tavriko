@@ -6,6 +6,7 @@ export function getQuizArenaLayout(contentWidth: number, height: number, playerC
   const dense = playerCount >= 5;
   const compactHeader = contentWidth < 400;
   const tightHeader = contentWidth < 325;
+  const mobileCards = contentWidth < 480;
   const wideAnswers = contentWidth >= 560;
   const widthGrowth = unit((contentWidth - 400) / 500);
   const uiGrowth = widthGrowth * unit((height - 560) / 240);
@@ -19,6 +20,8 @@ export function getQuizArenaLayout(contentWidth: number, height: number, playerC
     wideAnswers,
     compactHeader,
     tightHeader,
+    mobileCards,
+    categoryExtraRightPadding: mobileCards ? (tightHeader ? 8 : 14) : 0,
     uiGrowth,
     denseFrameMaxWidth: dense && wideAnswers
       ? Math.round(640 + 210 * unit((contentWidth - 560) / 420))
