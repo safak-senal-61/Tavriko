@@ -984,17 +984,17 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
               >
                 {feedback && isCorrectChoice ? (
                   <>
-                    <GradientFill colors={['rgba(43, 213, 118, 0.24)', 'rgba(20, 103, 72, 0.3)']} direction="horizontal" />
+                    <GradientFill colors={['#217654', '#146748', '#0C543A']} stops={[0, 0.5, 1]} />
                     <View pointerEvents="none" style={styles.optCorrectGlow} />
                   </>
                 ) : feedback && isWrongChoice ? (
-                  <GradientFill colors={['rgba(255, 92, 110, 0.24)', 'rgba(160, 24, 44, 0.3)']} direction="horizontal" />
+                  <GradientFill colors={['#FF8A98', '#FF5A6A', '#C8243A']} stops={[0, 0.5, 1]} />
                 ) : (
                   <GradientFill
                     colors={
                       !feedback && isMyChoice
-                        ? ['rgba(124, 92, 255, 0.30)', 'rgba(124, 92, 255, 0.12)']
-                        : ['rgba(255, 255, 255, 0.062)', 'rgba(255, 255, 255, 0.026)']
+                        ? ['rgba(255, 196, 61, 0.38)', 'rgba(120, 70, 220, 0.6)']
+                        : ['rgba(80, 44, 180, 0.62)', 'rgba(40, 18, 96, 0.8)']
                     }
                     direction="horizontal"
                   />
@@ -1011,9 +1011,9 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   <Text
                     style={[
                       styles.optBadgeText,
-                      !feedback && isMyChoice && { color: '#FFFFFF' },
-                      feedback && isCorrectChoice && { color: '#06110C' },
-                      feedback && isWrongChoice && { color: '#24070C' },
+                      !feedback && isMyChoice && { color: '#180B34' },
+                      feedback && isCorrectChoice && { color: '#146748' },
+                      feedback && isWrongChoice && { color: '#C8243A' },
                     ]}
                   >
                     {optionLabels[index]}
@@ -1156,10 +1156,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: 'rgba(9, 8, 16, 0.55)',
   },
-  arenaBody: { flexGrow: 1, justifyContent: 'space-between', gap: 6 },
+  arenaBody: { flexGrow: 1, justifyContent: 'center', gap: 8, paddingVertical: 4 },
   arenaScroll: { flex: 1, minHeight: 0 },
-  groupArenaBody: { flexGrow: 1, justifyContent: 'space-between', paddingVertical: 4, gap: 6 },
-  webArenaBody: { flexGrow: 1, justifyContent: 'space-between', paddingBottom: 6, gap: 10 },
+  groupArenaBody: { flexGrow: 1, justifyContent: 'center', paddingVertical: 4, gap: 8 },
+  webArenaBody: { flexGrow: 1, justifyContent: 'center', paddingTop: 4, paddingBottom: 8, gap: 10 },
   optionsWide: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
   optWrapWide: { width: '49%' },
   // ---- Üst Bar ----
@@ -1363,7 +1363,9 @@ const styles = StyleSheet.create({
   // ---- Soru Kartı ----
   questionCard: {
     minHeight: 104,
+    flexGrow: 1,
     flexShrink: 1,
+    maxHeight: 200,
     borderRadius: 18,
     overflow: 'hidden',
     borderWidth: 1,
@@ -1427,93 +1429,97 @@ const styles = StyleSheet.create({
   optCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    minHeight: 48,
-    paddingVertical: 4,
-    paddingLeft: 8,
-    paddingRight: 12,
-    borderRadius: 14,
+    gap: 9,
+    minHeight: 50,
+    paddingVertical: 3,
+    paddingLeft: 6,
+    paddingRight: 8,
+    borderRadius: 25,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.10)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(154, 107, 255, 0.6)',
   },
   optCardCompact: {
     minHeight: 46,
-    borderRadius: 13,
+    borderRadius: 23,
   },
   optCardTiny: {
     minHeight: 44,
-    borderRadius: 12,
+    borderRadius: 22,
   },
   optCardSelected: {
-    borderColor: 'rgba(124, 92, 255, 0.9)',
+    borderColor: '#FFC43D',
   },
   optCardCorrect: {
-    borderColor: 'rgba(43, 213, 118, 0.75)',
+    borderColor: '#B6FFE0',
   },
   optCorrectGlow: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(43, 213, 118, 0.04)',
+    backgroundColor: 'rgba(63, 208, 138, 0.06)',
   },
   optCardHighlighted: {
-    borderColor: 'rgba(255, 196, 61, 0.8)',
+    borderColor: '#FFCE67',
   },
   optCardWrong: {
-    borderColor: 'rgba(255, 92, 110, 0.8)',
+    borderColor: '#FFB3BC',
   },
   optCardDimmed: {
-    opacity: 0.55,
+    opacity: 0.6,
   },
   optBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
-    backgroundColor: SURFACE_STRONG,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   optBadgeCompact: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
   },
   optBadgeSelected: {
-    backgroundColor: '#7C5CFF',
+    backgroundColor: '#FFC43D',
+    borderColor: '#FFE27A',
   },
   optBadgeCorrect: {
-    backgroundColor: '#2BD576',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
   },
   optBadgeWrong: {
-    backgroundColor: '#FF5C6E',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
   },
   optBadgeText: {
-    color: '#E4E1F2',
-    fontSize: 12,
-    fontFamily: THEME.fonts.extraBold,
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: THEME.fonts.black,
   },
   optText: {
     flex: 1,
     minWidth: 0,
-    color: '#F2F0FA',
-    fontSize: 15,
-    fontFamily: THEME.fonts.bold,
-    lineHeight: 19,
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: THEME.fonts.black,
   },
   optTextCompact: {
-    fontSize: 14.5,
+    fontSize: 15,
   },
   optTextLarge: {
     fontSize: 18,
   },
   optionMark: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  optionMarkResult: { backgroundColor: 'rgba(255, 255, 255, 0.92)' },
-  optionMarkDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#C4B5FF' },
+  optionMarkResult: { backgroundColor: '#FFFFFF' },
+  optionMarkDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFCE67' },
   // ---- Alt Durum ----
   fixedBottomStatus: {
     minHeight: 30,
