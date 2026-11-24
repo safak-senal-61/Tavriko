@@ -951,7 +951,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     width: '100%',
     maxWidth: 700,
-    alignSelf: 'stretch',
+    alignSelf: 'center',
   },
   tabButton: {
     flex: 1,
@@ -980,7 +980,7 @@ const styles = StyleSheet.create({
   roomSetupCard: {
     width: '100%',
     maxWidth: 700,
-    alignSelf: 'stretch',
+    alignSelf: 'center',
     backgroundColor: '#291A3E',
     borderRadius: 24,
     borderWidth: 1.5,

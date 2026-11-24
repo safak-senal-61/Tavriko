@@ -199,6 +199,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   // her zaman açık (masaüstü ferah yerleşimi yalnızca geniş web penceresi).
   const { height: winH, width: winW } = useWindowDimensions();
   const compact = Platform.OS !== 'web' || winW < 520;
+  // Tablet / katlanabilir: giriş-kayıt ekranı telefon sütununda kalmasın,
+  // arka plan ekranı kaplasın, form okunabilir genişlikte ortalanır.
+  const tabletLayout = Platform.OS !== 'web' && winW > 540;
   // Çok küçük ekranlar (≤740dp): ekstra sıkı katman — hero, girişler ve
   // butonlar daha da küçültülür.
   const tiny = winH <= 740;
@@ -577,7 +580,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     );
   }
   return (
-    <View style={[styles.authRoot, wideLayout && styles.authRootWide]}>
+    <View style={[styles.authRoot, (wideLayout || tabletLayout) && styles.authRootWide]}>
       {/* Luxury Multi-Layered Cosmic Background */}
       <Svg style={StyleSheet.absoluteFill} viewBox="0 0 400 850" preserveAspectRatio="none" pointerEvents="none">
         <Defs>
@@ -593,12 +596,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         <Circle cx="50" cy="620" r="160" fill="#DB2777" opacity="0.15" />
       </Svg>
       <ScrollView
-        style={[styles.scrollView, wideLayout && styles.authRootWide]}
+        style={[styles.scrollView, (wideLayout || tabletLayout) && styles.authRootWide]}
         contentContainerStyle={[
           styles.scrollContent,
           compact && styles.scrollContentCompact,
           tiny && styles.scrollContentTiny,
           wideLayout && styles.scrollContentWide,
+          tabletLayout && styles.scrollContentTablet,
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -1360,6 +1364,11 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   authRootWide: { maxWidth: '100%' },
+  scrollContentTablet: {
+    maxWidth: 600,
+    paddingHorizontal: 24,
+    paddingVertical: 28,
+  },
   scrollContentWide: {
     maxWidth: 1032,
     flexDirection: 'row',

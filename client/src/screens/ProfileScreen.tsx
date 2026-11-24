@@ -1881,7 +1881,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.12)',
     width: '100%',
     maxWidth: profileContentWidth,
-    alignSelf: 'stretch',
+    alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'space-between',
   },

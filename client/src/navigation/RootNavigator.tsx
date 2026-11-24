@@ -2683,7 +2683,9 @@ const styles = StyleSheet.create({
     maxWidth: 520,
   },
   nativeTabletContainer: {
-    maxWidth: 880,
+    // Arka plan ekranı kaplar; içerik genişliğini ekranların kendisi
+    // (screenRootTablet / auth içeriği) sınırlar.
+    maxWidth: '100%',
   },
   nativeQuizTabletContainer: { maxWidth: NATIVE_QUIZ_TABLET_FRAME_WIDTH },
   desktopSidebar: {
