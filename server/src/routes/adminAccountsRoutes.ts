@@ -8,7 +8,7 @@ import { addSupportNote, audit, compensationCatalog, grantInput, limits, moderat
   permissions, reasonText, requestGrant, restrictionsEnabled, reviewGrant, uuidPattern, type Operation } from '../services/adminAccountOperations';
 import { readPlayerAnalytics, readSignupCohorts } from '../services/playerAnalytics';
 import { readDuelFunnel } from '../services/duelFunnel';
-import { caseText, firstReplyHours, readCaseReplies, replyToCase, ticketKinds, updateCase } from '../services/supportCases';
+import { attachmentHeaders, attachmentSelect, caseText, firstReplyHours, readCaseAttachment, readCaseReplies, replyToCase, ticketKinds, updateCase } from '../services/supportCases';
 import { isBugReport, notifyPlayerOfBugUpdate } from '../services/supportBugEmails';
 
 const prefix = '/api/admin/accounts';
@@ -143,7 +143,8 @@ export function createAdminAccountsRouter(client = db.rawClient) {
       ] } : {}) };
     try {
       const items = await client.supportCase.findMany({ where, take: 21, skip: (Number(page) - 1) * 20,
-        orderBy: [{ createdAt: queue === 'resolved' ? 'desc' : 'asc' }, { id: 'asc' }] });
+        orderBy: [{ createdAt: queue === 'resolved' ? 'desc' : 'asc' }, { id: 'asc' }],
+        include: { attachments: { select: attachmentSelect, orderBy: { createdAt: 'asc' } } } });
       const overdue = admin.role === 'owner' ? await client.supportCase.count({ where: {
         status: { not: 'resolved' }, firstReplyAt: null, createdAt: { lte: deadline },
       } }) : null;
@@ -159,6 +160,14 @@ export function createAdminAccountsRouter(client = db.rawClient) {
     if (!uuidPattern.test(id)) return res.status(404).json({ error: 'Talep bulunamadı.' });
     try { res.json(await readCaseReplies(client, id, { admin: res.locals.accountAdmin })); }
     catch (error) { failed(res, error); }
+  });
+  router.get(prefix + '/cases/:id/attachments/:attachmentId', async (req, res) => {
+    const { id, attachmentId } = req.params;
+    if (!uuidPattern.test(String(id)) || !uuidPattern.test(String(attachmentId))) return res.status(404).json({ error: 'Ek dosya bulunamadı.' });
+    try {
+      const file = await readCaseAttachment(client, String(id), String(attachmentId), { admin: res.locals.accountAdmin });
+      res.set(attachmentHeaders(file.name, file.mime, file.size)).end(file.data);
+    } catch (error) { failed(res, error); }
   });
   router.post(prefix + '/cases/:id/replies', mutation('cases', ['revision','body','ask']), async (req, res) => {
     const id = String(req.params.id);

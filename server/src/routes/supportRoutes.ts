@@ -4,7 +4,7 @@ import { waitUntil } from '@vercel/functions';
 import { db } from '../db/prismaClient';
 import { requireUserAuth } from '../middleware/auth';
 import { OperationError, uuidPattern } from '../services/adminAccountOperations';
-import { appealCutoff, caseText, openCase, publicCaseFields, readCaseReplies, replyToCase } from '../services/supportCases';
+import { appealCutoff, attachmentHeaders, caseText, openCase, parseAttachments, publicCaseFields, readCaseAttachment, readCaseReplies, replyToCase } from '../services/supportCases';
 import { isGuestIdentity } from '../services/playerAccess';
 import { BUG_REPORT_PREFIX, notifyOwnerOfBug } from '../services/supportBugEmails';
 
@@ -34,9 +34,14 @@ export function createSupportRouter(client = db.rawClient) {
     if (!req.is('application/json')) return res.status(415).json({ error: 'JSON gerekli.' });
     const { kind, moderationId, message } = req.body || {};
     const bug = kind === 'bug';
+    const attachments = parseAttachments(req.body?.attachments);
     const text = caseText(message, 12, 1200);
     const subject = kind === 'appeal' ? 'Moderasyon itirazı' : caseText(req.body?.subject, 4, bug ? 80 - BUG_REPORT_PREFIX.length : 80);
-    if (!text || !subject || subject.includes('\n') || (kind === 'appeal' ? typeof moderationId !== 'string' || !uuidPattern.test(moderationId)
+    if (attachments === 'invalid') {
+      return res.status(400).json({ error: 'Ek dosyalar geçersiz. En fazla 3 dosya, her biri 3 MB olabilir; görsel, PDF, metin veya ZIP ekleyin.' });
+    }
+    if (!text || !subject || subject.includes('\n') || (kind === 'appeal' && attachments?.length) ||
+      (kind === 'appeal' ? typeof moderationId !== 'string' || !uuidPattern.test(moderationId)
       : (!bug && kind !== 'support') || moderationId != null || subject.startsWith(BUG_REPORT_PREFIX.trimEnd()))) {
       return res.status(400).json({ error: 'Konu, açıklama veya itiraz kaydı geçersiz.' });
     }
@@ -45,9 +50,10 @@ export function createSupportRouter(client = db.rawClient) {
       const saved = await openCase(client, accountId, {
         kind: kind === 'appeal' ? 'appeal' : 'support',
         subject: bug ? BUG_REPORT_PREFIX + subject : subject, message: text, moderationId: moderationId ?? null,
+        attachments: attachments ?? [],
       });
       if (bug) {
-        const delivery = notifyOwnerOfBug(client, { id: saved.id, accountId, subject: saved.subject });
+        const delivery = notifyOwnerOfBug(client, { id: saved.id, accountId, subject: saved.subject, attachmentCount: saved.attachments?.length ?? 0 });
         if (process.env.VERCEL) waitUntil(delivery);
         else void delivery;
       }
@@ -83,6 +89,16 @@ export function createSupportRouter(client = db.rawClient) {
     } catch (error) {
       if (error instanceof OperationError) return res.status(error.status).json({ error: error.message });
       return res.status(503).json({ error: 'Bildirim kaydedilemedi.' });
+    }
+  });
+  router.get('/:id/attachments/:attachmentId', async (req, res) => {
+    const { id, attachmentId } = req.params;
+    if (!uuidPattern.test(id) || !uuidPattern.test(attachmentId)) return res.status(404).json({ error: 'Ek dosya bulunamadı.' });
+    try {
+      const file = await readCaseAttachment(client, id, attachmentId, { account: req.authUserId! });
+      res.set(attachmentHeaders(file.name, file.mime, file.size)).end(file.data);
+    } catch (error) {
+      res.status(error instanceof OperationError ? error.status : 503).json({ error: error instanceof OperationError ? error.message : 'Ek dosya açılamadı.' });
     }
   });
   router.get('/:id/replies', async (req, res) => {

@@ -58,6 +58,7 @@ async function loadCases(target=1, message=''){
       const row=el('li'),view=el('button','Hesabı aç');view.type='button';view.addEventListener('click',()=>openDetail(item.accountId));
       row.append(el('strong',item.subject),el('small',(item.bugReport?'Hata bildirimi':item.kind==='appeal'?'Moderasyon itirazı':'Destek')+' · '+caseStates[item.status]+' · '+timestamp(item.createdAt)+' · '+item.accountId),
         el('p',item.message,'case-copy'),el('small','Sorumlu: '+(item.assignee || 'Atanmamış')),view);
+      if(item.attachments&&item.attachments.length){const files=el('div'),label=el('small','Ek dosyalar: ');files.append(label);for(const f of item.attachments){const link=el('a',f.name+' · '+Math.max(1,Math.round(f.size/1024))+' KB');link.href=api+'/cases/'+encodeURIComponent(item.id)+'/attachments/'+encodeURIComponent(f.id);link.target='_blank';link.rel='noopener noreferrer';files.append(link);}row.append(files);}
       if(item.waitingForPlayer)row.append(el('small','Oyuncu yanıtı bekleniyor'));
       if(item.late)row.append(el('small',item.firstReplyAt?'İlk yanıt hedefi aşıldı':'İlk yanıt gecikti'));
       if(item.moderationId)row.append(el('small','Moderasyon kaydı: '+item.moderationId));

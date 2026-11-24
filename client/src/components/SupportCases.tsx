@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { MAX_ATTACHMENTS, formatBytes, openRemoteAttachment, pickFileAttachment, pickImageAttachment, type PickedAttachment, type RemoteAttachment } from '../utils/supportAttachments';
 import { PageShimmer } from './LoadingShimmer';
 import { useGameStore } from '../store/gameStore';
 import { PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
 import { usePageData } from '../utils/usePageData';
 
-type Case = { id: string; subject: string; message: string; status: keyof typeof statuses; createdAt: string; resolution: string | null; waitingForPlayer?: boolean };
+type Case = { id: string; subject: string; message: string; status: keyof typeof statuses; createdAt: string; resolution: string | null; waitingForPlayer?: boolean; attachments?: RemoteAttachment[] };
 type Event = { id: string; action: 'warn' | 'restrict'; createdAt: string };
 const statuses = { open: 'Açık', in_progress: 'İnceleniyor', resolved: 'Sonuçlandı' };
 const date = (value: string) => new Date(value).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul' });
@@ -20,6 +21,10 @@ export function SupportCases({ api, token, owner }: { api: string; token: string
   const [page, setPage] = useState(1);
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState('');
+  const [attachments, setAttachments] = useState<PickedAttachment[]>([]);
+  const [attachmentNotice, setAttachmentNotice] = useState('');
+  const [picking, setPicking] = useState(false);
+  const [preview, setPreview] = useState<{ uri: string; name: string } | null>(null);
   const sendRef = useRef<AbortController | null>(null);
   const endpoint = `${api.replace(/\/+$/, '')}/support`;
   const headers = { Authorization: `Bearer ${token}` };
@@ -35,6 +40,28 @@ export function SupportCases({ api, token, owner }: { api: string; token: string
     if (data) setAppeal(old => data.events.some(event => event.id === old) ? old : null);
   }, [data]);
 
+  async function addAttachment(source: 'image' | 'file') {
+    if (picking || attachments.length >= MAX_ATTACHMENTS) return;
+    setPicking(true); setAttachmentNotice('');
+    try {
+      const result = source === 'image' ? await pickImageAttachment() : await pickFileAttachment();
+      if (result.error) setAttachmentNotice(result.error);
+      else if (result.attachment) {
+        const picked = result.attachment;
+        setAttachments(list => list.length >= MAX_ATTACHMENTS ? list : [...list, picked]);
+      }
+    } finally {
+      setPicking(false);
+    }
+  }
+
+  async function openAttachment(caseId: string, file: RemoteAttachment) {
+    setAttachmentNotice('');
+    const result = await openRemoteAttachment({ api, token, caseId, attachment: file });
+    if (result.imageUri) setPreview({ uri: result.imageUri, name: file.name });
+    else if (result.error) setNotice(result.error);
+  }
+
   async function send() {
     if (sendRef.current || invalid) return;
     const controller = new AbortController();
@@ -43,7 +70,8 @@ export function SupportCases({ api, token, owner }: { api: string; token: string
     try {
       const response = await fetch(endpoint, {
         method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, signal: controller.signal,
-        body: JSON.stringify({ kind: appeal ? 'appeal' : bug ? 'bug' : 'support', ...(appeal ? { moderationId: appeal } : { subject }), message }),
+        body: JSON.stringify({ kind: appeal ? 'appeal' : bug ? 'bug' : 'support', ...(appeal ? { moderationId: appeal } : { subject }), message,
+          ...(!appeal && attachments.length ? { attachments: attachments.map(file => ({ name: file.name, mime: file.mime, data: file.base64 })) } : {}) }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Talep gönderilemedi.');
@@ -51,7 +79,8 @@ export function SupportCases({ api, token, owner }: { api: string; token: string
         pageDataCache.invalidateWhere((url, scope) => scope === owner && url.startsWith(`${endpoint}?page=`));
       }
       if (controller.signal.aborted) return;
-      setSubject(''); setMessage(''); setAppeal(null); setNotice(bug ? 'Hata bildiriminiz kaydedildi.' : 'Talebiniz kaydedildi.');
+      setSubject(''); setMessage(''); setAppeal(null); setAttachments([]); setAttachmentNotice('');
+      setNotice(bug ? 'Hata bildiriminiz kaydedildi.' : 'Talebiniz kaydedildi.');
       setPage(1);
     } catch (error) {
       if (!controller.signal.aborted) setNotice(error instanceof Error ? error.message : 'Talep gönderilemedi.');
@@ -83,6 +112,24 @@ export function SupportCases({ api, token, owner }: { api: string; token: string
       {bug && subject.trim().length > subjectLimit && <Text style={s.secondary}>Hata konusu en fazla {subjectLimit} karakter olabilir.</Text>}
       <TextInput accessibilityLabel="Talep açıklaması" placeholder="Ne oldu? En az 12 karakter." placeholderTextColor="#AEA0C3"
         value={message} onChangeText={setMessage} maxLength={1200} multiline style={[s.input, s.message]} editable={!sending} />
+      {!appeal && <>
+        <View style={s.attachmentBar}>
+          <Pressable accessibilityRole="button" disabled={sending || picking || attachments.length >= MAX_ATTACHMENTS}
+            style={({ pressed }) => [s.attachmentButton, { opacity: sending || picking || attachments.length >= MAX_ATTACHMENTS ? 0.55 : pressed ? 0.8 : 1 }]}
+            onPress={() => void addAttachment('image')}><Text style={s.attachmentAction}>Fotoğraf veya ekran görüntüsü ekle</Text></Pressable>
+          <Pressable accessibilityRole="button" disabled={sending || picking || attachments.length >= MAX_ATTACHMENTS}
+            style={({ pressed }) => [s.attachmentButton, { opacity: sending || picking || attachments.length >= MAX_ATTACHMENTS ? 0.55 : pressed ? 0.8 : 1 }]}
+            onPress={() => void addAttachment('file')}><Text style={s.attachmentAction}>Dosya ekle</Text></Pressable>
+        </View>
+        {attachments.map(file => <View key={file.id} style={s.attachmentChip}>
+          <Text style={s.attachmentName} numberOfLines={1}>{file.name} · {formatBytes(file.size)}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={`${file.name} ekini kaldır`} disabled={sending}
+            onPress={() => setAttachments(list => list.filter(item => item.id !== file.id))}>
+            <Text style={s.attachmentRemove}>Kaldır</Text></Pressable>
+        </View>)}
+        <Text style={s.secondary}>En fazla {MAX_ATTACHMENTS} dosya, her biri 3 MB: ekran görüntüsü, fotoğraf, PDF, metin veya ZIP.</Text>
+        {!!attachmentNotice && <Text accessibilityLiveRegion="polite" style={s.body}>{attachmentNotice}</Text>}
+      </>}
       <Pressable accessibilityRole="button" disabled={sending || invalid}
         style={({ pressed }) => [s.button, s.primary, { opacity: sending || invalid ? 0.55 : pressed ? 0.8 : 1 }]}
         onPress={() => void send()}><Text style={s.primaryText}>{sending ? 'Gönderiliyor' : bug ? 'Hata bildirimini gönder' : 'Talebi gönder'}</Text></Pressable>
@@ -98,6 +145,11 @@ export function SupportCases({ api, token, owner }: { api: string; token: string
         <Text style={s.title}>{item.subject}</Text>
         <Text style={s.secondary}>{date(item.createdAt)} · {item.waitingForPlayer ? 'Yanıtınız bekleniyor' : statuses[item.status]}</Text>
         <Text style={s.body}>{item.message}</Text>
+        {!!item.attachments?.length && <View style={s.attachmentList}>{item.attachments.map(file =>
+          <Pressable key={file.id} accessibilityRole="button" accessibilityLabel={`${file.name} ekini aç`}
+            style={({ pressed }) => [s.attachmentChip, { opacity: pressed ? 0.75 : 1 }]} onPress={() => void openAttachment(item.id, file)}>
+            <Text style={s.attachmentName} numberOfLines={1}>{file.mime.startsWith('image/') ? 'Görsel' : 'Dosya'}: {file.name} · {formatBytes(file.size)}</Text>
+          </Pressable>)}</View>}
         {!!item.resolution && <Text style={s.body}>Destek yanıtı: {item.resolution}</Text>}
         <CaseConversation endpoint={`${endpoint}/${encodeURIComponent(item.id)}/replies`} listEndpoint={endpoint} token={token} owner={owner} />
       </View>)}
@@ -106,6 +158,14 @@ export function SupportCases({ api, token, owner }: { api: string; token: string
         {data?.more && <Pressable accessibilityRole="button" style={s.button} onPress={() => setPage(page + 1)}><Text style={s.body}>Sonraki</Text></Pressable>}
       </View>}
     </>}
+    <Modal visible={!!preview} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
+      <View style={s.previewBackdrop}>
+        {preview && <Image accessibilityLabel={preview.name} resizeMode="contain" source={{ uri: preview.uri }} style={s.previewImage} />}
+        {preview && <Text style={s.previewName} numberOfLines={2}>{preview.name}</Text>}
+        <Pressable accessibilityRole="button" style={[s.button, s.primary]} onPress={() => setPreview(null)}>
+          <Text style={s.primaryText}>Kapat</Text></Pressable>
+      </View>
+    </Modal>
   </View>;
 }
 
@@ -183,5 +243,15 @@ const s = StyleSheet.create({
   input: { borderColor: '#665183', borderWidth: 1, borderRadius: 10, padding: 10, color: '#F4ECFF', minHeight: 44 },
   message: { minHeight: 96, textAlignVertical: 'top' },
   primary: { backgroundColor: '#F8C85D', borderRadius: 10, alignItems: 'center' },
+  attachmentBar: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  attachmentButton: { borderColor: '#665183', borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, minHeight: 40, justifyContent: 'center', flexGrow: 1 },
+  attachmentAction: { color: '#FFE092', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  attachmentList: { gap: 6 },
+  attachmentChip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderColor: '#594477', borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  attachmentName: { color: '#F4ECFF', fontSize: 13, flexShrink: 1 },
+  attachmentRemove: { color: '#FFB4B4', fontSize: 13, fontWeight: '700' },
+  previewBackdrop: { flex: 1, backgroundColor: 'rgba(9,4,20,0.94)', padding: 20, gap: 12, justifyContent: 'center' },
+  previewImage: { width: '100%', height: '70%' },
+  previewName: { color: '#CDBEE0', fontSize: 13, textAlign: 'center' },
   primaryText: { color: '#231630', fontWeight: '800' },
 });
