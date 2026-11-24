@@ -9,6 +9,7 @@ import {
   Nunito_900Black,
 } from '@expo-google-fonts/nunito';
 import { View, Platform } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LoadingShimmer } from './src/components/LoadingShimmer';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { hydrateAuthStorage, getStoredAuth } from './src/utils/authStorage';
@@ -146,7 +147,11 @@ function AppInner() {
     );
   }
 
-  return <RootNavigator />;
+  return (
+    <SafeAreaProvider>
+      <RootNavigator />
+    </SafeAreaProvider>
+  );
 }
 
 // Sentry.wrap, SDK kapalıyken bile bileşeni değiştirmeden geçirir.

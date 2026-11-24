@@ -179,6 +179,9 @@ export const RootNavigator: React.FC = () => {
     () => getWebLayout(windowWidth, windowHeight, currentScreen, isWeb),
     [windowWidth, windowHeight, currentScreen, isWeb],
   );
+  // Tabletlerde (ve katlanabilirlerde) içerik telefon sütununa sıkışmasın:
+  // ızgara/kolon düzenleri geniş yerleşime geçer.
+  const wideLayout = webLayout.split || isNativeTablet;
   /* KVKK: arkadaşın tam profili (salt okunur) — ayarlar/hesap bölümleri gizli */
   const [viewingProfile, setViewingProfile] = useState<UserProfile | null>(null);
   // İnternet bağlantısı durumu (netMonitor besler; overlay + oyun koruma süresi)
@@ -1785,6 +1788,7 @@ export const RootNavigator: React.FC = () => {
             styles.container,
             !isWeb && styles.nativeContainer,
             isNativeTablet && currentScreen === 'quiz_arena' && styles.nativeQuizTabletContainer,
+            isNativeTablet && currentScreen !== 'quiz_arena' && styles.nativeTabletContainer,
             { opacity: screenFade },
           ]}
         >
@@ -1819,7 +1823,7 @@ export const RootNavigator: React.FC = () => {
         )}
         {currentScreen === 'home' && user && (
           <HomeScreen
-            wideLayout={webLayout.split}
+            wideLayout={wideLayout}
             user={user}
             isGuest={isGuest}
             onQuickMatch={handleStartQuickMatch}
@@ -1868,7 +1872,7 @@ export const RootNavigator: React.FC = () => {
         )}
         {currentScreen === 'categories' && (
           <CategoryExploreScreen
-            wideLayout={webLayout.split}
+            wideLayout={wideLayout}
             avatarSeed={user?.avatarUrl || user?.displayName}
             coins={user?.coins}
             gems={user?.gems}
@@ -2626,7 +2630,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   tabletOuter: {
-    backgroundColor: '#090414',
+    // Tabletlerde uygulama ekranı tamamen doldurur; kenarlarda siyah bant kalmaz.
+    backgroundColor: THEME.colors.background,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2647,14 +2652,13 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.background,
   },
   nativeTabletFrame: {
-    maxWidth: 520,
-    width: 520,
+    // Tablet doğal olarak geniş ekran: 520 dp'lik telefon çerçevesi yerine
+    // ekranın tamamı kullanılır, içerik kendi okunabilir genişliğinde ortalanır.
+    width: '100%',
+    maxWidth: '100%',
     height: '100%',
     maxHeight: '100%',
-    borderLeftWidth: 1.5,
-    borderRightWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    boxShadow: '0 0 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(108, 92, 231, 0.35)',
+    borderWidth: 0,
     overflow: 'hidden',
   },
   nativeQuizTabletFrame: { width: '100%', maxWidth: NATIVE_QUIZ_TABLET_FRAME_WIDTH },
@@ -2677,6 +2681,9 @@ const styles = StyleSheet.create({
   },
   nativeContainer: {
     maxWidth: 520,
+  },
+  nativeTabletContainer: {
+    maxWidth: 880,
   },
   nativeQuizTabletContainer: { maxWidth: NATIVE_QUIZ_TABLET_FRAME_WIDTH },
   desktopSidebar: {

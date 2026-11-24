@@ -25,6 +25,7 @@ import Svg, {
 import { UserProfile, SHOP_CATALOG, ShopProduct, ShopProductCategory, SHOP_DURATIONS, JOKERS, JokerGroup, isCosmeticProduct, isJokerId, isAdvancedJoker, shopPriceForDuration } from '@trivia/shared';
 import { JokerGroupTabs } from '../components/WalletPanels';
 import { THEME } from '../theme/tokens';
+import { useNavBottomPad } from '../utils/safeArea';
 import { sound } from '../services/soundService';
 import { getApiBaseUrl } from '../config';
 import { authHeaders } from '../utils/apiAuth';
@@ -284,6 +285,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   initialTab,
   onRefresh,
 }) => {
+  const navPad = useNavBottomPad(160);
   const page = usePlayerWebLayout();
   const threeProducts = page?.columns === 3;
   const roomy = page?.roomy;
@@ -539,7 +541,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         onAvatarPress={onProfile}
       />
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, Platform.OS !== 'web' && { paddingBottom: navPad }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Başlık */}

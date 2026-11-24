@@ -13,6 +13,7 @@ import {
 import { LoadingShimmer, PageShimmer } from '../components/LoadingShimmer';
 import { UserProfile, GameEvent } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
+import { useNavBottomPad } from '../utils/safeArea';
 import { sound } from '../services/soundService';
 import { trackEvent } from '../services/analytics';
 import { DEFAULT_API_BASE } from '../config';
@@ -72,6 +73,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
   onProfile,
   onStartEvent,
 }) => {
+  const navPad = useNavBottomPad(160);
   const page = usePlayerWebLayout();
   const eventColumns = page?.roomy && page.contentWidth >= 900;
   const eventArtSize = Math.round(54 * (page?.ui.art ?? 1));
@@ -205,7 +207,7 @@ export const EventsScreen: React.FC<EventsScreenProps> = ({
         onAvatarPress={onProfile}
       />
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, Platform.OS !== 'web' && { paddingBottom: navPad }]}
         showsVerticalScrollIndicator={false}
       >
         <KitHero

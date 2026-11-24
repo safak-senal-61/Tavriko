@@ -10,6 +10,7 @@ import {
 import { PageShimmer } from '../components/LoadingShimmer';
 import { UserProfile } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
+import { useNavBottomPad } from '../utils/safeArea';
 import { DEFAULT_API_BASE } from '../config';
 import {
   TavrikoScreen,
@@ -55,6 +56,7 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
   onNotifications,
   onProfile,
 }) => {
+  const navPad = useNavBottomPad(140);
   const { data, loading, error, read } = usePageData<LeaguePlayer[] | {
     topPlayers?: LeaguePlayer[]; leaders?: LeaguePlayer[];
   }>(leaderboardUrl(apiBaseUrl || DEFAULT_API_BASE), PAGE_TTL.leaderboard);
@@ -85,7 +87,7 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
         onAvatarPress={onProfile}
       />
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, Platform.OS !== 'web' && { paddingBottom: navPad }]}
         showsVerticalScrollIndicator={false}
       >
         <KitHero

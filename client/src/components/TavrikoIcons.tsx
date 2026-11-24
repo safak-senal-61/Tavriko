@@ -25,6 +25,7 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 import { THEME } from '../theme/tokens';
+import { NAV_BAR_MARGIN, useNavInset, useSideInset } from '../utils/safeArea';
 import { sound } from '../services/soundService';
 import { CharacterAvatar, AVATAR_PRESETS, AvatarPreset } from './TavrikoAvatars';
 import { useGameStore } from '../store/gameStore';
@@ -1070,11 +1071,15 @@ export const TavrikoScreen: React.FC<{
   const { width } = useWindowDimensions();
   const page = usePlayerWebLayout();
   const wideTab = mainTab && Platform.OS === 'web' && width >= WEB_TAB_WIDE_WIDTH;
+  // Tablet / katlanabilir: içerik telefon sütununa sıkışmaz, okunabilir
+  // genişlikte ortalanır.
+  const tabletLayout = Platform.OS !== 'web' && width > 540;
   return (
     <View
       testID={page?.roomy ? 'player-web-page' : undefined}
       style={[
         styles.screenRoot,
+        tabletLayout && styles.screenRootTablet,
         wideTab && styles.webTabScreen,
         style,
         page?.roomy && { minHeight: 0, paddingTop: 14, paddingHorizontal: page.pageInset },
@@ -1379,9 +1384,22 @@ const NavBarBase = <K extends string>({
   const slot = w > 0 ? (w - 12) / items.length : 0;
   const idx = items.findIndex((i) => i.key === activeKey);
   const showPill = idx >= 0 && items[idx].key !== raisedKey;
+  // Sistem çubuğu (gesture bar / tablet görev çubuğu) menünün altında
+  // kalmasın: menüyü cihazın güvenli alanı kadar yukarı taşı.
+  const bottomInset = useNavInset();
+  const sideInset = useSideInset();
   return (
     <View
-      style={[styles.bottomNav, inFlow && styles.bottomNavInFlow, ui && { height: ui.navHeight }]}
+      style={[
+        styles.bottomNav,
+        inFlow && styles.bottomNavInFlow,
+        ui && { height: ui.navHeight },
+        !inFlow && {
+          bottom: NAV_BAR_MARGIN + bottomInset,
+          left: NAV_BAR_MARGIN + sideInset,
+          right: NAV_BAR_MARGIN + sideInset,
+        },
+      ]}
       accessibilityRole="tablist"
       onLayout={(e) => setW(e.nativeEvent.layout.width)}
     >
@@ -1493,6 +1511,7 @@ const styles = StyleSheet.create({
     maxWidth: Platform.OS === 'web' ? '100%' : 620,
     alignSelf: 'center',
   },
+  screenRootTablet: { maxWidth: 880, paddingHorizontal: 24 },
   webTabScreen: { paddingHorizontal: 24, paddingTop: 14, minHeight: 0 },
   equippedBgLayer: {
     position: 'absolute',

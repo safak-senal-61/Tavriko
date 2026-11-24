@@ -16,6 +16,7 @@ import {
 import { LoadingShimmer } from '../components/LoadingShimmer';
 import { UserProfile, InventoryItem, ItemCategory, COSMETIC_RENTAL_MS, getCosmeticDef, getChestOpening, isPermanentGameplayBadge, isJokerId, JOKERS, JokerGroup } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
+import { useNavBottomPad } from '../utils/safeArea';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
 import { authHeaders } from '../utils/apiAuth';
@@ -173,6 +174,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   onProfile,
   onRewards,
 }) => {
+  const navPad = useNavBottomPad(140);
   const page = usePlayerWebLayout();
   const threeItems = page?.columns === 3;
   const roomy = page?.roomy;
@@ -417,7 +419,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
         onAvatarPress={onProfile}
       />
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, Platform.OS !== 'web' && { paddingBottom: navPad }]}
         showsVerticalScrollIndicator={false}
       >
         <KitHeader

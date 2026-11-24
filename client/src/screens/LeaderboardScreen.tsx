@@ -10,6 +10,7 @@ import {
 import { UserProfile } from '@trivia/shared';
 import { PageShimmer } from '../components/LoadingShimmer';
 import { THEME } from '../theme/tokens';
+import { useNavBottomPad } from '../utils/safeArea';
 import { DEFAULT_API_BASE } from '../config';
 import { PageLoadError } from '../components/PageLoadError';
 import { PAGE_TTL } from '../utils/pageDataCache';
@@ -73,6 +74,7 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
   onNavigateTab,
   onNotifications,
 }) => {
+  const navPad = useNavBottomPad(120);
   const [activeTab, setActiveTab] = useState<'weekly' | 'all_time'>('weekly');
   const { data, loading, error, read } = usePageData<LeaderboardEntry[] | {
     topPlayers?: LeaderboardEntry[]; leaders?: LeaderboardEntry[];
@@ -137,7 +139,7 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
         onAvatarPress={() => onNavigateTab && onNavigateTab('profile')}
       />
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, Platform.OS !== 'web' && { paddingBottom: navPad }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headRow}>

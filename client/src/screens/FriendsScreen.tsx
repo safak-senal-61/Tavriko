@@ -17,6 +17,7 @@ import Reanimated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
 import * as Clipboard from 'expo-clipboard';
 import { UserProfile, calculateLevelFromXp, extractProfileCosmetics } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
+import { useNavBottomPad } from '../utils/safeArea';
 import { sound } from '../services/soundService';
 import { trackEvent } from '../services/analytics';
 import { authHeaders } from '../utils/apiAuth';
@@ -96,6 +97,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
   onNotifications,
   onOpenFullProfile,
 }) => {
+  const navPad = useNavBottomPad(110);
   const [activeTab, setActiveTab] = useState<'friends' | 'add' | 'requests'>('friends');
   const [copied, setCopied] = useState(false);
   const [respondingReqId, setRespondingReqId] = useState<string | null>(null);
@@ -419,7 +421,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
         onAvatarPress={() => onNavigateTab && onNavigateTab('profile')}
       />
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, Platform.OS !== 'web' && { paddingBottom: navPad }]}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>ARKADAŞLAR</Text>

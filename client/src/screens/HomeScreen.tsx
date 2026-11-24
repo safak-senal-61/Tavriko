@@ -18,6 +18,7 @@ import { ChevronRight } from 'lucide-react-native';
 import { UserProfile, calculateLevelFromXp } from '@trivia/shared';
 import { resolveProfileTitle } from '../utils/profileTitle';
 import { THEME } from '../theme/tokens';
+import { useNavBottomPad } from '../utils/safeArea';
 import { sound } from '../services/soundService';
 import {
   TavrikoScreen,
@@ -180,6 +181,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onProLeague,
   onLoginPrompt,
 }) => {
+  const navPad = useNavBottomPad(104);
   // Giriş animasyonu + OYNA butonu nabız efekti
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(18)).current;
@@ -305,7 +307,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       )}
 
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, useWebNav && styles.scrollContentWeb, isGuest && { paddingBottom: 36 }]}
+        contentContainerStyle={[styles.scrollContent, useWebNav && styles.scrollContentWeb, isGuest && { paddingBottom: 36 }, !useWebNav && !isGuest && { paddingBottom: navPad }]}
         showsVerticalScrollIndicator={false}
       >
         <Animated.View

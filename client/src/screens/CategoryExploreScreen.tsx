@@ -14,6 +14,7 @@ import {
 import Reanimated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { CategoryId, CategoryInfo, ALL_CATEGORIES } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
+import { useNavBottomPad } from '../utils/safeArea';
 import { sound } from '../services/soundService';
 import { DEFAULT_API_BASE } from '../config';
 import { categoryCounts, subCountKey } from '../utils/categoryCounts';
@@ -125,6 +126,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
   onLoginPrompt,
   apiBaseUrl,
 }) => {
+  const navPad = useNavBottomPad(120);
   const page = usePlayerWebLayout();
   const artSize = Math.round(84 * (page?.ui.art ?? 1));
   const webCategoryArt = page?.roomy && { width: artSize, height: artSize };
@@ -262,6 +264,7 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
           Platform.OS === 'web' && styles.scrollContentWeb,
           wideLayout && styles.scrollContentWide,
           isGuest && { paddingBottom: 36 },
+          Platform.OS !== 'web' && !isGuest && { paddingBottom: navPad },
         ]}
         showsVerticalScrollIndicator={false}
       >

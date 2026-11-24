@@ -13,7 +13,7 @@ const mock = vi.hoisted(() => ({
   capture: vi.fn(),
 }));
 vi.mock('../src/services/analyticsConsent', () => ({ getAnalyticsConsent: () => mock.consent }));
-vi.mock('expo-constants', () => ({ default: { expoConfig: { version: '1.1.2' } } }));
+vi.mock('expo-constants', () => ({ default: { expoConfig: { version: '1.1.3' } } }));
 vi.mock('posthog-react-native', () => ({
   default: class {
     constructor(...args: unknown[]) { mock.initialize(...args); }
@@ -50,7 +50,7 @@ describe('analytics session', () => {
     await analytics.syncAnalyticsSession('player');
     expect(mock.reset).toHaveBeenCalledOnce();
     expect(mock.identify).toHaveBeenCalledExactlyOnceWith('player');
-    expect(mock.capture).toHaveBeenCalledExactlyOnceWith('session_start', { platform: 'web', version: '1.1.2' });
+    expect(mock.capture).toHaveBeenCalledExactlyOnceWith('session_start', { platform: 'web', version: '1.1.3' });
     expect(mock.identify.mock.invocationCallOrder[0]).toBeLessThan(mock.capture.mock.invocationCallOrder[0]);
   });
 

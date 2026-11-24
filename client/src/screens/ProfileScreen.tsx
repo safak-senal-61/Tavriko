@@ -20,6 +20,7 @@ import Svg, { Path, Circle, Rect, G } from 'react-native-svg';
 import * as Clipboard from 'expo-clipboard';
 import { UserProfile, UserSettings, calculateLevelFromXp, getBadgeDef, plainDisplayText } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
+import { useNavBottomPad } from '../utils/safeArea';
 import { sound } from '../services/soundService';
 import { socketService } from '../services/socketService';
 import { compressAvatarImageAsync, uploadAvatarToR2Async } from '../utils/avatarImage';
@@ -244,6 +245,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onOpenWallet,
   viewOnly,
 }) => {
+  const navPad = useNavBottomPad(150);
   const page = usePlayerWebLayout();
   const webProfile = page?.roomy;
   const fourStats = webProfile && page.contentWidth >= 920;
@@ -723,7 +725,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         onAvatarPress={viewOnly ? undefined : onEditProfile}
         onCurrencyPress={viewOnly ? undefined : onOpenWallet}
       />
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, Platform.OS !== 'web' && { paddingBottom: navPad }]} showsVerticalScrollIndicator={false}>
         {/* Unified Compact Hero Identity Card */}
         <View style={[styles.heroCard, webProfile && styles.webProfileWidth]}>
           {/* Kuşanılmış arka plan: profil kartının içinde görünür */}
