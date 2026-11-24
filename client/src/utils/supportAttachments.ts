@@ -11,9 +11,13 @@ export const ATTACHMENT_MIMES = [
 export type PickedAttachment = { id: string; name: string; mime: string; size: number; base64: string };
 export type RemoteAttachment = { id: string; name: string; mime: string; size: number };
 
-const moduleOf = (name: string) => {
-  try { return require(name); } catch { return null; }
-};
+// Native modules load lazily so older binaries without them can still open settings.
+let imagePicker: any = null;
+let documentPicker: any = null;
+let sharing: any = null;
+try { imagePicker = require('expo-image-picker'); } catch { imagePicker = null; }
+try { documentPicker = require('expo-document-picker'); } catch { documentPicker = null; }
+try { sharing = require('expo-sharing'); } catch { sharing = null; }
 
 const extensions: Record<string, string> = {
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif',
@@ -35,16 +39,17 @@ function base64Size(base64: string) {
   return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
 }
 
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('read failed'));
+    reader.onload = () => resolve(String(reader.result ?? '').split(',')[1] ?? '');
+    reader.readAsDataURL(blob);
+  });
+}
+
 async function readBase64(uri: string): Promise<string> {
-  if (Platform.OS === 'web' || uri.startsWith('data:')) {
-    const blob = await (await fetch(uri)).blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error('Dosya okunamadı.'));
-      reader.onload = () => resolve(String(reader.result ?? '').split(',')[1] ?? '');
-      reader.readAsDataURL(blob);
-    });
-  }
+  if (Platform.OS === 'web' || uri.startsWith('data:')) return blobToBase64(await (await fetch(uri)).blob());
   return FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
 }
 
@@ -60,10 +65,9 @@ function prepare(name: string, mime: string | null | undefined, base64: string):
 }
 
 export async function pickImageAttachment(): Promise<{ attachment?: PickedAttachment; error?: string }> {
-  const picker = moduleOf('expo-image-picker');
-  if (!picker?.launchImageLibraryAsync) return { error: 'Galeri bu sürümde kullanılamıyor.' };
+  if (!imagePicker?.launchImageLibraryAsync) return { error: 'Galeri bu sürümde kullanılamıyor.' };
   try {
-    const result = await picker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6, base64: true, allowsMultipleSelection: false });
+    const result = await imagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6, base64: true, allowsMultipleSelection: false });
     if (result.canceled || !result.assets?.length) return {};
     const asset = result.assets[0];
     const name = typeof asset.fileName === 'string' && asset.fileName ? asset.fileName : `ekran-goruntusu-${Date.now()}.jpg`;
@@ -75,14 +79,14 @@ export async function pickImageAttachment(): Promise<{ attachment?: PickedAttach
 }
 
 export async function pickFileAttachment(): Promise<{ attachment?: PickedAttachment; error?: string }> {
-  const picker = moduleOf('expo-document-picker');
-  if (!picker?.getDocumentAsync) return { error: 'Dosya seçici bu sürümde kullanılamıyor.' };
+  if (!documentPicker?.getDocumentAsync) return { error: 'Dosya seçici bu sürümde kullanılamıyor.' };
   try {
-    const result = await picker.getDocumentAsync({ type: ATTACHMENT_MIMES, copyToCacheDirectory: true, multiple: false });
+    const result = await documentPicker.getDocumentAsync({ type: ATTACHMENT_MIMES, copyToCacheDirectory: true, multiple: false });
     if (result.canceled || !result.assets?.length) return {};
     const asset = result.assets[0];
     const base64 = await readBase64(asset.uri);
-    return prepare(asset.name || asset.uri.split('/').pop() || `ek-${Date.now()}`, asset.mimeType ?? null, base64);
+    const fallbackName = String(asset.uri).split('/').pop() ?? `ek-${Date.now()}`;
+    return prepare(asset.name || fallbackName, asset.mimeType ?? null, base64);
   } catch {
     return { error: 'Dosya okunamadı, başka bir dosya deneyin.' };
   }
@@ -94,21 +98,16 @@ export async function openRemoteAttachment(input: {
 }): Promise<{ imageUri?: string; error?: string }> {
   const base = input.api.replace(/\/+$/, '');
   const url = `${base}/support/${encodeURIComponent(input.caseId)}/attachments/${encodeURIComponent(input.attachment.id)}`;
+  const name = input.attachment.name.replace(/[\\/:*?"<>|]+/g, '-') || 'ek-dosya';
   try {
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${input.token}` } });
-    if (!response.ok) return { error: 'Ek dosya açılamadı.' };
-    const blob = await response.blob();
-    if (input.attachment.mime.startsWith('image/')) {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error('read failed'));
-        reader.onload = () => resolve(String(reader.result ?? '').split(',')[1] ?? '');
-        reader.readAsDataURL(blob);
-      });
-      return base64 ? { imageUri: `data:${input.attachment.mime};base64,${base64}` } : { error: 'Ek dosya açılamadı.' };
-    }
-    const name = input.attachment.name.replace(/[\\/:*?"<>|]+/g, '-');
     if (Platform.OS === 'web') {
+      const response = await fetch(url, { headers: { Authorization: `Bearer ${input.token}` } });
+      if (!response.ok) return { error: 'Ek dosya açılamadı.' };
+      const blob = await response.blob();
+      if (input.attachment.mime.startsWith('image/')) {
+        const base64 = await blobToBase64(blob);
+        return base64 ? { imageUri: `data:${input.attachment.mime};base64,${base64}` } : { error: 'Ek dosya açılamadı.' };
+      }
       const href = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = href; link.download = name;
@@ -116,17 +115,19 @@ export async function openRemoteAttachment(input: {
       setTimeout(() => URL.revokeObjectURL(href), 10_000);
       return {};
     }
-    const sharing = moduleOf('expo-sharing');
-    if (!FileSystem.cacheDirectory || !sharing?.shareAsync) return { error: 'Dosya bu cihazda açılamıyor.' };
-    const path = `${FileSystem.cacheDirectory}${name}`;
-    const base64 = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(new Error('read failed'));
-      reader.onload = () => resolve(String(reader.result ?? '').split(',')[1] ?? '');
-      reader.readAsDataURL(blob);
-    });
-    await FileSystem.writeAsStringAsync(path, base64, { encoding: FileSystem.EncodingType.Base64 });
-    await sharing.shareAsync(path, { mimeType: input.attachment.mime, dialogTitle: input.attachment.name });
+    if (!FileSystem.cacheDirectory) return { error: 'Dosya bu cihazda açılamıyor.' };
+    const target = `${FileSystem.cacheDirectory}${Date.now()}-${name}`;
+    const download = await FileSystem.downloadAsync(url, target, { headers: { Authorization: `Bearer ${input.token}` } });
+    if (download.status !== 200) {
+      await FileSystem.deleteAsync(target, { idempotent: true }).catch(() => {});
+      return { error: 'Ek dosya açılamadı.' };
+    }
+    if (input.attachment.mime.startsWith('image/')) {
+      const base64 = await FileSystem.readAsStringAsync(download.uri, { encoding: FileSystem.EncodingType.Base64 });
+      return base64 ? { imageUri: `data:${input.attachment.mime};base64,${base64}` } : { error: 'Ek dosya açılamadı.' };
+    }
+    if (!sharing?.shareAsync) return { error: 'Dosya bu cihazda açılamıyor.' };
+    await sharing.shareAsync(download.uri, { mimeType: input.attachment.mime, dialogTitle: input.attachment.name });
     return {};
   } catch {
     return { error: 'Ek dosya açılamadı.' };
