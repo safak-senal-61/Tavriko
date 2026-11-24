@@ -8,7 +8,7 @@ export const BUG_REPORT_PREFIX = '[HATA] ';
 export const isBugReport = (ticket: { kind: string; subject: string }) =>
   ticket.kind === 'support' && ticket.subject.startsWith(BUG_REPORT_PREFIX);
 
-type Ticket = { id: string; accountId: string; subject: string };
+type Ticket = { id: string; accountId: string; subject: string; attachmentCount?: number };
 export type BugPlayerEmail = Ticket & { text: string; event: 'reply' | 'resolved' };
 type MailOutcome = 'accepted' | 'failed' | 'not_applicable';
 const safeEmail = (address: string | null | undefined) => {
@@ -27,6 +27,7 @@ export async function notifyOwnerOfBug(client: Pick<PrismaClient, 'user'>, ticke
     await sendOneSignalSupportEmail(config, email, renderSupportEmail({
       kind: 'report', subject: ticket.subject.slice(BUG_REPORT_PREFIX.length),
       username: reporter?.username, accountId: ticket.accountId, ticketId: ticket.id,
+      attachmentCount: ticket.attachmentCount,
     }));
   } catch {
     logger.warn('SYSTEM', 'Hata bildirimi yöneticiye e-posta ile iletilemedi.');

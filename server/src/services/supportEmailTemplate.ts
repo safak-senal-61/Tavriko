@@ -21,7 +21,7 @@ const variants = {
 } as const;
 
 type SupportEmail = { subject: string } & (
-  | { kind: 'report'; username?: string; accountId: string; ticketId: string }
+  | { kind: 'report'; username?: string; accountId: string; ticketId: string; attachmentCount?: number }
   | { kind: 'reply' | 'resolved'; text: string }
 );
 
@@ -37,7 +37,7 @@ const field = (label: string, value: string) => `
 export function renderSupportEmail(data: SupportEmail) {
   const variant = variants[data.kind];
   const fields = data.kind === 'report'
-    ? `${data.username ? field('OYUNCU', `@${data.username}`) : ''}${field('HESAP KİMLİĞİ', data.accountId)}${field('TALEP KİMLİĞİ', data.ticketId)}`
+    ? `${data.username ? field('OYUNCU', `@${data.username}`) : ''}${field('HESAP KİMLİĞİ', data.accountId)}${field('TALEP KİMLİĞİ', data.ticketId)}${data.attachmentCount ? field('EK DOSYA', `${data.attachmentCount} dosya · yönetim panelindeki talep kaydından açılır`) : ''}`
     : field(data.kind === 'reply' ? 'DESTEK YANITI' : 'TALEP SONUCU', data.text);
   return {
     email_subject: `Tavriko | ${variant.title}`,

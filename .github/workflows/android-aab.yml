@@ -1,4 +1,4 @@
-name: Android AAB (local EAS build)
+name: Android APK + AAB (local EAS builds)
 
 on:
   workflow_dispatch:
@@ -7,6 +7,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: apk
+            profile: preview
+            output: tavriko.apk
+          - target: aab
+            profile: production
+            output: tavriko.aab
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,13 +30,14 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Compile shared package
         run: npm run build:shared
-      - name: Build AAB
+      - name: Build ${{ matrix.target }}
         working-directory: client
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EAS_BUILD_NO_EXPO_GO_WARNING: "true"
-        run: npx -y eas-cli@latest build --local -p android --profile production --non-interactive --output ${{ github.workspace }}/tavriko.aab
-      - name: Verify release bundle
+        run: npx -y eas-cli@latest build --local -p android --profile ${{ matrix.profile }} --non-interactive --output ${{ github.workspace }}/${{ matrix.output }}
+      - name: Verify AAB
+        if: matrix.target == 'aab'
         run: |
           set -euo pipefail
           jar="$RUNNER_TEMP/bundletool.jar"
@@ -41,10 +52,23 @@ jobs:
             python3 scripts/verify-play-aab.py tavriko.aab "$RUNNER_TEMP/tavriko-manifest.xml"
             sha256sum tavriko.aab
           } | tee tavriko-aab-verification.txt
+      - name: Verify APK
+        if: matrix.target == 'apk'
+        run: |
+          set -euo pipefail
+          apksigner="$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)"
+          aapt="$(find "$ANDROID_HOME/build-tools" -name aapt2 | sort -V | tail -1)"
+          "$apksigner" verify --print-certs tavriko.apk
+          "$aapt" dump badging tavriko.apk | head -5
+          {
+            echo "Commit: $GITHUB_SHA"
+            "$aapt" dump badging tavriko.apk | grep -E "^package:" || true
+            sha256sum tavriko.apk
+          } | tee tavriko-apk-verification.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: tavriko-aab
+          name: tavriko-${{ matrix.target }}
           path: |
-            tavriko.aab
-            tavriko-aab-verification.txt
+            ${{ matrix.output }}
+            tavriko-${{ matrix.target }}-verification.txt
           if-no-files-found: error
