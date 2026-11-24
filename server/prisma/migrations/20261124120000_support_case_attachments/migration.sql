@@ -11,4 +11,5 @@ CREATE TABLE "support_case_attachments" (
 CREATE INDEX "support_case_attachments_caseId_createdAt_idx" ON "support_case_attachments" ("caseId", "createdAt");
 ALTER TABLE "support_case_attachments" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON "support_case_attachments" FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON "support_case_attachments" TO service_role;
 COMMIT;
