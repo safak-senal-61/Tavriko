@@ -101,7 +101,8 @@ import { ProfileInspectModal, PublicProfileCard } from '../components/ProfileIns
 import { DeveloperScreen } from '../screens/DeveloperScreen';
 import { ConnectionStatusOverlay } from '../components/ConnectionStatusOverlay';
 import { AnalyticsConsentBanner } from '../components/AnalyticsConsentBanner';
-import { useAnalyticsConsent } from '../services/analyticsConsent';
+import { setAnalyticsConsent, useAnalyticsConsent } from '../services/analyticsConsent';
+import { useLegalVersion } from '../services/legalVersion';
 import { PushPermissionReminder } from '../components/PushPermissionReminder';
 import { pushSupported } from '../services/pushNotifications';
 import { usePushPermission } from '../services/usePushPermission';
@@ -325,15 +326,19 @@ export const RootNavigator: React.FC = () => {
     void duelFunnelPreference(getApiBaseUrl(), user.id, realSessionToken, undefined, controller.signal).catch(() => {});
     return () => controller.abort();
   }, [user?.id, user?.isGuest, realSessionToken]);
-  const pendingLegalConsent = Boolean(realSessionToken) && needsLegalConsent(user, isGuest);
-  const shouldCheckLegal = pendingLegalConsent && currentScreen !== 'auth' && currentScreen !== 'splash';
+  const legalVersion = useLegalVersion(API_BASE);
+  const pendingLegalConsent = Boolean(realSessionToken) && needsLegalConsent(user, isGuest, legalVersion);
+  // Onay ekranı girişten hemen sonra, hangi ekranda olursa olsun açılır.
+  const shouldCheckLegal = pendingLegalConsent && currentScreen !== 'splash';
   const showLegalGate = shouldCheckLegal && checkedLegalSession?.id === user?.id &&
     checkedLegalSession?.token === realSessionToken;
   const consent = useAnalyticsConsent();
   const signedInPlayer = realSessionToken && !isGuest && !pendingLegalConsent &&
     currentScreen !== 'auth' && currentScreen !== 'splash' ? user?.id ?? null : null;
   const safePromptScreen = Boolean(signedInPlayer && !activeRoom && !gameAlert && !viewingProfile && netOnline);
-  const showAnalyticsConsent = consent === null && safePromptScreen &&
+  // Analitik tercihi artık yasal onay ekranında sorulur. Bant yalnızca daha önce
+  // yasal metinleri onaylamış ama analitik tercihini vermemiş kullanıcılara çıkar.
+  const showAnalyticsConsent = consent === null && safePromptScreen && !showLegalGate &&
     (currentScreen === 'home' || currentScreen === 'friends');
   const push = usePushPermission(signedInPlayer, realSessionToken);
 
@@ -359,7 +364,7 @@ export const RootNavigator: React.FC = () => {
       setLegalSubmitting(true);
       setLegalGateError(null);
       try {
-        const updated = await submitLegalConsent(API_BASE, current.token, method);
+        const updated = await submitLegalConsent(API_BASE, current.token, method, legalVersion);
         const latest = useGameStore.getState();
         if (latest.token === current.token && latest.user?.id === updated.id) {
           // Merge only the receipt so a late response cannot roll back newer profile data.
@@ -371,7 +376,7 @@ export const RootNavigator: React.FC = () => {
         setLegalSubmitting(false);
       }
     },
-    [setUser]
+    [setUser, legalVersion]
   );
 
   // Google butonunun altındaki bildirimle giriş yapıldıysa onayı otomatik kaydet.
@@ -2598,10 +2603,14 @@ export const RootNavigator: React.FC = () => {
       <LegalConsentGate
         key={user?.id ?? 'signed-out'}
         visible={showLegalGate && !autoLegalInFlight}
-        isUpdate={isLegalUpdate(user)}
+        isUpdate={isLegalUpdate(user, legalVersion)}
         submitting={legalSubmitting}
         errorMsg={legalGateError}
-        onAccept={() => { void acceptLegal('in_app'); }}
+        version={legalVersion}
+        onAccept={(analytics) => {
+          setAnalyticsConsent(analytics);
+          void acceptLegal('in_app');
+        }}
         onLogout={() => {
           setLegalGateError(null);
           setAuthRedirectNotice(null);

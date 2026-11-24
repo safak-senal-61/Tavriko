@@ -41,5 +41,9 @@ export interface LegalConsentRecord {
 }
 export declare const LEGAL_DOCUMENTS: LegalDocument[];
 export declare function getLegalDocument(id: string): LegalDocument | undefined;
-/** Kullanıcının mevcut sürüm yasal metinleri onaylayıp onaylamadığını döndürür. */
-export declare function hasAcceptedCurrentLegal(settings: unknown): boolean;
+/**
+ * Kullanıcının verilen sürümdeki yasal metinleri onaylayıp onaylamadığını döndürür.
+ * `version` verilmezse paketteki LEGAL_VERSION kullanılır; istemci, sunucudan
+ * okuduğu güncel sürümü geçerek eski paketlerdeki sürüm kaymasını önler.
+ */
+export declare function hasAcceptedCurrentLegal(settings: unknown, version?: string): boolean;

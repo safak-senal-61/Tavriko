@@ -197,63 +197,106 @@ export const LegalConsentGate: React.FC<{
   isUpdate: boolean;
   submitting: boolean;
   errorMsg?: string | null;
-  onAccept: () => void;
+  version?: string;
+  onAccept: (analytics: 'granted' | 'denied') => void;
   onLogout: () => void;
-}> = ({ visible, isUpdate, submitting, errorMsg, onAccept, onLogout }) => {
+}> = ({ visible, isUpdate, submitting, errorMsg, version = LEGAL_VERSION, onAccept, onLogout }) => {
   const [checked, setChecked] = useState(false);
+  const [analytics, setAnalytics] = useState<'granted' | 'denied' | null>(null);
   const [openDoc, setOpenDoc] = useState<LegalDocumentId | null>(null);
   const [showError, setShowError] = useState(false);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={() => {}}>
       <View style={styles.backdrop}>
-        <View style={[styles.sheet, { maxHeight: undefined }]} accessibilityViewIsModal>
-          <View style={styles.gateIcon}>
-            <FileText size={28} color="#FFC43D" />
-          </View>
-          <Text style={[styles.sheetTitle, { textAlign: 'center' }]}>
-            {isUpdate ? 'Sözleşmelerimizi güncelledik' : 'Hoş geldin! Son bir adım'}
-          </Text>
-          <Text style={styles.gateSub}>
-            {isUpdate
-              ? 'Tavriko’yu kullanmaya devam etmek için güncel metinleri inceleyip onaylaman gerekiyor.'
-              : 'Hesabını kullanmaya başlamadan önce aşağıdaki metinleri inceleyip onaylaman gerekiyor.'}
-          </Text>
-          <LegalConsentCheckbox
-            checked={checked}
-            onToggle={() => {
-              setChecked((c) => !c);
-              setShowError(false);
-            }}
-            onOpen={setOpenDoc}
-            highlightError={showError}
-          />
-          {(showError || errorMsg) && (
-            <Text style={styles.errorText}>
-              {errorMsg || 'Devam etmek için metinleri onaylaman gerekiyor.'}
+        <ScrollView style={{ width: '100%', maxWidth: 560, maxHeight: '92%' }} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+          <View style={styles.sheet} accessibilityViewIsModal>
+            <View style={styles.gateIcon}>
+              <FileText size={26} color="#FFC43D" />
+            </View>
+            <Text style={[styles.sheetTitle, { textAlign: 'center' }]}>
+              {isUpdate ? 'Sözleşmelerimizi güncelledik' : 'Hoş geldin! Son bir adım'}
             </Text>
-          )}
-          <TouchableOpacity
-            style={[styles.primaryBtn, (!checked || submitting) && { opacity: 0.6 }]}
-            disabled={submitting}
-            onPress={() => {
-              if (!checked) {
-                setShowError(true);
-                return;
-              }
-              onAccept();
-            }}
-            accessibilityRole="button"
-          >
-            {submitting ? (
-              <LoadingShimmer label="Onay kaydediliyor" ink />
-            ) : (
-              <Text style={styles.primaryBtnText}>ONAYLA VE DEVAM ET</Text>
+            <Text style={styles.gateSub}>
+              {isUpdate
+                ? 'Tavriko’yu kullanmaya devam etmek için güncel metinleri inceleyip onaylaman gerekiyor.'
+                : 'Hesabını kullanmaya başlamadan önce aşağıdaki metinleri inceleyip onaylaman gerekiyor.'}
+            </Text>
+
+            <LegalConsentCheckbox
+              checked={checked}
+              onToggle={() => {
+                setChecked((c) => !c);
+                setShowError(false);
+              }}
+              onOpen={setOpenDoc}
+              highlightError={showError}
+            />
+
+            <View style={styles.analyticsBlock}>
+              <Text style={styles.analyticsTitle}>Kullanım analitiği (isteğe bağlı)</Text>
+              <Text style={styles.analyticsBody}>
+                İzin verirsen, Tavriko’yu geliştirmek için maç başlatma ve tamamlama gibi oyun içi
+                etkinlikleri anonim olarak ölçeriz. Oyuncu adın ve e-posta adresin bu ölçüme gönderilmez;
+                veriler üçüncü kişilerle paylaşılmaz. Seçim yapmazsan ölçüm yapılmaz, oyunu etkilemez.
+              </Text>
+              <View style={styles.analyticsRow}>
+                <TouchableOpacity
+                  style={[styles.choiceBtn, analytics === 'granted' && styles.choiceBtnActive]}
+                  onPress={() => setAnalytics('granted')}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: analytics === 'granted' }}
+                >
+                  <Text style={[styles.choiceText, analytics === 'granted' && styles.choiceTextActive]}>İzin ver</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.choiceBtn, analytics === 'denied' && styles.choiceBtnActive]}
+                  onPress={() => setAnalytics('denied')}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: analytics === 'denied' }}
+                >
+                  <Text style={[styles.choiceText, analytics === 'denied' && styles.choiceTextActive]}>İzin verme</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                onPress={() => setOpenDoc('privacy')}
+                accessibilityRole="button"
+                accessibilityLabel="Gizlilik Politikasını aç"
+                style={styles.analyticsLinkRow}
+              >
+                <ExternalLink size={13} color="#FFD66B" />
+                <Text style={styles.analyticsLink}>Gizlilik Politikası</Text>
+              </TouchableOpacity>
+            </View>
+
+            {(showError || errorMsg) && (
+              <Text style={styles.errorText}>
+                {errorMsg || 'Devam etmek için metinleri onaylaman gerekiyor.'}
+              </Text>
             )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={onLogout} disabled={submitting} accessibilityRole="button">
-            <Text style={styles.secondaryBtnText}>Onaylamadan çıkış yap</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[styles.primaryBtn, (!checked || submitting) && { opacity: 0.6 }]}
+              disabled={submitting}
+              onPress={() => {
+                if (!checked) {
+                  setShowError(true);
+                  return;
+                }
+                onAccept(analytics ?? 'denied');
+              }}
+              accessibilityRole="button"
+            >
+              {submitting ? (
+                <LoadingShimmer label="Onay kaydediliyor" ink />
+              ) : (
+                <Text style={styles.primaryBtnText}>ONAYLA VE DEVAM ET</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={onLogout} disabled={submitting} accessibilityRole="button">
+              <Text style={styles.secondaryBtnText}>Onaylamadan çıkış yap</Text>
+            </TouchableOpacity>
+            <Text style={styles.gateVersion}>Yasal metin sürümü: {formatLegalVersion(version)}</Text>
+          </View>
+        </ScrollView>
       </View>
       <LegalDocumentModal documentId={openDoc} onClose={() => setOpenDoc(null)} />
     </Modal>
@@ -328,25 +371,6 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   checkboxChecked: { backgroundColor: '#FFC43D', borderColor: '#FFC43D' },
-  errorText: { color: '#FCA5A5', fontSize: 13, marginTop: 8, fontFamily: THEME.fonts.extraBold },
-  gateIcon: {
-    alignSelf: 'center',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 196, 61, 0.14)',
-    marginBottom: 12,
-  },
-  gateSub: {
-    color: '#D9CDF5',
-    fontSize: 14,
-    lineHeight: 21,
-    textAlign: 'center',
-    marginTop: 6,
-    fontFamily: THEME.fonts.body,
-  },
   listRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -368,4 +392,55 @@ const styles = StyleSheet.create({
   listFooter: { color: '#BFB3E0', fontSize: 12, marginTop: 14, fontFamily: THEME.fonts.body },
   webLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, minHeight: 32 },
   webLinkText: { color: '#C4B5FD', fontSize: 13, fontFamily: THEME.fonts.extraBold },
+  gateIcon: {
+    alignSelf: 'center',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,196,61,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  gateSub: {
+    color: '#D6CCF5',
+    fontSize: 13.5,
+    lineHeight: 20,
+    textAlign: 'center',
+    fontFamily: THEME.fonts.body,
+    marginTop: 6,
+  },
+  gateVersion: {
+    color: 'rgba(255,255,255,0.38)',
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 10,
+    fontFamily: THEME.fonts.body,
+  },
+  analyticsBlock: {
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(111,240,198,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(111,240,198,0.25)',
+  },
+  analyticsTitle: { color: '#6FF0C6', fontSize: 13.5, fontFamily: THEME.fonts.extraBold, marginBottom: 6 },
+  analyticsBody: { color: '#E4DCF9', fontSize: 12.5, lineHeight: 18, fontFamily: THEME.fonts.body },
+  analyticsRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
+  choiceBtn: {
+    flex: 1,
+    minHeight: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  choiceBtnActive: { backgroundColor: 'rgba(111,240,198,0.18)', borderColor: '#6FF0C6' },
+  choiceText: { color: 'rgba(255,255,255,0.75)', fontSize: 13, fontFamily: THEME.fonts.extraBold },
+  choiceTextActive: { color: '#6FF0C6' },
+  analyticsLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  analyticsLink: { color: '#FFD66B', fontSize: 12.5, fontFamily: THEME.fonts.extraBold, textDecorationLine: 'underline' },
+  errorText: { color: '#FCA5A5', fontSize: 12.5, lineHeight: 18, marginTop: 10, fontFamily: THEME.fonts.body },
 });

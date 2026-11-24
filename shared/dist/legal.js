@@ -320,8 +320,14 @@ exports.LEGAL_DOCUMENTS = [
 function getLegalDocument(id) {
     return exports.LEGAL_DOCUMENTS.find((d) => d.id === id);
 }
-/** Kullanıcının mevcut sürüm yasal metinleri onaylayıp onaylamadığını döndürür. */
-function hasAcceptedCurrentLegal(settings) {
+/**
+ * Kullanıcının verilen sürümdeki yasal metinleri onaylayıp onaylamadığını döndürür.
+ * `version` verilmezse paketteki LEGAL_VERSION kullanılır; istemci, sunucudan
+ * okuduğu güncel sürümü geçerek eski paketlerdeki sürüm kaymasını önler.
+ */
+function hasAcceptedCurrentLegal(settings, version = exports.LEGAL_VERSION) {
     const consent = settings?.legalConsent;
-    return Boolean(consent && typeof consent === 'object' && consent.version === exports.LEGAL_VERSION);
+    if (!consent || typeof consent !== 'object')
+        return false;
+    return consent.version === version;
 }

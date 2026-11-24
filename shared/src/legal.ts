@@ -344,8 +344,13 @@ export function getLegalDocument(id: string): LegalDocument | undefined {
   return LEGAL_DOCUMENTS.find((d) => d.id === id);
 }
 
-/** Kullanıcının mevcut sürüm yasal metinleri onaylayıp onaylamadığını döndürür. */
-export function hasAcceptedCurrentLegal(settings: unknown): boolean {
+/**
+ * Kullanıcının verilen sürümdeki yasal metinleri onaylayıp onaylamadığını döndürür.
+ * `version` verilmezse paketteki LEGAL_VERSION kullanılır; istemci, sunucudan
+ * okuduğu güncel sürümü geçerek eski paketlerdeki sürüm kaymasını önler.
+ */
+export function hasAcceptedCurrentLegal(settings: unknown, version: string = LEGAL_VERSION): boolean {
   const consent = (settings as any)?.legalConsent;
-  return Boolean(consent && typeof consent === 'object' && consent.version === LEGAL_VERSION);
+  if (!consent || typeof consent !== 'object') return false;
+  return consent.version === version;
 }
