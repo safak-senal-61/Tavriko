@@ -26,6 +26,21 @@ describe('account legal consent', () => {
     expect(needsLegalConsent(user, true)).toBe(false);
   });
 
+  it('compares consent against the version fetched from the server', () => {
+    const serverReceipt = { ...receipt, version: '2026-12-01', documents: [] };
+    const onServerVersion = { ...user, settings: { ...user.settings, legalConsent: serverReceipt } };
+    // Paket sürümü eski olsa da sunucunun sürümü onaylanmışsa ekran açılmaz.
+    expect(needsLegalConsent(onServerVersion, false, '2026-12-01')).toBe(false);
+    expect(needsLegalConsent(onServerVersion, false, LEGAL_VERSION)).toBe(true);
+  });
+
+  it('posts the version it was given so a stale bundle cannot loop on 409', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ user: { ...accepted, settings: { ...accepted.settings, legalConsent: { ...receipt, version: '2026-12-01', documents: [] } } } }) });
+    vi.stubGlobal('fetch', fetchMock);
+    await submitLegalConsent('https://example.invalid/api', 'fixture', 'in_app', '2026-12-01');
+    expect(JSON.parse(String((fetchMock.mock.calls[0][1] as any).body)).version).toBe('2026-12-01');
+  });
+
   it('only accepts a successful response that contains the current receipt', async () => {
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'Tekrar dene' }) })
