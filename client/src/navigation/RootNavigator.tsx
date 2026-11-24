@@ -19,6 +19,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useGameStore, clearAllAccountStorage } from '../store/gameStore';
+import { NATIVE_QUIZ_TABLET_FRAME_WIDTH } from '../utils/quizArenaLayout';
 import { authHeaders } from '../utils/apiAuth';
 import { PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
 import { eventsUrl, friendsChanged, gameplayRewardsUrl, leaderboardUrl, prefetchGameplayRewards, profileUrl, referralUrl } from '../utils/pageResources';
@@ -1774,6 +1775,7 @@ export const RootNavigator: React.FC = () => {
       <View style={[
         styles.appFrame,
         isNativeTablet && styles.nativeTabletFrame,
+        isNativeTablet && currentScreen === 'quiz_arena' && styles.nativeQuizTabletFrame,
         webLayout.roomy && [styles.webFrame, { maxWidth: webLayout.frameMaxWidth }],
       ]}>
         <Animated.View
@@ -1782,6 +1784,7 @@ export const RootNavigator: React.FC = () => {
           style={[
             styles.container,
             !isWeb && styles.nativeContainer,
+            isNativeTablet && currentScreen === 'quiz_arena' && styles.nativeQuizTabletContainer,
             { opacity: screenFade },
           ]}
         >
@@ -2654,6 +2657,7 @@ const styles = StyleSheet.create({
     boxShadow: '0 0 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(108, 92, 231, 0.35)',
     overflow: 'hidden',
   },
+  nativeQuizTabletFrame: { width: '100%', maxWidth: NATIVE_QUIZ_TABLET_FRAME_WIDTH },
   webFrame: {
     flexBasis: 0,
     minWidth: 0,
@@ -2674,6 +2678,7 @@ const styles = StyleSheet.create({
   nativeContainer: {
     maxWidth: 520,
   },
+  nativeQuizTabletContainer: { maxWidth: NATIVE_QUIZ_TABLET_FRAME_WIDTH },
   desktopSidebar: {
     flexGrow: 0,
     flexShrink: 0,

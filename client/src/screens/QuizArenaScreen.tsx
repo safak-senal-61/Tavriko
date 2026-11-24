@@ -41,6 +41,8 @@ import {
 } from '../components/TavrikoIcons';
 import { GradientFill } from '../components/TavrikoGradient';
 import { DISCOVER_CATEGORY_IMG, DISCOVER_SUBCATEGORY_IMG } from '../components/DiscoverArtwork';
+import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
+import { getQuizArenaLayout, NATIVE_QUIZ_TABLET_FRAME_WIDTH } from '../utils/quizArenaLayout';
 export type QuestionAnswerState =
   | 'answerable'
   | 'submitting'
@@ -361,11 +363,12 @@ const SummitRaceTrack: React.FC<{
   racers: RacerInfo[];
   totalQuestions: number;
   compact?: boolean;
+  mobileCards?: boolean;
   /** 5+ oyuncu: kart içi boşluklar ve şerit aralıkları sıkılaştırılır */
   dense?: boolean;
   /** Dense moddaki orantılı küçültme katsayısı (1 = küçültme yok) */
   scale?: number;
-}> = ({ racers, totalQuestions, compact = false, dense = false, scale = 1 }) => {
+}> = ({ racers, totalQuestions, compact = false, mobileCards = false, dense = false, scale = 1 }) => {
   const marker = Math.max(8, Math.round(raceMarkerSize(racers.length, compact) * scale));
   // Şerit kalınlığı göstergelerle birlikte küçülür; 8 kişilik odada bile sığar.
   const trackHeight = Math.max(5, Math.min(8, Math.round(marker * 0.42)));
@@ -410,6 +413,7 @@ const SummitRaceTrack: React.FC<{
           paddingBottom: Math.max(3, Math.round(4 * scale)),
           gap: Math.max(1, Math.round(2 * scale)),
         },
+        mobileCards && styles.mobilePanelCorners,
       ]}
     >
       <View style={styles.raceTitleRow}>
@@ -889,9 +893,12 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     }).sort((a, b) => Number(b.usable) - Number(a.usable)) : [];
   const totalRounds = question.totalRounds || 10;
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const webLayout = usePlayerWebLayout();
+  const contentWidth = Platform.OS === 'web'
+    ? webLayout?.contentWidth ?? windowWidth - 32
+    : Math.min(windowWidth, NATIVE_QUIZ_TABLET_FRAME_WIDTH) - 32;
   const compact = windowHeight < 800;
   const tiny = windowHeight < 690;
-  const wideAnswers = Platform.OS === 'web' && windowWidth >= 700;
   const myRacer = activeRacers.find((r) => r.isMe);
   const myScore = formatCleanScore(currentScore, myRacer?.correctAnswers || 0, totalRounds);
   const rightPlayer = useMemo(() => {
@@ -931,16 +938,17 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     return me ? [me, ...others] : others;
   }, [activeRacers]);
   const playerCount = activeRacers.length;
-  // Kalabalık odalarda yüksek ekranlarda da küçült; kısa ekranlarda daha sıkı ol.
-  const denseLayout = playerCount >= 5;
-  const denseScale = denseLayout
-    ? Math.max(0.65, Math.min(0.92 - 0.04 * (playerCount - 5), (windowHeight - 100) / 760))
-    : 1;
+  const arenaLayout = getQuizArenaLayout(contentWidth, windowHeight, playerCount);
+  const { dense: denseLayout, denseScale, compactHeader, tightHeader, wideAnswers, uiGrowth, mobileCards } = arenaLayout;
   const ds = (value: number) => Math.round(value * denseScale);
-  const denseWide = denseLayout && wideAnswers;
-  const denseTopInset = Math.round(Math.max(0, Math.min(140, (windowHeight - 560) / 2)));
+  const denseFrame = arenaLayout.denseFrameMaxWidth
+    ? { maxWidth: arenaLayout.denseFrameMaxWidth }
+    : undefined;
+  const denseTopInset = Math.round(Math.max(0, Math.min(140, (windowHeight - 560 - 70 * uiGrowth) / 2)));
   const denseOptionBadge = Math.max(20, ds(30));
   const denseTimerSize = Math.max(34, ds(46));
+  const closeSize = denseLayout ? Math.round(36 + 8 * uiGrowth) : compactHeader ? 38 : 44;
+  const roundHeight = denseLayout ? Math.round(32 + 8 * uiGrowth) : compactHeader ? 34 : 40;
   const denseJokerButton = { minHeight: Math.max(26, ds(34)), paddingVertical: 2 };
   const denseQuestionSize = Math.max(15, ds(compact ? 19 : 22)) + (isLargeText ? 3 : 0);
   const denseOptionSize = Math.max(13, ds(compact ? 16 : 18)) + (isLargeText ? 2 : 0);
@@ -948,7 +956,6 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const rowSize = Math.ceil(playerCount / 2);
   const playerRows = playerCount <= 4 ? [multiPlayers] : [multiPlayers.slice(0, rowSize), multiPlayers.slice(rowSize)];
   const multiRing = playerCount <= 4 ? (tiny ? 35 : 41) : Math.max(16, ds(tiny ? 28 : 34));
-  const narrowHeader = isGroup && windowWidth < 380;
   const groupScore = (p: typeof multiPlayers[number]) => p.isMe ? myScore : formatCleanScore(p.score || 0, p.correctAnswers, totalRounds);
   const multiLeaderScore = Math.max(0, ...multiPlayers.map(groupScore));
   const hasGroupLeader = multiLeaderScore > 0 && multiPlayers.filter(p => groupScore(p) === multiLeaderScore).length === 1;
@@ -974,54 +981,90 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   return (
     <TavrikoScreen style={denseLayout ? styles.denseScreenContainer : styles.screenContainer}>
       {/* 1. Üst Bar: Çıkış, Soru Sayacı, Kategori */}
-      <View style={[styles.topRow, denseLayout && styles.denseTopRow, denseWide && styles.denseWideFrame, denseWide && { marginTop: denseTopInset }]}>
+      <View
+        testID="quiz-arena-header"
+        style={[
+          styles.topRow,
+          isGroup && styles.groupTopRow,
+          denseLayout && styles.denseTopRow,
+          compactHeader && styles.compactTopRow,
+          denseFrame && [styles.denseWideFrame, denseFrame, { marginTop: denseTopInset }],
+        ]}
+      >
         <TouchableOpacity
-          style={[styles.closeBtn, denseLayout && styles.denseCloseBtn]}
-          hitSlop={denseLayout ? 4 : undefined}
+          style={[styles.closeBtn, { width: closeSize, height: closeSize, borderRadius: closeSize / 2 }, denseLayout && styles.denseControlBorder]}
+          hitSlop={closeSize < 44 ? 4 : undefined}
           onPress={handleExitPress}
           activeOpacity={0.8}
           accessibilityLabel="Oyundan çık"
         >
-          <CloseXIcon size={denseLayout ? 16 : 20} color="#FFFFFF" />
+          <CloseXIcon size={Math.round(closeSize * 0.45)} color="#FFFFFF" />
         </TouchableOpacity>
-        <View style={[styles.roundPill, narrowHeader && styles.roundPillNarrow, denseLayout && styles.denseRoundPill]}>
-          <Text style={[styles.roundPillText, (narrowHeader || denseLayout) && styles.roundTextNarrow]} numberOfLines={1}>
+        <View style={[
+          styles.roundPill,
+          { height: roundHeight, borderRadius: mobileCards ? 8 : roundHeight / 2 },
+          denseLayout && styles.denseControlBorder,
+          (denseLayout || compactHeader) && { paddingHorizontal: tightHeader ? 6 : Math.round(9 + 5 * uiGrowth) },
+        ]}>
+          <Text style={[
+            styles.roundPillText,
+            (denseLayout || compactHeader) && { fontSize: tightHeader ? 12 : Math.round(13 + 2 * uiGrowth) },
+          ]} numberOfLines={1}>
             Soru {question.roundNumber} / {totalRounds}
           </Text>
         </View>
-        <View style={[styles.categoryPill, isGroup && styles.groupCategoryPill, narrowHeader && styles.categoryPillNarrow, denseLayout && styles.denseCategoryPill]}>
-          {!narrowHeader && <Image source={categoryArt} style={[styles.categoryArt, denseLayout && styles.denseCategoryArt]} resizeMode="contain" />}
+        <View testID="quiz-category-card" style={[
+          styles.categoryPill,
+          denseLayout && styles.denseControlBorder,
+          {
+            minHeight: arenaLayout.categoryMinHeight,
+            maxWidth: arenaLayout.categoryMaxWidth,
+            paddingLeft: arenaLayout.categoryHorizontalPadding,
+            paddingRight: arenaLayout.categoryHorizontalPadding + arenaLayout.categoryExtraRightPadding,
+            gap: compactHeader ? 4 : 6,
+          },
+          mobileCards && styles.mobileCardCorners,
+        ]}>
+          <Image
+            testID="quiz-category-art"
+            accessible={false}
+            source={categoryArt}
+            style={[styles.categoryArt, { width: arenaLayout.categoryArtSize, height: arenaLayout.categoryArtSize }]}
+            resizeMode="contain"
+          />
           <View style={styles.categoryPillTexts}>
-            <Text style={styles.categoryPillText} numberOfLines={1}>
+            <Text style={[styles.categoryPillText, { fontSize: arenaLayout.categoryFontSize }]} numberOfLines={1}>
               {categoryName}
             </Text>
             {subCategoryLabel ? (
-              <Text style={styles.subCategoryPillText} numberOfLines={1} accessibilityLabel={`Alt kategori: ${subCategoryLabel}`}>
+              <Text style={[styles.subCategoryPillText, { fontSize: arenaLayout.subCategoryFontSize }]} numberOfLines={1} accessibilityLabel={`Alt kategori: ${subCategoryLabel}`}>
                 {subCategoryLabel}
               </Text>
             ) : null}
           </View>
         </View>
         {isGroup && (
-          <CircularTimer
-            totalMs={totalMs} pauseUntil={localPauseUntil}
-            endTime={endTime}
-            isActive={!jokerApplying && !feedback && (answerState === 'answerable' || (isMultiplayer && answerState === 'submitting'))}
-            secondsLeft={secondsLeft}
-            onTimeExpired={handleTimeExpiredInternal}
-            onSecondChange={handleSecondChange}
-            size={denseLayout ? denseTimerSize : narrowHeader ? 42 : 48}
-          />
+          <View style={styles.groupHeaderTimer}>
+            <CircularTimer
+              totalMs={totalMs} pauseUntil={localPauseUntil}
+              endTime={endTime}
+              isActive={!jokerApplying && !feedback && (answerState === 'answerable' || (isMultiplayer && answerState === 'submitting'))}
+              secondsLeft={secondsLeft}
+              onTimeExpired={handleTimeExpiredInternal}
+              onSecondChange={handleSecondChange}
+              size={denseLayout ? denseTimerSize : compactHeader ? 42 : 48}
+            />
+          </View>
         )}
       </View>
       <ScrollView
         ref={arenaScrollRef}
         testID="quiz-arena-scroll"
-        style={[styles.arenaScroll, denseWide && styles.denseWideFrame]}
+        style={[styles.arenaScroll, denseFrame && [styles.denseWideFrame, denseFrame]]}
         contentContainerStyle={[
           isGroup ? styles.groupArenaBody : Platform.OS === 'web' ? styles.webArenaBody : styles.arenaBody,
           denseLayout && { gap: Math.max(4, ds(8)), paddingVertical: 4 },
-          denseWide && styles.denseWideBody,
+          denseFrame && styles.denseWideBody,
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -1121,6 +1164,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           racers={activeRacers}
           totalQuestions={totalRounds}
           compact={compact}
+          mobileCards={mobileCards}
           dense={denseLayout}
           scale={denseScale}
         />
@@ -1129,6 +1173,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       {/* 4. Soru Kartı */}
       <Animated.View
         key={`q-${question.id}-${question.roundNumber}`}
+        testID="quiz-question-card"
         entering={FadeIn.duration(320)}
         style={[
           styles.questionCard,
@@ -1136,13 +1181,14 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           (tiny || denseLayout) && styles.questionCardTiny,
           denseLayout && styles.denseQuestionCard,
           denseLayout && { minHeight: Math.max(46, ds(68)) },
+          mobileCards && styles.mobilePanelCorners,
         ]}
       >
         <GradientFill
           colors={['rgba(107, 60, 255, 0.55)', 'rgba(52, 22, 128, 0.75)', 'rgba(30, 12, 74, 0.85)']}
           direction="diagonal"
         />
-        <View style={[styles.questionCardInner, denseLayout && styles.denseQuestionInner]} pointerEvents="none" />
+        <View style={[styles.questionCardInner, denseLayout && styles.denseQuestionInner, mobileCards && styles.mobileQuestionInner]} pointerEvents="none" />
         {!tiny && !denseLayout && (
           <View style={styles.difficultyRow}>
             <View
@@ -1257,6 +1303,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   removed && { opacity: .42 },
                   denseLayout && styles.denseOptCard,
                   denseLayout && { minHeight: Math.max(38, ds(49)) },
+                  mobileCards && styles.mobileCardCorners,
                 ]}
                 disabled={isOptionsDisabled || jokerBusy || removed}
                 activeOpacity={0.8}
@@ -1328,6 +1375,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
             style={[
               styles.inlineFeedbackCard,
               denseLayout && styles.denseFeedbackCard,
+              mobileCards && styles.mobileCardCorners,
               {
                 borderColor: feedback.isTimeout || feedback.unavailable
                   ? 'rgba(255, 196, 61, 0.6)'
@@ -1428,13 +1476,16 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   denseScreenContainer: { minHeight: 0, paddingBottom: 8 },
-  denseWideFrame: { width: '100%', maxWidth: 740, alignSelf: 'center' },
+  denseWideFrame: { width: '100%', alignSelf: 'center' },
   denseWideBody: { justifyContent: 'flex-start' },
   denseTopRow: { gap: 6, marginBottom: 4 },
-  denseCloseBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1 },
-  denseRoundPill: { height: 32, borderRadius: 16, paddingHorizontal: 9, borderWidth: 1 },
-  denseCategoryPill: { minHeight: 32, borderRadius: 16, paddingHorizontal: 8, borderWidth: 1 },
-  denseCategoryArt: { width: 22, height: 22 },
+  denseControlBorder: { borderWidth: 1 },
+  compactTopRow: { gap: 4 },
+  groupTopRow: { justifyContent: 'flex-start' },
+  groupHeaderTimer: { flexShrink: 0, marginLeft: 'auto' },
+  mobileCardCorners: { borderRadius: 9 },
+  mobilePanelCorners: { borderRadius: 11 },
+  mobileQuestionInner: { borderRadius: 7 },
   miniPlayerDense: { maxWidth: 84, paddingVertical: 2, borderRadius: 8 },
   denseQuestionCard: { borderRadius: 16, borderWidth: 1.5, paddingVertical: 6, paddingHorizontal: 10 },
   denseQuestionInner: { top: 3, bottom: 3, left: 3, right: 3, borderRadius: 12 },
@@ -1482,41 +1533,32 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.black,
     letterSpacing: 0.3,
   },
-  roundPillNarrow: { paddingHorizontal: 8 },
-  roundTextNarrow: { fontSize: 13 },
   categoryPill: {
-    minHeight: 40,
-    maxWidth: 210,
+    minWidth: 0,
     paddingVertical: 3,
     flexShrink: 1,
-    paddingHorizontal: 12,
     borderRadius: 20,
     backgroundColor: 'rgba(36, 16, 80, 0.92)',
     borderWidth: 1.5,
     borderColor: 'rgba(154, 107, 255, 0.6)',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
   },
   categoryArt: {
-    width: 32,
-    height: 32,
+    flexShrink: 0,
   },
-  groupCategoryPill: { flex: 1, minWidth: 0, maxWidth: '100%' },
-  categoryPillNarrow: { paddingHorizontal: 8 },
   categoryPillTexts: {
+    minWidth: 0,
     flexShrink: 1,
     justifyContent: 'center',
   },
   categoryPillText: {
     color: '#FFFFFF',
-    fontSize: 13,
     fontFamily: THEME.fonts.black,
     flexShrink: 1,
   },
   subCategoryPillText: {
     color: '#D9CDF5',
-    fontSize: 10,
     fontFamily: THEME.fonts.bold,
     flexShrink: 1,
     marginTop: 1,
