@@ -15,15 +15,15 @@ export function JokerGroupTabs({ selected, onChange }: { selected: JokerGroup | 
   </View>;
 }
 
-function Panel({ title, onClose, children, instant }: React.PropsWithChildren<{ title: string; onClose: () => void; instant?: boolean }>) {
+function Panel({ title, onClose, children, instant, compact }: React.PropsWithChildren<{ title: string; onClose: () => void; instant?: boolean; compact?: boolean }>) {
   return <Modal visible transparent animationType={instant ? 'none' : 'fade'} onRequestClose={onClose}>
-    <View style={s.scrim}>
+    <View style={[s.scrim, compact && s.scrimCompact]}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessible={false} />
-      <View style={s.panel} accessibilityViewIsModal>
-        <Pressable onPress={onClose} style={s.close} accessibilityRole="button" accessibilityLabel="Kapat">
-          <CloseXIcon size={16} color="#D9CDEC" />
+      <View style={[s.panel, compact && s.panelCompact]} accessibilityViewIsModal>
+        <Pressable onPress={onClose} style={[s.close, compact && s.closeCompact]} accessibilityRole="button" accessibilityLabel="Kapat">
+          <CloseXIcon size={compact ? 14 : 16} color="#D9CDEC" />
         </Pressable>
-        <Text accessibilityRole="header" style={s.title}>{title}</Text>
+        <Text accessibilityRole="header" style={[s.title, compact && s.titleCompact]}>{title}</Text>
         {children}
       </View>
     </View>
@@ -54,25 +54,25 @@ export function JokerPurchasePanel({ user, options, live, tactics, capabilities,
   const stock = new Map(user.inventory?.map(item => [item.id, item.qty]));
   const available = JOKERS.filter(joker => (stock.get(joker.id) ?? 0) <= 0 &&
     (!group || joker.group === group) && canUseJoker(joker.id, options, { live, tactics, capabilities, lightningAvailable }));
-  return <Panel title="Joker satın al" onClose={onClose} instant>
-    <View style={s.wallet}><CoinIcon size={17} /><Text style={s.balance}>{walletAmount(user.coins ?? 0)} altın</Text></View>
-    <Text style={s.desc}>Bu soruya uygun, sende olmayan jokerler. Sayaç işlemeye devam eder.</Text>
+  return <Panel title="Joker satın al" onClose={onClose} instant compact>
+    <View style={s.wallet}><CoinIcon size={14} /><Text style={[s.balance, s.balanceCompact]}>{walletAmount(user.coins ?? 0)} altın</Text></View>
+    <Text style={[s.desc, s.descCompact]}>Bu soruya uygun, sende olmayan jokerler. Sayaç işlemeye devam eder.</Text>
     <JokerGroupTabs selected={group} onChange={setGroup} />
     {error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
     <ScrollView showsVerticalScrollIndicator={false} style={s.catalog} contentContainerStyle={s.catalogContent}>
-    {!available.length && <Text style={s.desc}>Bu grupta satın alabileceğin joker yok.</Text>}
+    {!available.length && <Text style={[s.desc, s.descCompact]}>Bu grupta satın alabileceğin joker yok.</Text>}
     {available.map(joker => {
       const canBuy = user.coins >= joker.price;
-      return <View key={joker.id} style={s.joker}>
-        <WalletArtwork kind={joker.id} size={38} />
-        <View style={s.detail}>
-          <Text style={s.itemTitle}>{joker.name}</Text>
-          <Text style={s.itemDesc}>{joker.desc}</Text>
+      return <View key={joker.id} style={[s.joker, s.jokerCompact]}>
+        <WalletArtwork kind={joker.id} size={30} />
+        <View style={[s.detail, s.detailCompact]}>
+          <Text style={[s.itemTitle, s.itemTitleCompact]}>{joker.name}</Text>
+          <Text style={[s.itemDesc, s.itemDescCompact]} numberOfLines={2}>{joker.desc}</Text>
         </View>
-        <Pressable style={[s.buy, !canBuy && s.disabled]} disabled={!!buying || !canBuy} onPress={() => onBuy(joker.id)}
+        <Pressable style={[s.buy, s.buyCompact, !canBuy && s.disabled]} disabled={!!buying || !canBuy} onPress={() => onBuy(joker.id)}
           accessibilityRole="button" accessibilityLabel={`${joker.name} satın al: ${joker.price} altın`}
           accessibilityState={{ busy: buying === joker.id, disabled: !!buying || !canBuy }}>
-          <CoinIcon size={15} /><Text style={s.buyText}>{buying === joker.id ? 'Alınıyor…' : `${joker.price} · Al`}</Text>
+          <CoinIcon size={13} /><Text style={[s.buyText, s.buyTextCompact]}>{buying === joker.id ? 'Alınıyor…' : `${joker.price} · Al`}</Text>
         </Pressable>
       </View>;
     })}
@@ -105,4 +105,17 @@ const s = StyleSheet.create({
   disabled: { opacity: .55 },
   buyText: { color: '#FFE2AC', fontFamily: THEME.fonts.extraBold, fontSize: 13 },
   error: { color: '#FFB7C9', fontSize: 13, textAlign: 'center' },
+  // Quiz içi satın alma: 320×568 ekranda şıkları ve joker şeridini örtmesin
+  scrimCompact: { justifyContent: 'flex-end', padding: 10 },
+  panelCompact: { maxWidth: 380, borderRadius: 16, padding: 12, gap: 6 },
+  closeCompact: { width: 40, height: 40, right: 2, top: 0 },
+  titleCompact: { fontSize: 17, paddingHorizontal: 30 },
+  balanceCompact: { fontSize: 13 },
+  descCompact: { fontSize: 11, lineHeight: 15 },
+  jokerCompact: { padding: 6, gap: 6, borderRadius: 10 },
+  detailCompact: { gap: 1 },
+  itemTitleCompact: { fontSize: 13 },
+  itemDescCompact: { fontSize: 11 },
+  buyCompact: { minHeight: 44, paddingHorizontal: 8, borderRadius: 8 },
+  buyTextCompact: { fontSize: 12 },
 });
