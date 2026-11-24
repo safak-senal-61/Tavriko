@@ -363,8 +363,10 @@ const SummitRaceTrack: React.FC<{
   compact?: boolean;
   /** 5+ oyuncu: kart içi boşluklar ve şerit aralıkları sıkılaştırılır */
   dense?: boolean;
-}> = ({ racers, totalQuestions, compact = false, dense = false }) => {
-  const marker = raceMarkerSize(racers.length, compact);
+  /** Dense moddaki orantılı küçültme katsayısı (1 = küçültme yok) */
+  scale?: number;
+}> = ({ racers, totalQuestions, compact = false, dense = false, scale = 1 }) => {
+  const marker = Math.max(8, Math.round(raceMarkerSize(racers.length, compact) * scale));
   // Şerit kalınlığı göstergelerle birlikte küçülür; 8 kişilik odada bile sığar.
   const trackHeight = Math.max(5, Math.min(8, Math.round(marker * 0.42)));
   const [laneWidth, setLaneWidth] = useState(0);
@@ -400,7 +402,11 @@ const SummitRaceTrack: React.FC<{
       style={[
         styles.raceCard,
         compact && { paddingTop: 4, paddingBottom: 6 },
-        dense && { paddingTop: 3, paddingBottom: 4, gap: 2 },
+        dense && {
+          paddingTop: Math.max(2, Math.round(3 * scale)),
+          paddingBottom: Math.max(3, Math.round(4 * scale)),
+          gap: Math.max(1, Math.round(2 * scale)),
+        },
       ]}
     >
       <View style={styles.raceTitleRow}>
@@ -921,13 +927,20 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     return me ? [me, ...others] : others;
   }, [activeRacers]);
   const playerCount = activeRacers.length;
+  // 5+ kişi: soru kartı, şıklar ve yarış kartı sıkışık modda render edilir.
+  const denseLayout = playerCount >= 5;
+  /**
+   * Adaptif küçültme: 8 oyunculu odalarda tüm öğeler ekrana sığsın diye
+   * oyuncu sayısı ve ekran yüksekliğine göre orantılı ölçek uygulanır.
+   * 1-4 oyunculu maçlarda ölçek 1 kalır, mevcut görünüm birebir korunur.
+   */
+  const denseScale = denseLayout ? Math.max(0.62, Math.min(1, (windowHeight - 130) / 650)) : 1;
+  const ds = (value: number) => Math.round(value * denseScale);
   const isGroup = multiPlayers.length > 0;
   const rowSize = Math.ceil(playerCount / 2);
   const playerRows = playerCount <= 4 ? [multiPlayers] : [multiPlayers.slice(0, rowSize), multiPlayers.slice(rowSize)];
-  const multiRing = playerCount <= 4 ? (tiny ? 35 : 41) : (tiny ? 28 : 34);
+  const multiRing = playerCount <= 4 ? (tiny ? 35 : 41) : Math.max(16, ds(tiny ? 28 : 34));
   const narrowHeader = isGroup && windowWidth < 380;
-  // 5+ kişi: soru kartı, şıklar ve yarış kartı sıkışık modda render edilir.
-  const denseLayout = playerCount >= 5;
   const groupScore = (p: typeof multiPlayers[number]) => p.isMe ? myScore : formatCleanScore(p.score || 0, p.correctAnswers, totalRounds);
   const multiLeaderScore = Math.max(0, ...multiPlayers.map(groupScore));
   const hasGroupLeader = multiLeaderScore > 0 && multiPlayers.filter(p => groupScore(p) === multiLeaderScore).length === 1;
@@ -996,7 +1009,10 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         ref={arenaScrollRef}
         testID="quiz-arena-scroll"
         style={styles.arenaScroll}
-        contentContainerStyle={isGroup ? styles.groupArenaBody : Platform.OS === 'web' ? styles.webArenaBody : styles.arenaBody}
+        contentContainerStyle={[
+          isGroup ? styles.groupArenaBody : Platform.OS === 'web' ? styles.webArenaBody : styles.arenaBody,
+          denseLayout && { gap: Math.max(2, ds(6)), paddingVertical: 2 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
       {/* Günlük Meydan Okuma bilgisi */}
@@ -1095,6 +1111,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           totalQuestions={totalRounds}
           compact={compact}
           dense={denseLayout}
+          scale={denseScale}
         />
       )}
 
@@ -1106,6 +1123,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
           styles.questionCard,
           compact && styles.questionCardCompact,
           (tiny || denseLayout) && styles.questionCardTiny,
+          denseLayout && { minHeight: Math.max(44, ds(80)), paddingVertical: Math.max(3, ds(8)) },
         ]}
       >
         <GradientFill
@@ -1128,6 +1146,10 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
             styles.questionText,
             compact && styles.questionTextCompact,
             isLargeText && styles.questionTextLarge,
+            denseLayout && {
+              fontSize: Math.max(13, ds(compact ? 19 : 22)),
+              lineHeight: Math.max(17, ds(compact ? 25 : 29)),
+            },
           ]}
           numberOfLines={5}
           adjustsFontSizeToFit
@@ -1146,7 +1168,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   jokerRetry?.hint ?? jokerEffect?.hint ?? (jokerApplying ? 'Joker uygulanıyor…' : jokerBusy ? 'İşlem yapılıyor…' : 'Joker kullanıldı')}
               </Text>
               {jokerEffect && !isOptionsDisabled && (
-                <TouchableOpacity style={[styles.jokerTrigger, styles.jokerShopTrigger, styles.jokerAfterUse]}
+                <TouchableOpacity style={[styles.jokerTrigger, styles.jokerShopTrigger, styles.jokerAfterUse, denseLayout && { minHeight: Math.max(26, ds(34)) }]}
                   accessibilityRole="button" accessibilityLabel="Joker satın al"
                   onPress={() => { setJokerError(undefined); setJokersOpen(true); }}>
                   <Text numberOfLines={1} style={styles.jokerTriggerText}>Joker Al</Text>
@@ -1159,7 +1181,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                 <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator={false}
                   testID="owned-joker-strip" style={styles.jokerStrip} contentContainerStyle={styles.jokerStripContent}>
                   {ownedJokers.map(joker => (
-                    <TouchableOpacity key={joker.id} style={[styles.jokerTrigger, !joker.usable && styles.jokerUnavailable]}
+                    <TouchableOpacity key={joker.id} style={[styles.jokerTrigger, !joker.usable && styles.jokerUnavailable, denseLayout && { minHeight: Math.max(26, ds(34)) }]}
                       disabled={!joker.usable} accessibilityRole="button"
                       accessibilityLabel={`${joker.name} ${joker.usable ? 'kullan' : 'bu soruda kullanılamaz'}, ${joker.qty} adet`}
                       accessibilityState={{ disabled: !joker.usable }}
@@ -1170,7 +1192,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   ))}
                 </ScrollView>
               ) : <Text style={[styles.jokerTriggerText, styles.jokerStrip]}>Henüz jokerin yok</Text>}
-              <TouchableOpacity style={[styles.jokerTrigger, styles.jokerShopTrigger]}
+              <TouchableOpacity style={[styles.jokerTrigger, styles.jokerShopTrigger, denseLayout && { minHeight: Math.max(26, ds(34)) }]}
                 accessibilityRole="button" accessibilityLabel="Joker satın al"
                 onPress={() => { setJokerError(undefined); setJokersOpen(true); }}>
                 <Text numberOfLines={1} style={styles.jokerTriggerText}>Joker Al</Text>
@@ -1190,7 +1212,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       )}
 
       {/* 5. Şıklar */}
-      <View style={[styles.optionsContainer, compact && { gap: 7 }, denseLayout && { gap: 5 }, wideAnswers && styles.optionsWide]}>
+      <View style={[styles.optionsContainer, compact && { gap: 7 }, denseLayout && { gap: Math.max(2, ds(5)) }, wideAnswers && styles.optionsWide]}>
         {question.options.map((opt, index) => {
           const activeSelectedId = selectedOptionId || localSelectedOptionId;
           const isMyChoice = activeSelectedId === opt.id;
@@ -1221,6 +1243,12 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   highlighted && styles.optCardHighlighted,
                   isOptionsDisabled && !isMyChoice && !isCorrectChoice && styles.optCardDimmed,
                   removed && { opacity: .42 },
+                  denseLayout && {
+                    minHeight: Math.max(36, ds(46)),
+                    paddingVertical: Math.max(2, ds(4)),
+                    paddingLeft: Math.max(5, ds(8)),
+                    paddingRight: Math.max(6, ds(10)),
+                  },
                 ]}
                 disabled={isOptionsDisabled || jokerBusy || removed}
                 activeOpacity={0.8}
@@ -1253,6 +1281,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                     !feedback && isMyChoice && styles.optBadgeSelected,
                     feedback && isCorrectChoice && styles.optBadgeCorrect,
                     feedback && isWrongChoice && styles.optBadgeWrong,
+                    denseLayout && { width: Math.max(24, ds(34)), height: Math.max(24, ds(34)), borderRadius: Math.round(Math.max(24, ds(34)) / 2) },
                   ]}
                 >
                   <Text
@@ -1267,7 +1296,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   </Text>
                 </View>
 
-                <Text style={[styles.optText, compact && styles.optTextCompact, isLargeText && styles.optTextLarge]}>
+                <Text style={[styles.optText, compact && styles.optTextCompact, isLargeText && styles.optTextLarge, denseLayout && { fontSize: Math.max(12, ds(compact ? 16 : 18)) }]}>
                   {removed ? 'Elendi' : `${opt.text}${voteShare}`}
                 </Text>
 
@@ -1283,7 +1312,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       </View>
 
       {/* 6. Sabit Alt Durum Alanı (yerleşim kaymasız) */}
-      <View style={[styles.fixedBottomStatus, compact && { minHeight: 44 }]}>
+      <View style={[styles.fixedBottomStatus, compact && { minHeight: denseLayout ? Math.max(18, ds(30)) : 44 }]}>
         {feedback ? (
           <Animated.View
             entering={FadeInDown.duration(280)}
