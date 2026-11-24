@@ -938,6 +938,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
     : 1;
   const ds = (value: number) => Math.round(value * denseScale);
   const denseWide = denseLayout && wideAnswers;
+  const denseTopInset = Math.round(Math.max(0, Math.min(140, (windowHeight - 560) / 2)));
   const denseOptionBadge = Math.max(20, ds(30));
   const denseTimerSize = Math.max(34, ds(46));
   const denseJokerButton = { minHeight: Math.max(26, ds(34)), paddingVertical: 2 };
@@ -973,7 +974,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   return (
     <TavrikoScreen style={denseLayout ? styles.denseScreenContainer : styles.screenContainer}>
       {/* 1. Üst Bar: Çıkış, Soru Sayacı, Kategori */}
-      <View style={[styles.topRow, denseLayout && styles.denseTopRow, denseWide && styles.denseWideFrame]}>
+      <View style={[styles.topRow, denseLayout && styles.denseTopRow, denseWide && styles.denseWideFrame, denseWide && { marginTop: denseTopInset }]}>
         <TouchableOpacity
           style={[styles.closeBtn, denseLayout && styles.denseCloseBtn]}
           hitSlop={denseLayout ? 4 : undefined}
@@ -1428,7 +1429,7 @@ const styles = StyleSheet.create({
   },
   denseScreenContainer: { minHeight: 0, paddingBottom: 8 },
   denseWideFrame: { width: '100%', maxWidth: 740, alignSelf: 'center' },
-  denseWideBody: { justifyContent: 'center' },
+  denseWideBody: { justifyContent: 'flex-start' },
   denseTopRow: { gap: 6, marginBottom: 4 },
   denseCloseBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1 },
   denseRoundPill: { height: 32, borderRadius: 16, paddingHorizontal: 9, borderWidth: 1 },
