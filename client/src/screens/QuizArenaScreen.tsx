@@ -755,6 +755,8 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const difficultyColor = DIFFICULTY_COLORS[question.difficulty] || DIFFICULTY_COLORS.medium;
   return (
     <TavrikoScreen style={styles.screenContainer}>
+      {/* Arka planı sakinleştiren ince karartma: kartlar öne çıksın */}
+      <View pointerEvents="none" style={styles.backdropScrim} />
       {/* 1. Üst Bar: Çıkış, Soru Sayacı, Kategori */}
       <View style={styles.topRow}>
         <TouchableOpacity
@@ -859,7 +861,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         ]}
       >
         <GradientFill
-          colors={['rgba(107, 60, 255, 0.55)', 'rgba(52, 22, 128, 0.75)', 'rgba(30, 12, 74, 0.85)']}
+          colors={['rgba(124, 92, 255, 0.22)', 'rgba(24, 20, 40, 0.94)', 'rgba(18, 16, 30, 0.98)']}
           direction="diagonal"
         />
         <View style={styles.questionCardInner} pointerEvents="none" />
@@ -982,17 +984,17 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
               >
                 {feedback && isCorrectChoice ? (
                   <>
-                    <GradientFill colors={['#217654', '#146748', '#0C543A']} stops={[0, 0.5, 1]} />
+                    <GradientFill colors={['rgba(43, 213, 118, 0.24)', 'rgba(20, 103, 72, 0.3)']} direction="horizontal" />
                     <View pointerEvents="none" style={styles.optCorrectGlow} />
                   </>
                 ) : feedback && isWrongChoice ? (
-                  <GradientFill colors={['#FF8A98', '#FF5A6A', '#C8243A']} stops={[0, 0.5, 1]} />
+                  <GradientFill colors={['rgba(255, 92, 110, 0.24)', 'rgba(160, 24, 44, 0.3)']} direction="horizontal" />
                 ) : (
                   <GradientFill
                     colors={
                       !feedback && isMyChoice
-                        ? ['rgba(255, 196, 61, 0.38)', 'rgba(120, 70, 220, 0.6)']
-                        : ['rgba(80, 44, 180, 0.62)', 'rgba(40, 18, 96, 0.8)']
+                        ? ['rgba(124, 92, 255, 0.30)', 'rgba(124, 92, 255, 0.12)']
+                        : ['rgba(255, 255, 255, 0.062)', 'rgba(255, 255, 255, 0.026)']
                     }
                     direction="horizontal"
                   />
@@ -1009,9 +1011,9 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   <Text
                     style={[
                       styles.optBadgeText,
-                      !feedback && isMyChoice && { color: '#180B34' },
-                      feedback && isCorrectChoice && { color: '#146748' },
-                      feedback && isWrongChoice && { color: '#C8243A' },
+                      !feedback && isMyChoice && { color: '#FFFFFF' },
+                      feedback && isCorrectChoice && { color: '#06110C' },
+                      feedback && isWrongChoice && { color: '#24070C' },
                     ]}
                   >
                     {optionLabels[index]}
@@ -1086,10 +1088,10 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                 style={{
                   marginTop: 8,
                   alignSelf: 'center',
-                  paddingHorizontal: 22,
-                  paddingVertical: 8,
-                  borderRadius: 14,
-                  backgroundColor: '#6B3CFF',
+                  paddingHorizontal: 20,
+                  paddingVertical: 9,
+                  borderRadius: 12,
+                  backgroundColor: '#7C5CFF',
                 }}
               >
                 <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: THEME.fonts.extraBold }}>SONRAKİ SORU</Text>
@@ -1125,26 +1127,39 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   expert: '#E879F9',
 };
 
+const SURFACE = 'rgba(255, 255, 255, 0.05)';
+const SURFACE_STRONG = 'rgba(255, 255, 255, 0.075)';
+const HAIRLINE = 'rgba(255, 255, 255, 0.09)';
+const TEXT_MUTED_SOFT = '#A5A0BF';
+
 const styles = StyleSheet.create({
   jokerRow: { gap: 3 },
-  jokerStatus: { minHeight: 32, justifyContent: 'center' },
-  jokerActions: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
+  jokerStatus: { minHeight: 30, justifyContent: 'center' },
+  jokerActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   jokerStrip: { flex: 1, minWidth: 0 },
-  jokerStripContent: { gap: 5 },
-  jokerTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 36, gap: 3, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 9, borderWidth: 1, borderColor: '#72597F', backgroundColor: '#271B40' },
-  jokerUnavailable: { opacity: .55 },
-  jokerShopTrigger: { borderColor: '#AA794B', backgroundColor: '#402948', flexShrink: 0 },
+  jokerStripContent: { gap: 6 },
+  jokerTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minHeight: 32, gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1, borderColor: HAIRLINE, backgroundColor: SURFACE },
+  jokerUnavailable: { opacity: .5 },
+  jokerShopTrigger: { borderColor: 'rgba(124, 92, 255, 0.55)', backgroundColor: 'rgba(124, 92, 255, 0.22)', flexShrink: 0 },
   jokerAfterUse: { marginLeft: 'auto' },
-  jokerTriggerText: { color: '#FFE0B1', flexShrink: 1, fontSize: 10, fontFamily: THEME.fonts.extraBold },
-  jokerInlineError: { color: '#FFB7C9', fontSize: 12 },
+  jokerTriggerText: { color: '#EDEAF8', flexShrink: 1, fontSize: 11, fontFamily: THEME.fonts.bold },
+  jokerInlineError: { color: '#FF9FB0', fontSize: 11, fontFamily: THEME.fonts.bold },
   screenContainer: {
     justifyContent: 'space-between',
     paddingBottom: 12,
   },
+  backdropScrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(9, 8, 16, 0.55)',
+  },
   arenaBody: { flexGrow: 1, justifyContent: 'space-between', gap: 6 },
   arenaScroll: { flex: 1, minHeight: 0 },
-  groupArenaBody: { flexGrow: 1, justifyContent: 'space-between', paddingVertical: 3, gap: 5 },
-  webArenaBody: { flexGrow: 1, justifyContent: 'space-between', paddingBottom: 5, gap: 8 },
+  groupArenaBody: { flexGrow: 1, justifyContent: 'space-between', paddingVertical: 4, gap: 6 },
+  webArenaBody: { flexGrow: 1, justifyContent: 'space-between', paddingBottom: 6, gap: 10 },
   optionsWide: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8 },
   optWrapWide: { width: '49%' },
   // ---- Üst Bar ----
@@ -1156,50 +1171,50 @@ const styles = StyleSheet.create({
   },
   topSpacer: { flex: 1, minWidth: 2 },
   closeBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: 'rgba(186, 150, 255, 0.6)',
-    backgroundColor: 'rgba(36, 16, 80, 0.92)',
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: HAIRLINE,
+    backgroundColor: SURFACE,
     alignItems: 'center',
     justifyContent: 'center',
   },
   roundPill: {
-    height: 34,
-    paddingHorizontal: 14,
-    borderRadius: 17,
-    backgroundColor: 'rgba(36, 16, 80, 0.92)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(154, 107, 255, 0.6)',
+    height: 30,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: HAIRLINE,
     alignItems: 'center',
     justifyContent: 'center',
   },
   roundPillText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: THEME.fonts.black,
-    letterSpacing: 0.3,
+    color: '#C9C5DE',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
+    letterSpacing: 0.4,
   },
-  roundPillNarrow: { paddingHorizontal: 6 },
-  roundTextNarrow: { fontSize: 12 },
+  roundPillNarrow: { paddingHorizontal: 7 },
+  roundTextNarrow: { fontSize: 11 },
   categoryPill: {
-    minHeight: 34,
+    minHeight: 30,
     maxWidth: 210,
-    paddingVertical: 2,
+    paddingVertical: 3,
     flexShrink: 1,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    backgroundColor: 'rgba(36, 16, 80, 0.92)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(154, 107, 255, 0.6)',
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: SURFACE,
+    borderWidth: 1,
+    borderColor: HAIRLINE,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
   categoryArt: {
-    width: 26,
-    height: 26,
+    width: 20,
+    height: 20,
   },
   groupCategoryPill: { flexShrink: 1, minWidth: 0, maxWidth: 320 },
   categoryPillNarrow: { paddingHorizontal: 8 },
@@ -1208,13 +1223,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   categoryPillText: {
-    color: '#FFFFFF',
+    color: '#EFEDF9',
     fontSize: 12,
-    fontFamily: THEME.fonts.black,
+    fontFamily: THEME.fonts.bold,
     flexShrink: 1,
   },
   subCategoryPillText: {
-    color: '#D9CDF5',
+    color: TEXT_MUTED_SOFT,
     fontSize: 9,
     fontFamily: THEME.fonts.bold,
     flexShrink: 1,
@@ -1227,8 +1242,8 @@ const styles = StyleSheet.create({
   },
   difficultyBadge: {
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 8,
+    borderRadius: 7,
+    paddingHorizontal: 7,
     paddingVertical: 2,
   },
   dailyStrip: {
@@ -1236,17 +1251,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: 'rgba(255, 122, 0, 0.2)',
+    backgroundColor: 'rgba(255, 196, 61, 0.10)',
     borderWidth: 1,
-    borderColor: '#FF7A00',
+    borderColor: 'rgba(255, 196, 61, 0.32)',
     paddingVertical: 5,
     paddingHorizontal: 12,
-    borderRadius: 14,
+    borderRadius: 10,
   },
   dailyStripText: {
-    color: '#FFB300',
+    color: '#FFC43D',
     fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
+    fontFamily: THEME.fonts.bold,
     flexShrink: 1,
   },
   // ---- Oyuncu kartları ----
@@ -1266,83 +1281,74 @@ const styles = StyleSheet.create({
   matchCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: 8,
     minHeight: 44,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(120, 90, 190, 0.45)',
-    backgroundColor: 'rgba(24, 10, 56, 0.85)',
+    borderColor: HAIRLINE,
+    backgroundColor: SURFACE,
   },
-  matchCardDense: { minHeight: 38, paddingVertical: 2, gap: 5 },
-  matchCardMe: { borderColor: 'rgba(56, 189, 248, 0.55)' },
-  matchCardLeading: { borderColor: 'rgba(245, 202, 121, 0.7)' },
+  matchCardDense: { minHeight: 38, paddingVertical: 3, gap: 6, paddingHorizontal: 7 },
+  matchCardMe: { borderColor: 'rgba(56, 189, 248, 0.42)', backgroundColor: 'rgba(56, 189, 248, 0.10)' },
+  matchCardLeading: { borderColor: 'rgba(245, 202, 121, 0.45)', backgroundColor: 'rgba(245, 202, 121, 0.10)' },
   matchAvatarRing: {
-    borderWidth: 2,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1B0C38',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
   matchAnsweredDot: {
     position: 'absolute',
     bottom: -3,
     right: -3,
-    width: 14,
-    height: 14,
+    width: 13,
+    height: 13,
     borderRadius: 7,
-    backgroundColor: '#3FD08A',
+    backgroundColor: '#2BD576',
     borderWidth: 1.5,
     borderColor: '#14082E',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  matchBody: { flex: 1, minWidth: 0, gap: 3 },
-  matchTopRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  matchBody: { flex: 1, minWidth: 0, gap: 4 },
+  matchTopRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   matchName: {
     flex: 1,
     minWidth: 0,
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontFamily: THEME.fonts.black,
+    color: '#E9E6F6',
+    fontSize: 11.5,
+    fontFamily: THEME.fonts.bold,
   },
   matchNameDense: { fontSize: 11 },
   matchScore: {
-    fontSize: 16,
-    lineHeight: 18,
+    fontSize: 15,
+    lineHeight: 17,
     fontFamily: THEME.fonts.display,
     fontVariant: ['tabular-nums'],
   },
-  matchScoreDense: { fontSize: 14, lineHeight: 16 },
+  matchScoreDense: { fontSize: 13, lineHeight: 15 },
   matchBadge: {
-    color: '#FFD27A',
+    color: '#F5CA79',
     fontSize: 10,
-    fontFamily: THEME.fonts.black,
+    fontFamily: THEME.fonts.bold,
   },
   matchProgressTrack: {
-    height: 4,
+    height: 3,
     borderRadius: 2,
-    backgroundColor: 'rgba(154, 107, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
     overflow: 'hidden',
   },
   matchProgressFill: {
-    height: 4,
+    height: 3,
     borderRadius: 2,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
   },
-  streakCard: { justifyContent: 'center', gap: 6, borderColor: 'rgba(255, 155, 47, 0.55)' },
-  streakCardText: { color: '#FFC43D', fontSize: 13, fontFamily: THEME.fonts.black },
+  streakCard: { justifyContent: 'center', gap: 6, borderColor: 'rgba(255, 155, 47, 0.38)', backgroundColor: 'rgba(255, 155, 47, 0.10)' },
+  streakCardText: { color: '#FFC43D', fontSize: 12, fontFamily: THEME.fonts.bold },
   // ---- Geri Sayım ----
   timerWrap: {
     marginTop: 2,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 14,
   },
   timerCenter: {
     flex: 1,
@@ -1358,54 +1364,49 @@ const styles = StyleSheet.create({
   questionCard: {
     minHeight: 104,
     flexShrink: 1,
-    borderRadius: 22,
+    borderRadius: 18,
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'rgba(170, 140, 255, 0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
     paddingVertical: 16,
     paddingHorizontal: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#6B3CFF',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 16,
-    elevation: 8,
   },
   questionCardCompact: {
     minHeight: 78,
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   questionCardTiny: {
-    minHeight: 48,
-    paddingVertical: 3,
+    minHeight: 46,
+    paddingVertical: 2,
   },
   questionCardInner: {
     position: 'absolute',
-    top: 5,
-    left: 5,
-    right: 5,
-    bottom: 5,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     borderRadius: 17,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: 'rgba(255, 255, 255, 0.04)',
   },
   difficultyText: {
-    color: 'rgba(217, 205, 245, 0.75)',
-    fontSize: 10,
-    fontFamily: THEME.fonts.black,
-    letterSpacing: 1.4,
+    color: TEXT_MUTED_SOFT,
+    fontSize: 9,
+    fontFamily: THEME.fonts.bold,
+    letterSpacing: 1.3,
     marginBottom: 4,
   },
   questionText: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 19,
-    color: '#FFFFFF',
+    fontFamily: THEME.fonts.extraBold,
+    fontSize: 18,
+    color: '#F7F5FF',
     textAlign: 'center',
     lineHeight: 24,
   },
   questionTextCompact: {
-    fontSize: 17,
+    fontSize: 16.5,
     lineHeight: 21,
   },
   questionTextLarge: {
@@ -1426,97 +1427,93 @@ const styles = StyleSheet.create({
   optCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
-    minHeight: 50,
-    paddingVertical: 3,
-    paddingLeft: 6,
-    paddingRight: 8,
-    borderRadius: 25,
+    gap: 10,
+    minHeight: 48,
+    paddingVertical: 4,
+    paddingLeft: 8,
+    paddingRight: 12,
+    borderRadius: 14,
     overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: 'rgba(154, 107, 255, 0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
   },
   optCardCompact: {
     minHeight: 46,
-    borderRadius: 23,
+    borderRadius: 13,
   },
   optCardTiny: {
     minHeight: 44,
-    borderRadius: 22,
+    borderRadius: 12,
   },
   optCardSelected: {
-    borderColor: '#FFC43D',
+    borderColor: 'rgba(124, 92, 255, 0.9)',
   },
   optCardCorrect: {
-    borderColor: '#B6FFE0',
+    borderColor: 'rgba(43, 213, 118, 0.75)',
   },
   optCorrectGlow: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(63, 208, 138, 0.06)',
+    backgroundColor: 'rgba(43, 213, 118, 0.04)',
   },
   optCardHighlighted: {
-    borderColor: '#FFCE67',
+    borderColor: 'rgba(255, 196, 61, 0.8)',
   },
   optCardWrong: {
-    borderColor: '#FFB3BC',
+    borderColor: 'rgba(255, 92, 110, 0.8)',
   },
   optCardDimmed: {
-    opacity: 0.6,
+    opacity: 0.55,
   },
   optBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: SURFACE_STRONG,
     alignItems: 'center',
     justifyContent: 'center',
   },
   optBadgeCompact: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 26,
+    height: 26,
+    borderRadius: 8,
   },
   optBadgeSelected: {
-    backgroundColor: '#FFC43D',
-    borderColor: '#FFE27A',
+    backgroundColor: '#7C5CFF',
   },
   optBadgeCorrect: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
+    backgroundColor: '#2BD576',
   },
   optBadgeWrong: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
+    backgroundColor: '#FF5C6E',
   },
   optBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontFamily: THEME.fonts.black,
+    color: '#E4E1F2',
+    fontSize: 12,
+    fontFamily: THEME.fonts.extraBold,
   },
   optText: {
     flex: 1,
     minWidth: 0,
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: THEME.fonts.black,
+    color: '#F2F0FA',
+    fontSize: 15,
+    fontFamily: THEME.fonts.bold,
+    lineHeight: 19,
   },
   optTextCompact: {
-    fontSize: 15,
+    fontSize: 14.5,
   },
   optTextLarge: {
     fontSize: 18,
   },
   optionMark: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  optionMarkResult: { backgroundColor: '#FFFFFF' },
-  optionMarkDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFCE67' },
+  optionMarkResult: { backgroundColor: 'rgba(255, 255, 255, 0.92)' },
+  optionMarkDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#C4B5FF' },
   // ---- Alt Durum ----
   fixedBottomStatus: {
     minHeight: 30,
@@ -1524,27 +1521,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bottomHintText: {
-    color: '#D9CDF5',
+    color: TEXT_MUTED_SOFT,
     fontSize: 11,
-    fontFamily: THEME.fonts.extraBold,
+    fontFamily: THEME.fonts.bold,
     textAlign: 'center',
   },
   inlineFeedbackCard: {
     width: '100%',
-    backgroundColor: 'rgba(10, 4, 24, 0.82)',
-    borderRadius: 16,
+    backgroundColor: 'rgba(20, 18, 32, 0.94)',
+    borderRadius: 14,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1.5,
+    paddingVertical: 10,
+    borderWidth: 1,
   },
   inlineFeedbackTitle: {
-    fontFamily: THEME.fonts.display,
-    fontSize: 15,
+    fontFamily: THEME.fonts.extraBold,
+    fontSize: 14,
+    letterSpacing: 0.2,
   },
   inlineFeedbackSub: {
-    color: '#E6DCFF',
+    color: '#B9B3D0',
     fontSize: 11,
-    fontFamily: THEME.fonts.body,
-    marginTop: 2,
+    fontFamily: THEME.fonts.bold,
+    marginTop: 3,
   },
 });
