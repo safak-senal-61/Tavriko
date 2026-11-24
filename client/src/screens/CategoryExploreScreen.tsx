@@ -284,9 +284,6 @@ export const CategoryExploreScreen: React.FC<CategoryExploreScreenProps> = ({
           <View style={styles.hero}>
             <Image source={HERO_DISCOVER_IMG} style={styles.heroArt} />
             <View style={styles.heroContent}>
-              <View style={styles.heroKicker}>
-                <Text style={styles.heroKickerText}>✦ TAVRİKO</Text>
-              </View>
               <Text style={styles.heroTitle}>KEŞFET</Text>
               <Text style={styles.heroSubtitle} numberOfLines={2}>
                 {visibleSections.length} bölüm · {totalSubCount} kategori ·{' '}
@@ -598,20 +595,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingLeft: 16,
     paddingRight: 158,
-  },
-  heroKicker: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(90, 219, 181, 0.14)',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginBottom: 5,
-  },
-  heroKickerText: {
-    color: '#5ADBB5',
-    fontSize: 9.5,
-    fontFamily: THEME.fonts.extraBold,
-    letterSpacing: 2,
   },
   heroTitle: {
     fontFamily: THEME.fonts.display,
