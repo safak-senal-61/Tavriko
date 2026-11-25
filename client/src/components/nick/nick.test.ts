@@ -45,6 +45,13 @@ describe('efekt bütçesi', () => {
     pool.release(99);
     expect(woke).toBe(1);
   });
+
+  it('mutlak sınır (web WebGL bağlam sınırı) öncelikli istekleri de durdurur', () => {
+    const pool = new NickSlotPool(1, 2);
+    expect(pool.tryAcquire(1)).toBe(true);
+    expect(pool.tryAcquire(2, true)).toBe(true);
+    expect(pool.tryAcquire(3, true)).toBe(false);
+  });
 });
 
 describe('palet yardımcıları', () => {

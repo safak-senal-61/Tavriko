@@ -37,3 +37,6 @@ server/data/prisma/users.json
 server/data/prisma/user_notifications.json
 server/data/prisma/user_inventory_items.json
 server/data/prisma/match_history.json
+
+# Skia web wasm (scripts/copy-canvaskit.mjs ile derlemede kopyalanır)
+client/public/canvaskit.wasm

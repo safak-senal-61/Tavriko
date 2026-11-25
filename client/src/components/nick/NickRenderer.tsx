@@ -37,6 +37,8 @@ import { nickFontFor } from './nickFonts';
 import { cyclicColor, withAlpha } from './nickColor';
 import { useNickClock } from './useNickClock';
 
+const IS_WEB = Platform.OS === 'web';
+
 export type NickVariant = 'inline' | 'hero';
 
 export interface NickRendererProps {
@@ -196,8 +198,21 @@ const NickStyled = memo(function NickStyled({
     setBox((prev) => (prev && Math.abs(prev.w - width) < 0.5 && Math.abs(prev.h - height) < 0.5 ? prev : { w: width, h: height }));
   }, []);
 
+  // react-native-web onTextLayout üretmez: tek satırlık nicklerde satırı kutudan
+  // sentezle (ascender = NaN → çekirdek font metrikleriyle taban çizgisini bulur).
+  const lineHeight = typeof inner.lineHeight === 'number' ? inner.lineHeight : fontSize * 1.37;
+  const webLines = useMemo<NickLine[] | null>(() => {
+    if (!IS_WEB || !box || box.w <= 0) return null;
+    const singleLine = numberOfLines === 1 || box.h < lineHeight * 1.5;
+    if (!singleLine) return null;
+    return [{ text, x: 0, y: 0, width: box.w, height: box.h, ascender: NaN }];
+  }, [box, text, numberOfLines, lineHeight]);
+  const drawLines = IS_WEB ? webLines : lines;
+  const align: 'left' | 'center' | 'right' =
+    inner.textAlign === 'center' ? 'center' : inner.textAlign === 'right' ? 'right' : 'left';
+
   const mode: NickQuality =
-    fullGranted && typeface && lines && lines.length && box ? 'full' : cap === 'static' ? 'static' : 'lite';
+    fullGranted && typeface && drawLines && drawLines.length && box ? 'full' : cap === 'static' ? 'static' : 'lite';
 
   // --- parçacıklar (yalnızca hero + full) ---
   const wantParticles =
@@ -247,20 +262,21 @@ const NickStyled = memo(function NickStyled({
         numberOfLines={numberOfLines}
         adjustsFontSizeToFit={adjustsFontSizeToFit}
         allowFontScaling={allowFontScaling}
-        onTextLayout={cap === 'full' ? onTextLayout : undefined}
+        onTextLayout={cap === 'full' && !IS_WEB ? onTextLayout : undefined}
         onLayout={cap === 'full' ? onLayout : undefined}
         testID={testID}
         accessibilityLabel={accessibilityLabel}
       >
         {text}
       </Animated.Text>
-      {mode === 'full' && typeface && lines && box && (
+      {mode === 'full' && typeface && drawLines && box && (
         <NickSkiaText
           def={def}
           typeface={typeface}
           fontSize={fontSize}
           letterSpacing={letterSpacing}
-          lines={lines}
+          lines={drawLines}
+          align={align}
           width={box.w}
           height={box.h}
           time={time}

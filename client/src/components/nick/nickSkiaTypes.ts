@@ -8,6 +8,7 @@ export interface NickLine {
   y: number;
   width: number;
   height: number;
+  /** Taban çizgisine uzaklık. Web'de NaN: çekirdek font metriklerinden hesaplar. */
   ascender: number;
   capHeight?: number;
 }
@@ -25,4 +26,6 @@ export interface NickSkiaTextProps {
   time: SharedValue<number>;
   /** parıltı çarpanı (hero varyantında daha güçlü) */
   glowScale: number;
+  /** web'de sentezlenen satırlar için yatay hizalama */
+  align?: 'left' | 'center' | 'right';
 }

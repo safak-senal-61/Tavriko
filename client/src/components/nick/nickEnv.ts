@@ -103,8 +103,12 @@ export function useNickEnv(): NickEnvSnapshot {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
-/** Aynı anda çalışan tam kalite (Skia) nick sayısı üst sınırı. */
-export const fullPool = new NickSlotPool(lowEnd ? 4 : 12);
+/**
+ * Aynı anda çalışan tam kalite (Skia) nick sayısı üst sınırı.
+ * Web'de her Skia canvas'ı ayrı bir WebGL bağlamı açar (tarayıcı sınırı ~16).
+ */
+export const fullPool =
+  Platform.OS === 'web' ? new NickSlotPool(lowEnd ? 4 : 10, 13) : new NickSlotPool(lowEnd ? 4 : 12);
 /** Aynı anda çalışan Lottie parçacık katmanı üst sınırı. */
 export const particlePool = new NickSlotPool(lowEnd ? 1 : 4);
 
