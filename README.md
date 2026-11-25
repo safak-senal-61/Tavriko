@@ -349,7 +349,14 @@ TELEGRAM_BOT_TOKEN=123456789:AA...
 TELEGRAM_ADMIN_IDS=123456789
 EVREN_API_KEY=your_ssb_evren_token
 PUBLIC_APP_URL=https://tavriko-app.vercel.app
+# Google ile giriş (Tavriko'nun kendi OAuth istemcisi)
+GOOGLE_CLIENT_ID=...apps.googleusercontent.com        # Web application istemcisi
+GOOGLE_CLIENT_SECRET=...                              # Aynı Web istemcisinin sırrı
+GOOGLE_ANDROID_CLIENT_ID=...apps.googleusercontent.com # Yerel SDK (opsiyonel)
 ```
+
+Google girişinin nasıl çalıştığı ve Google Cloud'da hangi adreslerin kayıtlı olması
+gerektiği: [`docs/GOOGLE-LOGIN.md`](docs/GOOGLE-LOGIN.md).
 
 ### Push Bildirimleri (FCM) — Firebase Bağlantısı
 Android push bildirimleri Firebase Cloud Messaging (FCM) üzerinden **doğrudan backend'den** gönderilir (Expo push servisine bağımlı değildir):

@@ -1,12 +1,15 @@
 import { Router, Request, Response } from 'express';
 import { isIP } from 'node:net';
+import { randomBytes } from 'node:crypto';
+import jwt from 'jsonwebtoken';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import { waitUntil } from '@vercel/functions';
 import { db } from '../db/prismaClient';
 import { supabaseService } from '../db/supabaseClient';
 import { UserProfile, LEGAL_VERSION, REQUIRED_LEGAL_DOCUMENTS, LegalConsentRecord } from '@trivia/shared';
 import { logger } from '../utils/logger';
-import { requireUserAuth } from '../middleware/auth';
+import { getJwtSecret, requireUserAuth } from '../middleware/auth';
+import { cacheService } from '../cache/redisClient';
 import { getOneSignalEmailConfig, sendOneSignalAccountRemovalEmail, sendOneSignalPasswordResetEmail } from '../services/oneSignalEmail';
 import { confirmPasswordReset, getPasswordResetSecret, issuePasswordReset, PASSWORD_RESET_RESEND_SECONDS } from '../services/passwordReset';
 import { accountRemovalEmail, confirmAccountRemoval, issueAccountRemoval, REMOVAL_RESEND_SECONDS, type RemovalTarget } from '../services/accountRemoval';
@@ -123,21 +126,251 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// Only the Tavriko Supabase project can issue an accepted session. Raw Google
-// access/ID tokens are not credentials for this endpoint.
+// Tavriko'nun kendi Google OAuth istemcisiyle çalışan giriş akışı.
+// Tarayıcı Google'a doğrudan yönlendirilir; kod sunucuda (client_secret ile)
+// değiş-tokuş edilir ve oturum yalnızca bu sunucu tarafından üretilir.
+const googleStartLimit = rateLimit({ ...rateLimitOptions, windowMs: 60_000, limit: 30 });
+const googleCallbackLimit = rateLimit({ ...rateLimitOptions, windowMs: 60_000, limit: 60 });
+const googleExchangeLimit = rateLimit({ ...rateLimitOptions, windowMs: 60_000, limit: 60 });
 const googleLoginLimit = rateLimit({ ...rateLimitOptions, windowMs: 60_000, limit: 30 });
 
-router.get('/google/callback', (req: Request, res: Response): void => {
+const GOOGLE_HANDOFF_PREFIX = 'auth:google:handoff:';
+const GOOGLE_HANDOFF_TTL_SECONDS = 120;
+
+type GooglePlatform = 'web' | 'native';
+type GoogleHandoff = { token: string; user: UserProfile };
+
+type GoogleIdentity = {
+  sub: string;
+  email: string;
+  name?: string;
+  picture?: string;
+};
+
+const googleWebClientId = (): string => (process.env.GOOGLE_WEB_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || '').trim();
+const googleClientSecret = (): string => (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+const googleAndroidClientId = (): string => (process.env.GOOGLE_ANDROID_CLIENT_ID || '').trim();
+
+function googleRedirectUri(req: Request): string {
+  const configured = (process.env.GOOGLE_OAUTH_REDIRECT_URI || '').trim();
+  if (configured) return configured;
+  const publicBase = (process.env.PUBLIC_APP_URL || '').trim().replace(/\/+$/, '');
+  if (publicBase) return `${publicBase}/api/auth/google/callback`;
+  const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:4000';
+  const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
+  return `${proto}://${host}/api/auth/google/callback`;
+}
+
+function redirectGoogleResult(res: Response, platform: GooglePlatform, fragment: string): void {
+  const target = platform === 'native' ? `tavriko://auth-callback#${fragment}` : `/app#${fragment}`;
+  res.redirect(303, target);
+}
+
+async function completeGoogleLogin(identity: GoogleIdentity): Promise<GoogleHandoff> {
+  const email = identity.email.trim().toLowerCase();
+  const name = identity.name?.trim() || undefined;
+  const picture = identity.picture && identity.picture.startsWith('https://') ? identity.picture : 'av1';
+  const result = await db.loginOrRegisterGoogle({
+    email,
+    displayName: name || email.split('@')[0],
+    fullName: name,
+    avatarUrl: picture,
+    googleId: identity.sub,
+  });
+  return { token: result.token, user: result.user };
+}
+
+async function storeGoogleHandoff(handoff: GoogleHandoff): Promise<string> {
+  const code = randomBytes(24).toString('base64url');
+  await cacheService.setCustomValue(`${GOOGLE_HANDOFF_PREFIX}${code}`, handoff, GOOGLE_HANDOFF_TTL_SECONDS);
+  return code;
+}
+
+router.get('/google/start', googleStartLimit, (req: Request, res: Response): void => {
   res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
-  const code = req.query.code;
-  // Forward only the short-lived PKCE code, never arbitrary callback parameters
-  // or a redirect destination supplied by the browser.
-  const fragment = typeof code === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(code)
-    ? `code=${encodeURIComponent(code)}`
-    : 'error=oauth';
-  res.redirect(303, `/app#${fragment}`);
+  const clientId = googleWebClientId();
+  const secret = googleClientSecret();
+  const signingSecret = getJwtSecret();
+  if (!clientId || !secret || !signingSecret) {
+    res.status(503).json({ error: 'Google girişi yapılandırılmadı. GOOGLE_CLIENT_ID ve GOOGLE_CLIENT_SECRET gerekli.' });
+    return;
+  }
+  const platform: GooglePlatform = req.query.platform === 'native' ? 'native' : 'web';
+  const state = jwt.sign(
+    { purpose: 'google_oauth', platform, nonce: randomBytes(16).toString('base64url') },
+    signingSecret,
+    { expiresIn: '10m', issuer: 'tavriko' },
+  );
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: googleRedirectUri(req),
+    response_type: 'code',
+    scope: 'openid email profile',
+    state,
+    prompt: 'select_account',
+    access_type: 'online',
+    include_granted_scopes: 'true',
+  });
+  res.redirect(303, `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
 });
 
+router.get('/google/callback', googleCallbackLimit, async (req: Request, res: Response): Promise<void> => {
+  res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+
+  const signingSecret = getJwtSecret();
+  const rawState = typeof req.query.state === 'string' ? req.query.state : '';
+  let platform: GooglePlatform = 'web';
+  let stateVerified = false;
+  if (signingSecret && rawState && rawState.length <= 2048) {
+    try {
+      const state = jwt.verify(rawState, signingSecret, { issuer: 'tavriko' }) as jwt.JwtPayload;
+      if (state?.purpose === 'google_oauth') {
+        platform = state.platform === 'native' ? 'native' : 'web';
+        stateVerified = true;
+      }
+    } catch {
+      // Geçersiz/eski state: aşağıda hata dönüşü yapılır.
+    }
+  }
+  if (!stateVerified) {
+    // Eski kurulumlar Supabase'in PKCE kodunu bu adrese döndürür (state yok).
+    // Onların akışını bozmamak için kod aynen uygulamaya iletilir.
+    const legacyCode = req.query.code;
+    if (!rawState && typeof legacyCode === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(legacyCode)) {
+      res.redirect(303, `/app#code=${encodeURIComponent(legacyCode)}`);
+      return;
+    }
+    redirectGoogleResult(res, platform, 'error=oauth');
+    return;
+  }
+  if (typeof req.query.error === 'string') {
+    redirectGoogleResult(res, platform, 'error=oauth');
+    return;
+  }
+
+  const code = req.query.code;
+  if (typeof code !== 'string' || code.length < 8 || code.length > 2048 || /[\s]/.test(code)) {
+    redirectGoogleResult(res, platform, 'error=oauth');
+    return;
+  }
+
+  try {
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: googleWebClientId(),
+        client_secret: googleClientSecret(),
+        redirect_uri: googleRedirectUri(req),
+        grant_type: 'authorization_code',
+      }).toString(),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!tokenResponse.ok) throw new Error(`google_token_${tokenResponse.status}`);
+    const tokens = await tokenResponse.json() as { access_token?: unknown };
+    if (typeof tokens.access_token !== 'string' || !tokens.access_token) throw new Error('google_access_token');
+
+    const userResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!userResponse.ok) throw new Error(`google_userinfo_${userResponse.status}`);
+    const profile = await userResponse.json() as {
+      sub?: unknown; email?: unknown; email_verified?: unknown; name?: unknown; picture?: unknown;
+    };
+    if (
+      typeof profile.sub !== 'string' || !profile.sub ||
+      typeof profile.email !== 'string' || !profile.email.includes('@') ||
+      profile.email_verified !== true ||
+      /[\s]/.test(profile.email)
+    ) {
+      redirectGoogleResult(res, platform, 'error=oauth');
+      return;
+    }
+    const handoff = await completeGoogleLogin({
+      sub: profile.sub,
+      email: profile.email,
+      name: typeof profile.name === 'string' ? profile.name : undefined,
+      picture: typeof profile.picture === 'string' ? profile.picture : undefined,
+    });
+    const handoffCode = await storeGoogleHandoff(handoff);
+    redirectGoogleResult(res, platform, `code=${encodeURIComponent(handoffCode)}`);
+  } catch (err) {
+    logger.error('AUTH', 'Google OAuth tamamlanamadı.', { error: err instanceof Error ? err.name : 'unknown' });
+    redirectGoogleResult(res, platform, 'error=oauth');
+  }
+});
+
+// Tarayıcıya dönen tek kullanımlık kodu Tavriko oturumuna çevirir.
+router.post('/google/exchange', googleExchangeLimit, async (req: Request, res: Response): Promise<void> => {
+  res.set('Cache-Control', 'no-store');
+  const code = req.body?.code;
+  if (typeof code !== 'string' || !/^[A-Za-z0-9_-]{20,128}$/.test(code)) {
+    res.status(401).json({ error: 'Google oturumu doğrulanamadı.' });
+    return;
+  }
+  const key = `${GOOGLE_HANDOFF_PREFIX}${code}`;
+  const handoff = await cacheService.getCustomValue<GoogleHandoff>(key).catch(() => null);
+  await cacheService.deleteCustomValue(key).catch(() => undefined);
+  if (!handoff || typeof handoff.token !== 'string' || !handoff.token || !handoff.user) {
+    res.status(401).json({ error: 'Google oturumu doğrulanamadı.' });
+    return;
+  }
+  res.json({ token: handoff.token, user: handoff.user });
+});
+
+// Yerel Google SDK'sından (tarayıcısız) gelen kimlik jetonu. Yalnızca
+// Tavriko'nun Android/Web istemcileri için düzenlenmiş jetonlar kabul edilir.
+router.post('/google/id-token', googleLoginLimit, async (req: Request, res: Response): Promise<void> => {
+  res.set('Cache-Control', 'no-store');
+  const idToken = req.body?.idToken;
+  if (typeof idToken !== 'string' || idToken.length < 32 || idToken.length > 8192) {
+    res.status(401).json({ error: 'Google kimlik jetonu gerekli.' });
+    return;
+  }
+  const allowedAudiences = [googleAndroidClientId(), googleWebClientId()].filter(Boolean);
+  if (allowedAudiences.length === 0) {
+    res.status(503).json({ error: 'Google girişi yapılandırılmadı.' });
+    return;
+  }
+  try {
+    const response = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+      { signal: AbortSignal.timeout(10_000) },
+    );
+    if (!response.ok) throw new Error(`google_tokeninfo_${response.status}`);
+    const claims = await response.json() as {
+      aud?: unknown; iss?: unknown; sub?: unknown; email?: unknown; email_verified?: unknown;
+      name?: unknown; picture?: unknown; exp?: unknown;
+    };
+    const expiresAt = Number(claims.exp);
+    const issuer = typeof claims.iss === 'string' ? claims.iss : '';
+    if (
+      typeof claims.aud !== 'string' || !allowedAudiences.includes(claims.aud) ||
+      (issuer !== 'accounts.google.com' && issuer !== 'https://accounts.google.com') ||
+      typeof claims.sub !== 'string' || !claims.sub ||
+      typeof claims.email !== 'string' || !claims.email.includes('@') ||
+      (claims.email_verified !== true && claims.email_verified !== 'true') ||
+      !Number.isFinite(expiresAt) || expiresAt * 1000 <= Date.now()
+    ) {
+      res.status(401).json({ error: 'Google hesabı doğrulanamadı.' });
+      return;
+    }
+    const result = await completeGoogleLogin({
+      sub: claims.sub,
+      email: claims.email,
+      name: typeof claims.name === 'string' ? claims.name : undefined,
+      picture: typeof claims.picture === 'string' ? claims.picture : undefined,
+    });
+    res.json(result);
+  } catch (err) {
+    logger.error('AUTH', 'Google kimlik jetonu doğrulanamadı.', { error: err instanceof Error ? err.name : 'unknown' });
+    res.status(401).json({ error: 'Google hesabı doğrulanamadı.' });
+  }
+});
+
+// Eski kurulumlar için: Supabase oturum jetonuyla Google girişi.
 router.post('/google', googleLoginLimit, async (req: Request, res: Response): Promise<void> => {
   res.set('Cache-Control', 'no-store');
   const token = req.body?.accessToken;
