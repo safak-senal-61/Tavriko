@@ -771,7 +771,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <View style={styles.heroIdentityCol}>
               <View style={styles.heroNameRow}>
                 {activeNameEffect ? (
-                  <AnimatedNameText effectId={activeNameEffect} style={styles.displayName} numberOfLines={1}>
+                  <AnimatedNameText effectId={activeNameEffect} style={styles.displayName} numberOfLines={1} variant="hero">
                     {user.fullName || user.displayName}
                   </AnimatedNameText>
                 ) : (

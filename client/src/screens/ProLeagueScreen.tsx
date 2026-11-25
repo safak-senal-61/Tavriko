@@ -238,9 +238,10 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
                     </Text>
                     <PlayerAvatar userId={item.userId} seed={item.avatarUrl || item.displayName} size={36} />
                     <View style={styles.playerInfo}>
-                      <Text style={styles.playerName} numberOfLines={1}>
-                        <PlayerName userId={item.userId} name={item.displayName} /> {isMe ? '(Sen)' : ''}
-                      </Text>
+                      <View style={styles.playerNameRow}>
+                        <PlayerName userId={item.userId} name={item.displayName} style={[styles.playerName, { flexShrink: 1 }]} numberOfLines={1} />
+                        {isMe ? <Text style={styles.playerName}> (Sen)</Text> : null}
+                      </View>
                       <Text style={styles.playerTitle}>{item.rankTitle || 'Lig Oyuncusu'}</Text>
                     </View>
                     <TrophyIcon size={16} />
@@ -531,6 +532,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  playerNameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   playerName: {
     color: '#FFFFFF',
     fontSize: 13,

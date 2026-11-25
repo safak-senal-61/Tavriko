@@ -110,7 +110,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     <Text style={styles.badgeText}> {profile.equippedBadge}</Text>
                   </View>
                 )}
-                <PlayerName userId={profile.id} name={profile.displayName} style={styles.displayName} cosmetics={profile.equippedFrame !== undefined || profile.equippedNameEffect !== undefined ? profile : undefined} />
+                <PlayerName userId={profile.id} name={profile.displayName} style={styles.displayName} variant="hero" cosmetics={profile.equippedFrame !== undefined || profile.equippedNameEffect !== undefined ? profile : undefined} />
                 {profile.username && (
                   <Text style={styles.username}>@{profile.username}</Text>
                 )}

@@ -251,10 +251,10 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
                       <Text style={styles.rankText}>{displayRank}</Text>
                       <PlayerAvatar userId={item.userId || item.id} seed={item.avatarUrl || item.displayName} size={38} />
                       <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={styles.nameText} numberOfLines={1}>
-                          <PlayerName userId={item.userId || item.id} name={item.displayName} />
-                          {isMe ? <Text style={styles.meTag}>  Sen</Text> : null}
-                        </Text>
+                        <View style={styles.nameRow}>
+                          <PlayerName userId={item.userId || item.id} name={item.displayName} style={[styles.nameText, { flexShrink: 1 }]} numberOfLines={1} />
+                          {isMe ? <Text style={[styles.nameText, styles.meTag]}>  Sen</Text> : null}
+                        </View>
                         <Text style={styles.subRankText} numberOfLines={1}>
                           Seviye {item.level} · {item.rankTitle}
                         </Text>
@@ -464,6 +464,7 @@ const styles = StyleSheet.create({
     fontFamily: THEME.fonts.black,
     textAlign: 'center',
   },
+  nameRow: { flexDirection: 'row', alignItems: 'center', minWidth: 0 },
   nameText: {
     color: '#FFFFFF',
     fontSize: 15,

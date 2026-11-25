@@ -301,6 +301,8 @@ interface FloatingItemData {
   type: 'emoji' | 'message';
   content: string;
   senderName?: string;
+  /** Gönderen kullanıcı kimliği: sohbet balonunda nick stili için */
+  senderId?: string;
   avatarSeed?: string;
   xOffset: number;
 }
@@ -372,9 +374,12 @@ const FloatingLobbyItem: React.FC<{
         <CharacterAvatar seed={item.avatarSeed || item.senderName} size={24} />
       </View>
       <View style={styles.floatingChatTextCol}>
-        <Text style={styles.floatingChatSender} numberOfLines={1}>
-          {item.senderName}
-        </Text>
+        <PlayerName
+          userId={item.senderId}
+          name={item.senderName || ''}
+          style={styles.floatingChatSender}
+          numberOfLines={1}
+        />
         <Text style={styles.floatingChatBody}>{plainDisplayText(item.content)}</Text>
       </View>
     </Animated.View>
@@ -555,6 +560,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
             type: 'message',
             content: data.text,
             senderName: data.displayName,
+            senderId: data.playerId,
             avatarSeed: data.avatarUrl || data.displayName,
             xOffset,
           },
@@ -612,6 +618,7 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
         type: 'message',
         content: textToSend,
         senderName: myPlayer?.displayName || 'Sen',
+        senderId: currentUserId,
         avatarSeed: myPlayer?.avatarUrl || myPlayer?.displayName,
         xOffset,
       },
@@ -856,9 +863,12 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
 
                 <View style={styles.playerInfo}>
                   <View style={styles.nameRow}>
-                    <Text style={styles.playerName} numberOfLines={1}>
-                      {isBlocked ? 'Engellenen oyuncu' : <PlayerName userId={p.id} name={p.displayName} />} {isMe ? '(Sen)' : ''}
-                    </Text>
+                    {isBlocked ? (
+                      <Text style={styles.playerName} numberOfLines={1}>Engellenen oyuncu</Text>
+                    ) : (
+                      <PlayerName userId={p.id} name={p.displayName} style={[styles.playerName, { flexShrink: 1 }]} numberOfLines={1} />
+                    )}
+                    {isMe ? <Text style={[styles.playerName, { maxWidth: undefined }]}> (Sen)</Text> : null}
                   </View>
                   <View style={styles.playerRoleRow}>
                     {playerIsHost && <Flag size={12} color="#FFD081" />}

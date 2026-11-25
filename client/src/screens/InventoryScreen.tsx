@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Image as ImageIcon, Sparkles } from 'lucide-react-native';
+import { Image as ImageIcon } from 'lucide-react-native';
 import { WalletArtwork } from '../components/WalletArtwork';
 import { JokerGroupTabs } from '../components/WalletPanels';
 import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
@@ -14,7 +14,9 @@ import {
   Platform,
 } from 'react-native';
 import { LoadingShimmer } from '../components/LoadingShimmer';
-import { UserProfile, InventoryItem, ItemCategory, COSMETIC_RENTAL_MS, getCosmeticDef, getChestOpening, isPermanentGameplayBadge, isJokerId, JOKERS, JokerGroup } from '@trivia/shared';
+import { UserProfile, InventoryItem, ItemCategory, COSMETIC_RENTAL_MS, getCosmeticDef, getChestOpening, isPermanentGameplayBadge, isJokerId, JOKERS, JokerGroup, getNickStyle } from '@trivia/shared';
+import { NickRenderer } from '../components/nick/NickRenderer';
+import { NickPlate } from '../components/nick/NickPlate';
 import { THEME } from '../theme/tokens';
 import { useNavBottomPad } from '../utils/safeArea';
 import { sound } from '../services/soundService';
@@ -47,7 +49,6 @@ import {
   BackgroundThumb,
   AnimatedFrame,
   AnimatedBackgroundThumb,
-  AnimatedNameText,
   CosmeticPreviewModal,
   frameFor,
   backgroundFor,
@@ -379,9 +380,11 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     if (pk === 'name_effect') {
       return (
         <View style={{ width: Math.round(size * 2), alignItems: 'center' }}>
-          <AnimatedNameText effectId={item.id} numberOfLines={1} style={{ fontSize: Math.round(size * 0.62), fontWeight: '800' }}>
-            Örnek İsim
-          </AnimatedNameText>
+          <NickPlate styleId={item.id} radius={10} style={{ paddingHorizontal: 8, paddingVertical: 6, alignSelf: 'stretch' }}>
+            <NickRenderer styleId={item.id} numberOfLines={1} style={{ fontSize: Math.round(size * 0.5), fontFamily: THEME.fonts.black }}>
+              {user?.displayName || 'Örnek İsim'}
+            </NickRenderer>
+          </NickPlate>
         </View>
       );
     }
@@ -484,7 +487,11 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
             activeRows.push(
               <ActiveEffectRow
                 key="fx-name"
-                visual={<Sparkles size={21} color="#FFE0A9" />}
+                visual={
+                  <NickRenderer styleId={nameFx.id} numberOfLines={1} style={{ fontSize: 13, fontFamily: THEME.fonts.black, maxWidth: 64 }}>
+                    {user?.displayName || 'Nick'}
+                  </NickRenderer>
+                }
                 label={getCosmeticDef(nameFx.id)?.name || 'İsim Efekti'}
                 expiresAt={nameFx.expiresAt}
                 accent="#D946EF"
@@ -587,7 +594,11 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                   activeOpacity={0.8}
                   onPress={() => {
                     if (isChest) handleOpenChestClick(item);
-                    else if (isEquippable(item) && !equipped) handleEquipItem(item);
+                    else if (item.id.startsWith('name_') && getNickStyle(item.id)) {
+                      // Nick stilleri: önce canlı önizleme, "Uygula" ile kuşan
+                      sound.playSound('tap');
+                      setPreviewItem(item);
+                    } else if (isEquippable(item) && !equipped) handleEquipItem(item);
                     else if (previewKindOf(item)) {
                       sound.playSound('tap');
                       setPreviewItem(item);
@@ -651,6 +662,37 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
             : undefined
         }
         onClose={() => setPreviewItem(null)}
+        ownership={
+          previewItem && getNickStyle(previewItem.id)
+            ? user?.equippedNameEffect === previewItem.id &&
+              (!user?.equippedNameEffectExpiresAt || user.equippedNameEffectExpiresAt > Date.now())
+              ? 'active'
+              : 'owned'
+            : undefined
+        }
+        priceLabel={
+          previewItem && getNickStyle(previewItem.id)
+            ? previewItem.remainingMs
+              ? `Saklanan kalan süre: ${formatRemaining(previewItem.remainingMs)}`
+              : `Uyguladığında ${previewItem.durationHours && previewItem.durationHours > 0 ? (previewItem.durationHours >= 24 ? `${Math.round(previewItem.durationHours / 24)} gün` : `${previewItem.durationHours} saat`) : '1 saat'} boyunca aktif olur`
+            : undefined
+        }
+        actionLabel={
+          previewItem && getNickStyle(previewItem.id)
+            ? equippingItemId === previewItem.id
+              ? 'Uygulanıyor...'
+              : 'Uygula'
+            : undefined
+        }
+        onAction={
+          previewItem && getNickStyle(previewItem.id)
+            ? () => {
+                const it = previewItem;
+                setPreviewItem(null);
+                if (it) void handleEquipItem(it);
+              }
+            : undefined
+        }
       />
 
       {/* Chest Opening Modal */}

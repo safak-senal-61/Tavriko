@@ -6,6 +6,7 @@
 // otomatik olarak eşyayı düşürür (envanter kartındaki bar da biter).
 // ----------------------------------------------------------------------------
 import type { ItemRarity } from './types';
+import { NICK_STYLES } from './nickStyles';
 
 export const COSMETIC_RENTAL_HOURS = 1;
 export const COSMETIC_RENTAL_MS = COSMETIC_RENTAL_HOURS * 60 * 60 * 1000;
@@ -276,89 +277,21 @@ export const BACKGROUND_DEFS: CosmeticDef[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// İSİM EFEKTLERİ
+// İSİM EFEKTLERİ — Animated Nick paketlerinden türetilir (bkz. nickStyles.ts)
 // ---------------------------------------------------------------------------
-export const NAME_EFFECT_DEFS: CosmeticDef[] = [
-  {
-    id: 'name_glow_gold',
-    kind: 'name_effect',
-    name: 'Altın İsim Parıltısı',
-    desc: 'Liderlik tablolarında ve odalarda isminiz altın ışıkla parlar.',
-    rarity: 'epic',
-    visual: { nameColor: '#FFD700', nameGlow: 'gold', anim: 'shimmer', icon: '✨' },
+export const NAME_EFFECT_DEFS: CosmeticDef[] = NICK_STYLES.map((s) => ({
+  id: s.styleId,
+  kind: 'name_effect' as const,
+  name: s.name,
+  desc: s.desc,
+  rarity: s.rarity,
+  visual: {
+    nameColor: s.palette.base,
+    nameColor2: s.palette.colors[1] ?? s.palette.base,
+    anim: 'shimmer' as const,
+    icon: s.icon,
   },
-  {
-    id: 'name_gradient_fire',
-    kind: 'name_effect',
-    name: 'Ateş Gradyan İsmi',
-    desc: 'İsminizi kızıl lav ve alev gradyanı renkleriyle süsler.',
-    rarity: 'legendary',
-    visual: { nameColor: '#FF4500', nameColor2: '#FFD700', nameGlow: 'fire', anim: 'flame', icon: '🔥' },
-  },
-  {
-    id: 'name_gradient_ice',
-    kind: 'name_effect',
-    name: 'Buz Gradyan İsmi',
-    desc: 'Buz mavisi kristal gradyanı ile isminizi serinletir.',
-    rarity: 'epic',
-    visual: { nameColor: '#67E8F9', nameColor2: '#0EA5E9', nameGlow: 'ice', anim: 'shimmer', icon: '❄️' },
-  },
-  {
-    id: 'name_gradient_rainbow',
-    kind: 'name_effect',
-    name: 'Gökkuşağı Gradyan İsmi',
-    desc: 'Yedi renk gökkuşağı gradyanıyla isminizi süsler.',
-    rarity: 'mythic',
-    visual: {
-      nameColor: '#F87171',
-      nameColor2: '#A78BFA',
-      nameGlow: 'rainbow',
-      anim: 'shimmer',
-      icon: '🌈',
-    },
-  },
-  // --- YENİ: Farklı tarzlarda isim efektleri (hepsi 1 saatlik) ---
-  {
-    id: 'name_emerald_vine',
-    kind: 'name_effect',
-    name: 'Zümrüt Sarmaşık İsmi',
-    desc: 'Işıldayan zümrüt yeşili yapraklarla isminizi süsler.',
-    rarity: 'rare',
-    visual: { nameColor: '#6EE7B7', nameColor2: '#059669', nameGlow: 'emerald', anim: 'pulse', icon: '🌿' },
-  },
-  {
-    id: 'name_toxic_slime',
-    kind: 'name_effect',
-    name: 'Toksik Slime İsmi',
-    desc: 'Asit yeşili ve moru karışan radyoaktif slime parıltısı.',
-    rarity: 'epic',
-    visual: { nameColor: '#A3E635', nameColor2: '#7C3AED', nameGlow: 'toxic', anim: 'flame', icon: '☢️' },
-  },
-  {
-    id: 'name_candy_heart',
-    kind: 'name_effect',
-    name: 'Şeker Pembe İsmi',
-    desc: 'Pembe şeker kalp gradyanıyla tatlı bir parıltı.',
-    rarity: 'epic',
-    visual: { nameColor: '#F9A8D4', nameColor2: '#EC4899', nameGlow: 'candy', anim: 'shimmer', icon: '🍬' },
-  },
-  {
-    id: 'name_void_shadow',
-    kind: 'name_effect',
-    name: 'Boşluk Gölgesi İsmi',
-    desc: 'Karanlık evrenin derin mor gölgesiyle isminizi gizemli kılar.',
-    rarity: 'legendary',
-    visual: { nameColor: '#A78BFA', nameColor2: '#1E1B4B', nameGlow: 'shadow', anim: 'pulse', icon: '🌑' },
-  },
-  {
-    id: 'name_plasma_bolt',
-    kind: 'name_effect',
-    name: 'Plazma Yıldırımı İsmi',
-    desc: 'Elektrik mavisi plazma yıldırımlarıyla isminizi çarpar.',
-    rarity: 'mythic',
-    visual: { nameColor: '#67E8F9', nameColor2: '#D946EF', nameGlow: 'plasma', anim: 'flame', icon: '⚡' },
-  },
-];
+}));
 
 // ---------------------------------------------------------------------------
 // ROZETLER (görev ödülleri ve daha önce dağıtılan rozetler)

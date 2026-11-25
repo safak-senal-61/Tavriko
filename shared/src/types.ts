@@ -1,3 +1,4 @@
+import { NICK_STYLES, type NickEffectsPreference } from './nickStyles';
 export type CategoryId =
   | 'geography'
   | 'mathematics'
@@ -365,6 +366,8 @@ export interface UserSettings {
   smoothAnimations?: boolean;
   batterySaver?: boolean;
   ambientGlow?: boolean;
+  /** Animasyonlu nick efekti kalitesi: otomatik / tam / hafif / kapalı */
+  nickEffects?: NickEffectsPreference;
   textSize?: 'normal' | 'large';
   buttonSpring?: boolean;
   defaultDifficulty?: 'easy' | 'medium' | 'hard';
@@ -655,7 +658,7 @@ export function generateSeason1Tiers(): SeasonTierItem[] {
     } else if (i === 5) {
       premiumReward = { type: 'coin', amount: 2200, title: '2.200 Altın', rarity: 'epic' };
     } else if (i === 10) {
-      premiumReward = { type: 'name_effect', amount: 1, title: 'Altın İsim Parıltısı', itemId: 'name_glow_gold', rarity: 'epic' };
+      premiumReward = { type: 'name_effect', amount: 1, title: 'Gold Nick', itemId: 'name_glow_gold', rarity: 'epic' };
     } else if (i === 15) {
       premiumReward = seasonJokerReward('joker_half', 4, 'epic');
     } else if (i === 20) {
@@ -667,7 +670,7 @@ export function generateSeason1Tiers(): SeasonTierItem[] {
     } else if (i === 35) {
       premiumReward = seasonJokerReward('joker_half', 6, 'legendary');
     } else if (i === 40) {
-      premiumReward = { type: 'name_effect', amount: 1, title: 'Ateş Gradyan İsim', itemId: 'name_gradient_fire', rarity: 'legendary' };
+      premiumReward = { type: 'name_effect', amount: 1, title: 'Fire Nick', itemId: 'name_gradient_fire', rarity: 'legendary' };
     } else if (i === 45) {
       premiumReward = { type: 'coin', amount: 8000, title: '8.000 Altın', rarity: 'mythic' };
     } else if (i === 50) {
@@ -799,6 +802,21 @@ export function shopPriceForDuration(p: ShopProduct, durationId?: string | null)
 
 /** Sezon kozmetik ödülleri en fazla 1 ay geçerlidir */
 export const SEASON_REWARD_HOURS = 24 * 30;
+
+/** Animated Nick paketlerinin mağaza ürünleri (tek kaynak: nickStyles.ts) */
+export const NICK_SHOP_PRODUCTS: ShopProduct[] = [...NICK_STYLES]
+  .sort((a, b) => a.order - b.order)
+  .map((s): ShopProduct => ({
+    id: s.styleId,
+    name: s.name,
+    desc: `${s.desc} Seçtiğin süre boyunca aktif.`,
+    category: 'name_effects',
+    price: s.price,
+    currency: 'gems',
+    rarity: s.rarity,
+    badge: s.badge ?? 'SÜRELİ',
+    grantItems: [{ id: s.styleId, name: s.name, desc: 'Seçtiğin süre boyunca aktif animasyonlu nick stili', qty: 1, category: 'name_effect', rarity: s.rarity }],
+  }));
 
 export const SHOP_CATALOG: ShopProduct[] = [
   ...JOKERS.map((j): ShopProduct => ({
@@ -952,27 +970,8 @@ export const SHOP_CATALOG: ShopProduct[] = [
     grantItems: [{ id: 'frame_steampunk', name: 'Buhar Zırhı Çerçevesi', desc: 'Pirinç ve çelik profil çerçevesi', qty: 1, category: 'frame', rarity: 'legendary' }],
   },
 
-  // --- Name Effects ---
-  {
-    id: 'name_glow_gold',
-    name: 'Altın İsim Parıltısı',
-    desc: 'Liderlik tablolarında ve odalarda isminizi altın sarısı ışıltıyla parlatır.',
-    category: 'name_effects',
-    price: 45,
-    currency: 'gems',
-    rarity: 'epic',
-    grantItems: [{ id: 'name_glow_gold', name: 'Altın İsim Parıltısı', desc: 'Altın isim efekti', qty: 1, category: 'name_effect', rarity: 'epic' }],
-  },
-  {
-    id: 'name_gradient_fire',
-    name: 'Ateş Gradyan İsmi',
-    desc: 'İsminizi kızıl lav ve alev gradyan renkleriyle süsler.',
-    category: 'name_effects',
-    price: 75,
-    currency: 'gems',
-    rarity: 'legendary',
-    grantItems: [{ id: 'name_gradient_fire', name: 'Ateş Gradyan İsmi', desc: 'Ateşli isim efekti', qty: 1, category: 'name_effect', rarity: 'legendary' }],
-  },
+  // --- Name Effects: Animated Nick paketleri (nickStyles.ts) ---
+  ...NICK_SHOP_PRODUCTS,
 
   // --- Boosters ---
   {
@@ -1109,85 +1108,7 @@ export const SHOP_CATALOG: ShopProduct[] = [
     badge: 'SÜRELİ',
     grantItems: [{ id: 'bg_volcano', name: 'Volkan Gecesi Teması', desc: 'Seçtiğin süre boyunca aktif volkan arka planı', qty: 1, category: 'background', rarity: 'legendary' }],
   },
-  {
-    id: 'name_gradient_ice',
-    name: 'Buz Gradyan İsmi',
-    desc: 'Buz mavisi kristal gradyanı ile isminizi serinletir. Seçtiğin süre boyunca aktif.',
-    category: 'name_effects',
-    price: 50,
-    currency: 'gems',
-    rarity: 'epic',
-    badge: 'SÜRELİ',
-    grantItems: [{ id: 'name_gradient_ice', name: 'Buz Gradyan İsmi', desc: 'Seçtiğin süre boyunca aktif buz isim efekti', qty: 1, category: 'name_effect', rarity: 'epic' }],
-  },
-  {
-    id: 'name_gradient_rainbow',
-    name: 'Gökkuşağı Gradyan İsmi',
-    desc: 'Yedi renk gökkuşağı gradyanıyla isminizi süsler. Seçtiğin süre boyunca aktif.',
-    category: 'name_effects',
-    price: 90,
-    currency: 'gems',
-    rarity: 'mythic',
-    badge: 'SÜRELİ',
-    grantItems: [{ id: 'name_gradient_rainbow', name: 'Gökkuşağı Gradyan İsmi', desc: 'Seçtiğin süre boyunca aktif gökkuşağı isim efekti', qty: 1, category: 'name_effect', rarity: 'mythic' }],
-  },
 
-  // --- YENİ: Farklı tarzlarda isim efektleri (süreli) ---
-  {
-    id: 'name_emerald_vine',
-    name: 'Zümrüt Sarmaşık İsmi',
-    desc: 'Işıldayan zümrüt yeşili yapraklarla isminizi süsler. Seçtiğin süre boyunca aktif.',
-    category: 'name_effects',
-    price: 30,
-    currency: 'gems',
-    rarity: 'rare',
-    badge: 'SÜRELİ',
-    grantItems: [{ id: 'name_emerald_vine', name: 'Zümrüt Sarmaşık İsmi', desc: 'Seçtiğin süre boyunca aktif zümrüt isim efekti', qty: 1, category: 'name_effect', rarity: 'rare' }],
-  },
-  {
-    id: 'name_toxic_slime',
-    name: 'Toksik Slime İsmi',
-    desc: 'Asit yeşili ve moru karışan radyoaktif slime parıltısı. Seçtiğin süre boyunca aktif.',
-    category: 'name_effects',
-    price: 55,
-    currency: 'gems',
-    rarity: 'epic',
-    badge: 'SÜRELİ',
-    grantItems: [{ id: 'name_toxic_slime', name: 'Toksik Slime İsmi', desc: 'Seçtiğin süre boyunca aktif toksik isim efekti', qty: 1, category: 'name_effect', rarity: 'epic' }],
-  },
-  {
-    id: 'name_candy_heart',
-    name: 'Şeker Pembe İsmi',
-    desc: 'Pembe şeker kalp gradyanıyla tatlı bir parıltı. Seçtiğin süre boyunca aktif.',
-    category: 'name_effects',
-    price: 55,
-    currency: 'gems',
-    rarity: 'epic',
-    badge: 'SÜRELİ',
-    grantItems: [{ id: 'name_candy_heart', name: 'Şeker Pembe İsmi', desc: 'Seçtiğin süre boyunca aktif şeker isim efekti', qty: 1, category: 'name_effect', rarity: 'epic' }],
-  },
-  {
-    id: 'name_void_shadow',
-    name: 'Boşluk Gölgesi İsmi',
-    desc: 'Karanlık evrenin derin mor gölgesiyle isminizi gizemli kılar. Seçtiğin süre boyunca aktif.',
-    category: 'name_effects',
-    price: 70,
-    currency: 'gems',
-    rarity: 'legendary',
-    badge: 'SÜRELİ',
-    grantItems: [{ id: 'name_void_shadow', name: 'Boşluk Gölgesi İsmi', desc: 'Seçtiğin süre boyunca aktif boşluk isim efekti', qty: 1, category: 'name_effect', rarity: 'legendary' }],
-  },
-  {
-    id: 'name_plasma_bolt',
-    name: 'Plazma Yıldırımı İsmi',
-    desc: 'Elektrik mavisi plazma yıldırımlarıyla isminizi çarpar. Seçtiğin süre boyunca aktif.',
-    category: 'name_effects',
-    price: 90,
-    currency: 'gems',
-    rarity: 'mythic',
-    badge: 'SÜRELİ',
-    grantItems: [{ id: 'name_plasma_bolt', name: 'Plazma Yıldırımı İsmi', desc: 'Seçtiğin süre boyunca aktif plazma isim efekti', qty: 1, category: 'name_effect', rarity: 'mythic' }],
-  },
 
   // --- YENİ: Çalışan farklı güçlendirici iksirler ---
   {

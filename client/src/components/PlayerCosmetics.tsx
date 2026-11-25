@@ -1,10 +1,11 @@
-import React, { useEffect, useSyncExternalStore } from 'react';
-import { StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { StyleSheet, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { getApiBaseUrl } from '../config';
 import { useGameStore } from '../store/gameStore';
 import { authHeaders } from '../utils/apiAuth';
 import { CharacterAvatar } from './TavrikoIcons';
-import { ANIMATED_FRAME_COLORS, AnimatedFrame, AnimatedNameText, FramedAvatar, frameFor } from './StoreKit';
+import { ANIMATED_FRAME_COLORS, AnimatedFrame, FramedAvatar, frameFor } from './StoreKit';
+import { NickRenderer, type NickVariant } from './nick/NickRenderer';
 
 /**
  * Oyuncuların çerçeve ve isim efektini her ekranda (liderlik, arkadaşlar, lobi, quiz...)
@@ -28,9 +29,7 @@ const pending = new Set<string>();
 const inflight = new Set<string>();
 const listeners = new Set<() => void>();
 let timer: ReturnType<typeof setTimeout> | null = null;
-let version = 0;
-
-const emit = () => { version += 1; listeners.forEach(l => l()); };
+const emit = () => { listeners.forEach(l => l()); };
 const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
 const isRealUserId = (id?: string | null): id is string => !!id && !/^(bot_|guest_)/i.test(id);
 
@@ -68,15 +67,34 @@ export function invalidatePlayerCosmetics(id?: string) {
   emit();
 }
 
+const EMPTY_ENTRY = { at: 0, data: NONE };
+
+/**
+ * Oyuncunun kozmetikleri. Her bileşen yalnızca kendi kimliğinin önbellek
+ * kaydına abone olur (snapshot = o kaydın nesnesi); başka oyuncuların verisi
+ * gelince yeniden render olmaz. Kendi hesabın için yalnızca kozmetik alanları
+ * seçilir, profilin diğer alanları değişince isimler yeniden çizilmez.
+ */
 export function usePlayerCosmetics(userId?: string | null, override?: PlayerCosmetics | null): PlayerCosmetics {
-  useSyncExternalStore(subscribe, () => version, () => version);
-  const me = useGameStore(s => s.user);
-  const own = !!userId && me?.id === userId ? me : null;
-  const wanted = !override && !own && isRealUserId(userId) ? userId : null;
+  const meId = useGameStore(s => s.user?.id);
+  const meFrame = useGameStore(s => s.user?.equippedFrame);
+  const meFrameExp = useGameStore(s => s.user?.equippedFrameExpiresAt);
+  const meName = useGameStore(s => s.user?.equippedNameEffect);
+  const meNameExp = useGameStore(s => s.user?.equippedNameEffectExpiresAt);
+  const isOwn = !!userId && meId === userId;
+  const wanted = !override && !isOwn && isRealUserId(userId) ? userId : null;
+  const getSnap = useCallback(() => (wanted ? cache.get(wanted) ?? EMPTY_ENTRY : EMPTY_ENTRY), [wanted]);
+  const entry = useSyncExternalStore(subscribe, getSnap, getSnap);
   useEffect(() => { if (wanted) request(wanted); });
+  const own = useMemo<PlayerCosmetics | null>(
+    () => (isOwn
+      ? { equippedFrame: meFrame, equippedFrameExpiresAt: meFrameExp, equippedNameEffect: meName, equippedNameEffectExpiresAt: meNameExp }
+      : null),
+    [isOwn, meFrame, meFrameExp, meName, meNameExp],
+  );
   if (override) return override;
   if (own) return own;
-  return (wanted && cache.get(wanted)?.data) || NONE;
+  return entry.data || NONE;
 }
 
 const active = (id?: string, exp?: number) => (id && (!exp || exp > Date.now()) ? id : undefined);
@@ -123,18 +141,22 @@ export const PlayerAvatar: React.FC<{
   );
 };
 
-/** Oyuncu adı: isim efekti varsa animasyonlu, yoksa düz metin. */
+/**
+ * Oyuncu adı: kuşanılmış nick stili varsa merkezi NickRenderer ile (Skia/Lottie
+ * veya hafif mod), yoksa düz metin. Profil, maç, liderlik, arkadaş ve sohbet
+ * ekranlarının hepsi bu bileşeni kullanır; stil değişince hepsi güncellenir.
+ */
 export const PlayerName: React.FC<{
   userId?: string | null;
   name: string;
   style?: StyleProp<TextStyle>;
   numberOfLines?: number;
   cosmetics?: PlayerCosmetics | null;
-}> = ({ userId, name, style, numberOfLines, cosmetics }) => {
+  variant?: NickVariant;
+}> = React.memo(({ userId, name, style, numberOfLines, cosmetics, variant }) => {
   const c = usePlayerCosmetics(userId, cosmetics);
   const effectId = activeNameEffectId(c);
-  if (effectId) return <AnimatedNameText effectId={effectId} style={style} numberOfLines={numberOfLines}>{name}</AnimatedNameText>;
-  return <Text style={style} numberOfLines={numberOfLines}>{name}</Text>;
-};
+  return <NickRenderer styleId={effectId} text={name} style={style} numberOfLines={numberOfLines} variant={variant} />;
+});
 
 const styles = StyleSheet.create({ centered: { position: 'absolute' } });
