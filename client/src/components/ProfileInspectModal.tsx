@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { PlayerAvatar, PlayerName } from './PlayerCosmetics';
 import {
   View,
   Text,
@@ -96,7 +97,7 @@ export const ProfileInspectModal: React.FC<ProfileInspectModalProps> = ({
             >
               {/* Avatar + çevrimiçi durumu */}
               <Reanimated.View entering={ZoomIn.springify().damping(16)} style={styles.avatarWrap}>
-                <CharacterAvatar seed={profile.avatarUrl || profile.displayName || 'oyuncu'} size={78} />
+                <PlayerAvatar userId={profile.id} seed={profile.avatarUrl || profile.displayName || 'oyuncu'} size={78} />
                 <View
                   style={[
                     styles.statusBadge,

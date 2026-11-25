@@ -942,7 +942,7 @@ export const FramedAvatar: React.FC<{ frameId: string; seed?: string; size: numb
   frameId,
   seed,
   size,
-  animate,
+  animate = true,
 }) => {
   const fr = frameFor(frameId);
   const inner = Math.round(size * (fr?.inner ?? 0.78));

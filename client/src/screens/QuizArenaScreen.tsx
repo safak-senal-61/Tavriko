@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { PlayerAvatar, PlayerName } from '../components/PlayerCosmetics';
+import { useGameStore } from '../store/gameStore';
 import {
   View,
   Text,
@@ -292,6 +294,7 @@ const RaceLane: React.FC<{
   x: number;
   correct: number;
 }> = ({ racer, color, marker, trackHeight, laneWidth, x, correct }) => {
+  const myUserId = useGameStore((st) => st.user?.id);
   const pos = useSharedValue(x);
   const pop = useSharedValue(1);
   const bubble = useSharedValue(0);
@@ -347,7 +350,7 @@ const RaceLane: React.FC<{
               markerStyle,
             ]}
           >
-            <CharacterAvatar seed={racer.avatarUrl || racer.displayName} size={marker - 4} />
+            <PlayerAvatar userId={racer.isMe ? myUserId : racer.id} seed={racer.avatarUrl || racer.displayName} size={marker - 4} />
           </Animated.View>
           <Animated.View pointerEvents="none" style={[styles.raceBubble, bubbleStyle]}>
             <Text style={styles.raceBubbleText}>+1</Text>
@@ -470,29 +473,31 @@ const DuelPlayerBlock: React.FC<{
   hasAnswered?: boolean;
   badge?: string | null;
   compact?: boolean;
-}> = ({ name, avatarSeed, score, side, isLeading, showLeaderSlot, hasAnswered, badge, compact = false }) => {
+  userId?: string;
+}> = ({ name, avatarSeed, score, side, isLeading, showLeaderSlot, hasAnswered, badge, compact = false, userId }) => {
   const ring = compact ? 60 : 76;
   const isMe = side === 'me';
   const color = isLeading ? '#F5CA79' : isMe ? '#38BDF8' : '#C06BFF';
   return (
     <View style={styles.playerBlock}>
-      <View
-        style={[
+      <PlayerAvatar
+        userId={userId}
+        seed={avatarSeed}
+        size={ring - 10}
+        ringSize={ring}
+        ringStyle={[
           styles.playerAvatarRing,
           { width: ring, height: ring, borderRadius: ring / 2, borderColor: color, shadowColor: color },
         ]}
       >
-        <CharacterAvatar seed={avatarSeed} size={ring - 10} />
         {hasAnswered && (
           <View style={styles.playerAnsweredDot}>
             <CheckMarkSvg size={12} color="#FFFFFF" />
           </View>
         )}
-      </View>
+      </PlayerAvatar>
       <View style={[styles.playerNamePill, { borderColor: `${color}AA` }]}>
-        <Text style={styles.playerNameText} numberOfLines={1}>
-          {name}
-        </Text>
+        <PlayerName userId={userId} name={name} style={styles.playerNameText} numberOfLines={1} />
       </View>
       <Text
         style={[styles.playerScore, compact && styles.playerScoreCompact, { color: isLeading ? '#FFDE9A' : isMe ? '#5FE1FF' : '#D9B8FF' }]}
@@ -530,7 +535,8 @@ const MiniPlayerBlock: React.FC<{
   isLeading?: boolean;
   hasAnswered?: boolean;
   badge?: string | null;
-}> = ({ name, avatarSeed, score, isMe, ringSize, dense, isLeading, hasAnswered, badge }) => {
+  userId?: string;
+}> = ({ name, avatarSeed, score, isMe, ringSize, dense, isLeading, hasAnswered, badge, userId }) => {
   const color = isLeading ? '#F5CA79' : isMe ? '#38BDF8' : '#C06BFF';
   const dot = Math.max(dense ? 11 : 13, Math.round(ringSize * 0.3));
   const ringBorder = Math.max(2, Math.round(ringSize * 0.07));
@@ -538,8 +544,12 @@ const MiniPlayerBlock: React.FC<{
   const scoreSize = Math.max(11, Math.round(ringSize * 0.28));
   return (
     <View style={[styles.miniPlayerBlock, dense && styles.miniPlayerDense, isLeading && styles.miniPlayerLeading]} accessible accessibilityLabel={`${name}, ${score} puan${isLeading ? ', önde' : ''}${hasAnswered ? ', cevapladı' : ''}`}>
-      <View
-        style={[
+      <PlayerAvatar
+        userId={userId}
+        seed={avatarSeed}
+        size={ringSize - ringBorder * 2 - 2}
+        ringSize={ringSize}
+        ringStyle={[
           styles.playerAvatarRing,
           {
             width: ringSize,
@@ -553,7 +563,6 @@ const MiniPlayerBlock: React.FC<{
           },
         ]}
       >
-        <CharacterAvatar seed={avatarSeed} size={ringSize - ringBorder * 2 - 2} />
         {hasAnswered && (
           <View
             style={[
@@ -564,14 +573,8 @@ const MiniPlayerBlock: React.FC<{
             <CheckMarkSvg size={Math.round(dot * 0.67)} color="#FFFFFF" />
           </View>
         )}
-      </View>
-        <Text
-          style={[styles.playerNameText, styles.miniPlayerName, { fontSize: nameSize }]}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {name}
-        </Text>
+      </PlayerAvatar>
+        <PlayerName userId={userId} name={name} style={[styles.playerNameText, styles.miniPlayerName, { fontSize: nameSize }]} numberOfLines={1} />
         <Text
           style={[styles.miniPlayerScore, {
             color: isLeading ? '#FFDE9A' : isMe ? '#5FE1FF' : '#D9B8FF',
@@ -900,12 +903,14 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
   const compact = windowHeight < 800;
   const tiny = windowHeight < 690;
   const myRacer = activeRacers.find((r) => r.isMe);
+  const myUserId = useGameStore((st) => st.user?.id);
   const myScore = formatCleanScore(currentScore, myRacer?.correctAnswers || 0, totalRounds);
   const rightPlayer = useMemo(() => {
     if (opponent) {
       const racer = activeRacers.find((r) => r.id === opponent.id);
       return {
         name: opponent.displayName,
+        userId: opponent.id as string | undefined,
         avatarSeed: opponent.avatarUrl || opponent.displayName,
         score: formatCleanScore(
           racer?.score ?? opponent.score ?? 0,
@@ -922,6 +927,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       .sort((a, b) => (b.score || 0) - (a.score || 0) || b.correctAnswers - a.correctAnswers)[0];
     return {
       name: others.length > 1 ? `${best.displayName} +${others.length - 1}` : best.displayName,
+      userId: best.id as string | undefined,
       avatarSeed: best.avatarUrl || best.displayName,
       score: formatCleanScore(best.score || 0, best.correctAnswers, totalRounds),
       hasAnswered: Boolean(best.hasAnswered),
@@ -1089,6 +1095,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
                   <MiniPlayerBlock
                     key={p.id}
                     name={p.isMe ? 'Sen' : p.displayName}
+                    userId={p.isMe ? myUserId : p.id}
                     avatarSeed={(p.isMe ? myAvatarUrl : undefined) || p.avatarUrl || p.displayName}
                     score={score}
                     isMe={!!p.isMe}
@@ -1107,6 +1114,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
       <View style={styles.scoreboard}>
         <DuelPlayerBlock
           side="me"
+          userId={myUserId}
           name={myDisplayName}
           avatarSeed={myAvatarUrl || myRacer?.avatarUrl || myDisplayName}
           score={myScore}
@@ -1128,6 +1136,7 @@ export const QuizArenaScreen: React.FC<QuizArenaScreenProps> = ({
         {rightPlayer ? (
           <DuelPlayerBlock
             side="opponent"
+            userId={rightPlayer.userId}
             name={rightPlayer.name}
             avatarSeed={rightPlayer.avatarSeed}
             score={rightPlayer.score}

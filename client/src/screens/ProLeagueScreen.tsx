@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PlayerAvatar, PlayerName } from '../components/PlayerCosmetics';
 import {
   View,
   Text,
@@ -235,13 +236,10 @@ export const ProLeagueScreen: React.FC<ProLeagueScreenProps> = ({
                     <Text style={[styles.rankNum, isPromotion && styles.promoRank]}>
                       {actualRank}
                     </Text>
-                    <CharacterAvatar
-                      seed={item.avatarUrl || item.displayName}
-                      size={36}
-                    />
+                    <PlayerAvatar userId={item.userId} seed={item.avatarUrl || item.displayName} size={36} />
                     <View style={styles.playerInfo}>
                       <Text style={styles.playerName} numberOfLines={1}>
-                        {item.displayName} {isMe ? '(Sen)' : ''}
+                        <PlayerName userId={item.userId} name={item.displayName} /> {isMe ? '(Sen)' : ''}
                       </Text>
                       <Text style={styles.playerTitle}>{item.rankTitle || 'Lig Oyuncusu'}</Text>
                     </View>

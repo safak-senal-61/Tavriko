@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { PlayerAvatar, PlayerName } from '../components/PlayerCosmetics';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform, Image, ScrollView, useWindowDimensions, ImageSourcePropType } from 'react-native';
 import { LoadingShimmer } from '../components/LoadingShimmer';
 import { Bot, Check, Radio, ShieldCheck, Swords, Volume2, VolumeX, X } from 'lucide-react-native';
@@ -14,9 +15,11 @@ import { TavrikoScreen, CharacterAvatar } from '../components/TavrikoIcons';
 const ARENA_IMG: ImageSourcePropType = cdnImage('images/radar_arena.png');
 const ROBOT_IMG: ImageSourcePropType = cdnImage('images/duel_robot.png');
 
+const RING_OUTER = 72;
+
 interface DuelVersusScreenProps {
-  myProfile: { displayName: string; avatarUrl?: string; rankTitle?: string };
-  opponentProfile: { displayName: string; avatarUrl?: string; rankTitle?: string; isBot?: boolean };
+  myProfile: { id?: string; displayName: string; avatarUrl?: string; rankTitle?: string };
+  opponentProfile: { id?: string; displayName: string; avatarUrl?: string; rankTitle?: string; isBot?: boolean };
   categoryName?: string;
   onCancel?: () => void;
 }
@@ -103,21 +106,22 @@ export const DuelVersusScreen: React.FC<DuelVersusScreenProps> = ({
         <View style={styles.players}>
           <Animated.View style={[styles.playerCard, { transform: [{ translateX: entrance.interpolate({ inputRange: [0, 1], outputRange: [-38, 0] }) }] }]}>
             <GradientFill colors={['#49306E', '#2B1A46']} direction="diagonal" />
-            <View style={[styles.avatarRing, styles.myRing]}><CharacterAvatar seed={myProfile.avatarUrl || myProfile.displayName} size={62} /></View>
+            <PlayerAvatar userId={myProfile.id} seed={myProfile.avatarUrl || myProfile.displayName} size={62} ringSize={RING_OUTER} ringStyle={[styles.avatarRing, styles.myRing]} />
             <Text style={styles.playerLabel}>SEN</Text>
-            <Text style={styles.playerName} numberOfLines={2}>{myProfile.displayName || 'Oyuncu'}</Text>
+            <PlayerName userId={myProfile.id} name={myProfile.displayName || 'Oyuncu'} style={styles.playerName} numberOfLines={2} />
             <Text style={styles.rank} numberOfLines={1}>{myProfile.rankTitle || 'Acemi Kaşif'}</Text>
             <View style={styles.ready}><Check size={13} color="#ADF0D8" /><Text style={styles.readyText}>Hazır</Text></View>
           </Animated.View>
           <View style={styles.vs}><Text style={styles.vsText}>VS</Text></View>
           <Animated.View style={[styles.playerCard, styles.opponentCard, { transform: [{ translateX: entrance.interpolate({ inputRange: [0, 1], outputRange: [38, 0] }) }] }]}>
             <GradientFill colors={isBot ? ['#493122', '#2E1D3A'] : ['#1F4944', '#1C2C3B']} direction="diagonal" />
-            <View style={[styles.avatarRing, isBot ? styles.botRing : styles.liveRing]}>
-              {isBot ? <Image source={ROBOT_IMG} style={styles.botAvatar} resizeMode="contain" />
-                : <CharacterAvatar seed={opponentProfile.avatarUrl || opponentProfile.displayName} size={62} />}
-            </View>
+            {isBot ? (
+              <View style={[styles.avatarRing, styles.botRing]}><Image source={ROBOT_IMG} style={styles.botAvatar} resizeMode="contain" /></View>
+            ) : (
+              <PlayerAvatar userId={opponentProfile.id} seed={opponentProfile.avatarUrl || opponentProfile.displayName} size={62} ringSize={RING_OUTER} ringStyle={[styles.avatarRing, styles.liveRing]} />
+            )}
             <Text style={[styles.playerLabel, { color: isBot ? '#FFE2A4' : '#ADF0D8' }]}>{isBot ? 'BİLGİSAYAR RAKİP' : 'CANLI RAKİP'}</Text>
-            <Text style={styles.playerName} numberOfLines={2}>{opponentProfile.displayName || (isBot ? 'Zekaküpü' : 'Rakip Oyuncu')}</Text>
+            <PlayerName userId={isBot ? undefined : opponentProfile.id} name={opponentProfile.displayName || (isBot ? 'Zekaküpü' : 'Rakip Oyuncu')} style={styles.playerName} numberOfLines={2} />
             <Text style={styles.rank} numberOfLines={1}>{isBot ? 'Yapay zekâ düellosu' : opponentProfile.rankTitle || 'Düellocu'}</Text>
             <View style={styles.ready}><Check size={13} color="#ADF0D8" /><Text style={styles.readyText}>Hazır</Text></View>
           </Animated.View>

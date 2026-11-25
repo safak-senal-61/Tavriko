@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { PlayerAvatar, PlayerName } from '../components/PlayerCosmetics';
 import {
   Animated,
   View,
@@ -543,7 +544,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                   onPress={() => handleOpenProfile(f)}
                 >
                   <View style={styles.avatarWrap}>
-                    <CharacterAvatar seed={f.avatarUrl || playerName} size={46} />
+                    <PlayerAvatar userId={f.id} seed={f.avatarUrl || playerName} size={46} />
                     <View
                       style={[
                         styles.statusDot,
@@ -558,9 +559,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                   </View>
                   <View style={{ flex: 1, justifyContent: 'center' }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={styles.friendName} numberOfLines={1}>
-                        {playerName}
-                      </Text>
+                      <PlayerName userId={f.id} name={playerName} style={styles.friendName} numberOfLines={1} />
                       <View style={styles.friendBadge}>
                         <Text style={styles.friendBadgeText}>Arkadaş</Text>
                       </View>
