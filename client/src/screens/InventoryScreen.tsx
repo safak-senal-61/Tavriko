@@ -361,6 +361,25 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   };
 
   /** Kozmetik mi? (kuşanılabilir) */
+  /** Eşya şu an profilde takılı mı? (süreli kozmetiklerde süresi dolmamış olmalı) */
+  const isItemEquipped = (item: InventoryItem): boolean => {
+    if (!user) return false;
+    const slot = item.id.startsWith('frame_') ? 'frame'
+      : item.id.startsWith('bg_') ? 'background'
+      : item.id.startsWith('name_') ? 'nameEffect'
+      : item.id.startsWith('badge_') ? 'badge' : null;
+    if (!slot) return false;
+    const map = {
+      frame: [user.equippedFrame, user.equippedFrameExpiresAt],
+      background: [user.equippedBackground, user.equippedBackgroundExpiresAt],
+      nameEffect: [user.equippedNameEffect, user.equippedNameEffectExpiresAt],
+      badge: [user.equippedBadge, user.equippedBadgeExpiresAt],
+    } as const;
+    const [id, exp] = map[slot];
+    if (id !== item.id) return false;
+    return !exp || exp > Date.now();
+  };
+
   const isEquippable = (item: InventoryItem) =>
     item.id.startsWith('frame_') || item.id.startsWith('bg_') || item.id.startsWith('name_') || item.id.startsWith('badge_');
 
@@ -581,7 +600,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
               const rarityColor = RARITY_COLORS[item.rarity || 'common'];
               const isChest = !!getChestOpening(item.id);
               const permanent = isPermanentGameplayBadge(item.id, item.durationHours);
-              const equipped = permanent && user?.equippedBadge === item.id && !user?.equippedBadgeExpiresAt;
+              const equipped = isItemEquipped(item);
 
               return (
                 <Reanimated.View
@@ -598,7 +617,11 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                       // Nick stilleri: önce canlı önizleme, "Uygula" ile kuşan
                       sound.playSound('tap');
                       setPreviewItem(item);
-                    } else if (isEquippable(item) && !equipped) handleEquipItem(item);
+                    } else if (isEquippable(item) && equipped) {
+                      sound.playSound('tap');
+                      setIsError(false);
+                      setStatusMessage(`${item.name} zaten kuşanılı.`);
+                    } else if (isEquippable(item)) handleEquipItem(item);
                     else if (previewKindOf(item)) {
                       sound.playSound('tap');
                       setPreviewItem(item);
@@ -664,8 +687,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
         onClose={() => setPreviewItem(null)}
         ownership={
           previewItem && getNickStyle(previewItem.id)
-            ? user?.equippedNameEffect === previewItem.id &&
-              (!user?.equippedNameEffectExpiresAt || user.equippedNameEffectExpiresAt > Date.now())
+            ? isItemEquipped(previewItem)
               ? 'active'
               : 'owned'
             : undefined
@@ -685,7 +707,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
             : undefined
         }
         onAction={
-          previewItem && getNickStyle(previewItem.id)
+          previewItem && getNickStyle(previewItem.id) && !isItemEquipped(previewItem)
             ? () => {
                 const it = previewItem;
                 setPreviewItem(null);

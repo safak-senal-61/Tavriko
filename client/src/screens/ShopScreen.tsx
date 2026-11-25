@@ -275,6 +275,9 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
   );
 };
 
+/** Son bilinen joker durumu: aynı oturumda mağazaya tekrar girildiğinde sekmeler zıplamaz. */
+const jokerAvailabilityCache = { enabled: true, advanced: false };
+
 export const ShopScreen: React.FC<ShopScreenProps> = ({
   user,
   apiBaseUrl,
@@ -299,22 +302,28 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const purchaseLock = useRef(false);
   const [polarAvailable, setPolarAvailable] = useState(false);
   const [polarSandbox, setPolarSandbox] = useState(false);
-  const [jokersAvailable, setJokersAvailable] = useState(false);
-  const [advancedJokersAvailable, setAdvancedJokersAvailable] = useState(false);
+  // Jokerler sekmesi ilk karede yerinde görünür (sonradan eklenip menüyü kaydırmaz).
+  // Sunucu açıkça kapalı derse gizlenir; cevap modül düzeyinde önbelleklenir.
+  const [jokersAvailable, setJokersAvailable] = useState(jokerAvailabilityCache.enabled);
+  const [advancedJokersAvailable, setAdvancedJokersAvailable] = useState(jokerAvailabilityCache.advanced);
   const base = apiBaseUrl || getApiBaseUrl();
   useEffect(() => {
     const controller = new AbortController();
     void fetch(`${base}/social/shop/jokers/availability`, { signal: controller.signal })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (!controller.signal.aborted) {
-          setJokersAvailable(data?.enabled === true);
-          setAdvancedJokersAvailable(data?.advanced === true);
-        }
+        if (controller.signal.aborted || !data) return;
+        jokerAvailabilityCache.enabled = data.enabled === true;
+        jokerAvailabilityCache.advanced = data.advanced === true;
+        setJokersAvailable(jokerAvailabilityCache.enabled);
+        setAdvancedJokersAvailable(jokerAvailabilityCache.advanced);
       })
       .catch(() => {});
     return () => controller.abort();
   }, [base]);
+  useEffect(() => {
+    if (!jokersAvailable && activeTab === 'jokers') setActiveTab(WEB ? 'diamonds' : 'gold');
+  }, [jokersAvailable, activeTab]);
   useEffect(() => {
     if (!WEB) return;
     const controller = new AbortController();

@@ -5112,6 +5112,16 @@ export class PrismaService {
     let record = await this.loadRecord(userId);
     if (!record) throw new Error('Kullanıcı bulunamadı.');
     if (!record.inventory) record.inventory = this.defaultInventory();
+    // Zaten takılı olan kozmetiğe tekrar "Kuşan" denirse yeni kopya harcanmaz ve
+    // süre baştan başlamaz; kalan süre olduğu gibi akmaya devam eder.
+    const equipSlot = slotOfItem(itemId);
+    if (equipSlot) {
+      const f = PrismaService.COSMETIC_FIELDS[equipSlot];
+      const exp = record[f.exp];
+      if (record[f.id] === itemId && (!exp || exp > Date.now())) {
+        return { user: this.toProfile(record), rewardText: `${this.cosmeticName(record, itemId)} zaten kuşanılı.` };
+      }
+    }
     const stashed = await this.useStashedCosmetic(record, itemId);
     if (stashed) return stashed;
     if (!record.isGuest && itemId.startsWith('badge_')) {
