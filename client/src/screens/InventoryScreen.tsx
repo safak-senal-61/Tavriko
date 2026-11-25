@@ -325,6 +325,12 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   const [equippingItemId, setEquippingItemId] = useState<string | null>(null);
 
   /** Kozmetik kuşanma: envanterdeki çerçeve/arka plan/isim efekti/rozet profiline uygulanır. */
+  const formatRemaining = (ms: number) => {
+    const mins = Math.max(1, Math.round(ms / 60000));
+    if (mins >= 1440) return `${Math.floor(mins / 1440)}g ${Math.floor((mins % 1440) / 60)}sa`;
+    return mins >= 60 ? `${Math.floor(mins / 60)}sa ${mins % 60}dk` : `${mins}dk`;
+  };
+
   const handleEquipItem = async (item: InventoryItem) => {
     if (!apiBaseUrl || equippingItemId) return;
     setEquippingItemId(item.id);
@@ -572,7 +578,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 
               return (
                 <Reanimated.View
-                  key={`${activeTab}-${item.id}`}
+                  key={`${activeTab}-${item.id}-${item.remainingMs ?? 'new'}`}
                   entering={FadeInDown.delay(Math.min(index, 8) * 50).duration(340)}
                   style={[styles.itemCardWrap, threeItems && styles.webItemWrap]}
                 >
@@ -590,7 +596,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                 >
                   <View style={[styles.rarityBar, { backgroundColor: rarityColor }]} />
                   <View style={styles.qtyBadge}>
-                    <Text style={styles.qtyText}>{permanent ? 'Kalıcı' : `x${item.qty}`}</Text>
+                    <Text style={styles.qtyText}>{permanent ? 'Kalıcı' : item.remainingMs ? formatRemaining(item.remainingMs) : `x${item.qty}`}</Text>
                   </View>
                   <View style={[styles.iconWrap, roomy && { height: 2.15 * itemArt }]}>
                     {renderItemVisual(item, itemArt)}

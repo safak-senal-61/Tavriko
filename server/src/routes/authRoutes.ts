@@ -414,6 +414,8 @@ router.post('/settings', requireUserAuth, async (req: Request, res: Response): P
     // legalConsent yalnızca /legal-consent ucu tarafından sunucu saatiyle yazılır.
     const safeSettings = settings && typeof settings === 'object' ? { ...settings } : {};
     delete (safeSettings as any).legalConsent;
+    // Bekleyen kozmetik süreleri yalnızca sunucu tarafından yazılır.
+    delete (safeSettings as any).cosmeticStash;
     const updated = await db.updateUserSettings(userId, safeSettings);
     res.json({ success: true, user: updated });
   } catch {
