@@ -334,6 +334,8 @@ export interface InventoryItem {
   equipped?: boolean;
   /** Kozmetiğin bu kopyası kuşanıldığında başlayacak süre (saat). Varsayılan 1. */
   durationHours?: number;
+  /** Başka bir kozmetik kuşanılınca saklanan eşyanın kalan süresi (ms). Sunucu doldurur. */
+  remainingMs?: number;
 }
 
 export interface NotificationItem {
@@ -391,6 +393,8 @@ export interface UserSettings {
   xp3BoosterExpiresAt?: string; // ISO tarih
   /** 2x Altın iksirinin (booster_coin_2x_1h / _24h) bitiş zamanı — sunucu yazılır, istemci okur. */
   coinBoosterExpiresAt?: string; // ISO tarih
+  /** Yerine başkası kuşanılan süreli kozmetiklerin kalan süreleri — yalnızca sunucu yazar. */
+  cosmeticStash?: Array<{ slot: 'frame' | 'background' | 'nameEffect' | 'badge'; itemId: string; name: string; remainingMs: number; storedAt: number }>;
   /** Yasal metin onayı (sunucu tarafından yazılır, istemci değiştiremez). */
   legalConsent?: {
     version: string;
