@@ -61,7 +61,11 @@ export function isLowEndDevice(info: { totalMemory?: number | null; yearClass?: 
 export class NickSlotPool {
   private holders = new Set<number>();
   private listeners = new Set<() => void>();
-  constructor(public max: number) {}
+  /**
+   * @param max   normal istekler için üst sınır
+   * @param hardMax öncelikli istekler dahil mutlak üst sınır (web'de WebGL bağlam sınırı)
+   */
+  constructor(public max: number, public hardMax = Infinity) {}
 
   get used() {
     return this.holders.size;
@@ -69,6 +73,7 @@ export class NickSlotPool {
 
   tryAcquire(id: number, priority = false): boolean {
     if (this.holders.has(id)) return true;
+    if (this.holders.size >= this.hardMax) return false;
     if (!priority && this.holders.size >= this.max) return false;
     this.holders.add(id);
     return true;

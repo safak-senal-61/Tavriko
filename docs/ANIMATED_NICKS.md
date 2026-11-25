@@ -10,8 +10,8 @@ Tavriko'daki animasyonlu nick (isim efekti) sistemi. Tek kaynak: `shared/src/nic
 | Mağaza / kozmetik | `shared/src/types.ts` (`NICK_SHOP_PRODUCTS` → `SHOP_CATALOG`), `shared/src/cosmetics.ts` (`NAME_EFFECT_DEFS`) | Mağaza ürünleri ve profil kozmetik tanımları kayıt defterinden türetilir. |
 | Sunucu | `server/src/db/prismaClient.ts` | Satın alma / envanter / kuşanma mevcut `name_` akışını kullanır; `getItemRarity` artık kozmetik tanımındaki nadirliği okur. |
 | Merkezi renderer | `client/src/components/nick/NickRenderer.tsx` | `<NickRenderer styleId text style numberOfLines variant />` |
-| Skia | `nick/NickSkiaLayer.native.tsx`, `nick/nickShaders.ts` | Görünmez RN `<Text>` satır yerleşimi (onTextLayout) üzerine aynı Nunito glifleri SkSL shader dolgusu + BlurMask parıltısıyla çizilir. Web'de `NickSkiaLayer.tsx` (stub). |
-| Lottie | `nick/NickParticles.native.tsx`, `client/assets/lottie/nick/*.json` | Yıldız/kıvılcım/elektrik/kozmik toz/kar parçacıkları; `colorFilters` ile paket renkleri. JSON'lar `scripts/generate-nick-lottie.mjs` ile üretilir. |
+| Skia | `nick/NickSkiaCore.tsx`, `nick/nickShaders.ts`, `nick/NickSkiaLayer(.native).tsx` | Görünmez RN `<Text>` satır yerleşimi üzerine aynı Nunito glifleri SkSL shader dolgusu + BlurMask parıltısıyla çizilir. iOS/Android'de çekirdek doğrudan; web'de CanvasKit (`/canvaskit.wasm`) ilk ihtiyaçta yüklenip çekirdek dinamik içe aktarılır (web'de onTextLayout olmadığından tek satır kutudan sentezlenir). |
+| Lottie | `nick/NickParticles(.native).tsx`, `client/assets/lottie/nick/*.json` | Yıldız/kıvılcım/elektrik/kozmik toz/kar parçacıkları. Native'de lottie-react-native + `colorFilters`, web'de lottie-web (SVG, tembel yükleme) + JSON'a yazılan paket renkleri. JSON'lar `scripts/generate-nick-lottie.mjs` ile üretilir. |
 | Linear Gradient | `nick/NickPlate.tsx`, `nick/NickPreviewModal.tsx` | Paket plakaları ve önizleme arka planları. |
 | Önizleme | `nick/NickPreviewModal.tsx` | Profil, liderlik, maç, sohbet, arkadaş listesinde canlı deneme + kalite seçici. `CosmeticPreviewModal(kind="name")` buna yönlenir. |
 | Ortam/kalite | `nick/nickEnv.ts`, `nick/nickQualityCore.ts`, `nick/useNickClock.ts` | Tercih, pil tasarrufu, hareketi azalt, düşük donanım, AppState, ekran-dışı durdurma, eşzamanlı efekt bütçesi. |
@@ -22,14 +22,14 @@ ara liderlik, maç sonu podyumu, Pro Lig. `AnimatedNameText` (StoreKit) geriye d
 
 ## Kalite seviyeleri
 
-- **full**: Skia shader + parıltı (+ `variant="hero"` için Lottie parçacıkları). Yalnızca iOS/Android.
-- **lite**: Reanimated renk döngüsü, 20–24 fps. Web, düşük donanım, pil tasarrufu, bütçe aşımı.
+- **full**: Skia shader + parıltı (+ `variant="hero"` için Lottie parçacıkları). iOS, Android ve web.
+- **lite**: Reanimated renk döngüsü, 20–24 fps. Düşük donanım, pil tasarrufu, bütçe aşımı veya CanvasKit yüklenirken.
 - **static**: Animasyonsuz palet rengi. Ayarlar → Nick Efektleri "Kapalı", "Akıcı Animasyonlar" kapalı veya sistemde "hareketi azalt" açık (Otomatik modda).
 
 Ayarlar → Görsel → **Nick Efektleri**: Otomatik / Tam / Hafif / Kapalı (`UserSettings.nickEffects`, settings JSON'unda saklanır).
 
 Performans kuralları: saat yalnızca nick ekrandayken ve uygulama ön plandayken ilerler (UI thread `measure`, ~12 karede bir);
-aynı anda en fazla 12 (düşük donanımda 4) tam kalite nick ve 4 (1) parçacık katmanı çalışır; ekran dışındaki Lottie katmanı sökülür;
+aynı anda en fazla 12 (web'de 10, öncelikliler dahil mutlak 13 — tarayıcı WebGL bağlam sınırı; düşük donanımda 4) tam kalite nick ve 4 (1) parçacık katmanı çalışır; ekran dışındaki Lottie katmanı sökülür;
 yazı tipi ve shader nesneleri modül düzeyinde önbelleklenir; `usePlayerCosmetics` yalnızca ilgili oyuncunun önbellek kaydına abone olur.
 
 ## Yeni paket eklemek
@@ -51,3 +51,8 @@ yeniden kullanıldığı için mevcut satın alımlar, envanterler ve kuşanılm
 
 Skia, Lottie ve Expo Linear Gradient yerel modüldür. Bu sürüm yeni bir yerel derleme (EAS build) gerektirir; bu yüzden
 `client/app.json` sürümü 1.1.5 / versionCode 25'e yükseltildi (`runtimeVersion.policy = appVersion`, eski 1.1.4 binary'lerine OTA gitmez).
+
+## Web derlemesi
+
+`npm --prefix client run build:web` önce `scripts/copy-canvaskit.mjs` ile `canvaskit.wasm`'ı `client/public`'e kopyalar
+(git'e eklenmez); Expo bunu dist köküne taşır. Sunucu `/canvaskit.wasm` ve `/app/canvaskit.wasm` yollarından `application/wasm` olarak sunar.

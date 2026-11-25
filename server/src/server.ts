@@ -593,7 +593,17 @@ export function createApp() {
     app.get('/favicon.ico', (req, res) => {
       res.sendFile(path.join(clientDistDir!, 'favicon.ico'));
     });
-    // Marka ikonları, manifest, paylaşım görseli ve SEO dosyaları (client/public -> client/dist)
+    // Skia web (Animated Nick efektleri) CanvasKit wasm'ı
+    const canvasKitStatic = express.static(clientDistDir, {
+      index: false,
+      maxAge: '7d',
+      setHeaders: (res) => res.setHeader('Content-Type', 'application/wasm'),
+    });
+    app.get(['/canvaskit.wasm', '/app/canvaskit.wasm'], (req, res, next) => {
+      req.url = '/canvaskit.wasm';
+      canvasKitStatic(req, res, next);
+    });
+        // Marka ikonları, manifest, paylaşım görseli ve SEO dosyaları (client/public -> client/dist)
     const brandStaticFiles = [
       'favicon-16.png',
       'favicon-32.png',
