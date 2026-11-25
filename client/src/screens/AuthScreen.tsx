@@ -18,8 +18,6 @@ import { LoadingShimmer } from '../components/LoadingShimmer';
 import * as ImagePicker from 'expo-image-picker';
 import { compressAvatarImageAsync } from '../utils/avatarImage';
 import * as WebBrowser from 'expo-web-browser';
-import * as SecureStore from 'expo-secure-store';
-import * as Crypto from 'expo-crypto';
 import Svg, { Path, Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { CalendarDays } from 'lucide-react-native';
 // Doğum tarihi için şık takvim seçici (native). Web'de takvim girişi metin
@@ -34,25 +32,8 @@ if (Platform.OS !== 'web') {
   }
 }
 WebBrowser.maybeCompleteAuthSession();
-const supabaseAuthUrl = 'https://rjvbgofzsfescnfohzgu.supabase.co/auth/v1';
-const supabasePublishableKey = 'sb_publishable_ix4qzOkTfA-bFTKvsJ-tSA_rEs0YeEf';
-const verifierKey = 'tavriko-google-code-verifier';
 const web = Platform.OS === 'web';
-
-async function saveVerifier(verifier: string) {
-  const value = JSON.stringify({ verifier, expiresAt: Date.now() + 10 * 60_000 });
-  if (web) window.sessionStorage.setItem(verifierKey, value);
-  else await SecureStore.setItemAsync(verifierKey, value);
-}
-
-async function takeVerifier(): Promise<string | null> {
-  const value = web ? window.sessionStorage.getItem(verifierKey) : await SecureStore.getItemAsync(verifierKey);
-  if (web) window.sessionStorage.removeItem(verifierKey);
-  else await SecureStore.deleteItemAsync(verifierKey);
-  if (!value) return null;
-  const { verifier, expiresAt } = JSON.parse(value);
-  return typeof verifier === 'string' && expiresAt >Date.now() ? verifier : null;
-}
+const nativeAuthRedirect = 'tavriko://auth-callback';
 import { UserProfile, LEGAL_VERSION, LegalDocumentId } from '@trivia/shared';
 import {
   LegalConsentCheckbox,
@@ -378,24 +359,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     lastProcessedCode.current = code;
     setLoading(true);
     try {
-      if (!code || !/^[a-zA-Z0-9_-]{8,128}$/.test(code)) throw new Error('Google OAuth tamamlanmadı.');
-      const verifier = await takeVerifier();
-      if (!verifier) throw new Error('Google oturumu doğrulanamadı.');
-      const exchange = await fetch(`${supabaseAuthUrl}/token?grant_type=pkce`, {
-        method: 'POST',
-        headers: { apikey: supabasePublishableKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auth_code: code, code_verifier: verifier }),
-      });
-      if (!exchange.ok) throw new Error('Google oturumu doğrulanamadı.');
-      const { access_token: accessToken } = await exchange.json();
-      if (typeof accessToken !== 'string' || !accessToken) throw new Error('Google oturumu doğrulanamadı.');
-      const response = await fetch(`${apiBaseUrl}/auth/google`, {
+      if (!code || !/^[A-Za-z0-9_-]{20,128}$/.test(code)) throw new Error('Google OAuth tamamlanmadı.');
+      // Sunucu, Google kodunu kendi istemci sırrıyla değiş-tokuş eder ve
+      // tarayıcıya yalnızca tek kullanımlık bir kod verir.
+      const response = await fetch(`${apiBaseUrl}/auth/google/exchange`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken }),
+        body: JSON.stringify({ code }),
       });
-      if (!response.ok) throw new Error('Google girişi reddedildi.');
+      if (!response.ok) throw new Error('Google oturumu doğrulanamadı.');
       const result = await response.json();
+      if (!result?.token || !result?.user) throw new Error('Google oturumu doğrulanamadı.');
       sound.playSound('victory');
       sound.triggerHaptic('success');
       onSuccess(result.user, result.token);
@@ -436,25 +410,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     markGoogleLegalAcknowledged();
     lastProcessedCode.current = null;
     try {
-      const redirectTo = Platform.OS === 'web'
-        ? `${window.location.origin}/api/auth/google/callback`
-        : 'tavriko://auth-callback';
-      const verifier = Array.from(await Crypto.getRandomBytesAsync(32),
-        byte => byte.toString(16).padStart(2, '0')).join('');
-      const digest = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, verifier,
-        { encoding: Crypto.CryptoEncoding.BASE64 });
-      const challenge = digest.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-      await saveVerifier(verifier);
-      const params = new URLSearchParams({
-        provider: 'google', redirect_to: redirectTo, prompt: 'select_account',
-        code_challenge: challenge, code_challenge_method: 's256',
-      });
-      const authorizationUrl = `${supabaseAuthUrl}/authorize?${params.toString()}`;
-      if (Platform.OS === 'web') {
-        window.location.assign(authorizationUrl);
+      // Google'a Tavriko'nun kendi istemcisiyle gidilir; yönlendirme adresi ve
+      // istemci sırrı sunucuda kalır, istemci yalnızca akışı başlatır.
+      const startUrl = `${apiBaseUrl}/auth/google/start?platform=${web ? 'web' : 'native'}`;
+      if (web) {
+        window.location.assign(startUrl);
         return;
       }
-      const result = await WebBrowser.openAuthSessionAsync(authorizationUrl, redirectTo);
+      const result = await WebBrowser.openAuthSessionAsync(startUrl, nativeAuthRedirect);
       if (result.type === 'success' && result.url) await handleAuthRedirectUrl(result.url);
       if (!lastProcessedCode.current) setLoading(false);
     } catch {

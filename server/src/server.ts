@@ -3738,7 +3738,9 @@ export function createApp() {
   app.use('/api', logRouter);
   app.use('/api/auth', authRoutes);
   app.get('/auth/google/callback', (req, res) => {
-    res.redirect('/api/auth/google/callback');
+    // Sorgu dizesi (code/state) kaybolmadan asıl uç noktaya taşınır.
+    const queryIndex = req.originalUrl.indexOf('?');
+    res.redirect(302, `/api/auth/google/callback${queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : ''}`);
   });
   app.use('/api', triviaRoutes);
   app.use('/api/social', socialRoutes);

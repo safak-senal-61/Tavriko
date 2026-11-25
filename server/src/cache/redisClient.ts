@@ -8,6 +8,7 @@ export interface CacheService {
   getSeenQuestions(playerId: string, categoryId: string): Promise<string[]>;
   getCustomValue<T = any>(key: string): Promise<T | null>;
   setCustomValue(key: string, value: any, ttlSec?: number): Promise<void>;
+  deleteCustomValue(key: string): Promise<void>;
   isAvailable(): boolean;
   ping(): Promise<boolean>;
 }
@@ -164,6 +165,17 @@ class UpstashRedisService implements CacheService {
     if (ttlSec && ttlSec > 0) {
       setTimeout(() => this.memCustom.delete(key), ttlSec * 1000);
     }
+  }
+
+  public async deleteCustomValue(key: string): Promise<void> {
+    if (this.client) {
+      try {
+        await this.client.del(key);
+      } catch (err: any) {
+        console.warn('[Upstash Redis] deleteCustomValue fallback devrede:', err.message);
+      }
+    }
+    this.memCustom.delete(key);
   }
 }
 
