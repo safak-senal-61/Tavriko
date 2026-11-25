@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { PlayerAvatar, PlayerName } from '../components/PlayerCosmetics';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import Animated, {
   FadeIn,
@@ -95,12 +96,14 @@ const PodiumColumn: React.FC<{
   const ring = tone.avatar + 8;
   return (
     <Animated.View entering={FadeInUp.delay(delay).springify().damping(14)} style={styles.podiumCol}>
-      <View style={[styles.podiumRing, { width: ring, height: ring, borderRadius: ring / 2, borderColor: tone.ring }]}>
-        <CharacterAvatar seed={entry.avatarUrl || entry.displayName} size={tone.avatar} />
-      </View>
-      <Text style={[styles.podiumName, isMe && { color: '#FFC43D' }]} numberOfLines={1}>
-        {isMe ? 'Sen' : entry.displayName}
-      </Text>
+      <PlayerAvatar
+        userId={entry.playerId}
+        seed={entry.avatarUrl || entry.displayName}
+        size={tone.avatar}
+        ringSize={ring}
+        ringStyle={[styles.podiumRing, { width: ring, height: ring, borderRadius: ring / 2, borderColor: tone.ring }]}
+      />
+      <PlayerName userId={entry.playerId} name={isMe ? 'Sen' : entry.displayName} style={[styles.podiumName, isMe && { color: '#FFC43D' }]} numberOfLines={1} />
       <Text style={[styles.podiumScore, { color: tone.text }]}>
         {formatNumberTR(normalizeDisplayScore(entry.score, totalRounds))}
         <Text style={styles.podiumUnit}> puan</Text>
@@ -256,11 +259,9 @@ export const MatchResultPodiumScreen: React.FC<MatchResultPodiumScreenProps> = (
                     accessibilityLabel={`${entry.rank}. sıra, ${isMe ? 'Sen' : entry.displayName}, ${points} puan`}
                   >
                     <Text style={styles.rankingPlace}>{entry.rank}.</Text>
-                    <CharacterAvatar seed={entry.avatarUrl || entry.displayName} size={32} />
+                    <PlayerAvatar userId={entry.playerId} seed={entry.avatarUrl || entry.displayName} size={32} />
                     <View style={styles.rankingNameWrap}>
-                      <Text style={[styles.rankingName, isMe && styles.rankingMeText]} numberOfLines={1}>
-                        {isMe ? 'Sen' : entry.displayName}
-                      </Text>
+                      <PlayerName userId={entry.playerId} name={isMe ? 'Sen' : entry.displayName} style={[styles.rankingName, isMe && styles.rankingMeText]} numberOfLines={1} />
                       {typeof entry.correctAnswersCount === 'number' && (
                         <Text style={styles.rankingCaption}>{entry.correctAnswersCount}/{totalRounds} doğru</Text>
                       )}

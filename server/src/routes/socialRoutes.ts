@@ -508,6 +508,34 @@ router.post('/notifications/send', requireUserAuth, async (req: Request, res: Re
   }
 });
 
+// --- Toplu kozmetik sorgusu: liderlik, arkadaş, lobi ve quiz ekranlarında çerçeve/isim efekti göstermek için ---
+const COSMETICS_BATCH_LIMIT = 60;
+router.get('/cosmetics', requireUserAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const raw = typeof req.query.ids === 'string' ? req.query.ids : '';
+    const ids = [...new Set(raw.split(',').map(id => id.trim()).filter(id => id && id.length <= 64 && !/^(bot_|guest_)/i.test(id)))]
+      .slice(0, COSMETICS_BATCH_LIMIT);
+    const entries = await Promise.all(ids.map(async id => {
+      try {
+        const profile = await db.getUserProfileAsync(id);
+        if (!profile) return null;
+        // Yalnızca herkese açık görünüm alanları; süresi dolanlar sunucuda zaten düşürülür.
+        return [id, {
+          equippedFrame: profile.equippedFrame,
+          equippedFrameExpiresAt: profile.equippedFrameExpiresAt,
+          equippedNameEffect: profile.equippedNameEffect,
+          equippedNameEffectExpiresAt: profile.equippedNameEffectExpiresAt,
+        }] as const;
+      } catch {
+        return null;
+      }
+    }));
+    res.json({ cosmetics: Object.fromEntries(entries.filter((e): e is NonNullable<typeof e> => !!e)) });
+  } catch {
+    res.status(500).json({ error: 'Kozmetikler alınamadı.' });
+  }
+});
+
 // --- Public profile by friend code (profile share links) ---
 router.get('/users/by-code/:friendCode', async (req: Request, res: Response): Promise<void> => {
   try {

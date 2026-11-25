@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PlayerAvatar, PlayerName } from '../components/PlayerCosmetics';
 import {
   View,
   Text,
@@ -214,12 +215,14 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
                     style={styles.podiumCol}
                   >
                     {place === 1 && <LaurelIcon size={26} />}
-                    <View style={[styles.podiumAvatarRing, { borderColor: tone.ring, width: avatar + 8, height: avatar + 8, borderRadius: (avatar + 8) / 2 }]}>
-                      <CharacterAvatar seed={item.avatarUrl || item.displayName} size={avatar} />
-                    </View>
-                    <Text style={styles.podiumName} numberOfLines={1}>
-                      {isMe ? 'Sen' : item.displayName}
-                    </Text>
+                    <PlayerAvatar
+                      userId={item.userId || item.id}
+                      seed={item.avatarUrl || item.displayName}
+                      size={avatar}
+                      ringSize={avatar + 8}
+                      ringStyle={[styles.podiumAvatarRing, { borderColor: tone.ring, width: avatar + 8, height: avatar + 8, borderRadius: (avatar + 8) / 2 }]}
+                    />
+                    <PlayerName userId={item.userId || item.id} name={isMe ? 'Sen' : item.displayName} style={styles.podiumName} numberOfLines={1} />
                     <Text style={[styles.podiumValue, { color: tone.text }]}>
                       {formatNumberTR(valueOf(item))} <Text style={styles.podiumUnit}>{unitLabel}</Text>
                     </Text>
@@ -246,10 +249,10 @@ export const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({
                       style={[styles.playerRow, isMe && styles.playerRowMe, idx > 0 && styles.playerRowDivider]}
                     >
                       <Text style={styles.rankText}>{displayRank}</Text>
-                      <CharacterAvatar seed={item.avatarUrl || item.displayName} size={38} />
+                      <PlayerAvatar userId={item.userId || item.id} seed={item.avatarUrl || item.displayName} size={38} />
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={styles.nameText} numberOfLines={1}>
-                          {item.displayName}
+                          <PlayerName userId={item.userId || item.id} name={item.displayName} />
                           {isMe ? <Text style={styles.meTag}>  Sen</Text> : null}
                         </Text>
                         <Text style={styles.subRankText} numberOfLines={1}>

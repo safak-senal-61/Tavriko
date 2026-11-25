@@ -1948,11 +1948,13 @@ export const RootNavigator: React.FC = () => {
         {currentScreen === 'duel_versus' && (
           <DuelVersusScreen
             myProfile={{
+              id: user?.id,
               displayName: user?.displayName || 'Sen',
               avatarUrl: user?.avatarUrl,
               rankTitle: user?.rankTitle || 'Acemi Kaşif',
             }}
             opponentProfile={{
+              id: duelOpponent?.id,
               displayName: duelOpponent?.displayName || (duelOpponent?.isBot ? 'BİLGİSAYAR' : 'Rakip Oyuncu'),
               avatarUrl: duelOpponent?.avatarUrl,
               rankTitle: duelOpponent?.isBot ? 'Yapay Zeka' : 'Düellocu',

@@ -1,4 +1,5 @@
 import React from 'react';
+import { PlayerAvatar, PlayerName } from './PlayerCosmetics';
 import {
   Modal,
   View,
@@ -97,9 +98,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               {/* Avatar & Identifiers */}
               <View style={styles.avatarWrap}>
                 <View style={styles.avatarGlow}>
-                  <CharacterAvatar
+                  <PlayerAvatar
+                    userId={profile.id}
                     seed={profile.avatarUrl || profile.displayName}
                     size={80}
+                    cosmetics={profile.equippedFrame !== undefined || profile.equippedNameEffect !== undefined ? profile : undefined}
                   />
                 </View>
                 {profile.equippedBadge && (
@@ -107,7 +110,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                     <Text style={styles.badgeText}> {profile.equippedBadge}</Text>
                   </View>
                 )}
-                <Text style={styles.displayName}>{profile.displayName}</Text>
+                <PlayerName userId={profile.id} name={profile.displayName} style={styles.displayName} cosmetics={profile.equippedFrame !== undefined || profile.equippedNameEffect !== undefined ? profile : undefined} />
                 {profile.username && (
                   <Text style={styles.username}>@{profile.username}</Text>
                 )}

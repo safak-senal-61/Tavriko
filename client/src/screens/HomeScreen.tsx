@@ -1,4 +1,5 @@
 import { cdnImage } from '../utils/cdn';
+import { PlayerAvatar, PlayerName } from '../components/PlayerCosmetics';
 import React, { useEffect, useRef } from 'react';
 import {
   View,
@@ -348,17 +349,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               direction="diagonal"
             />
             <View style={[styles.profileAvatarWrap, shortLayout && styles.profileAvatarWrapShort]}>
-              <View style={[styles.profileAvatarRing, shortLayout && styles.profileAvatarRingShort]}>
-                <CharacterAvatar seed={user.avatarUrl || user.displayName} size={shortLayout ? 48 : 62} />
-              </View>
+              <PlayerAvatar
+                userId={user.id}
+                seed={user.avatarUrl || user.displayName}
+                size={shortLayout ? 48 : 62}
+                ringSize={shortLayout ? 56 : 72}
+                ringStyle={[styles.profileAvatarRing, shortLayout && styles.profileAvatarRingShort]}
+              />
               <View style={styles.profileCrown} pointerEvents="none">
                 <LaurelIcon size={26} />
               </View>
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.userName} numberOfLines={1}>
-                {user.displayName}
-              </Text>
+              <PlayerName userId={user.id} name={user.displayName} style={styles.userName} numberOfLines={1} />
               <View style={styles.levelRow}>
                 <Text style={styles.levelText}>Seviye {prog.level}</Text>
                 <Text style={styles.levelDot}>·</Text>

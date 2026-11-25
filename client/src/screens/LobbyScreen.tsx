@@ -1,4 +1,5 @@
 import { cdnImage } from '../utils/cdn';
+import { PlayerAvatar, PlayerName } from '../components/PlayerCosmetics';
 import { usePlayerWebLayout } from '../navigation/PlayerWebLayoutContext';
 import { GradientFill } from '../components/TavrikoGradient';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -851,12 +852,12 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                 entering={FadeInDown.delay(index * 80).duration(380)}
                 style={[styles.playerRow, playerGrid && styles.webPlayerSlot, isMe && styles.playerRowMe]}
               >
-                <CharacterAvatar seed={isBlocked ? 'av1' : p.avatarUrl || p.displayName} size={42} />
+                <PlayerAvatar userId={isBlocked ? undefined : p.id} seed={isBlocked ? 'av1' : p.avatarUrl || p.displayName} size={42} />
 
                 <View style={styles.playerInfo}>
                   <View style={styles.nameRow}>
                     <Text style={styles.playerName} numberOfLines={1}>
-                      {isBlocked ? 'Engellenen oyuncu' : p.displayName} {isMe ? '(Sen)' : ''}
+                      {isBlocked ? 'Engellenen oyuncu' : <PlayerName userId={p.id} name={p.displayName} />} {isMe ? '(Sen)' : ''}
                     </Text>
                   </View>
                   <View style={styles.playerRoleRow}>
@@ -1057,16 +1058,11 @@ export const LobbyScreen: React.FC<LobbyScreenProps> = ({
                   return (
                     <View style={styles.friendRow}>
                       <View style={styles.friendAvatarWrap}>
-                        <CharacterAvatar
-                          seed={item.avatarUrl || item.displayName || item.name || 'av2'}
-                          size={44}
-                        />
+                        <PlayerAvatar userId={item.id} seed={item.avatarUrl || item.displayName || item.name || 'av2'} size={44} />
                         {item.online ? <View style={styles.friendOnlineDot} /> : null}
                       </View>
                       <View style={styles.friendRowInfo}>
-                        <Text style={styles.friendRowName} numberOfLines={1}>
-                          {item.displayName || item.name}
-                        </Text>
+                        <PlayerName userId={item.id} name={item.displayName || item.name} style={styles.friendRowName} numberOfLines={1} />
                         <Text style={styles.friendRowStatus} numberOfLines={1}>
                           {item.online ? 'Çevrimiçi' : 'Çevrimdışı'}
                           {item.level ? ` · Sv. ${item.level}` : ''}

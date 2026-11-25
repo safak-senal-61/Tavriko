@@ -1,4 +1,6 @@
 import React from 'react';
+
+import { PlayerAvatar, PlayerName } from '../components/PlayerCosmetics';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { PlayerScoreSummary } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
@@ -53,14 +55,8 @@ export const IntermissionLeaderboardScreen: React.FC<
                 style={[styles.playerRow, isMe && styles.playerRowMe]}
               >
                 <Text style={styles.rankText}>{item.rank || idx + 1}</Text>
-                <CharacterAvatar
-                  seed={item.avatarUrl || item.displayName}
-                  index={idx}
-                  size={34}
-                />
-                <Text style={styles.nameText} numberOfLines={1}>
-                  {item.displayName}
-                </Text>
+                <PlayerAvatar userId={item.playerId} seed={item.avatarUrl || item.displayName} size={34} />
+                <PlayerName userId={item.playerId} name={item.displayName} style={styles.nameText} numberOfLines={1} />
                 <Text
                   style={[
                     styles.deltaText,

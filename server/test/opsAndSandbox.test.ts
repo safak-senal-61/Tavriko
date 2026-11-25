@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../src/db/prismaClient', () => ({ db: {
   verifyToken: (token: string) => token === 'player' ? { userId: 'signed-player' } : null,
   purchaseShopProduct: vi.fn().mockResolvedValue({ user: {}, message: 'ok' }),
+  getUserProfileAsync: vi.fn(async (id: string) => id === 'u1' ? { id, equippedFrame: 'frame_gold', equippedFrameExpiresAt: 99, equippedNameEffect: 'name_fire', coins: 5 } : null),
   rawClient: { portalSession: { findFirst: vi.fn().mockResolvedValue({ method: 'password', createdAt: new Date() }) } },
 } }));
 vi.mock('../src/db/supabaseClient', () => ({ supabaseService: { getClient: () => null } }));
@@ -262,5 +263,13 @@ describe('Admin and storefront routes', () => {
       .send({ userId: 'not-the-buyer', productId: 'frame_steampunk', durationId: '1d' });
     expect(rental.status).toBe(200);
     expect(db.purchaseShopProduct).toHaveBeenCalledExactlyOnceWith('signed-player', 'frame_steampunk', 'gems', '1d');
+  });
+  it('returns only public cosmetic fields for a batch of players and skips bots', async () => {
+    const app = express().use(express.json()).use(social);
+    expect((await request(app).get('/cosmetics?ids=u1')).status).toBe(401);
+    const res = await request(app).get('/cosmetics?ids=u1,bot_7,missing').set('Authorization', 'Bearer player');
+    expect(res.status).toBe(200);
+    expect(res.body.cosmetics).toEqual({ u1: { equippedFrame: 'frame_gold', equippedFrameExpiresAt: 99, equippedNameEffect: 'name_fire' } });
+    expect(db.getUserProfileAsync).not.toHaveBeenCalledWith('bot_7');
   });
 });
