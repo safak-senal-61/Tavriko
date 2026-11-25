@@ -108,7 +108,7 @@ export const DuelVersusScreen: React.FC<DuelVersusScreenProps> = ({
             <GradientFill colors={['#49306E', '#2B1A46']} direction="diagonal" />
             <PlayerAvatar userId={myProfile.id} seed={myProfile.avatarUrl || myProfile.displayName} size={62} ringSize={RING_OUTER} ringStyle={[styles.avatarRing, styles.myRing]} />
             <Text style={styles.playerLabel}>SEN</Text>
-            <PlayerName userId={myProfile.id} name={myProfile.displayName || 'Oyuncu'} style={styles.playerName} numberOfLines={2} />
+            <PlayerName userId={myProfile.id} name={myProfile.displayName || 'Oyuncu'} style={styles.playerName} numberOfLines={2} variant="hero" />
             <Text style={styles.rank} numberOfLines={1}>{myProfile.rankTitle || 'Acemi Kaşif'}</Text>
             <View style={styles.ready}><Check size={13} color="#ADF0D8" /><Text style={styles.readyText}>Hazır</Text></View>
           </Animated.View>
@@ -121,7 +121,7 @@ export const DuelVersusScreen: React.FC<DuelVersusScreenProps> = ({
               <PlayerAvatar userId={opponentProfile.id} seed={opponentProfile.avatarUrl || opponentProfile.displayName} size={62} ringSize={RING_OUTER} ringStyle={[styles.avatarRing, styles.liveRing]} />
             )}
             <Text style={[styles.playerLabel, { color: isBot ? '#FFE2A4' : '#ADF0D8' }]}>{isBot ? 'BİLGİSAYAR RAKİP' : 'CANLI RAKİP'}</Text>
-            <PlayerName userId={isBot ? undefined : opponentProfile.id} name={opponentProfile.displayName || (isBot ? 'Zekaküpü' : 'Rakip Oyuncu')} style={styles.playerName} numberOfLines={2} />
+            <PlayerName userId={isBot ? undefined : opponentProfile.id} name={opponentProfile.displayName || (isBot ? 'Zekaküpü' : 'Rakip Oyuncu')} style={styles.playerName} numberOfLines={2} variant="hero" />
             <Text style={styles.rank} numberOfLines={1}>{isBot ? 'Yapay zekâ düellosu' : opponentProfile.rankTitle || 'Düellocu'}</Text>
             <View style={styles.ready}><Check size={13} color="#ADF0D8" /><Text style={styles.readyText}>Hazır</Text></View>
           </Animated.View>

@@ -1,3 +1,4 @@
+import { type NickEffectsPreference } from './nickStyles';
 export type CategoryId = 'geography' | 'mathematics' | 'general_culture' | 'history' | 'science_tech' | 'space_astronomy' | 'sports' | 'cinema_tv' | 'music' | 'literature' | 'biology' | 'physics_chemistry' | 'logic_puzzles' | 'language_vocab' | 'art_culture' | 'food_gastronomy' | 'animals_wildlife' | 'nature_ecology' | 'gaming_videogames' | 'anime_manga' | 'cartoons_animation' | 'comics_superheroes' | 'fantasy_fiction' | 'social_internet' | 'mythology_ancient' | 'hobbies_leisure' | 'daily_life' | 'turkey_special' | 'mixed';
 export type DifficultyLevel = 'easy' | 'medium' | 'hard' | 'expert';
 export type ReviewStatus = 'pending_review' | 'approved' | 'published' | 'rejected';
@@ -290,6 +291,8 @@ export interface UserSettings {
     smoothAnimations?: boolean;
     batterySaver?: boolean;
     ambientGlow?: boolean;
+    /** Animasyonlu nick efekti kalitesi: otomatik / tam / hafif / kapalı */
+    nickEffects?: NickEffectsPreference;
     textSize?: 'normal' | 'large';
     buttonSpring?: boolean;
     defaultDifficulty?: 'easy' | 'medium' | 'hard';
@@ -687,6 +690,8 @@ export declare function isCosmeticProduct(p: ShopProduct): boolean;
 export declare function shopPriceForDuration(p: ShopProduct, durationId?: string | null): number;
 /** Sezon kozmetik ödülleri en fazla 1 ay geçerlidir */
 export declare const SEASON_REWARD_HOURS: number;
+/** Animated Nick paketlerinin mağaza ürünleri (tek kaynak: nickStyles.ts) */
+export declare const NICK_SHOP_PRODUCTS: ShopProduct[];
 export declare const SHOP_CATALOG: ShopProduct[];
 export interface GameEvent {
     id: string;

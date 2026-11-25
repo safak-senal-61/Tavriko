@@ -22,7 +22,10 @@ import Svg, {
   Circle,
   Path,
 } from 'react-native-svg';
-import { UserProfile, SHOP_CATALOG, ShopProduct, ShopProductCategory, SHOP_DURATIONS, JOKERS, JokerGroup, isCosmeticProduct, isJokerId, isAdvancedJoker, shopPriceForDuration } from '@trivia/shared';
+import { UserProfile, SHOP_CATALOG, ShopProduct, ShopProductCategory, SHOP_DURATIONS, JOKERS, JokerGroup, isCosmeticProduct, isJokerId, isAdvancedJoker, shopPriceForDuration, getNickStyle, nickOwnership, NICK_PACKS } from '@trivia/shared';
+import { NickRenderer } from '../components/nick/NickRenderer';
+import { NickPlate } from '../components/nick/NickPlate';
+import { NickRarityChip, NickOwnershipBadge } from '../components/nick/NickBadges';
 import { JokerGroupTabs } from '../components/WalletPanels';
 import { THEME } from '../theme/tokens';
 import { useNavBottomPad } from '../utils/safeArea';
@@ -52,10 +55,8 @@ import {
   BackgroundThumb,
   AnimatedFrame,
   AnimatedBackgroundThumb,
-  AnimatedNameText,
   ANIMATED_FRAME_COLORS,
   ANIMATED_BG_LAYERS,
-  ANIMATED_NAME_COLORS,
   CosmeticPreviewModal,
   frameFor,
   backgroundFor,
@@ -155,15 +156,15 @@ const ShopItemVisual: React.FC<{ product: ShopProduct; seed?: string; name?: str
       </View>
     );
   }
-  // Animasyonlu isim efektleri: renk döngüsü
-  if (ANIMATED_NAME_COLORS[pId]) {
+  // Animated Nick paketleri: paketin kendi plakası üzerinde canlı NickRenderer
+  if (getNickStyle(pId)) {
     return (
       <View style={[styles.visualTall, previewHeight]}>
-        <View style={styles.namePlate}>
-          <AnimatedNameText effectId={pId} style={styles.namePlateText} numberOfLines={1}>
+        <NickPlate styleId={pId} style={styles.namePlate}>
+          <NickRenderer styleId={pId} style={styles.namePlateText} numberOfLines={1}>
             {name || 'Tavriko'}
-          </AnimatedNameText>
-        </View>
+          </NickRenderer>
+        </NickPlate>
       </View>
     );
   }
@@ -597,6 +598,14 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         )}
 
         {activeTab === 'jokers' && <JokerGroupTabs selected={jokerGroup} onChange={setJokerGroup} />}
+        {activeTab === 'name_effects' && (
+          <View style={styles.nickCollection}>
+            <Text style={styles.nickCollectionTitle}>Animated Nick Paketleri</Text>
+            <Text style={styles.nickCollectionSub}>
+              {NICK_PACKS.filter((p) => nickOwnership(p.styleId, user) !== 'locked').length}/{NICK_PACKS.length} paket koleksiyonunda · Satın almadan önce kartına dokunup nickini dene
+            </Text>
+          </View>
+        )}
         {/* Ürün Izgarası (Yumuşak Sekme Geçiş Animasyonu ile) */}
         <Animated.View
           style={[
@@ -610,6 +619,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         >
           {filteredProducts.map((item, index) => {
             const owned = isProductOwned(item);
+            const nickDef = item.category === 'name_effects' ? getNickStyle(item.id) : null;
+            const nickState = nickDef ? nickOwnership(item.id, user) : null;
             const rarityColor = RARITY_COLORS[item.rarity || 'common'];
             const isBuying = purchasingId === item.id;
 
@@ -621,6 +632,12 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
               >
                 <View style={[styles.rarityBar, { backgroundColor: rarityColor }]} />
                 {/* Rozetler */}
+                {nickDef && (
+                  <View style={styles.nickStateRow}>
+                    <NickRarityChip rarity={nickDef.rarity} small />
+                    <NickOwnershipBadge state={nickState!} />
+                  </View>
+                )}
                 <View style={styles.badgeRow}>
                   {item.badge && (
                     <View style={styles.promoBadge}>
@@ -732,6 +749,12 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
             : undefined
         }
         onClose={() => setPreviewProduct(null)}
+        ownership={previewProduct && getNickStyle(previewProduct.id) ? nickOwnership(previewProduct.id, user) : undefined}
+        priceLabel={
+          previewProduct && previewProduct.currency !== 'try'
+            ? `${previewProduct.price} ${previewProduct.currency === 'coins' ? 'Altın' : 'Elmas'} · 1 saatten başlayan süreler`
+            : undefined
+        }
         actionLabel={previewProduct && !isProductOwned(previewProduct) ? 'Satın al' : undefined}
         onAction={() => {
           const p = previewProduct;
@@ -1018,6 +1041,32 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     fontFamily: THEME.fonts.extraBold,
   },
+  nickStateRow: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+    marginBottom: 6,
+  },
+  nickCollection: {
+    marginHorizontal: 2,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  nickCollectionTitle: {
+    color: '#FFFFFF',
+    fontFamily: THEME.fonts.black,
+    fontSize: 15,
+  },
+  nickCollectionSub: {
+    marginTop: 3,
+    color: 'rgba(226,218,255,0.72)',
+    fontFamily: THEME.fonts.bold,
+    fontSize: 12,
+  },
   namePlate: {
     paddingHorizontal: 12,
     height: 44,
@@ -1026,7 +1075,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(10, 4, 30, 0.6)',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    maxWidth: 150,
+    maxWidth: 160,
+    minWidth: 120,
   },
   namePlateText: {
     fontSize: 17,

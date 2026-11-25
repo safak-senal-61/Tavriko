@@ -32,6 +32,7 @@ import {
   LEAGUE_START_POINTS,
   getDailyChallengeConfig,
   SEASON_1_TIERS,
+  getCosmeticDef,
   SHOP_CATALOG,
   JOKERS,
   EVENT_DEFINITIONS,
@@ -508,6 +509,8 @@ export class PrismaService {
   private getItemRarity(itemId: string): ItemRarity {
     const chest = getChestOpening(itemId);
     if (chest) return chest.rarity;
+    const cosmetic = getCosmeticDef(itemId);
+    if (cosmetic) return cosmetic.rarity;
     if (itemId.includes('legendary') || itemId.includes('mythic')) return 'mythic';
     if (itemId.includes('gold') || itemId.includes('epic')) return 'epic';
     if (itemId.includes('silver') || itemId.includes('rare')) return 'rare';

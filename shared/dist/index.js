@@ -19,6 +19,7 @@ __exportStar(require("./events"), exports);
 __exportStar(require("./scoring"), exports);
 __exportStar(require("./categories"), exports);
 __exportStar(require("./cosmetics"), exports);
+__exportStar(require("./nickStyles"), exports);
 __exportStar(require("./legal"), exports);
 __exportStar(require("./rewards"), exports);
 __exportStar(require("./gameplayRewards"), exports);

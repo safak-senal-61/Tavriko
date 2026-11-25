@@ -876,6 +876,7 @@ export const FriendsScreen: React.FC<FriendsScreenProps> = ({
                       {animatedName ? (
                         <AnimatedNameText
                           effectId={nameEffectId}
+                          variant="hero"
                           style={[styles.inspectDisplayName]}
                           numberOfLines={1}
                         >

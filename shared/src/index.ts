@@ -3,6 +3,7 @@ export * from './events';
 export * from './scoring';
 export * from './categories';
 export * from './cosmetics';
+export * from './nickStyles';
 export * from './legal';
 export * from './rewards';
 export * from './gameplayRewards';

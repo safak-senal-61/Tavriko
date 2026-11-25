@@ -27,6 +27,9 @@ import Svg, { Defs, LinearGradient, Stop, Path, Circle } from 'react-native-svg'
 import { THEME } from '../theme/tokens';
 import { GradientFill } from './TavrikoGradient';
 import { CharacterAvatar } from './TavrikoAvatars';
+import { NICK_STYLES } from '@trivia/shared';
+import { NickRenderer } from './nick/NickRenderer';
+import { NickPreviewModal } from './nick/NickPreviewModal';
 import { FRAME_ART, FrameArtwork } from './FrameArtwork';
 
 /* Mağaza / Envanter / Etkinlik / Sezon / Pro Lig ortak görsel kiti */
@@ -319,22 +322,17 @@ export const BadgeVisual: React.FC<{ badgeId: string; size?: number }> = ({ badg
   );
 };
 
-/** İsim efektleri: renk döngü hızı ve stili farklı */
+/**
+ * İsim efektleri: artık @trivia/shared NICK_STYLES kayıt defterinden türetilir
+ * (Animated Nick Cosmetics). Bu harita geriye dönük uyumluluk içindir.
+ */
 export const ANIMATED_NAME_STYLES: Record<string, {
   colors: string[];
   duration: number;
   glow: number;
-}> = {
-  name_gradient_ice: { colors: ['#A5F3FC', '#38BDF8', '#E0F2FE', '#38BDF8'], duration: 5000, glow: 6 },
-  name_gradient_rainbow: { colors: ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#B197FC', '#FF6B6B'], duration: 3500, glow: 10 },
-  name_gradient_fire: { colors: ['#FFE27A', '#FF9B2F', '#E11D48', '#FF9B2F'], duration: 2800, glow: 12 },
-  // Yeni isim efektleri: farklı tarzda, her biri 1 saatlik
-  name_emerald_vine: { colors: ['#6EE7B7', '#34D399', '#A7F3D0', '#059669'], duration: 4200, glow: 8 },
-  name_toxic_slime: { colors: ['#A3E635', '#7C3AED', '#84CC16', '#7C3AED'], duration: 2600, glow: 14 },
-  name_candy_heart: { colors: ['#F9A8D4', '#EC4899', '#FBCFE8', '#EC4899'], duration: 3000, glow: 9 },
-  name_void_shadow: { colors: ['#A78BFA', '#1E1B4B', '#6D28D9', '#A78BFA'], duration: 6000, glow: 16 },
-  name_plasma_bolt: { colors: ['#67E8F9', '#D946EF', '#22D3EE', '#D946EF'], duration: 2000, glow: 18 },
-};
+}> = Object.fromEntries(
+  NICK_STYLES.map((s) => [s.styleId, { colors: s.palette.colors, duration: s.motion.periodMs, glow: s.motion.glow }]),
+);
 
 const PARTICLE_EMOJI: Record<string, string> = {
   snowflake: '❄',
@@ -880,37 +878,21 @@ const PulseBgLayer: React.FC<{ color: string; period: number }> = ({ color, peri
   return <Animated.View style={style} pointerEvents="none" />;
 };
 
-/** Animasyonlu isim efekti: her efektin kendine özgü hız ve parlaklığı */
+/**
+ * Animasyonlu isim efekti — merkezi NickRenderer'a yönlendirir
+ * (Skia shader / Lottie / lite / static kalite seçimi orada yapılır).
+ */
 export const AnimatedNameText: React.FC<{
   effectId: string;
   children?: string;
   style?: any;
   numberOfLines?: number;
-}> = ({ effectId, children, style, numberOfLines }) => {
-  const def = ANIMATED_NAME_STYLES[(effectId || '').toLowerCase()] || ANIMATED_NAME_STYLES.name_gradient_ice;
-  const colors = def.colors;
-  const progress = useSharedValue(0);
-  useEffect(() => {
-    progress.value = withRepeat(withTiming(1, { duration: def.duration, easing: Easing.linear }), -1, false);
-  }, [def.duration]);
-  const animStyle = useAnimatedStyle(() => {
-    const t = progress.value;
-    const idx = Math.min(colors.length - 1, Math.floor(t * colors.length));
-    const nextIdx = (idx + 1) % colors.length;
-    const local = t * colors.length - idx;
-    return {
-      color: mixHex(colors[idx], colors[nextIdx], local),
-      textShadowColor: mixHex(colors[idx], colors[nextIdx], local),
-      textShadowRadius: def.glow,
-      textShadowOffset: { width: 0, height: 0 },
-    };
-  });
-  return (
-    <Animated.Text style={[style, animStyle]} numberOfLines={numberOfLines}>
-      {children}
-    </Animated.Text>
-  );
-};
+  variant?: 'inline' | 'hero';
+}> = ({ effectId, children, style, numberOfLines, variant }) => (
+  <NickRenderer styleId={effectId} style={style} numberOfLines={numberOfLines} variant={variant}>
+    {children}
+  </NickRenderer>
+);
 
 /** İki hex rengi karıştırır (Reanimated worklet güvenli) */
 const mixHex = (a: string, b: string, t: number): string => {
@@ -934,7 +916,7 @@ export const ANIMATED_BG_LAYERS: Record<string, string[]> = Object.fromEntries(
   Object.entries(ANIMATED_BG_STYLES).map(([k, v]) => [k, v.layers]),
 );
 export const ANIMATED_NAME_COLORS: Record<string, string[]> = Object.fromEntries(
-  Object.entries(ANIMATED_NAME_STYLES).map(([k, v]) => [k, v.colors]),
+  NICK_STYLES.map((s) => [s.styleId, s.palette.colors]),
 );
 
 /* Avatar + çerçeve: kullanıcının fotoğrafı/avatarı çerçevenin içinde görünür */
@@ -997,17 +979,34 @@ export const CosmeticPreviewModal: React.FC<{
   onClose: () => void;
   actionLabel?: string;
   onAction?: () => void;
-}> = ({ visible, kind, itemId, title, seed, name, level, stats, onClose, actionLabel, onAction }) => {
+  /** İsim efektleri için: Kilitli / Sahipsin / Aktif */
+  ownership?: 'locked' | 'owned' | 'active';
+  priceLabel?: string;
+}> = ({ visible, kind, itemId, title, seed, name, level, stats, onClose, actionLabel, onAction, ownership, priceLabel }) => {
   const bg = kind === 'background' ? backgroundFor(itemId) : null;
   const frameHasArt = kind === 'frame' && !!frameFor(itemId);
   const isAnimFrame = kind === 'frame' && !frameHasArt && !!ANIMATED_FRAME_STYLES[(itemId || '').toLowerCase()];
   const isAnimBg = kind === 'background' && !!ANIMATED_BG_STYLES[(itemId || '').toLowerCase()];
   const isNameEffect = kind === 'name';
-  const animNameDef = isNameEffect
-    ? ANIMATED_NAME_STYLES[(itemId || '').toLowerCase()]
-    : null;
   const [pvW, setPvW] = useState(240);
   const [pvH, setPvH] = useState(390);
+  // İsim efektleri: canlı çok-bağlamlı Animated Nick önizlemesi
+  if (isNameEffect) {
+    return (
+      <NickPreviewModal
+        visible={visible}
+        styleId={itemId}
+        name={name}
+        seed={seed}
+        level={level}
+        ownership={ownership}
+        priceLabel={priceLabel}
+        actionLabel={actionLabel}
+        onAction={onAction}
+        onClose={onClose}
+      />
+    );
+  }
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={kit.pvBackdrop}>

@@ -13,7 +13,7 @@ import {
 import { LoadingShimmer } from '../components/LoadingShimmer';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { getApiBaseUrl } from '../config';
-import { UserProfile, UserSettings } from '@trivia/shared';
+import { UserProfile, UserSettings, NICK_EFFECT_PREFERENCE_LABELS, type NickEffectsPreference } from '@trivia/shared';
 import { THEME } from '../theme/tokens';
 import { sound } from '../services/soundService';
 import { trackEvent } from '../services/analytics';
@@ -169,6 +169,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   // Visual & Performance
   const [smoothAnimations, setSmoothAnimations] = useState<boolean>(pick('smoothAnimations', true));
   const [batterySaver, setBatterySaver] = useState<boolean>(pick('batterySaver', false));
+  const [nickEffects, setNickEffects] = useState<NickEffectsPreference>(pick('nickEffects', 'auto'));
 
   // Gameplay Preferences
   const [defaultDifficulty, setDefaultDifficulty] = useState<'easy' | 'medium' | 'hard'>(pick('defaultDifficulty', 'medium'));
@@ -225,6 +226,7 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
     victoryMelody,
     smoothAnimations,
     batterySaver,
+    nickEffects,
     defaultDifficulty,
     penaltyForWrong,
     autoNextQuestion,
@@ -764,12 +766,37 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </View>
             {renderToggle(smoothAnimations, () => setSmoothAnimations(v => !v), 'Akıcı Animasyonlar')}
           </View>
-          <View style={[styles.itemRow, { borderBottomWidth: 0 }]}>
+          <View style={styles.itemRow}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={styles.itemLabel}>Pil Tasarrufu</Text>
               <Text style={styles.itemSub}>Yeni ekranlarda dekoratif hareketleri azalt</Text>
             </View>
             {renderToggle(batterySaver, () => setBatterySaver(v => !v), 'Pil Tasarrufu')}
+          </View>
+          <View style={[styles.itemRow, { borderBottomWidth: 0, flexDirection: 'column', alignItems: 'stretch' }]}>
+            <Text style={styles.itemLabel}>Nick Efektleri</Text>
+            <Text style={styles.itemSub}>
+              Animasyonlu nicklerin kalitesi. Otomatik; düşük donanımda, pil tasarrufunda ve "hareketi azalt" açıkken hafif ya da sabit görünüme geçer.
+            </Text>
+            <View style={[styles.segmentedPills, { marginTop: 10, alignSelf: 'flex-start' }]}>
+              {(['auto', 'full', 'lite', 'off'] as const).map((key) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.miniSegPill, nickEffects === key && styles.miniSegPillActive]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: nickEffects === key }}
+                  accessibilityLabel={`Nick efektleri: ${NICK_EFFECT_PREFERENCE_LABELS[key]}`}
+                  onPress={() => {
+                    sound.playSound('tap');
+                    setNickEffects(key);
+                  }}
+                >
+                  <Text style={[styles.miniSegPillText, nickEffects === key && styles.miniSegPillTextActive]}>
+                    {NICK_EFFECT_PREFERENCE_LABELS[key]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
         </>}
