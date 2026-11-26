@@ -3,6 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import { db } from '../db/prismaClient';
 import { requireUserAuth } from '../middleware/auth';
 import { applyGemOrder, createGemCheckout, polarGemConfig, verifyPolarGemSignature } from '../services/polarGemPayments';
+import { clientIpAddress, clientOriginAllowed } from '../services/polarClient';
 import { checkoutIdPattern } from '../services/polarSandbox';
 import { walletSchemaReady } from '../services/walletSchema';
 import { walletRateLimitOptions } from '../middleware/walletRateLimit';
@@ -16,7 +17,8 @@ export const polarGemPlayerRoutes = Router();
 polarGemPlayerRoutes.post('/shop/diamonds/availability', availabilityLimit, async (req, res) => {
   const config = polarGemConfig();
   res.set('Cache-Control', 'no-store').json({
-    enabled: Boolean(config && req.get('origin') === config.origin && await walletSchemaReady(db.rawClient, 'gems')),
+    enabled: Boolean(config && clientOriginAllowed(req.get('origin'), config.origin) &&
+      await walletSchemaReady(db.rawClient, 'gems')),
     sandbox: Boolean(config?.sandbox),
   });
 });
@@ -25,7 +27,7 @@ polarGemPlayerRoutes.post('/shop/diamonds/checkout', checkoutStartLimit, require
   const config = polarGemConfig();
   const userId = req.authUserId;
   const packId = req.body?.productId;
-  if (!config || req.get('origin') !== config.origin || !await walletSchemaReady(db.rawClient, 'gems')) {
+  if (!config || !clientOriginAllowed(req.get('origin'), config.origin) || !await walletSchemaReady(db.rawClient, 'gems')) {
     res.status(503).json({ error: 'Elmas ödemesi şu anda açık değil.' }); return;
   }
   if (!userId || userId.startsWith('guest_') || typeof packId !== 'string' || !config.products.has(packId)) {
@@ -37,7 +39,7 @@ polarGemPlayerRoutes.post('/shop/diamonds/checkout', checkoutStartLimit, require
     if (!account) { res.status(401).json({ error: 'Lütfen tekrar giriş yap.' }); return; }
     const recent = await prisma.polarGemOrder.count({ where: { userId, createdAt: { gte: new Date(Date.now() - 60_000) } } });
     if (recent >= 4) { res.status(429).json({ error: 'Yeni ödeme açmak için biraz bekle.' }); return; }
-    const checkout = await createGemCheckout(config, packId, userId);
+    const checkout = await createGemCheckout(config, packId, userId, fetch, clientIpAddress(req));
     if (!checkout) { res.status(400).json({ error: 'Paket bulunamadı.' }); return; }
     await prisma.polarGemOrder.create({ data: checkout.row });
     res.json({ url: checkout.url });

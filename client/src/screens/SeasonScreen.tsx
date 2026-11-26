@@ -8,6 +8,7 @@ import {
   Modal,
   Platform,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { UserProfile, SEASON_1_TIERS, SeasonTierItem, SeasonReward, isJokerId } from '@trivia/shared';
 import { WalletArtwork } from '../components/WalletArtwork';
 import { THEME } from '../theme/tokens';
@@ -96,7 +97,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
   const seasonXp = user?.seasonXp || 0;
   const hasPremium = !!user?.hasPremiumPass;
   const base = apiBaseUrl || DEFAULT_API_BASE;
-  const canCheckOffer = Platform.OS === 'web' && !!user && !user.isGuest && !hasPremium;
+  const canCheckOffer = !!user && !user.isGuest && !hasPremium;
   const claimedFree = user?.claimedSeasonFreeTiers || user?.claimedSeasonTiers || [1];
   const claimedPremium = user?.claimedSeasonPremiumTiers || [];
 
@@ -331,7 +332,29 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
       if (!origins.includes(url.origin) || !url.pathname.startsWith('/checkout/') || url.username || url.password) {
         failWith('Ödeme adresi doğrulanamadı.'); return;
       }
-      window.location.assign(url.href);
+      if (Platform.OS === 'web') {
+        window.location.assign(url.href);
+        return;
+      }
+      const checkoutId = url.pathname.split('/').filter(Boolean).pop() ?? '';
+      if (!/^[a-f0-9-]{36}$/i.test(checkoutId)) { failWith('Ödeme adresi doğrulanamadı.'); return; }
+      await WebBrowser.openBrowserAsync(url.href, { enableBarCollapsing: true });
+      setStatusMessage('Ödemen Polar tarafından doğrulanıyor.');
+      for (let attempt = 0; attempt < 24; attempt += 1) {
+        try {
+          const poll = await fetch(`${base}/social/season/checkout/${checkoutId}`, { headers: authHeaders() });
+          if (poll.ok) {
+            const { status } = await poll.json();
+            if (status === 'paid' || status === 'refunded') {
+              setStatusMessage(status === 'paid' ? 'Ödemen doğrulandı. Premium Pass etkinleştirildi.' : 'Bu ödeme iade edildi.');
+              onRefreshUser?.();
+              return;
+            }
+          }
+        } catch { /* ağ hatasında tekrar dene */ }
+        await new Promise(resolve => setTimeout(resolve, 2500));
+      }
+      setStatusMessage('Ödeme henüz doğrulanmadı. Sezon ekranını yenile.');
     } catch {
       failWith('Bağlantı hatası oluştu.');
     } finally {
@@ -587,8 +610,8 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
             >
               <Text style={styles.passBuyBtnText}>{isPurchasingPass ? 'Açılıyor…' :
                 `${offer.sandbox ? 'Test ödemesi' : 'Polar ile satın al'} · ${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(offer.amount / 100)}`}</Text>
-            </TouchableOpacity> : <Text style={styles.passPromoSub}>{Platform.OS !== 'web'
-              ? 'Satın alma web sürümünde yapılır.' : !user || user.isGuest ? 'Satın almak için giriş yap.'
+            </TouchableOpacity> : <Text style={styles.passPromoSub}>{!user || user.isGuest
+              ? 'Satın almak için giriş yap.'
               : checkingOffer ? 'Ödeme durumu kontrol ediliyor…' : 'Polar ödemesi henüz açık değil.'}</Text>}
           </Reanimated.View>
         ) : (

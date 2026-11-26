@@ -65,6 +65,15 @@ describe('Polar Season 1 pass', () => {
     expect(tx.polarSeasonOrder.create).toHaveBeenCalledTimes(1);
   });
 
+  it('forwards the customer IP so Polar prices the pass in TRY for the right region', async () => {
+    const { prisma } = fixture(false, false);
+    const request = vi.fn<typeof fetch>().mockImplementation(async () => response(checkout));
+    await startSeasonCheckout(prisma, config, 'player1', request, '203.0.113.7');
+    expect(JSON.parse(String(request.mock.calls[0][1]?.body))).toMatchObject({
+      currency: 'try', customer_ip_address: '203.0.113.7',
+    });
+  });
+
   it('blocks another checkout while a previous payment is confirming or the pass is already active', async () => {
     const request = vi.fn<typeof fetch>().mockImplementation(async () => response({ ...checkout, status: 'confirmed' }));
     await expect(startSeasonCheckout(fixture().prisma, config, 'player1', request)).rejects.toThrow('doğrulanıyor');

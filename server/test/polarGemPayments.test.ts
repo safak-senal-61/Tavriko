@@ -71,6 +71,20 @@ describe('paid diamonds and joker economy', () => {
     expect(await createGemCheckout(config, 'joker_half', 'abc', reply(order))).toBeNull();
   });
 
+  it('forwards the customer IP to Polar and omits it when unknown', async () => {
+    const config = polarGemConfig(env)!;
+    const id = randomUUID();
+    const order = { id, url: `https://sandbox.polar.sh/checkout/${id}`, status: 'open',
+      product_id: products.POLAR_GEMS_PRODUCT_100, amount: 3999, currency: 'try' };
+    const reply = () => vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify(order)));
+    const withIp = reply();
+    await createGemCheckout(config, 'gems_100', 'abc', withIp, '198.51.100.4');
+    expect(JSON.parse(String(withIp.mock.calls[0][1]?.body))).toMatchObject({ customer_ip_address: '198.51.100.4' });
+    const withoutIp = reply();
+    await createGemCheckout(config, 'gems_100', 'abc', withoutIp);
+    expect(JSON.parse(String(withoutIp.mock.calls[0][1]?.body))).not.toHaveProperty('customer_ip_address');
+  });
+
   it('removes legacy pictograms without removing ordinary names, digits or punctuation', () => {
     const legacy = '\u{1F451} Tavriko \u{1F1F9}\u{1F1F7} #28 • 1\uFE0F\u20E3';
     expect(plainDisplayText(legacy)).toBe('Tavriko #28 •');
