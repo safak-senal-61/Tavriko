@@ -12,6 +12,7 @@ import {
   Animated,
   ActivityIndicator,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { LoadingShimmer } from '../components/LoadingShimmer';
 import Svg, {
   Defs,
@@ -82,7 +83,9 @@ interface CategoryTabItem {
 }
 
 const WEB = Platform.OS === 'web';
-const SELLABLE_CATALOG = SHOP_CATALOG.filter(p =>WEB || p.currency !== 'try');
+// Elmas paketleri artık yerel uygulamada da listelenir; ödeme Polar
+// checkout'u uygulama içi tarayıcıda açılır.
+const SELLABLE_CATALOG = SHOP_CATALOG;
 
 const ALL_CATEGORY_TABS: CategoryTabItem[] = [
   { id: 'diamonds', name: 'Elmas' },
@@ -293,7 +296,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const page = usePlayerWebLayout();
   const threeProducts = page?.columns === 3;
   const roomy = page?.roomy;
-  const [activeTab, setActiveTab] = useState<ShopProductCategory>(initialTab === 'diamonds' && !WEB ? 'gold' : initialTab ?? (WEB ? 'diamonds' : 'gold'));
+  const [activeTab, setActiveTab] = useState<ShopProductCategory>(initialTab ?? (WEB ? 'diamonds' : 'gold'));
   const [jokerGroup, setJokerGroup] = useState<JokerGroup | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
@@ -325,7 +328,6 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     if (!jokersAvailable && activeTab === 'jokers') setActiveTab(WEB ? 'diamonds' : 'gold');
   }, [jokersAvailable, activeTab]);
   useEffect(() => {
-    if (!WEB) return;
     const controller = new AbortController();
     void fetch(`${base}/social/shop/diamonds/availability`, { method: 'POST', signal: controller.signal })
       .then(r => r.ok ? r.json() : null)
@@ -426,6 +428,26 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     return false;
   };
 
+  // Yerel uygulamada Polar sayfası kapanınca webhook'un bakiyeyi yazmasını bekleriz.
+  const pollGemCheckout = async (checkoutId: string) => {
+    setStatusMessage('Ödemen doğrulanıyor. Elmaslar doğrulamadan sonra bakiyene eklenir.');
+    for (let attempt = 0; attempt < 24; attempt += 1) {
+      try {
+        const result = await fetch(`${base}/social/shop/diamonds/checkout/${checkoutId}`, { headers: authHeaders() });
+        if (result.ok) {
+          const { status } = await result.json();
+          if (status === 'paid' || status === 'refunded') {
+            setStatusMessage(status === 'paid' ? 'Ödemen doğrulandı. Elmas bakiyen güncellendi.' : 'Bu ödeme iade edildi.');
+            onRefresh?.();
+            return;
+          }
+        }
+      } catch { /* ağ hatasında tekrar dene */ }
+      await new Promise(resolve => setTimeout(resolve, 2500));
+    }
+    setStatusMessage('Ödeme henüz doğrulanmadı. Elmaslar birkaç dakika içinde eklenecek; mağazayı yenile.');
+  };
+
   const handleInitiatePurchase = async (product: ShopProduct) => {
     sound.playSound('tap');
     if (!user) {
@@ -443,7 +465,19 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     }
 
     if (product.currency === 'try') {
-      if (!WEB || !polarAvailable || user.isGuest || purchaseLock.current) return;
+      if (purchaseLock.current) return;
+      if (user.isGuest) {
+        sound.playSound('wrong');
+        setIsError(true);
+        setStatusMessage('Elmas almak için giriş yapmalısın.');
+        return;
+      }
+      if (!polarAvailable) {
+        sound.playSound('wrong');
+        setIsError(true);
+        setStatusMessage('Elmas ödemesi şu anda açık değil.');
+        return;
+      }
       purchaseLock.current = true;
       setPurchasingId(product.id);
       setStatusMessage(null);
@@ -458,7 +492,14 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         const allowedOrigins = polarSandbox ? ['https://sandbox.polar.sh'] : ['https://polar.sh', 'https://buy.polar.sh'];
         if (!allowedOrigins.includes(url.origin) ||
             !url.pathname.startsWith('/checkout/') || url.username || url.password) throw new Error('Ödeme adresi doğrulanamadı.');
-        window.location.assign(url.href);
+        if (WEB) {
+          window.location.assign(url.href);
+        } else {
+          const checkoutId = url.pathname.split('/').filter(Boolean).pop() ?? '';
+          if (!/^[a-f0-9-]{36}$/i.test(checkoutId)) throw new Error('Ödeme adresi doğrulanamadı.');
+          await WebBrowser.openBrowserAsync(url.href, { enableBarCollapsing: true });
+          await pollGemCheckout(checkoutId);
+        }
       } catch (error) {
         setIsError(true);
         setStatusMessage(error instanceof Error ? error.message : 'Ödeme sayfası açılamadı.');

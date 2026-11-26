@@ -53,7 +53,9 @@ function paymentUrl(config: Config, data: Checkout, productId: string, amount: n
   return { url: url.href, id: data.id };
 }
 
-export async function startSeasonCheckout(prisma: PrismaClient, config: Config, userId: string, request = fetch) {
+export async function startSeasonCheckout(
+  prisma: PrismaClient, config: Config, userId: string, request = fetch, customerIp?: string,
+) {
   return prisma.$transaction(async tx => {
     const [user] = await tx.$queryRaw<{ hasPremiumPass: boolean }[]>`
       SELECT "hasPremiumPass" FROM "users" WHERE "id" = ${userId} FOR UPDATE`;
@@ -77,6 +79,7 @@ export async function startSeasonCheckout(prisma: PrismaClient, config: Config, 
       method: 'POST', headers: headers(config), redirect: 'error', signal: AbortSignal.timeout(5000),
       body: JSON.stringify({
         products: [config.productId], currency: 'try', external_customer_id: userId,
+        ...(customerIp ? { customer_ip_address: customerIp } : {}),
         allow_discount_codes: false, allow_trial: false,
         metadata: { tavriko_season: '1' },
         return_url: `${config.origin}/app?season=1`,

@@ -4,6 +4,7 @@ import { db } from '../db/prismaClient';
 import { requireUserAuth } from '../middleware/auth';
 import { walletRateLimitOptions } from '../middleware/walletRateLimit';
 import { verifyPolarGemSignature } from '../services/polarGemPayments';
+import { clientIpAddress, clientOriginAllowed } from '../services/polarClient';
 import { checkoutIdPattern } from '../services/polarSandbox';
 import { applySeasonOrder, polarSeasonConfig, SeasonCheckoutConflict, startSeasonCheckout } from '../services/polarSeasonPayments';
 
@@ -17,7 +18,7 @@ const seasonSchemaReady = () => db.rawClient.$queryRaw<{ ready: boolean }[]>`
 export const polarSeasonPlayerRoutes = Router();
 polarSeasonPlayerRoutes.post('/season/checkout/availability', available, async (req, res) => {
   const config = polarSeasonConfig();
-  const enabled = !!config && req.get('origin') === config.origin && await seasonSchemaReady();
+  const enabled = !!config && clientOriginAllowed(req.get('origin'), config.origin) && await seasonSchemaReady();
   res.set('Cache-Control', 'no-store').json({
     enabled, sandbox: enabled && config.sandbox, amount: enabled ? config.amount : undefined,
   });
@@ -25,7 +26,7 @@ polarSeasonPlayerRoutes.post('/season/checkout/availability', available, async (
 polarSeasonPlayerRoutes.post('/season/checkout', start, requireUserAuth, async (req, res) => {
   res.set('Cache-Control', 'no-store');
   const config = polarSeasonConfig();
-  if (!config || req.get('origin') !== config.origin || !await seasonSchemaReady()) {
+  if (!config || !clientOriginAllowed(req.get('origin'), config.origin) || !await seasonSchemaReady()) {
     res.status(503).json({ error: 'Premium Pass ödemesi şu anda açık değil.' }); return;
   }
   const userId = req.authUserId;
@@ -33,7 +34,7 @@ polarSeasonPlayerRoutes.post('/season/checkout', start, requireUserAuth, async (
     res.status(401).json({ error: 'Premium Pass almak için giriş yap.' }); return;
   }
   try {
-    res.json({ url: await startSeasonCheckout(db.rawClient, config, userId) });
+    res.json({ url: await startSeasonCheckout(db.rawClient, config, userId, fetch, clientIpAddress(req)) });
   } catch (error) {
     const conflict = error instanceof SeasonCheckoutConflict;
     res.status(conflict ? 409 : 502).json({ error: conflict ? error.message : 'Polar ödeme sayfası açılamadı. Tekrar dene.' });

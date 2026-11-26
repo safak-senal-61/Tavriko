@@ -35,7 +35,9 @@ export function verifyPolarGemSignature(bytes: Buffer, header: (name: string) =>
   });
 }
 
-export async function createGemCheckout(config: Config, packId: string, userId: string, request = fetch) {
+export async function createGemCheckout(
+  config: Config, packId: string, userId: string, request = fetch, customerIp?: string,
+) {
   const pack = config.products.get(packId);
   if (!pack) return null;
   const api = config.sandbox ? 'https://sandbox-api.polar.sh' : 'https://api.polar.sh';
@@ -46,6 +48,7 @@ export async function createGemCheckout(config: Config, packId: string, userId: 
     headers: { Authorization: `Bearer ${config.token}`, 'Content-Type': 'application/json', 'Polar-Version': '2026-10' },
     body: JSON.stringify({
       products: [pack.polarId], currency: 'try', external_customer_id: userId,
+      ...(customerIp ? { customer_ip_address: customerIp } : {}),
       metadata: { tavriko_gem_pack: packId }, allow_discount_codes: false, allow_trial: false,
       return_url: returnUrl, success_url: `${returnUrl}?gem_checkout={CHECKOUT_ID}`,
     }),
