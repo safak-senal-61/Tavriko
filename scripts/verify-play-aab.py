@@ -30,6 +30,8 @@ def main(bundle, manifest_path):
               "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"}
     require(not denied.intersection(permissions), f"Unexpected Android permissions: {denied & permissions}")
     require("com.google.android.gms.permission.AD_ID" in permissions, "Missing AD_ID permission")
+    require("com.android.vending.BILLING" in permissions, "Missing com.android.vending.BILLING permission (Google Play Billing)")
+    require(version_code >= 27, "versionCode must be at least 27")
     require(manifest.find("application").get(ns + "usesCleartextTraffic") != "true",
             "Release must not allow cleartext traffic")
     counts = {"arm64-v8a": 0, "x86_64": 0}

@@ -35,4 +35,4 @@ Android uygulaması elmas paketlerini ve Premium Pass'i yalnızca Google Play Bi
 
 1. `server/prisma/migrations/20261126180000_play_purchases` üretim veritabanına uygulanır (onaylı, elle).
 2. Play Console ürünleri ve servis hesabı izinleri tanımlanır; env değişkenleri eklenir; sunucu yayınlanır.
-3. `expo-iap` yerel modül olduğu için OTA yetmez: sürüm 1.1.6 / versionCode 26 ile yeni AAB (EAS production) yüklenir, önce Internal testing'de lisans testçisiyle denenir.
+3. `expo-iap` yerel modül olduğu için OTA yetmez: sürüm 1.1.6 / versionCode 27 ile yeni AAB (EAS production) yüklenir, önce Internal testing'de lisans testçisiyle denenir.
