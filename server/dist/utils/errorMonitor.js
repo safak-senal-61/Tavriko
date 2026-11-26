@@ -5,7 +5,9 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.initErrorMonitor = initErrorMonitor;
+exports.getErrorMonitorStatus = getErrorMonitorStatus;
 exports.captureError = captureError;
+exports.sendErrorMonitorTest = sendErrorMonitorTest;
 exports.addBreadcrumb = addBreadcrumb;
 let Sentry = null;
 try {
@@ -16,34 +18,79 @@ catch {
     Sentry = null;
 }
 let initialized = false;
+function readDsn() {
+    return process.env.SENTRY_DSN?.trim() || process.env.GLITCHTIP_DSN?.trim();
+}
 function initErrorMonitor() {
-    const dsn = process.env.SENTRY_DSN || process.env.GLITCHTIP_DSN;
+    const dsn = readDsn();
     if (!dsn || initialized || !Sentry) {
         return initialized;
     }
     try {
         Sentry.init({
             dsn,
-            environment: process.env.NODE_ENV || 'development',
+            environment: process.env.VERCEL_ENV || process.env.NODE_ENV || 'development',
             serverName: 'tavriko-server',
-            tracesSampleRate: 0.2,
+            dataCollection: {
+                userInfo: false,
+                cookies: false,
+                httpHeaders: false,
+                httpBodies: [],
+                urlQueryParams: false,
+                databaseQueryData: false,
+                stackFrameVariables: false,
+                frameContextLines: 0,
+            },
+            tracesSampleRate: 0,
+            beforeSend(event) {
+                // Do not export request contents, identity, app breadcrumbs or raw exception
+                // messages (which can include database values or upstream payloads).
+                delete event.request;
+                delete event.user;
+                delete event.breadcrumbs;
+                delete event.extra;
+                for (const error of event.exception?.values ?? []) {
+                    error.value = 'Tavriko server exception';
+                }
+                return event;
+            },
         });
-        initialized = true;
-        console.log('[errorMonitor] GlitchTip/Sentry icin hata izleme aktif');
+        initialized = Boolean(Sentry.getClient()?.getDsn());
+        if (initialized)
+            console.log('[errorMonitor] Sunucu hata izleme aktif');
     }
-    catch (err) {
-        console.warn('[errorMonitor] hata izleme baslatilamadi:', err);
+    catch {
+        console.warn('[errorMonitor] Sunucu hata izleme başlatılamadı.');
     }
     return initialized;
 }
-function captureError(err) {
+function getErrorMonitorStatus() {
+    return initialized ? 'initialized' : readDsn() ? 'failed' : 'unconfigured';
+}
+async function captureError(err) {
     if (initialized && Sentry) {
         try {
             Sentry.captureException(err);
+            // Vercel may freeze the instance after the response. Flush before replying.
+            await Sentry.flush(1500);
         }
         catch {
             // ignore
         }
+    }
+}
+async function sendErrorMonitorTest() {
+    if (!initialized || !Sentry)
+        return null;
+    try {
+        const eventId = Sentry.captureMessage('Tavriko server monitoring test', {
+            level: 'info',
+            tags: { ops_test: 'true' },
+        });
+        return await Sentry.flush(2500) ? eventId : null;
+    }
+    catch {
+        return null;
     }
 }
 /**

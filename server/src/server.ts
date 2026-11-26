@@ -30,6 +30,7 @@ import triviaRoutes from './routes/triviaRoutes';
 import socialRoutes from './routes/socialRoutes';
 import { polarGemPlayerRoutes, polarGemWebhook } from './routes/polarGemRoutes';
 import { polarSeasonPlayerRoutes, polarSeasonWebhook } from './routes/polarSeasonRoutes';
+import { handlePlayVoidedCron, playBillingPlayerRoutes } from './routes/playBillingRoutes';
 import referralRoutes from './routes/referralRoutes';
 import pushRoutes from './routes/pushRoutes';
 import { requireAdminAuth, getAdminSessionFromRequest, isPortalConfigured, setTelegramAdminVerifier } from './middleware/auth';
@@ -437,6 +438,7 @@ export function createApp() {
   };
   app.get('/api/cron/reengage-push', handleReengagementCron);
   app.post('/api/cron/reengage-push', handleReengagementCron);
+  app.get('/api/cron/play-voided', handlePlayVoidedCron);
 
   // Telegram set webhook endpoint
   app.get(['/api/admin/telegram/set-webhook', '/admin/telegram/set-webhook'], requireAdminAuth, async (req, res) => {
@@ -3754,6 +3756,7 @@ export function createApp() {
   app.use('/api/social', socialRoutes);
   app.use('/api/social', polarGemPlayerRoutes);
   app.use('/api/social', polarSeasonPlayerRoutes);
+  app.use('/api/social', playBillingPlayerRoutes);
   app.use('/api/referrals', referralRoutes);
   app.use('/api/push', pushRoutes);
   app.use(legalRouter);

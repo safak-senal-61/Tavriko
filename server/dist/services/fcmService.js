@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isFcmEnabled = isFcmEnabled;
 exports.getFcmStatus = getFcmStatus;
+exports.verifyFcmApi = verifyFcmApi;
 exports.sendFcmToTokens = sendFcmToTokens;
 /**
  * Firebase Cloud Messaging (FCM) doğrudan gönderim servisi.
@@ -121,6 +122,18 @@ function isFcmEnabled() {
 function getFcmStatus() {
     const enabled = getMessagingInstance() !== null;
     return { enabled, reason: enabled ? '' : disabledReason };
+}
+/** Exercise provider authentication and message validation without using any device token. */
+async function verifyFcmApi() {
+    const fcm = getMessagingInstance();
+    if (!fcm)
+        return false;
+    const name = await fcm.send({
+        topic: 'tavriko-health-validation',
+        data: { title: 'Tavriko', message: 'FCM API validation' },
+        android: { priority: 'high' },
+    }, true);
+    return typeof name === 'string' && name.length > 0;
 }
 /** FCM data payload değerleri string olmalı; objeler JSON'a çevrilir. */
 function stringifyData(data) {

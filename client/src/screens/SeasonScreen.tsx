@@ -8,7 +8,7 @@ import {
   Modal,
   Platform,
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
+import { buyWithPlay, playBillingSupported, preparePlayBilling } from '../services/playBilling';
 import { UserProfile, SEASON_1_TIERS, SeasonTierItem, SeasonReward, isJokerId } from '@trivia/shared';
 import { WalletArtwork } from '../components/WalletArtwork';
 import { THEME } from '../theme/tokens';
@@ -84,7 +84,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
   const [claimingAll, setClaimingAll] = useState(false);
   const [claimedRewardModal, setClaimedRewardModal] = useState<SeasonReward | null>(null);
   const [isPurchasingPass, setIsPurchasingPass] = useState(false);
-  const [offer, setOffer] = useState<{ amount: number; sandbox: boolean } | null>(null);
+  const [offer, setOffer] = useState<{ amount: number; sandbox: boolean; playPrice?: string } | null>(null);
   const [checkingOffer, setCheckingOffer] = useState(false);
   const [onlyClaimable, setOnlyClaimable] = useState(false);
 
@@ -106,6 +106,18 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
     const controller = new AbortController();
     setCheckingOffer(true);
     setOffer(null);
+    // Yerel uygulamada Polar'a yönlendirme yok: Android'de Google Play Billing, diğerlerinde satış kapalı.
+    if (Platform.OS !== 'web') {
+      let alive = true;
+      if (!playBillingSupported) { setCheckingOffer(false); return; }
+      void preparePlayBilling(base).then(state => {
+        if (!alive) return;
+        const playPrice = state.enabled ? state.prices.premium_pass : undefined;
+        if (playPrice) setOffer({ amount: 0, sandbox: false, playPrice });
+        setCheckingOffer(false);
+      });
+      return () => { alive = false; };
+    }
     void fetch(`${base}/social/season/checkout/availability`, { method: 'POST', signal: controller.signal })
       .then(res => res.ok ? res.json() : null)
       .then(data => {
@@ -318,6 +330,22 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
     setIsPurchasingPass(true);
     try {
       sound.playSound('tap');
+      if (Platform.OS !== 'web') {
+        const result = await buyWithPlay(base, 'premium_pass');
+        if (result.status === 'granted' || result.status === 'already_processed') {
+          sound.playSound('reward');
+          setStatusMessage('Ödemen doğrulandı. Premium Pass etkinleştirildi.');
+          onRefreshUser?.();
+        } else if (result.status === 'pending') {
+          setStatusMessage('Ödemen onay bekliyor. Onaylanınca Premium Pass otomatik açılır.');
+        } else if (result.status === 'pass_owned') {
+          setStatusMessage('Premium Pass zaten aktif. Bu ödeme Google Play tarafından otomatik iade edilir.');
+          onRefreshUser?.();
+        } else if (result.status === 'error') {
+          failWith(result.message);
+        }
+        return;
+      }
       const res = await fetch(`${base}/social/season/checkout`, {
         method: 'POST',
         headers: authHeaders(),
@@ -332,29 +360,7 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
       if (!origins.includes(url.origin) || !url.pathname.startsWith('/checkout/') || url.username || url.password) {
         failWith('Ödeme adresi doğrulanamadı.'); return;
       }
-      if (Platform.OS === 'web') {
-        window.location.assign(url.href);
-        return;
-      }
-      const checkoutId = url.pathname.split('/').filter(Boolean).pop() ?? '';
-      if (!/^[a-f0-9-]{36}$/i.test(checkoutId)) { failWith('Ödeme adresi doğrulanamadı.'); return; }
-      await WebBrowser.openBrowserAsync(url.href, { enableBarCollapsing: true });
-      setStatusMessage('Ödemen Polar tarafından doğrulanıyor.');
-      for (let attempt = 0; attempt < 24; attempt += 1) {
-        try {
-          const poll = await fetch(`${base}/social/season/checkout/${checkoutId}`, { headers: authHeaders() });
-          if (poll.ok) {
-            const { status } = await poll.json();
-            if (status === 'paid' || status === 'refunded') {
-              setStatusMessage(status === 'paid' ? 'Ödemen doğrulandı. Premium Pass etkinleştirildi.' : 'Bu ödeme iade edildi.');
-              onRefreshUser?.();
-              return;
-            }
-          }
-        } catch { /* ağ hatasında tekrar dene */ }
-        await new Promise(resolve => setTimeout(resolve, 2500));
-      }
-      setStatusMessage('Ödeme henüz doğrulanmadı. Sezon ekranını yenile.');
+      window.location.assign(url.href);
     } catch {
       failWith('Bağlantı hatası oluştu.');
     } finally {
@@ -609,10 +615,11 @@ export const SeasonScreen: React.FC<SeasonScreenProps> = ({
               disabled={isPurchasingPass || claimingAll || !!loadingKey}
             >
               <Text style={styles.passBuyBtnText}>{isPurchasingPass ? 'Açılıyor…' :
+                offer.playPrice ? `Satın al · ${offer.playPrice}` :
                 `${offer.sandbox ? 'Test ödemesi' : 'Polar ile satın al'} · ${new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(offer.amount / 100)}`}</Text>
             </TouchableOpacity> : <Text style={styles.passPromoSub}>{!user || user.isGuest
               ? 'Satın almak için giriş yap.'
-              : checkingOffer ? 'Ödeme durumu kontrol ediliyor…' : 'Polar ödemesi henüz açık değil.'}</Text>}
+              : checkingOffer ? 'Ödeme durumu kontrol ediliyor…' : Platform.OS === 'web' ? 'Polar ödemesi henüz açık değil.' : 'Premium Pass şu anda satın alınamıyor.'}</Text>}
           </Reanimated.View>
         ) : (
           <View style={styles.passActiveBanner}>

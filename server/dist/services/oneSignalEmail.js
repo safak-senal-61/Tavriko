@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getOneSignalEmailConfig = getOneSignalEmailConfig;
 exports.sendOneSignalPasswordResetEmail = sendOneSignalPasswordResetEmail;
 exports.sendOneSignalAccountRemovalEmail = sendOneSignalAccountRemovalEmail;
+exports.sendOneSignalSupportEmail = sendOneSignalSupportEmail;
 const node_crypto_1 = require("node:crypto");
 const logger_1 = require("../utils/logger");
 const passwordResetEmail_1 = require("./passwordResetEmail");
@@ -41,7 +42,10 @@ async function sendOneSignalAccountRemovalEmail(config, removal) {
             : { email_body: (0, accountRemovalEmail_1.renderAccountRemovalEmail)(removal) }),
     });
 }
-async function sendTransactionalEmail(config, email, message) {
+function sendOneSignalSupportEmail(config, email, message) {
+    return sendTransactionalEmail(config, email, message, 'support');
+}
+async function sendTransactionalEmail(config, email, message, purpose = 'security') {
     try {
         const response = await fetch(EMAIL_ENDPOINT, {
             method: 'POST',
@@ -64,13 +68,13 @@ async function sendTransactionalEmail(config, email, message) {
         if (!result || typeof result !== 'object' || !('id' in result) ||
             typeof result.id !== 'string' || !result.id.trim()) {
             // Do not log the address, response body, API key, or OTP.
-            logger_1.logger.warn('AUTH', 'OneSignal güvenlik e-postasını kabul etmedi.', { status: response.status });
+            logger_1.logger.warn(purpose === 'security' ? 'AUTH' : 'SYSTEM', 'OneSignal işlem e-postasını kabul etmedi.', { status: response.status });
             return false;
         }
         return true;
     }
     catch {
-        logger_1.logger.warn('AUTH', 'OneSignal güvenlik e-postası gönderilemedi.');
+        logger_1.logger.warn(purpose === 'security' ? 'AUTH' : 'SYSTEM', 'OneSignal işlem e-postası gönderilemedi.');
         return false;
     }
 }

@@ -237,6 +237,10 @@ class GameRoomManager {
         }
         // Reset player round states
         Object.values(room.players).forEach((p) => {
+            if (room.currentRound === 1) {
+                p.rewardStarted = p.isConnected && !p.isBot;
+                p.rewardAnswers = 0;
+            }
             p.hasAnsweredCurrentRound = false;
             p.lastAnswerTimeMs = 0;
             p.lastSelectedOptionId = undefined;
@@ -329,17 +333,18 @@ class GameRoomManager {
         // Schedule intermission or next round (1200ms gives crisp, responsive pacing while allowing review of correct answer)
         setTimeout(() => {
             if (room.currentRound >= room.totalRounds) {
-                this.finishGame(code);
+                this.finishGame(code, true);
             }
             else {
                 this.advanceToNextRound(code);
             }
         }, 1200);
     }
-    finishGame(code) {
+    finishGame(code, completedNormally = false) {
         const room = this.getRoom(code);
-        if (!room)
+        if (!room || room.status === 'game_over')
             return;
+        const rewardCompletedPlayerIds = (0, shared_1.rewardCompletionPlayers)(room, completedNormally);
         const summary = (0, shared_1.buildFinalMatchSummary)(room);
         (0, errorMonitor_1.addBreadcrumb)(`Maç bitti: ${code}`, 'game', {
             roomCode: code,
@@ -348,7 +353,7 @@ class GameRoomManager {
             totalRounds: room.totalRounds,
         });
         if (this.onGameOver) {
-            this.onGameOver(code, summary);
+            this.onGameOver(code, summary, rewardCompletedPlayerIds);
         }
     }
     getLeaderboard(code) {

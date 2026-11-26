@@ -266,7 +266,7 @@ class SupabaseService {
                 level: record.level,
                 xp: record.xp,
                 coins: record.coins,
-                gems: record.gems ?? 14,
+                gems: record.gems ?? 0,
                 rank_title: record.rankTitle,
                 rank_points: record.rankPoints,
                 stats: record.stats,

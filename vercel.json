@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/reengage-push",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/play-voided",
+      "schedule": "30 3 * * *"
     }
   ],
   "buildCommand": "npx prisma generate --schema=server/prisma/schema.prisma && npm run build:shared && npm run build:server && npm run build:client:web",

@@ -48,7 +48,7 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
     roomManager.onRoundEnd = (roomCode, result) => {
         io.to(roomCode).emit(shared_1.SOCKET_EVENTS.ROUND_RESULT, result);
     };
-    roomManager.onGameOver = (roomCode, summary) => {
+    roomManager.onGameOver = (roomCode, summary, rewardCompletedPlayerIds) => {
         io.to(roomCode).emit(shared_1.SOCKET_EVENTS.GAME_OVER, summary);
         const verifiedPlayerIds = [...(io.sockets.adapter.rooms.get(roomCode) ?? [])].map(id => io.sockets.sockets.get(id)?.data.playerId)
             .filter((id) => typeof id === 'string');
@@ -57,7 +57,7 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
         void (async () => {
             await prismaClient_1.db.recordFinalMatch(summary);
             if (process.env.DATABASE_URL || process.env.DIRECT_URL) {
-                await (0, playerAnalytics_1.recordCompletedPlayers)(prismaClient_1.db.rawClient, { ...summary, matchId: (0, node_crypto_1.randomUUID)(), verifiedPlayerIds, category });
+                await (0, playerAnalytics_1.recordCompletedPlayers)(prismaClient_1.db.rawClient, { ...summary, matchId: (0, node_crypto_1.randomUUID)(), verifiedPlayerIds, rewardCompletedPlayerIds, category });
             }
         })().catch(error => console.error('Match persistence failed', error));
     };
@@ -335,24 +335,29 @@ function setupSocketHandlers(io, roomManager, matchmaker) {
             socket.emit(shared_1.SOCKET_EVENTS.PUBLIC_ROOMS_UPDATE, roomManager.getPublicRooms());
         });
         socket.on(shared_1.SOCKET_EVENTS.SEND_EMOTE, (data) => {
+            if (!data || !(0, shared_1.isLobbyReaction)(data.emote) || !socket.rooms.has(data.roomCode) ||
+                !roomManager.getRoom(data.roomCode)?.players[initialPlayerId])
+                return;
             io.to(data.roomCode).emit(shared_1.SOCKET_EVENTS.EMOTE_RECEIVED, {
-                ...data,
-                id: data.id || `emote_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                roomCode: data.roomCode,
+                playerId: initialPlayerId,
+                emote: data.emote,
+                id: (0, node_crypto_1.randomUUID)(),
             });
         });
         socket.on(shared_1.SOCKET_EVENTS.LOBBY_CHAT, (data) => {
-            if (!data.text || !data.roomCode)
+            if (!data || !(0, shared_1.isLobbyQuickMessage)(data.text) || !socket.rooms.has(data.roomCode))
                 return;
-            const cleanText = data.text.trim().slice(0, 100);
-            if (!cleanText)
+            const player = roomManager.getRoom(data.roomCode)?.players[initialPlayerId];
+            if (!player)
                 return;
             const payload = {
-                id: data.id || `chat_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                id: (0, node_crypto_1.randomUUID)(),
                 roomCode: data.roomCode,
-                playerId: data.playerId,
-                displayName: data.displayName || 'Oyuncu',
-                avatarUrl: data.avatarUrl,
-                text: cleanText,
+                playerId: initialPlayerId,
+                displayName: player.displayName,
+                avatarUrl: player.avatarUrl,
+                text: data.text,
                 timestamp: Date.now(),
             };
             // Broadcast to all sockets in that room (EPHEMERAL, no DB save)

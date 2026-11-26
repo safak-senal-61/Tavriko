@@ -1,6 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const express_rate_limit_1 = require("express-rate-limit");
 const prismaClient_1 = require("../db/prismaClient");
 const shared_1 = require("@trivia/shared");
 const evrenLlmGenerator_1 = require("../ai/evrenLlmGenerator");
@@ -8,7 +12,13 @@ const redisClient_1 = require("../cache/redisClient");
 const supabaseClient_1 = require("../db/supabaseClient");
 const questionImporter_1 = require("../utils/questionImporter");
 const auth_1 = require("../middleware/auth");
+const walletSchema_1 = require("../services/walletSchema");
+const walletRateLimit_1 = require("../middleware/walletRateLimit");
+const practiceJokerProof_1 = require("../services/practiceJokerProof");
+const jokerRoutes_1 = __importDefault(require("./jokerRoutes"));
 const router = (0, express_1.Router)();
+const practiceQuestionsLimit = (0, express_rate_limit_1.rateLimit)({ ...walletRateLimit_1.walletRateLimitOptions, limit: 90 });
+router.use(jokerRoutes_1.default);
 // Public trivia categories
 router.get('/categories', async (req, res) => {
     // Sunucusuz ortamda canlı soru havuzunun hazır olmasını bekle (Keşfet sayısındaki güncel değerler için)
@@ -17,7 +27,7 @@ router.get('/categories', async (req, res) => {
     res.json(categories);
 });
 // Single-player / practice question fetcher with anti-repeat support
-router.get('/questions/practice', async (req, res) => {
+router.get('/questions/practice', practiceQuestionsLimit, async (req, res) => {
     const category = req.query.category || 'mixed';
     const difficulty = req.query.difficulty;
     const subCategory = req.query.subcategory || undefined;
@@ -25,6 +35,14 @@ router.get('/questions/practice', async (req, res) => {
     const seenIdsRaw = req.query.seenIds;
     const seenIds = seenIdsRaw ? seenIdsRaw.split(',') : [];
     const sessionId = req.query.sessionId || 'practice';
+    const authorization = req.get('Authorization');
+    const proofOwner = authorization?.startsWith('Bearer ') ? prismaClient_1.db.verifyToken(authorization.slice(7))?.userId : undefined;
+    const proofSecret = (0, auth_1.getJwtSecret)();
+    if (authorization)
+        res.set('Cache-Control', 'private, no-store');
+    const issueJokerProof = req.query.jokers === '1' && typeof proofOwner === 'string' &&
+        !proofOwner.startsWith('guest_') && proofSecret && practiceJokerProof_1.practiceSessionPattern.test(sessionId) &&
+        await (0, walletSchema_1.walletSchemaReady)(prismaClient_1.db.rawClient);
     // Sunucusuz ortamda kalıcı soru havuzunun (Telegram soruları dahil) hazır olmasını bekle
     await prismaClient_1.db.ensureQuestionsRestored();
     const rawQuestions = prismaClient_1.db.getQuestions(category, difficulty, count, seenIds, subCategory);
@@ -42,8 +60,11 @@ router.get('/questions/practice', async (req, res) => {
     }));
     // Authoritatively set expiry in cache for each question with realistic sequence offset
     let cumulativeMs = Date.now();
-    await Promise.all(questions.map((q) => {
+    await Promise.all(questions.map((q, index) => {
         cumulativeMs += q.timeLimitSec * 1000 + 4000;
+        if (issueJokerProof && proofOwner) {
+            q.jokerProof = (0, practiceJokerProof_1.sealPracticeJoker)({ userId: proofOwner, sessionId, questionId: q.id }, rawQuestions[index], cumulativeMs, proofSecret);
+        }
         return redisClient_1.cacheService.setQuestionExpiry(sessionId, q.id, cumulativeMs, 300);
     }));
     if (subCategory && questions.length === 0) {

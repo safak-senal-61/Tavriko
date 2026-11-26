@@ -114,6 +114,7 @@ model User {
   gameplayRewardClaims      GameplayRewardClaim[]
   polarGemOrders            PolarGemOrder[]
   polarSeasonOrders         PolarSeasonOrder[]
+  playPurchases             PlayPurchase[]
   practiceJokerUses         PracticeJokerUse[]
 
   @@index([rankPoints(sort: Desc)])
@@ -151,6 +152,24 @@ model PolarSeasonOrder {
 
   @@index([userId, status])
   @@map("polar_season_orders")
+}
+
+model PlayPurchase {
+  purchaseToken String @id
+  orderId String @unique
+  userId String
+  productId String
+  kind String
+  gems Int @default(0)
+  test Boolean @default(false)
+  status String @default("granted")
+  createdAt DateTime @default(now())
+  consumedAt DateTime?
+  voidedAt DateTime?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind, status])
+  @@map("play_purchases")
 }
 
 model PracticeJokerUse {
