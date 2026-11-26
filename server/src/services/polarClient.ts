@@ -1,5 +1,10 @@
 import { isIP } from 'node:net';
 import type { Request } from 'express';
+import { makeWebCorsPolicy } from '../middleware/webCors';
+
+// Web uygulaması Cloudflare'da (ör. tavriko.games), API Vercel'de çalışabilir.
+// Oyuncu API'si için izinli her web origin'i checkout başlatabilir.
+const playerWebOrigins = makeWebCorsPolicy();
 
 /**
  * Yerel (Expo/capacitor) istekleri `Origin` başlığı göndermez; tarayıcılar
@@ -7,8 +12,8 @@ import type { Request } from 'express';
  * isteğin uygulamadan geldiğini kabul ediyoruz. CSRF koruması, tarayıcı
  * isteklerinde origin eşleşmesiyle korunmaya devam eder.
  */
-export function clientOriginAllowed(origin: string | undefined, expected: string): boolean {
-  return !origin || origin === expected;
+export function clientOriginAllowed(origin: string | undefined, expected: string, path = '/api/social'): boolean {
+  return !origin || origin === expected || playerWebOrigins(origin, path);
 }
 
 /**

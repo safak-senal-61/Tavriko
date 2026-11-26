@@ -14,6 +14,10 @@ describe('Polar client metadata', () => {
     expect(clientOriginAllowed(undefined, 'https://app.example.test')).toBe(true);
     expect(clientOriginAllowed('', 'https://app.example.test')).toBe(true);
     expect(clientOriginAllowed('https://evil.example', 'https://app.example.test')).toBe(false);
+    // Web uygulaması Cloudflare'da, API Vercel'de olabilir; oyuncu API'sinin
+    // izinli origin'leri checkout başlatabilmeli.
+    expect(clientOriginAllowed('https://tavriko-app.vercel.app', 'https://tavriko.games')).toBe(true);
+    expect(clientOriginAllowed('https://evil.example', 'https://tavriko.games')).toBe(false);
   });
 
   it('reads the first forwarded IP and ignores malformed values', () => {
