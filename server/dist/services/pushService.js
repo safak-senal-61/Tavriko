@@ -6,7 +6,6 @@ exports.notificationToPushPayload = notificationToPushPayload;
 exports.queuePushForNotification = queuePushForNotification;
 exports.sendPushToAllTokens = sendPushToAllTokens;
 exports.sendReengagementPush = sendReengagementPush;
-const shared_1 = require("@trivia/shared");
 const logger_1 = require("../utils/logger");
 const fcmService_1 = require("./fcmService");
 const EXPO_PUSH_ENDPOINT = 'https://exp.host/--/api/v2/push/send';
@@ -53,8 +52,8 @@ async function sendPushToExpo(tokens, payload) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(chunk.map((token) => ({
                     to: token,
-                    title: (0, shared_1.plainDisplayText)(payload.title),
-                    body: (0, shared_1.plainDisplayText)(payload.body),
+                    title: payload.title,
+                    body: payload.body,
                     sound: 'default',
                     ...(payload.channelId ? { channelId: payload.channelId === 'general' ? 'default' : payload.channelId } : {}),
                     ...(payload.channelId === 'invites' ? { priority: 'high' } : {}),
@@ -88,8 +87,8 @@ async function sendPushToExpo(tokens, payload) {
     // FCM device tokenlar (Android): firebase-admin ile doğrudan gönderim.
     if (fcmTokens.length) {
         const fcmResult = await (0, fcmService_1.sendFcmToTokens)(fcmTokens, {
-            title: (0, shared_1.plainDisplayText)(payload.title),
-            body: (0, shared_1.plainDisplayText)(payload.body),
+            title: payload.title,
+            body: payload.body,
             data: payload.data,
             channelId: payload.channelId,
             categoryId: payload.categoryId,

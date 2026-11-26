@@ -32,7 +32,7 @@ async function readProgress(store, userId) {
         count(DISTINCT ("playedAt" + interval '3 hours')::date) AS days
       FROM "match_history"
       WHERE "userId" = ${userId} AND left("id", 8) = 'tracked_'
-        AND "rankingsJson" @> '{"rewardCompletion":true}'::jsonb AND "totalQuestions" > 0`,
+        AND "correctAnswers" > 0 AND "totalQuestions" > 0`,
         friendIds.length ? store.user.count({
             where: { id: { in: friendIds }, friendIds: { array_contains: [userId] } },
         }) : Promise.resolve(0),

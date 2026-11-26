@@ -11,7 +11,6 @@ const adminAccountOperations_1 = require("../services/adminAccountOperations");
 const playerAnalytics_1 = require("../services/playerAnalytics");
 const duelFunnel_1 = require("../services/duelFunnel");
 const supportCases_1 = require("../services/supportCases");
-const supportBugEmails_1 = require("../services/supportBugEmails");
 const prefix = '/api/admin/accounts';
 const size = 20;
 const dayMs = 86_400_000;
@@ -169,12 +168,11 @@ function createAdminAccountsRouter(client = prismaClient_1.db.rawClient) {
                 ] } : {}) };
         try {
             const items = await client.supportCase.findMany({ where, take: 21, skip: (Number(page) - 1) * 20,
-                orderBy: [{ createdAt: queue === 'resolved' ? 'desc' : 'asc' }, { id: 'asc' }],
-                include: { attachments: { select: supportCases_1.attachmentSelect, orderBy: { createdAt: 'asc' } } } });
+                orderBy: [{ createdAt: queue === 'resolved' ? 'desc' : 'asc' }, { id: 'asc' }] });
             const overdue = admin.role === 'owner' ? await client.supportCase.count({ where: {
                     status: { not: 'resolved' }, firstReplyAt: null, createdAt: { lte: deadline },
                 } }) : null;
-            res.json({ targetHours, overdue, items: items.slice(0, 20).map(item => ({ ...item, bugReport: (0, supportBugEmails_1.isBugReport)(item),
+            res.json({ targetHours, overdue, items: items.slice(0, 20).map(item => ({ ...item,
                     late: (item.firstReplyAt ?? new Date()).getTime() - item.createdAt.getTime() >= targetHours * 3_600_000,
                     canEdit: admin.role === 'owner' || item.assignee === admin.email ||
                         !directory.some(person => person.email === item.assignee && (0, supportCases_1.ticketKinds)(person.role).includes(item.kind)) })), more: items.length > 20 && Number(page) < 999,
@@ -195,18 +193,6 @@ function createAdminAccountsRouter(client = prismaClient_1.db.rawClient) {
             failed(res, error);
         }
     });
-    router.get(prefix + '/cases/:id/attachments/:attachmentId', async (req, res) => {
-        const { id, attachmentId } = req.params;
-        if (!adminAccountOperations_1.uuidPattern.test(String(id)) || !adminAccountOperations_1.uuidPattern.test(String(attachmentId)))
-            return res.status(404).json({ error: 'Ek dosya bulunamadı.' });
-        try {
-            const file = await (0, supportCases_1.readCaseAttachment)(client, String(id), String(attachmentId), { admin: res.locals.accountAdmin });
-            res.set((0, supportCases_1.attachmentHeaders)(file.name, file.mime, file.size)).end(file.data);
-        }
-        catch (error) {
-            failed(res, error);
-        }
-    });
     router.post(prefix + '/cases/:id/replies', mutation('cases', ['revision', 'body', 'ask']), async (req, res) => {
         const id = String(req.params.id);
         const { revision, ask } = req.body;
@@ -215,9 +201,7 @@ function createAdminAccountsRouter(client = prismaClient_1.db.rawClient) {
             return res.status(400).json({ error: 'Mesajı ve talep bilgilerini kontrol edin.' });
         }
         try {
-            const { email, ...reply } = await (0, supportCases_1.replyToCase)(client, id, { admin: res.locals.accountAdmin }, { revision, body, ask });
-            const emailStatus = await (0, supportBugEmails_1.notifyPlayerOfBugUpdate)(client, email ?? null);
-            res.status(201).json({ ...reply, emailStatus });
+            res.status(201).json(await (0, supportCases_1.replyToCase)(client, id, { admin: res.locals.accountAdmin }, { revision, body, ask }));
         }
         catch (error) {
             failed(res, error);
@@ -233,9 +217,8 @@ function createAdminAccountsRouter(client = prismaClient_1.db.rawClient) {
             return res.status(400).json({ error: 'Talep durumunu, gerekçeyi ve varsa oyuncuya gönderilecek yanıtı kontrol edin.' });
         }
         try {
-            const email = await (0, supportCases_1.updateCase)(client, res.locals.accountAdmin, String(req.params.id), { revision, assignee, status, reason, resolution });
-            const emailStatus = await (0, supportBugEmails_1.notifyPlayerOfBugUpdate)(client, email);
-            res.json({ success: true, emailStatus });
+            await (0, supportCases_1.updateCase)(client, res.locals.accountAdmin, String(req.params.id), { revision, assignee, status, reason, resolution });
+            res.json({ success: true });
         }
         catch (error) {
             failed(res, error);

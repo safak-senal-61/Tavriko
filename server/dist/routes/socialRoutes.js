@@ -1,19 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const express_rate_limit_1 = require("express-rate-limit");
 const auth_1 = require("../middleware/auth");
 const prismaClient_1 = require("../db/prismaClient");
 const presenceManager_1 = require("../services/presenceManager");
 const shared_1 = require("@trivia/shared");
 const rewardedAdRoutes_1 = require("./rewardedAdRoutes");
 const gameplayRewardRoutes_1 = require("./gameplayRewardRoutes");
-const walletSchema_1 = require("../services/walletSchema");
-const realtimeJokerAvailability_1 = require("../services/realtimeJokerAvailability");
-const walletRateLimit_1 = require("../middleware/walletRateLimit");
 const router = (0, express_1.Router)();
-const shopAvailabilityLimit = (0, express_rate_limit_1.rateLimit)({ ...walletRateLimit_1.walletRateLimitOptions, limit: 120 });
-const shopPurchaseLimit = (0, express_rate_limit_1.rateLimit)({ ...walletRateLimit_1.walletRateLimitOptions, limit: 40 });
 router.get('/leaderboard', async (req, res) => {
     try {
         const topPlayers = await prismaClient_1.db.getLeaderboardAsync(30);
@@ -220,18 +214,13 @@ router.post('/rooms/active', auth_1.requireUserAuth, (req, res) => {
     }
 });
 // --- Shop Catalog & Purchasing ---
-router.get('/shop/catalog', async (req, res) => {
-    const advanced = await (0, realtimeJokerAvailability_1.advancedJokersReady)();
+router.get('/shop/catalog', (req, res) => {
     res.json({
         success: true,
-        catalog: advanced ? shared_1.SHOP_CATALOG : shared_1.SHOP_CATALOG.filter(({ id }) => !(0, shared_1.isJokerId)(id) || !(0, shared_1.isAdvancedJoker)(id)),
+        catalog: shared_1.SHOP_CATALOG,
     });
 });
-router.get('/shop/jokers/availability', shopAvailabilityLimit, async (_req, res) => {
-    const [enabled, advanced] = await Promise.all([(0, walletSchema_1.walletSchemaReady)(prismaClient_1.db.rawClient), (0, realtimeJokerAvailability_1.advancedJokersReady)()]);
-    res.set('Cache-Control', 'no-store').json({ enabled, advanced: enabled && advanced });
-});
-router.post('/shop/purchase', shopPurchaseLimit, auth_1.requireUserAuth, async (req, res) => {
+router.post('/shop/purchase', auth_1.requireUserAuth, async (req, res) => {
     try {
         const userId = req.authUserId;
         const { productId, packId, durationId } = req.body || {};
@@ -246,14 +235,6 @@ router.post('/shop/purchase', shopPurchaseLimit, auth_1.requireUserAuth, async (
             return;
         }
         if (product) {
-            if (product.category === 'jokers' && !await (0, walletSchema_1.walletSchemaReady)(prismaClient_1.db.rawClient)) {
-                res.status(503).json({ error: 'Jokerler henüz kullanıma açık değil.' });
-                return;
-            }
-            if ((0, shared_1.isJokerId)(product.id) && (0, shared_1.isAdvancedJoker)(product.id) && !await (0, realtimeJokerAvailability_1.advancedJokersReady)()) {
-                res.status(503).json({ error: 'Bu joker henüz canlı maçlarda kullanıma açık değil.' });
-                return;
-            }
             // Süreli kozmetiklerde durationId ('1h' | '1d' | '3d' | '1w' | '30d')
             // seçilen süreyi belirler; fiyat sunucuda ölçeklenir.
             const result = await prismaClient_1.db.purchaseShopProduct(userId, itemToBuy, product.currency, typeof durationId === 'string' ? durationId : undefined);
@@ -322,8 +303,23 @@ router.post('/season/claim', auth_1.requireUserAuth, async (req, res) => {
         res.status(400).json({ error: err.message });
     }
 });
-router.post('/season/premium-pass', (_req, res) => {
-    res.status(410).json({ error: 'Premium Pass artık elmasla alınmıyor. Güncel web sürümündeki Sezon ekranını kullan.' });
+router.post('/season/premium-pass', auth_1.requireUserAuth, async (req, res) => {
+    try {
+        const userId = req.authUserId;
+        if (!userId) {
+            res.status(400).json({ error: 'userId gereklidir' });
+            return;
+        }
+        const updated = await prismaClient_1.db.buyPremiumPass(userId);
+        res.json({
+            success: true,
+            user: updated,
+            message: '🎉 Tebrikler! Sezon 1 Premium Pass aktif edildi!',
+        });
+    }
+    catch (err) {
+        res.status(400).json({ error: err.message });
+    }
 });
 // --- Live Events ---
 router.get('/events', async (req, res) => {
@@ -479,36 +475,6 @@ router.post('/notifications/send', auth_1.requireUserAuth, async (req, res) => {
     }
     catch (err) {
         res.status(500).json({ error: err.message });
-    }
-});
-// --- Toplu kozmetik sorgusu: liderlik, arkadaş, lobi ve quiz ekranlarında çerçeve/isim efekti göstermek için ---
-const COSMETICS_BATCH_LIMIT = 60;
-router.get('/cosmetics', auth_1.requireUserAuth, async (req, res) => {
-    try {
-        const raw = typeof req.query.ids === 'string' ? req.query.ids : '';
-        const ids = [...new Set(raw.split(',').map(id => id.trim()).filter(id => id && id.length <= 64 && !/^(bot_|guest_)/i.test(id)))]
-            .slice(0, COSMETICS_BATCH_LIMIT);
-        const entries = await Promise.all(ids.map(async (id) => {
-            try {
-                const profile = await prismaClient_1.db.getUserProfileAsync(id);
-                if (!profile)
-                    return null;
-                // Yalnızca herkese açık görünüm alanları; süresi dolanlar sunucuda zaten düşürülür.
-                return [id, {
-                        equippedFrame: profile.equippedFrame,
-                        equippedFrameExpiresAt: profile.equippedFrameExpiresAt,
-                        equippedNameEffect: profile.equippedNameEffect,
-                        equippedNameEffectExpiresAt: profile.equippedNameEffectExpiresAt,
-                    }];
-            }
-            catch {
-                return null;
-            }
-        }));
-        res.json({ cosmetics: Object.fromEntries(entries.filter((e) => !!e)) });
-    }
-    catch {
-        res.status(500).json({ error: 'Kozmetikler alınamadı.' });
     }
 });
 // --- Public profile by friend code (profile share links) ---

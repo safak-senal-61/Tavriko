@@ -1,9 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ticketKinds = exports.attachmentLimits = exports.publicCaseFields = exports.attachmentSelect = exports.appealCutoff = exports.firstReplyHours = void 0;
-exports.parseAttachments = parseAttachments;
-exports.readCaseAttachment = readCaseAttachment;
-exports.attachmentHeaders = attachmentHeaders;
+exports.ticketKinds = exports.publicCaseFields = exports.appealCutoff = exports.firstReplyHours = void 0;
 exports.caseText = caseText;
 exports.readCaseReplies = readCaseReplies;
 exports.replyToCase = replyToCase;
@@ -11,7 +8,6 @@ exports.openCase = openCase;
 exports.updateCase = updateCase;
 const auth_1 = require("../middleware/auth");
 const adminAccountOperations_1 = require("./adminAccountOperations");
-const supportBugEmails_1 = require("./supportBugEmails");
 const dayMs = 86_400_000;
 const firstReplyHours = () => {
     const value = Number(process.env.SUPPORT_FIRST_REPLY_HOURS);
@@ -20,70 +16,10 @@ const firstReplyHours = () => {
 exports.firstReplyHours = firstReplyHours;
 const appealCutoff = () => new Date(Date.now() - 30 * dayMs);
 exports.appealCutoff = appealCutoff;
-exports.attachmentSelect = { id: true, name: true, mime: true, size: true };
 exports.publicCaseFields = {
     id: true, kind: true, subject: true, message: true, moderationId: true,
     status: true, resolution: true, createdAt: true, updatedAt: true, revision: true, waitingForPlayer: true,
-    attachments: { select: exports.attachmentSelect, orderBy: { createdAt: 'asc' } },
 };
-exports.attachmentLimits = { maxFiles: 3, maxBytes: 3 * 1024 * 1024, maxTotalBytes: 6 * 1024 * 1024 };
-const attachmentMimes = new Set([
-    'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif',
-    'application/pdf', 'text/plain', 'application/zip',
-]);
-function attachmentName(value) {
-    if (typeof value !== 'string')
-        return null;
-    const cleaned = value.replace(/[\p{Cc}\p{Cf}]/gu, '').replace(/[\\/]+/g, '-').trim().slice(0, 120);
-    return cleaned.length ? cleaned : null;
-}
-/** Validates player supplied attachments (base64 JSON) before they reach the database. */
-function parseAttachments(value) {
-    if (value === undefined || value === null)
-        return null;
-    if (!Array.isArray(value) || value.length > exports.attachmentLimits.maxFiles)
-        return 'invalid';
-    const parsed = [];
-    let total = 0;
-    for (const item of value) {
-        if (!item || typeof item !== 'object')
-            return 'invalid';
-        const { name, mime, data } = item;
-        const cleanName = attachmentName(name);
-        if (!cleanName || typeof mime !== 'string' || !attachmentMimes.has(mime) || typeof data !== 'string')
-            return 'invalid';
-        if (data.length < 4 || data.length > Math.ceil(exports.attachmentLimits.maxBytes / 3) * 4 + 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(data))
-            return 'invalid';
-        const bytes = Buffer.from(data, 'base64');
-        if (!bytes.length || bytes.length > exports.attachmentLimits.maxBytes)
-            return 'invalid';
-        total += bytes.length;
-        if (total > exports.attachmentLimits.maxTotalBytes)
-            return 'invalid';
-        parsed.push({ name: cleanName, mime, size: bytes.length, data: bytes });
-    }
-    return parsed;
-}
-async function readCaseAttachment(client, caseId, attachmentId, viewer) {
-    const row = await client.supportCaseAttachment.findFirst({
-        where: { id: attachmentId, caseId },
-        select: { name: true, mime: true, size: true, data: true, ticket: { select: { accountId: true, kind: true } } },
-    });
-    const allowed = !!row && ('account' in viewer ? viewer.account === row.ticket.accountId : (0, exports.ticketKinds)(viewer.admin.role).includes(row.ticket.kind));
-    if (!row || !allowed)
-        throw new adminAccountOperations_1.OperationError(404, 'Ek dosya bulunamadı.');
-    return { name: row.name, mime: row.mime, size: row.size, data: row.data };
-}
-function attachmentHeaders(name, mime, size) {
-    const ascii = name.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
-    return {
-        'Content-Type': mime,
-        'Content-Length': String(size),
-        'Content-Disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`,
-        'X-Content-Type-Options': 'nosniff',
-        'Cache-Control': 'private, no-store',
-    };
-}
 const ticketKinds = (role) => role === 'owner' ? ['support', 'appeal'] : role === 'support' ? ['support'] : role === 'moderator' ? ['appeal'] : [];
 exports.ticketKinds = ticketKinds;
 function caseText(value, min, max) {
@@ -139,9 +75,7 @@ async function replyToCase(client, id, actor, input) {
                     title: input.ask ? 'Destek ekibi bilgi bekliyor' : 'Destek talebinize yeni mesaj', sub: 'Mesajı Ayarlar → Hesap → Destek talepleri bölümünden açın.',
                     timeText: 'Şimdi' } });
         }
-        const email = !player && (0, supportBugEmails_1.isBugReport)(old)
-            ? { id, accountId: old.accountId, subject: old.subject, text: input.body, event: 'reply' } : null;
-        return { id: reply.id, revision: input.revision + 1, ...(email ? { email } : {}) };
+        return { id: reply.id, revision: input.revision + 1 };
     });
 }
 async function openCase(client, accountId, input) {
@@ -163,13 +97,7 @@ async function openCase(client, accountId, input) {
         const recent = await tx.supportCase.count({ where: { accountId, createdAt: { gt: new Date(Date.now() - dayMs) } } });
         if (active >= 3 || recent >= 5)
             throw new adminAccountOperations_1.OperationError(429, 'Açık talep veya günlük başvuru sınırına ulaşıldı.');
-        const { attachments, ...fields } = input;
-        const saved = await tx.supportCase.create({ data: {
-                accountId, ...fields,
-                ...(attachments?.length ? { attachments: { create: attachments.map(file => ({
-                            name: file.name, mime: file.mime, size: file.size, data: new Uint8Array(file.data),
-                        })) } } : {}),
-            }, select: exports.publicCaseFields });
+        const saved = await tx.supportCase.create({ data: { accountId, ...input }, select: exports.publicCaseFields });
         await tx.adminAccountEvent.create({ data: {
                 accountId, actor: accountId, role: 'player', action: 'case_opened',
                 reason: input.kind === 'appeal' ? 'Oyuncu moderasyon itirazı açtı.' : 'Oyuncu destek talebi açtı.',
@@ -215,8 +143,5 @@ async function updateCase(client, admin, id, input) {
                     sub: 'Yanıtı Ayarlar → Hesap → Destek talepleri bölümünde görebilirsiniz.', timeText: 'Şimdi',
                 } });
         }
-        const email = input.status === 'resolved' && input.resolution && (0, supportBugEmails_1.isBugReport)(old)
-            ? { id, accountId: old.accountId, subject: old.subject, text: input.resolution, event: 'resolved' } : null;
-        return email;
     });
 }

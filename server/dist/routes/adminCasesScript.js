@@ -41,9 +41,6 @@ function showCohorts(data) {
 let casePage=1, caseEpoch=0, caseAccount=null, riskEpoch=0;
 function caseField(form,label,control){const wrapper=el('label');wrapper.append(el('span',label),control);form.append(wrapper);}
 function caseOption(value,label){const o=el('option',label);o.value=value;return o;}
-function caseEmailStatus(value){
-  return value==='accepted'?' E-posta OneSignal tarafından kabul edildi.':value==='failed'?' Yanıt uygulamada kayıtlı, ancak e-posta gönderimi doğrulanamadı.':'';
-}
 async function loadCases(target=1, message=''){
   const epoch=++caseEpoch;
   by('cases-prev').disabled=by('cases-next').disabled=true;
@@ -59,9 +56,8 @@ async function loadCases(target=1, message=''){
     by('cases-prev').disabled=target<=1;by('cases-next').disabled=!d.more;
     for(const item of d.items){
       const row=el('li'),view=el('button','Hesabı aç');view.type='button';view.addEventListener('click',()=>openDetail(item.accountId));
-      row.append(el('strong',item.subject),el('small',(item.bugReport?'Hata bildirimi':item.kind==='appeal'?'Moderasyon itirazı':'Destek')+' · '+caseStates[item.status]+' · '+timestamp(item.createdAt)+' · '+item.accountId),
+      row.append(el('strong',item.subject),el('small',(item.kind==='appeal'?'Moderasyon itirazı':'Destek')+' · '+caseStates[item.status]+' · '+timestamp(item.createdAt)+' · '+item.accountId),
         el('p',item.message,'case-copy'),el('small','Sorumlu: '+(item.assignee || 'Atanmamış')),view);
-      if(item.attachments&&item.attachments.length){const files=el('div'),label=el('small','Ek dosyalar: ');files.append(label);for(const f of item.attachments){const link=el('a',f.name+' · '+Math.max(1,Math.round(f.size/1024))+' KB');link.href=api+'/cases/'+encodeURIComponent(item.id)+'/attachments/'+encodeURIComponent(f.id);link.target='_blank';link.rel='noopener noreferrer';files.append(link);}row.append(files);}
       if(item.waitingForPlayer)row.append(el('small','Oyuncu yanıtı bekleniyor'));
       if(item.late)row.append(el('small',item.firstReplyAt?'İlk yanıt hedefi aşıldı':'İlk yanıt gecikti'));
       if(item.moderationId)row.append(el('small','Moderasyon kaydı: '+item.moderationId));
@@ -81,10 +77,10 @@ async function loadCases(target=1, message=''){
         const save=el('button','Talebi güncelle'),feedback=el('p');save.type='submit';feedback.setAttribute('role','status');form.append(save,feedback);
         form.addEventListener('submit',async e=>{
           e.preventDefault();
-          if(next.value==='resolved'&&!confirm(item.bugReport?'Talebi sonuçlandırıp yanıtı oyuncuya e-posta ile de iletmek istiyor musunuz?':'Talebi sonuçlandırıp yanıtı oyuncuya göstermek istiyor musunuz?'))return;
+          if(next.value==='resolved'&&!confirm('Talebi sonuçlandırıp yanıtı oyuncuya göstermek istiyor musunuz?'))return;
           save.disabled=true;feedback.textContent='';
-          try{const saved=await write('/cases/'+encodeURIComponent(item.id),{revision:item.revision,assignee:assignee.value||null,status:next.value,reason:reason.value,
-            resolution:answer.required?answer.value:null});await loadCases(1,'Talep güncellendi.'+caseEmailStatus(saved.emailStatus));}
+          try{await write('/cases/'+encodeURIComponent(item.id),{revision:item.revision,assignee:assignee.value||null,status:next.value,reason:reason.value,
+            resolution:answer.required?answer.value:null});await loadCases(1,'Talep güncellendi.');}
           catch(error){feedback.textContent=error.message;}finally{save.disabled=false;}
         });
         row.append(edit);
@@ -124,9 +120,9 @@ function caseConversation(item){
       if(revision===item.revision)item.revision=sent.revision;
       const queue=by('cases-state').value;
       if(queue==='overdue'||(ask&&queue==='active')||(!ask&&queue==='waiting')){
-        await loadCases(casePage,(ask?'Mesaj gönderildi. Talep oyuncu yanıtını bekliyor.':'Mesaj gönderildi.')+caseEmailStatus(sent.emailStatus));by('cases-refresh').focus();
+        await loadCases(casePage,ask?'Mesaj gönderildi. Talep oyuncu yanıtını bekliyor.':'Mesaj gönderildi.');by('cases-refresh').focus();
       }
-      else{await refresh();feedback.textContent='Mesaj gönderildi.'+caseEmailStatus(sent.emailStatus)+' '+feedback.textContent;}
+      else{await refresh();feedback.textContent='Mesaj gönderildi. '+feedback.textContent;}
     }catch(error){feedback.textContent=error.message;}
     finally{reload.disabled=send.disabled=false;}
   });

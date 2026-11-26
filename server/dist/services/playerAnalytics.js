@@ -10,7 +10,6 @@ async function recordCompletedPlayers(client, summary) {
     if (!Array.isArray(summary.verifiedPlayerIds) || !summary.verifiedPlayerIds.length)
         return;
     const verified = new Set(summary.verifiedPlayerIds);
-    const earned = new Set(Array.isArray(summary.rewardCompletedPlayerIds) ? summary.rewardCompletedPlayerIds : []);
     // Older workers don't have a match instance ID. Keep a deterministic fallback for retries.
     const identity = typeof summary.matchId === 'string' && adminAccountOperations_1.uuidPattern.test(summary.matchId)
         ? summary.matchId : JSON.stringify([summary.roomCode, summary.mode,
@@ -31,7 +30,7 @@ async function recordCompletedPlayers(client, summary) {
                     id: `tracked_${(0, node_crypto_1.createHash)('sha256').update(JSON.stringify([identity, id])).digest('hex')}`,
                     userId: id, roomCode: summary.roomCode, mode: summary.mode, categoryId: summary.category || 'general_culture',
                     totalQuestions: boundedInt(summary.totalRounds), correctAnswers: boundedInt(rank.correctAnswersCount),
-                    score: boundedInt(rank.score), rankingsJson: earned.has(id) ? { rewardCompletion: true } : [],
+                    score: boundedInt(rank.score), rankingsJson: [],
                 };
             }),
             skipDuplicates: true,

@@ -34,9 +34,6 @@ const metrics_1 = require("./utils/metrics");
 const errorMonitor_1 = require("./utils/errorMonitor");
 const triviaRoutes_1 = __importDefault(require("./routes/triviaRoutes"));
 const socialRoutes_1 = __importDefault(require("./routes/socialRoutes"));
-const polarGemRoutes_1 = require("./routes/polarGemRoutes");
-const polarSeasonRoutes_1 = require("./routes/polarSeasonRoutes");
-const playBillingRoutes_1 = require("./routes/playBillingRoutes");
 const referralRoutes_1 = __importDefault(require("./routes/referralRoutes"));
 const pushRoutes_1 = __importDefault(require("./routes/pushRoutes"));
 const auth_1 = require("./middleware/auth");
@@ -54,7 +51,6 @@ const fleetTelemetry_1 = require("./services/fleetTelemetry");
 const playerAccess_1 = require("./services/playerAccess");
 const adminAccountOperations_1 = require("./services/adminAccountOperations");
 const playerAnalytics_1 = require("./services/playerAnalytics");
-const webCors_1 = require("./middleware/webCors");
 function getLocalIpAddress() {
     const interfaces = os_1.default.networkInterfaces();
     for (const name of Object.keys(interfaces)) {
@@ -95,12 +91,20 @@ function createApp() {
     app.use((0, fleetTelemetry_1.fleetMiddleware)(fleetStore));
     // SECURITY: CORS yalnızca Tavriko kaynaklarına açık. Origin göndermeyen
     // istekler (mobil uygulama, sunucudan sunucuya) tarayıcı kısıtına takılmaz.
-    const allowWebCors = (0, webCors_1.makeWebCorsPolicy)();
-    app.use((0, cors_1.default)((req, callback) => {
-        callback(null, { origin: allowWebCors(req.get('Origin'), req.path) });
+    const CORS_ALLOWED_ORIGINS = new Set([
+        'https://tavriko-app.vercel.app',
+        'http://localhost:8080',
+        'http://localhost:8081',
+        'http://localhost:19006',
+        'http://localhost:3000',
+    ]);
+    app.use((0, cors_1.default)({
+        origin: (origin, callback) => {
+            if (!origin || CORS_ALLOWED_ORIGINS.has(origin))
+                return callback(null, true);
+            return callback(null, false);
+        },
     }));
-    app.use('/api/webhooks/polar-gems', polarGemRoutes_1.polarGemWebhook);
-    app.use('/api/webhooks/polar-season', polarSeasonRoutes_1.polarSeasonWebhook);
     app.use(express_1.default.json({ limit: '15mb' }));
     app.use(express_1.default.urlencoded({ extended: true, limit: '15mb' }));
     // SECURITY: baseline security headers on every response
@@ -149,6 +153,7 @@ function createApp() {
         '/api/auth/register',
         '/api/auth/forgot-password',
         '/api/auth/reset-password',
+        '/api/auth/google/complete-session',
         '/api/portal/login',
         '/api/portal/security/passkeys',
     ], rateLimitAuth);
@@ -159,27 +164,25 @@ function createApp() {
         const start = Date.now();
         // Express may strip a mounted router's prefix from req.path before finish.
         const requestPath = req.path;
-        const isAccountSecurity = /^\/api\/auth\/(?:(?:forgot|reset)-password|request-delete-code|confirm-delete|delete-account(?:\/request)?|google(?:\/.*)?)\/?$/i.test(requestPath);
-        const omitRequestDetails = isAccountSecurity || /^\/api\/social\/ads\/rewarded(?:\/|$)/i.test(requestPath) ||
-            /^\/api\/(?:internal\/room-joker|questions\/practice\/joker)\/?$/i.test(requestPath);
+        const isAccountSecurity = /^\/api\/auth\/(?:(?:forgot|reset)-password|request-delete-code|confirm-delete|delete-account(?:\/request)?)\/?$/i.test(requestPath);
         res.on('finish', () => {
             const duration = Date.now() - start;
             const lvl = res.statusCode >= 500 ? 'ERROR' : res.statusCode >= 400 ? 'WARN' : 'INFO';
             const cat = isAccountSecurity || req.path.includes('/auth') ? 'AUTH' : 'HTTP';
             if (/^\/admin\/health\/?$/i.test(req.path) || /^\/api\/admin\/(?:ops|accounts)(?:\/|$)/i.test(req.path) ||
                 req.path === '/favicon.ico' ||
-                req.path === '/api/logs' || /^\/api\/logs\/ingest\/?$/i.test(requestPath) || req.path === '/api/internal/player-access' ||
+                req.path === '/api/logs' || req.path === '/api/internal/player-access' ||
                 /^\/api\/portal(?:\/|$)/i.test(req.path) || /^\/api\/support(?:\/|$)/i.test(req.path) ||
                 /^\/api\/(?:internal|player)\/duel-funnel(?:\/|$)/i.test(req.path) ||
                 req.path === '/api/logs/stream' ||
                 req.path.startsWith('/qr')) {
                 return;
             }
-            logger_1.logger.log(cat, lvl, `${req.method} ${omitRequestDetails ? requestPath : req.originalUrl} -> ${res.statusCode} (${duration}ms)`, {
+            logger_1.logger.log(cat, lvl, `${req.method} ${isAccountSecurity ? requestPath : req.originalUrl} -> ${res.statusCode} (${duration}ms)`, {
                 ip: req.ip,
-                query: !omitRequestDetails && Object.keys(req.query).length ? redactSensitiveBody(req.query) : undefined,
+                query: !isAccountSecurity && Object.keys(req.query).length ? redactSensitiveBody(req.query) : undefined,
                 body: req.method !== 'GET' &&
-                    !omitRequestDetails &&
+                    !isAccountSecurity &&
                     Object.keys(req.body || {}).length ? redactSensitiveBody(req.body) : undefined,
             });
         });
@@ -417,7 +420,6 @@ function createApp() {
     };
     app.get('/api/cron/reengage-push', handleReengagementCron);
     app.post('/api/cron/reengage-push', handleReengagementCron);
-    app.get('/api/cron/play-voided', playBillingRoutes_1.handlePlayVoidedCron);
     // Telegram set webhook endpoint
     app.get(['/api/admin/telegram/set-webhook', '/admin/telegram/set-webhook'], auth_1.requireAdminAuth, async (req, res) => {
         try {
@@ -567,16 +569,6 @@ function createApp() {
         app.get('/favicon.ico', (req, res) => {
             res.sendFile(path_1.default.join(clientDistDir, 'favicon.ico'));
         });
-        // Skia web (Animated Nick efektleri) CanvasKit wasm'ı
-        const canvasKitStatic = express_1.default.static(clientDistDir, {
-            index: false,
-            maxAge: '7d',
-            setHeaders: (res) => res.setHeader('Content-Type', 'application/wasm'),
-        });
-        app.get(['/canvaskit.wasm', '/app/canvaskit.wasm'], (req, res, next) => {
-            req.url = '/canvaskit.wasm';
-            canvasKitStatic(req, res, next);
-        });
         // Marka ikonları, manifest, paylaşım görseli ve SEO dosyaları (client/public -> client/dist)
         const brandStaticFiles = [
             'favicon-16.png',
@@ -588,8 +580,6 @@ function createApp() {
             'og-image.png',
             'manifest.json',
             'robots.txt',
-            'app-ads.txt',
-            'ads.txt',
             'sitemap.xml',
         ];
         app.get(brandStaticFiles.map((name) => `/${name}`), (req, res, next) => {
@@ -3710,9 +3700,6 @@ function createApp() {
     });
     app.use('/api', triviaRoutes_1.default);
     app.use('/api/social', socialRoutes_1.default);
-    app.use('/api/social', polarGemRoutes_1.polarGemPlayerRoutes);
-    app.use('/api/social', polarSeasonRoutes_1.polarSeasonPlayerRoutes);
-    app.use('/api/social', playBillingRoutes_1.playBillingPlayerRoutes);
     app.use('/api/referrals', referralRoutes_1.default);
     app.use('/api/push', pushRoutes_1.default);
     app.use(legalRoutes_1.legalRouter);
@@ -3784,7 +3771,7 @@ function createApp() {
             return res.json({ success: true });
         }
         catch (err) {
-            await (0, errorMonitor_1.captureError)(err);
+            (0, errorMonitor_1.captureError)(err);
             logger_1.logger.error('SOCKET', `Maç sonucu kaydetme hatası: ${err.message}`, err);
             return res.status(500).json({ success: false, error: err.message });
         }
@@ -3961,12 +3948,6 @@ function createApp() {
         // Browser navigation gets the animated page
         res.status(404).setHeader('Content-Type', 'text/html; charset=utf-8');
         res.send(renderNotFoundHtml());
-    });
-    app.use(async (err, _req, _res, next) => {
-        const status = err?.status;
-        if (typeof status !== 'number' || status >= 500)
-            await (0, errorMonitor_1.captureError)(err);
-        next(err);
     });
     return { app, httpServer, io, roomManager, matchmaker, telegramBot, close };
 }

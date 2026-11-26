@@ -7,10 +7,8 @@ const prismaClient_1 = require("../db/prismaClient");
 const supabaseClient_1 = require("../db/supabaseClient");
 const redisClient_1 = require("../cache/redisClient");
 const fcmService_1 = require("../services/fcmService");
-const errorMonitor_1 = require("../utils/errorMonitor");
 const inviteDelivery_1 = require("../services/inviteDelivery");
 const opsTelemetry_1 = require("../services/opsTelemetry");
-const posthogHealth_1 = require("../services/posthogHealth");
 const polarSandbox_1 = require("../services/polarSandbox");
 const opsPage_1 = require("./opsPage");
 function createOpsRouter(telemetry, makePolar = polarSandbox_1.buildPolarSandbox) {
@@ -18,8 +16,6 @@ function createOpsRouter(telemetry, makePolar = polarSandbox_1.buildPolarSandbox
     const probes = (0, opsTelemetry_1.makeProbeSampler)(() => {
         const supabase = supabaseClient_1.supabaseService.getClient();
         const polar = (0, polarSandbox_1.sandboxConfig)();
-        const fcm = (0, fcmService_1.getFcmStatus)().enabled;
-        const sentry = (0, errorMonitor_1.getErrorMonitorStatus)();
         return [
             {
                 name: 'PostgreSQL / Prisma', detail: 'Gerçek bağlantı: salt okunur SELECT 1. Şema ve replikasyon ölçülmez.',
@@ -55,14 +51,13 @@ function createOpsRouter(telemetry, makePolar = polarSandbox_1.buildPolarSandbox
                 check: polar ? () => makePolar(polar).productAvailable() : undefined, optional: process.env.POLAR_SANDBOX_ENABLED !== 'true',
             },
             {
-                name: 'Firebase FCM API', detail: 'Google API kimlik doğrulaması ve deneme isteği. Cihaza bildirim gönderilmez.',
-                check: fcm ? fcmService_1.verifyFcmApi : undefined, optional: !fcm,
+                name: 'Firebase FCM', detail: 'Yalnızca uygulama yapılandırması. Cihaza teslimat doğrulanmaz.',
+                unset: (0, fcmService_1.getFcmStatus)().enabled ? 'unknown' : 'unconfigured', optional: true,
             },
             {
-                name: 'Sentry / GlitchTip (sunucu)', detail: 'Sunucu SDK durumu. Mobil Sentry ayrıdır; olay alımı Sentry’den doğrulanır.',
-                unset: sentry, optional: sentry !== 'failed',
+                name: 'Sentry / GlitchTip', detail: 'Yalnızca DSN yapılandırması. Hata alımı ve saklama doğrulanmaz.',
+                unset: (process.env.SENTRY_DSN || process.env.GLITCHTIP_DSN) ? 'unknown' : 'unconfigured', optional: true,
             },
-            (0, posthogHealth_1.posthogHealthProbe)(),
         ];
     });
     const privateHeaders = (_req, res, next) => {
@@ -81,43 +76,7 @@ function createOpsRouter(telemetry, makePolar = polarSandbox_1.buildPolarSandbox
                 observedAt: new Date().toISOString(), runtime: telemetry.runtime(), traffic, services,
                 status: warning ? 'warning' : traffic.requests > 0 ? 'observed' : 'no-traffic',
                 sandboxEnabled: Boolean((0, polarSandbox_1.sandboxConfig)()),
-                sentryTestEnabled: (0, errorMonitor_1.getErrorMonitorStatus)() === 'initialized',
             });
-        }
-        catch (error) {
-            next(error);
-        }
-    });
-    let lastSentryTest = -Infinity;
-    router.post('/api/admin/ops/sentry/test', async (req, res, next) => {
-        try {
-            const session = await (0, auth_1.getAdminSessionFromRequest)(req, prismaClient_1.db.rawClient, true);
-            if (session?.role !== 'owner') {
-                res.status(403).json({ error: 'Sahip oturumu gerekli.' });
-                return;
-            }
-            const host = req.get('host');
-            const origin = req.get('origin');
-            const loopback = /^(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(host || '');
-            if (!host || (origin !== `https://${host}` && !(loopback && origin === `http://${host}`)) || !req.is('application/json')) {
-                res.status(403).json({ error: 'Test yalnızca aynı yönetim sayfasından başlatılabilir.' });
-                return;
-            }
-            if ((0, errorMonitor_1.getErrorMonitorStatus)() !== 'initialized') {
-                res.status(503).json({ error: 'Sunucu hata izleme hazır değil.' });
-                return;
-            }
-            if (Date.now() - lastSentryTest < 60_000) {
-                res.status(429).json({ error: 'Yeni test için bir dakika bekleyin.' });
-                return;
-            }
-            lastSentryTest = Date.now();
-            const eventId = await (0, errorMonitor_1.sendErrorMonitorTest)();
-            if (!eventId) {
-                res.status(502).json({ error: 'Test olayı gönderilemedi.' });
-                return;
-            }
-            res.json({ eventId });
         }
         catch (error) {
             next(error);

@@ -39,7 +39,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DatabaseAdapter = exports.db = exports.prisma = exports.PrismaService = void 0;
 exports.computeQuestionHash = computeQuestionHash;
 const fs = __importStar(require("fs"));
-const cosmeticStash_1 = require("../services/cosmeticStash");
 const path = __importStar(require("path"));
 const crypto_1 = __importDefault(require("crypto"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
@@ -47,7 +46,6 @@ const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const client_1 = require("@prisma/client");
 const shared_1 = require("@trivia/shared");
 const questionsData_1 = require("./questionsData");
-const rawPrisma_1 = require("./rawPrisma");
 const evrenLlmGenerator_1 = require("../ai/evrenLlmGenerator");
 const supabaseClient_1 = require("./supabaseClient");
 const questionStoreMerge_1 = require("../utils/questionStoreMerge");
@@ -117,7 +115,17 @@ class PrismaService {
     recordedMatchRewards = new Map();
     activePublicRooms = new Map();
     constructor() {
-        this.rawClient = (0, rawPrisma_1.getRawPrisma)();
+        const dbUrl = process.env.DATABASE_URL ||
+            process.env.DIRECT_URL ||
+            'postgresql://postgres:postgres@localhost:5432/postgres';
+        this.rawClient = new client_1.PrismaClient({
+            datasources: {
+                db: {
+                    url: dbUrl,
+                },
+            },
+            log: ['error'],
+        });
         this.loadLocalSnapshots();
         this.initQuestions();
         this.seedDefaults();
@@ -306,8 +314,6 @@ class PrismaService {
         },
     };
     getItemCategory(itemId) {
-        if (shared_1.JOKERS.some(j => j.id === itemId))
-            return 'joker';
         if ((0, shared_1.getChestOpening)(itemId) || itemId.includes('chest'))
             return 'chest';
         if (itemId.includes('key'))
@@ -328,9 +334,6 @@ class PrismaService {
         const chest = (0, shared_1.getChestOpening)(itemId);
         if (chest)
             return chest.rarity;
-        const cosmetic = (0, shared_1.getCosmeticDef)(itemId);
-        if (cosmetic)
-            return cosmetic.rarity;
         if (itemId.includes('legendary') || itemId.includes('mythic'))
             return 'mythic';
         if (itemId.includes('gold') || itemId.includes('epic'))
@@ -646,7 +649,7 @@ class PrismaService {
                         level: args.create.level ?? 1,
                         xp: args.create.xp ?? 0,
                         coins: args.create.coins ?? 500,
-                        gems: args.create.gems ?? 0,
+                        gems: args.create.gems ?? 15,
                         dailyStreak: args.create.dailyStreak ?? 1,
                         rankTitle: args.create.rankTitle ?? 'Acemi Kaşif',
                         rankPoints: args.create.rankPoints ?? 1000,
@@ -1248,7 +1251,7 @@ class PrismaService {
                     level: record.level,
                     xp: record.xp,
                     coins: record.coins,
-                    gems: record.gems ?? 0,
+                    gems: record.gems ?? 14,
                     dailyStreak: profile.dailyStreak ?? 1,
                     rankTitle: record.rankTitle,
                     rankPoints: record.rankPoints,
@@ -1391,7 +1394,7 @@ class PrismaService {
     calculateLevelBonus(payload) {
         let xp = 200;
         let coins = 300;
-        const gems = 0;
+        let gems = 10;
         if (payload.fullName && payload.fullName.trim().length >= 2) {
             xp += 250;
             coins += 150;
@@ -1407,10 +1410,12 @@ class PrismaService {
         if (payload.phone && payload.phone.trim().length >= 6) {
             xp += 350;
             coins += 200;
+            gems += 10;
         }
         if (payload.avatarUrl) {
             xp += 200;
             coins += 100;
+            gems += 5;
         }
         const level = Math.max(1, Math.floor(xp / 450) + 1);
         const rankTitle = level >= 4 ? 'Bilgi Şövalyesi' : level >= 3 ? 'Usta Kaşif' : level >= 2 ? 'Yükselen Yıldız' : 'Acemi Kaşif';
@@ -1428,7 +1433,7 @@ class PrismaService {
             level: 1,
             xp: 0,
             coins: 200,
-            gems: 0,
+            gems: 5,
             rankTitle: 'Misafir Kaşif',
             rankPoints: 1000,
             stats: {
@@ -1500,7 +1505,7 @@ class PrismaService {
                 level: bonus.level || 1,
                 xp: bonus.xp || 0,
                 coins: bonus.coins || 500,
-                gems: bonus.gems,
+                gems: bonus.gems || 15,
                 dailyStreak: 1,
                 rankTitle: bonus.rankTitle || 'Acemi Kaşif',
                 rankPoints: 1000 + (bonus.level || 1) * 100,
@@ -1528,7 +1533,6 @@ class PrismaService {
                 blockedUserIds: [],
                 eventProgress: {},
                 friendIds: [],
-                settings: payload.legalConsent ? { legalConsent: payload.legalConsent } : {},
                 createdAt: now,
                 updatedAt: now,
             },
@@ -1660,7 +1664,7 @@ class PrismaService {
                             level: bonus.level || 1,
                             xp: bonus.xp || 0,
                             coins: bonus.coins || 500,
-                            gems: bonus.gems,
+                            gems: bonus.gems || 15,
                             dailyStreak: 1,
                             rankTitle: bonus.rankTitle || 'Acemi Kaşif',
                             rankPoints: 1000,
@@ -1715,7 +1719,7 @@ class PrismaService {
                         level: bonus.level || 1,
                         xp: bonus.xp || 0,
                         coins: bonus.coins || 500,
-                        gems: bonus.gems,
+                        gems: bonus.gems || 15,
                         dailyStreak: 1,
                         lastDailyDate: null,
                         rankTitle: bonus.rankTitle || 'Acemi Kaşif',
@@ -1820,10 +1824,8 @@ class PrismaService {
             record.equippedNameEffectExpiresAt = updates.equippedNameEffectExpiresAt;
         if (updates.equippedBackgroundExpiresAt !== undefined)
             record.equippedBackgroundExpiresAt = updates.equippedBackgroundExpiresAt;
-        const settingsPatch = { ...updates.settings };
-        delete settingsPatch.legalConsent;
-        if (record.isGuest) {
-            record.settings = { ...record.settings, ...settingsPatch };
+        if (updates.settings !== undefined) {
+            record.settings = { ...(record.settings || {}), ...updates.settings };
         }
         record.updatedAt = Date.now();
         this.users.set(userId, record);
@@ -1836,7 +1838,7 @@ class PrismaService {
             this.savePersistedUsers();
             // Kalıcı olarak Prisma PostgreSQL veritabanını güncelle!
             try {
-                const updated = await this.rawClient.user.update({
+                await this.rawClient.user.update({
                     where: { id: record.id },
                     data: {
                         displayName: record.displayName,
@@ -1858,13 +1860,10 @@ class PrismaService {
                         equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
                         equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
                         blockedUserIds: (record.blockedUserIds || []),
+                        settings: (record.settings || {}),
                         updatedAt: new Date(),
                     },
-                    select: { settings: true },
                 });
-                record.settings = Object.keys(settingsPatch).length
-                    ? await this.mergePersistedSettings(this.rawClient, record.id, settingsPatch)
-                    : updated.settings;
                 console.log(`✅ [updateUserProfile] Prisma PostgreSQL kalıcı güncellendi: ${record.id} -> avatarUrl: ${record.avatarUrl}, title: ${record.rankTitle}`);
             }
             catch (dbErr) {
@@ -1879,34 +1878,29 @@ class PrismaService {
         }
         return this.toProfile(record);
     }
-    // Merge against the current row, not a cached settings snapshot. This also
-    // protects the consent receipt when other requests update unrelated fields.
-    async mergePersistedSettings(client, userId, patch) {
-        const [saved] = await client.$queryRaw `
-      UPDATE "users"
-      SET "settings" = COALESCE("settings", '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb,
-          "updatedAt" = NOW()
-      WHERE "id" = ${userId}
-      RETURNING "settings"`;
-        if (!saved)
-            throw new Error('Kullanıcı bulunamadı.');
-        return saved.settings;
-    }
     async updateUserSettings(userId, newSettings) {
-        const record = await this.loadRecord(userId);
+        let record = await this.loadRecord(userId);
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
-        if (record.isGuest) {
-            if (newSettings.legalConsent)
-                throw new Error('Misafir hesaplarında onay kaydedilemez.');
-            record.settings = { ...record.settings, ...newSettings };
-        }
-        else {
-            record.settings = await this.mergePersistedSettings(this.rawClient, record.id, newSettings);
-        }
+        record.settings = { ...(record.settings || {}), ...newSettings };
         record.updatedAt = Date.now();
         this.users.set(record.id, record);
         this.savePersistedUsers();
+        if (!record.isGuest) {
+            try {
+                await this.rawClient.user.update({
+                    where: { id: record.id },
+                    data: {
+                        settings: record.settings,
+                        updatedAt: new Date(),
+                    },
+                });
+                console.log(`✅ [updateUserSettings] PostgreSQL ayarlar güncellendi: ${record.id}`);
+            }
+            catch (err) {
+                console.warn('[updateUserSettings] DB error:', err.message);
+            }
+        }
         // If online status visibility was toggled
         if (newSettings.onlineStatusVisible !== undefined) {
             if (newSettings.onlineStatusVisible === false) {
@@ -1996,10 +1990,6 @@ class PrismaService {
             playerIds: (summary.rankings || []).map((r) => r.playerId),
         });
         const totalRounds = Math.max(1, Number(summary.totalRounds) || 5);
-        const idSet = (ids) => new Set(Array.isArray(ids) ? ids : []);
-        const verified = idSet(summary.verifiedPlayerIds);
-        const completed = idSet(summary.rewardCompletedPlayerIds);
-        const gold = idSet(summary.goldHuntPlayerIds);
         for (const rankItem of summary.rankings || []) {
             if (!rankItem.playerId || rankItem.playerId.startsWith('bot_') || rankItem.playerId.startsWith('guest_')) {
                 continue;
@@ -2015,8 +2005,6 @@ class PrismaService {
                 won: rankItem.rank === 1,
                 roomCode: summary.roomCode,
                 ranked,
-                goldHunt: !ranked && safeCorrect > 0 && verified.has(rankItem.playerId) &&
-                    completed.has(rankItem.playerId) && gold.has(rankItem.playerId),
                 category: typeof summary.category === 'string' ? summary.category : undefined,
             });
         }
@@ -2088,7 +2076,7 @@ class PrismaService {
         const xpMultiplier = xp3Active ? 3 : xp2Active ? 2 : 1;
         const coinMultiplier = coin2Active ? 2 : 1;
         const appliedXp = baseRewards.xp * xpMultiplier;
-        const appliedCoins = baseRewards.coins * coinMultiplier + (delta.goldHunt === true ? shared_1.GOLD_HUNT_BONUS : 0);
+        const appliedCoins = baseRewards.coins * coinMultiplier;
         record.xp += appliedXp;
         record.coins += appliedCoins;
         record.seasonXp = (record.seasonXp || 0) + baseRewards.seasonXp;
@@ -2377,6 +2365,7 @@ class PrismaService {
             };
             record.xp += cfg.rewardXp;
             record.coins += cfg.rewardCoins;
+            record.gems = (record.gems || 15) + cfg.rewardGems;
             if (cfg.rewardChest) {
                 if (!record.inventory)
                     record.inventory = [];
@@ -4306,161 +4295,12 @@ class PrismaService {
         }
         return this.toProfile(record);
     }
-    // ---- Süreli kozmetik "bekleyen süre" mantığı (bkz. services/cosmeticStash.ts) ----
-    static COSMETIC_FIELDS = {
-        frame: { id: 'equippedFrame', exp: 'equippedFrameExpiresAt' },
-        background: { id: 'equippedBackground', exp: 'equippedBackgroundExpiresAt' },
-        nameEffect: { id: 'equippedNameEffect', exp: 'equippedNameEffectExpiresAt' },
-        badge: { id: 'equippedBadge', exp: 'equippedBadgeExpiresAt' },
-    };
-    cosmeticName(record, itemId) {
-        const fromInv = record.inventory?.find(i => i.id === itemId)?.name;
-        if (fromInv)
-            return fromInv;
-        for (const product of shared_1.SHOP_CATALOG) {
-            const hit = product.grantItems?.find(g => g.id === itemId);
-            if (hit)
-                return hit.name;
-        }
-        for (const tier of shared_1.SEASON_1_TIERS) {
-            for (const reward of [tier.freeReward, tier.premiumReward]) {
-                if (reward?.itemId === itemId && reward.title)
-                    return reward.title;
-            }
-        }
-        return itemId;
-    }
-    /**
-     * Yeni kozmetiği kuşanır. Aynı slotta hâlâ süresi olan bir eşya varsa kalan süresi
-     * kaybolmaz; `settings.cosmeticStash` içine alınır ve envanterde görünür.
-     * Kalıcı yazım için dönen yeni sepeti `{ cosmeticStash }` olarak settings'e birleştirin.
-     */
-    equipWithStash(record, itemId, expiresAt, baseStash) {
-        const slot = (0, cosmeticStash_1.slotOfItem)(itemId);
-        if (!slot)
-            return baseStash ?? (0, cosmeticStash_1.readStash)(record.settings);
-        const f = PrismaService.COSMETIC_FIELDS[slot];
-        const now = Date.now();
-        const current = record[f.id];
-        const stash = (0, cosmeticStash_1.stashActive)(baseStash ?? (0, cosmeticStash_1.readStash)(record.settings), { itemId: current, expiresAt: record[f.exp], name: current ? this.cosmeticName(record, current) : undefined }, now);
-        record[f.id] = itemId;
-        record[f.exp] = expiresAt;
-        record.settings = { ...record.settings, cosmeticStash: stash };
-        return stash;
-    }
-    stashedInventoryItems(record) {
-        return (0, cosmeticStash_1.readStash)(record.settings).map(e => ({
-            id: e.itemId,
-            name: e.name,
-            desc: 'Kalan süren saklandı; istediğin zaman kuşanabilirsin.',
-            qty: 1,
-            category: { frame: 'frame', background: 'background', nameEffect: 'name_effect', badge: 'badge' }[e.slot],
-            rarity: this.getItemRarity(e.itemId),
-            remainingMs: e.remainingMs,
-        }));
-    }
-    /**
-     * Süresi dolan slotu doldurur: önce saklanan kalan süreler, yoksa envanterdeki aynı
-     * türden bir kopya (süre baştan başlar). Bellek kaydını günceller, kalıcı yazımı arka planda yapar.
-     */
-    promoteNextCosmetic(record, slot, now) {
-        const f = PrismaService.COSMETIC_FIELDS[slot];
-        record[f.id] = undefined;
-        record[f.exp] = undefined;
-        const stash = (0, cosmeticStash_1.readStash)(record.settings);
-        const next = (0, cosmeticStash_1.nextForSlot)(stash, slot);
-        let consumedInventoryId;
-        let patchStash = stash;
-        if (next) {
-            const taken = (0, cosmeticStash_1.takeFromStash)(stash, next.itemId);
-            patchStash = taken.rest;
-            record[f.id] = next.itemId;
-            record[f.exp] = now + next.remainingMs;
-        }
-        else {
-            const prefix = { frame: 'frame_', background: 'bg_', nameEffect: 'name_', badge: 'badge_' }[slot];
-            const copy = record.inventory?.find(i => i.id.startsWith(prefix) && i.qty > 0 && i.durationHours !== 0);
-            if (copy) {
-                copy.qty -= 1;
-                consumedInventoryId = copy.id;
-                record[f.id] = copy.id;
-                record[f.exp] = now + (copy.durationHours && copy.durationHours > 0 ? copy.durationHours : 1) * 3_600_000;
-                record.inventory = (record.inventory || []).filter(i => i.qty > 0);
-            }
-        }
-        if (next)
-            record.settings = { ...record.settings, cosmeticStash: patchStash };
-        this.savePersistedUsers();
-        if (record.isGuest)
-            return;
-        const equippedId = record[f.id] ?? null;
-        const equippedExp = this.toBigIntSafe(record[f.exp]);
-        void (async () => {
-            try {
-                await this.rawClient.user.update({ where: { id: record.id }, data: { [f.id]: equippedId, [f.exp]: equippedExp } });
-                if (next)
-                    await this.mergePersistedSettings(this.rawClient, record.id, { cosmeticStash: patchStash });
-                if (consumedInventoryId) {
-                    await this.rawClient.userInventoryItem.updateMany({ where: { userId: record.id, itemId: consumedInventoryId, qty: { gt: 0 } }, data: { qty: { decrement: 1 } } });
-                    await this.rawClient.userInventoryItem.deleteMany({ where: { userId: record.id, itemId: consumedInventoryId, qty: 0 } });
-                }
-            }
-            catch (err) {
-                console.error('[promoteNextCosmetic] DB update error:', err);
-            }
-        })();
-    }
-    /** Envanterdeki "kalan süre" kartını kuşanır (yerine geçtiği eşyanın süresi de saklanır). */
-    async useStashedCosmetic(record, itemId) {
-        const taken = (0, cosmeticStash_1.takeFromStash)((0, cosmeticStash_1.readStash)(record.settings), itemId);
-        if (!taken)
-            return null;
-        const slot = taken.entry.slot;
-        const f = PrismaService.COSMETIC_FIELDS[slot];
-        const stash = this.equipWithStash(record, itemId, Date.now() + taken.entry.remainingMs, taken.rest);
-        if (!record.isGuest) {
-            try {
-                const settings = await this.rawClient.$transaction(async (tx) => {
-                    await tx.user.update({ where: { id: record.id }, data: { [f.id]: record[f.id] ?? null, [f.exp]: this.toBigIntSafe(record[f.exp]) } });
-                    return this.mergePersistedSettings(tx, record.id, { cosmeticStash: stash });
-                });
-                record.settings = settings;
-            }
-            catch (err) {
-                console.error('[useStashedCosmetic] DB update error:', err);
-                if (process.env.DATABASE_URL || process.env.DIRECT_URL)
-                    throw new Error('Eşya kullanımı kaydedilemedi. Envanteri yenileyip tekrar deneyin.');
-            }
-        }
-        this.users.set(record.id, record);
-        if (record.username)
-            this.users.set(record.username, record);
-        this.savePersistedUsers();
-        const mins = Math.max(1, Math.round(taken.entry.remainingMs / 60000));
-        const left = mins >= 60 ? `${Math.floor(mins / 60)} sa ${mins % 60} dk` : `${mins} dk`;
-        return { user: this.toProfile(record), rewardText: `${taken.entry.name} yeniden kuşanıldı! ${left} kullanım süresi kaldı.` };
-    }
     async useInventoryItem(userId, itemId) {
-        if (shared_1.JOKERS.some(j => j.id === itemId))
-            throw new Error('Jokerler yalnızca antrenmanda kullanılabilir.');
         let record = await this.loadRecord(userId);
         if (!record)
             throw new Error('Kullanıcı bulunamadı.');
         if (!record.inventory)
             record.inventory = this.defaultInventory();
-        // Zaten takılı olan kozmetiğe tekrar "Kuşan" denirse yeni kopya harcanmaz ve
-        // süre baştan başlamaz; kalan süre olduğu gibi akmaya devam eder.
-        const equipSlot = (0, cosmeticStash_1.slotOfItem)(itemId);
-        if (equipSlot) {
-            const f = PrismaService.COSMETIC_FIELDS[equipSlot];
-            const exp = record[f.exp];
-            if (record[f.id] === itemId && (!exp || exp > Date.now())) {
-                return { user: this.toProfile(record), rewardText: `${this.cosmeticName(record, itemId)} zaten kuşanılı.` };
-            }
-        }
-        const stashed = await this.useStashedCosmetic(record, itemId);
-        if (stashed)
-            return stashed;
         if (!record.isGuest && itemId.startsWith('badge_')) {
             const accountId = record.id;
             const { updated, rewardText } = await this.rawClient.$transaction(async (tx) => {
@@ -4476,15 +4316,6 @@ class PrismaService {
                     await tx.userInventoryItem.update({ where: { userId_itemId: where }, data: { qty: { decrement: 1 } } });
                     await tx.userInventoryItem.deleteMany({ where: { ...where, qty: 0 } });
                 }
-                // Takılı rozetin kalan süresi kaybolmasın: saklanır ve envanterde görünür.
-                const current = await tx.user.findUnique({ where: { id: accountId }, select: { equippedBadge: true, equippedBadgeExpiresAt: true, settings: true } });
-                const currentSettings = (current?.settings ?? {});
-                const stash = (0, cosmeticStash_1.stashActive)((0, cosmeticStash_1.readStash)(currentSettings), {
-                    itemId: current?.equippedBadge,
-                    expiresAt: current?.equippedBadgeExpiresAt != null ? Number(current.equippedBadgeExpiresAt) : undefined,
-                    name: current?.equippedBadge ? this.cosmeticName(record, current.equippedBadge) : undefined,
-                }, Date.now());
-                await this.mergePersistedSettings(tx, accountId, { cosmeticStash: stash });
                 const updated = await tx.user.update({
                     where: { id: accountId },
                     data: { equippedBadge: itemId, equippedBadgeExpiresAt: permanent ? null : BigInt(Date.now() + hours * 3_600_000) },
@@ -4502,7 +4333,6 @@ class PrismaService {
             return { user: this.toProfile(record), rewardText };
         }
         const originalCoins = record.coins, originalGems = record.gems || 0;
-        const boosterPatch = {};
         const item = record.inventory.find((i) => i.id === itemId);
         if (!item || item.qty <= 0) {
             throw new Error('Bu eşyadan envanterinizde kalmadı.');
@@ -4520,24 +4350,28 @@ class PrismaService {
             : `${Math.round(rentalMs / (60 * 60 * 1000))} saat`;
         let rewardText = `${item.name} kullanıldı!`;
         if (itemId.startsWith('frame_')) {
-            boosterPatch.cosmeticStash = this.equipWithStash(record, itemId, Date.now() + rentalMs);
+            record.equippedFrame = itemId;
+            record.equippedFrameExpiresAt = Date.now() + rentalMs;
             rewardText = `${item.name} profilinize uygulandı! ${rentalLabel} boyunca aktif.`;
         }
         else if (itemId.startsWith('bg_')) {
-            boosterPatch.cosmeticStash = this.equipWithStash(record, itemId, Date.now() + rentalMs);
+            record.equippedBackground = itemId;
+            record.equippedBackgroundExpiresAt = Date.now() + rentalMs;
             rewardText = `${item.name} profilinize ve uygulamaya uygulandı! ${rentalLabel} boyunca aktif.`;
         }
         else if (itemId.startsWith('name_')) {
-            boosterPatch.cosmeticStash = this.equipWithStash(record, itemId, Date.now() + rentalMs);
+            record.equippedNameEffect = itemId;
+            record.equippedNameEffectExpiresAt = Date.now() + rentalMs;
             rewardText = `${item.name} profilinize uygulandı! ${rentalLabel} boyunca aktif.`;
         }
         else if (itemId.startsWith('badge_')) {
-            boosterPatch.cosmeticStash = this.equipWithStash(record, itemId, Date.now() + rentalMs);
+            record.equippedBadge = itemId;
+            record.equippedBadgeExpiresAt = Date.now() + rentalMs;
             rewardText = `${item.name} profilinize uygulandı! ${rentalLabel} boyunca aktif.`;
         }
         else if (itemId === 'gem') {
-            record.coins += 100;
-            rewardText = '+100 Altın hesabına eklendi!';
+            record.gems = (record.gems || 0) + 10;
+            rewardText = '+10 Elmas hesabına eklendi!';
         }
         else if (itemId === 'coin') {
             record.coins += 100;
@@ -4551,23 +4385,22 @@ class PrismaService {
             if (itemId.startsWith('booster_xp_3x')) {
                 const base = Math.max(Date.now(), record.xp3BoosterExpiresAt || 0);
                 record.xp3BoosterExpiresAt = base + durationMs;
-                boosterPatch.xp3BoosterExpiresAt = new Date(record.xp3BoosterExpiresAt).toISOString();
+                record.settings = { ...(record.settings || {}), xp3BoosterExpiresAt: new Date(record.xp3BoosterExpiresAt).toISOString() };
                 rewardText = `⚡ 3x XP iksiri aktif! ${durText} boyunca maçlardan kazanacağın XP 3 katına çıkar.`;
             }
             else if (itemId.startsWith('booster_coin')) {
                 const base = Math.max(Date.now(), record.coinBoosterExpiresAt || 0);
                 record.coinBoosterExpiresAt = base + durationMs;
-                boosterPatch.coinBoosterExpiresAt = new Date(record.coinBoosterExpiresAt).toISOString();
+                record.settings = { ...(record.settings || {}), coinBoosterExpiresAt: new Date(record.coinBoosterExpiresAt).toISOString() };
                 rewardText = `🪙 2x Altın iksiri aktif! ${durText} boyunca maçlardan kazanacağın Altın 2 katına çıkar.`;
             }
             else {
                 // booster_xp_2x (mevcut): 2x XP
                 const base = Math.max(Date.now(), record.activeBoosterExpiresAt || 0);
                 record.activeBoosterExpiresAt = base + durationMs;
-                boosterPatch.xpBoosterExpiresAt = new Date(record.activeBoosterExpiresAt).toISOString();
+                record.settings = { ...(record.settings || {}), xpBoosterExpiresAt: new Date(record.activeBoosterExpiresAt).toISOString() };
                 rewardText = `⚡ 2x XP artırıcı aktif! ${durText} boyunca maçlardan kazanacağın XP 2 katına çıkar.`;
             }
-            record.settings = { ...record.settings, ...boosterPatch };
         }
         else {
             record.xp += 30;
@@ -4591,7 +4424,7 @@ class PrismaService {
                         data: {
                             coins: { increment: record.coins - originalCoins },
                             gems: { increment: (record.gems || 0) - originalGems },
-                            xp: record.xp, level: record.level,
+                            xp: record.xp, level: record.level, settings: (record.settings || {}),
                             equippedFrame: record.equippedFrame ?? null,
                             equippedNameEffect: record.equippedNameEffect ?? null,
                             equippedBackground: record.equippedBackground ?? null,
@@ -4599,7 +4432,7 @@ class PrismaService {
                             equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
                             equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
                         },
-                        select: { coins: true, gems: true, settings: true },
+                        select: { coins: true, gems: true },
                     });
                     const quantity = await tx.userInventoryItem.updateMany({ where: {
                             userId: record.id, itemId, qty: { gt: 0 },
@@ -4607,14 +4440,10 @@ class PrismaService {
                     if (!quantity.count)
                         throw new Error('Eşya artık envanterde yok.');
                     await tx.userInventoryItem.deleteMany({ where: { userId: record.id, itemId, qty: 0 } });
-                    const settings = Object.keys(boosterPatch).length
-                        ? await this.mergePersistedSettings(tx, record.id, boosterPatch)
-                        : user.settings;
-                    return { ...user, settings };
+                    return user;
                 });
                 record.coins = updated.coins;
                 record.gems = updated.gems;
-                record.settings = updated.settings;
             }
             catch (err) {
                 console.error('[useInventoryItem] DB update error:', err);
@@ -4814,44 +4643,68 @@ class PrismaService {
             this.savePersistedUsers();
         return { user: this.toProfile(record), reward };
     }
+    async buyPremiumPass(userId) {
+        return this.withUserLock(userId, async () => {
+            const record = await this.loadRecord(userId);
+            if (!record)
+                throw new Error('Kullanıcı bulunamadı.');
+            if (record.hasPremiumPass) {
+                throw new Error('Zaten Sezon 1 Premium Pass sahibisiniz!');
+            }
+            const costGems = 250;
+            if ((record.gems || 0) < costGems) {
+                throw new Error(`Yetersiz Elmas! Premium Pass için ${costGems} Elmas gerekli (Mevcut: ${record.gems || 0} Elmas).`);
+            }
+            if (!record.isGuest && !this.isJest) {
+                try {
+                    await this.rawClient.$transaction(async (tx) => {
+                        await tx.$queryRaw `SELECT id FROM public.users WHERE id = ${record.id} FOR UPDATE`;
+                        const fresh = await tx.user.findUnique({ where: { id: record.id } });
+                        if (!fresh)
+                            throw new Error('Kullanıcı bulunamadı.');
+                        if (fresh.hasPremiumPass)
+                            throw new SeasonClaimError('Zaten Sezon 1 Premium Pass sahibisiniz!');
+                        if ((fresh.gems || 0) < costGems) {
+                            throw new SeasonClaimError(`Yetersiz Elmas! Premium Pass için ${costGems} Elmas gerekli (Mevcut: ${fresh.gems || 0} Elmas).`);
+                        }
+                        await tx.user.update({
+                            where: { id: record.id },
+                            data: { gems: { decrement: costGems }, hasPremiumPass: true, updatedAt: new Date() },
+                        });
+                    });
+                    const fresh = await this.loadRecord(userId);
+                    return this.toProfile(fresh || record);
+                }
+                catch (err) {
+                    if (err instanceof SeasonClaimError)
+                        throw new Error(err.message);
+                    console.error('[buyPremiumPass] DB transaction error:', err);
+                    if (process.env.NODE_ENV === 'production') {
+                        throw new Error('Satın alma şu anda kaydedilemedi, lütfen birkaç saniye sonra tekrar dene.');
+                    }
+                }
+            }
+            record.gems = (record.gems || 0) - costGems;
+            record.hasPremiumPass = true;
+            this.users.set(userId, record);
+            this.users.set(record.id, record);
+            if (record.username)
+                this.users.set(record.username, record);
+            if (!record.isGuest)
+                this.savePersistedUsers();
+            return this.toProfile(record);
+        });
+    }
     async purchaseShopProduct(userId, productId, paymentMethod = 'coins', durationId) {
+        let record = await this.loadRecord(userId);
+        if (!record)
+            throw new Error('Kullanıcı bulunamadı.');
+        const originalCoins = record.coins, originalGems = record.gems || 0;
         const product = shared_1.SHOP_CATALOG.find((p) => p.id === productId);
         if (!product)
             throw new Error('Ürün mağazada bulunamadı.');
-        if (product.currency === 'try' || product.grantGems)
-            throw new Error('Elmas paketleri yalnızca doğrulanmış ödeme ile yüklenir.');
-        if (product.category === 'jokers') {
-            if (/^(guest_|bot_)/i.test(userId))
-                throw new Error('Joker satın almak için giriş yap.');
-            const item = product.grantItems[0];
-            try {
-                // Debit and grant in one transaction, without loading the account before the write.
-                const saved = await this.rawClient.user.update({
-                    where: { id: userId, coins: { gte: product.price } },
-                    data: {
-                        coins: { decrement: product.price },
-                        inventoryItems: { upsert: {
-                                where: { userId_itemId: { userId, itemId: item.id } },
-                                update: { qty: { increment: item.qty } },
-                                create: { itemId: item.id, name: item.name, desc: item.desc, qty: item.qty },
-                            } },
-                    },
-                    include: { inventoryItems: true },
-                });
-                return { user: this.toProfile(this.prismaUserToRecord(saved)), message: `${item.name} envanterine eklendi.` };
-            }
-            catch (error) {
-                if (error instanceof client_1.Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-                    throw new Error(`Bu joker için ${product.price} altın gerekli.`);
-                }
-                throw error;
-            }
-        }
-        const loaded = await this.loadRecord(userId);
-        if (!loaded)
-            throw new Error('Kullanıcı bulunamadı.');
-        const record = { ...loaded, inventory: loaded.inventory?.map(item => ({ ...item })) };
-        const originalCoins = record.coins, originalGems = record.gems || 0;
+        if (product.currency === 'try')
+            throw new Error('Gerçek para ile satın alma şu anda kapalı.');
         // Süreli kozmetiklerde süre seçimi: 1 saatten en fazla 1 aya kadar.
         // Fiyat, temel fiyat x süre çarpanıyla ölçeklenir.
         const duration = (0, shared_1.isCosmeticProduct)(product) ? (0, shared_1.getShopDuration)(durationId) : null;
@@ -4868,87 +4721,71 @@ class PrismaService {
             }
             record.gems = (record.gems || 0) - effectivePrice;
         }
+        if (product.grantPremiumPass) {
+            record.hasPremiumPass = true;
+        }
         if (product.grantCoins) {
             record.coins += product.grantCoins;
         }
-        let stashDirty = false;
+        if (product.grantGems) {
+            record.gems = (record.gems || 0) + product.grantGems;
+        }
         if (product.grantItems) {
             if (!record.inventory)
                 record.inventory = [];
             for (const item of product.grantItems) {
                 const isCosmeticItem = item.category === 'frame' || item.category === 'badge' ||
                     item.category === 'name_effect' || item.category === 'background';
-                // Auto-equip consumes the newly purchased copy, not stock the player already owns.
-                const addedQty = item.qty - (isCosmeticItem ? 1 : 0);
                 const existing = record.inventory.find((i) => i.id === item.id);
-                if (existing && addedQty > 0) {
-                    existing.qty += addedQty;
+                if (existing) {
+                    existing.qty += item.qty;
+                    // Yeni süre seçildiyse bu kopyanın süresi güncellenir
+                    if (isCosmeticItem && duration)
+                        existing.durationHours = duration.hours;
                 }
-                else if (addedQty > 0) {
+                else {
                     record.inventory.push({
                         id: item.id,
                         name: item.name,
                         desc: item.desc,
-                        qty: addedQty,
+                        qty: item.qty,
                         category: item.category || this.getItemCategory(item.id),
                         rarity: item.rarity || this.getItemRarity(item.id),
                         durationHours: isCosmeticItem && duration ? duration.hours : undefined,
                     });
                 }
+                // Satın alınan kozmetik anında profile uygulanır (otomatik kuşanma) ve
+                // WePlay tarzı süreli modelde kuşanım 1 kopya harcar: envantere eklenir,
+                // hemen kuşanıldığı için 1 adet düşürülür. Süre seçime göre 1 saatten
+                // 1 aya kadardır; süre bitince kozmetik otomatik düşer.
+                const isRental = !!duration;
                 const expiresAt = duration ? Date.now() + duration.hours * 60 * 60 * 1000 : undefined;
-                // Yerine geçilen eşyanın kalan süresi kaybolmaz; envanterde bekler.
-                if ((item.category === 'frame' && item.id.startsWith('frame_')) ||
-                    (item.category === 'background' && item.id.startsWith('bg_')) ||
-                    (item.category === 'name_effect' && item.id.startsWith('name_')) ||
-                    (item.category === 'badge' && item.id.startsWith('badge_'))) {
-                    this.equipWithStash(record, item.id, expiresAt);
-                    stashDirty = true;
+                const isCosmetic = item.category === 'frame' || item.category === 'background' ||
+                    item.category === 'name_effect' || item.category === 'badge';
+                if (isCosmetic) {
+                    // Otomatik kuşanım 1 kopya tüketir
+                    const cosItem = record.inventory.find((i) => i.id === item.id);
+                    if (cosItem) {
+                        cosItem.qty = Math.max(0, cosItem.qty - 1);
+                    }
+                    record.inventory = (record.inventory || []).filter((i) => i.qty > 0);
                 }
-            }
-        }
-        if (!record.isGuest) {
-            try {
-                // Most products have no inventory write (auto-equipped cosmetics and currency packs).
-                // Return their committed balances directly; items that grant stock use an atomic nested write.
-                const stockGrants = (product.grantItems ?? []).flatMap(item => {
-                    const qty = item.qty - (['frame', 'badge', 'background', 'name_effect'].includes(item.category ?? '') ? 1 : 0);
-                    return qty > 0 ? [{
-                            where: { userId_itemId: { userId: record.id, itemId: item.id } },
-                            update: { qty: { increment: qty } },
-                            create: { itemId: item.id, name: item.name, desc: item.desc, qty, durationHours: duration?.hours },
-                        }] : [];
-                });
-                const grants = (category) => product.grantItems?.some(item => item.category === category);
-                const updated = await this.rawClient.user.update({
-                    where: {
-                        id: record.id,
-                        ...(product.currency === 'coins' ? { coins: { gte: effectivePrice } } : { gems: { gte: effectivePrice } }),
-                    },
-                    data: {
-                        coins: { increment: record.coins - originalCoins },
-                        gems: { increment: (record.gems || 0) - originalGems },
-                        equippedFrame: grants('frame') ? record.equippedFrame : undefined,
-                        equippedBadge: grants('badge') ? record.equippedBadge : undefined,
-                        equippedNameEffect: grants('name_effect') ? record.equippedNameEffect : undefined,
-                        equippedBackground: grants('background') ? record.equippedBackground : undefined,
-                        equippedFrameExpiresAt: grants('frame') ? this.toBigIntSafe(record.equippedFrameExpiresAt) : undefined,
-                        equippedBadgeExpiresAt: grants('badge') ? this.toBigIntSafe(record.equippedBadgeExpiresAt) : undefined,
-                        equippedNameEffectExpiresAt: grants('name_effect') ? this.toBigIntSafe(record.equippedNameEffectExpiresAt) : undefined,
-                        equippedBackgroundExpiresAt: grants('background') ? this.toBigIntSafe(record.equippedBackgroundExpiresAt) : undefined,
-                        inventoryItems: stockGrants.length ? { upsert: stockGrants } : undefined,
-                    },
-                    select: { coins: true, gems: true },
-                });
-                record.coins = updated.coins;
-                record.gems = updated.gems;
-                if (stashDirty) {
-                    record.settings = await this.mergePersistedSettings(this.rawClient, record.id, { cosmeticStash: (0, cosmeticStash_1.readStash)(record.settings) });
+                if (item.category === 'frame' && item.id.startsWith('frame_')) {
+                    record.equippedFrame = item.id;
+                    record.equippedFrameExpiresAt = expiresAt;
                 }
-            }
-            catch (err) {
-                console.error('[purchaseShopProduct] DB update error:', err);
-                if (process.env.DATABASE_URL || process.env.DIRECT_URL)
-                    throw new Error('Satın alma kaydedilemedi. Bakiyeyi yenileyip tekrar deneyin.');
+                if (item.category === 'background' && item.id.startsWith('bg_')) {
+                    record.equippedBackground = item.id;
+                    record.equippedBackgroundExpiresAt = expiresAt;
+                }
+                if (item.category === 'name_effect' && item.id.startsWith('name_')) {
+                    record.equippedNameEffect = item.id;
+                    record.equippedNameEffectExpiresAt = expiresAt;
+                }
+                if (item.category === 'badge' && item.id.startsWith('badge_')) {
+                    record.equippedBadge = item.id;
+                    record.equippedBadgeExpiresAt = expiresAt;
+                }
             }
         }
         this.users.set(userId, record);
@@ -4957,8 +4794,53 @@ class PrismaService {
             this.users.set(record.username, record);
         if (record.email)
             this.users.set(record.email.toLowerCase(), record);
-        if (!record.isGuest && !process.env.DATABASE_URL && !process.env.DIRECT_URL)
+        if (!record.isGuest) {
             this.savePersistedUsers();
+            try {
+                const updated = await this.rawClient.$transaction(async (tx) => {
+                    const user = await tx.user.update({
+                        where: {
+                            id: record.id,
+                            ...(product.currency === 'coins' ? { coins: { gte: effectivePrice } } : { gems: { gte: effectivePrice } }),
+                        },
+                        data: {
+                            coins: { increment: record.coins - originalCoins },
+                            gems: { increment: (record.gems || 0) - originalGems },
+                            hasPremiumPass: record.hasPremiumPass,
+                            equippedFrame: record.equippedFrame ?? null,
+                            equippedBadge: record.equippedBadge ?? null,
+                            equippedNameEffect: record.equippedNameEffect ?? null,
+                            equippedBackground: record.equippedBackground ?? null,
+                            equippedFrameExpiresAt: this.toBigIntSafe(record.equippedFrameExpiresAt),
+                            equippedBadgeExpiresAt: this.toBigIntSafe(record.equippedBadgeExpiresAt),
+                            equippedNameEffectExpiresAt: this.toBigIntSafe(record.equippedNameEffectExpiresAt),
+                            equippedBackgroundExpiresAt: this.toBigIntSafe(record.equippedBackgroundExpiresAt),
+                            updatedAt: new Date(),
+                        },
+                        select: { coins: true, gems: true },
+                    });
+                    for (const item of product.grantItems ?? []) {
+                        // An auto-equipped cosmetic consumes the newly purchased copy, not a separate support grant.
+                        const qty = item.qty - (['frame', 'badge', 'background', 'name_effect'].includes(item.category ?? '') ? 1 : 0);
+                        if (qty <= 0)
+                            continue;
+                        await tx.userInventoryItem.upsert({
+                            where: { userId_itemId: { userId: record.id, itemId: item.id } },
+                            update: { qty: { increment: qty } },
+                            create: { userId: record.id, itemId: item.id, name: item.name, desc: item.desc, qty, durationHours: duration?.hours },
+                        });
+                    }
+                    return user;
+                });
+                record.coins = updated.coins;
+                record.gems = updated.gems;
+            }
+            catch (err) {
+                console.error('[purchaseShopProduct] DB update error:', err);
+                if (process.env.DATABASE_URL || process.env.DIRECT_URL)
+                    throw new Error('Satın alma kaydedilemedi. Bakiyeyi yenileyip tekrar deneyin.');
+            }
+        }
         return {
             user: this.toProfile(record),
             message: `${product.name} başarıyla satın alındı ve hesabınıza tanımlandı!`,
@@ -4983,13 +4865,14 @@ class PrismaService {
             return randInt(a, b);
         };
         let coins = 0;
-        const gems = 0; // Older clients still expect this field.
+        let gems = 0;
         let xp = 0;
         let bonusItem;
         if (isGiftBox) {
             // 7 günlük meydan okuma hediye kutusu: cömert ama değişken epik ödüller
             const t = rollTier(0.5, 0.35);
             coins = bracket(t, [800, 1500], [1500, 2800], [2800, 4500]);
+            gems = Math.random() < 0.5 ? randInt(30, 70) : 0;
             xp = bracket(t, [100, 150], [150, 200], [200, 250]);
             const giftBonusPool = [
                 {
@@ -5014,6 +4897,7 @@ class PrismaService {
         else if (chestId === 'chest_legendary' || chestId === 'chest_diamond') {
             const t = rollTier(0.45, 0.38);
             coins = bracket(t, [1000, 2000], [2000, 4000], [4000, 6500]);
+            gems = Math.random() < 0.45 ? randInt(50, 110) : 0;
             xp = bracket(t, [80, 120], [120, 180], [180, 250]);
             bonusItem = {
                 id: 'frame_flame',
@@ -5027,6 +4911,7 @@ class PrismaService {
         else if (chestId.includes('gold')) {
             const t = rollTier(0.5, 0.35);
             coins = bracket(t, [500, 900], [900, 1800], [1800, 2800]);
+            gems = Math.random() < 0.4 ? randInt(20, 45) : 0;
             xp = bracket(t, [50, 80], [80, 120], [120, 160]);
             bonusItem = {
                 id: 'booster_xp_2x_1h',
@@ -5040,12 +4925,14 @@ class PrismaService {
         else if (chestId.includes('silver')) {
             const t = rollTier(0.55, 0.32);
             coins = bracket(t, [250, 500], [500, 900], [900, 1400]);
+            gems = Math.random() < 0.35 ? randInt(8, 20) : 0;
             xp = bracket(t, [25, 45], [45, 70], [70, 100]);
         }
         else {
             // Ahşap sandık: çoğunlukla mütevazı ödül
             const t = rollTier(0.6, 0.3);
             coins = bracket(t, [80, 180], [180, 350], [350, 500]);
+            gems = Math.random() < 0.35 ? randInt(3, 8) : 0;
             xp = bracket(t, [10, 20], [20, 35], [35, 50]);
         }
         const accountId = record.id;
@@ -5072,6 +4959,7 @@ class PrismaService {
                     record.inventory.push(bonusItem);
             }
             record.coins += coins;
+            record.gems += gems;
             record.xp += xp;
             const { level, rankTitle } = (0, shared_1.calculateLevelFromXp)(record.xp);
             record.level = level;
@@ -5117,7 +5005,7 @@ class PrismaService {
                 const { level, rankTitle } = (0, shared_1.calculateLevelFromXp)(owner.xp + xp);
                 return tx.user.update({
                     where: { id: accountId },
-                    data: { coins: { increment: coins }, xp: { increment: xp }, level, rankTitle },
+                    data: { coins: { increment: coins }, gems: { increment: gems }, xp: { increment: xp }, level, rankTitle },
                     include: { inventoryItems: true },
                 });
             });
@@ -5128,11 +5016,13 @@ class PrismaService {
             this.users.set(record.username, record);
         if (record.email)
             this.users.set(record.email.toLowerCase(), record);
-        const rewardText = `Sandık açıldı: +${coins} Altın ve +${xp} XP kazandınız.${bonusItem ? ` Bonus: ${bonusItem.name}.` : ''}`;
+        const rewardText = `🎉 Sandık açıldı: +${coins} Altın, +${gems} Elmas ve +${xp} XP kazandınız!${bonusItem ? ` Bonus: ${bonusItem.name}!` : ''}`;
         // İstemcinin ödül modalünde gösterdiği liste (boş olanlar filtrelenir).
         const rewards = [];
         if (coins > 0)
             rewards.push({ type: 'coins', amount: coins });
+        if (gems > 0)
+            rewards.push({ type: 'gems', amount: gems });
         if (xp > 0)
             rewards.push({ type: 'xp', amount: xp });
         if (bonusItem)
@@ -5289,7 +5179,7 @@ class PrismaService {
         }
         return {
             user: this.toProfile(record),
-            message: `${event.title} tamamlandı: +${event.rewardCoins} Altın ve +${event.rewardSeasonXp} Sezon XP.`,
+            message: `Tebrikler! ${event.title} tamamlandı: +${event.rewardCoins} Altın, +${event.rewardGems} Elmas, +${event.rewardSeasonXp} Sezon XP kazandınız!`,
         };
     }
     toProfile(record) {
@@ -5324,14 +5214,31 @@ class PrismaService {
         const todayStr = new Date().toISOString().slice(0, 10);
         const dcState = record.categoryMastery?.dailyChallenge;
         const completedToday = dcState?.lastCompletedDate === todayStr;
-        // Süreli profil kozmetiklerini kontrol et; süresi dolan slota saklanan kalan süre
-        // veya envanterdeki aynı türden bir eşya otomatik geçer.
+        // Süreli profil kozmetiklerini kontrol et ve süresi dolanları düşür.
         const now = Date.now();
-        for (const slot of ['frame', 'background', 'nameEffect', 'badge']) {
-            const f = PrismaService.COSMETIC_FIELDS[slot];
-            const exp = record[f.exp];
-            if (record[f.id] && exp && now >= exp)
-                this.promoteNextCosmetic(record, slot, now);
+        if (record.equippedFrame && record.equippedFrameExpiresAt && now >= record.equippedFrameExpiresAt) {
+            record.equippedFrame = undefined;
+            record.equippedFrameExpiresAt = undefined;
+            this.savePersistedUsers();
+            this.rawClient.user.update({ where: { id: record.id }, data: { equippedFrame: null, equippedFrameExpiresAt: null } }).catch(() => { });
+        }
+        if (record.equippedBackground && record.equippedBackgroundExpiresAt && now >= record.equippedBackgroundExpiresAt) {
+            record.equippedBackground = undefined;
+            record.equippedBackgroundExpiresAt = undefined;
+            this.savePersistedUsers();
+            this.rawClient.user.update({ where: { id: record.id }, data: { equippedBackground: null, equippedBackgroundExpiresAt: null } }).catch(() => { });
+        }
+        if (record.equippedNameEffect && record.equippedNameEffectExpiresAt && now >= record.equippedNameEffectExpiresAt) {
+            record.equippedNameEffect = undefined;
+            record.equippedNameEffectExpiresAt = undefined;
+            this.savePersistedUsers();
+            this.rawClient.user.update({ where: { id: record.id }, data: { equippedNameEffect: null, equippedNameEffectExpiresAt: null } }).catch(() => { });
+        }
+        if (record.equippedBadge && record.equippedBadgeExpiresAt && now >= record.equippedBadgeExpiresAt) {
+            record.equippedBadge = undefined;
+            record.equippedBadgeExpiresAt = undefined;
+            this.savePersistedUsers();
+            this.rawClient.user.update({ where: { id: record.id }, data: { equippedBadge: null, equippedBadgeExpiresAt: null } }).catch(() => { });
         }
         return {
             id: record.id,
@@ -5352,7 +5259,7 @@ class PrismaService {
             seasonXp: record.seasonXp ?? 0,
             hasPremiumPass: !!record.hasPremiumPass,
             coins: record.coins,
-            gems: record.gems ?? 0,
+            gems: record.gems ?? 14,
             dailyStreak: record.dailyStreak ?? 1,
             dailyChallenge: {
                 lastCompletedDate: dcState?.lastCompletedDate,
@@ -5362,7 +5269,7 @@ class PrismaService {
             rankTitle: record.rankTitle,
             rankPoints: record.rankPoints,
             profileCompletionPct,
-            inventory: [...(record.inventory || []), ...this.stashedInventoryItems(record)],
+            inventory: record.inventory,
             claimedSeasonTiers: record.claimedSeasonTiers,
             claimedSeasonFreeTiers: record.claimedSeasonFreeTiers || [],
             claimedSeasonPremiumTiers: record.claimedSeasonPremiumTiers || [],

@@ -5,6 +5,7 @@ exports.renderDashboardHtml = renderDashboardHtml;
 const express_1 = require("express");
 const logger_1 = require("../utils/logger");
 const prismaClient_1 = require("../db/prismaClient");
+const authRoutes_1 = require("./authRoutes");
 const adminShell_1 = require("./adminShell");
 const auth_1 = require("../middleware/auth");
 const portalOtp_1 = require("../services/portalOtp");
@@ -106,8 +107,29 @@ exports.logRouter.get('/logs/stream', auth_1.requireAdminAuth, (req, res) => {
     }
     logger_1.logger.info('SYSTEM', 'Yeni bir istemci SSE log akışına bağlandı');
 });
-// Older installed clients still send OAuth diagnostics. Silently discard them.
-exports.logRouter.post('/logs/ingest', (_req, res) => { res.sendStatus(204); });
+// Public client log ingestion (mobile app). Input is size-capped and sanitized
+// to prevent log flooding / injection.
+exports.logRouter.post('/logs/ingest', (req, res) => {
+    const { level = 'INFO', category = 'CLIENT', message, details } = req.body;
+    if (!message || typeof message !== 'string') {
+        res.status(400).json({ error: 'message zorunludur' });
+        return;
+    }
+    const safeLevel = ['INFO', 'WARN', 'ERROR'].includes(level) ? level : 'INFO';
+    const safeCategory = typeof category === 'string' ? category.slice(0, 24) : 'CLIENT';
+    const safeMessage = message.slice(0, 1000).replace(/[\r\n\t]/g, ' ');
+    let safeDetails = details;
+    if (details && typeof details === 'object') {
+        try {
+            safeDetails = JSON.parse(JSON.stringify(details).slice(0, 4000));
+        }
+        catch {
+            safeDetails = undefined;
+        }
+    }
+    logger_1.logger.log(safeCategory, safeLevel, `[MOBİL] ${safeMessage}`, safeDetails);
+    res.json({ success: true });
+});
 exports.logRouter.post('/logs/clear', auth_1.requireAdminAuth, (req, res) => {
     logger_1.logger.clear();
     res.json({ success: true });
@@ -137,10 +159,12 @@ exports.logRouter.get('/logs/stats', auth_1.requireAdminAuth, async (req, res) =
         catch (e) {
             recentUsers = [];
         }
+        const sessions = authRoutes_1.getPendingGoogleSessions ? (0, authRoutes_1.getPendingGoogleSessions)() : [];
         res.json({
             uptimeSeconds: Math.floor(process.uptime()),
             postgresUsersCount: pgUsers,
             recentUsers,
+            activeGoogleSessions: sessions,
             supabaseConfigured: true,
         });
     }
@@ -1252,7 +1276,7 @@ function renderDashboardHtml(page = adminShell_1.adminPages[0]) {
             </div>
           </div>
           <div class="cos-card">
-            <div class="cos-icon-wrap gold-frame">✦</div>
+            <div class="cos-icon-wrap gold-frame">👑</div>
             <div class="cos-name">Kraliyet Altın Çerçeve</div>
             <div class="cos-desc">24 ayar parıldayan altın. Pulse animasyonlu.</div>
             <div class="cos-meta">
@@ -1319,7 +1343,7 @@ function renderDashboardHtml(page = adminShell_1.adminPages[0]) {
             </div>
           </div>
           <div class="cos-card">
-            <div class="cos-icon-wrap animated-gradient" style="background:linear-gradient(135deg,#1E0E45,#4C1D95,#1E0E45);background-size:400% 400%;animation:cosGradientShift 5s ease-in-out infinite;">✦</div>
+            <div class="cos-icon-wrap animated-gradient" style="background:linear-gradient(135deg,#1E0E45,#4C1D95,#1E0E45);background-size:400% 400%;animation:cosGradientShift 5s ease-in-out infinite;">👑</div>
             <div class="cos-name">Kraliyet Moru Teması</div>
             <div class="cos-desc">Altın yıldızlı kraliyet kadifesi. Gradient shift animasyonlu.</div>
             <div class="cos-meta">
