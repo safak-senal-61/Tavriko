@@ -110,7 +110,9 @@ export function useNickEnv(): NickEnvSnapshot {
 export const fullPool =
   Platform.OS === 'web' ? new NickSlotPool(lowEnd ? 4 : 10, 13) : new NickSlotPool(lowEnd ? 4 : 12);
 /** Aynı anda çalışan Lottie parçacık katmanı üst sınırı. */
-export const particlePool = new NickSlotPool(lowEnd ? 1 : 4);
+// Parçacıklar artık her ekranda açık (liderlik, maç, arkadaşlar…): bir ekranda
+// aynı anda görünen efektli nick sayısını karşılayacak kadar yer ayrılır.
+export const particlePool = new NickSlotPool(lowEnd ? 2 : 10);
 
 let nextId = 1;
 export const allocNickId = () => nextId++;
