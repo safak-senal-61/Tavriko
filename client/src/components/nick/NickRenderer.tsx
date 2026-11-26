@@ -5,7 +5,7 @@
  *
  * Stil `styleId` üzerinden @trivia/shared NICK_STYLES kayıt defterinden okunur.
  * Kalite otomatik seçilir (bkz. nickQualityCore.resolveNickQuality):
- *   full   → Skia shader dolgusu + bulanık parıltı (+ hero'da Lottie parçacıkları)
+ *   full   → Skia shader dolgusu + bulanık parıltı + Lottie parçacıkları (her ekranda)
  *   lite   → Reanimated renk döngüsü, 24 fps, sabit parıltı
  *   static → animasyonsuz palet rengi
  *
@@ -50,7 +50,7 @@ export interface NickRendererProps {
   children?: React.ReactNode;
   style?: StyleProp<TextStyle>;
   numberOfLines?: number;
-  /** hero: profil başlığı / önizleme — öncelikli bütçe, parçacıklar, güçlü parıltı */
+  /** hero: profil başlığı / önizleme — bütçe aşılırsa önceliklidir. Efektler tüm varyantlarda aynıdır. */
   variant?: NickVariant;
   /** Kaliteyi zorla (ör. mağaza önizlemesinde kullanıcı seçimi). Platform sınırı yine uygulanır. */
   quality?: NickQuality;
@@ -219,10 +219,10 @@ const NickStyled = memo(function NickStyled({
   const mode: NickQuality =
     fullGranted && typeface && drawLines && drawLines.length && box ? 'full' : cap === 'static' ? 'static' : 'lite';
 
-  // --- parçacıklar (yalnızca hero + full) ---
+  // --- parçacıklar (tam kalitede her ekranda; bütçe aşılırsa hero öncelikli) ---
   const wantParticles =
-    hero && mode === 'full' && PARTICLES_AVAILABLE && def.particles.kind !== 'none' && onScreen;
-  const particlesGranted = usePoolSlot(particlePool, id, wantParticles, false);
+    mode === 'full' && PARTICLES_AVAILABLE && def.particles.kind !== 'none' && onScreen;
+  const particlesGranted = usePoolSlot(particlePool, id, wantParticles, hero);
 
   // --- lite / static Reanimated stili ---
   const liteColors = useMemo(() => readableColors(def.palette.colors, def.palette.base), [def]);
@@ -236,7 +236,7 @@ const NickStyled = memo(function NickStyled({
   const base = def.palette.base;
   const glowHex = withAlpha(def.palette.glow, 0.75);
   const isGlitch = def.fill === 'glitch';
-  const glowRadius = Math.max(2, def.motion.glow * (hero ? 0.9 : 0.6));
+  const glowRadius = Math.max(2, def.motion.glow * 0.9);
 
   const animStyle = useAnimatedStyle(() => {
     if (hidden.value === 1) {
@@ -288,7 +288,7 @@ const NickStyled = memo(function NickStyled({
           width={box.w}
           height={box.h}
           time={time}
-          glowScale={hero ? 1.25 : 0.85}
+          glowScale={1.25}
         />
       )}
       {particlesGranted && box && (
