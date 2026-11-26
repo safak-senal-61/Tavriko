@@ -79,6 +79,7 @@
       "expo-font",
       "./plugins/notification-sound",
       "./plugins/optional-hardware-features",
+      "./plugins/android-architectures",
       [
         "expo-audio",
         {

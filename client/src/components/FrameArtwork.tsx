@@ -6,7 +6,7 @@ import { useReducedMotion } from './DiscoveryArtwork';
 export type FrameArt = { src: ImageSourcePropType; inner: number; motion?: ImageSourcePropType };
 
 // Local WebP assets work offline and need no separate CDN deploy or animated image codec.
-// Posters are 512²; motion sheets are 6×4 tiles of 384², played at 80 ms per tile.
+// Posters are 512²; motion sheets are 6×4 tiles of 288² (1728×1152), played at 80 ms per tile.
 export const FRAME_ART: Record<string, FrameArt> = {
   frame_gold: {
     src: require('../../bundled/frames/royal_gold.webp'),
