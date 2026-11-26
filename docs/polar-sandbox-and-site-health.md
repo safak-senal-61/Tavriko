@@ -59,6 +59,20 @@ Sezon ekranı sandık ve anahtar vermez; jokerler ve diğer ödüller kademeye g
 3. Polar webhook hedefini `/api/webhooks/polar-season` olarak ayarla ve `order.paid`, `order.refunded` olaylarını seç; hedefin imza sırrını `POLAR_SEASON_WEBHOOK_SECRET` olarak kaydet. Checkout oluşturmak için `POLAR_SEASON_ENABLED=true` gerekir. Satış kapatılsa bile webhook teslimi ve iadeler çalışmaya devam eder. Checkout yanıtı ve sipariş olayları için [Polar Checkout API](https://polar.sh/docs/api-reference/2026-10/checkouts/create-checkout-session) sözleşmesine bak.
 4. Önce test ortamında `POLAR_SEASON_SANDBOX=true` ile açık checkout'u yeniden kullanma, başarılı ödeme sonrası Sezon ekranına dönüş, geciken webhook, tekrar teslim ve tam iade senaryolarını dene. Sandbox'ı ayrı veritabanıyla çalıştır; Vercel production ortamında Sandbox Pass devre dışıdır. Canlı ürün ve webhook onayı olmadan satış bayrağını açma. Ödül ilerlemesi ve daha önce alınmış eşyalar iade sırasında silinmez; yalnızca bu ödeme ile açılan erişim kapanır.
 
+## Canlı Polar ürünleri (Tavriko kuruluşu)
+
+Kuruluşun varsayılan para birimi TRY'dir. Elmas ürünlerinde yalnızca sabit TRY fiyatı bırakıldı; önceki 0 USD fiyatı kaldırıldı. Tüm ürünler tek seferliktir.
+
+| Ürün | Polar ürün kimliği | TRY fiyatı | Ortam değişkeni |
+|---|---|---:|---|
+| Tavriko 100 Elmas | `3db7aa1e-403b-4300-ae50-e571583456fd` | ₺39,99 | `POLAR_GEMS_PRODUCT_100` |
+| Tavriko 330 Elmas | `e584cfea-f4e7-4d77-ae53-9da5d205c6e8` | ₺99,99 | `POLAR_GEMS_PRODUCT_300` |
+| Tavriko 700 Elmas | `a9d807d4-efa1-4a8a-97f3-d9e10fc629a9` | ₺189,99 | `POLAR_GEMS_PRODUCT_600` |
+| Tavriko 1850 Elmas | `7b4b216b-f114-422e-abe7-43e1238b0ede` | ₺449,99 | `POLAR_GEMS_PRODUCT_1500` |
+| Tavriko Premium Pass | `f4221bd5-2931-41a3-848f-6bcbbc94131f` | ₺99,99 | `POLAR_SEASON_PRODUCT_ID` |
+
+Premium Pass ürünü özel (private) görünürlükte; yalnızca API checkout'u ile satılır. Webhook hedefleri: elmas için `/api/webhooks/polar-gems` (`f4393c85-5e53-4c14-be73-a7c0f59f1607`), sezon için `/api/webhooks/polar-season` (`642089e2-ca59-4789-9d70-718b1cf9076e`). Sırlar yalnızca Polar panelinden okunup Vercel ortam değişkenlerine girilir; repoya yazılmaz.
+
 ## Realtime Worker sürüm kontrolü
 
 Yeni jokerler için `shared` paketini derle, `npm run build:cloudflare` ve `npm run test:cloudflare` komutlarını çalıştır. Cloudflare'da doğru hesapla `npm run deploy:cloudflare` çalıştırmadan önce Vercel ile Worker'ın mevcut `INTERNAL_API_SECRET` değerlerinin eşleştiğini ve `practice_joker_uses` migration'ının uygulandığını doğrula. Dağıtım sonrası [Worker sağlık uç noktası](https://tavriko-realtime.uncertainidentity8.workers.dev/health) `advancedQuizJokers: true` göstermeli. Bu bayrak tek başına stok tüketimini doğrulamaz; bir test hesabıyla botlu ve arkadaş maçında birer joker kullanıp etkinin ve stok düşüşünün doğru olduğunu kontrol et.
