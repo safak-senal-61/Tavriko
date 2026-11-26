@@ -21,7 +21,7 @@ import {
 import { useGameStore, clearAllAccountStorage } from '../store/gameStore';
 import { NATIVE_QUIZ_TABLET_FRAME_WIDTH } from '../utils/quizArenaLayout';
 import { authHeaders } from '../utils/apiAuth';
-import { PAGE_TTL, pageDataCache } from '../utils/pageDataCache';
+import { PAGE_TTL, PageDataError, pageDataCache } from '../utils/pageDataCache';
 import { eventsUrl, friendsChanged, gameplayRewardsUrl, leaderboardUrl, prefetchGameplayRewards, profileUrl, referralUrl } from '../utils/pageResources';
 import { shuffleOptionsForPlayer } from '../utils/optionShuffle';
 import { seenScopeKey, getSeenQuestionIds, markQuestionsSeen } from '../utils/seenQuestions';
@@ -197,6 +197,9 @@ export const RootNavigator: React.FC = () => {
   const [authRedirectNotice, setAuthRedirectNotice] = useState<string | null>(null);
   // Screen transition animation
   const screenFade = useRef(new Animated.Value(1)).current;
+  // Sunucu hesabın silindiğini / oturumun geçersiz olduğunu bildirdiğinde
+  // (ör. başka cihazdan silme) yerel oturum tamamen temizlenir.
+  const forceLogoutRef = useRef<(notice: string) => void>(() => {});
   const navigateTo = (nextScreen: ScreenName) => {
     if (nextScreen === currentScreenRef.current) {
       return;
@@ -418,8 +421,41 @@ export const RootNavigator: React.FC = () => {
         const withReceipt = preserveLegalConsent(fresh, latest.user);
         if (withReceipt !== latest.user) setUser(withReceipt);
       }
-    } catch {}
+    } catch (error) {
+      const latest = useGameStore.getState();
+      if (error instanceof PageDataError && (error.status === 401 || error.status === 404)
+          && latest.user?.id === owner && latest.token === current.token) {
+        forceLogoutRef.current(error.status === 404
+          ? 'Hesabın silinmiş. Oturumun kapatıldı.'
+          : 'Oturumun sona erdi. Lütfen yeniden giriş yap.');
+      }
+    }
   }, [setUser, syncWithFreshUser]);
+
+  forceLogoutRef.current = (notice: string) => {
+    clearAllAccountStorage();
+    setUser(null, null);
+    resetGame();
+    setAuthRedirectNotice(notice);
+    navigateTo('auth');
+  };
+
+  // Hesap başka yerden silinmişse uygulama açıkken de fark edilsin.
+  useEffect(() => {
+    if (!user?.id || isGuest || !realSessionToken) return;
+    const check = () => {
+      if (Platform.OS === 'web' && typeof document !== 'undefined' && document.hidden) return;
+      void refreshUserProfile();
+    };
+    const interval = setInterval(check, 120000);
+    const subscription = AppState.addEventListener('change', state => { if (state === 'active') check(); });
+    if (Platform.OS === 'web' && typeof window !== 'undefined') window.addEventListener('focus', check);
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+      if (Platform.OS === 'web' && typeof window !== 'undefined') window.removeEventListener('focus', check);
+    };
+  }, [user?.id, realSessionToken, isGuest, refreshUserProfile]);
   const refreshWallet = useCallback(() => { void refreshUserProfile(true); }, [refreshUserProfile]);
 
   useEffect(() => {
