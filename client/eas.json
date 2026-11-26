@@ -12,6 +12,9 @@
       },
       "ios": {
         "buildConfiguration": "Release"
+      },
+      "env": {
+        "TAVRIKO_ANDROID_ARCHS": "armeabi-v7a,arm64-v8a"
       }
     },
     "production": {

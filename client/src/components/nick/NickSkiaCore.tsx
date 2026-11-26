@@ -22,6 +22,7 @@ import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
 import type { NickFill, NickStyleDef } from '@trivia/shared';
 import { nickShaderSource, paletteUniforms } from './nickShaders';
 import { NICK_FONT_FILES } from './nickFonts';
+import { fitLine, splitRnEllipsis } from './nickLineFit';
 import { Image, Platform } from 'react-native';
 import { Asset } from 'expo-asset';
 
@@ -133,27 +134,20 @@ function layoutGlyphs(
   const ellipsis = font.getGlyphIDs('…');
   const ellW = ellipsis.length ? font.getGlyphWidths(ellipsis)[0] : 0;
   for (const line of lines) {
-    let ids = font.getGlyphIDs(line.text.replace(/\s+$/, ''));
+    const src = splitRnEllipsis(line.text);
+    let ids = font.getGlyphIDs(src.text);
     let widths = font.getGlyphWidths(ids);
-    const total = () => widths.reduce((a, b) => a + b + letterSpacing, 0);
     const synth = Number.isNaN(line.ascender);
-    // Web: tarayıcı kerning uygular, Skia glif genişlikleri uygulamaz → birkaç
-    // piksellik fark kesme sayılmaz; harf aralığı sıkıştırılarak kutuya oturtulur.
-    let squeeze = 0;
-    if (synth && ids.length > 1) {
-      const over = total() - letterSpacing - line.width;
-      if (over > 0 && over <= line.width * 0.08) squeeze = -over / (ids.length - 1);
+    // RN satırına oturt: kerning farkı → sıkıştır; RN kesmişse aynı yerde '…'
+    const fit = fitLine(widths, letterSpacing, line.width, ellW, src.ellipsized);
+    const squeeze = fit.squeeze;
+    if (fit.count < ids.length) {
+      ids = ids.slice(0, fit.count);
+      widths = widths.slice(0, fit.count);
     }
-    // RN '…' ile kestiyse (veya satır metni sığmıyorsa) aynı şekilde kes
-    if (!squeeze && total() > line.width + 1.5 && ids.length > 1) {
-      while (ids.length > 1 && total() + ellW > line.width + 1) {
-        ids = ids.slice(0, -1);
-        widths = widths.slice(0, -1);
-      }
-      if (ellipsis.length) {
-        ids = [...ids, ellipsis[0]];
-        widths = [...widths, ellW];
-      }
+    if (fit.ellipsis && ellipsis.length) {
+      ids = [...ids, ellipsis[0]];
+      widths = [...widths, ellW];
     }
     // Web'de onTextLayout yok: satır kutusu verilir (ascender = NaN), taban çizgisi
     // CSS satır kutusundaki gibi (yarım satır aralığı + font ascent) hesaplanır.
@@ -204,15 +198,12 @@ export const NickSkiaText = memo(function NickSkiaText({
   const pad = Math.ceil(glowR * 1.6 + 4);
 
   const font = useMemo(() => {
-    // Gerçek piksel boyu: RN satırının capHeight değeri (fontScale dahil) ile eşle
-    const probe = Skia.Font(typeface, 100);
-    const capPerUnit = (probe.measureText('H').height || 70.5) / 100;
-    const cap = lines[0]?.capHeight;
-    const size = cap && cap > 0 && capPerUnit > 0 ? cap / capPerUnit : fontSize;
-    const f = Skia.Font(typeface, size);
+    // fontSize, NickRenderer tarafından sistem yazı ölçeğiyle çarpılmış gerçek
+    // boyuttur; RN <Text> ile aynı TTF kullanıldığından genişlikler eşleşir.
+    const f = Skia.Font(typeface, fontSize);
     f.setSubpixel?.(true);
     return f;
-  }, [typeface, fontSize, lines]);
+  }, [typeface, fontSize]);
 
   const run = useMemo(() => layoutGlyphs(font, lines, letterSpacing, pad, align), [font, lines, letterSpacing, pad, align]);
 
