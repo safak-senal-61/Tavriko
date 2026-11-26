@@ -201,7 +201,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const compact = Platform.OS !== 'web' || winW < 520;
   // Tablet / katlanabilir: giriş-kayıt ekranı telefon sütununda kalmasın,
   // arka plan ekranı kaplasın, form okunabilir genişlikte ortalanır.
-  const tabletLayout = Platform.OS !== 'web' && winW > 540;
+  const tabletLayout = winW > 540;
   // Çok küçük ekranlar (≤740dp): ekstra sıkı katman — hero, girişler ve
   // butonlar daha da küçültülür.
   const tiny = winH <= 740;
@@ -1345,14 +1345,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#12052C',
     width: '100%',
-    maxWidth: 480,
-    alignSelf: 'center',
+    // Arka plan her zaman ekranı kaplar; yalnızca form sütunu (scrollContent)
+    // okunabilir genişlikte ortalanır. Mobil tarayıcıda "masaüstü sitesi"
+    // modunda giriş ekranı dar bir şerit olarak kalıyordu.
+    maxWidth: '100%',
+    alignSelf: 'stretch',
     alignItems: 'center',
   },
   scrollView: {
     width: '100%',
-    maxWidth: 480,
-    alignSelf: 'center',
+    maxWidth: '100%',
+    alignSelf: 'stretch',
   },
   scrollContent: {
     flexGrow: 1,
