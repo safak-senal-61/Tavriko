@@ -17,7 +17,7 @@ export interface NickSkiaTextProps {
   def: NickStyleDef;
   /** Skia SkTypeface (web'de hiç oluşmaz) */
   typeface: any;
-  /** RN fontSize (ölçeklenmemiş) — satır capHeight ile düzeltilir */
+  /** Gerçek çizim boyutu: RN fontSize × sistem yazı ölçeği (allowFontScaling açıksa) */
   fontSize: number;
   letterSpacing: number;
   lines: NickLine[];

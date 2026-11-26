@@ -110,3 +110,31 @@ describe('SkSL shader derlemesi (CanvasKit)', () => {
     }
   }, 30_000);
 });
+
+describe('nick satır oturtma (Skia ↔ RN)', () => {
+  // Dinamik import: modül saf, Skia gerektirmez
+  it('kerning kaynaklı küçük fazlalık kesilmez, sıkıştırılır', async () => {
+    const { fitLine } = await import('./nickLineFit');
+    const widths = Array(11).fill(10); // doğal 110
+    const fit = fitLine(widths, 0, 106, 9);
+    expect(fit.ellipsis).toBe(false);
+    expect(fit.count).toBe(11);
+    expect(fit.squeeze).toBeCloseTo(-0.4, 5);
+  });
+  it('sığıyorsa dokunulmaz', async () => {
+    const { fitLine } = await import('./nickLineFit');
+    expect(fitLine(Array(5).fill(10), 0, 50, 9)).toEqual({ count: 5, ellipsis: false, squeeze: 0 });
+  });
+  it('RN gerçekten kestiyse aynı genişlikte … ile biter', async () => {
+    const { fitLine } = await import('./nickLineFit');
+    const fit = fitLine(Array(11).fill(10), 0, 70, 9);
+    expect(fit.ellipsis).toBe(true);
+    expect(fit.count * 10 + 9).toBeLessThanOrEqual(71);
+  });
+  it('Android U+FEFF dolgu karakterleri ve iOS … temizlenir', async () => {
+    const { cleanLineText, splitRnEllipsis } = await import('./nickLineFit');
+    expect(cleanLineText('Şafak Şe…\uFEFF\uFEFF\uFEFF')).toBe('Şafak Şe…');
+    expect(splitRnEllipsis('Şafak Şe…\uFEFF')).toEqual({ text: 'Şafak Şe', ellipsized: true });
+    expect(splitRnEllipsis('Şafak Şenal ')).toEqual({ text: 'Şafak Şenal', ellipsized: false });
+  });
+});

@@ -18,6 +18,7 @@
  */
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  PixelRatio,
   Platform,
   StyleSheet,
   Text,
@@ -171,6 +172,10 @@ const NickStyled = memo(function NickStyled({
 
   const fontSize = typeof inner.fontSize === 'number' ? inner.fontSize : 14;
   const letterSpacing = typeof inner.letterSpacing === 'number' ? inner.letterSpacing : 0;
+  // RN <Text> sistem yazı ölçeğini (Android "Yazı boyutu", iOS Dynamic Type)
+  // uygular; Skia aynı boyutta çizmeli, yoksa harfler taşar ve yanlış kesilir.
+  const fontScale = !IS_WEB && allowFontScaling !== false ? PixelRatio.getFontScale() || 1 : 1;
+  const drawFontSize = fontSize * fontScale;
 
   // --- saat + görünürlük ---
   const { ref, time, onScreen } = useNickClock(running, { fps: cap === 'full' ? 0 : env.lowEnd ? 20 : 24 });
@@ -235,10 +240,13 @@ const NickStyled = memo(function NickStyled({
 
   const animStyle = useAnimatedStyle(() => {
     if (hidden.value === 1) {
-      return { color: 'transparent', textShadowColor: 'transparent', transform: [{ translateX: 0 }] };
+      // Skia çizerken yerleşim metni tamamen gizlenir. Android 'transparent'
+      // gölge rengini varsayılan yarı saydam siyaha düşürebildiği için yalnızca
+      // renk değil opaklık ve gölge yarıçapı da sıfırlanır (koyu "hayalet" harfler).
+      return { opacity: 0, color: 'transparent', textShadowColor: 'transparent', textShadowRadius: 0, transform: [{ translateX: 0 }] };
     }
     if (animated.value !== 1) {
-      return { color: base, textShadowColor: glowHex, transform: [{ translateX: 0 }] };
+      return { opacity: 1, color: base, textShadowColor: glowHex, textShadowRadius: glowRadius, transform: [{ translateX: 0 }] };
     }
     const t = time.value * speed;
     const c = cyclicColor(liteColors, t);
@@ -247,7 +255,7 @@ const NickStyled = memo(function NickStyled({
       const ph = t % 1;
       if (ph < 0.06 || (ph > 0.52 && ph < 0.55)) dx = Math.sin(time.value * 90) * 1.6;
     }
-    return { color: c, textShadowColor: c, transform: [{ translateX: dx }] };
+    return { opacity: 1, color: c, textShadowColor: c, textShadowRadius: glowRadius, transform: [{ translateX: dx }] };
   });
 
   const staticShadow = useMemo(
@@ -273,7 +281,7 @@ const NickStyled = memo(function NickStyled({
         <NickSkiaText
           def={def}
           typeface={typeface}
-          fontSize={fontSize}
+          fontSize={drawFontSize}
           letterSpacing={letterSpacing}
           lines={drawLines}
           align={align}
