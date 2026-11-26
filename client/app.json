@@ -3,7 +3,7 @@
     "name": "Tavriko",
     "slug": "tavriko",
     "scheme": "tavriko",
-    "version": "1.1.5",
+    "version": "1.1.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -42,7 +42,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW"
       ],
-      "versionCode": 25
+      "versionCode": 26
     },
     "splash": {
       "image": "./assets/splash-icon-transparent.png",
@@ -88,6 +88,7 @@
         }
       ],
       "expo-web-browser",
+      "expo-iap",
       "@react-native-community/datetimepicker",
       [
         "@sentry/react-native/expo",

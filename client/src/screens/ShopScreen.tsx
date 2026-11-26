@@ -12,7 +12,7 @@ import {
   Animated,
   ActivityIndicator,
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
+import { buyWithPlay, playBillingSupported, preparePlayBilling, restorePlayPurchases, type PlayBillingState } from '../services/playBilling';
 import { LoadingShimmer } from '../components/LoadingShimmer';
 import Svg, {
   Defs,
@@ -83,8 +83,10 @@ interface CategoryTabItem {
 }
 
 const WEB = Platform.OS === 'web';
-// Elmas paketleri artık yerel uygulamada da listelenir; ödeme Polar
-// checkout'u uygulama içi tarayıcıda açılır.
+// Elmas paketleri webde Polar ile, Android uygulamasında yalnızca Google Play
+// Billing ile satılır. Yerel uygulamada Polar'a veya web ödemesine hiçbir
+// bağlantı/yönlendirme gösterilmez (Play ödeme politikası). Play kapalıysa
+// Elmas sekmesi yerel uygulamada hiç görünmez.
 const SELLABLE_CATALOG = SHOP_CATALOG;
 
 const ALL_CATEGORY_TABS: CategoryTabItem[] = [
@@ -305,6 +307,8 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   const purchaseLock = useRef(false);
   const [polarAvailable, setPolarAvailable] = useState(false);
   const [polarSandbox, setPolarSandbox] = useState(false);
+  const [play, setPlay] = useState<PlayBillingState & { checked: boolean }>({ enabled: false, prices: {}, checked: WEB || !playBillingSupported });
+  const payAvailable = WEB ? polarAvailable : play.enabled;
   // Jokerler sekmesi ilk karede yerinde görünür (sonradan eklenip menüyü kaydırmaz).
   // Sunucu açıkça kapalı derse gizlenir; cevap modül düzeyinde önbelleklenir.
   const [jokersAvailable, setJokersAvailable] = useState(jokerAvailabilityCache.enabled);
@@ -328,6 +332,25 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     if (!jokersAvailable && activeTab === 'jokers') setActiveTab(WEB ? 'diamonds' : 'gold');
   }, [jokersAvailable, activeTab]);
   useEffect(() => {
+    if (WEB || !playBillingSupported) return;
+    let alive = true;
+    void preparePlayBilling(base).then(state => {
+      if (!alive) return;
+      setPlay({ ...state, checked: true });
+      // Ödenmiş ama uygulama kapandığı için doğrulanamamış satın almaları tamamla.
+      if (state.enabled && user && !user.isGuest) {
+        void restorePlayPurchases(base).then(count => {
+          if (alive && count > 0) { setIsError(false); setStatusMessage('Bekleyen satın alman doğrulandı. Bakiyen güncellendi.'); onRefresh?.(); }
+        });
+      }
+    });
+    return () => { alive = false; };
+  }, [base, user?.id, user?.isGuest]);
+  useEffect(() => {
+    if (!WEB && play.checked && !play.enabled && activeTab === 'diamonds') setActiveTab('gold');
+  }, [play.checked, play.enabled, activeTab]);
+  useEffect(() => {
+    if (!WEB) return;
     const controller = new AbortController();
     void fetch(`${base}/social/shop/diamonds/availability`, { method: 'POST', signal: controller.signal })
       .then(r => r.ok ? r.json() : null)
@@ -413,6 +436,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   };
 
   const filteredProducts = SELLABLE_CATALOG.filter(p => p.category === activeTab &&
+    (WEB || p.currency !== 'try' || Boolean(play.prices[p.id])) &&
     (advancedJokersAvailable || !isJokerId(p.id) || !isAdvancedJoker(p.id)) &&
     (activeTab !== 'jokers' || !jokerGroup || JOKERS.some(joker => joker.id === p.id && joker.group === jokerGroup)));
 
@@ -426,26 +450,6 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     if (product.category === 'name_effects' && user.inventory?.some((i) => i.id === product.id)) return true;
     if (product.category === 'backgrounds' && user.inventory?.some((i) => i.id === product.id)) return true;
     return false;
-  };
-
-  // Yerel uygulamada Polar sayfası kapanınca webhook'un bakiyeyi yazmasını bekleriz.
-  const pollGemCheckout = async (checkoutId: string) => {
-    setStatusMessage('Ödemen doğrulanıyor. Elmaslar doğrulamadan sonra bakiyene eklenir.');
-    for (let attempt = 0; attempt < 24; attempt += 1) {
-      try {
-        const result = await fetch(`${base}/social/shop/diamonds/checkout/${checkoutId}`, { headers: authHeaders() });
-        if (result.ok) {
-          const { status } = await result.json();
-          if (status === 'paid' || status === 'refunded') {
-            setStatusMessage(status === 'paid' ? 'Ödemen doğrulandı. Elmas bakiyen güncellendi.' : 'Bu ödeme iade edildi.');
-            onRefresh?.();
-            return;
-          }
-        }
-      } catch { /* ağ hatasında tekrar dene */ }
-      await new Promise(resolve => setTimeout(resolve, 2500));
-    }
-    setStatusMessage('Ödeme henüz doğrulanmadı. Elmaslar birkaç dakika içinde eklenecek; mağazayı yenile.');
   };
 
   const handleInitiatePurchase = async (product: ShopProduct) => {
@@ -472,7 +476,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         setStatusMessage('Elmas almak için giriş yapmalısın.');
         return;
       }
-      if (!polarAvailable) {
+      if (!payAvailable) {
         sound.playSound('wrong');
         setIsError(true);
         setStatusMessage('Elmas ödemesi şu anda açık değil.');
@@ -481,6 +485,27 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
       purchaseLock.current = true;
       setPurchasingId(product.id);
       setStatusMessage(null);
+      if (!WEB) {
+        try {
+          const result = await buyWithPlay(base, product.id);
+          if (result.status === 'granted' || result.status === 'already_processed') {
+            sound.playSound('reward');
+            setIsError(false);
+            setStatusMessage('Ödemen doğrulandı. Elmas bakiyen güncellendi.');
+            onRefresh?.();
+          } else if (result.status === 'pending') {
+            setIsError(false);
+            setStatusMessage('Ödemen onay bekliyor. Onaylanınca elmaslar otomatik eklenir.');
+          } else if (result.status === 'error') {
+            setIsError(true);
+            setStatusMessage(result.message);
+          }
+        } finally {
+          purchaseLock.current = false;
+          setPurchasingId(null);
+        }
+        return;
+      }
       try {
         const response = await fetch(`${base}/social/shop/diamonds/checkout`, {
           method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -492,14 +517,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         const allowedOrigins = polarSandbox ? ['https://sandbox.polar.sh'] : ['https://polar.sh', 'https://buy.polar.sh'];
         if (!allowedOrigins.includes(url.origin) ||
             !url.pathname.startsWith('/checkout/') || url.username || url.password) throw new Error('Ödeme adresi doğrulanamadı.');
-        if (WEB) {
-          window.location.assign(url.href);
-        } else {
-          const checkoutId = url.pathname.split('/').filter(Boolean).pop() ?? '';
-          if (!/^[a-f0-9-]{36}$/i.test(checkoutId)) throw new Error('Ödeme adresi doğrulanamadı.');
-          await WebBrowser.openBrowserAsync(url.href, { enableBarCollapsing: true });
-          await pollGemCheckout(checkoutId);
-        }
+        window.location.assign(url.href);
       } catch (error) {
         setIsError(true);
         setStatusMessage(error instanceof Error ? error.message : 'Ödeme sayfası açılamadı.');
@@ -598,7 +616,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         {/* Başlık */}
         <KitHeader title="Mağaza" subtitle="Kozmetikler ve güçlendiriciler" />
         <KitChips
-          tabs={CATEGORY_TABS.filter(c => c.id !== 'jokers' || jokersAvailable).map((c) => ({ id: c.id, label: c.name }))}
+          tabs={CATEGORY_TABS.filter(c => (c.id !== 'jokers' || jokersAvailable) && (c.id !== 'diamonds' || WEB || play.enabled)).map((c) => ({ id: c.id, label: c.name }))}
           active={activeTab}
           onChange={(id, idx) => handleSelectCategoryTab(id, idx)}
           scrollRef={tabScrollRef}
@@ -608,7 +626,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           <View style={styles.walletSummary}>
             <Text accessibilityRole="header" style={styles.walletTitle}>{activeTab === 'diamonds' ? 'Elmas paketleri' : activeTab === 'gold' ? 'Altın paketleri' : 'Quiz jokerleri'}</Text>
             <Text style={styles.walletDescription}>{activeTab === 'diamonds'
-              ? polarSandbox ? 'Polar test ortamı. Gerçek ödeme yapma.' : polarAvailable ? 'Tek seferlik, güvenli Polar ödemesi.' : 'Elmas paketlerinin ödemesi henüz kullanıma açık değil.'
+              ? !WEB ? 'Tek seferlik, Google Play ile güvenli ödeme.' : polarSandbox ? 'Polar test ortamı. Gerçek ödeme yapma.' : polarAvailable ? 'Tek seferlik, güvenli Polar ödemesi.' : 'Elmas paketlerinin ödemesi henüz kullanıma açık değil.'
               : activeTab === 'gold' ? 'Quiz oynayarak altın kazan veya elmasla paket al.' : 'Altınla al. Her jokerin kullanılabildiği maç türü kartında yazıyor.'}</Text>
           </View>
         </View> : <><KitHero
@@ -753,9 +771,9 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                   style={[
                     styles.priceBtn,
                     roomy && styles.webPriceButton,
-                    owned || (item.currency === 'try' && !polarAvailable) ? styles.priceBtnOwned : styles.priceBtnActive,
+                    owned || (item.currency === 'try' && !payAvailable) ? styles.priceBtnOwned : styles.priceBtnActive,
                   ]}
-                  disabled={owned || purchasingId !== null || (item.currency === 'try' && !polarAvailable)}
+                  disabled={owned || purchasingId !== null || (item.currency === 'try' && !payAvailable)}
                   activeOpacity={0.8}
                   onPress={() => handleInitiatePurchase(item)}
                 >
@@ -764,7 +782,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
                   ) : owned ? (
                     <Text style={styles.priceBtnTextOwned}>SAHİPSİN</Text>
                   ) : item.currency === 'try' ? (
-                    <Text style={polarAvailable ? styles.priceBtnText : styles.priceBtnTextOwned}>{item.price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺{polarAvailable ? ' · Satın al' : ''}</Text>
+                    <Text style={payAvailable ? styles.priceBtnText : styles.priceBtnTextOwned}>{WEB ? `${item.price.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺` : play.prices[item.id]}{payAvailable ? ' · Satın al' : ''}</Text>
                   ) : (
                     <View style={styles.priceContentRow}>
                       <Text style={styles.priceBtnText}>
