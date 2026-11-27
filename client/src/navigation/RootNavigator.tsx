@@ -2454,6 +2454,7 @@ export const RootNavigator: React.FC = () => {
             initialTab={shopTab}
             onUpdateUser={syncWithFreshUser}
             onRefresh={refreshWallet}
+            onOpenSeason={() => requireAuth(() => navigateTo('season'), 'Sezon 1 Pass')}
             onBack={() => navigateTo('home')}
             onNotifications={() => navigateTo('notifications')}
             onProfile={() => navigateTo('profile')}

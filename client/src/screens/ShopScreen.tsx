@@ -75,6 +75,8 @@ interface ShopScreenProps {
   onProfile?: () => void;
   initialTab?: ShopProductCategory;
   onRefresh?: () => void;
+  /** Sezon Pass ödüllerini göstermek (ve web'de Polar ile satın almak) için sezon ekranını açar. */
+  onOpenSeason?: () => void;
 }
 
 interface CategoryTabItem {
@@ -293,12 +295,13 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
   onProfile,
   initialTab,
   onRefresh,
+  onOpenSeason,
 }) => {
   const navPad = useNavBottomPad(160);
   const page = usePlayerWebLayout();
   const threeProducts = page?.columns === 3;
   const roomy = page?.roomy;
-  const [activeTab, setActiveTab] = useState<ShopProductCategory>(initialTab ?? (WEB ? 'diamonds' : 'gold'));
+  const [activeTab, setActiveTab] = useState<ShopProductCategory>(initialTab ?? 'diamonds');
   const [jokerGroup, setJokerGroup] = useState<JokerGroup | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState<boolean>(false);
@@ -450,6 +453,45 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
     if (product.category === 'name_effects' && user.inventory?.some((i) => i.id === product.id)) return true;
     if (product.category === 'backgrounds' && user.inventory?.some((i) => i.id === product.id)) return true;
     return false;
+  };
+
+  const hasPremiumPass = !!user?.hasPremiumPass;
+  const passPlayPrice = !WEB && play.enabled ? play.prices.premium_pass : undefined;
+  const handleBuyPass = async () => {
+    sound.playSound('tap');
+    if (WEB) { onOpenSeason?.(); return; }
+    if (!user || user.isGuest) {
+      sound.playSound('wrong');
+      setIsError(true);
+      setStatusMessage('Premium Pass almak için giriş yapmalısın.');
+      return;
+    }
+    if (!passPlayPrice || purchaseLock.current) return;
+    purchaseLock.current = true;
+    setPurchasingId('premium_pass');
+    setStatusMessage(null);
+    try {
+      const result = await buyWithPlay(base, 'premium_pass');
+      if (result.status === 'granted' || result.status === 'already_processed') {
+        sound.playSound('reward');
+        setIsError(false);
+        setStatusMessage('Ödemen doğrulandı. Premium Pass etkinleştirildi.');
+        onRefresh?.();
+      } else if (result.status === 'pending') {
+        setIsError(false);
+        setStatusMessage('Ödemen onay bekliyor. Onaylanınca Premium Pass otomatik açılır.');
+      } else if (result.status === 'pass_owned') {
+        setIsError(false);
+        setStatusMessage('Premium Pass zaten aktif. Bu ödeme Google Play tarafından otomatik iade edilir.');
+        onRefresh?.();
+      } else if (result.status === 'error') {
+        setIsError(true);
+        setStatusMessage(result.message);
+      }
+    } finally {
+      purchaseLock.current = false;
+      setPurchasingId(null);
+    }
   };
 
   const handleInitiatePurchase = async (product: ShopProduct) => {
@@ -616,7 +658,7 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
         {/* Başlık */}
         <KitHeader title="Mağaza" subtitle="Kozmetikler ve güçlendiriciler" />
         <KitChips
-          tabs={CATEGORY_TABS.filter(c => (c.id !== 'jokers' || jokersAvailable) && (c.id !== 'diamonds' || WEB || play.enabled)).map((c) => ({ id: c.id, label: c.name }))}
+          tabs={CATEGORY_TABS.filter(c => (c.id !== 'jokers' || jokersAvailable) && (c.id !== 'diamonds' || WEB || play.enabled || !play.checked)).map((c) => ({ id: c.id, label: c.name }))}
           active={activeTab}
           onChange={(id, idx) => handleSelectCategoryTab(id, idx)}
           scrollRef={tabScrollRef}
@@ -665,6 +707,46 @@ export const ShopScreen: React.FC<ShopScreenProps> = ({
           </View>
         )}
 
+        {activeTab === 'diamonds' && !WEB && !play.checked && (
+          <View style={styles.purchasePending} accessibilityLiveRegion="polite" accessibilityState={{ busy: true }}>
+            <ActivityIndicator size="small" color="#FFE0A9" />
+            <Text style={styles.walletDescription}>Google Play fiyatları yükleniyor…</Text>
+          </View>
+        )}
+        {activeTab === 'diamonds' && (
+          <View style={styles.passCard}>
+            <Image source={STORE_IMG.trophy} style={styles.passCardArt} resizeMode="contain" />
+            <View style={styles.walletSummary}>
+              <Text accessibilityRole="header" style={styles.passCardTitle}>Sezon Premium Pass</Text>
+              <Text style={styles.walletDescription}>
+                {hasPremiumPass ? 'Premium Pass aktif. Ödüllerini sezon ekranından alabilirsin.'
+                  : 'Altın, sabit joker ödülleri ve Alev Çerçevesi. Abonelik değil, tek seferlik ödeme.'}
+              </Text>
+              <View style={styles.passCardActions}>
+                {!hasPremiumPass && (WEB || passPlayPrice) ? (
+                  <TouchableOpacity
+                    style={styles.passCardBuy}
+                    onPress={handleBuyPass}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    disabled={purchasingId !== null}
+                  >
+                    {purchasingId === 'premium_pass'
+                      ? <ActivityIndicator size="small" color="#2A1200" />
+                      : <Text style={styles.passCardBuyText}>{WEB ? 'Satın al' : `Satın al · ${passPlayPrice}`}</Text>}
+                  </TouchableOpacity>
+                ) : !hasPremiumPass && play.checked ? (
+                  <Text style={styles.walletDescription}>Premium Pass şu anda satın alınamıyor.</Text>
+                ) : null}
+                {onOpenSeason && (
+                  <TouchableOpacity onPress={() => { sound.playSound('tap'); onOpenSeason(); }} accessibilityRole="button" style={styles.passCardLink}>
+                    <Text style={styles.passCardLinkText}>Ödülleri gör</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          </View>
+        )}
         {activeTab === 'jokers' && <JokerGroupTabs selected={jokerGroup} onChange={setJokerGroup} />}
         {activeTab === 'name_effects' && (
           <View style={styles.nickCollection}>
@@ -926,6 +1008,14 @@ const styles = StyleSheet.create({
   purchasePending: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, marginBottom: 12 },
   walletSection: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: '#5D4A77', backgroundColor: '#251B3B', padding: 10, marginBottom: 16 },
   walletSummary: { flex: 1, gap: 4, paddingRight: 8 },
+  passCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255, 200, 55, 0.55)', backgroundColor: '#2E1F3F', padding: 12, marginBottom: 16 },
+  passCardArt: { width: 64, height: 64 },
+  passCardTitle: { fontFamily: THEME.fonts.extraBold, color: '#FFD879', fontSize: 17 },
+  passCardActions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 4 },
+  passCardBuy: { minHeight: 38, minWidth: 120, alignItems: 'center', justifyContent: 'center', backgroundColor: KIT.gold, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 12 },
+  passCardBuyText: { fontFamily: THEME.fonts.extraBold, fontSize: 14, color: '#2A1200' },
+  passCardLink: { paddingVertical: 8, paddingHorizontal: 4 },
+  passCardLinkText: { fontFamily: THEME.fonts.bold, fontSize: 13, color: '#FFE0A9', textDecorationLine: 'underline' },
   walletTitle: { fontFamily: THEME.fonts.extraBold, color: '#FFE0A9', fontSize: 19 },
   walletDescription: { fontFamily: THEME.fonts.bold, color: '#D9C9E9', fontSize: 13, lineHeight: 19 },
   scrollContent: {
