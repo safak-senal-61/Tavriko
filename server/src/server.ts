@@ -30,7 +30,7 @@ import triviaRoutes from './routes/triviaRoutes';
 import socialRoutes from './routes/socialRoutes';
 import { polarGemPlayerRoutes, polarGemWebhook } from './routes/polarGemRoutes';
 import { polarSeasonPlayerRoutes, polarSeasonWebhook } from './routes/polarSeasonRoutes';
-import { handlePlayVoidedCron, playBillingPlayerRoutes } from './routes/playBillingRoutes';
+import { handlePlayRtdnWebhook, handlePlayVoidedCron, playBillingPlayerRoutes } from './routes/playBillingRoutes';
 import referralRoutes from './routes/referralRoutes';
 import pushRoutes from './routes/pushRoutes';
 import { requireAdminAuth, getAdminSessionFromRequest, isPortalConfigured, setTelegramAdminVerifier } from './middleware/auth';
@@ -453,6 +453,7 @@ export function createApp() {
     res.set('Cache-Control', 'public, max-age=300').json({ android: { minVersionCode } });
   });
   app.get('/api/cron/play-voided', handlePlayVoidedCron);
+  app.post('/api/webhooks/google-play', handlePlayRtdnWebhook);
 
   // Telegram set webhook endpoint
   app.get(['/api/admin/telegram/set-webhook', '/admin/telegram/set-webhook'], requireAdminAuth, async (req, res) => {

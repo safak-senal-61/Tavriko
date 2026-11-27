@@ -4,6 +4,7 @@ import {
   type Purchase,
 } from 'expo-iap';
 import { authHeaders } from '../utils/apiAuth';
+import { useNotificationStore } from '../store/notificationStore';
 import type { PlayBillingState, PlayBuyResult } from './playBilling';
 
 export type { PlayBillingState, PlayBuyResult } from './playBilling';
@@ -49,6 +50,8 @@ async function verify(base: string, purchase: Purchase): Promise<PlayBuyResult> 
       if (data.status === 'granted' || data.status === 'already_processed') {
         // Sunucu ürünü Google tarafında zaten tüketti; burada yalnızca yerel önbelleği temizleriz.
         await finishTransaction({ purchase, isConsumable: true }).catch(() => {});
+        // Sunucu satın alma bildirimini (ürün, saat, sipariş no) bildirim merkezine yazdı.
+        if (data.status === 'granted') void useNotificationStore.getState().refresh(base, true).catch(() => {});
         return { status: data.status, gems: data.gems, pass: data.pass };
       }
       if (data.status === 'pending' || data.status === 'pass_owned') return { status: data.status };
