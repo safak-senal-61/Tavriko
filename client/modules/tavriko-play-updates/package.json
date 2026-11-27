@@ -1,0 +1,7 @@
+{
+  "name": "tavriko-play-updates",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Google Play In-App Updates (IMMEDIATE + FLEXIBLE) için yerel Expo modülü. expo-in-app-updates 0.13.0 (MIT) temel alınarak uyarlandı.",
+  "license": "MIT"
+}

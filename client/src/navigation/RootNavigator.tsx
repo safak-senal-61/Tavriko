@@ -104,6 +104,10 @@ import { AnalyticsConsentBanner } from '../components/AnalyticsConsentBanner';
 import { setAnalyticsConsent, useAnalyticsConsent } from '../services/analyticsConsent';
 import { useLegalVersion } from '../services/legalVersion';
 import { PushPermissionReminder } from '../components/PushPermissionReminder';
+import { FlexibleUpdateCard } from '../components/FlexibleUpdateCard';
+import { playUpdatesSupported, usePlayUpdateStore } from '../services/playUpdates';
+import { useNavBottomPad, NAV_BAR_SPACE } from '../utils/safeArea';
+import { useComebackNotifications } from '../services/comebackNotifications';
 import { pushSupported } from '../services/pushNotifications';
 import { usePushPermission } from '../services/usePushPermission';
 import { useNetStatus, OFFLINE_GAME_GRACE_MS } from '../store/netStatus';
@@ -344,6 +348,11 @@ export const RootNavigator: React.FC = () => {
   const showAnalyticsConsent = consent === null && safePromptScreen && !showLegalGate &&
     (currentScreen === 'home' || currentScreen === 'friends');
   const push = usePushPermission(signedInPlayer, realSessionToken);
+  // Uygulamaya bir süre girilmezse cihazda planlanan "oyuna dön" hatırlatmaları.
+  useComebackNotifications(signedInPlayer, push.status === 'granted');
+  const updateBottomPad = useNavBottomPad(NAV_BAR_SPACE + 8);
+  const updateBlocking = usePlayUpdateStore(s => s.decision.kind === 'required');
+  const updateCardVisible = usePlayUpdateStore(s => s.promptDue && (s.decision.kind === 'optional' || s.decision.kind === 'downloaded'));
 
   useEffect(() => {
     if (currentScreen !== 'home' || !netOnline || !signedInPlayer || !realSessionToken) return;
@@ -2659,9 +2668,13 @@ export const RootNavigator: React.FC = () => {
         }}
       />
       {showAnalyticsConsent && <AnalyticsConsentBanner />}
+      {playUpdatesSupported && (
+        <FlexibleUpdateCard eligible={safePromptScreen && currentScreen === 'home' && !showAnalyticsConsent} bottomOffset={updateBottomPad} />
+      )}
       {pushSupported && signedInPlayer && (
         <PushPermissionReminder
-          eligible={safePromptScreen && currentScreen === 'home' && push.foreground && !push.busy && !showAnalyticsConsent}
+          eligible={safePromptScreen && currentScreen === 'home' && push.foreground && !push.busy && !showAnalyticsConsent &&
+            !updateBlocking && !updateCardVisible}
           permission={push.status}
           onEnable={push.enable}
         />

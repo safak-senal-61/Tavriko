@@ -404,15 +404,19 @@ export function createApp() {
     }
   });
 
-  // Cron (Vercel): "oyuna dön" bildirimleri — 3+ gündür aktif olmayan oyunculara
-  // aralıklarla (rotasyonlu mesajlarla) hatırlatma gönderir. CRON_SECRET ile
+  // Cron (Vercel): "oyuna dön" bildirimleri — 20+ saattir aktif olmayan oyunculara
+  // günde iki kez (öğle ve akşam, rotasyonlu mesajlarla) hatırlatma gönderir.
+  // 2 saatlik hatırlatmalar cihazda yerel bildirimle planlanır (client comebackNotifications). CRON_SECRET ile
   // korunur (Vercel cron istekleri Authorization: Bearer <CRON_SECRET> gönderir).
   const REENGAGEMENT_VARIANTS: Array<{ title: string; body: string }> = [
     { title: '⚔️ Rakipler seni bekliyor!', body: 'Tavriko\'da lig sıralaması değişiyor. 1v1 düelloyla yerini koru!' },
     { title: '🏆 Sezon ödülleri senin', body: 'Seviye atlayıp sezon ödüllerini toplamaya devam et. Hemen bir maç yap!' },
     { title: '🔥 Serin devam ediyor!', body: 'Günlük görevlerini tamamlayıp altın ve elmas kazanmayı unutma.' },
     { title: '💎 Elmasların seni bekliyor', body: 'Arkadaşlarını düelloya davet et, davet ödüllerini kap!' },
+    { title: '🎁 Ödülün hazır', body: 'Toplanmayı bekleyen ödüllerin var. Hemen gir, kaçırma!' },
+    { title: '🧠 Yeni sorular geldi', body: 'Bilgini test et, rekorunu bir adım daha ileri taşı.' },
   ];
+  const REENGAGEMENT_INACTIVE_MS = 20 * 60 * 60 * 1000;
 
   const handleReengagementCron = async (req: any, res: any) => {
     const secret = process.env.CRON_SECRET || '';
@@ -423,8 +427,10 @@ export function createApp() {
     }
     try {
       // 3+ gün önce son etkinliği olan oyuncular; rotasyonlu mesaj seçimi
-      const inactiveSince = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-      const variant = REENGAGEMENT_VARIANTS[new Date().getUTCDate() % REENGAGEMENT_VARIANTS.length];
+      const inactiveSince = new Date(Date.now() - REENGAGEMENT_INACTIVE_MS);
+      const now = new Date();
+      const slot = now.getUTCHours() < 12 ? 0 : 1;
+      const variant = REENGAGEMENT_VARIANTS[(now.getUTCDate() * 2 + slot) % REENGAGEMENT_VARIANTS.length];
       const result = await sendReengagementPush(
         { title: variant.title, body: variant.body, channelId: 'general', data: { type: 'system', screen: 'home' } },
         inactiveSince
@@ -436,8 +442,16 @@ export function createApp() {
       return res.status(500).json({ success: false, error: err.message });
     }
   };
-  app.get('/api/cron/reengage-push', handleReengagementCron);
-  app.post('/api/cron/reengage-push', handleReengagementCron);
+  app.get(['/api/cron/reengage-push', '/api/cron/reengage-push-evening'], handleReengagementCron);
+  app.post(['/api/cron/reengage-push', '/api/cron/reengage-push-evening'], handleReengagementCron);
+
+  // Android uygulama içi güncelleme politikası. ANDROID_MIN_VERSION_CODE'dan
+  // düşük sürümler zorunlu güncelleme ekranını görür (Google Play IMMEDIATE akışı).
+  app.get('/api/app/update-policy', (_req, res) => {
+    const raw = Number(process.env.ANDROID_MIN_VERSION_CODE);
+    const minVersionCode = Number.isSafeInteger(raw) && raw > 0 ? raw : 0;
+    res.set('Cache-Control', 'public, max-age=300').json({ android: { minVersionCode } });
+  });
   app.get('/api/cron/play-voided', handlePlayVoidedCron);
 
   // Telegram set webhook endpoint
