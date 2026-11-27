@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaClient } from '@prisma/client';
 import {
   PLAY_PASS_PRODUCT_ID, PlayPurchaseRejected, playAccountId, playBillingConfig, resetPlayTokenCache,
-  revokePlayPurchase, syncVoidedPlayPurchases, verifyPlayPurchase,
+  handlePlayRtdn, parseRtdnBody, revokePlayPurchase, syncVoidedPlayPurchases, verifyPlayPurchase,
 } from '../src/services/googlePlayBilling';
 
 const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -31,13 +31,23 @@ function fakePrisma(options: { hasPremiumPass?: boolean; existing?: Record<strin
   const rows = new Map<string, any>();
   if (options.existing) rows.set(String(options.existing.purchaseToken), options.existing);
   const user = { gems: 0, hasPremiumPass: options.hasPremiumPass ?? false };
+  const notifications = new Map<string, any>();
+  const find = (where: any) => where.purchaseToken ? rows.get(where.purchaseToken)
+    : [...rows.values()].find(row => row.orderId === where.orderId);
   const tx = {
-    $queryRaw: vi.fn(async () => [{ hasPremiumPass: user.hasPremiumPass }]),
+    $queryRaw: vi.fn(async () => [{ hasPremiumPass: user.hasPremiumPass, gems: user.gems }]),
     playPurchase: {
-      findUnique: vi.fn(async ({ where }: any) => rows.get(where.purchaseToken) ?? null),
+      findUnique: vi.fn(async ({ where }: any) => find(where) ?? null),
       findFirst: vi.fn(async () => null),
-      create: vi.fn(async ({ data }: any) => { rows.set(data.purchaseToken, { status: 'granted', ...data }); return data; }),
-      update: vi.fn(async ({ where, data }: any) => { Object.assign(rows.get(where.purchaseToken), data); }),
+      count: vi.fn(async ({ where }: any) => [...rows.values()].filter(row => row.userId === where.userId &&
+        row.status === where.status && where.voidReason.in.includes(row.voidReason) &&
+        (where.test === undefined || row.test === where.test)).length),
+      create: vi.fn(async ({ data }: any) => { rows.set(data.purchaseToken, { status: 'granted', createdAt: new Date('2026-11-27T11:32:00Z'), ...data }); return data; }),
+      update: vi.fn(async ({ where, data }: any) => { Object.assign(find(where), data); }),
+    },
+    userNotification: {
+      findUnique: vi.fn(async ({ where }: any) => notifications.get(where.id) ?? null),
+      create: vi.fn(async ({ data }: any) => { const row = { ...data, createdAt: new Date() }; notifications.set(data.id, row); return row; }),
     },
     polarSeasonOrder: { findFirst: vi.fn(async () => null) },
     user: { update: vi.fn(async ({ data }: any) => {
@@ -47,7 +57,7 @@ function fakePrisma(options: { hasPremiumPass?: boolean; existing?: Record<strin
     }) },
   };
   const prisma = { ...tx, $transaction: vi.fn(async (fn: any) => fn(tx)) };
-  return { prisma: prisma as unknown as PrismaClient, rows, user, tx };
+  return { prisma: prisma as unknown as PrismaClient, rows, user, tx, notifications };
 }
 const paid = (extra: Record<string, unknown> = {}) => ({
   purchaseState: 0, consumptionState: 0, orderId: 'GPA.1234-5678', quantity: 1,
@@ -138,11 +148,149 @@ describe('Google Play Billing', () => {
     expect(await syncVoidedPlayPurchases(prisma, config, request as any)).toEqual({ revoked: 1 });
     expect(user.gems).toBe(-70);
     expect(rows.get(token).status).toBe('voided');
+    expect(rows.get(token)).toMatchObject({ gemsClawedBack: 30, gemsDebt: 70, balanceAfterVoid: -70, voidSource: 'voided_api' });
     expect(await revokePlayPurchase(prisma, token)).toBe(false);
     expect(user.gems).toBe(-70);
 
     const pass = fakePrisma({ hasPremiumPass: true, existing: { purchaseToken: token, userId, productId: PLAY_PASS_PRODUCT_ID, kind: 'pass', gems: 0, status: 'granted' } });
     expect(await revokePlayPurchase(pass.prisma, token)).toBe(true);
     expect(pass.user.hasPremiumPass).toBe(false);
+  });
+
+  it('writes an in-app purchase notification with product, time and order id', async () => {
+    const config = playBillingConfig({ ...env, PLAY_BILLING_ALLOW_TEST_PURCHASES: 'true' })!;
+    const { prisma, notifications } = fakePrisma();
+    const notify = vi.fn();
+    await verifyPlayPurchase(prisma, config, userId, 'gems_100', token, fakeFetch(paid({ purchaseType: 0 })) as any, { ip: '203.0.113.9', notify });
+    const item = notifications.get('play_GPA.1234-5678');
+    expect(item.type).toBe('reward');
+    expect(item.title).toBe('Satın alma tamamlandı');
+    expect(item.sub).toMatch(/100 Elmas hesabına eklendi\. Ürün: 100 Elmas · Tarih: \d\d\.\d\d\.\d{4} \d\d:\d\d · Sipariş: GPA\.1234-5678 · Test satın alması/);
+    expect(notify).toHaveBeenCalledOnce();
+  });
+
+  describe('ters ibraz senaryoları (100 elmas satın alındı)', () => {
+    const granted = { purchaseToken: token, orderId: 'GPA.1', userId, productId: 'gems_100', kind: 'gems', gems: 100,
+      status: 'granted', test: false, createdAt: new Date('2026-11-27T11:32:00Z') };
+    for (const [balance, removed, debt] of [[100, 100, 0], [70, 70, 30], [0, 0, 100]] as const) {
+      it(`bakiye ${balance}: ${removed} düşülür, ${debt} borç kalır`, async () => {
+        const config = playBillingConfig(env)!;
+        const { prisma, user, rows, notifications } = fakePrisma({ existing: { ...granted } });
+        user.gems = balance;
+        expect(await revokePlayPurchase(prisma, token, { reason: 'chargeback', source: 'rtdn', config })).toBe(true);
+        expect(user.gems).toBe(balance - 100);
+        expect(rows.get(token)).toMatchObject({ status: 'voided', voidReason: 'chargeback', gemsClawedBack: removed, gemsDebt: debt });
+        const note = notifications.get('play_void_GPA.1');
+        expect(note.title).toBe('Ödeme itirazı: satın alma geri alındı');
+        expect(note.sub).toContain(`Bakiyenden ${removed} elmas düşüldü`);
+        if (debt) expect(note.sub).toContain(`${debt} elmas borç olarak kaldı`);
+        if (debt) expect(note.sub).toContain('Borç kapanana kadar yeni Google Play satın alması yapılamaz');
+      });
+    }
+
+    it('borç varken ve tekrarlanan ters ibrazda yeni satın almayı reddeder', async () => {
+      const config = playBillingConfig(env)!;
+      const voided = { ...granted, status: 'voided', voidReason: 'chargeback' };
+      const debtor = fakePrisma({ existing: voided });
+      debtor.user.gems = -30;
+      const other = 'tok.' + 'b'.repeat(60);
+      await expect(verifyPlayPurchase(debtor.prisma, config, userId, 'gems_100', other, fakeFetch(paid({ orderId: 'GPA.2' })) as any))
+        .rejects.toThrow(/borcun kapanana kadar/);
+      expect(debtor.user.gems).toBe(-30);
+      // Borç kapandıysa tek ters ibraz satın almayı engellemez.
+      debtor.user.gems = 5;
+      expect((await verifyPlayPurchase(debtor.prisma, config, userId, 'gems_100', other, fakeFetch(paid({ orderId: 'GPA.2' })) as any)).status).toBe('granted');
+      debtor.rows.get(other).status = 'voided';
+      debtor.rows.get(other).voidReason = 'fraud';
+      const third = 'tok.' + 'c'.repeat(60);
+      await expect(verifyPlayPurchase(debtor.prisma, config, userId, 'gems_100', third, fakeFetch(paid({ orderId: 'GPA.3' })) as any))
+        .rejects.toThrow(/Tekrarlanan ödeme itirazları/);
+    });
+
+    it('normal iade (remorse) hesabı kilitlemez; test ters ibrazları varsayılan olarak sayılmaz', async () => {
+      const config = playBillingConfig({ ...env, PLAY_BILLING_ALLOW_TEST_PURCHASES: 'true' })!;
+      const refund = fakePrisma({ existing: { ...granted, status: 'voided', voidReason: 'remorse' } });
+      refund.user.gems = -100;
+      const other = 'tok.' + 'd'.repeat(60);
+      expect((await verifyPlayPurchase(refund.prisma, config, userId, 'gems_100', other, fakeFetch(paid({ orderId: 'GPA.4' })) as any)).status).toBe('granted');
+      const tester = fakePrisma({ existing: { ...granted, test: true, status: 'voided', voidReason: 'chargeback' } });
+      tester.user.gems = -100;
+      expect((await verifyPlayPurchase(tester.prisma, config, userId, 'gems_100', other, fakeFetch(paid({ orderId: 'GPA.5', purchaseType: 0 })) as any)).status).toBe('granted');
+      const strict = playBillingConfig({ ...env, PLAY_BILLING_ALLOW_TEST_PURCHASES: 'true', PLAY_CHARGEBACK_COUNT_TESTS: 'true' })!;
+      const tester2 = fakePrisma({ existing: { ...granted, test: true, status: 'voided', voidReason: 'chargeback' } });
+      tester2.user.gems = -100;
+      await expect(verifyPlayPurchase(tester2.prisma, strict, userId, 'gems_100', other, fakeFetch(paid({ orderId: 'GPA.6', purchaseType: 0 })) as any))
+        .rejects.toBeInstanceOf(PlayPurchaseRejected);
+    });
+  });
+
+  describe('RTDN', () => {
+    const encode = (payload: unknown) => ({ message: { data: Buffer.from(JSON.stringify(payload)).toString('base64') } });
+    const granted = { purchaseToken: token, orderId: 'GPA.9', userId, productId: 'gems_100', kind: 'gems', gems: 100,
+      status: 'granted', test: true, createdAt: new Date('2026-11-27T11:32:00Z'), purchaseIp: '203.0.113.9' };
+
+    it('parses Pub/Sub push bodies', () => {
+      expect(parseRtdnBody(encode({ packageName: 'com.tavriko.app' }))).toEqual({ packageName: 'com.tavriko.app' });
+      expect(parseRtdnBody({ message: { data: '%%%' } })).toBeNull();
+      expect(parseRtdnBody(null)).toBeNull();
+    });
+
+    it('ignores other packages and test notifications', async () => {
+      const config = playBillingConfig(env)!;
+      const { prisma } = fakePrisma();
+      expect(await handlePlayRtdn(prisma, config, { packageName: 'com.other' })).toBe('ignored');
+      expect(await handlePlayRtdn(prisma, config, { packageName: 'com.tavriko.app', testNotification: {} })).toBe('test');
+    });
+
+    it('answers a chargeback review once with consumption evidence, then claws back on void', async () => {
+      const config = playBillingConfig(env)!;
+      const { prisma, user, rows, notifications } = fakePrisma({ existing: { ...granted } });
+      user.gems = 70; // 30 elmas harcandı
+      const bodies: any[] = [];
+      const request = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (String(url).startsWith('https://oauth2')) return jsonResponse({ access_token: 'ya29.test', expires_in: 3600 });
+        if (String(url).endsWith(':reviewrefund')) bodies.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+        return new Response(null, { status: 200 });
+      });
+      const review = { packageName: 'com.tavriko.app', pendingRefundReviewNotification: { pendingRefundToken: 'prt-1', orderId: 'GPA.9', refundReason: 7 } };
+      expect(await handlePlayRtdn(prisma, config, review, request as any)).toBe('review_sent');
+      expect(bodies).toHaveLength(1);
+      expect(bodies[0].url).toBe('https://androidpublisher.googleapis.com/androidpublisher/v3/applications/com.tavriko.app/orders/GPA.9:reviewrefund');
+      expect(bodies[0].body).toMatchObject({
+        pendingRefundToken: 'prt-1', sampleContentProvided: true, refundPreference: 'DECLINE', consumptionPercentageMilliunits: 30_000,
+      });
+      expect(bodies[0].body.consumptionUsageEvents[0]).toMatchObject({ obfuscatedAccountId: playAccountId(userId), ipAddress: '203.0.113.9' });
+      expect(await handlePlayRtdn(prisma, config, review, request as any)).toBe('review_duplicate');
+      expect(bodies).toHaveLength(1);
+
+      const voided = { packageName: 'com.tavriko.app', voidedPurchaseNotification: { purchaseToken: token, orderId: 'GPA.9', productType: 2, refundType: 1 } };
+      expect(await handlePlayRtdn(prisma, config, voided, request as any)).toBe('voided');
+      expect(user.gems).toBe(-30);
+      expect(rows.get(token)).toMatchObject({ voidReason: 'chargeback', voidSource: 'rtdn', gemsClawedBack: 70, gemsDebt: 30 });
+      expect(notifications.get('play_void_GPA.9').sub).toContain('30 elmas borç olarak kaldı');
+      expect(await handlePlayRtdn(prisma, config, voided, request as any)).toBe('voided_unknown');
+      expect(user.gems).toBe(-30);
+    });
+
+    it('stays neutral when nothing was used and retries on Google 5xx', async () => {
+      const config = playBillingConfig(env)!;
+      const { prisma, user } = fakePrisma({ existing: { ...granted } });
+      user.gems = 100;
+      let body: any;
+      const ok = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+        if (String(url).startsWith('https://oauth2')) return jsonResponse({ access_token: 'ya29.test', expires_in: 3600 });
+        body = JSON.parse(String(init?.body));
+        return new Response(null, { status: 200 });
+      });
+      const review = { packageName: 'com.tavriko.app', pendingRefundReviewNotification: { pendingRefundToken: 'prt-2', orderId: 'GPA.9' } };
+      expect(await handlePlayRtdn(prisma, config, review, ok as any)).toBe('review_sent');
+      expect(body).toMatchObject({ refundPreference: 'NEUTRAL', consumptionPercentageMilliunits: 0 });
+
+      const fresh = fakePrisma({ existing: { ...granted } });
+      const failing = vi.fn(async (url: string | URL | Request) => String(url).startsWith('https://oauth2')
+        ? jsonResponse({ access_token: 'ya29.test', expires_in: 3600 }) : new Response('{}', { status: 503 }));
+      await expect(handlePlayRtdn(fresh.prisma, config, { ...review, pendingRefundReviewNotification: { pendingRefundToken: 'prt-3', orderId: 'GPA.9' } }, failing as any))
+        .rejects.toThrow();
+    });
   });
 });

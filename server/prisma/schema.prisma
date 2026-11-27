@@ -166,9 +166,24 @@ model PlayPurchase {
   createdAt DateTime @default(now())
   consumedAt DateTime?
   voidedAt DateTime?
+  /// Doğrulama isteğinin IP adresi (ters ibraz kanıtı için).
+  purchaseIp String?
+  /// chargeback | fraud | friendly_fraud | remorse | ... | unknown
+  voidReason String?
+  /// rtdn | voided_api | admin
+  voidSource String?
+  gemsClawedBack Int @default(0)
+  gemsDebt Int @default(0)
+  balanceAfterVoid Int?
+  /// Ters ibraz incelemesi (PendingRefundReviewNotification) bilgileri.
+  disputeToken String?
+  disputeAt DateTime?
+  disputePreference String?
+  disputeReviewedAt DateTime?
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, kind, status])
+  @@index([userId, status, voidReason])
   @@map("play_purchases")
 }
 

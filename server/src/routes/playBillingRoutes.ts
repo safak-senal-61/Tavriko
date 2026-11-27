@@ -3,8 +3,11 @@ import { rateLimit } from 'express-rate-limit';
 import { db } from '../db/prismaClient';
 import { requireUserAuth } from '../middleware/auth';
 import { walletRateLimitOptions } from '../middleware/walletRateLimit';
+import { timingSafeEqual } from 'node:crypto';
+import { queuePushForNotification } from '../services/pushService';
+import { clientIpAddress } from '../services/polarClient';
 import {
-  playAccountId, playBillingConfig, playSchemaReady, PlayPurchaseRejected, syncVoidedPlayPurchases, verifyPlayPurchase,
+  handlePlayRtdn, parseRtdnBody, playAccountId, playBillingConfig, playSchemaReady, PlayPurchaseRejected, syncVoidedPlayPurchases, verifyPlayPurchase,
 } from '../services/googlePlayBilling';
 
 const availabilityLimit = rateLimit({ ...walletRateLimitOptions, limit: 120 });
@@ -41,7 +44,9 @@ playBillingPlayerRoutes.post('/shop/play/verify', verifyLimit, requireUserAuth, 
     res.status(400).json({ error: 'Geçersiz satın alma.' }); return;
   }
   try {
-    const result = await verifyPlayPurchase(db.rawClient, config, userId, productId, purchaseToken);
+    const result = await verifyPlayPurchase(db.rawClient, config, userId, productId, purchaseToken, fetch, {
+      ip: clientIpAddress(req), notify: undefined,
+    });
     res.status(result.status === 'pending' ? 202 : 200).json(result);
   } catch (error) {
     if (error instanceof PlayPurchaseRejected) { res.status(409).json({ error: error.message }); return; }
@@ -57,8 +62,37 @@ export async function handlePlayVoidedCron(req: any, res: any) {
   const config = playBillingConfig();
   if (!config || !await playSchemaReady(db.rawClient)) { res.json({ success: true, skipped: true }); return; }
   try {
-    res.json({ success: true, ...await syncVoidedPlayPurchases(db.rawClient, config) });
+    res.json({ success: true, ...await syncVoidedPlayPurchases(db.rawClient, config, fetch, Date.now(), queuePushForNotification) });
   } catch {
     res.status(502).json({ success: false });
+  }
+}
+
+function sameSecret(given: unknown, expected: string) {
+  if (typeof given !== 'string' || !expected) return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/**
+ * Google Play gerçek zamanlı geliştirici bildirimleri (Cloud Pub/Sub push).
+ * Push URL'si: /api/webhooks/google-play?token=<PLAY_RTDN_TOKEN>
+ * 2xx = mesaj işlendi (veya bizi ilgilendirmiyor); 5xx = Pub/Sub yeniden dener.
+ */
+export async function handlePlayRtdnWebhook(req: any, res: any) {
+  res.set('Cache-Control', 'no-store');
+  const config = playBillingConfig();
+  if (!config || !config.rtdnToken || !sameSecret(req.query?.token, config.rtdnToken)) {
+    res.status(401).json({ success: false }); return;
+  }
+  const notification = parseRtdnBody(req.body);
+  if (!notification) { res.status(204).end(); return; }
+  if (!await playSchemaReady(db.rawClient)) { res.status(503).json({ success: false }); return; }
+  try {
+    const outcome = await handlePlayRtdn(db.rawClient, config, notification, fetch, queuePushForNotification);
+    res.json({ success: true, outcome });
+  } catch {
+    res.status(500).json({ success: false });
   }
 }
