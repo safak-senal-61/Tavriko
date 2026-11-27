@@ -24,6 +24,10 @@ exports.SOCKET_EVENTS = {
     GAME_OVER: 'game:game_over',
     PLAYER_DISCONNECTED: 'game:player_disconnected',
     PLAYER_RECONNECTED: 'game:player_reconnected',
+    /** 1v1: rakip maçtan çıktı (başlamadan önce ise maç iptal edilir). */
+    OPPONENT_LEFT: 'game:opponent_left',
+    /** 1v1: maçtan erken çıkan oyuncuya uygulanan altın cezası. */
+    QUIT_PENALTY: 'game:quit_penalty',
     // Gameplay Flow (Client -> Server)
     SUBMIT_ANSWER: 'game:submit_answer',
     USE_JOKER: 'game:use_joker',

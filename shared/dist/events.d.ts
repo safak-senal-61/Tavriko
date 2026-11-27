@@ -18,6 +18,10 @@ export declare const SOCKET_EVENTS: {
     readonly GAME_OVER: "game:game_over";
     readonly PLAYER_DISCONNECTED: "game:player_disconnected";
     readonly PLAYER_RECONNECTED: "game:player_reconnected";
+    /** 1v1: rakip maçtan çıktı (başlamadan önce ise maç iptal edilir). */
+    readonly OPPONENT_LEFT: "game:opponent_left";
+    /** 1v1: maçtan erken çıkan oyuncuya uygulanan altın cezası. */
+    readonly QUIT_PENALTY: "game:quit_penalty";
     readonly SUBMIT_ANSWER: "game:submit_answer";
     readonly USE_JOKER: "game:use_joker";
     readonly JOKER_RESULT: "game:joker_result";

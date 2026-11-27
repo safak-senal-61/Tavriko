@@ -38,6 +38,8 @@ import { renderAdminLoginHtml, sanitizeNextPath } from './routes/adminLoginPage'
 import { adminPageHeaders, adminPages, adminSessionScript, adminTheme, dashboardPages, renderAdminHeader, renderAdminHero } from './routes/adminShell';
 import { legalRouter } from './routes/legalRoutes';
 import { makeOpsTelemetry } from './services/opsTelemetry';
+import { applyDuelQuitPenalty } from './services/duelQuitPenalty';
+import { SENSITIVE_KEYS, redactUrlForLog } from './utils/redactUrl';
 import { createOpsRouter } from './routes/opsRoutes';
 import { createAdminAccountsRouter } from './routes/adminAccountsRoutes';
 import { createSupportRouter } from './routes/supportRoutes';
@@ -61,8 +63,6 @@ function getLocalIpAddress(): string {
   }
   return 'tavriko-app.vercel.app';
 }
-
-const SENSITIVE_KEYS = /pass|token|secret|authorization|otp|code|cookie/i;
 
 // SECURITY: redact sensitive fields (passwords, tokens, OTP codes) before writing
 // request payloads to logs. Logs are readable from the admin portal and must never
@@ -185,7 +185,7 @@ export function createApp() {
       logger.log(
         cat,
         lvl,
-        `${req.method} ${omitRequestDetails ? requestPath : req.originalUrl} -> ${res.statusCode} (${duration}ms)`,
+        `${req.method} ${omitRequestDetails ? requestPath : redactUrlForLog(req.originalUrl)} -> ${res.statusCode} (${duration}ms)`,
         {
           ip: req.ip,
           query: !omitRequestDetails && Object.keys(req.query).length ? redactSensitiveBody(req.query) : undefined,
@@ -3861,6 +3861,25 @@ export function createApp() {
       await captureError(err);
       logger.error('SOCKET', `Maç sonucu kaydetme hatası: ${err.message}`, err);
       return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/internal/duel-quit-penalty', async (req, res) => {
+    const secret = process.env.INTERNAL_API_SECRET;
+    const supplied = req.get('x-internal-secret');
+    if (!secret || !supplied || !safeEqualStrings(secret, supplied)) {
+      return res.status(403).json({ error: 'Yetkisiz erişim' });
+    }
+    try {
+      const result = await applyDuelQuitPenalty(db.rawClient, req.body?.playerId, req.body?.matchId);
+      if (result.applied) {
+        logger.info('SOCKET', 'Erken çıkış cezası uygulandı', { roomCode: req.body?.roomCode, amount: result.amount });
+      }
+      return res.set('Cache-Control', 'no-store').json(result);
+    } catch (err: any) {
+      await captureError(err);
+      logger.error('SOCKET', `Erken çıkış cezası uygulanamadı: ${err?.message}`);
+      return res.status(500).json({ applied: false, amount: 0 });
     }
   });
 

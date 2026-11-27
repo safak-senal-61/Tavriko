@@ -620,7 +620,12 @@ export class SocketService {
 
   public leaveRoom(roomCode: string, playerId: string): void {
     const cleanCode = roomCode.trim().toUpperCase();
-    this.sendEnvelope(SOCKET_EVENTS.LEAVE_ROOM, { roomCode: cleanCode, playerId });
+    const socket = this.ws;
+    if (socket && this.currentUrl.includes(`/ws/room/${cleanCode}?`)) {
+      this.detachLeavingRoomSocket(socket, cleanCode, playerId);
+    } else {
+      this.sendEnvelope(SOCKET_EVENTS.LEAVE_ROOM, { roomCode: cleanCode, playerId });
+    }
     this.sendPresenceEnvelope('presence:update', {
       userId: playerId,
       online: true,
@@ -631,6 +636,59 @@ export class SocketService {
       delete this.lastSessionContext.roomCode;
       this.cancelRoomJokers();
     }
+  }
+
+  /**
+   * Odadan çıkarken oda soketini servisten ayırır: çıkış mesajı (soket henüz
+   * açılıyorsa açılınca) gönderilir, sunucunun olası ceza bildirimi beklenir ve
+   * soket kapatılır. Önceden sunucu soketi kapattığında istemci aynı oda
+   * adresine otomatik yeniden bağlanıyor ve oyuncu rakibin ekranında kalıyordu.
+   */
+  private detachLeavingRoomSocket(socket: WebSocket, roomCode: string, playerId: string): void {
+    this.stopPingInterval();
+    clearTimeout(this.reconnectTimer);
+    this.cancelRoomJokers();
+    this.roomQuestion = undefined;
+    this.ws = null;
+    this.currentUrl = '';
+    this.reconnectAttempts = 0;
+
+    const envelope: WsMessageEnvelope = {
+      event: SOCKET_EVENTS.LEAVE_ROOM,
+      requestId: `req_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      payload: { roomCode, playerId },
+      timestamp: Date.now(),
+    };
+    const message = JSON.stringify(envelope);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try { socket.close(1000, 'Left room'); } catch {}
+    };
+    // Sunucu ceza kaydını en fazla birkaç saniyede yanıtlar; sonra soket her durumda kapanır.
+    const timer = setTimeout(finish, 9000);
+    socket.onmessage = (event: MessageEvent) => {
+      try {
+        const parsed = JSON.parse(typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data));
+        if (parsed?.event === SOCKET_EVENTS.QUIT_PENALTY) {
+          this.emitLocal(SOCKET_EVENTS.QUIT_PENALTY, parsed.payload);
+          finish();
+        }
+      } catch {}
+    };
+    socket.onerror = () => {};
+    socket.onclose = () => {
+      done = true;
+      clearTimeout(timer);
+    };
+    const send = () => {
+      try { socket.send(message); } catch { finish(); }
+    };
+    if (socket.readyState === WebSocket.OPEN) send();
+    else if (socket.readyState === WebSocket.CONNECTING) socket.onopen = send;
+    else finish();
   }
 
   public toggleReady(roomCode: string, playerId: string): void {

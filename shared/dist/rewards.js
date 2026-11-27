@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.REWARDED_AD_COOLDOWN_SEC = exports.REWARDED_AD_DAILY_LIMIT = exports.REWARDED_AD_COINS = exports.LP_MIN_WIN_GAIN = exports.LP_WRONG_ANSWER_PENALTY = exports.LP_LOSS = exports.LP_PER_CORRECT_ON_WIN = exports.LP_WIN_BASE = exports.LEAGUE_START_POINTS = exports.MAX_MATCH_XP_SOLO = exports.MAX_MATCH_XP_MULTIPLAYER = exports.DIFFICULTY_XP_LABEL = exports.DIFFICULTY_XP_MULTIPLIER = void 0;
+exports.DUEL_QUIT_PENALTY_COINS = exports.REWARDED_AD_COOLDOWN_SEC = exports.REWARDED_AD_DAILY_LIMIT = exports.REWARDED_AD_COINS = exports.LP_MIN_WIN_GAIN = exports.LP_WRONG_ANSWER_PENALTY = exports.LP_LOSS = exports.LP_PER_CORRECT_ON_WIN = exports.LP_WIN_BASE = exports.LEAGUE_START_POINTS = exports.MAX_MATCH_XP_SOLO = exports.MAX_MATCH_XP_MULTIPLAYER = exports.DIFFICULTY_XP_LABEL = exports.DIFFICULTY_XP_MULTIPLIER = void 0;
 exports.calculateMatchRewards = calculateMatchRewards;
 exports.calculateLeagueChange = calculateLeagueChange;
 exports.applyLeagueChange = applyLeagueChange;
@@ -111,3 +111,5 @@ function getRewardedAdStatus(state, now = Date.now()) {
         cooldownSec,
     };
 }
+/** Hızlı eşleşme / düello maçını bitmeden terk eden oyuncudan düşülen altın. */
+exports.DUEL_QUIT_PENALTY_COINS = 10;

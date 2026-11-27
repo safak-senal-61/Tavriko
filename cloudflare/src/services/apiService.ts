@@ -116,6 +116,30 @@ export class ApiService {
     }
   }
 
+  /** Bitmemiş 1v1 maçı terk eden oyuncudan altın düşer; sunucu maç başına bir kez uygular. */
+  public async applyQuitPenalty(roomCode: string, matchId: string, playerId: string): Promise<{ applied: boolean; amount: number; balance?: number } | null> {
+    if (!this.internalSecret) return null;
+    const cleanUrl = (this.backendUrl || 'https://tavriko-app.vercel.app').replace(/\/+$/, '');
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await fetch(`${cleanUrl}/api/internal/duel-quit-penalty`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-internal-secret': this.internalSecret },
+          body: JSON.stringify({ roomCode, matchId, playerId }),
+          signal: AbortSignal.timeout(3500),
+        });
+        if (response.ok) {
+          const data = await response.json<any>();
+          return { applied: data?.applied === true, amount: Number(data?.amount) || 0,
+            ...(typeof data?.balance === 'number' ? { balance: data.balance } : {}) };
+        }
+        if (response.status < 500) return null;
+      } catch { /* Retry once; the backend applies the penalty at most once per match. */ }
+    }
+    console.warn('[ApiService] Quit penalty delivery failed.');
+    return null;
+  }
+
   public async reportDuelMatch(room: string, ids: string[], matchedAt: number): Promise<void> {
     if (!this.internalSecret || !ids.length) return;
     const cleanUrl = (this.backendUrl || 'https://tavriko-app.vercel.app').replace(/\/+$/, '');
