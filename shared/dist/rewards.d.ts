@@ -80,3 +80,5 @@ export interface RewardedAdStatus {
     cooldownSec: number;
 }
 export declare function getRewardedAdStatus(state: Partial<RewardedAdState> | null | undefined, now?: number): RewardedAdStatus;
+/** Hızlı eşleşme / düello maçını bitmeden terk eden oyuncudan düşülen altın. */
+export declare const DUEL_QUIT_PENALTY_COINS = 10;

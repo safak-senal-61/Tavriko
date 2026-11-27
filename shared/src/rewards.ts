@@ -166,3 +166,6 @@ export function getRewardedAdStatus(state: Partial<RewardedAdState> | null | und
     cooldownSec,
   };
 }
+
+/** Hızlı eşleşme / düello maçını bitmeden terk eden oyuncudan düşülen altın. */
+export const DUEL_QUIT_PENALTY_COINS = 10;

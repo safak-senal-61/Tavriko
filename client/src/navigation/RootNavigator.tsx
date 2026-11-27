@@ -49,6 +49,7 @@ import {
   LOW_GEMS,
   LOW_COINS,
   ShopProductCategory,
+  SOCKET_EVENTS,
 } from '@trivia/shared';
 // Screens
 import { SplashScreen } from '../screens/SplashScreen';
@@ -196,7 +197,7 @@ export const RootNavigator: React.FC = () => {
   const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>('medium');
   const [errorMessage, setErrorMessage] = useState<string>('');
   /** Alt kategoride soru yok uyarısı: window.alert yerine marka dilinde modal */
-  const [gameAlert, setGameAlert] = useState<{ message: string; title?: string } | null>(null);
+  const [gameAlert, setGameAlert] = useState<{ message: string; title?: string; variant?: 'error' | 'info' } | null>(null);
   // Guest redirect banner
   const [authRedirectNotice, setAuthRedirectNotice] = useState<string | null>(null);
   // Screen transition animation
@@ -962,6 +963,43 @@ export const RootNavigator: React.FC = () => {
       }
     );
 
+    // 1v1: rakip çarpıya bastı. Sorular başlamadan çıktıysa maç iptal edilir ve
+    // ana sayfaya dönülür; maç sürerken çıktıysa sonuç ekranı normal gelir.
+    const unsubOpponentLeft = socketService.on(SOCKET_EVENTS.OPPONENT_LEFT, (data: any) => {
+      const room = activeRoomRef.current;
+      if (!user || !room || !data || data.roomCode !== room.code || data.playerId === user.id) return;
+      const name = typeof data.displayName === 'string' && data.displayName.trim() ? data.displayName.trim() : 'Rakibin';
+      sound.triggerHaptic('warning');
+      if (data.phase === 'before_start') {
+        handleExitCurrentGame();
+        setGameAlert({
+          title: 'Rakip oyundan çıktı',
+          message: data.reason === 'no_show'
+            ? `${name} maça bağlanamadı. Maç iptal edildi, yeni bir eşleşme arayabilirsin.`
+            : `${name} maç başlamadan oyundan çıktı. Maç iptal edildi, yeni bir eşleşme arayabilirsin.`,
+          variant: 'info',
+        });
+      } else {
+        setGameAlert({
+          title: 'Rakip oyundan çıktı',
+          message: `${name} maçtan ayrıldı. Maç senin lehine sonuçlandı.`,
+          variant: 'info',
+        });
+      }
+    });
+    // Bitmemiş 1v1 maçtan çıkan oyuncuya uygulanan altın cezası (sunucu onaylı).
+    const unsubQuitPenalty = socketService.on(SOCKET_EVENTS.QUIT_PENALTY, (data: any) => {
+      const amount = Math.max(0, Math.round(Number(data?.amount) || 0));
+      setGameAlert({
+        title: 'Erken çıkış cezası',
+        message: amount > 0
+          ? `Maçı bitirmeden çıktığın için ${amount} altın ceza aldın.`
+          : 'Maçı bitirmeden çıktın. Bakiyende altın olmadığı için kesinti yapılmadı.',
+        variant: 'error',
+      });
+      void refreshUserProfile(true);
+    });
+
     const unsubNotif = socketService.on('notification:new', (notif: any) => {
       const inbox = useNotificationStore.getState();
       // Gönderen, kendi gönderdiği isteğin bildirimini asla görmemeli
@@ -998,6 +1036,8 @@ export const RootNavigator: React.FC = () => {
       unsubGameOver();
       unsubMatchFound();
       unsubPlayerAnswered();
+      unsubOpponentLeft();
+      unsubQuitPenalty();
       unsubNotif();
       unsubNotifUpdate();
       unsubFriendsSync();
@@ -2570,7 +2610,7 @@ export const RootNavigator: React.FC = () => {
         visible={gameAlert !== null}
         title={gameAlert?.title}
         message={gameAlert?.message || ''}
-        variant="error"
+        variant={gameAlert?.variant ?? 'error'}
         onConfirm={() => setGameAlert(null)}
       />
 

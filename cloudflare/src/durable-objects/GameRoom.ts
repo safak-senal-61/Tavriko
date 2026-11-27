@@ -50,7 +50,10 @@ interface SavedRoomJoker {
   roundNumber: number;
   effect: JokerEffect;
 }
-type AlarmType = 'countdown' | 'round_end' | 'intermission';
+type AlarmType = 'countdown' | 'round_end' | 'intermission' | 'join_timeout';
+
+/** Eşleşen 1v1 oyuncuların odaya bağlanması için tanınan süre. */
+const DUEL_JOIN_TIMEOUT_MS = 10_000;
 
 interface AlarmContext {
   type: AlarmType;
@@ -68,6 +71,8 @@ export class GameRoomDO extends DurableObject<Env> {
   private access: PlayerAccessGate;
   private verifiedPlayers = new Set<string>();
   private funnelMatchId: string | null = null;
+  /** create-match ile başlayan her 1v1 maçın tekil kimliği (erken çıkış cezası için). */
+  private matchId: string | null = null;
   private rateLimiters = new WeakMap<WebSocket, RateLimiter>();
   private pendingJokers = new Set<string>();
 
@@ -84,6 +89,7 @@ export class GameRoomDO extends DurableObject<Env> {
       const storedPrivacy = await this.ctx.storage.get<boolean>('isPrivateRoom');
       this.verifiedPlayers = new Set(await this.ctx.storage.get<string[]>('verifiedPlayers') ?? []);
       this.funnelMatchId = await this.ctx.storage.get<string>('funnelMatchId') ?? null;
+      this.matchId = await this.ctx.storage.get<string>('matchId') ?? null;
 
       if (storedRoom) {
         this.room = storedRoom;
@@ -169,6 +175,8 @@ export class GameRoomDO extends DurableObject<Env> {
       this.funnelMatchId = typeof data.funnelMatchId === 'string' ? data.funnelMatchId : null;
       if (this.funnelMatchId) await this.ctx.storage.put('funnelMatchId', this.funnelMatchId);
       else await this.ctx.storage.delete('funnelMatchId');
+      this.matchId = crypto.randomUUID();
+      await this.ctx.storage.put('matchId', this.matchId);
       const roomCode = sanitizeRoomCode(data.roomCode || url.searchParams.get('roomCode') || '');
       this.room = {
         code: roomCode,
@@ -210,7 +218,10 @@ export class GameRoomDO extends DurableObject<Env> {
             currentStreak: 0,
             isReady: true,
             isHost: p.id === data.players[0].id,
-            isConnected: !p.isBot,
+            // Gerçek oyuncu, odaya WebSocket ile bağlandığında bağlı sayılır. Önceden
+            // burada true yazıldığı için hiç bağlanmayan (ör. eşleşirken çarpıya
+            // basan) rakip odada "hayalet" olarak kalıyor ve maç onunla başlıyordu.
+            isConnected: false,
             hasAnsweredCurrentRound: false,
             totalResponseTimeMs: 0,
             correctAnswersCount: 0,
@@ -230,6 +241,7 @@ export class GameRoomDO extends DurableObject<Env> {
       this.room.totalRounds = Math.min(planned, this.questions.length);
       await this.persist();
       await this.ctx.storage.put('questions', this.questions);
+      if (this.isDuelRoom()) await this.scheduleAlarm('join_timeout', DUEL_JOIN_TIMEOUT_MS);
       return new Response(JSON.stringify({ success: true, room: this.getSanitizedRoom() }), {
         headers: { 'Content-Type': 'application/json' },
       });
@@ -551,6 +563,14 @@ export class GameRoomDO extends DurableObject<Env> {
         return;
       }
 
+      if (this.room.status === 'lobby' && this.isDuelRoom()) {
+        // 1v1 maç başlamadan oyuncu koptu: rakibi bekletme, maçı iptal et.
+        delete this.room.players[playerId];
+        delete this.room.scores[playerId];
+        await this.cancelDuelBeforeStart([player], 'left', playerId);
+        return;
+      }
+
       if (this.room.status === 'lobby') {
         // In lobby, remove disconnected player immediately so player count stays accurate
         delete this.room.players[playerId];
@@ -634,6 +654,21 @@ export class GameRoomDO extends DurableObject<Env> {
         }
         break;
 
+      case 'join_timeout': {
+        if (this.room.status !== 'lobby' || !this.isDuelRoom()) break;
+        const missing = Object.values(this.room.players).filter((p) => !p.isBot && !p.isConnected);
+        if (missing.length === 0) {
+          await this.autoStartDuel();
+          break;
+        }
+        for (const p of missing) {
+          delete this.room.players[p.id];
+          delete this.room.scores[p.id];
+        }
+        await this.cancelDuelBeforeStart(missing, 'no_show');
+        break;
+      }
+
     }
   }
 
@@ -665,6 +700,10 @@ export class GameRoomDO extends DurableObject<Env> {
     if (!this.room) return;
 
     const player = this.room.players[playerId];
+    if (player && this.isDuelRoom()) {
+      await this.handleDuelLeave(ws, player);
+      return;
+    }
     if (player) {
       delete this.room.players[playerId];
       delete this.room.scores[playerId];
@@ -703,6 +742,91 @@ export class GameRoomDO extends DurableObject<Env> {
 
     try {
       ws.close(1000, 'Left room');
+    } catch {}
+  }
+
+  private isDuelRoom(): boolean {
+    return this.room?.mode === 'duel' || this.room?.mode === 'quick_match';
+  }
+
+  /**
+   * 1v1 maçta oyuncu çarpıya bastı. Rakibe anında bildirilir: sorular başlamadan
+   * çıkıldıysa maç iptal edilir, maç sürerken çıkıldıysa kalan oyuncu kazanır.
+   * Bitmemiş maçı terk eden kayıtlı oyuncuya altın cezası uygulanır.
+   */
+  private async handleDuelLeave(ws: WebSocket, player: Player): Promise<void> {
+    if (!this.room) return;
+    const statusBefore = this.room.status;
+    delete this.room.players[player.id];
+    delete this.room.scores[player.id];
+
+    if (statusBefore !== 'game_over') {
+      this.broadcast(SOCKET_EVENTS.PLAYER_DISCONNECTED, {
+        playerId: player.id,
+        username: player.username,
+        isLeaving: true,
+      }, player.id);
+
+      if (statusBefore === 'lobby' || statusBefore === 'countdown') {
+        await this.cancelDuelBeforeStart([player], 'left', player.id);
+      } else {
+        this.broadcast(SOCKET_EVENTS.OPPONENT_LEFT, {
+          roomCode: this.room.code,
+          playerId: player.id,
+          displayName: player.displayName || player.username,
+          phase: 'in_game',
+          reason: 'left',
+        }, player.id);
+        const remaining = Object.values(this.room.players);
+        if (remaining.filter((p) => p.isConnected).length === 0) {
+          this.room.status = 'game_over';
+          await this.clearGameAlarms();
+          await this.persist();
+        } else if (remaining.length <= 1) {
+          await this.finishGame();
+        } else {
+          await this.persist();
+          this.broadcastStateSync();
+        }
+      }
+      if (!player.isBot && !isGuestIdentity(player.id)) await this.sendQuitPenalty(ws, player.id);
+    } else {
+      await this.persist();
+    }
+
+    try {
+      ws.close(1000, 'Left room');
+    } catch {}
+  }
+
+  /** Maç başlamadan bir oyuncu çıktı veya hiç bağlanmadı: kalanlara bildir, odayı kapat. */
+  private async cancelDuelBeforeStart(left: Player[], reason: 'left' | 'no_show', excludePlayerId?: string): Promise<void> {
+    if (!this.room) return;
+    this.room.status = 'game_over';
+    await this.clearGameAlarms();
+    await this.persist();
+    for (const p of left) {
+      this.broadcast(SOCKET_EVENTS.OPPONENT_LEFT, {
+        roomCode: this.room.code,
+        playerId: p.id,
+        displayName: p.displayName || p.username,
+        phase: 'before_start',
+        reason,
+      }, excludePlayerId);
+    }
+    this.broadcastStateSync();
+  }
+
+  private async sendQuitPenalty(ws: WebSocket, playerId: string): Promise<void> {
+    if (!this.room || !this.matchId) return;
+    const result = await this.apiService.applyQuitPenalty(this.room.code, this.matchId, playerId);
+    if (!result?.applied) return;
+    try {
+      ws.send(encodeWsMessage(SOCKET_EVENTS.QUIT_PENALTY, {
+        roomCode: this.room.code,
+        amount: result.amount,
+        ...(typeof result.balance === 'number' ? { balance: result.balance } : {}),
+      }));
     } catch {}
   }
 
@@ -1423,7 +1547,7 @@ export class GameRoomDO extends DurableObject<Env> {
     this.broadcast(SOCKET_EVENTS.ROOM_STATE_SYNC, { room: this.getSanitizedRoom() });
   }
 
-  private broadcast(event: string, payload: any): void {
+  private broadcast(event: string, payload: any, excludePlayerId?: string): void {
     const raw = encodeWsMessage(event, payload);
     const sockets = this.ctx.getWebSockets();
     const sentPlayerIds = new Set<string>();
@@ -1431,6 +1555,7 @@ export class GameRoomDO extends DurableObject<Env> {
     for (const ws of sockets) {
       try {
         const attachment = ws.deserializeAttachment() as WsAttachment | null;
+        if (excludePlayerId && attachment?.playerId === excludePlayerId) continue;
         if (attachment?.playerId) {
           if (sentPlayerIds.has(attachment.playerId)) {
             // Already sent to this player via another active socket; close duplicate

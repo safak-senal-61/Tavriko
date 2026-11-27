@@ -67,6 +67,11 @@ Implemented in [`cloudflare/src/durable-objects/GameRoom.ts`](file:///c:/Users/%
    - Schedules an `intermission` alarm (`ROUND_INTERMISSION_SEC = 3.5`s) before the next question or game end.
 5. **`finished`**:
    - `finishGame()` computes final standings (`calculateRankings`), constructs `FinalMatchSummary` (`podium`, `rankings`, `playedAt`), broadcasts `game:game_over`, and reports the match to `POST /api/matches/complete`.
-6. **Reconnection**:
+6. **1v1 leave & quit penalty** (`mode: 'duel' | 'quick_match'`):
+   - `create-match` pre-adds matched humans with `isConnected: false`; the countdown starts only after every human has opened the room socket. A `join_timeout` alarm (10 s) cancels the match if someone never connects (`game:opponent_left`, `reason: 'no_show'`, no penalty).
+   - `room:leave` in `lobby`/`countdown` cancels the match (`status: 'game_over'`, no match report) and sends `game:opponent_left` (`phase: 'before_start'`) to the other player. In `question_active`/`round_result` it sends `phase: 'in_game'` and finishes the match for the remaining player.
+   - Leaving an unfinished match calls `POST /api/internal/duel-quit-penalty`; the backend deducts `DUEL_QUIT_PENALTY_COINS` (10 altın, never below zero) once per `matchId` using a `gameplay_reward_claims` row `duel_quit:<matchId>`. The leaver receives `game:quit_penalty` (`{ amount, balance }`) before its socket closes. A socket drop (not an explicit leave) is never penalized.
+   - The client detaches the room socket on leave so it no longer auto-reconnects (and silently rejoins) the room it just left.
+7. **Reconnection**:
    - An active duel stores reconnect deadlines separately from the phase deadline, then sets the single Durable Object alarm to the earliest outstanding deadline. A disconnect never replaces the current round or intermission deadline.
    - A reconnecting player receives the room state and the current question with the server's remaining time, without restarting the countdown.
