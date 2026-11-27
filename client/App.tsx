@@ -8,7 +8,7 @@ import {
   Nunito_800ExtraBold,
   Nunito_900Black,
 } from '@expo-google-fonts/nunito';
-import { View, Platform } from 'react-native';
+import { AppState, View, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LoadingShimmer } from './src/components/LoadingShimmer';
 import { RootNavigator } from './src/navigation/RootNavigator';
@@ -16,6 +16,9 @@ import { hydrateAuthStorage, getStoredAuth } from './src/utils/authStorage';
 import { useGameStore } from './src/store/gameStore';
 import { initPushNotifications } from './src/services/pushNotifications';
 import { checkAndApplyOtaUpdate } from './src/services/otaUpdates';
+import { checkForPlayUpdate, initPlayUpdates, playUpdatesSupported } from './src/services/playUpdates';
+import { UpdateRequiredScreen } from './src/components/UpdateRequiredScreen';
+import { useNetStatus } from './src/store/netStatus';
 import { adsSupported, refreshAdsConsent } from './src/services/ads';
 import { hydrateAnalyticsConsent } from './src/services/analyticsConsent';
 
@@ -114,6 +117,22 @@ function AppInner() {
     void checkAndApplyOtaUpdate();
   }, []);
 
+  // Google Play uygulama içi güncelleme (mağaza sürümü): açılışta, ön plana
+  // dönüşte (en fazla 6 saatte bir) ve bağlantı geri gelince kontrol.
+  useEffect(() => {
+    if (!playUpdatesSupported) return;
+    initPlayUpdates();
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') void checkForPlayUpdate('foreground');
+    });
+    let wasOnline = useNetStatus.getState().online;
+    const unsubscribeNet = useNetStatus.subscribe(state => {
+      if (state.online && !wasOnline) void checkForPlayUpdate('online');
+      wasOnline = state.online;
+    });
+    return () => { sub.remove(); unsubscribeNet(); };
+  }, []);
+
   // Dokunma yönlendirmesi ve Android kanalları; burada izin istenmez.
   useEffect(() => {
     initPushNotifications();
@@ -150,6 +169,7 @@ function AppInner() {
   return (
     <SafeAreaProvider>
       <RootNavigator />
+      {playUpdatesSupported && <UpdateRequiredScreen />}
     </SafeAreaProvider>
   );
 }

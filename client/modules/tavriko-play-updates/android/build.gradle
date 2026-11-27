@@ -1,0 +1,24 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'expo.modules.tavrikoplayupdates'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.tavrikoplayupdates"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+  lint {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // Google'ın resmi Play Core In-App Updates kütüphanesi (en güncel sürüm).
+  implementation 'com.google.android.play:app-update:2.1.0'
+  implementation 'com.google.android.play:app-update-ktx:2.1.0'
+}
